@@ -301,6 +301,50 @@ export function createInventoryStore({ services } = {}) {
   }
 
   /**
+   * Whether the player's order actually DIFFERS from the GM's authored one.
+   *
+   * Derived from the RENDERED order rather than from `progressiveOrders[key]` merely
+   * being present: a stored order can name the authored sequence exactly (drag a row
+   * away and back, or a GM re-authoring the list into the order the player had already
+   * chosen), and offering to reset an order that is already the GM's is a control that
+   * does nothing when pressed.
+   */
+  const salvageOrderIsCustom = $derived.by(() => {
+    const stages = Array.isArray(selectedItem?.salvage?.stages) ? selectedItem.salvage.stages : [];
+    if (stages.length === 0) return false;
+    const ordered = orderedSalvageStages;
+    return ordered.length === stages.length && ordered.some((stage, i) => stage.id !== stages[i].id);
+  });
+
+  /**
+   * Drop the player's order for the selected salvage, restoring the GM's authored one.
+   *
+   * Persists `[]`, NOT the authored id list — they are different claims. `[]` means
+   * "this player expresses no preference", so a later GM re-author is followed. Writing
+   * today's authored ids would PIN the current sequence and silently outlive the GM
+   * changing it, which is the opposite of what "reset" promises.
+   *
+   * Optimistic and debounced like every other order write, so a rejected write reverts
+   * and announces through the same path.
+   *
+   * @param {string} [announcement] pre-formatted live-region text (the component owns
+   *   the i18n)
+   */
+  function resetSalvageOrder(announcement = '') {
+    const key = progressiveOrderKey({ scope: 'salvage', id: selectedItem?.componentId });
+    if (!key || selectedItem?.salvage?.allowPlayerResultReorder === false) return;
+
+    progressiveOrders = { ...progressiveOrders, [key]: [] };
+    salvageOrderAnnouncement = announcement;
+
+    if (orderCommitTimer) clearTimeout(orderCommitTimer);
+    orderCommitTimer = setTimeout(() => {
+      orderCommitTimer = null;
+      void commitProgressiveOrder(key);
+    }, ORDER_COMMIT_DEBOUNCE_MS);
+  }
+
+  /**
    * Flush a pending debounced order write immediately, reporting whether it landed.
    *
    * Called on drop, before a salvage run starts, and on window teardown via
@@ -631,6 +675,9 @@ export function createInventoryStore({ services } = {}) {
     get salvageOrderAnnouncement() {
       return salvageOrderAnnouncement;
     },
+    get salvageOrderIsCustom() {
+      return salvageOrderIsCustom;
+    },
     get worldTimeTick() {
       return worldTimeTick;
     },
@@ -655,6 +702,7 @@ export function createInventoryStore({ services } = {}) {
     salvage,
     resetSalvage,
     reorderSalvageStage,
+    resetSalvageOrder,
     flushSalvageOrder,
     select,
     setSearch,

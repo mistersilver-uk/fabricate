@@ -39,7 +39,9 @@
     stages = [],
     announcement = '',
     onReorder = () => {},
-    onReorderSettled = () => {}
+    onReorderSettled = () => {},
+    canResetOrder = false,
+    onResetOrder = () => {}
   } = $props();
 
   const mode = $derived(salvage?.mode ?? 'simple');
@@ -80,7 +82,10 @@
     mode === 'routed'
       ? { icon: 'fas fa-code-branch', tone: 'accent' }
       : mode === 'progressive'
-        ? { icon: 'fas fa-arrow-down-long', tone: 'info' }
+        ? // A NUMBERED list, not an arrow: this banner names the mode, and what makes the
+          // mode is that the results are ORDERED. The arrow belongs to the flow banner
+          // below, which is the one making a claim about direction.
+          { icon: 'fas fa-list-ol', tone: 'info' }
         : checkUsable
           ? { icon: 'fas fa-dice-d20', tone: 'info' }
           : { icon: 'fas fa-recycle', tone: 'success' }
@@ -117,6 +122,18 @@
         : 'FABRICATE.App.Inventory.Salvage.Action'
     )
   );
+
+  // The note explains what pressing the button COSTS, and that cost is not the same in
+  // both states: with a usable check the button is the roll — it commits, once, with no
+  // reroll, which is the surprise worth warning about. Without one there is nothing to
+  // roll and nothing to lose. One note for both said neither.
+  const footerNote = $derived(
+    localize(
+      checkUsable
+        ? 'FABRICATE.App.Inventory.Salvage.FooterNoteRoll'
+        : 'FABRICATE.App.Inventory.Salvage.FooterNote'
+    )
+  );
 </script>
 
 <div class="salvage-panel" data-inventory-salvage-panel={mode}>
@@ -148,6 +165,8 @@
       {result}
       {fixedNoteKey}
       {fixedNoteFallback}
+      {canResetOrder}
+      {onResetOrder}
     />
   {:else if mode === 'routed'}
     <SalvageRoutedBody {salvage} {result} />
@@ -175,8 +194,8 @@
     <!-- A ruled row, not a full-width slab: the note explains the gesture's cost on the
          left and the action sits right, at its own width. -->
     <div class="salvage-footer">
-      <p class="salvage-footer-note">
-        {localize('FABRICATE.App.Inventory.Salvage.FooterNote')}
+      <p class="salvage-footer-note" data-inventory-salvage-footer-note>
+        {footerNote}
       </p>
       <button
         type="button"

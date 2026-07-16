@@ -120,7 +120,7 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Simple, with no salvage check roll formula | **You will recover**, then the materials, each tagged **Guaranteed**. No roll is made. |
 | Simple, with a salvage check roll formula | **On a success**, the materials, the DC to beat, and a note that a failed roll can cost the component. |
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
-| Progressive | The result stages in order, each with the check value that reaches it. |
+| Progressive | The result stages in order, each with the check value that reaches it, shown as **Reach ≥N**. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -167,8 +167,11 @@ A component set up for progressive salvage carries an **Allow player result re-o
 It decides whether a player's own preferred stage order is used when that component is salvaged, or whether your authored order always is.
 
 When it is on, the player can drag a stage on the **Salvage** tab, or move it with the move up and move down controls on each stage.
-Each move is announced for screen readers, and the reached-at values update to match the new order.
+Each move is announced for screen readers, and the reach values update to match the new order.
 A chosen order is a standing preference rather than a one-off choice, remembered per player and per component, in this world only.
+
+The player can also **Reset** the list back to your authored order.
+Reset clears that player's preference rather than pinning your current order, so if you later re-author the stages, that player follows the new order.
 
 When it is off, the stage list is shown in your authored order, marked **Order set by the GM**, and players cannot rearrange it.
 

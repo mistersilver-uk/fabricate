@@ -37,15 +37,27 @@
 
   SHARED WITH PLAYER SALVAGE (issue 675). Progressive salvage spends its roll down an
   ordered list under exactly these rules, so it reuses this component rather than
-  growing a twin. Two OPTIONAL, DEFAULT-OFF extensions exist for it:
+  growing a twin. Three OPTIONAL, DEFAULT-OFF extensions exist for it:
 
     `showQuantity`  render each stage's `×N`.
     `stateChip`     a snippet, rendered per stage, for a per-row state (salvage's
                     Recovered / Roll fell short / Not reached / Awaiting roll).
+    `stacked`       the player Inventory's row shape (the prototype's): the reorder
+                    controls LEAD the row, and the stage's identity is a flexible
+                    COLUMN — name + `×N`, then its numbers beneath — so the name wraps
+                    instead of being crushed.
 
-  Both default to today's rendering, so the Crafting tab — which passes neither — is
+  All three default to today's rendering, so the Crafting tab — which passes none — is
   byte-unchanged. A required prop or an always-on chip would have re-skinned crafting
   as a side effect of a salvage feature.
+
+  WHY `stacked` EXISTS AT ALL. The inline row lays every part on one line and lets only
+  the name flex, so it is the name that pays for every other part. In the player
+  inspector — a 300px COLUMN, not the crafting tab's wide panel — grip + ordinal + art
+  + `×N` + difficulty + "Reached at ≥N" + a state chip + two chevrons leave the name a
+  MEASURED ZERO pixels: it does not truncate to a word, it disappears, and the chevrons
+  overflow the panel. Adding a chip to a row that was already full is what did it, so
+  the fix belongs with the extension that caused it, not in the crafting tab.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -61,6 +73,7 @@
     // Issue 675, all opt-in: omitted, this renders exactly as it did for crafting.
     showQuantity = false,
     stateChip = null,
+    stacked = false,
     // WHY the rows are fixed. `canReorder: false` has MORE THAN ONE CAUSE and only the
     // caller knows which applies: the GM pinned the order, or (salvage) the roll has
     // already been spent down the list. Defaulting to the GM string keeps the crafting
@@ -126,12 +139,101 @@
   }
 </script>
 
+<!--
+  The row's parts as snippets, so the reorderable and fixed branches SHARE them rather
+  than carrying two copies that drift (and count twice against the duplication gate).
+-->
+{#snippet quantity(stage)}
+  {#if showQuantity && stage.quantity !== null && stage.quantity !== undefined}
+    <span class="crafting-stage-quantity" data-progressive-stage-quantity={String(stage.quantity)}>×{stage.quantity}</span>
+  {/if}
+{/snippet}
+
+{#snippet numbers(stage)}
+  <!--
+    ONE number when stacked, TWO inline.
+
+    They are not independent facts: `progressiveStageThresholds` DERIVES the threshold
+    as the running sum of the difficulties before it, so a list that prints both prints
+    the same information twice, and the threshold is the one that answers the player's
+    actual question ("what do I need to roll to reach this?"). Inline, on the crafting
+    tab's wide panel, the pair is affordable and the difficulty is a useful cross-check.
+    Stacked, in a 300px column, it is not: the two together measure wider than the whole
+    identity column, and the redundant one is what pushes the useful one out of the box.
+    The prototype prints the threshold alone for exactly this reason.
+  -->
+  {#if !stacked && stage.difficulty !== null && stage.difficulty !== undefined}
+    <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
+      <i class="fas fa-gauge-high" aria-hidden="true"></i>{stage.difficulty}
+    </span>
+  {/if}
+  <!-- Omitted (not zeroed) when the threshold is undefined: a stage the award loop
+       skips is reached at NO budget, so any number here would be a lie. -->
+  {#if stage.threshold !== null && stage.threshold !== undefined}
+    <span class="crafting-stage-threshold" data-progressive-stage-threshold={String(stage.threshold)}>
+      {#if stacked}
+        <!-- The SHORT form of the same phrase, not a new term. The prototype labels this
+             "DC n", but "DC" is a defined concept here that progressive genuinely does
+             NOT have: `InventoryListingBuilder._salvageDc` returns null for progressive,
+             and a component's `dcOverride` does not shift these thresholds. Borrowing
+             the prototype's loose wording would contradict the projection and the docs. -->
+        {format('FABRICATE.App.Crafting.Detail.StageThresholdShort', 'Reach ≥{threshold}', { threshold: stage.threshold })}
+      {:else}
+        {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', { threshold: stage.threshold })}
+      {/if}
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet identity(stage)}
+  {#if stacked}
+    <!-- The prototype's shape: ONE flexible column. The name wraps inside it and the
+         numbers sit beneath, so nothing on the row competes with the name for width. -->
+    <span class="crafting-stage-identity">
+      <span class="crafting-stage-name">{stage.name}{@render quantity(stage)}</span>
+      <span class="crafting-stage-meta is-stacked">{@render numbers(stage)}</span>
+    </span>
+    {#if stateChip}{@render stateChip(stage)}{/if}
+  {:else}
+    <span class="crafting-stage-name">{stage.name}</span>
+    <span class="crafting-stage-meta">
+      {@render quantity(stage)}
+      {@render numbers(stage)}
+      {#if stateChip}{@render stateChip(stage)}{/if}
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet moveButtons(stage, index)}
+  <span class="crafting-stage-move" class:is-stacked={stacked} data-progressive-stage-move>
+    <button
+      type="button"
+      class="crafting-stage-move-button"
+      data-progressive-stage-move-up
+      aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')} — ${stageName(stage)}`}
+      title={text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')}
+      disabled={index === 0}
+      onclick={() => move(index, -1)}
+    ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
+    <button
+      type="button"
+      class="crafting-stage-move-button"
+      data-progressive-stage-move-down
+      aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')} — ${stageName(stage)}`}
+      title={text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')}
+      disabled={index === stages.length - 1}
+      onclick={() => move(index, 1)}
+    ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+  </span>
+{/snippet}
+
 <div class="crafting-stage-list" data-recipe-section="progressive-stages">
   {#each stages as stage, index (stage.id)}
     {#if canReorder}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="crafting-stage-row is-reorderable"
+        class:is-stacked={stacked}
         data-progressive-stage={stage.id}
         data-progressive-stage-reorderable
         draggable="true"
@@ -140,9 +242,29 @@
         ondragover={(event) => event.preventDefault()}
         ondrop={(event) => { event.preventDefault(); handleDrop(index); }}
       >
-        <span class="crafting-stage-handle" aria-hidden="true" title={text('FABRICATE.App.Crafting.Detail.DragStage', 'Drag to reorder')}>
+        <!--
+          `aria-hidden` moves DOWN a level when stacked, and that is load-bearing: the
+          chevrons live inside this cluster there, and an aria-hidden ancestor would take
+          the list's only keyboard-reachable reorder control away from assistive tech.
+          Unstacked, the attribute stays exactly where it was — the crafting tab's DOM is
+          unchanged.
+        -->
+        <span
+          class="crafting-stage-handle"
+          class:is-stacked={stacked}
+          aria-hidden={stacked ? undefined : 'true'}
+          title={text('FABRICATE.App.Crafting.Detail.DragStage', 'Drag to reorder')}
+        >
           <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-          <span class="crafting-stage-ordinal" data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span>
+          <!-- Stacked, the reorder controls LEAD the row (the prototype's shape): the
+               grip and the chevrons are one affordance, so they sit together, and the
+               ordinal reads after them as the row's identity rather than its handle. -->
+          {#if stacked}{@render moveButtons(stage, index)}{/if}
+          <span
+            class="crafting-stage-ordinal"
+            aria-hidden={stacked ? 'true' : undefined}
+            data-progressive-stage-ordinal={String(index + 1)}
+          >{index + 1}</span>
         </span>
         {#if stage.img}
           <!-- draggable="false" is REQUIRED, not decorative: an <img> is natively
@@ -151,74 +273,21 @@
                first drag row in the repo to contain an image — the GM's row has none. -->
           <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" draggable="false" />
         {/if}
-        <span class="crafting-stage-name">{stage.name}</span>
-        <span class="crafting-stage-meta">
-          {#if showQuantity && stage.quantity !== null && stage.quantity !== undefined}
-            <span class="crafting-stage-quantity" data-progressive-stage-quantity={String(stage.quantity)}>×{stage.quantity}</span>
-          {/if}
-          {#if stage.difficulty !== null && stage.difficulty !== undefined}
-            <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
-              <i class="fas fa-gauge-high" aria-hidden="true"></i>{stage.difficulty}
-            </span>
-          {/if}
-          <!-- Omitted (not zeroed) when the threshold is undefined: a stage the award
-               loop skips is reached at NO budget, so any number here would be a lie. -->
-          {#if stage.threshold !== null && stage.threshold !== undefined}
-            <span class="crafting-stage-threshold" data-progressive-stage-threshold={String(stage.threshold)}>
-              {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', { threshold: stage.threshold })}
-            </span>
-          {/if}
-          {#if stateChip}{@render stateChip(stage)}{/if}
-        </span>
-        <span class="crafting-stage-move" data-progressive-stage-move>
-          <button
-            type="button"
-            class="crafting-stage-move-button"
-            data-progressive-stage-move-up
-            aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')} — ${stageName(stage)}`}
-            title={text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')}
-            disabled={index === 0}
-            onclick={() => move(index, -1)}
-          ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
-          <button
-            type="button"
-            class="crafting-stage-move-button"
-            data-progressive-stage-move-down
-            aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')} — ${stageName(stage)}`}
-            title={text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')}
-            disabled={index === stages.length - 1}
-            onclick={() => move(index, 1)}
-          ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
-        </span>
+        {@render identity(stage)}
+        {#if !stacked}{@render moveButtons(stage, index)}{/if}
       </div>
     {:else}
       <!-- D13: no drag handlers attached at all, and no grip glyph. The ordinal and the
            difficulty stay — the order is still information, it is just not the player's
            to change. -->
-      <div class="crafting-stage-row is-fixed" data-progressive-stage={stage.id} data-progressive-stage-fixed>
+      <div class="crafting-stage-row is-fixed" class:is-stacked={stacked} data-progressive-stage={stage.id} data-progressive-stage-fixed>
         <span class="crafting-stage-ordinal" aria-hidden="true" data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span>
         {#if stage.img}
           <!-- Also non-draggable in the fixed state: the row is not a drag source, but a
                bare <img> still is, and dragging it out of the app can navigate away. -->
           <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" draggable="false" />
         {/if}
-        <span class="crafting-stage-name">{stage.name}</span>
-        <span class="crafting-stage-meta">
-          {#if showQuantity && stage.quantity !== null && stage.quantity !== undefined}
-            <span class="crafting-stage-quantity" data-progressive-stage-quantity={String(stage.quantity)}>×{stage.quantity}</span>
-          {/if}
-          {#if stage.difficulty !== null && stage.difficulty !== undefined}
-            <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
-              <i class="fas fa-gauge-high" aria-hidden="true"></i>{stage.difficulty}
-            </span>
-          {/if}
-          {#if stage.threshold !== null && stage.threshold !== undefined}
-            <span class="crafting-stage-threshold" data-progressive-stage-threshold={String(stage.threshold)}>
-              {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', { threshold: stage.threshold })}
-            </span>
-          {/if}
-          {#if stateChip}{@render stateChip(stage)}{/if}
-        </span>
+        {@render identity(stage)}
       </div>
     {/if}
   {/each}
@@ -293,6 +362,88 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* ============================================================
+     `stacked` (issue 675) — the player Inventory's row shape.
+     Every rule below is gated on .is-stacked, which only the salvage caller sets, so
+     the crafting tab renders from the block above exactly as before.
+     ============================================================ */
+
+  /* The identity column is the ONLY thing on the row that flexes, and it is allowed to
+     grow TALL instead of thin. That inversion is the whole fix: the inline row let the
+     name absorb every other part's width and it measured 0px in a 300px column. */
+  .crafting-stage-identity {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .crafting-stage-row.is-stacked .crafting-stage-name {
+    overflow: visible;
+    white-space: normal;
+    /* `anywhere`, not `break-word`: a single unbroken token longer than the column
+       (an id-like or agglutinative name) still has to break rather than push the row
+       wide again. */
+    overflow-wrap: anywhere;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  /* `×N` reads as part of the name, so it sits in the same wrapping text flow — not in
+     a rigid box that would re-introduce a fixed cost on the row. */
+  .crafting-stage-row.is-stacked .crafting-stage-quantity {
+    margin-left: 5px;
+  }
+
+  /* Wraps rather than overflowing: every child here is `nowrap`, so an inline-flex that
+     cannot wrap paints its numbers straight out of the identity column and under the
+     state chip. Nothing clips it — an overflow this quiet is exactly the class of bug
+     that reads fine in a mounted test. */
+  .crafting-stage-meta.is-stacked {
+    flex-wrap: wrap;
+    gap: var(--fab-space-2);
+    font-size: 11px;
+  }
+
+  .crafting-stage-handle.is-stacked {
+    gap: 6px;
+  }
+
+  .crafting-stage-row.is-stacked .crafting-stage-ordinal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+    background: var(--fab-surface);
+    text-align: center;
+  }
+
+  .crafting-stage-row.is-stacked .crafting-stage-img {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+  }
+
+  /* Stacked, the chevrons are a VERTICAL pair leading the row. Each keeps a 22px touch
+     target rather than the prototype's ~17px: HTML5 drag never fires on touch, so these
+     buttons are the only touch path to reordering and cannot shrink below usable. */
+  .crafting-stage-move.is-stacked {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .crafting-stage-move.is-stacked .crafting-stage-move-button {
+    width: 24px;
+    min-height: 22px;
   }
 
   .crafting-stage-meta {

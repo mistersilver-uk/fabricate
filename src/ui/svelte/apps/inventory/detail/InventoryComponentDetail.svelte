@@ -34,7 +34,9 @@
     salvageStages = [],
     salvageAnnouncement = '',
     onReorderSalvageStage = () => {},
-    onSalvageReorderSettled = () => {}
+    onSalvageReorderSettled = () => {},
+    salvageOrderIsCustom = false,
+    onResetSalvageOrder = () => {}
   } = $props();
 
   // Each detail list (sources, used-by, required-for, produced-by, contributors)
@@ -201,6 +203,8 @@
         announcement={salvageAnnouncement}
         onReorder={onReorderSalvageStage}
         onReorderSettled={onSalvageReorderSettled}
+        canResetOrder={salvageOrderIsCustom}
+        onResetOrder={onResetSalvageOrder}
       />
     </div>
   {:else}

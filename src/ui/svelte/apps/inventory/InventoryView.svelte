@@ -65,6 +65,14 @@
   function onReorderSalvageStage(index, target, announcement) {
     store?.reorderSalvageStage?.(index, target, announcement);
   }
+  // The announcement is owned here, not by the store: the store holds no i18n, and a
+  // keyboard user who presses Reset must hear that the order moved — the rows change
+  // under them with no other signal.
+  function onResetSalvageOrder() {
+    store?.resetSalvageOrder?.(
+      localize('FABRICATE.App.Inventory.Salvage.StageOrderResetAnnouncement')
+    );
+  }
   function onSalvageReorderSettled() {
     // A drag has already settled by the time it drops, so flush rather than coalesce.
     // The returned status is the store's business here; the FOOTER is what must gate
@@ -173,6 +181,8 @@
           {onResetSalvage}
           {onReorderSalvageStage}
           {onSalvageReorderSettled}
+          salvageOrderIsCustom={store?.salvageOrderIsCustom ?? false}
+          {onResetSalvageOrder}
         />
       </section>
     </div>

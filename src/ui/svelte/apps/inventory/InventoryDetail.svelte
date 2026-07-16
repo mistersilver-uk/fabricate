@@ -41,7 +41,9 @@
     salvageStages = [],
     salvageAnnouncement = '',
     onReorderSalvageStage = () => {},
-    onSalvageReorderSettled = () => {}
+    onSalvageReorderSettled = () => {},
+    salvageOrderIsCustom = false,
+    onResetSalvageOrder = () => {}
   } = $props();
 
   const isRecipeItem = $derived(item?.isRecipeItem === true);
@@ -66,6 +68,8 @@
     {salvageAnnouncement}
     {onReorderSalvageStage}
     {onSalvageReorderSettled}
+    {salvageOrderIsCustom}
+    {onResetSalvageOrder}
   />
 {/if}
 

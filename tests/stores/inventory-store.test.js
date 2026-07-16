@@ -669,6 +669,99 @@ describe('inventoryStore', () => {
     return { store, log, services };
   }
 
+  describe('inventoryStore - resetting the progressive salvage order', () => {
+    it('reports a custom order only when the rendered order actually differs', async () => {
+      const { store } = await loadedProgressiveStore();
+      assert.equal(store.salvageOrderIsCustom, false, 'nothing has moved yet');
+
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      assert.equal(store.salvageOrderIsCustom, true);
+
+      // Moved back. A stored order still EXISTS under this key, so a presence check
+      // would say "custom" and offer a Reset that does nothing when pressed.
+      store.reorderSalvageStage(1, 0, '');
+      flushSync();
+      assert.equal(
+        store.salvageOrderIsCustom,
+        false,
+        "the order is the GM's again, whatever is stored under the key"
+      );
+    });
+
+    it("resets by persisting NO preference, not by pinning today's authored ids", async () => {
+      const { store, log } = await loadedProgressiveStore();
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      await store.flushSalvageOrder();
+      flushSync();
+      log.length = 0;
+
+      store.resetSalvageOrder("Order reset to your GM's.");
+      flushSync();
+
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => s.id),
+        ['s1', 's2'],
+        "the GM's authored order is restored, optimistically"
+      );
+      assert.equal(store.salvageOrderIsCustom, false);
+      assert.equal(store.salvageOrderAnnouncement, "Order reset to your GM's.");
+      assert.deepEqual(log, [], 'and the write is debounced like every other order write');
+
+      assert.deepEqual(await store.flushSalvageOrder(), { ok: true });
+      assert.deepEqual(
+        log,
+        [['setProgressiveResultOrder', 'salvage:c1', []]],
+        'EMPTY, not [s1, s2]: "no preference" follows a later GM re-author, whereas the ' +
+          'authored ids would pin this sequence and silently outlive it'
+      );
+    });
+
+    it('restores the thresholds the authored order carries', async () => {
+      const { store } = await loadedProgressiveStore();
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => [s.id, s.threshold]),
+        [
+          ['s2', 3],
+          ['s1', 8],
+        ],
+        'the reordered list recomputes its cumulative thresholds'
+      );
+
+      store.resetSalvageOrder('');
+      flushSync();
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => [s.id, s.threshold]),
+        [
+          ['s1', 5],
+          ['s2', 8],
+        ],
+        'and reset puts the authored ones back — a stale threshold would have the top ' +
+          'row claiming a higher bar than the row beneath it'
+      );
+    });
+
+    it('refuses to reset an order the GM pinned', async () => {
+      const { services } = orderServices();
+      const row = progressiveRow();
+      row.salvage.allowPlayerResultReorder = false;
+      services.listInventoryForActor = async () => ({ selectedActorId: 'hero', rows: [row] });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+      store.select('sys:c1');
+      flushSync();
+
+      store.resetSalvageOrder('nope');
+      flushSync();
+      assert.equal(store.salvageOrderAnnouncement, '', 'there is no player order to reset');
+      assert.equal(store.salvageOrderIsCustom, false);
+    });
+  });
+
   describe('inventoryStore - progressive salvage order', () => {
     it('reorders under the salvage: key, storing IDS (not indices) so a GM edit survives', async () => {
       const { store, log } = await loadedProgressiveStore();

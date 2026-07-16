@@ -922,13 +922,16 @@ function salvageServices(item, storeOverrides = {}) {
   calls.salvage = [];
   calls.reset = [];
   calls.reorder = [];
+  calls.resetOrder = [];
   store.salvagingKey = null;
   store.salvageResult = null;
   store.orderedSalvageStages = item.salvage?.stages ?? [];
   store.salvageOrderAnnouncement = '';
+  store.salvageOrderIsCustom = false;
   store.salvage = (componentId) => calls.salvage.push(componentId);
   store.resetSalvage = () => calls.reset.push(true);
   store.reorderSalvageStage = (...args) => calls.reorder.push(args);
+  store.resetSalvageOrder = (...args) => calls.resetOrder.push(args);
   store.flushSalvageOrder = () => Promise.resolve({ ok: true });
   Object.assign(store, storeOverrides);
   return { services, calls, store };
@@ -1216,10 +1219,6 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
     const target = await openSalvage(services);
 
-    // The body's own --info-soft "one roll flows down this list" box is gone: the panel's
-    // mode banner directly above already says exactly that, and two adjacent boxes making
-    // one point is what the redesign removed. The section keeps an eyebrow + a pre-roll
-    // hint instead.
     assert.ok(target.querySelector('[data-inventory-salvage-roll-hint]'), 'hints that a roll resolves it');
     const rows = target.querySelectorAll('[data-progressive-stage-reorderable]');
     assert.equal(rows.length, 2, 'both stages are reorderable');
@@ -1284,6 +1283,189 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   });
 
+  // --- The row's SHAPE (issue 675 fix round) ------------------------------------
+  //
+  // The inline row let the name flex and everything else hold a fixed width, so in the
+  // 300px inspector the name measured ZERO pixels — it did not truncate to a word, it
+  // disappeared, and the chevrons overflowed the panel. These pin the SHAPE that made
+  // it fit, because a mounted test cannot see the width: happy-dom computes no cascade,
+  // so every geometry assertion here would read green either way.
+
+  const SHAPE_STAGES = [
+    { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 2, difficulty: 4, threshold: 4 },
+    { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+  ];
+
+  function shapeServices(storeOverrides = {}) {
+    return salvageServices(
+      salvageItem({
+        mode: 'progressive',
+        checkUsable: true,
+        stages: SHAPE_STAGES,
+        awardMode: 'equal',
+      }),
+      storeOverrides,
+    );
+  }
+
+  it('stacks the row identity so the name has a column of its own to wrap in', async () => {
+    const { services } = shapeServices();
+    const target = await openSalvage(services);
+
+    const row = target.querySelector('[data-progressive-stage="s1"]');
+    const identity = row.querySelector('.crafting-stage-identity');
+    assert.ok(identity, 'the stacked row wraps its identity in a column');
+    assert.ok(
+      identity.querySelector('.crafting-stage-name'),
+      'the name lives INSIDE that column, not as a row-level flex child',
+    );
+    assert.equal(
+      identity.querySelector('[data-progressive-stage-quantity]').textContent.trim(),
+      '×2',
+      'and ×N shares the name\'s wrapping text flow rather than costing the row a fixed slot',
+    );
+  });
+
+  it('leads the row with the reorder controls, before the ordinal', async () => {
+    const { services } = shapeServices();
+    const target = await openSalvage(services);
+
+    const row = target.querySelector('[data-progressive-stage="s1"]');
+    const parts = [...row.querySelectorAll('[data-progressive-stage-move], [data-progressive-stage-ordinal]')];
+    assert.equal(parts.length, 2);
+    assert.ok(
+      parts[0].hasAttribute('data-progressive-stage-move'),
+      'the chevrons come FIRST — they were on the trailing edge, where they overflowed the panel',
+    );
+    assert.ok(parts[1].hasAttribute('data-progressive-stage-ordinal'));
+
+    const handle = row.querySelector('.crafting-stage-handle');
+    assert.ok(handle.contains(parts[0]), 'the grip and the chevrons are one cluster');
+    assert.equal(
+      handle.getAttribute('aria-hidden'),
+      null,
+      'and the cluster is NOT aria-hidden — it now holds the only keyboard reorder control',
+    );
+  });
+
+  it('prints ONE number per stacked row: the cumulative threshold, not both', async () => {
+    const { services } = shapeServices();
+    const target = await openSalvage(services);
+
+    assert.equal(
+      target.querySelector('[data-progressive-stage-difficulty]'),
+      null,
+      'the per-stage difficulty is the running sum the threshold already reports — printing both said it twice, and the pair measured wider than the whole identity column',
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-progressive-stage-threshold]')].map((n) => n.textContent.trim()),
+      ['Reach ≥4', 'Reach ≥7'],
+      'and the survivor is the number that answers "what must I roll to reach this?"',
+    );
+  });
+
+  // --- The flow banner (issue 675 fix round) -------------------------------------
+  //
+  // A previous round deleted this as a duplicate of the mode banner. It is not one: the
+  // mode banner NAMES the mode, this states the MECHANIC — that the roll STOPS at the
+  // first result it cannot reach — and stopping is the entire reason the order is worth
+  // arranging. Pinned by CONTENT, because two boxes both existing is exactly what the
+  // deletion argued against; what matters is that they say different things.
+
+  it('states the flow rule as well as the mode name, and they are not the same claim', async () => {
+    const { services } = shapeServices();
+    const target = await openSalvage(services);
+
+    // The harness's i18n stub echoes keys, so this pins the two boxes to two DIFFERENT
+    // keys. The English they resolve to is pinned in `lang/en.json`; what a component
+    // test can prove is that neither box is rendering the other's string.
+    const banner = target.querySelector('[data-inventory-salvage-banner]');
+    const flow = target.querySelector('[data-inventory-salvage-flow]');
+    assert.ok(flow, 'the flow banner renders');
+    assert.notEqual(flow, banner, 'as its own box, beneath the mode banner');
+    assert.match(banner.textContent, /BannerProgressiveTitle/, 'the mode banner names the mode');
+    assert.match(flow.textContent, /Salvage\.ProgressiveFlow/, 'the flow banner states the mechanic');
+    assert.ok(
+      !banner.textContent.includes('ProgressiveFlow'),
+      'and it is not the mode banner repeating itself — deleting either loses a distinct statement',
+    );
+  });
+
+  // --- Reset (issue 675 fix round) ----------------------------------------------
+
+  it('offers Reset in the reorder note, and routes it to the store with an announcement', async () => {
+    const { services, calls } = shapeServices({ salvageOrderIsCustom: true });
+    const target = await openSalvage(services);
+
+    const note = target.querySelector('[data-inventory-salvage-reorder-note]');
+    const reset = note.querySelector('[data-inventory-salvage-reorder-reset]');
+    assert.ok(reset, 'Reset lives IN the note that grants the affordance');
+    assert.equal(reset.disabled, false);
+
+    reset.click();
+    await settle();
+    assert.equal(calls.resetOrder.length, 1, 'restores the GM\'s authored order');
+    assert.ok(
+      calls.resetOrder[0][0],
+      'and carries live-region text: a keyboard user has no other signal that the rows moved',
+    );
+  });
+
+  it('disables Reset while the order is already the GM\'s', async () => {
+    // Disabled rather than absent: a control that appears mid-drag reads as a glitch,
+    // and its absence would say the order cannot be restored rather than need not be.
+    const { services, calls } = shapeServices({ salvageOrderIsCustom: false });
+    const target = await openSalvage(services);
+
+    const reset = target.querySelector('[data-inventory-salvage-reorder-reset]');
+    assert.ok(reset, 'it is still rendered');
+    assert.equal(reset.disabled, true);
+    reset.click();
+    await settle();
+    assert.equal(calls.resetOrder.length, 0, 'and does nothing when pressed');
+  });
+
+  it('shows no Reset at all when the GM pinned the order', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'progressive',
+        checkUsable: true,
+        stages: SHAPE_STAGES,
+        awardMode: 'equal',
+        allowPlayerResultReorder: false,
+      }),
+    );
+    const target = await openSalvage(services);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-reorder-reset]'),
+      null,
+      'there is no player order to reset — the note itself does not apply',
+    );
+  });
+
+  // --- The footer note names the gesture's actual cost ---------------------------
+
+  it('warns that the roll is one-shot only where there IS a roll', async () => {
+    // Keyed on `checkUsable`, like the banner and the body dispatch: with a usable check
+    // the button IS the roll — it commits, once, with no reroll — and without one there
+    // is nothing to roll and no reroll to warn about. One note for both said neither.
+    const { services } = shapeServices();
+    const rolled = await openSalvage(services);
+    assert.match(
+      rolled.querySelector('[data-inventory-salvage-footer-note]').textContent,
+      /Salvage\.FooterNoteRoll/,
+      'a usable check gets the one-shot warning',
+    );
+
+    const { services: noCheck } = salvageServices(
+      salvageItem({ mode: 'simple', checkUsable: false, results: [] }),
+    );
+    const target = await openSalvage(noCheck);
+    const note = target.querySelector('[data-inventory-salvage-footer-note]').textContent;
+    assert.match(note, /Salvage\.FooterNote$/, 'and the no-check case gets its own note');
+    assert.ok(!note.includes('FooterNoteRoll'), 'not the roll warning');
+  });
+
   // --- The body reconciles with the resolved roll -------------------------------
   //
   // The pre-roll list is a PLAN; once the roll resolves it is a RECORD. A stage row
@@ -1345,6 +1527,36 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       null,
       'no row still claims to await a roll beneath the success ribbon',
     );
+    // The eyebrow reconciles too, rather than emptying out: "Roll to resolve" is a
+    // pre-roll instruction, and leaving the slot blank afterwards throws away the one
+    // number that summarises the list beneath it.
+    assert.equal(target.querySelector('[data-inventory-salvage-roll-hint]'), null);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-recovered-count]').textContent.trim(),
+      'FABRICATE.App.Inventory.Salvage.RecoveredCount:{"recovered":1,"total":3}',
+      'counted over the STAGES: the record can name a component this list does not show, '
+        + 'so counting it directly could print "5 of 4"',
+    );
+  });
+
+  it('post-roll with NO run record: the eyebrow counts nothing rather than reporting zero', async () => {
+    // A runless salvage leaves no record. "0 of 3 recovered" derived from an absent
+    // record is a lie, not a default — the rows degrade to a neutral resolved state and
+    // the count must decline to answer.
+    const { services } = progressiveServices({
+      salvageResult: {
+        componentId: 'c1',
+        state: 'success',
+        message: '',
+        awarded: [],
+        awardedComponentIds: [],
+        outcomeId: null,
+      },
+    });
+    const target = await openSalvage(services);
+    assert.deepEqual(chipStates(target), ['resolved', 'resolved', 'unreachable']);
+    assert.equal(target.querySelector('[data-inventory-salvage-recovered-count]'), null);
+    assert.equal(target.querySelector('[data-inventory-salvage-roll-hint]'), null);
   });
 
   it('post-roll: reorder is FROZEN — the roll has already been spent down the list', async () => {

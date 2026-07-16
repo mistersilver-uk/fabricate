@@ -1216,13 +1216,20 @@ Identical rows minus working affordances are not acceptable: a player must not b
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 **Optional per-caller extensions.**
-The extension set is exactly three, all **opt-in and default-off**: an optional per-stage **quantity**, an optional per-stage **state chip**, and an optional **fixed-state note** overriding the explanation shown when reordering is unavailable.
+The extension set is exactly four, all **opt-in and default-off**: an optional per-stage **quantity**, an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, and an optional **stacked row layout**.
 A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
 This exists so a second consumer can add rendering without re-skinning the first.
 The fixed-state note is overridable because `canReorder: false` has **two** causes the component cannot distinguish: the GM pinned the order (the permission is off), or the player's order has already been **spent** by a resolved roll.
 Defaulting to the GM reason keeps the crafting rendering unchanged, since there it is the only cause; a caller with a second cause MUST supply the note, or the surface asserts something untrue about the roll that just happened.
 The GM reason takes precedence where both apply — it stays true whether or not a roll has since been spent.
 The set is enumerated deliberately: a future extension is added to this list, so "not listed" means "not supported", not "not yet noticed".
+
+The **stacked row layout** exists because the default inline row lays every part on one line and lets only the name flex, so the name absorbs every other part's width.
+In a narrow column (the player inspector's 300px) that measures a **zero-width name** and overflows the trailing controls out of the panel — the row does not degrade gracefully, it fails.
+Stacked, the reorder controls **lead** the row and the stage's identity is a flexible **column** (name and quantity in one wrapping text flow, its number beneath), so the name wraps instead of being crushed.
+A stacked row MUST print the **cumulative threshold only**, never the threshold and the per-stage difficulty together: the threshold is derived as the running sum of the difficulties before it, so the pair states the same information twice, and it is the redundant number that pushes the useful one out of the column.
+Both numbers remain correct to show inline, where the width exists and the difficulty serves as a cross-check.
+The threshold MUST NOT be labelled a **DC** on any surface: `DC` is a distinct authored concept that progressive resolution does not have (the projection resolves progressive's DC to null, and a component's `dcOverride` does not shift these thresholds), so the label would name a value the player cannot find and the GM cannot author.
 
 **Progressive salvage deltas.**
 
@@ -1232,6 +1239,12 @@ Deriving salvage thresholds from the crafting award mode violates the agreement 
 - The player's order is stored under the `salvage:<componentId>` key (see `resolution-modes` §Which user's order is read).
 - A pending debounced write MUST be **flushed before a salvage run starts**, and a **rejected** write MUST abort the run: an unflushed write is captured stale onto the run record, and a rejected one leaves the player looking at an order that was reverted.
 - Salvage renders **no exclude affordance**: reorder is the whole of the feature.
+- The panel MUST state the mode and the flow **rule** as two separate statements: naming the mode ("progressive, ordered") does not tell a player that the roll **stops** at the first result it cannot reach, and stopping is the entire reason the order is worth arranging.
+Neither is a duplicate of the other, and collapsing them loses the mechanic rather than a repetition.
+- Where reordering is permitted, the surface MUST offer a **reset** to the GM's authored order.
+An order the player can rearrange is one they can get lost in, and the authored order is the only one they cannot reconstruct from what is on screen.
+Reset persists **no preference** (an empty order), never the currently-authored ids: an empty order follows a later GM re-author, whereas pinning today's ids would silently outlive the GM changing them.
+It is offered only when the rendered order actually **differs** from the authored one — a stored order can name the authored sequence exactly, so a reset offered on the mere presence of stored state does nothing when pressed.
 
 ##### Browse Status
 
