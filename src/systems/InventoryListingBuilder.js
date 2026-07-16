@@ -22,15 +22,18 @@
  */
 
 import { getFabricateFlag } from '../config/flags.js';
+// The ONE `toolBroken` reader, reused rather than re-implemented. That flag is the
+// AUTHORITATIVE presence-gate disqualifier, and a second copy of its tolerant
+// flag-shape handling would drift from the gate this projection has to agree with.
+// The module is deliberately import-free, so this adds no transitive edge.
+import { isToolBroken } from '../gatheringToolRuntime.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 // Single-sourced with the GM UI so the builder and the recipe-item editor share one
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 // The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
-// A deliberately import-free leaf, so it adds no module edge to the mounted graph —
-// which matters here: this builder is already in every mounted harness's transitive
-// closure, and one import added to its crafting sibling once cancelled 36 tests.
+// A deliberately import-free leaf.
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
@@ -879,18 +882,46 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * Whether an owned tool item is BROKEN — a derived, read-only runtime verdict, not a
-   * persisted field, and NOT a salvage gate (a broken salvageable tool is still
-   * salvageable; recycling it is the most useful thing left to do with it).
+   * Whether an owned tool item is BROKEN — a read-only verdict, and NOT a salvage gate
+   * (a broken salvageable tool is still salvageable; recycling it is the most useful
+   * thing left to do with it).
    *
-   * Only `limitedUses` breakage is knowable without rolling: the other modes decide at
-   * attempt time (a chance roll / a formula), so they are never reported broken here.
-   * The usage read mirrors `Tool#applyUsage`'s write exactly — `toolUsage`, falling back
-   * to the pre-migration `catalystItemUsage`.
+   * TWO sources, because brokenness has two: a persisted PAST FACT and a projected
+   * FUTURE one. Reading only the second reports almost every real broken tool as
+   * intact.
+   *
+   * 1. **`flags.fabricate.toolBroken` — the authoritative disqualifier.** It is a
+   *    persisted past fact needing no roll, written by the `flagBroken` on-break action
+   *    for EVERY breakage mode, and read as authoritative by the runtime presence gate
+   *    (`gatheringToolRuntime.isToolBroken`, reused here). It is also the ONLY on-break
+   *    mode that leaves a broken item in the player's inventory at all — `destroy` and
+   *    `replaceWith` remove it — so it is the source that matters most: a
+   *    `breakageChance` / `diceExpression` tool that has broken carries this flag and NO
+   *    `toolUsage`, and reading usage alone renders it intact while the engine refuses
+   *    it for crafting.
+   *
+   * 2. **Usage exhaustion — a projection, and narrower than it looks.** Only
+   *    `limitedUses` is knowable ahead of an attempt (the other modes decide at attempt
+   *    time by a chance roll or a formula). The read mirrors `Tool#applyUsage`'s write
+   *    exactly — `toolUsage`, falling back to the pre-migration `catalystItemUsage`.
+   *
+   *    It is gated on `toolBreakage.authority !== 'checkDriven'`. Under the GM-selectable
+   *    `checkDriven` authority the ACTIVE CHECK decides whether tools break and per-tool
+   *    modes are ignored (except `immune`) — yet `applyToolUsageAndBreakage` still calls
+   *    `applyUsage` unconditionally, so `timesUsed` climbs past `maxUses` on a tool the
+   *    engine will never break by exhaustion. Ungated, the row would claim "Broken"
+   *    permanently for a perfectly usable tool. Source 1 still applies under that
+   *    authority: a forced break that flags the item is a real past fact.
    * @private
    */
   _isToolBroken(system, componentId, item) {
     if (!item) return false;
+    // The persisted past fact — mode-agnostic and authority-agnostic.
+    if (isToolBroken(item)) return true;
+
+    // The projection. Never under checkDriven: usage still accrues there, but it
+    // decides nothing.
+    if (system?.toolBreakage?.authority === 'checkDriven') return false;
     const tools = Array.isArray(system?.tools) ? system.tools : [];
     const tool = tools.find((entry) => entry?.componentId === componentId) ?? null;
     if (tool?.breakage?.mode !== 'limitedUses') return false;

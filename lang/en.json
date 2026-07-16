@@ -446,7 +446,7 @@
           "TabsLabel": "Item details",
           "TabInfo": "Info",
           "TabSalvage": "Salvage",
-          "BrokenBanner": "This tool is broken — it has used up its remaining uses and can't be used for crafting.",
+          "BrokenBanner": "This tool is broken and can't be used for crafting.",
           "Tier": "Tier {tier}",
           "TypeComponent": "Component",
           "TypeEssence": "Essence",

@@ -36,7 +36,7 @@
   const icon = $derived(typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle');
   const quantityLabel = $derived(`×${quantity}`);
   // At-a-glance badges (component rows only): salvageable, tool. Essence rows carry
-  // neither. `broken` is a derived, read-only runtime verdict — it does NOT gate
+  // neither. `broken` is a read-only verdict decided builder-side — it does NOT gate
   // salvageability, so the recycle badge stands on a broken tool.
   const isTool = $derived(item?.isTool === true);
   const isSalvageable = $derived(item?.salvage?.enabled === true);

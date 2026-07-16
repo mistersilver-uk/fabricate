@@ -1453,10 +1453,18 @@ Every overlay sits **inside** the thumbnail's bounds and above it — not hangin
     Essences are GM-authored per system with their own icon; a fixed icon set, or a hue keyed on an essence's name, silently mis-renders any essence the GM named differently.
     The chip exists so the glyph reads against arbitrary artwork.
 - **Broken treatment.**
-`broken` is a **derived, read-only** runtime verdict (a tool has spent its uses); it is not persisted and no engine path un-breaks a tool.
+`broken` is a **read-only** verdict, and no engine path un-breaks a tool.
+It has **two** sources, and reading only the second reports almost every broken tool a player can actually see as intact:
+
+  - the persisted **`flags.fabricate.toolBroken`** past fact — the authoritative presence-gate disqualifier, written by the `flagBroken` on-break action for **every** breakage mode and requiring no roll to know.
+    This is the source that matters most: `flagBroken` is the only on-break mode that leaves a broken item in the player's inventory at all (`destroy` and `replaceWith` remove it), and a chance- or formula-broken tool carries this flag with **no usage counter** whatsoever.
+  - a **projection** of usage exhaustion, which only `limitedUses` supports (the other modes decide at attempt time by a roll).
+    It MUST NOT be applied under the `checkDriven` tool-breakage authority: usage still accrues there, but the active check decides breakage and per-tool modes are ignored, so projecting exhaustion would report a perfectly usable tool broken permanently.
+
 A broken item dims its artwork, takes a danger wash and a danger card border, and its **"Broken" pip REPLACES the quantity pip** — they are one slot, not two.
 There is **no repair affordance** anywhere; the treatment states why the tool is unusable and offers no action.
 Brokenness is about **usability, not salvageability**, and MUST NOT gate the salvage surface.
+
 - **Inspector Info order.**
 Broken banner → description → essences → **Sources** (hidden for books) → Used by → Produced by.
 

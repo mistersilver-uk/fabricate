@@ -41,10 +41,10 @@
   const isEssence = $derived(item?.isEssenceSource === true);
   const isTool = $derived(item?.isTool === true);
   const description = $derived(String(item?.description ?? '').trim());
-  // A derived, read-only runtime verdict: the tool has spent its uses. Nothing
-  // un-breaks a tool, so the banner states WHY it is unusable and offers no action —
-  // and it does NOT gate salvage: recycling a broken tool is the most useful thing
-  // left to do with it.
+  // A read-only verdict decided builder-side, from a persisted `toolBroken` past fact
+  // or a projected usage exhaustion. Nothing un-breaks a tool, so the banner states
+  // that it is unusable and offers no action — and it does NOT gate salvage: recycling
+  // a broken tool is the most useful thing left to do with it.
   const broken = $derived(item?.broken === true);
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
