@@ -741,9 +741,9 @@
             icon="fas fa-arrow-down-a-z"
             section="salvage-allow-player-result-reorder"
             field="salvageAllowPlayerResultReorder"
-            title={text('FABRICATE.Admin.Manager.Component.Salvage.AllowPlayerResultReorderTitle', 'Allow player result re-ordering')}
-            sub={text('FABRICATE.Admin.Manager.Component.Salvage.AllowPlayerResultReorderSub', 'Players may set their own stage order for this salvage, which is remembered and used every time they salvage this component.')}
-            toggleLabel={text('FABRICATE.Admin.Manager.Component.Salvage.AllowPlayerResultReorderToggle', 'Allow player result re-ordering')}
+            title={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Title', 'Allow player result re-ordering')}
+            sub={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Sub', 'Players may set their own stage order for this salvage, which is remembered and used every time they salvage this component.')}
+            toggleLabel={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Toggle', 'Allow player result re-ordering')}
             on={salvageDraft.allowPlayerResultReorder !== false}
             disabled={saving}
             onToggle={(next) => setSalvage({ allowPlayerResultReorder: next === true })}
