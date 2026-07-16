@@ -205,6 +205,26 @@ describe('InventoryView (mounted)', () => {
     assert.ok(detail.querySelector('[data-inventory-used-by="r1"]'), 'still shows Used by');
   });
 
+  // The grid's footer is part of its frame, not a control that earns its place past a
+  // threshold. The shared Pagination hides itself below `pageSizeOptions`' smallest
+  // option (25 here), so the shipped grid rendered NO footer at all for a realistic
+  // 18-item inventory — no count, no per-page control — and nothing in this suite
+  // looked at it.
+  it('always renders the grid footer, even when everything fits on one page', async () => {
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const summary = target.querySelector('[data-pagination-summary]');
+    assert.ok(summary, 'the footer renders below the smallest page size');
+    assert.match(summary.textContent, /1.*of 1/, 'and states the size of what is on screen');
+    assert.ok(
+      target.querySelector('[data-pagination-size]'),
+      'the per-page control is present — hiding it is what makes a chosen size unrecoverable',
+    );
+    assert.ok(target.querySelector('[data-pagination-page]'), 'and the page indicator reads Page 1 of 1');
+  });
+
   it('shows essence and tool pips on a component card', async () => {
     const { services } = makeServices(makeItem());
     const target = await harness.mount({ services });

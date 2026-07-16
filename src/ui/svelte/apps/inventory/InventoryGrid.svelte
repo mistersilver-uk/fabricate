@@ -38,6 +38,7 @@
         {pageSize}
         {pageIndex}
         pageSizeOptions={[25, 50, 75]}
+        persistent
         onPageChange={(index) => onPageChange?.(index)}
         onPageSizeChange={(size) => onPageSizeChange?.(size)}
       />

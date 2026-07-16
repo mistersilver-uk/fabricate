@@ -147,8 +147,16 @@
 </div>
 
 <style>
+  /* The grid stretches its ITEMS, but the item is this wrapper and the visible card is
+     the BUTTON inside it — so a wrapped name grew the wrapper while the button kept its
+     own short height, and a row of cards came out ragged. Making the wrapper a flex row
+     stretches the button to the wrapper's (row's) height on the cross axis, so the
+     tallest name in a row sets the row and every card in it matches. Done here rather
+     than with `height: 100%`, which the Foundry `height: auto` reset below would have
+     to undo. */
   .inventory-card {
     min-width: 0;
+    display: flex;
   }
 
   .inventory-card-button {
@@ -346,14 +354,19 @@
     line-height: 1;
   }
 
+  /* The name WRAPS and the card grows to fit it (the prototype's behaviour). A card is
+     a 120px-wide column, so an ellipsis here is not an edge case — "Masterwork
+     Armorer's Jig" and most authored component names are longer than one line, and
+     truncating turned the grid's only text into "Smoke Cracked Am…". The grid's rows
+     stretch, so the taller card sets its row's height rather than overlapping. */
   .inventory-card-name {
     min-width: 0;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* `anywhere` so a single unbroken token longer than the card still breaks instead
+       of overflowing the frame it cannot be trimmed to fit. */
+    overflow-wrap: anywhere;
     font-size: 11.5px;
     font-weight: 600;
-    line-height: 1.15;
+    line-height: 1.25;
   }
 </style>
