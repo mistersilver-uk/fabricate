@@ -6746,14 +6746,14 @@ async function main() {
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
     results.phaseTimings = phaseTimings;
-    // A browser that already CRASHED (the teardown case) can make close() reject; that
-    // must not abort the finally before summary.json is written. Swallow a teardown-shaped
-    // close error; re-surface anything else.
+    // A browser that already CRASHED (the teardown case) can make close() reject. This is
+    // the finally block and the run's verdict is already recorded in `results`, so a close
+    // failure is post-run cleanup noise — never re-throw here (it would mask the try's
+    // outcome and skip the summary.json write below). Log and continue.
     try {
       await browser.close();
     } catch (closeErr) {
-      if (!isTransientPageTeardown(closeErr?.message)) throw closeErr;
-      process.stderr.write(`Ignoring transient teardown on browser.close(): ${closeErr.message}\n`);
+      process.stderr.write(`browser.close() failed (ignored): ${closeErr.message}\n`);
     }
 
     const combinedTimings = [

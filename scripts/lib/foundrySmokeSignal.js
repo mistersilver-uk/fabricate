@@ -106,8 +106,11 @@ export function classifyCapturedError(text, patterns) {
  * @returns {boolean}
  */
 export function isTransientPageTeardown(message) {
-  return /has been closed|target closed|session closed|page crashed|has been disconnected|browser has disconnected/i.test(
-    String(message ?? '')
+  return (
+    typeof message === 'string' &&
+    /has been closed|target closed|session closed|page crashed|has been disconnected|browser has disconnected/i.test(
+      message
+    )
   );
 }
 

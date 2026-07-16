@@ -321,8 +321,9 @@ test('the harness guards the process against a late teardown rejection and exits
   // swallowing teardown-shaped rejections and failing fast on anything else.
   assert.match(source, /process\.on\('unhandledRejection'/);
   assert.match(source, /isTransientPageTeardown\(message\)/);
-  // browser.close() on a crashed browser cannot abort the finally before summary.json.
-  assert.match(source, /isTransientPageTeardown\(closeErr\?\.message\)/);
+  // browser.close() on a crashed browser is swallowed in the finally (never re-thrown),
+  // so it cannot abort the run before summary.json is written.
+  assert.match(source, /browser\.close\(\) failed \(ignored\)/);
   // The final exit keys on the harness's own verdict, immediately.
   assert.match(source, /process\.exit\(results\.passed \? 0 : 1\)/);
 });
