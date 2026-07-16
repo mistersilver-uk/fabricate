@@ -727,7 +727,10 @@
             <div class="manager-availability-pill-row" data-component-edit-tag-pills>
               {#if selectedTagOptions().length > 0}
                 {#each selectedTagOptions() as option (option.tag)}
-                  <span class="manager-availability-pill" data-component-edit-tag-pill={option.tag}>
+                  <!-- `is-tag` maps the shared pill's `--fab-chip-color` to purple. The
+                       vehicle is Gathering's, and without a mapping these inherited its
+                       AMBER `--fab-warning` default — a warning tone on a plain tag. -->
+                  <span class="manager-availability-pill is-tag" data-component-edit-tag-pill={option.tag}>
                     <i class="fas fa-tag" aria-hidden="true"></i>
                     <span>{option.tag}</span>
                     <button type="button" class="manager-availability-remove" aria-label={removeTagLabel(option.tag)} onclick={() => removeTag(option.tag)} disabled={saving}>
@@ -757,45 +760,56 @@
           {#if essenceDraft.length > 0}
             <div class="manager-component-essence-grid">
               {#each essenceDraft as option (option.id)}
-                <article class="manager-component-essence-card" data-component-edit-essence={option.id}>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    onclick={() => adjustEssence(option.id, -1)}
-                    aria-label={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
-                    title={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
-                    disabled={saving}
-                  >
-                    <i class="fas fa-minus" aria-hidden="true"></i>
-                  </button>
+                <!-- IDENTITY FIRST, then the stepper (issue 676, brief §C5). The card was
+                     one 5-column run rendering −, qty, +, icon, name: the control came
+                     before the thing it counted, and nothing distinguished a contributed
+                     essence from an untouched one. `is-inactive` carries that tint. -->
+                <article
+                  class={`manager-component-essence-card ${Number(option.quantity) > 0 ? 'is-active' : 'is-inactive'}`}
+                  data-component-edit-essence={option.id}
+                  data-component-essence-active={Number(option.quantity) > 0}
+                >
+                  <div class="manager-component-essence-identity">
+                    <span class="manager-component-essence-icon" aria-hidden="true">
+                      <i class={option.icon || 'fas fa-mortar-pestle'}></i>
+                    </span>
+                    <strong class="manager-component-essence-name" title={option.name}>{option.name}</strong>
+                  </div>
 
-                  <input
-                    class="manager-component-essence-quantity"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={option.quantity}
-                    aria-label={text('FABRICATE.Admin.Items.Editor.QuantityLabel', 'Quantity for {name}').replace('{name}', option.name)}
-                    oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
-                    disabled={saving}
-                  />
+                  <div class="manager-component-essence-stepper">
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      onclick={() => adjustEssence(option.id, -1)}
+                      aria-label={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
+                      title={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
+                      disabled={saving}
+                    >
+                      <i class="fas fa-minus" aria-hidden="true"></i>
+                    </button>
 
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    onclick={() => adjustEssence(option.id, 1)}
-                    aria-label={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
-                    title={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
-                    disabled={saving}
-                  >
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                  </button>
+                    <input
+                      class="manager-component-essence-quantity"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={option.quantity}
+                      aria-label={text('FABRICATE.Admin.Items.Editor.QuantityLabel', 'Quantity for {name}').replace('{name}', option.name)}
+                      oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
+                      disabled={saving}
+                    />
 
-                  <span class="manager-component-essence-icon" aria-hidden="true">
-                    <i class={option.icon || 'fas fa-mortar-pestle'}></i>
-                  </span>
-
-                  <strong class="manager-component-essence-name">{option.name}</strong>
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      onclick={() => adjustEssence(option.id, 1)}
+                      aria-label={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
+                      title={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
+                      disabled={saving}
+                    >
+                      <i class="fas fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
                 </article>
               {/each}
             </div>

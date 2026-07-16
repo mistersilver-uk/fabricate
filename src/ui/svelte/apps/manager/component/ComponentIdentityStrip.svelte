@@ -73,6 +73,17 @@
   const showPremiseNote = $derived(hasRegisteredItemUuid && !sourceMissing);
   const showOverflow = $derived(hasRegisteredItemUuid);
 
+  // ── THE DROP TARGET IS THE WHOLE STRIP ─────────────────────────────────────────
+  // Only the inner zone used to react, so a GM dragging an item over the strip's
+  // heading — the obvious place to aim, and most of the strip's area — got no feedback
+  // at all and had to find the small inner box. `dragDrop` is therefore attached at
+  // SECTION level and is the single drop handler: nesting a second one inside would
+  // double-fire on the bubbling drop.
+  //
+  // `onActiveChange` (not just `activeClass`) because the swap is not purely a CSS
+  // hover state: the icon and the copy change too, and those live in this component.
+  let dropActive = $state(false);
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -135,7 +146,16 @@
      They were two separate cards (a body section and a rail inspector); the strip
      merges them, so the outer card keeps "identity" and the source-linkage block below
      keeps "source". -->
-<section class="manager-task-core-card manager-component-identity-strip" data-component-edit-section="identity">
+<section
+  class="manager-task-core-card manager-component-identity-strip"
+  data-component-edit-section="identity"
+  data-component-identity-drop-active={dropActive}
+  use:dragDrop={{
+    onDrop: handleSourceDrop,
+    activeClass: 'is-drop-active',
+    onActiveChange: (active) => { dropActive = active; }
+  }}
+>
   <div class="manager-task-card-heading">
     <div>
       <h3>{text('FABRICATE.Admin.Manager.Component.Identity.Title', 'Identity')}</h3>
@@ -181,18 +201,24 @@
       role="group"
       aria-label={text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item')}
       title={text('FABRICATE.Admin.Manager.Component.SourceCard.ReplaceHint', 'Drop a Foundry item to replace it, or right-click to unlink.')}
-      use:dragDrop={{ onDrop: handleSourceDrop, activeClass: 'is-drop-active' }}
       oncontextmenu={(event) => { event.preventDefault(); unlinkSource(); }}
       onmousedown={onLinkedSourceMouseDown}
     >
-      {#if sourceMissing}
+      {#if dropActive}
+        <!-- Under a drag the strip stops describing the CURRENT link and describes what
+             releasing will do — the swap is destructive-ish (it restamps the roles map
+             and commits immediately), so it says so before the drop, not after. -->
+        <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-arrow-down-to-bracket"></i></span>
+      {:else if sourceMissing}
         <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-link-slash"></i></span>
       {:else if component?.img}
         <img class="manager-environment-scene-thumb" src={component.img} alt="" />
       {:else}
         <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-box-open"></i></span>
       {/if}
-      {#if sourceMissing}
+      {#if dropActive}
+        <span class="manager-environment-scene-name manager-muted" data-component-source-release>{text('FABRICATE.Admin.Manager.Component.SourceCard.ReleaseToSwap', 'Release to swap the linked item')}</span>
+      {:else if sourceMissing}
         <span class="manager-environment-scene-name manager-muted" data-component-source-unresolved>{text('FABRICATE.Admin.Manager.Component.SourceCard.MissingLabel', 'Source item unresolved')}</span>
       {:else}
         <button
@@ -213,10 +239,11 @@
       class="manager-environment-scene-dropzone manager-component-source-drop-target"
       data-component-edit-action="replace-source"
       data-component-source-dropzone
-      use:dragDrop={{ onDrop: handleSourceDrop, activeClass: 'is-drop-active' }}
     >
-      <i class="fas fa-box" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.NoSourceHint', 'Drop or replace a Foundry item to link this component to a source.')}</span>
+      <i class={dropActive ? 'fas fa-arrow-down-to-bracket' : 'fas fa-box'} aria-hidden="true"></i>
+      <span>{dropActive
+        ? text('FABRICATE.Admin.Manager.Component.SourceCard.ReleaseToSwap', 'Release to swap the linked item')
+        : text('FABRICATE.Admin.Manager.Component.SourceCard.NoSourceHint', 'Drop or replace a Foundry item to link this component to a source.')}</span>
     </div>
   {/if}
   </div>
