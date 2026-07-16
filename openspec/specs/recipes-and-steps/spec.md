@@ -389,8 +389,9 @@ SalvageRun = {
     quantity: number,
   }>,
   createdResults?: Array<{
-    actorUuid: string,
     itemUuid: string,
+    // the producing component id, or `null` for pre-fix historical runs
+    componentId: string | null,
     quantity: number,
   }>,
 }

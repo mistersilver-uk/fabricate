@@ -1339,6 +1339,59 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
   assert.equal(stored.history[0].componentId, 'comp-1', 'Most recent run should be at index 0');
 });
 
+test('salvage run createdResults record the awarding componentId, in award order (issue 659)', async () => {
+  // A single result group awards two distinct components. The persisted run's
+  // createdResults must carry each awarding componentId (not the pre-fix
+  // hardcoded null), and in the order the results were awarded.
+  const scrapIron = { id: 'scrap-iron', name: 'Iron Scrap', registeredItemUuid: null };
+  const scrapWood = { id: 'scrap-wood', name: 'Wood Scrap', registeredItemUuid: null };
+
+  const compItem = makeItem('comp-item', 'Broken Relic', 1);
+  const actor = makeActor('actor-659', [compItem]);
+
+  const resultGroup = {
+    id: 'rg-1', name: 'Scraps',
+    results: [
+      { id: 'r-1', componentId: 'scrap-iron', quantity: 2 },
+      { id: 'r-2', componentId: 'scrap-wood', quantity: 3 }
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Broken Relic',
+    salvage: { enabled: true, ingredientQuantity: 1, toolIds: [], resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    id: 'sys-659',
+    salvageEnabled: true,
+    salvageResolutionMode: 'simple',
+    salvageCraftingCheck: {
+      enabled: false, macroUuid: null, outcomes: [], progressive: null,
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: true }
+    },
+    components: [component, scrapIron, scrapWood],
+    tools: []
+  });
+
+  const realResolutionService = new ResolutionModeService({ getSystem: () => system });
+  const engine = makeEngine({ resolutionModeService: realResolutionService });
+  engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+  engine._applyToolBreakage = async () => [];
+
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true, `Expected success but got: ${result.message}`);
+  const createdResults = result.salvageRun.createdResults;
+  assert.ok(Array.isArray(createdResults), 'createdResults should be an array');
+  assert.equal(createdResults.length, 2, 'both awarded results should be recorded');
+  assert.deepEqual(
+    createdResults.map((r) => r.componentId),
+    ['scrap-iron', 'scrap-wood'],
+    'createdResults must carry the awarding componentId in award order — not null'
+  );
+});
+
 test('salvage() creates a waitingTime run when salvage has a time requirement', async () => {
   const engine = makeEngine();
   const salvageRunManager = engine.salvageRunManager;
