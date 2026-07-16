@@ -74,13 +74,17 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
       'all three inspector actions are manager-button controls'
     );
     // The selectors chain `.manager-button` (0,3,0) so they beat the base
-    // `.manager-button` rule declared later in the sheet — issue 643.
+    // `.manager-button` rule declared later in the sheet — issue 643. Each rule is now
+    // SHARED with the component browser inspector's matching action (issue 676), so the
+    // recipe selector heads a list rather than standing alone: match it either way.
     for (const selector of [
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'
     ]) {
-      const cssBlock = css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)));
+      const start = css.indexOf(selector);
+      assert.ok(start >= 0, `${selector} should own a rule`);
+      const cssBlock = css.slice(start, css.indexOf('}', start));
       assert.ok(cssBlock.includes('width: 100%;'), `${selector} should be full width`);
     }
   });
@@ -100,7 +104,9 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
 
 describe('inspector action button layout', () => {
   it('stacks the inspector actions in a single non-wrapping column', () => {
-    const start = css.indexOf('.fabricate-manager .manager-recipe-browser-inspector-actions {');
+    // The COMPONENT browser inspector (issue 676) shares this rule rather than
+    // re-deriving a second copy, so the recipe selector is no longer the whole prelude.
+    const start = css.indexOf('.fabricate-manager .manager-recipe-browser-inspector-actions,');
     assert.ok(start >= 0, 'inspector actions rule should exist');
     const end = css.indexOf('}', start);
     const block = css.slice(start, end);

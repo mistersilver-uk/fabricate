@@ -63,9 +63,11 @@ function compileManagerRoot() {
   for (const componentEditorPart of ['ComponentEditorHeader', 'ComponentIdentityStrip']) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/component/${componentEditorPart}.svelte`);
   }
-  // The library's row, extracted out of the browser (issue 676). It lives under
-  // `components/` — NOT `component/`, which the screenshot map globs for the EDITOR.
+  // The library's row and its inspector, both extracted out of the browser / the root
+  // (issue 676). They live under `components/` — NOT `component/`, which the screenshot
+  // map globs for the EDITOR.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -4885,7 +4887,15 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
-    assert.ok(target.textContent.includes('Component directory'));
+    // The view renders NO page header of its own (issue 676): the shell already renders
+    // the breadcrumb / "Components" / subtitle block, and a second kicker + "Component
+    // directory" + subtitle under it was ~74px of duplicated chrome. The Recipe Studio
+    // deleted exactly this, and ruling 1 says it wins.
+    assert.equal(
+      target.querySelector('.manager-main .manager-section-header'),
+      null,
+      'the browser renders no second page header'
+    );
     assert.ok(target.textContent.includes('Drop items to add components'));
     assert.ok(target.textContent.includes('Iron Ore'));
     assert.ok(target.textContent.includes('Compendium'));
@@ -4963,10 +4973,28 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the general bucket renders no redundant badge'
     );
 
-    target.querySelector('[data-clear-filters="components"]').click();
+    // Filters clear through the dismissible CHIP run (issue 676), adopted from the Recipe
+    // Studio: the lone "Clear filters" button said that filters were on but never which
+    // ones. `data-clear-filters="components"` survives only on the filtered-to-nothing
+    // panel, which is not this state.
+    const categoryChip = target.querySelector('[data-component-filter-chip="category"]');
+    assert.ok(categoryChip, 'an active category filter announces itself as a chip');
+    assert.ok(
+      categoryChip.textContent.includes('General'),
+      'the chip names the LOCALIZED category, not the raw `general` token'
+    );
+    categoryChip.querySelector('button').click();
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
+    assert.equal(
+      target.querySelector('[data-component-filter-chip="category"]'),
+      null,
+      'clearing the chip clears the filter it names'
+    );
+    // The count reports the page WINDOW, not "2 of 2" — `paginateComponents` has computed
+    // the range since it was written and the view never read it.
+    assert.equal(target.querySelector('[data-component-count]').textContent.trim(), '1–2 of 2');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
@@ -4983,30 +5011,36 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(copySourceAction.getAttribute('title'), 'Compendium.fabricate.items.iron-ore');
     copySourceAction.click();
     flushSync();
-    assert.equal(
+    // Copy and Delete are HOSTED here (issue 676) — they were rehomed off the row, whose
+    // three ghost icons had turned it into a toolbar. The inspector is the reason the row
+    // can carry one action, so these must exist rather than be absent.
+    assert.ok(
       target.querySelector('[data-component-action="edit"]'),
-      null,
-      'component inspector should not duplicate row edit action'
-    );
-    assert.equal(
-      target.querySelector('[data-component-action="delete"]'),
-      null,
-      'component inspector should not duplicate row delete action'
+      'component inspector offers Edit'
     );
     assert.ok(
-      target.querySelector('[data-component-section="source"]'),
-      'component inspector should expose a Source section'
+      target.querySelector('[data-component-action="delete"]'),
+      'component inspector hosts the Delete rehomed off the row'
+    );
+    assert.ok(
+      target.querySelector('[data-component-action="unlink"]'),
+      'component inspector offers Unlink for a linked component'
     );
     assert.equal(
       target.querySelector('[data-component-source-missing]'),
       null,
       'resolved source should not show a missing-source warning'
     );
-    const componentHeroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
-    assert.ok(componentHeroRow, 'component inspector should use the prominent hero title row');
+    const componentInspector = target.querySelector('[data-component-inspector]');
+    assert.ok(componentInspector, 'the components route renders the browser inspector');
     assert.ok(
-      componentHeroRow.querySelector('.manager-component-preview'),
-      'component inspector hero should render the component preview image'
+      componentInspector.querySelector('.manager-component-browser-inspector-hero .fab-medallion'),
+      'the inspector hero renders the shared Medallion, not a bespoke preview img'
+    );
+    assert.equal(
+      componentInspector.querySelectorAll('[data-component-fact]').length,
+      2,
+      'the inspector reports the two stat tiles (tags / essences)'
     );
 
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
@@ -5035,7 +5069,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'components',
       'breadcrumb Components button should return to the components browser'
     );
-    target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]').click();
+    // Delete now fires from the INSPECTOR, not the row: the row carries one action.
+    assert.equal(
+      target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]'),
+      null,
+      'the row no longer carries a delete icon'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-component-id="c1"] .manager-action-group button').length,
+      1,
+      'the row carries exactly ONE action — three ghost icons made it a toolbar'
+    );
+    target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-component-action="delete"]').click();
+    flushSync();
 
     assert.deepEqual(dropped, [{ type: 'Item', uuid: 'Item.dropped' }]);
     assert.deepEqual(copied, ['Compendium.fabricate.items.iron-ore']);
@@ -5132,9 +5181,33 @@ describe('CraftingSystemManager mounted behavior', () => {
       'component-edit',
       'row Edit should land on the component-edit route'
     );
+    // Issue 676, decision 4: the editor header is the COMPONENT's identity, matching the
+    // recipe editor's exactly — its image, its NAME as the h1, and a
+    // "<category> · Linked <source>" subline. This route used to fall through to the
+    // generic static "Edit component" heading, which the decision required it not to.
+    const editHeading = target.querySelector('[data-component-edit-heading]');
+    assert.ok(editHeading, 'the component editor renders its own identity heading');
+    assert.equal(
+      editHeading.querySelector('h1.manager-title').textContent.trim(),
+      'Iron Ore',
+      'the heading names the component, not the route'
+    );
     assert.ok(
-      target.textContent.includes('Edit component'),
-      'header should show the Edit component title'
+      editHeading.querySelector('.fab-medallion'),
+      'the heading leads with the shared Medallion, as the recipe editor does'
+    );
+    assert.equal(
+      editHeading.querySelector('[data-component-edit-subline]').textContent.trim(),
+      'Reagent · Linked Compendium',
+      'the subline reads "<category> · Linked <source>"'
+    );
+    // The breadcrumb names the component too — not the generic string the recipe
+    // breadcrumb's own comment rejects.
+    assert.ok(
+      Array.from(target.querySelectorAll('.manager-breadcrumbs span')).some(
+        (node) => node.textContent.trim() === 'Iron Ore'
+      ),
+      'the breadcrumb names the component'
     );
     assert.ok(
       target.querySelector('[data-component-edit-section="identity"]'),

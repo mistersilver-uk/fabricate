@@ -46,6 +46,18 @@
  * The EXPECTED map below is therefore measured from the real cascade and cross-checked
  * against the scale above; each entry notes the prototype target it corresponds to.
  * Change a size on purpose -> update this map on purpose.
+ *
+ * ── THE FIXTURE IS A MIRROR, AND MIRRORS ROT ─────────────────────────────────────
+ * The fixture below is hand-maintained markup standing in for the real components. That
+ * makes this gate able to measure a cascade the DOM can't — and able to go on happily
+ * measuring markup the product no longer renders. It did exactly that: it pinned a
+ * `.manager-filter` span and a `.manager-button.manager-component-group-toggle` (a class
+ * with no CSS anywhere), and its own comments recorded the resulting drift as if it were
+ * a finding rather than a defect. Issue 676 rebuilt the browser on the Recipe Studio's
+ * toolbar and this fixture was re-derived from the shipped markup and re-measured.
+ *
+ * So: when you change the Component Studio's markup, UPDATE THIS FIXTURE FIRST, then
+ * re-measure. A green run against stale fixture markup proves nothing at all.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -64,40 +76,61 @@ const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="components">
-        <section class="manager-section-header">
-          <div class="manager-heading">
-            <p class="manager-kicker" data-m="kicker">Alchemy</p>
-            <h2 class="manager-title" data-m="title">Component directory</h2>
-            <p class="manager-subtitle" data-m="subtitle">Crafting metadata on borrowed Foundry items.</p>
-          </div>
-        </section>
-        <section class="manager-toolbar">
-          <div class="manager-toolbar-primary">
+        <section class="manager-toolbar manager-component-toolbar">
+          <div class="manager-component-filter-row">
             <label class="manager-search">
               <input type="search" data-m="search" value="iron">
             </label>
-            <label class="manager-filter">
-              <span data-m="filter-label">Category</span>
-              <select data-m="filter-select"><option>All categories</option></select>
-            </label>
-            <button class="manager-button manager-component-group-toggle" data-m="toolbar-button"><span>Group by category</span></button>
+            <select class="manager-component-essence-filter" data-m="essence-select"><option>All essences</option></select>
+          </div>
+          <div class="manager-component-filter-row is-secondary">
+            <select class="manager-component-category-filter" data-m="filter-select"><option>All categories (4)</option></select>
+            <span class="manager-component-filter-divider"></span>
+            <div class="manager-component-filter-field">
+              <span class="manager-component-filter-label" data-m="filter-label">Group by category</span>
+              <button class="manager-status-toggle is-on" data-component-group-by-category>
+                <span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>
+              </button>
+            </div>
+            <span class="manager-component-filter-divider"></span>
+            <div class="manager-component-filter-field">
+              <span class="manager-component-filter-label">Sort by</span>
+              <select data-m="sort-select"><option>Name</option></select>
+              <button class="manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
+            </div>
+          </div>
+          <div class="manager-component-filter-row is-chips">
+            <span class="manager-chip is-info manager-component-filter-chip" data-m="filter-chip"><span>Category: Reagent</span></span>
+            <span class="manager-component-count" data-m="count">1–2 of 2</span>
           </div>
         </section>
         <div class="manager-components-list">
-          <div class="manager-component-row">
-            <button class="manager-component-identity">
-              <span class="manager-component-chip"><img alt="" src=""></span>
-              <span class="manager-system-copy">
-                <span class="manager-system-name" data-m="row-name">Iron Ore</span>
-                <span class="manager-system-description" data-m="row-description">Unrefined metal.</span>
+          <ul class="manager-component-group-body">
+            <li class="manager-component-row">
+              <button class="manager-component-identity">
+                <span class="manager-system-copy">
+                  <span class="manager-system-name" data-m="row-name">Iron Ore</span>
+                  <span class="manager-system-description" data-m="row-description">Unrefined metal.</span>
+                </span>
+              </button>
+              <span class="manager-component-row-meta">
+                <span class="manager-chip manager-component-category-badge" data-m="row-badge">Reagent</span>
+                <span class="manager-chip is-info manager-component-difficulty-badge" data-m="row-difficulty"><span>Progressive difficulty 2</span></span>
               </span>
-            </button>
-            <span class="manager-component-row-meta">
-              <span class="manager-chip manager-component-category-badge" data-m="row-badge">Reagent</span>
-              <span class="manager-chip is-info manager-component-difficulty-badge" data-m="row-difficulty"><span>Progressive difficulty 2</span></span>
-            </span>
-          </div>
+            </li>
+          </ul>
         </div>
+        <section class="manager-component-browser-inspector">
+          <p class="manager-component-browser-inspector-label" data-m="inspector-label">Selected component</p>
+          <p class="manager-component-browser-inspector-flavour" data-m="inspector-flavour">Unrefined metal, dug from a hillside.</p>
+          <div class="manager-component-stat-grid">
+            <div class="manager-component-stat">
+              <strong class="manager-component-stat-value" data-m="stat-value">2</strong>
+              <span class="manager-component-stat-label" data-m="stat-label">Tags</span>
+            </div>
+          </div>
+          <span class="manager-availability-pill is-tag" data-m="tag-pill"><span>metal</span></span>
+        </section>
       </div>
 
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="component-edit">
@@ -138,20 +171,36 @@ function page() {
 // px at the 16px root: rem * 16. Each entry names the Phase 0 prototype target it
 // corresponds to, so drift from the design is visible rather than merely tolerated.
 const EXPECTED = {
-  kicker: 11.52, // 0.72rem — prototype eyebrow 9px @ .14em
-  title: 22, // prototype browser h2 22px serif — an exact match
-  subtitle: 11.52, // 0.72rem — prototype page subtitle 12.5px sans
-  // 0.72rem via the Component-Studio bleed fix. Was 14 (Foundry's app base):
-  // `.manager-search input` has no base size, and only `.manager-recipe-toolbar`
-  // scoped its own.
-  search: 11.52, // prototype search input 12.5px sans
-  'filter-label': 12.48, // 0.78rem — prototype toolbar micro-label 8.5px @ .08em
-  'filter-select': 12.48, // 0.78rem — prototype filter/sort select 11.5px sans
-  'toolbar-button': 11.52, // 0.72rem — bleed fix; prototype control text 12.5px sans
+  // ── The toolbar. It is the Recipe Studio's bar now (issue 676, ruling 1), so every
+  // control reads at the shared --fab-recipe-control-font and the micro-label at the
+  // recipe micro-label size. Both numbers MOVED in that change, and both moved TOWARD
+  // the prototype — the map below is re-measured against the real markup, not carried
+  // over. The old map pinned the drift and its own comments admitted it
+  // ("filter-label: 12.48, // prototype toolbar micro-label 8.5px").
+  search: 11.52, // 0.72rem — prototype search input 12.5px sans
+  'filter-label': 8.8, // 0.55rem — prototype toolbar micro-label 8.5px @ .08em (was 12.48)
+  // 0.72rem. These were 14 — Foundry's app base bleeding through — because the Component
+  // Studio's own bleed patch covers `.manager-search input` and `.manager-toolbar
+  // .manager-button` but NOT `select`, and the browser's selects had no font-size rule
+  // at all. Joining `.manager-component-toolbar select` to the recipe rule closed it.
+  'filter-select': 11.52, // prototype filter/sort select 11.5px sans — near-exact
+  'sort-select': 11.52,
+  'essence-select': 11.52,
+  'toolbar-button': 11.52, // 0.72rem — the sort-direction toggle at the compact scale
+  'filter-chip': 12, // 0.75rem — the chip family
+  count: 10.88, // 0.68rem — quiet right-aligned metadata, not a control
+  // ── The list.
   'row-name': 12.16, // 0.76rem serif — bleed fix; prototype row name 13.5px serif
   'row-description': 12.48, // 0.78rem — prototype row description 11px sans
   'row-badge': 12, // 0.75rem — prototype row badge/chip 9px sans
   'row-difficulty': 12, // same chip family
+  // ── The browser inspector (issue 676). It shares the recipe inspector's rules.
+  'inspector-label': 9.28, // 0.58rem — a section micro-label on the panel background
+  'inspector-flavour': 11.52, // 0.72rem — the description, whole
+  'stat-value': 14.72, // 0.92rem serif, tabular figures
+  'stat-label': 9.92, // 0.62rem
+  'tag-pill': 12.16, // 0.76rem — the shared availability pill, now purple via `is-tag`
+  // ── The editor column.
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
   'readonly-label': 13.12, // 0.82rem — locked-field label

@@ -5077,7 +5077,7 @@ async function main() {
 
         // Components → open the editor so the identity card (central column) and the
         // linked-source inspector (right context panel) are captured (#398).
-        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-edit)').first().click();
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-pen)').first().click();
         await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-component-edit-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-component-edit-section="source"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5110,7 +5110,7 @@ async function main() {
         // what this photographs: the mode/DC/routing/reorder chrome is collapsed, but
         // the result-group editor (and its add-group control, the only one in the
         // codebase) is still there.
-        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Sword") button:has(i.fa-edit)')
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Sword") button:has(i.fa-pen)')
           .first().click();
         await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
@@ -5529,7 +5529,7 @@ async function main() {
             // the Unsaved chip, and the editor Save flow are captured together. Save
             // afterwards so the dirty draft does not trip the discard guard on exit.
             if (blockedNames[1]) {
-              await page.locator(`.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) button:has(i.fa-edit)`)
+              await page.locator(`.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) button:has(i.fa-pen)`)
                 .first().click();
               await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
                 .waitFor({ state: 'visible', timeout: 5_000 });

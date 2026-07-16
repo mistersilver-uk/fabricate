@@ -588,16 +588,20 @@ test('manager recipes browser defines a non-overflowing card row', () => {
 
   // The recipe row LEFT the shared 76px row-card geometry group: it is a denser card at
   // 11px/12px and radius 9 (~62px tall), so a page of recipes shows more of the library
-  // and less of the gaps between it. The other four browser rows keep the 76px group.
+  // and less of the gaps between it. The COMPONENT row followed it (issue 676, ruling 1:
+  // where the Component Studio and the Recipe Studio disagree, the Recipe Studio wins).
+  // The other three browser rows keep the 76px group — this change never visited them.
   assert.ok(
-    css.includes('.fabricate-manager .manager-component-row,\n.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'),
-    'component, environment, gathering task, and essence rows keep the shared 76px row height'
+    css.includes('.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'),
+    'environment, gathering task, and essence rows keep the shared 76px row height'
   );
-  assert.equal(
-    /\.manager-recipe-row,\n[^{]*min-height: 76px/.test(css),
-    false,
-    'the recipe row must not still be in the 76px geometry group'
-  );
+  for (const row of ['manager-recipe-row', 'manager-component-row']) {
+    assert.equal(
+      new RegExp(`\\.${row},\\n[^{]*min-height: 76px`).test(css),
+      false,
+      `the ${row} must not still be in the 76px geometry group`
+    );
+  }
   assert.ok(rowBlock.includes('min-height: 62px;'), 'the recipe row is the denser library card');
   assert.ok(rowBlock.includes('padding: 11px 12px;'), 'the recipe row uses the library card padding');
   assert.ok(rowBlock.includes('border-radius: 9px;'), 'the recipe row uses the library card radius');
@@ -610,10 +614,11 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   );
 
   // Selection is the accent BORDER. A ring plus an inset left bar is the same statement
-  // made twice, and the bar bit into the row's medallion.
+  // made twice, and the bar bit into the row's medallion. The COMPONENT row joined the
+  // opt-out in issue 676: it now leads with the same Medallion, so it had the same defect.
   assert.ok(
-    blockFor('.fabricate-manager .manager-recipe-row.is-selected').includes('box-shadow: none;'),
-    'the selected recipe row rings in the accent and adds no left bar'
+    blockFor('.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected').includes('box-shadow: none;'),
+    'the selected recipe and component rows ring in the accent and add no left bar'
   );
 });
 
@@ -687,8 +692,11 @@ test('long-labelled switches escape the status cell geometry', () => {
   // leaves ~36px. It now carries NO label of its own — the uppercase micro-label beside it
   // is its accessible name (`aria-labelledby`) — so it is track-only, and it opts out of
   // the status-cell cap so the track is not squeezed either.
+  // The component library's grouping switch (issue 676) shares the rule: it shipped as a
+  // `.manager-button` under a class carrying NO CSS at all, so its pressed state had no
+  // visual expression whatsoever.
   const groupToggleBlock = blockFor(
-    '.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle]'
+    '.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle],\n.fabricate-manager .manager-component-filter-row .manager-status-toggle[data-component-group-by-category]'
   );
   assert.ok(
     groupToggleBlock.includes('max-width: none;'),
@@ -698,10 +706,13 @@ test('long-labelled switches escape the status cell geometry', () => {
 
   // The micro-label is what titles the control, and `white-space: nowrap` is the whole
   // reason "Sort by" no longer breaks onto two lines in the flagship frame.
-  const filterLabelBlock = blockFor('.fabricate-manager .manager-recipe-filter-label');
+  const filterLabelBlock = blockFor('.fabricate-manager .manager-recipe-filter-label,\n.fabricate-manager .manager-component-filter-label');
   assert.ok(filterLabelBlock.includes('white-space: nowrap;'), 'a filter micro-label never wraps');
   assert.ok(filterLabelBlock.includes('text-transform: uppercase;'), 'a filter micro-label is a micro-label');
-  assert.ok(blockFor('.fabricate-manager .manager-recipe-filter-divider').includes('width: 1px;'), 'the view controls are ruled apart');
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipe-filter-divider,\n.fabricate-manager .manager-component-filter-divider').includes('width: 1px;'),
+    'the view controls are ruled apart'
+  );
 
   // (2) The Overview Enabled/Locked status cards are left-aligned rows (icon + copy
   // + switch), not the media column's centred, 14ch-clamped stack (issue 643).
@@ -1322,18 +1333,20 @@ test('manager components browser defines drop target and compact responsive list
   const listBlock = blockFor('.fabricate-manager .manager-components-list');
   const rowBlock = blockFor('.fabricate-manager .manager-component-row');
   const rowMetaBlock = blockFor('.fabricate-manager .manager-component-row-meta');
-  const chipBlock = blockFor('.fabricate-manager .manager-component-chip');
   const toolbarBlock = Array.from(css.matchAll(/\.fabricate-manager \.manager-toolbar\s*\{[\s\S]*?\}/g))
     .map(match => match[0])
     .join('\n');
-  const toolbarPrimaryBlock = blockFor('.fabricate-manager .manager-toolbar-primary');
   const dropBlock = blockFor('.fabricate-manager .manager-component-drop-zone');
   const identityBlock = blockFor('.fabricate-manager .manager-component-identity');
   const componentCopyBlock = blockFor('.fabricate-manager .manager-component-identity .manager-system-copy');
 
+  // Drop target, toolbar, LIST (it takes the slack), pager. The view's own duplicate page
+  // header is gone (issue 676 — the shell already renders one), so the growing track must
+  // be the list; leaving the old four-`auto`-then-`1fr` template handed it to the PAGER.
   assert.ok(
-    css.includes('.fabricate-manager[data-manager-view="components"] .manager-main'),
-    'components route should reserve rows for header, drop target, toolbar, and list'
+    blockFor('.fabricate-manager[data-manager-view="components"] .manager-main')
+      .includes('grid-template-rows: auto auto minmax(0, 1fr) auto;'),
+    'components route should give the growing row to the list, not the pager'
   );
   assert.equal(
     css.includes('--fab-mv2-component-grid'),
@@ -1344,21 +1357,45 @@ test('manager components browser defines drop target and compact responsive list
   assert.ok(rowBlock.includes('display: flex;'), 'a component row is a flex row, not a column grid');
   assert.ok(rowBlock.includes('flex-wrap: wrap;'), 'a component row wraps rather than compressing');
   assert.ok(rowMetaBlock.includes('flex-wrap: wrap;'), 'the badge run wraps inside the row');
-  assert.ok(
-    chipBlock.includes('background: var(--fab-bg-3);') && !chipBlock.includes('gradient'),
-    'the item chip is a FLAT fill on the surface ramp, never a gradient'
-  );
-  assert.ok(
-    chipBlock.includes('width: var(--fab-cs-chip-sm);'),
-    'the item chip uses the Component Studio dimension alias'
-  );
+  // The row's identity tile is the shared `Medallion` component (issue 676, ruling 1 —
+  // the recipe row already leads with it), which is flat-by-contract in its own scoped
+  // style and carries a real glyph fallback. The hand-rolled `.manager-component-chip` /
+  // `.manager-component-thumb` pair it replaced must not linger as dead CSS.
+  for (const dead of ['manager-component-chip', 'manager-component-thumb', 'manager-component-preview']) {
+    assert.equal(
+      new RegExp(`\\.${dead}[\\s,{:]`).test(css),
+      false,
+      `${dead} was replaced by the shared Medallion and must not survive as dead CSS`
+    );
+  }
+  // The row geometry matches the recipe row, not the 76px group it left.
+  assert.ok(rowBlock.includes('min-height: 62px;'), 'the component row is the denser ~62px card');
+  assert.ok(rowBlock.includes('border-radius: 9px;'), 'the component row takes the recipe row radius');
   assert.ok(dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'), 'component drop zone should reserve icon and copy space');
   assert.ok(dropBlock.includes('margin: var(--fab-space-3);'), 'component drop zone should keep balanced vertical spacing around the toolbar');
   assert.ok(css.includes('.fabricate-manager .manager-component-drop-zone.is-drop-active'), 'component drop zone should expose an active drag state');
   assert.ok(toolbarBlock.includes('display: grid;'), 'manager toolbar should own a grid layout for primary controls and auxiliary rows');
   assert.ok(toolbarBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'manager toolbar grid should keep rows bounded to the main content width');
-  assert.ok(toolbarPrimaryBlock.includes('display: flex;'), 'manager primary toolbar row should lay out controls as a flex row');
-  assert.ok(toolbarPrimaryBlock.includes('flex-wrap: wrap;'), 'manager primary toolbar row should wrap controls without involving selected pills');
+  // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
+  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its
+  // own selects carried no font-size at all and were rendering at Foundry's 14px app base.
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row')
+      .includes('flex-wrap: wrap;'),
+    'the component filter rows share the recipe filter row rule'
+  );
+  assert.ok(
+    blockFor(
+      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar select'
+    ).includes('font-size: var(--fab-recipe-control-font);'),
+    'the component toolbar controls are typed by the shared control font, not the Foundry bleed'
+  );
+  assert.ok(
+    blockFor(
+      '.fabricate-manager .manager-button.manager-recipe-sort-direction,\n.fabricate-manager .manager-button.manager-component-sort-direction'
+    ).includes('border-radius: 9px;'),
+    'the component sort-direction button escapes the boxy base .manager-button scale'
+  );
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
       || css.includes('.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity'),
