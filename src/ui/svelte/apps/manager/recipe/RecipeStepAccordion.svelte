@@ -27,6 +27,11 @@
   let {
     steps = [],
     reorderable = false,
+    // Results and Tools render EVERY step as an always-open card (issue 643 §C1):
+    // the old single-expand accordion (expandedStepId = '') showed NOTHING by default
+    // on those tabs, so the most mode-dependent surfaces shipped unseen. Overview keeps
+    // the collapsing accordion (it is a reorder list), and Ingredients keeps it too.
+    alwaysOpen = false,
     onReorderSteps = () => {},
     onDeleteStep = () => {},
     onUpdateStep = null,
@@ -36,6 +41,10 @@
 
   let expandedStepId = $state('');
   let dragIndex = $state(-1);
+
+  function isOpen(stepId) {
+    return alwaysOpen || expandedStepId === stepId;
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -70,7 +79,7 @@
 <ul class="manager-recipe-steps-list">
   {#each steps as step, index (step.id)}
     <li
-      class={`manager-recipe-steps-row ${expandedStepId === step.id ? 'is-expanded' : ''}`}
+      class={`manager-recipe-steps-row ${isOpen(step.id) ? 'is-expanded' : ''} ${alwaysOpen ? 'is-always-open' : ''}`}
       data-recipe-step-id={step.id}
       ondragover={reorderable ? (event) => event.preventDefault() : undefined}
       ondrop={reorderable ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
@@ -89,20 +98,31 @@
           {#if reorderable}<i class="fas fa-grip-vertical" aria-hidden="true"></i>{/if}
           <span class="manager-environment-comp-order">{index + 1}</span>
         </span>
-        <div
-          role="button"
-          tabindex="0"
-          class="manager-recipe-steps-row-main"
-          aria-expanded={expandedStepId === step.id}
-          onclick={() => toggleStep(step.id)}
-          onkeydown={(event) => onStepKeydown(event, step.id)}
-        >
-          <span class="manager-environment-comp-copy">
-            <span class="manager-environment-comp-name">{stepName(step, index)}</span>
-            <span class="manager-environment-comp-sub">{stepDescription(step) || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description')}</span>
-          </span>
-          <i class={`fas manager-recipe-steps-chevron ${expandedStepId === step.id ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
-        </div>
+        {#if alwaysOpen}
+          <!-- Always-open (Results / Tools): the header is a static label, not a
+               toggle — the body below is permanently rendered. -->
+          <div class="manager-recipe-steps-row-main is-static">
+            <span class="manager-environment-comp-copy">
+              <span class="manager-environment-comp-name">{stepName(step, index)}</span>
+              <span class="manager-environment-comp-sub">{stepDescription(step) || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description')}</span>
+            </span>
+          </div>
+        {:else}
+          <div
+            role="button"
+            tabindex="0"
+            class="manager-recipe-steps-row-main"
+            aria-expanded={expandedStepId === step.id}
+            onclick={() => toggleStep(step.id)}
+            onkeydown={(event) => onStepKeydown(event, step.id)}
+          >
+            <span class="manager-environment-comp-copy">
+              <span class="manager-environment-comp-name">{stepName(step, index)}</span>
+              <span class="manager-environment-comp-sub">{stepDescription(step) || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description')}</span>
+            </span>
+            <i class={`fas manager-recipe-steps-chevron ${expandedStepId === step.id ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+          </div>
+        {/if}
         <div class="manager-recipe-steps-requirements">
           {#if onUpdateStep}
             <RecipeDurationEditor
@@ -121,7 +141,7 @@
         </div>
       </div>
 
-      {#if expandedStepId === step.id && body}
+      {#if isOpen(step.id) && body}
         <div class="manager-recipe-steps-editor">
           {@render body(step, index)}
         </div>

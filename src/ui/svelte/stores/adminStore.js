@@ -81,6 +81,7 @@ import {
   localizeRecipePersistenceError,
 } from '../../../utils/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
+import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -322,13 +323,23 @@ function _buildRequirementPreviewStep(step, index, sharedRecipeToolIds = []) {
       ? Math.max(...ingredientSetSummaries.map((set) => set.toolCount))
       : 0;
 
+  const resultGroups = Array.isArray(step?.resultGroups) ? step.resultGroups : [];
+
   return {
     id: step?.id || `step-${index + 1}`,
     name: step?.name || `Step ${index + 1}`,
     ingredientSetCount: ingredientSets.length,
     ingredientCount: previewIngredientCount,
     toolCount: sharedRecipeToolIds.length + stepToolCount + previewSetToolCount,
-    resultGroupCount: Array.isArray(step?.resultGroups) ? step.resultGroups.length : 0,
+    resultGroupCount: resultGroups.length,
+    // The number of result ITEMS across the step's groups. Distinct from
+    // `resultGroupCount`: the browser row's "N out" half is only meaningful in
+    // `simple` / `progressive` (issue 643 §9); tier- and set-keyed modes render
+    // the GROUP count instead, so both numbers have to be projected.
+    resultItemCount: resultGroups.reduce(
+      (sum, group) => sum + (Array.isArray(group?.results) ? group.results.length : 0),
+      0
+    ),
     hasAlternatives: ingredientSetSummaries.length > 1,
     ingredientSetSummaries,
   };
@@ -404,12 +415,80 @@ function _buildRecipeBrowserDisplay(recipe) {
     description: String(recipe.description || '').trim(),
     stepCount: requirementsPreview.length,
     resultGroupCount: requirementsPreview.reduce((sum, step) => sum + step.resultGroupCount, 0),
+    resultItemCount: requirementsPreview.reduce((sum, step) => sum + step.resultItemCount, 0),
     ingredientCount: requirementsPreview.reduce((sum, step) => sum + step.ingredientCount, 0),
     toolCount: requirementsPreview.reduce((sum, step) => sum + step.toolCount, 0),
     ...structure,
     requirementsPreview,
     isSimple,
   };
+}
+
+/**
+ * The crafting check a recipe row's check pill resolves against, keyed off the
+ * SYSTEM's resolution mode. `routedByCheck` authors its check on the `routed`
+ * slot; `simple`, `alchemy` and `routedByIngredients` share the `simple`
+ * pass/fail slot; `progressive` has its own.
+ * @private
+ */
+function _recipeCheckConfig(system) {
+  const mode = system?.resolutionMode || 'simple';
+  if (mode === 'routedByCheck') return system?.craftingCheck?.routed || null;
+  if (mode === 'progressive') return system?.craftingCheck?.progressive || null;
+  return system?.craftingCheck?.simple || null;
+}
+
+/**
+ * The check pill the recipe row renders (issue 643 §9). The row cannot derive
+ * this — the DC lives on the SYSTEM's check, keyed by the recipe's `checkTierId`
+ * — so it is projected here.
+ *
+ * A check is USABLE only when it has an authored `rollFormula`; "checks enabled"
+ * is not the same thing. The DC resolution mirrors
+ * `CraftingEngine._resolveSimpleCheckDc`: the recipe's selected tier wins, then
+ * the check's static default.
+ *
+ * The two check-less kinds are NOT the same fact, and the row must not tell the GM
+ * they are:
+ *
+ *  - `ingredients` — a `routedByIngredients` system with no usable check. Results
+ *    route off the ingredient set that was used, so the recipe resolves perfectly
+ *    well with no roll. This is a working configuration, reported neutrally.
+ *  - `none` — every other mode with no usable check. The system cannot roll for this
+ *    recipe, which is a state the GM should be able to SCAN a library for, so it
+ *    carries a warning rather than an em dash that says nothing.
+ *
+ * @param {object} system the selected crafting system (raw, not projected).
+ * @param {object} recipe the Recipe model.
+ * @returns {{kind: 'none' | 'ingredients' | 'progressive' | 'dynamic' | 'dc', dc: number | null}}
+ * @private
+ */
+function _buildRecipeCheckSummary(system, recipe) {
+  const mode = system?.resolutionMode || 'simple';
+  // Alchemy's own check mode is system-level and independent of the crafting
+  // check; `none` means the recipe resolves with no check at all.
+  if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'none') {
+    return { kind: 'none', dc: null };
+  }
+
+  const config = _recipeCheckConfig(system);
+  const hasRollFormula = Boolean(String(config?.rollFormula ?? '').trim());
+  if (!config || !hasRollFormula) {
+    return mode === 'routedByIngredients'
+      ? { kind: 'ingredients', dc: null }
+      : { kind: 'none', dc: null };
+  }
+  if (mode === 'progressive') return { kind: 'progressive', dc: null };
+  // A dynamic DC is macro-resolved at craft time; there is no static number to show.
+  if (config.dcMode === 'dynamic') return { kind: 'dynamic', dc: null };
+
+  const tiers = Array.isArray(config.tiers) ? config.tiers : [];
+  const tier = recipe?.checkTierId ? tiers.find((entry) => entry?.id === recipe.checkTierId) : null;
+  const tierDc = Number(tier?.dc);
+  if (tier && Number.isFinite(tierDc)) return { kind: 'dc', dc: Math.trunc(tierDc) };
+
+  const defaultDc = Number(config.dc);
+  return { kind: 'dc', dc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15 };
 }
 
 function _getManagedItems(system) {
@@ -1560,9 +1639,15 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       recipeItemName: recipeItemDefinition?.name || '',
       recipeItemImg: recipeItemDefinition?.img || '',
       recipeItemSourceUuid: recipeItemDefinition?.originItemUuid || '',
+      // The row's check pill: the system check's DC resolved through this recipe's
+      // `checkTierId`, or `{ kind: 'none' }` when the system has no USABLE check
+      // (usable iff an authored rollFormula exists — "checks enabled" is not the
+      // same thing). The row cannot derive this (issue 643 §9).
+      checkSummary: _buildRecipeCheckSummary(selectedSystem, recipe),
       isSimple: display.isSimple,
       stepCount: display.stepCount,
       resultGroupCount: display.resultGroupCount,
+      resultItemCount: display.resultItemCount,
       ingredientCount: display.ingredientCount,
       toolCount: display.toolCount,
       structureKey: display.structureKey,
@@ -2231,6 +2316,10 @@ export function createAdminStore(services) {
     recipeCategories: [],
     showVisibilitySummary: false,
     worldUsers: [],
+    // EVERY world actor (not the player-character roster), each carrying its
+    // control set. The recipe editor's context rail resolves granted character
+    // ids over this list; see `src/utils/recipeAccessRoster.js`.
+    accessCharacters: [],
     // The derived `evaluateSystemValidation` report for the selected system,
     // consumed by the GM system-overview view, its rail count badge, and the
     // system-blocker banner. A derived/computed view — nothing is persisted on
@@ -3413,15 +3502,39 @@ export function createAdminStore(services) {
     }));
   }
 
-  // Re-project the non-GM world users backing the per-recipe restriction
-  // allow-list. Cheap and surgical (no full `refresh()`), so the owning app can
-  // wire it to Foundry's user CRUD hooks and keep the allow-list current when a
-  // player is added, renamed, or removed while the manager is open.
-  function refreshWorldUsers() {
+  // Re-project BOTH access rosters (non-GM users + every world actor with its
+  // control set). The owning app wires this to user AND actor CRUD, because
+  // `controlledBy` / `sharedWithAllPlayers` derive from `actor.ownership` as well as
+  // from `user.character`. Cheap and surgical: no full `refresh()`.
+  //
+  // This REPLACED a users-only `refreshWorldUsers`, which had no production caller left
+  // once the hooks moved here: the two rosters move together, because the same user and
+  // actor CRUD changes both.
+  function refreshAccessRosters() {
     viewState.update((state) => ({
       ...state,
       worldUsers: services.getWorldUsers?.() || [],
+      accessCharacters: services.getAccessCharacterActors?.() || [],
     }));
+  }
+
+  /**
+   * Resolve a recipe's `access` grant into displayable player / character rows.
+   * Resolution lives HERE (not in the rail): the rail receives resolved rows and
+   * never touches ids. Unresolvable ids are dropped from display and never persisted
+   * away — the rail is read-only.
+   *
+   * @param {{characterIds?: string[], playerIds?: string[]}|null} access
+   * @param {{players?: object[], characters?: object[]}} [rosters] Defaults to the
+   *   currently projected rosters; callers inside a Svelte `$derived` pass them
+   *   explicitly so the reactive dependency is visible.
+   */
+  function resolveRecipeAccess(access, rosters = null) {
+    const state = rosters || get(viewState);
+    return resolveRecipeAccessRoster(access, {
+      players: state.players || state.worldUsers || [],
+      characters: state.characters || state.accessCharacters || [],
+    });
   }
 
   async function _saveGatheringConfig(config) {
@@ -4614,6 +4727,9 @@ export function createAdminStore(services) {
     // Non-GM world users, for the per-recipe "restrict to specific users" editor.
     // Sourced through the injected service so the store never touches `game.*`.
     const worldUsers = services.getWorldUsers?.() || [];
+    // Every world actor with its control set (see getAccessCharacterActors): the
+    // rail resolves granted character ids over this, NOT the PC-filtered roster.
+    const accessCharacters = services.getAccessCharacterActors?.() || [];
 
     let selectedSystemData = null;
     let essenceCards = [];
@@ -4683,6 +4799,7 @@ export function createAdminStore(services) {
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
+      accessCharacters,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
     }));
@@ -4761,6 +4878,7 @@ export function createAdminStore(services) {
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
+      accessCharacters,
       systemValidation,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
@@ -7440,23 +7558,76 @@ export function createAdminStore(services) {
     }
   }
 
-  async function toggleRecipeEnabled(recipeId, enabled) {
+  /**
+   * Enable / disable a recipe. Disabling is always allowed; ENABLING an incomplete
+   * recipe (or one with a conflicting signature) is rejected by `updateRecipe` — so
+   * this is a GATED write, in explicit contrast to `toggleRecipeLocked` below.
+   *
+   * The refusal reason is localized once here and then surfaced ONCE. When the
+   * caller supplies `onBlocked` (the recipe library's in-window flash, issue 643),
+   * the flash OWNS the message and the Foundry notification is SUPPRESSED — the GM
+   * must not be told the same thing twice, in two places, one of which is easy to
+   * miss behind a maximised manager window. With no `onBlocked`, the notification
+   * remains the only channel and still fires.
+   *
+   * @param {string} recipeId
+   * @param {boolean} enabled
+   * @param {{onBlocked?: (message: string) => void}} [options]
+   * @returns {Promise<boolean>} whether the write landed.
+   */
+  async function toggleRecipeEnabled(recipeId, enabled, options = {}) {
     const recipeManager = services.getRecipeManager();
 
     try {
-      // Disabling is always allowed; enabling a recipe that is incomplete or has a conflicting
-      // signature is rejected by updateRecipe and surfaced as an error below.
-      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true });
+      // notify:false — the toggle is the GM's own explicit editor action with immediate
+      // visual feedback, so the "Recipe updated" toast is noise.
+      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true, notify: false });
       await refresh();
       return true;
     } catch (err) {
       console.error('Fabricate | Failed to toggle recipe enabled state:', err);
-      // An enable/save failure is surfaced as a localized, id-free toast:
+      // An enable/save failure is surfaced as a localized, id-free message:
       // RecipeActivationError (enable, issue 550) or RecipePersistenceError (save,
       // issue 595) each carry coded issues the localizer maps to lang copy.
-      services.notify?.error?.(
+      const message =
         localizeRecipeActivationError(err, services.localize) ||
-          localizeRecipePersistenceError(err, services.localize) ||
+        localizeRecipePersistenceError(err, services.localize) ||
+        err?.message ||
+        'Failed to update recipe';
+
+      if (typeof options?.onBlocked === 'function') options.onBlocked(message);
+      else services.notify?.error?.(message);
+      return false;
+    }
+  }
+
+  /**
+   * Lock / unlock a recipe. A locked recipe stays VISIBLE to players but only a GM
+   * can craft it (`CraftingEngine.guardCraftStart` → 'Recipe is locked').
+   *
+   * This write is NEVER gated, which is the whole point of it existing separately
+   * from `toggleRecipeEnabled`: locking is an authoring affordance a GM reaches for
+   * precisely while a recipe is unfinished, so refusing it on incompleteness would
+   * make it useless exactly when it is wanted. `allowIncomplete: true` therefore
+   * applies in BOTH directions, and there is no activation gate to catch.
+   *
+   * @param {string} recipeId
+   * @param {boolean} locked
+   * @returns {Promise<boolean>} whether the write landed.
+   */
+  async function toggleRecipeLocked(recipeId, locked) {
+    const recipeManager = services.getRecipeManager();
+
+    try {
+      // notify:false — same as the enabled toggle: an explicit editor action with
+      // immediate visual feedback needs no "Recipe updated" toast.
+      await recipeManager.updateRecipe(recipeId, { locked: locked === true }, { allowIncomplete: true, notify: false });
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to toggle recipe locked state:', err);
+      services.notify?.error?.(
+        localizeRecipePersistenceError(err, services.localize) ||
           err?.message ||
           'Failed to update recipe'
       );
@@ -7854,6 +8025,7 @@ export function createAdminStore(services) {
     deleteRecipe,
     duplicateRecipe,
     toggleRecipeEnabled,
+    toggleRecipeLocked,
     updateRecipe,
     getRecipeSignatureConflicts,
     getPcRoster,
@@ -7901,7 +8073,8 @@ export function createAdminStore(services) {
     setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
     refresh,
     refreshGatheringConfig,
-    refreshWorldUsers,
+    refreshAccessRosters,
+    resolveRecipeAccess,
     destroy,
   };
 }

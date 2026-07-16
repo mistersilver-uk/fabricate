@@ -52,12 +52,23 @@
     progressive = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
-    onRemove = () => {}
+    onRemove = () => {},
+    // Deep-link from a progressive row's read-only difficulty badge to the component
+    // editor (component.difficulty is a Component property with four consumers).
+    onOpenComponent = () => {}
   } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  function format(key, fallback, replacements) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(replacements)) {
+      result = result.replace(`{${token}}`, value);
+    }
+    return result;
   }
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
@@ -81,7 +92,40 @@
     dragIndex = -1;
   }
 
-  // Mirror RecipeItemInspector: 'ingredientSet' is Ingredient routing; 'check'
+  // Reorder was DRAG-ONLY, with an aria-hidden grip on a draggable div and no keyboard
+  // path at all — a live accessibility hole, since order is load-bearing in progressive
+  // mode (the award loop spends the check budget down the list). These are real buttons,
+  // disabled at the ends, and the position change is announced through the aria-live
+  // region below (issue 643 §6).
+  let announcement = $state('');
+
+  function componentNameFor(item) {
+    const match = (componentOptions || []).find((option) => option.id === item?.componentId);
+    return match?.name || text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
+  }
+
+  function moveItem(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= results.length) return;
+
+    // Read the name BEFORE the move. `reorderItem` emits the reordered group, and once
+    // the parent round-trips the new prop `results[index]` is the item that swapped INTO
+    // this slot — so announcing after the move can name the wrong result.
+    const name = componentNameFor(results[index]);
+    const total = results.length;
+    reorderItem(index, target);
+
+    // ONE key with three placeholders, not a concatenation of "moved to position" + "of":
+    // word order is not universal, and a sentence assembled from fragments cannot be
+    // translated.
+    announcement = format(
+      'FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement',
+      '{name} moved to position {position} of {total}',
+      { name, position: target + 1, total }
+    );
+  }
+
+  // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
   // routes by the system crafting-check outcome.
   const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
   const isCheckRouting = $derived(routingProvider === 'check');
@@ -216,7 +260,10 @@
   {/if}
 
   {#if results.length === 0}
-    <p class="manager-muted manager-recipe-ingredient-set-empty">{text('FABRICATE.Admin.Manager.Recipe.ResultSetEmptyHint', 'Add an item this recipe produces.')}</p>
+    <!-- Danger-bordered dashed panel (§C5): an outcome that produces nothing is a gap. -->
+    <div class="manager-recipe-result-empty" data-recipe-result-empty>
+      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ResultSetEmptyPanel', 'Nothing produced on this outcome.')}</p>
+    </div>
   {:else}
     <div class="manager-recipe-ingredient-set-groups">
       {#each results as item, index (item?.id || index)}
@@ -249,9 +296,35 @@
               {item}
               {componentOptions}
               {progressive}
+              {onOpenComponent}
               onChange={(nextItem) => updateItem(index, nextItem)}
               onRemove={() => removeItem(index)}
-            />
+            >
+              {#snippet reorderControls()}
+                <!-- Reorder lives to the RIGHT of the component's DC (issue 643): after
+                     the difficulty badge, before the remove control. -->
+                <span class="manager-recipe-result-move" data-recipe-result-move>
+                  <button
+                    type="button"
+                    class="manager-icon-button"
+                    data-recipe-result-move-up
+                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')} — ${componentNameFor(item)}`}
+                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
+                    disabled={index === 0}
+                    onclick={() => moveItem(index, -1)}
+                  ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
+                  <button
+                    type="button"
+                    class="manager-icon-button"
+                    data-recipe-result-move-down
+                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')} — ${componentNameFor(item)}`}
+                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}
+                    disabled={index === results.length - 1}
+                    onclick={() => moveItem(index, 1)}
+                  ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                </span>
+              {/snippet}
+            </RecipeResultItemRow>
           </div>
         {:else}
           <RecipeResultItemRow
@@ -265,14 +338,22 @@
     </div>
   {/if}
 
+  {#if progressive}
+    <p class="sr-only" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
+  {/if}
+
   <div class="manager-recipe-ingredient-set-add">
     <SearchablePopover
       options={componentPickerOptions}
       pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="manager-button is-subtle manager-recipe-add-component-trigger"
-      triggerIcon="fas fa-cube"
-      triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-      triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+      triggerClass="manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
+      triggerIcon="fas fa-plus"
+      triggerLabel={progressive
+        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+      triggerAriaLabel={progressive
+        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
       triggerAddMarker="result-item"
       dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
       searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}

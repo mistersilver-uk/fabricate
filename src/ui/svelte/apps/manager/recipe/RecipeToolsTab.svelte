@@ -40,25 +40,54 @@
 </script>
 
 <section class="manager-recipe-tab manager-recipe-tools-tab" data-recipe-tab="tools" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Tools', 'Tools')}>
-  <RecipeToolsSection
-    {toolIds}
-    {toolsLibrary}
-    {onAddTool}
-    {onRemoveTool}
-  />
+  <div class="manager-recipe-tab-intro">
+    <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.Recipe.ToolsSection', 'Tools')}</h2>
+    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ToolsIntro', 'Required to craft but not consumed — a forge, a cauldron, a whetstone.')}</p>
+  </div>
 
   {#if isMultiStep && steps.length > 0}
-    <h4 class="manager-recipe-tools-steps-title">{text('FABRICATE.Admin.Manager.Recipe.PerStepTools', 'Tools per step')}</h4>
-    <RecipeStepAccordion {steps} {onDeleteStep}>
+    <!-- The recipe-level tools are GLOBAL — required for every step (§D2). -->
+    <div class="manager-recipe-tools-global" data-recipe-tools-global>
+      <div class="manager-recipe-tools-global-head">
+        <span class="manager-recipe-tools-global-medallion" aria-hidden="true"><i class="fas fa-globe"></i></span>
+        <div>
+          <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.GlobalTools', 'Global tools')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.GlobalToolsHint', 'required for every step')}</p>
+        </div>
+      </div>
+      <RecipeToolsSection
+        {toolIds}
+        {toolsLibrary}
+        emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyGlobal', 'No global tools — add one that every step needs.')}
+        addLabel={text('FABRICATE.Admin.Manager.Recipe.AddGlobalTool', 'Add global tool')}
+        {onAddTool}
+        {onRemoveTool}
+      />
+    </div>
+
+    <div class="manager-recipe-tools-divider" aria-hidden="true">
+      <span>{text('FABRICATE.Admin.Manager.Recipe.PlusPerStep', 'Plus, per step')}</span>
+    </div>
+
+    <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
       {#snippet body(step)}
         <RecipeToolsSection
           idPrefix={`step-${step.id}-`}
           toolIds={stepToolIds(step)}
           {toolsLibrary}
+          emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyStep', 'No tools needed for this step.')}
           onAddTool={(toolId) => onAddStepTool(step.id, toolId)}
           onRemoveTool={(toolId) => onRemoveStepTool(step.id, toolId)}
         />
       {/snippet}
     </RecipeStepAccordion>
+  {:else}
+    <RecipeToolsSection
+      {toolIds}
+      {toolsLibrary}
+      emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyPanel', 'No tools required.')}
+      {onAddTool}
+      {onRemoveTool}
+    />
   {/if}
 </section>

@@ -10,6 +10,8 @@ import {
   isReservedRoutedName,
   matchResultGroupsByName,
   normalizeRoutedName,
+  routedHasOutcomeTiers,
+  routedOutcomeTierCount,
 } from '../../src/utils/routedOutcomeKeywords.js';
 
 // ---------------------------------------------------------------------------
@@ -111,4 +113,52 @@ test('matchResultGroupsByName tolerates groups with a nullish name', () => {
     matchResultGroupsByName('', groups).map((g) => g.id),
     ['g-1', 'g-2']
   );
+});
+
+// ---------------------------------------------------------------------------
+// routedOutcomeTierCount
+// ---------------------------------------------------------------------------
+
+test('routedOutcomeTierCount counts the active list by id, success and failure alike', () => {
+  const routed = {
+    type: 'relative',
+    relativeOutcomes: [
+      { id: 'crit', name: 'Critical', success: true },
+      { id: 'ok', name: 'Success', success: true },
+      { id: 'miss', name: 'Miss', success: false }
+    ],
+    fixedOutcomes: [{ id: 'fixed-1', name: 'Fixed', success: true }]
+  };
+  assert.equal(routedOutcomeTierCount(routed), 3);
+  assert.equal(routedOutcomeTierCount({ ...routed, type: 'fixed' }), 1);
+});
+
+test('routedOutcomeTierCount ignores tiers without an id and tolerates missing input', () => {
+  assert.equal(routedOutcomeTierCount(null), 0);
+  assert.equal(routedOutcomeTierCount(undefined), 0);
+  assert.equal(routedOutcomeTierCount({}), 0);
+  assert.equal(routedOutcomeTierCount({ relativeOutcomes: 'not-an-array' }), 0);
+  assert.equal(
+    routedOutcomeTierCount({ relativeOutcomes: [{ name: 'nameless' }, null, { id: 'ok' }] }),
+    1
+  );
+});
+
+test('routedOutcomeTierCount agrees with routedHasOutcomeTiers on every shape', () => {
+  const shapes = [
+    null,
+    {},
+    { relativeOutcomes: [] },
+    { relativeOutcomes: [{ name: 'no id' }] },
+    // An id-bearing tier the GM has not named yet: still a tier.
+    { relativeOutcomes: [{ id: 'unnamed' }] },
+    { type: 'fixed', fixedOutcomes: [{ id: 'a' }, { id: 'b' }], relativeOutcomes: [] }
+  ];
+  for (const routed of shapes) {
+    assert.equal(
+      routedOutcomeTierCount(routed) > 0,
+      routedHasOutcomeTiers(routed),
+      `count and has-any should agree for ${JSON.stringify(routed)}`
+    );
+  }
 });

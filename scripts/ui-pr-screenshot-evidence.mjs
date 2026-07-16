@@ -16,12 +16,13 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
-// The recipe editor's four screenshot frames (overview/ingredients/validation/
-// multi-step) share the same trigger files, so any recipe editor/inspector/
-// sub-component change republishes all four.
+// The recipe editor's five screenshot frames (overview/ingredients/validation/
+// multi-step/tools) share the same trigger files, so any recipe editor / context-rail
+// / sub-component change republishes all five. The rail (RecipeContextRail) lives
+// under `recipe/` and is covered by the glob below; the BROWSER inspector deliberately
+// does not (see the manager-recipes recipe).
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/RecipeItemInspector\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
 ];
 
@@ -160,8 +161,19 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-recipes',
     label: 'Manager recipes',
-    smokeLabels: ['manager-recipes-normal'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/],
+    // `manager-recipes-no-check` photographs the row's "No check" WARNING pill. That is a
+    // SYSTEM-level state (no authored `rollFormula`), so it is unreachable in the
+    // routed-check smoke system however a recipe is authored — the harness switches system
+    // through the rail's select to capture it.
+    smokeLabels: ['manager-recipes-normal', 'manager-recipes-narrow', 'manager-recipes-no-check'],
+    // The library inspector deliberately lives under `apps/manager/recipes/` and NOT
+    // `apps/manager/recipe/` (issue 643): the latter is RECIPE_EDIT_MATCHES, so a
+    // browser-side component placed there would republish the five recipe-EDITOR
+    // frames and never the browser frame.
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
+    ],
   },
   {
     id: 'manager-import-report',
@@ -193,13 +205,14 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-crafting-settings'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
-  // The recipe editor publishes FOUR distinct frames (overview/identity,
-  // ingredients, validation tab, multi-step durations). `collect` emits ONE
-  // file per recipe id (it takes the first matching smoke label), so each frame
-  // needs its own recipe — a single recipe with four smoke labels would only
-  // ever publish the first (overview) frame and silently drop the other three.
-  // The four share the same `matches` so any change to a recipe editor/inspector
-  // or recipe sub-component republishes all four together.
+  // The recipe editor publishes TEN distinct frames (overview/identity, ingredients,
+  // validation tab, multi-step durations, the four Results-tab modes — routed-by-check,
+  // multi-step, progressive, alchemy — tools, and the restricted-visibility context
+  // rail). `collect` emits ONE file per recipe id (it takes the first matching smoke
+  // label), so each frame needs its own recipe — a single recipe with ten smoke labels
+  // would only ever publish the first (overview) frame and silently drop the rest. All
+  // ten share the same `matches`, so any change to a recipe editor/inspector or recipe
+  // sub-component republishes them together.
   {
     id: 'manager-recipe-edit-normal',
     label: 'Manager recipe editor — overview / identity',
@@ -225,9 +238,43 @@ export const VIEW_RECIPES = Object.freeze([
     matches: RECIPE_EDIT_MATCHES,
   },
   {
+    id: 'manager-recipe-edit-results',
+    label: 'Manager recipe editor — results (routed-by-check outcome sets)',
+    smokeLabels: ['manager-recipe-edit-results'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-results-multistep',
+    label: 'Manager recipe editor — results (per-step content, multi-step)',
+    smokeLabels: ['manager-recipe-edit-results-multistep'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-results-progressive',
+    label: 'Manager recipe editor — results (progressive ordered stages)',
+    smokeLabels: ['manager-recipe-edit-results-progressive'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    id: 'manager-recipe-edit-results-alchemy',
+    label: 'Manager recipe editor — results (alchemy two-slot success/reserved-failure)',
+    smokeLabels: ['manager-recipe-edit-results-alchemy'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
     id: 'manager-recipe-edit-tools',
     label: 'Manager recipe editor — tools (component-name fallback for unlabelled tools)',
     smokeLabels: ['manager-recipe-edit-tools'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    // The context rail is MODE-CONDITIONAL (issue 643 §4b). Every other recipe frame
+    // is captured against a system whose visibility mode drives the Books & Scrolls
+    // branch, so without this frame the restricted (access) branch would ship with no
+    // screenshot evidence at all.
+    id: 'manager-recipe-edit-access-rail',
+    label: 'Manager recipe editor — restricted-visibility context rail (players and characters with access)',
+    smokeLabels: ['manager-recipe-edit-access-rail'],
     matches: RECIPE_EDIT_MATCHES,
   },
   {

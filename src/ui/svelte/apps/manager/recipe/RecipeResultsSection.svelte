@@ -26,7 +26,6 @@
 
   let {
     resultGroups = [],
-    complex = true,
     // Alchemy Simple mode (issue 554): render a FIXED two-slot view — a labeled
     // "On success" result set + a reserved, undeletable "On a failed check" set —
     // instead of the generic add/remove group list. Decoupled from `complex`.
@@ -45,6 +44,9 @@
     progressive = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
+    // Deep-link from a progressive row's read-only difficulty badge to the component
+    // editor's Difficulty card.
+    onOpenComponent = () => {},
     idPrefix = ''
   } = $props();
 
@@ -98,11 +100,16 @@
     }));
   }
 
-  // Defensive: never let the simple (chromeless, single-group) render hide extra
-  // groups. Trimming to one group is the confirmed store path; if a recipe is
-  // somehow flagged simple while still holding >1 group, fall back to the full
-  // list so the first edit can't silently drop group[1..].
-  const effectiveComplex = $derived(complex || groups.length > 1);
+  // Result routing lives in the group HEAD (the "Produced on outcome" / "Produced by"
+  // assignment), which only renders when the group is chromed — so a routed system
+  // always needs chrome, even for a single group, or it would lose its routing control.
+  const isRouted = $derived(routingProvider === 'check' || routingProvider === 'ingredientSet');
+
+  // Rendering complexity is EMERGENT from structure (issue 643): multiple result
+  // groups get the set chrome; a single, NON-routed result group renders CHROMELESS
+  // (no "Set 1" box). Routed modes (check/ingredients) keep chrome regardless of count
+  // so their per-group routing head stays available. No stored Simple/Complex flag.
+  const effectiveComplex = $derived(groups.length > 1 || isRouted);
 
   // Simple mode shows exactly one chromeless group bound to the first group. If
   // none exists yet, synthesize an empty placeholder for editing.
@@ -165,12 +172,7 @@
   }
 </script>
 
-<section class="manager-task-core-card manager-recipe-section" data-recipe-section={`${idPrefix}results`}>
-  <div class="manager-task-card-heading">
-    <div>
-      <h3>{text('FABRICATE.Admin.Manager.Recipe.ResultsSection', 'Results')}</h3>
-    </div>
-  </div>
+<section class="manager-recipe-results-section" data-recipe-section={`${idPrefix}results`}>
   {#if alchemySimple}
     <!-- Alchemy Simple: exactly two labeled result sets (success + reserved failure);
          no add-set, no remove on either. -->
@@ -178,6 +180,7 @@
       <RecipeResultGroupCard
         group={alchemySuccessGroup}
         {componentOptions}
+        {onOpenComponent}
         hideRemove={true}
         staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
@@ -185,6 +188,7 @@
       <RecipeResultGroupCard
         group={alchemyFailureGroup}
         {componentOptions}
+        {onOpenComponent}
         reserved={true}
         hideRemove={true}
         roleAccent="warning"
@@ -200,6 +204,7 @@
         chromeless={true}
         {componentOptions}
         {progressive}
+        {onOpenComponent}
         onChange={(nextGroup) => updateSimpleGroup(nextGroup)}
       />
     </div>
@@ -207,25 +212,23 @@
     <div class="manager-recipe-section-empty">
       <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}</p>
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint', 'Add a set of items this recipe can produce.')}</p>
-      <button type="button" class="manager-button" data-recipe-add="result-set" onclick={() => addGroup()}>
+      <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
       </button>
     </div>
   {:else}
-    <ul class="manager-recipe-ingredient-sets">
+    <!-- Results has NO OR relationship between groups (§C2): the producing group is
+         chosen at craft time by outcome/routing, so no OR divider sits between them. -->
+    <ul class="manager-recipe-result-groups">
       {#each groups as group, index (group?.id || index)}
-        <li class="manager-recipe-ingredient-set-item">
-          {#if index > 0}
-            <div class="manager-recipe-ingredient-set-or" aria-hidden="true">
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-            </div>
-          {/if}
+        <li class="manager-recipe-result-group-item">
           <RecipeResultGroupCard
             {group}
             {componentOptions}
             {routingProvider}
             {progressive}
+            {onOpenComponent}
             ingredientSetOptions={ingredientOptionsFor(group)}
             assignedIngredientSetIds={assignedSetIdsFor(group)}
             outcomeTierOptions={tierOptionsFor(index)}
@@ -238,7 +241,7 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="manager-button" data-recipe-add="result-set" onclick={() => addGroup()}>
+    <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
     </button>

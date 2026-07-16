@@ -16,6 +16,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import RecipeEditorTabs from './recipe/RecipeEditorTabs.svelte';
+  import RecipeModeBanner from './recipe/RecipeModeBanner.svelte';
   import RecipeOverviewTab from './recipe/RecipeOverviewTab.svelte';
   import RecipeIngredientsTab from './recipe/RecipeIngredientsTab.svelte';
   import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
@@ -25,15 +26,21 @@
 
   let {
     recipe = null,
-    complex = false,
+    // Whether the system mode allows more than one ingredient set (issue 643).
+    // Threaded through this wrapper to the Ingredients tab so its single-set
+    // (chromeless) view can show the "Add ingredient set" promotion affordance —
+    // a tab prop that skips this wrapper silently drops to its default.
+    canAddSet = false,
     // Alchemy Simple two-slot result editor (issue 554). Declared+forwarded here so
     // the Results tab receives it through the wrapper (a tab prop that skips this
     // wrapper silently drops to its default and never renders).
     alchemySimple = false,
+    // A simple-resolution system with the check enabled also gets the reserved-failure
+    // two-slot result editor (issue 643). Threaded through this wrapper like alchemySimple.
+    simpleFailureSlot = false,
     saving = false,
     saveFailed = false,
     onPickImagePath = null,
-    linkedItemImage = '',
     currencyUnits = [],
     toolsLibrary = [],
     componentOptions = [],
@@ -42,6 +49,11 @@
     itemTags = [],
     checkTierOptions = [],
     minSuccessTierOptions = [],
+    // Category lives on the Overview tab (prototype §5.1). Threaded through this
+    // wrapper so the Overview tab receives them (a tab prop skipping this wrapper
+    // silently drops to its default and the control never renders).
+    categories = [],
+    onSetCategory = () => {},
     // Result routing (routed systems): the per-recipe routing mode (provider) and
     // the system's routed-check outcome tiers {id,name} for the result-set
     // assignment controls.
@@ -58,13 +70,25 @@
     // Progressive systems award a recipe's results in order, so the Results tab
     // exposes drag-reorder on the result rows. Other modes ignore result order.
     progressive = false,
-    // True when the system's recipe visibility list mode is `player`; unlocks the
-    // per-recipe "restrict to specific users" editor on the Overview tab.
-    playerListMode = false,
-    // Non-GM world users ({ id, name }) offered as the restriction allow-list.
-    worldUsers = [],
+    // Progressive result rows deep-link to the COMPONENT editor's Difficulty card:
+    // `component.difficulty` is consumed by recipes, salvage, gathering AND system
+    // validation, so it is a read-only badge here, never an inline stepper.
+    onOpenComponent = () => {},
+    // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every
+    // tab and routes to Crafting Settings, which is the only place it can change.
+    resolutionMode = 'simple',
+    // Requested-tab handshake (a nonce, so the same tab can be re-requested): the
+    // context rail deep-links into a tab of the editor it sits beside.
+    requestedTab = '',
+    requestedTabNonce = 0,
+    // Report the active tab up so the sibling context rail can react to it (the rail
+    // shows a validation summary only while the Validation tab is open — §G4). The
+    // tab state lives here; the rail is a sibling in the shell, so it is lifted out.
+    onActiveTabChange = () => {},
+    onOpenCraftingSettings = () => {},
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
+    onToggleLocked = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -83,6 +107,7 @@
   const description = $derived(recipe?.description || '');
   const img = $derived(recipe?.img || '');
   const enabled = $derived(recipe?.enabled !== false);
+  const locked = $derived(recipe?.locked === true);
 
   // A recipe is multi-step when it carries an explicit steps array; per-step
   // groupings replace the recipe-level sections in that mode (the right-inspector
@@ -166,11 +191,6 @@
     return (stepId) => onDeleteStep(stepId, context);
   }
 
-  // When a recipe item is linked, the identity image mirrors the linked item's
-  // image and the picker is locked — exactly like the environment editor locks
-  // its image to a linked scene.
-  const isRecipeItemLinked = $derived(Boolean(recipe?.recipeItemId));
-
   let activeTab = $state('overview');
   let lastRecipeId = $state(null);
 
@@ -185,11 +205,41 @@
   }));
   const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
   const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
+
+  // Tab count badges (issue 643 §F1): Ingredients / Results / Tools carry a mono
+  // count so the strip reads like the prototype. Multi-step recipes sum each tab's
+  // count across every step; single-step recipes read the recipe-scope arrays.
+  function countIngredients(scope) {
+    const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+    return sets.reduce((total, set) => {
+      const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups.length : 0;
+      const essences = set?.essences && typeof set.essences === 'object' ? Object.keys(set.essences).length : 0;
+      return total + groups + essences;
+    }, 0);
+  }
+  function countResults(scope) {
+    const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
+    return groups.reduce((total, group) => total + (Array.isArray(group?.results) ? group.results.length : 0), 0);
+  }
+  function countTools(scope) {
+    return Array.isArray(scope?.toolIds) ? scope.toolIds.length : 0;
+  }
+  function sumOverScopes(counter) {
+    if (isMultiStep) return steps.reduce((total, step) => total + counter(step), 0);
+    return counter(recipe || {});
+  }
+  const ingredientsCount = $derived(sumOverScopes(countIngredients));
+  const resultsCount = $derived(sumOverScopes(countResults));
+  // Tools also carries the recipe-level (global) tools in multi-step mode.
+  const toolsCount = $derived(sumOverScopes(countTools) + (isMultiStep ? countTools(recipe || {}) : 0));
   // While the recipe is OFF, an enable-blocking issue disables the enable toggle so
   // the GM cannot trigger the hard activation failure (issue 549); disabling stays
   // free. Predicted from the same readiness the Validation tab renders.
   const enableBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
+    ingredients: ingredientsCount > 0 ? [{ label: String(ingredientsCount), tone: 'neutral' }] : [],
+    results: resultsCount > 0 ? [{ label: String(resultsCount), tone: 'neutral' }] : [],
+    tools: toolsCount > 0 ? [{ label: String(toolsCount), tone: 'neutral' }] : [],
     validation: [
       ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
       ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : [])
@@ -204,16 +254,36 @@
     lastRecipeId = nextRecipeId;
   });
 
+  // Mirror the active tab out to the shell (which threads it to the context rail).
+  $effect(() => {
+    onActiveTabChange(activeTab);
+  });
+
+  // Honour an external tab request (the context rail's validation deep-link). Keyed
+  // on the NONCE so requesting the tab the user has since navigated away from still
+  // works, and so a stale `requestedTab` never fights manual tab clicks.
+  let lastRequestedTabNonce = $state(0);
+  $effect(() => {
+    if (requestedTabNonce === lastRequestedTabNonce) return;
+    lastRequestedTabNonce = requestedTabNonce;
+    if (TAB_IDS.includes(requestedTab)) activeTab = requestedTab;
+  });
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
+  // The recipe image is always editable: a recipe can belong to many books & scrolls
+  // (recipeIds[] is many-to-many), so it no longer mirrors or locks to a single linked
+  // recipe item's image.
   async function chooseImage() {
-    if (typeof onPickImagePath !== 'function' || isRecipeItemLinked) return;
+    if (typeof onPickImagePath !== 'function') return;
     const value = await onPickImagePath(img || DEFAULT_RECIPE_IMAGE);
     if (value) onUpdateRecipe({ img: value });
   }
+
+  const TAB_IDS = ['overview', 'ingredients', 'results', 'tools', 'validation'];
 
   // Deep-link from a validation issue: switch to the tab that hosts the gap.
   function selectIssue(targetTab) {
@@ -226,7 +296,11 @@
 <main class="manager-main manager-recipe-edit-main" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}>
   {#if recipe}
     <div class="manager-recipe-edit-view" data-recipe-editor>
+      <!-- Header → tabs → banner → content (§4.2): the banner sits BELOW the tab strip
+           so the tabs stay attached to the header above them. -->
       <RecipeEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
+
+      <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
 
       <div
         class="manager-editor-tab-panel"
@@ -243,8 +317,6 @@
             {enabled}
             {saving}
             {saveFailed}
-            {isRecipeItemLinked}
-            {linkedItemImage}
             {onPickImagePath}
             onNameInput={(value) => onUpdateRecipe({ name: value })}
             onDescriptionInput={(value) => onUpdateRecipe({ description: value })}
@@ -252,10 +324,12 @@
             {enableBlocked}
             onChooseImage={chooseImage}
             {isMultiStep}
+            {categories}
+            {onSetCategory}
             {checkTierOptions}
             {minSuccessTierOptions}
-            {playerListMode}
-            {worldUsers}
+            {locked}
+            {onToggleLocked}
             {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}
@@ -265,25 +339,27 @@
         {:else if activeTab === 'ingredients'}
           <RecipeIngredientsTab
             {recipe}
-            {complex}
+            {canAddSet}
             {isMultiStep}
             {currencyUnits}
             {componentOptions}
             {essenceOptions}
             {itemTags}
             {showSetName}
+            {routingProvider}
             onUpdateIngredientSets={updateIngredientSets}
             onDeleteStep={deleteStepFrom('ingredients')}
           />
         {:else if activeTab === 'results'}
           <RecipeResultsTab
             {recipe}
-            {complex}
             {alchemySimple}
+            {simpleFailureSlot}
             {isMultiStep}
             {componentOptions}
             {routingProvider}
             {progressive}
+            {onOpenComponent}
             outcomeTierOptions={routedOutcomeTierOptions}
             outcomeTiersDefined={routedOutcomeTiersDefined}
             onAssignIngredientSet={assignIngredientSet}

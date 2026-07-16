@@ -267,51 +267,25 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .map(scene => normalizeSceneOption(scene))
           .filter(scene => scene.uuid && scene.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
-      // Non-GM world users ({ id, name }), name-sorted, for the per-recipe
-      // "restrict to specific users" allow-list under the `player` list mode.
-      // GMs are excluded because they always see every recipe, so restricting
-      // to a GM would be a no-op.
-      getWorldUsers: () => {
-        const USER_ROLES = globalThis.CONST?.USER_ROLES || {
-          NONE: 0,
-          PLAYER: 1,
-          TRUSTED: 2,
-          ASSISTANT: 3,
-          GAMEMASTER: 4,
-        };
-        const loc = (key, fallback) => {
-          const translated = game?.i18n?.localize?.(key);
-          return translated && translated !== key ? translated : fallback;
-        };
-        const roleLabel = (role) => {
-          switch (role) {
-            case USER_ROLES.GAMEMASTER:
-              return loc('USER.RoleGamemaster', 'Game Master');
-            case USER_ROLES.ASSISTANT:
-              return loc('USER.RoleAssistant', 'Assistant GM');
-            case USER_ROLES.TRUSTED:
-              return loc('USER.RoleTrusted', 'Trusted Player');
-            case USER_ROLES.PLAYER:
-              return loc('USER.RolePlayer', 'Player');
-            default:
-              return loc('USER.RoleNone', 'None');
-          }
-        };
-        // Foundry `User#color` is a Color (v11+) or a plain string on older cores.
-        const colorOf = (user) => {
-          const color = user?.color;
-          if (!color) return '';
-          return typeof color === 'string' ? color : color.css || color.toString?.() || '';
-        };
-        return Array.from(game.users?.contents || [])
+      // Non-GM world users ({ id, name, role, color, avatar }), name-sorted: the
+      // Access tab's grantable Players list and the recipe editor's context rail.
+      //
+      // Sourced from `game.users.players` — Foundry's canonical NON-GM roster —
+      // not `game.users.contents`. The old comment already claimed GMs were
+      // excluded while the code returned every user, so the Access tab offered GMs
+      // as grantable targets and granting one did nothing (a GM viewer already
+      // passes `_isRecipeVisibleByAccessGrant` before it ever reads `playerIds`).
+      // `User#isGM` is `hasRole(ASSISTANT)`, so this drops Assistant GMs too.
+      getWorldUsers: () =>
+        this._playerUsers()
           .map(user => ({
             id: user.id,
             name: user.name,
-            role: roleLabel(user.role),
-            color: colorOf(user),
+            role: this._userRoleLabel(user.role),
+            color: this._userColor(user),
+            avatar: user.avatar || user.img || '',
           }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-      },
+          .sort((a, b) => a.name.localeCompare(b.name)),
       getActorOptions: () =>
         Array.from(game.actors?.contents || [])
           .map(actor => ({
@@ -323,15 +297,28 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter(actor => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
-      // Player-character actors ({ id, name, img }), name-sorted, for the per-recipe
-      // "grant access to specific characters" roster under the `restricted`
-      // visibility mode. A character is a player-character per
-      // `game.fabricate.isPlayerCharacterActor` (actor.type === 'character'),
-      // with a plain type fallback so the store never touches classification logic.
+      // Player-character actors, name-sorted, for the Access tab's grantable
+      // Characters roster under the `restricted` visibility mode. A character is a
+      // player-character per `game.fabricate.isPlayerCharacterActor`
+      // (actor.type === 'character'), with a plain type fallback so the store never
+      // touches classification logic. Each entry carries its control set — see
+      // `_describeAccessActor`.
       getPlayerCharacterActors: () =>
         Array.from(game.actors?.contents || [])
           .filter(actor => game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character')
-          .map(actor => ({ id: actor.id, name: actor.name, img: actor.img || '' }))
+          .map(actor => this._describeAccessActor(actor))
+          .filter(actor => actor.id && actor.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      // EVERY world actor, name-sorted — deliberately NOT the
+      // `isPlayerCharacterActor`-filtered roster above. The runtime access predicate
+      // (`RecipeVisibilityService._viewerControlsCharacter`) applies no type filter,
+      // so a grant naming an actor outside the PC roster is still honoured by the
+      // engine. The recipe editor's context rail resolves granted character ids over
+      // THIS list; resolving over the filtered roster would drop such a grant from
+      // display and under-report who has access.
+      getAccessCharacterActors: () =>
+        Array.from(game.actors?.contents || [])
+          .map(actor => this._describeAccessActor(actor))
           .filter(actor => actor.id && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       // Game-world Items ({ uuid, name, img, type }), name-sorted, for the
@@ -826,16 +813,122 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     };
   }
 
-  // Keep the per-recipe restriction allow-list (`worldUsers`) live: when a player
-  // is created, renamed, or removed while the manager is open, re-project it.
-  // Each entry is `[hook, id]` so `_unregisterUserHooks` can pair them off.
+  // Foundry's canonical NON-GM roster. Filtering GMs out FIRST is load-bearing:
+  // `Document#testUserPermission` short-circuits every GM (Assistant included, since
+  // `User#isGM` is `hasRole(ASSISTANT)`) to OWNER, so testing before filtering would
+  // report every actor as controlled by every GM. Never use `Actor#isOwner` /
+  // `Document#permission` here — both are `game.user`-scoped and always true on the
+  // GM's own client.
+  //
+  // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`), so
+  // it applies the ROLE floor too: a role-NONE user is not a player and cannot be
+  // granted a recipe, and admitting one here would offer the GM a grantable target the
+  // engine ignores.
+  _playerUsers() {
+    const players = game.users?.players;
+    if (Array.isArray(players)) return players;
+
+    const PLAYER = globalThis.CONST?.USER_ROLES?.PLAYER ?? 1;
+    return Array.from(game.users?.contents || []).filter((user) => {
+      if (user?.isGM === true) return false;
+      if (typeof user?.hasRole === 'function') return user.hasRole('PLAYER') === true;
+      return Number(user?.role ?? 0) >= Number(PLAYER);
+    });
+  }
+
+  // Every roster this labels comes from `_playerUsers()`, which is GM-free by
+  // construction — so GAMEMASTER and ASSISTANT are unreachable here and are not
+  // enumerated. What remains are the two roles a grantable user can actually hold.
+  _userRoleLabel(role) {
+    const USER_ROLES = globalThis.CONST?.USER_ROLES || { NONE: 0, PLAYER: 1, TRUSTED: 2 };
+    const loc = (key, fallback) => {
+      const translated = game?.i18n?.localize?.(key);
+      return translated && translated !== key ? translated : fallback;
+    };
+    if (role === USER_ROLES.TRUSTED) return loc('USER.RoleTrusted', 'Trusted Player');
+    if (role === USER_ROLES.PLAYER) return loc('USER.RolePlayer', 'Player');
+    return loc('USER.RoleNone', 'None');
+  }
+
+  // Foundry `User#color` is a Color (v11+) or a plain string on older cores.
+  _userColor(user) {
+    const color = user?.color;
+    if (!color) return '';
+    return typeof color === 'string' ? color : color.css || color.toString?.() || '';
+  }
+
+  // Who controls this actor, as Fabricate's runtime defines it. The relation is a
+  // SET, not a single user: `RecipeVisibilityService._viewerControlsCharacter`
+  // grants access to any viewer whose ASSIGNED character is this actor OR who holds
+  // Foundry OWNER on it — a union, not a fallback chain. A singular "played by"
+  // field cannot represent that and would silently under-report access, which is the
+  // worst possible failure in a GM access surface.
+  //
+  // `sharedWithAllPlayers` covers the case that makes it a correctness bug rather
+  // than a nicety: `getUserLevel` falls through to `ownership.default`, and a GM can
+  // set the "All Players" row to Owner through core UI (routine for party actors).
+  // Then the grant genuinely reaches the whole table, and the rail must say so
+  // instead of naming one player.
+  //
+  // `User#character` is a resolved `Actor | null` (there is no `characterId`; it
+  // self-heals to null on actor deletion) and is not schema-unique, so 0..N users
+  // may be assigned the same actor.
+  _describeAccessActor(actor) {
+    const LEVELS = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS || {
+      NONE: 0,
+      LIMITED: 1,
+      OBSERVER: 2,
+      OWNER: 3,
+    };
+    const controlledBy = this._playerUsers()
+      .map((user) => {
+        const assigned = !!user.character && user.character.id === actor.id;
+        const owner = actor.testUserPermission?.(user, 'OWNER') === true;
+        if (!assigned && !owner) return null;
+        return {
+          id: user.id,
+          name: user.name,
+          avatar: user.avatar || user.img || '',
+          assigned,
+        };
+      })
+      .filter(Boolean)
+      // Assigned-first, then by name — the assigned player is the one the GM means.
+      .sort((a, b) => (a.assigned === b.assigned ? a.name.localeCompare(b.name) : a.assigned ? -1 : 1));
+
+    const defaultLevel = Number(actor.ownership?.default ?? LEVELS.NONE);
+    return {
+      id: actor.id,
+      name: actor.name,
+      img: actor.img || '',
+      controlledBy,
+      sharedWithAllPlayers: Number.isFinite(defaultLevel) && defaultLevel >= Number(LEVELS.OWNER),
+    };
+  }
+
+  // Keep the access rosters (`worldUsers` + `accessCharacters`) live while the
+  // manager is open: they back the Access tab's grantable lists and the recipe
+  // editor's context rail. Each entry is `[hook, id]` so `_unregisterUserHooks` can
+  // pair them off.
+  //
+  // Actor CRUD matters too — `controlledBy` / `sharedWithAllPlayers` derive from
+  // `actor.ownership`, name and img — but `updateActor` is NOISY (every HP tick
+  // fires it), so it is key-filtered on the `changed` diff. (`noHook` on core's
+  // ownership dialog gates only the `pre*` hooks, so `updateActor` does fire.)
   _registerUserHooks() {
     if (this._userHooks) return;
-    const reproject = () => this._adminStore?.refreshWorldUsers?.();
-    this._userHooks = ['createUser', 'updateUser', 'deleteUser'].map((hook) => [
-      hook,
-      Hooks.on(hook, reproject),
-    ]);
+    const reproject = () => this._adminStore?.refreshAccessRosters?.();
+    const reprojectOnRelevantActorChange = (_actor, changed) => {
+      const diff = changed || {};
+      if ('ownership' in diff || 'name' in diff || 'img' in diff) reproject();
+    };
+    this._userHooks = [
+      ...['createUser', 'updateUser', 'deleteUser', 'createActor', 'deleteActor'].map((hook) => [
+        hook,
+        Hooks.on(hook, reproject),
+      ]),
+      ['updateActor', Hooks.on('updateActor', reprojectOnRelevantActorChange)],
+    ];
   }
 
   _unregisterUserHooks() {

@@ -151,24 +151,36 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
   });
 
-  it('maps a recipe editor file to all five recipe-edit frame recipes', () => {
+  it('maps a recipe editor file to all ten recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
       'manager-recipe-edit-validation',
       'manager-recipe-edit-multistep',
+      // The four Results-tab modes (issue 643): routed-by-check outcome bands, the
+      // multi-step per-step content (the frame that proves the C1 render fix),
+      // progressive ordered stages, and the alchemy two-slot shape.
+      'manager-recipe-edit-results',
+      'manager-recipe-edit-results-multistep',
+      'manager-recipe-edit-results-progressive',
+      'manager-recipe-edit-results-alchemy',
       'manager-recipe-edit-tools',
+      // The MODE-CONDITIONAL context rail's restricted (access) branch. It is the
+      // only frame captured against a restricted-visibility system; the others
+      // run against a system whose mode drives the Books & Scrolls branch.
+      'manager-recipe-edit-access-rail',
     ];
 
-    // The top-level editor view, the recipe-item inspector, and any recipe
-    // sub-component all republish all five frames.
+    // The top-level editor view, the context rail, and any recipe sub-component all
+    // republish all ten frames. The rail lives under `recipe/` (issue 643) so the
+    // glob covers it; the BROWSER inspector deliberately lives under `recipes/`.
     for (const file of [
       'src/ui/svelte/apps/manager/RecipeEditView.svelte',
-      'src/ui/svelte/apps/manager/RecipeItemInspector.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all five recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all ten recipe-edit frames`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -178,18 +190,28 @@ describe('UI PR screenshot evidence', () => {
       ['manager-recipe-edit-ingredients'],
       ['manager-recipe-edit-validation'],
       ['manager-recipe-edit-multistep'],
+      ['manager-recipe-edit-results'],
+      ['manager-recipe-edit-results-multistep'],
+      ['manager-recipe-edit-results-progressive'],
+      ['manager-recipe-edit-results-alchemy'],
       ['manager-recipe-edit-tools'],
+      ['manager-recipe-edit-access-rail'],
     ]);
   });
 
-  it('collects the five recipe-edit frames into five separate files', () => {
+  it('collects the ten recipe-edit frames into ten separate files', () => {
     withScreenshotFixtures(
       {
         'screenshot-01-manager-recipe-edit-normal.png': 'normal',
         'screenshot-02-manager-recipe-edit-ingredients.png': 'ingredients',
         'screenshot-03-manager-recipe-edit-validation.png': 'validation',
         'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
-        'screenshot-05-manager-recipe-edit-tools.png': 'tools',
+        'screenshot-05-manager-recipe-edit-results.png': 'results',
+        'screenshot-06-manager-recipe-edit-results-multistep.png': 'results-multistep',
+        'screenshot-07-manager-recipe-edit-results-progressive.png': 'results-progressive',
+        'screenshot-08-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
+        'screenshot-09-manager-recipe-edit-tools.png': 'tools',
+        'screenshot-10-manager-recipe-edit-access-rail.png': 'access-rail',
       },
       (root) => {
         const result = collectScreenshotEvidence({
@@ -197,7 +219,7 @@ describe('UI PR screenshot evidence', () => {
           prNumber: 654,
           root,
         });
-        assert.equal(result.copied.length, 5);
+        assert.equal(result.copied.length, 10);
         const byName = Object.fromEntries(
           result.copied.map(item => [
             item.destination.replaceAll('\\', '/').split('/').pop(),
@@ -209,7 +231,12 @@ describe('UI PR screenshot evidence', () => {
           'manager-recipe-edit-ingredients.png': 'ingredients',
           'manager-recipe-edit-validation.png': 'validation',
           'manager-recipe-edit-multistep.png': 'multistep',
+          'manager-recipe-edit-results.png': 'results',
+          'manager-recipe-edit-results-multistep.png': 'results-multistep',
+          'manager-recipe-edit-results-progressive.png': 'results-progressive',
+          'manager-recipe-edit-results-alchemy.png': 'results-alchemy',
           'manager-recipe-edit-tools.png': 'tools',
+          'manager-recipe-edit-access-rail.png': 'access-rail',
         });
       },
     );
@@ -401,6 +428,11 @@ describe('UI PR screenshot evidence', () => {
       emitted.add(match[1]);
     }
     for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
+      emitted.add(match[1]);
+    }
+    // The Results-tab captures (issue 643) route through captureRecipeResultsTab(page,
+    // <recipeName>, '<label>', <selector>); the label is the third, string-literal arg.
+    for (const match of harness.matchAll(/captureRecipeResultsTab\(\s*page,\s*[^,]+,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     for (const match of harness.matchAll(/captureCurrentPlayerGathering\(\s*'([^']+)'/g)) {

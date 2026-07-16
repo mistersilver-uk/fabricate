@@ -297,16 +297,53 @@ async function openManagerCraftingSection(page, subitemId, managerView) {
 // Return to the recipes browser (via the Crafting group) and open the named
 // recipe's editor, waiting for the recipe-edit route. Consolidates the
 // "return then open recipe X" sequence the recipe-editor captures repeat.
+//
+// Each recipe row carries its own Edit pencil again (issue 643), matching the Books &
+// Scrolls row edit affordance — the primary way a GM opens the editor. Click it directly
+// (Duplicate / Delete stay inspector-only), then wait for the recipe-edit route.
 async function openManagerRecipeEditor(page, recipeName) {
   await openManagerCraftingSection(page, 'recipes', 'recipes');
   await page
-    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") button:has(i.fa-edit)`)
+    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") [data-recipe-edit]`)
     .first()
     .click();
   await page
     .locator('.fabricate-manager[data-manager-view="recipe-edit"]')
     .first()
     .waitFor({ state: 'visible', timeout: 5_000 });
+}
+
+// The rail's "All crafting systems" back-link is INERT on the systems browser itself
+// (issue 643): there is nowhere to go back to, so it renders disabled. Click it only
+// when it is live; a disabled link means the manager is ALREADY at the system library
+// — which is the destination — so treat that as success rather than hanging on a dead
+// control. Returns whether a live click was issued, for callers that need to know.
+async function returnToSystemLibrary(page) {
+  const link = page.locator('.fabricate-manager .manager-scope-return').first();
+  if ((await link.count()) === 0) return false;
+  if (await link.isDisabled().catch(() => false)) return false;
+  await link.click();
+  return true;
+}
+
+/**
+ * Open a recipe, switch to its Results tab, wait for a mode-specific content marker
+ * to be VISIBLE, and capture the frame. Extracted so every Results-tab capture (issue
+ * 643) reuses one open→click→wait→assert→screenshot span rather than repeating it —
+ * the smoke script's `scripts/*.mjs` duplication counts against the SonarCloud gate.
+ * `contentSelector` is scoped under the visible Results tab, so a still-hidden or
+ * empty tab never yields a green frame.
+ */
+async function captureRecipeResultsTab(page, recipeName, label, contentSelector) {
+  await openManagerRecipeEditor(page, recipeName);
+  await page.locator('.fabricate-manager [data-recipe-tab-button="results"]').first().click();
+  await page.locator('.fabricate-manager [data-recipe-tab="results"]').first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await page.locator(`.fabricate-manager [data-recipe-tab="results"] ${contentSelector}`).first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await assertManagerLayoutStable(page, label);
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, label);
 }
 
 /**
@@ -935,6 +972,47 @@ async function assertManagerLayoutStable(page, label) {
   ).length;
   if (rowCount === 0 && editFormCount === 0) {
     throw new Error(`Manager rendered no table rows at ${label}`);
+  }
+}
+
+/**
+ * Assert at least one recipe row is actually REACHABLE — a pointer hit-test, not a
+ * DOM count.
+ *
+ * `assertManagerLayoutStable` measures horizontal overflow and counts rows it FINDS in
+ * the DOM, so it passed cleanly on a 900px library that rendered no row a GM could see
+ * or click (issue 643): the stacked body squeezed `.manager-table-scroll` to ~24px and
+ * the inspector's background painted over the rows, while every row was still in the
+ * DOM at its full 76px. Only a hit-test fails on that, so this is the check that the
+ * narrow library is usable at all.
+ *
+ * The rows legitimately sit below the fold once the body stacks, so the first row is
+ * scrolled into view before the test — "reachable after a scroll" is the contract,
+ * "already on screen" is not.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} label
+ */
+async function assertRecipeRowsHittable(page, label) {
+  const report = await withDeadline(page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll('.manager-recipe-row'));
+    rows[0]?.scrollIntoView({ block: 'center' });
+    const hittable = rows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) return false;
+      const x = Math.round(rect.left + Math.min(rect.width / 2, 60));
+      const y = Math.round(rect.top + (rect.height / 2));
+      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
+      const hit = document.elementFromPoint(x, y);
+      return Boolean(hit) && row.contains(hit);
+    }).length;
+    return { total: rows.length, hittable };
+  }), 30_000, `assertRecipeRowsHittable ${label}`);
+
+  if (report.hittable === 0) {
+    throw new Error(
+      `Recipe library rendered no VISIBLE row at ${label}: ${report.total} row(s) present in the DOM, 0 reachable by a pointer (clipped, zero-height, or painted over).`
+    );
   }
 }
 
@@ -1720,7 +1798,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         chosenSetId: setBId
       },
       checkRouted: { recipeId: checkRoutedRecipe.id },
-      progressive: { recipeId: progressiveRecipe.id },
+      progressive: { recipeId: progressiveRecipe.id, systemId: progressiveSystemId, recipeName: 'Smoke Mold Brick' },
       gather: { environmentId: rcGatherEnvironment.id, taskId: rcGatherTaskId },
       hazard: { environmentId: hazardEnvironment.id, taskId: rcGatherTaskId }
     };
@@ -2640,6 +2718,9 @@ const cleanup = {
   sceneIds: [],
   systemId: null,
   blockedSystemId: null,
+  // The `visibilityMode: 'restricted'` system whose recipe carries an access grant
+  // (issue 643 §4b) — the only fixture that renders the recipe rail's ACCESS branch.
+  restrictedSystemId: null,
   recipeIds: [],
   // Issue #489 craft-execution coverage fixtures: dedicated per-mode crafting
   // systems (simple / routedByIngredients / routedByCheck / progressive) and
@@ -3007,10 +3088,20 @@ async function main() {
           missingTestUsers.length > 0 ? await User.createDocuments(missingTestUsers) : []
         );
         const gathererUser = users.find(user => user.name === 'Fabricate Gatherer');
+        const observerUser = users.find(user => user.name === 'Fabricate Observer');
         const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
         const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
         await crafter.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
         if (travelMember) await travelMember.update({ ownership: { default: noneLevel } });
+        // "Who controls this character" is a UNION of two independent routes: the
+        // viewer holds Foundry OWNER on the actor, OR the actor is that user's
+        // ASSIGNED character (`User#character`). The crafter covers the OWNER route
+        // (above). Nothing in the smoke world ever assigned a character, so the
+        // assigned route had no fixture at all — assign the travel member to the
+        // Observer, and the restricted recipe rail can render both sublines.
+        if (travelMember && observerUser) {
+          await observerUser.update({ character: travelMember.id });
+        }
         const userIds = users.map(user => user.id);
 
         // Build inventory copies from world items
@@ -3049,6 +3140,7 @@ async function main() {
           actorIds,
           userIds,
           gathererUserId: gathererUser.id,
+          observerUserId: observerUser?.id ?? null,
           crafterId: crafter.id,
           travelMemberId: travelMember?.id ?? null,
           itemsByName
@@ -3061,6 +3153,7 @@ async function main() {
       cleanup.crafterId = createdDocs.crafterId;
       cleanup.travelMemberId = createdDocs.travelMemberId;
       cleanup.gathererUserId = createdDocs.gathererUserId;
+      cleanup.observerUserId = createdDocs.observerUserId;
       process.stdout.write(`  Created ${createdDocs.itemIds.length} items and ${createdDocs.actorIds.length} actors with inventories.\n`);
 
       // Screenshot the Items sidebar (force: true bypasses overlays like "Game Paused")
@@ -3184,7 +3277,7 @@ async function main() {
         await closeOpenApplications(page);
       }
 
-      const craftingSetup = await page.evaluate(async () => {
+      const craftingSetup = await page.evaluate(async ({ gathererUserId, crafterId, travelMemberId }) => {
         const csm = game.fabricate.getCraftingSystemManager();
 
         // Create the crafting system
@@ -3213,8 +3306,10 @@ async function main() {
 
         await csm.updateSystem(systemId, {
           // `routedByCheck` resolution allows multiple ingredient/result sets, so the
-          // recipe editor unlocks Complex mode (recipeMultiSetAllowed gates on a mode
-          // NOT in ['simple','progressive']). Under this system mode every recipe routes
+          // recipe editor shows the "Add ingredient set" promotion affordance
+          // (recipeCanAddSet gates on a mode NOT in ['simple','progressive'] and not
+          // alchemy). Complexity is emergent from the set/group count — there is no
+          // Simple/Complex toggle. Under this system mode every recipe routes
           // by the routed crafting-check outcome, and a single-result-group recipe is
           // produced on any non-failure outcome (the single-group exemption). The
           // authored `craftingCheck.routed.rollFormula` below means no missing-formula
@@ -3290,6 +3385,10 @@ async function main() {
           },
           // Two currency units so the currency-cost requirement row can target a unit.
           itemTags: ['rare', 'reagent', 'metallic'],
+          // Two authored recipe categories, so the library's group-by-category treatment
+          // is exercised with MORE THAN ONE group. A single "General" bucket proves
+          // nothing about grouping (issue 643).
+          recipeCategories: ['Alchemy', 'Smithing'],
           requirements: {
             currency: {
               enabled: true,
@@ -3602,6 +3701,65 @@ async function main() {
           ]
         }, { allowIncomplete: true });
 
+        // ── Recipe-library row states (issue 643) ────────────────────────────────
+        // Every fixture recipe above is enabled, unlocked, complete and uncategorised,
+        // so the library's Disabled row, Locked row, "Can't enable" pill, empty-Produces
+        // danger row and category grouping had NEVER been photographed. These two seed
+        // the missing states rather than mutating a recipe another phase depends on.
+        //
+        // 'Temper a Blade' carries an ingredient set but NO result groups: structurally
+        // sound (an empty result group would fail structure — this omits the group entirely),
+        // so `validateStructure()` passes while `validate()` fails, which is exactly the
+        // `_isRecipeIncomplete` predicate. Being OFF, the row reads "Can't enable" — enabling
+        // it would be refused. The edits carry `allowIncomplete` because the merged recipe is
+        // still an incomplete shell.
+        const incompleteRecipe = await rm.createRecipe({
+          name: 'Temper a Blade',
+          description: 'Re-harden a finished blade to raise its edge retention.',
+          craftingSystemId: systemId,
+          img: 'icons/skills/melee/hand-grip-sword-red.webp',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Iron Sword',
+              options: [{
+                quantity: 1,
+                match: { type: 'component', componentId: componentMap['Iron Sword'] }
+              }]
+            }]
+          }]
+        }, { allowIncomplete: true });
+        await rm.updateRecipe(incompleteRecipe.id, { enabled: false, category: 'Smithing' }, { allowIncomplete: true });
+
+        // A COMPLETE recipe that is locked (visible to players, GM-only to craft) — the
+        // one row state the lock control writes and nothing had ever captured.
+        const lockedRecipe = await rm.createRecipe({
+          name: 'Quench a Blade',
+          description: 'Plunge the hot blade into brine to set its temper.',
+          craftingSystemId: systemId,
+          img: 'icons/skills/trades/smithing-anvil-silver-red.webp',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Iron Ore',
+              options: [{
+                quantity: 1,
+                match: { type: 'component', componentId: componentMap['Iron Ore'] }
+              }]
+            }]
+          }],
+          resultGroups: [{
+            name: 'Tempered Weapon',
+            results: [{ componentId: componentMap['Iron Sword'], quantity: 1 }]
+          }]
+        });
+        await rm.updateRecipe(lockedRecipe.id, { locked: true, category: 'Smithing' });
+
+        // Spread the existing recipes across the two authored categories so the library
+        // renders THREE groups (Alchemy / General / Smithing), not one. `allowIncomplete`
+        // keeps a category edit from re-gating an already-savable draft on completeness.
+        await rm.updateRecipe(recipe1.id, { category: 'Smithing' }, { allowIncomplete: true });
+        await rm.updateRecipe(recipe2.id, { category: 'Alchemy' }, { allowIncomplete: true });
+        await rm.updateRecipe(multiStepRecipe.id, { category: 'Smithing' }, { allowIncomplete: true });
+
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
@@ -3875,13 +4033,70 @@ async function main() {
           enabledTaskIds: ['broken-stale-task']
         });
 
+        // A `visibilityMode: 'restricted'` system (issue 643 §4b). The recipe
+        // editor's context rail is MODE-CONDITIONAL: `restricted` shows who the
+        // recipe is granted to, `item`/`knowledge` shows the books teaching it. The
+        // smoke world had no restricted system, no access grant and no assigned
+        // character, so the access branch could not be captured at all — a run would
+        // silently screenshot the Books & Scrolls branch instead and the PR evidence
+        // would show the wrong rail.
+        const restrictedSystem = await csm.createSystem({
+          name: 'Warded Athenaeum',
+          description: 'A restricted system whose recipes are granted to named players and characters.'
+        });
+        const restrictedSystemId = restrictedSystem.id;
+        const restrictedComponentIds = [];
+        for (const restrictedWorldItem of game.items.contents.slice(0, 2)) {
+          const added = await csm.addItemFromUuid(restrictedSystemId, restrictedWorldItem.uuid);
+          if (added?.item?.id) restrictedComponentIds.push(added.item.id);
+        }
+        await csm.updateSystem(restrictedSystemId, { visibilityMode: 'restricted' });
+        const wardedRecipe = await rm.createRecipe({
+          name: 'Warded Rite',
+          description: 'A rite only the warded may perform.',
+          craftingSystemId: restrictedSystemId,
+          img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Ward Focus',
+              options: [{
+                quantity: 1,
+                match: { type: 'component', componentId: restrictedComponentIds[0] }
+              }]
+            }]
+          }],
+          resultGroups: [{
+            name: 'Warded Sigil',
+            results: [{
+              componentId: restrictedComponentIds[1] ?? restrictedComponentIds[0],
+              quantity: 1
+            }]
+          }]
+        });
+        // The grant carries BOTH a player and characters, and the two characters
+        // reach their controllers by DIFFERENT routes — the crafter via Foundry
+        // OWNER ownership, the travel member via `User#character` assignment — so the
+        // rail's `controlledBy` union is exercised, not just one half of it.
+        await rm.updateRecipe(
+          wardedRecipe.id,
+          {
+            access: {
+              characterIds: [crafterId, travelMemberId].filter(Boolean),
+              playerIds: [gathererUserId].filter(Boolean)
+            }
+          },
+          { allowIncomplete: true }
+        );
+
         return {
           systemId,
           blockedSystemId,
           blockedComponentNames: blockedComponents.map((component) => component.name),
           blockedEnvironmentId: blockedEnvironment?.id ?? null,
+          restrictedSystemId,
+          restrictedRecipeName: 'Warded Rite',
           componentMap,
-          recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id],
+          recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id, wardedRecipe.id],
           healingPotionRecipeId: recipe2.id,
           sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
@@ -3897,10 +4112,15 @@ async function main() {
             behaviorId: unconfiguredBehavior?.id ?? null
           }
         };
+      }, {
+        gathererUserId: cleanup.gathererUserId,
+        crafterId: cleanup.crafterId,
+        travelMemberId: cleanup.travelMemberId
       });
 
       cleanup.systemId = craftingSetup.systemId;
       cleanup.blockedSystemId = craftingSetup.blockedSystemId;
+      cleanup.restrictedSystemId = craftingSetup.restrictedSystemId;
       cleanup.recipeIds = craftingSetup.recipeIds;
       cleanup.sceneIds = craftingSetup.sceneIds;
       // The interactable Region is embedded in azureGroveScene, so it is cleaned
@@ -4099,8 +4319,16 @@ async function main() {
             throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
         }
-        if (await page.locator('.fabricate-manager .manager-scope-card .manager-scope-name:has-text("The Herbalist")').count() === 0) {
-          throw new Error('Manager selected-system scope is missing static selected-system text.');
+        // The rail's crafting-system card SELECTS (issue 643): it names the current system
+        // AND lists every other, so the GM can switch without a round trip through the
+        // system library. The old card could only name it.
+        const scopeSelectValue = await page
+          .locator('.fabricate-manager .manager-scope-card [data-manager-scope-select]')
+          .first()
+          .inputValue()
+          .catch(() => '');
+        if (scopeSelectValue !== craftingSetup.systemId) {
+          throw new Error(`Manager rail system select should name the selected system. Saw: "${scopeSelectValue}".`);
         }
         if (await page.locator('.fabricate-manager .manager-scope-return[aria-label="Return to System Library"]').count() === 0) {
           throw new Error('Manager selected-system scope is missing the return-to-library action.');
@@ -4153,7 +4381,7 @@ async function main() {
           throw new Error('Manager rail toggle did not re-expand the navigation rail.');
         }
 
-        await page.locator('.fabricate-manager .manager-scope-return').first().click();
+        await returnToSystemLibrary(page);
         await page.waitForTimeout(750);
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
@@ -4392,9 +4620,48 @@ async function main() {
         await openManagerCraftingSection(page, 'recipes', 'recipes');
         await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
-        await assertManagerLayoutStable(page, 'recipes normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-recipes-normal');
+        await assertRecipeRowsHittable(page, 'recipes normal');
+        await captureStableManagerView(page, { layout: 'recipes normal', label: 'manager-recipes-normal' });
+
+        // The rich recipe row (issue 643) is the highest horizontal-overflow risk in the
+        // manager: identity + I/O readout + check pill + lock + toggle + three actions on
+        // one line. Drive it at the narrow width too — assertManagerLayoutStable only
+        // flags what it FINDS, so a width nobody measures is coverage nobody has.
+        //
+        // And a row nobody can SEE is coverage nobody has either: the layout check counts
+        // DOM rows, so it passed on a 900px library that showed zero of them. The hit-test
+        // runs before the capture (and scrolls the first row into view, which is also the
+        // frame worth photographing at this width).
+        await setManagerWindowSize(page, { width: 900, height: 700 });
+        await assertRecipeRowsHittable(page, 'recipes narrow');
+        await captureStableManagerView(page, {
+          layout: 'recipes narrow',
+          label: 'manager-recipes-narrow',
+        });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+
+        // The row's "No check" warning pill fires when the SYSTEM has no usable crafting
+        // check (no authored rollFormula) — a system-level fact, so it cannot exist in the
+        // routed-check smoke system whatever a recipe is authored to do. Switch to the
+        // check-less "Smoke Simple Forge" through the rail's new system select (which also
+        // proves the select routes), photograph the warning row, and switch back. Guarded:
+        // a hiccup records a failed step rather than aborting the phase.
+        const scopeSelect = page.locator('.fabricate-manager [data-manager-scope-select]').first();
+        try {
+          await scopeSelect.selectOption({ label: 'Smoke Simple Forge' });
+          await page.waitForTimeout(750);
+          await page.locator('.fabricate-manager .manager-recipe-row [data-recipe-check="none"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertRecipeRowsHittable(page, 'recipes no-check');
+          await captureStableManagerView(page, {
+            layout: 'recipes no check',
+            label: 'manager-recipes-no-check',
+          });
+        } finally {
+          await scopeSelect.selectOption(craftingSetup.systemId).catch(() => {});
+          await page.waitForTimeout(750);
+          await openManagerCraftingSection(page, 'recipes', 'recipes');
+        }
 
         // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
         // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a
@@ -4450,8 +4717,9 @@ async function main() {
 
         // Showcase Requirements → Ingredients tab: capture every requirement row type
         // (component, OR group, tag, currency cost), the faint dividers, and the tag
-        // layout. The recipe is authored complex, so the section renders the full set
-        // card list with one or more data-recipe-group cards.
+        // layout. The recipe has a SINGLE ingredient set, so it renders CHROMELESS
+        // (issue 643) — the requirement rows sit on the tab background with no "Set 1"
+        // box, above the full-width "Add ingredient set" promotion button.
         await openManagerRecipeEditor(page, 'Showcase Requirements');
         await page.locator('.fabricate-manager [data-recipe-tab-button="ingredients"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -4487,6 +4755,106 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipe edit multistep');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-multistep');
+
+        // Results-tab coverage (issue 643): the most mode-dependent tab previously had
+        // ZERO screenshot coverage — which is why the multi-step Results structural bug
+        // shipped unseen. Cover every resolution mode's Results shape.
+        //
+        // Routed-by-check: outcome-routed result sets (tier bands). In the same
+        // (Herbalist's Compendium) system as the Ingredients/Validation captures.
+        await captureRecipeResultsTab(
+          page,
+          'Routed Check Readiness',
+          'manager-recipe-edit-results',
+          '[data-recipe-result-set-id]'
+        );
+
+        // Multi-step: the per-step result content must be VISIBLE (the always-open
+        // step accordion) — this is the frame that proves the multi-step Results
+        // renders something (the C1 fix), not an empty tab.
+        await captureRecipeResultsTab(
+          page,
+          'Multi-Step Alloy',
+          'manager-recipe-edit-results-multistep',
+          '[data-recipe-section$="-results"]'
+        );
+
+        // Progressive: the ordered stage list + roll-budget info strip + read-only
+        // difficulty badge + keyboard move chevrons. In its own system, so switch to it
+        // through the existing selection helper (not a fresh open span) and restore the
+        // default system afterward. Guarded so a hiccup records a failed step.
+        if (executionFixtures?.progressive?.systemId) {
+          try {
+            await returnToSystemLibrary(page);
+            await selectSmokeSystemInManager(page, executionFixtures.progressive.systemId);
+            await captureRecipeResultsTab(
+              page,
+              executionFixtures.progressive.recipeName,
+              'manager-recipe-edit-results-progressive',
+              '[data-recipe-result-row]'
+            );
+            results.steps.push({ step: 'recipe-edit-results-progressive', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'recipe-edit-results-progressive', passed: false, error: err.message });
+            process.stderr.write(`Progressive results capture failed: ${err.message}\n`);
+          } finally {
+            await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+            await selectSmokeSystemInManager(page, craftingSetup.systemId).catch(() => {});
+          }
+        }
+
+        // Alchemy: the two-slot result shape — a success set plus a reserved,
+        // undeletable "On a failed check" set. In its own alchemy system; same
+        // switch-and-restore guard as the progressive capture.
+        if (alchemyFixtures?.cauldronSystemId) {
+          try {
+            await returnToSystemLibrary(page);
+            await selectSmokeSystemInManager(page, alchemyFixtures.cauldronSystemId);
+            await captureRecipeResultsTab(
+              page,
+              'Elixir of Vigor',
+              'manager-recipe-edit-results-alchemy',
+              '[data-recipe-result-set-static-label]'
+            );
+            results.steps.push({ step: 'recipe-edit-results-alchemy', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'recipe-edit-results-alchemy', passed: false, error: err.message });
+            process.stderr.write(`Alchemy results capture failed: ${err.message}\n`);
+          } finally {
+            await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+            await selectSmokeSystemInManager(page, craftingSetup.systemId).catch(() => {});
+          }
+        }
+
+        // Warded Rite (restricted system) → the recipe editor's context rail renders
+        // its ACCESS branch: players with access, characters with access, and each
+        // character's "played by" subline. This is the ONLY capture of the restricted
+        // branch — every other recipe capture runs against Arcane Forge, whose
+        // visibility mode drives the Books & Scrolls branch instead. Guarded so a
+        // hiccup records a failed step instead of aborting the rest of Phase D0, and
+        // the system selection is restored either way.
+        try {
+          await returnToSystemLibrary(page);
+          await selectSmokeSystemInManager(page, craftingSetup.restrictedSystemId);
+          await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);
+          await page.locator('.fabricate-manager [data-recipe-section="access"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-recipe-access-characters]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'recipe edit access rail',
+            label: 'manager-recipe-edit-access-rail',
+          });
+          results.steps.push({ step: 'recipe-edit-access-rail', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipe-edit-access-rail', passed: false, error: err.message });
+          process.stderr.write(`Restricted recipe rail capture failed: ${err.message}\n`);
+        } finally {
+          // Every later Phase D0 capture reads the fully-seeded Arcane Forge system,
+          // so re-select it whether or not the restricted capture succeeded.
+          await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+          await selectSmokeSystemInManager(page, craftingSetup.systemId).catch(() => {});
+        }
 
         // Return to the recipes browser for the remaining navigation.
         await openManagerCraftingSection(page, 'recipes', 'recipes');
@@ -4859,7 +5227,7 @@ async function main() {
         try {
           await setManagerWindowSize(page, { width: 1280, height: 900 });
           // Return to the system library, then select the broken system.
-          await page.locator('.fabricate-manager .manager-scope-return').first().click();
+          await returnToSystemLibrary(page);
           await page.waitForTimeout(400);
           await page.locator(`${managerSystemRowSelector(craftingSetup.blockedSystemId)} .manager-system-identity`)
             .first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -4951,7 +5319,7 @@ async function main() {
           process.stderr.write(`System overview capture failed: ${err.message}\n`);
         } finally {
           // Return to the smoke system so later phases see the expected selection.
-          await page.locator('.fabricate-manager .manager-scope-return').first().click().catch(() => {});
+          await returnToSystemLibrary(page).catch(() => {});
           await page.waitForTimeout(300);
           await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`)
             .first().click().catch(() => {});
@@ -5322,13 +5690,21 @@ async function main() {
             delete payloadSystem.id; // copy mode strips ids anyway; be explicit
             const components = Array.isArray(payloadSystem.components) ? payloadSystem.components : [];
             const base = components[0] ? JSON.parse(JSON.stringify(components[0])) : {};
+            // The orphan is a CLONE of a real component, so it inherits that
+            // component's source references and MUST overwrite every one of them.
+            // These are the post-issue-560 names (`registeredItemUuid` /
+            // `originItemUuid` / `aliasItemUuids`); writing only the retired
+            // `sourceItemUuid` / `sourceUuid` / `fallbackItemIds` left the clone
+            // pointing at the SAME real Item as its base, so two components claimed
+            // one source, the import failed closed ("... is claimed by both ..."),
+            // and the report dialog this step waits for never rendered.
             const orphan = {
               ...base,
               id: 'smoke-import-report-orphan',
               name: 'Smoke Orphan Reagent',
-              sourceItemUuid: 'Item.fabricateSmokeMissing0001',
-              sourceUuid: 'Item.fabricateSmokeMissing0001',
-              fallbackItemIds: [],
+              registeredItemUuid: 'Item.fabricateSmokeMissing0001',
+              originItemUuid: 'Item.fabricateSmokeMissing0001',
+              aliasItemUuids: [],
             };
             payloadSystem.components = [...components, orphan];
             const payload = {
@@ -6294,15 +6670,21 @@ async function main() {
           try { await Item.deleteDocuments(cleanupData.executionItemIds); } catch { /* ok */ }
         }
 
-        // Delete the dedicated broken system seeded for the overview/banner captures
-        // (and its gathering environment via the environment store).
-        if (cleanupData.blockedSystemId) {
+        // Delete the dedicated single-purpose systems: the broken one seeded for the
+        // overview/banner captures, and the restricted-visibility one seeded for the
+        // recipe rail's access branch (issue 643). Both go through the same delete
+        // (with their gathering environments via the environment store), so they
+        // share one loop rather than two near-identical blocks.
+        const singlePurposeSystemIds = [
+          cleanupData.blockedSystemId,
+          cleanupData.restrictedSystemId
+        ].filter(Boolean);
+        if (singlePurposeSystemIds.length > 0) {
           const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
-          try { await environmentStore?.cleanupByCraftingSystem?.(cleanupData.blockedSystemId); } catch { /* ok */ }
-
           const csm = game.fabricate?.getCraftingSystemManager?.();
-          if (csm) {
-            try { await csm.deleteSystem(cleanupData.blockedSystemId); } catch { /* already deleted */ }
+          for (const singlePurposeSystemId of singlePurposeSystemIds) {
+            try { await environmentStore?.cleanupByCraftingSystem?.(singlePurposeSystemId); } catch { /* ok */ }
+            try { await csm?.deleteSystem(singlePurposeSystemId); } catch { /* already deleted */ }
           }
         }
 

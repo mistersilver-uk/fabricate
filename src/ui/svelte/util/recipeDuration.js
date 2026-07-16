@@ -29,6 +29,17 @@ const PLURAL_FALLBACK = {
   minutes: 'minutes'
 };
 
+// Compact, mono-friendly unit abbreviations ("2 hr", "30 min", "1 day") used by
+// the inline duration steppers on the Overview tab. These are deliberately terse
+// and unit-count-agnostic (no separate plural) so the pill stays narrow.
+const ABBREV_FALLBACK = {
+  years: 'yr',
+  months: 'mo',
+  days: 'day',
+  hours: 'hr',
+  minutes: 'min'
+};
+
 function text(key, fallback) {
   const translated = localize(key);
   return translated && translated !== key ? translated : fallback;
@@ -76,4 +87,39 @@ export function formatTimeRequirement(time) {
     }
   }
   return parts.join(', ');
+}
+
+/**
+ * The compact, mono-friendly unit abbreviation (e.g. "hr", "min") used by the
+ * inline duration stepper pill on the Overview tab.
+ * @param {string} unit - One of `TIME_UNITS`.
+ * @returns {string}
+ */
+export function durationUnitAbbrev(unit) {
+  return text(
+    `FABRICATE.Admin.Manager.Recipe.DurationUnitAbbrev.${unit}`,
+    ABBREV_FALLBACK[unit] || unit
+  );
+}
+
+/**
+ * Build a compact "2 hr 30 min" style string from the non-zero fields of a time
+ * requirement — the friendly label shown beside the inline duration steppers on
+ * the Overview tab. Returns the localized "Instant" label when there is no
+ * duration.
+ * @param {object|null} time - `{ minutes, hours, days, months, years }` or null.
+ * @returns {string}
+ */
+export function formatTimeRequirementCompact(time) {
+  if (!time || typeof time !== 'object') {
+    return text('FABRICATE.Admin.Manager.Recipe.DurationInstant', 'Instant');
+  }
+  const parts = [];
+  for (const unit of TIME_UNITS) {
+    const value = Number(time[unit] || 0);
+    if (value > 0) parts.push(`${value} ${durationUnitAbbrev(unit)}`);
+  }
+  return parts.length > 0
+    ? parts.join(' ')
+    : text('FABRICATE.Admin.Manager.Recipe.DurationInstant', 'Instant');
 }

@@ -17,6 +17,14 @@ const sharedComponentNames = [
   'ManagerColorPopover',
   'EssenceSourceSelector',
   'Pagination',
+  // The Recipe Studio primitives (issue 643). They are import-free leaves, but they
+  // MUST still be compiled into this tree: a `.svelte` the mounted root renders but
+  // the allowlist omits does NOT fail — it hangs, reported as `# cancelled`.
+  'Medallion',
+  'StatusPill',
+  'CollapsibleGroupHeader',
+  // The duration editor's per-unit steppers are the shared editable-input Stepper.
+  'Stepper',
 ];
 
 let tempRoot;
@@ -81,6 +89,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+  // The library inspector, extracted out of the root (issue 643). It lives under
+  // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
@@ -118,9 +129,13 @@ function compileManagerRoot() {
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeItemInspector.svelte');
   for (const recipeComponent of [
     'RecipeEditorTabs',
+    // The editor's mode banner + context rail (issue 643). The rail REPLACED
+    // RecipeItemInspector and lives under `recipe/` so the screenshot map's
+    // RECIPE_EDIT_MATCHES glob republishes the editor frames when it changes.
+    'RecipeModeBanner',
+    'RecipeContextRail',
     'RecipeOverviewTab',
     'RecipeIngredientsTab',
     'RecipeResultsTab',
@@ -128,6 +143,7 @@ function compileManagerRoot() {
     'RecipeValidationTab',
     'RecipeStepAccordion',
     'RecipeDurationEditor',
+    'RecipeDurationSteppers',
     'RecipeIngredientsSection',
     'RecipeIngredientSetCard',
     'RecipeIngredientGroupCard',
@@ -239,6 +255,9 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
+    // The recipe library's pure list model (filter / group / sort / paginate + the
+    // per-row derivations). Imported by RecipesBrowserView (issue 643).
+    'src/utils/recipeBrowserModel.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
@@ -317,7 +336,12 @@ async function openRecipeEditor(calls, storeOptions = {}) {
   craftingParent().click();
   await tick();
   flushSync();
-  target.querySelector('[data-recipe-id="r1"] .manager-icon-button').click();
+  // The Edit action moved to the inspector (issue 643): SELECT the row by clicking its
+  // identity, which drives the shell inspector, then click the inspector's Edit action.
+  target.querySelector('[data-recipe-id="r1"] .manager-recipe-identity').click();
+  await tick();
+  flushSync();
+  target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="edit"]').click();
   await tick();
   flushSync();
   return target;
@@ -1189,8 +1213,13 @@ function createStore(calls = [], options = {}) {
     importRecipes: () => calls.push(['importRecipes']),
     exportRecipes: () => calls.push(['exportRecipes']),
     setRecipeSearch: (term) => calls.push(['setRecipeSearch', term]),
-    toggleRecipeEnabled: (id, enabled) => {
-      calls.push(['toggleRecipeEnabled', id, enabled]);
+    // The THIRD argument is load-bearing and is captured deliberately. It carries the
+    // blocked-enable `onBlocked` sink: supplying it is what makes the real store
+    // SUPPRESS its Foundry notification. Drop it anywhere in the row → root → store
+    // chain and the in-window flash dies while the toast silently returns, so a stub
+    // that swallowed it would let that regression through green.
+    toggleRecipeEnabled: (id, enabled, toggleOptions) => {
+      calls.push(['toggleRecipeEnabled', id, enabled, toggleOptions]);
       return options.toggleRecipeEnabledResult ?? true;
     },
     updateRecipe: (id, updates, opts) => {
@@ -3598,59 +3627,89 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('recipe overview shows the restriction editor only in player mode and stages visibility on toggle', () => {
-    // Not in player mode ⇒ no visibility section.
+  // The per-recipe visibility card is GONE (issue 643 §2c). It was a legacy surface
+  // editing legacy fields: gated on the superseded `recipeVisibility.listMode`, writing
+  // `recipe.visibility { restricted, allowedUserIds }` whose canonical successor is
+  // `recipe.access { characterIds, playerIds }` — owned by the Access tab. The
+  // assertions below are the REMOVAL contract, not a repoint of the old editor.
+  it('recipe overview no longer renders any per-recipe visibility editor', () => {
     mountRecipeOverview({
-      recipe: { id: 'r1', visibility: null },
-      playerListMode: false,
-      worldUsers: [{ id: 'u1', name: 'Alice' }],
+      recipe: { id: 'r1', visibility: { restricted: true, allowedUserIds: ['u1'] } },
       onUpdateRecipe: () => {},
     });
-    assert.equal(target.querySelector('[data-recipe-section="visibility"]'), null);
+    assert.equal(
+      target.querySelector('[data-recipe-section="visibility"]'),
+      null,
+      'the legacy visibility section is deleted, not restyled'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-field="visibility-restricted"]'),
+      null,
+      'no restrict toggle'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-visibility-users]'),
+      null,
+      'no allowed-users allow-list'
+    );
+  });
+
+  // The Locked STATUS card is a different concept from the recipe-item locked IMAGE
+  // (`data-recipe-item-locked-image`), so it deliberately sits outside that naming
+  // family. `recipe.locked` was persisted and engine-honoured but written by nothing.
+  it('recipe overview renders the Locked status card and toggles it in both directions', () => {
+    const toggled = [];
+    mountRecipeOverview({
+      recipe: { id: 'r1' },
+      locked: false,
+      onToggleLocked: (next) => toggled.push(next),
+      onUpdateRecipe: () => {},
+    });
+    const card = target.querySelector('[data-recipe-section="locked-status"]');
+    assert.ok(card, 'the Locked status card renders');
+    assert.equal(
+      target.querySelector('[data-recipe-item-locked-image]'),
+      null,
+      'the Locked card is not the recipe-item locked-image affordance'
+    );
+    // The Locked card is a left-aligned status card (icon + copy + switch), not the
+    // 96px image-picker media stack (`.manager-task-core-status`), which centres its
+    // copy and 14ch-clamps it (issue 643).
+    assert.ok(
+      card.querySelector('.manager-recipe-status-card') || card.classList.contains('manager-recipe-status-card'),
+      'the Locked switch and its copy sit in a status card'
+    );
+    assert.ok(
+      card.querySelector('[data-recipe-field="locked"]'),
+      'the Locked switch renders in the status card'
+    );
+    assert.equal(
+      card.querySelector('.manager-task-core-status'),
+      null,
+      'a card with no image picker must not reuse the media column stack, which centres and 14ch-clamps its copy'
+    );
+    const toggle = target.querySelector('[data-recipe-field="locked"]');
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'an unlocked recipe reads off');
+    toggle.click();
+    assert.deepEqual(toggled, [true], 'locking requests locked = true');
 
     unmount(mounted);
     mounted = null;
     target.remove();
 
-    // Player mode ⇒ restrict toggle present; toggling stages the full visibility object.
-    const emitted = [];
+    // Unlocking is never gated — a GM locks a recipe precisely while it is unfinished.
+    const unlocked = [];
     mountRecipeOverview({
-      recipe: { id: 'r1', visibility: null },
-      playerListMode: true,
-      worldUsers: [{ id: 'u1', name: 'Alice' }],
-      onUpdateRecipe: (patch) => emitted.push(patch),
+      recipe: { id: 'r1' },
+      locked: true,
+      onToggleLocked: (next) => unlocked.push(next),
+      onUpdateRecipe: () => {},
     });
-    assert.ok(target.querySelector('[data-recipe-section="visibility"]'), 'visibility section renders');
-    const toggle = target.querySelector('[data-recipe-field="visibility-restricted"]');
-    assert.ok(toggle, 'the restrict toggle renders');
-    toggle.click();
-    assert.deepEqual(emitted.at(-1), {
-      visibility: { restricted: true, allowedUserIds: [] },
-    });
-  });
-
-  it('recipe overview restriction editor toggles a user into allowedUserIds', () => {
-    const emitted = [];
-    mountRecipeOverview({
-      recipe: { id: 'r1', visibility: { restricted: true, allowedUserIds: [] } },
-      playerListMode: true,
-      worldUsers: [
-        { id: 'u1', name: 'Alice' },
-        { id: 'u2', name: 'Bob' },
-      ],
-      onUpdateRecipe: (patch) => emitted.push(patch),
-    });
-    // The empty-state warning shows while restricted with no users selected.
-    assert.ok(
-      target.querySelector('[data-recipe-visibility-empty]'),
-      'the no-users-selected warning renders'
-    );
-    const bob = target.querySelector('[data-recipe-visibility-user="u2"] input');
-    assert.ok(bob, 'a checkbox renders per world user');
-    bob.dispatchEvent(new Event('change', { bubbles: true }));
-    assert.deepEqual(emitted.at(-1), {
-      visibility: { restricted: true, allowedUserIds: ['u2'] },
-    });
+    const lockedToggle = target.querySelector('[data-recipe-field="locked"]');
+    assert.equal(lockedToggle.getAttribute('aria-pressed'), 'true', 'a locked recipe reads on');
+    assert.equal(lockedToggle.disabled, false, 'unlocking is never gated');
+    lockedToggle.click();
+    assert.deepEqual(unlocked, [false], 'unlocking requests locked = false');
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {
@@ -3937,7 +3996,8 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
-    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
+    // Parent total = 2 recipes + 2 books & scrolls items in the default fixture (issue 643).
+    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '4');
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
@@ -3960,27 +4020,31 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
     assert.ok(target.querySelector('.manager-system-edit-form'));
 
+    // The rail's crafting-system card SELECTS (issue 643): a real `<select>` naming the
+    // current system and listing every other, so the GM can switch system without a
+    // round trip through the system library — which the old name + icon-button card had
+    // no way to do at all.
     const scopeCard = target.querySelector('.manager-scope-card');
     assert.ok(scopeCard, 'selected system scope card should render');
-    assert.equal(scopeCard.querySelector('.manager-scope-name')?.textContent.trim(), 'Alchemy');
-    assert.equal(scopeCard.querySelector('.manager-scope-name')?.tagName, 'SPAN');
+    const scopeSelect = scopeCard.querySelector('[data-manager-scope-select]');
+    assert.ok(scopeSelect, 'the rail card should expose a system select');
+    assert.equal(scopeSelect.tagName, 'SELECT');
+    assert.equal(scopeSelect.value, 'alchemy', 'the select names the selected system');
+    assert.ok(
+      Array.from(scopeSelect.options).map((option) => option.value).includes('alchemy'),
+      'the select lists the systems the manager knows about'
+    );
+    assert.equal(
+      scopeCard.querySelector('.manager-scope-name'),
+      null,
+      'the static name span is retired, not merely hidden'
+    );
+
     const returnButton = scopeCard.querySelector('.manager-scope-return');
     assert.ok(returnButton, 'selected system scope should expose a return-to-library button');
     assert.equal(returnButton.getAttribute('aria-label'), 'Return to System Library');
     assert.equal(returnButton.getAttribute('title'), 'Return to System Library');
-
-    const callsBeforeScopeNameClick = calls.length;
-    scopeCard
-      .querySelector('.manager-scope-name')
-      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(
-      calls.length,
-      callsBeforeScopeNameClick,
-      'clicking the selected system name should not route or clear selection'
-    );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    assert.match(returnButton.textContent, /All crafting systems/);
 
     const callsBeforeReturn = calls.length;
     returnButton.click();
@@ -4042,7 +4106,14 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
     assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
-    assert.ok(target.textContent.includes('Recipe library'));
+    // ONE page header, owned by the shell (issue 643). The library used to render a
+    // second — kicker + "Recipe library" + a second subtitle — directly beneath the
+    // shell's breadcrumb / "Recipes" / subtitle / Create block.
+    assert.equal(
+      target.querySelectorAll('.manager-main .manager-section-header').length,
+      0,
+      'the library must not stack a second page header under the shell header'
+    );
     assert.ok(target.textContent.includes('Healing Draught'));
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
     assert.ok(target.textContent.includes('Player visibility'));
@@ -4056,14 +4127,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(disabledRecipeToggle, 'disabled recipe row should render the shared status toggle');
     assert.equal(enabledRecipeToggle.getAttribute('aria-pressed'), 'true');
     assert.equal(disabledRecipeToggle.getAttribute('aria-pressed'), 'false');
-    assert.equal(
-      enabledRecipeToggle.querySelector('.manager-status-toggle-label').textContent.trim(),
-      'On'
-    );
-    assert.equal(
-      disabledRecipeToggle.querySelector('.manager-status-toggle-label').textContent.trim(),
-      'Off'
-    );
+    // No "On"/"Off" TEXT in the row (issue 643): the track colour is the state, the
+    // aria-label names it, and the Disabled pill says it in words. A third copy on every
+    // row cost ~30px of the description. The label survives everywhere else in the manager,
+    // where a switch has no pill beside it.
+    for (const toggle of [enabledRecipeToggle, disabledRecipeToggle]) {
+      assert.equal(
+        toggle.querySelector('.manager-status-toggle-label'),
+        null,
+        'the row switch carries no redundant On/Off text'
+      );
+      assert.ok(toggle.getAttribute('aria-label'), 'the switch is still named for assistive tech');
+    }
     assert.equal(
       target.querySelector('[data-recipe-id="r2"] .manager-toggle input[type="checkbox"]'),
       null
@@ -4075,16 +4150,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-id="r2"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
-    const r2IncompleteChip = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-warning');
-    assert.ok(
-      r2IncompleteChip,
-      'an incomplete recipe row should render the Incomplete warning chip'
-    );
-    assert.equal(r2IncompleteChip.textContent.trim(), 'Incomplete');
+    // r2 is incomplete AND off, so enabling it would be REFUSED — the row says that
+    // rather than merely "incomplete" (issue 643 §2's four row states, rendered
+    // through the shared StatusPill).
+    const r2Blocked = target.querySelector('[data-recipe-id="r2"] [data-status-pill="danger"]');
+    assert.ok(r2Blocked, "an incomplete, disabled recipe row should say it can't be enabled");
+    assert.equal(r2Blocked.textContent.trim(), "Can't enable");
     assert.equal(
-      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning'),
+      target.querySelector('[data-recipe-id="r1"] [data-status-pill="warning"]'),
       null,
-      'a complete recipe row should not render the Incomplete chip'
+      'a complete recipe row should not render an authoring-state pill'
     );
 
     assert.equal(
@@ -4093,58 +4168,74 @@ describe('CraftingSystemManager mounted behavior', () => {
       'pagination should hide while filtered row count is below the page size'
     );
 
+    // The status filter is a segmented control (all / on / off), defaulting to `all`
+    // — a default that hid rows would break the smoke harness's visible-row wait.
     assert.equal(
-      target.querySelector('[data-clear-filters="recipes"]'),
+      target.querySelector('[data-recipe-filter-chip="status"]'),
       null,
-      'Clear filters should hide while no filter is active'
+      'no active-filter chip should show while every filter is at its default'
     );
-    const recipeStatusFilterSelect = target.querySelector(
-      '[aria-label="Filter recipes by status"]'
-    );
-    recipeStatusFilterSelect.value = 'disabled';
-    recipeStatusFilterSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    const offSegment = target.querySelector('[data-recipe-status-option="off"] input');
+    offSegment.checked = true;
+    offSegment.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    const recipeClearButton = target.querySelector('[data-clear-filters="recipes"]');
-    assert.ok(recipeClearButton, 'Clear filters should appear when a recipe filter is active');
-    recipeClearButton.click();
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 1, 'only the off recipe remains');
+    const statusChip = target.querySelector('[data-recipe-filter-chip="status"]');
+    assert.ok(statusChip, 'an active filter should surface a clearable chip');
+    statusChip.querySelector('.manager-recipe-chip-clear').click();
     await tick();
     flushSync();
     assert.equal(
-      target.querySelector('[data-clear-filters="recipes"]'),
+      target.querySelector('[data-recipe-filter-chip="status"]'),
       null,
-      'Clear filters should hide after resetting filters'
+      'clearing the chip should reset the filter'
     );
-    assert.equal(target.querySelector('[aria-label="Filter recipes by status"]').value, 'all');
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
 
-    // The standalone Recipe Editor was removed, so the inspector no longer
-    // offers Edit; duplicate/delete remain.
+    // `Edit recipe` is the POINT of the inspector and its primary action (issue 643).
+    // The panel used to offer Duplicate and Delete as visual peers and no Edit at all,
+    // which made destroying the recipe the loudest thing on it.
+    const inspectorActions = Array.from(
+      target.querySelectorAll('.manager-recipe-browser-inspector-actions [data-recipe-action]')
+    ).map((button) => button.dataset.recipeAction);
+    assert.deepEqual(
+      inspectorActions,
+      ['duplicate', 'edit', 'delete'],
+      'Duplicate (secondary), then Edit (primary), then Delete demoted below it'
+    );
+    // The 2x2 stat grid (issue 643, brief §3.3) answers the four questions a GM has
+    // about the recipe they just clicked. Structure and Result-groups restated the row
+    // itself and are gone; Ingredients, Results and the Crafting check replace them.
+    for (const fact of ['ingredients', 'results', 'steps', 'check']) {
+      assert.ok(
+        target.querySelector(`[data-recipe-fact="${fact}"]`),
+        `recipe inspector should expose the ${fact} stat`
+      );
+    }
+    assert.ok(
+      target.querySelector('.manager-recipe-stat-grid'),
+      'recipe inspector should render the stat grid, not the generic fact list'
+    );
+    // The inspector is ONE column on the panel background, not five nested boxes: it used
+    // to wrap every section in a `.manager-inspector-card` under its own <h3>, including an
+    // invented "Recipe details" heading over a stat grid that needs no title.
     assert.equal(
-      target.querySelector('[data-recipe-action="edit"]'),
-      null,
-      'recipe inspector should no longer expose an Edit action'
+      target.querySelectorAll('.manager-recipe-browser-inspector .manager-inspector-card').length,
+      0,
+      'the inspector sections are micro-labels on the panel, not nested cards'
     );
-    assert.ok(
-      target.querySelector('[data-recipe-action="duplicate"]'),
-      'recipe inspector should expose a Duplicate action'
+    assert.equal(
+      target.querySelector('[data-recipe-inspector]').textContent.includes('Recipe details'),
+      false,
+      'the invented "Recipe details" heading is gone'
     );
-    assert.ok(
-      target.querySelector('[data-recipe-action="delete"]'),
-      'recipe inspector should expose a Delete action'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-fact="structure"]'),
-      'recipe inspector should expose a Structure fact'
-    );
-    assert.ok(
-      target.querySelector('[data-recipe-fact="result-groups"]'),
-      'recipe inspector should expose a Result groups fact'
-    );
-    const heroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
-    assert.ok(heroRow, 'recipe inspector should use the prominent hero title row');
-    assert.ok(
-      heroRow.querySelector('.manager-recipe-preview'),
-      'recipe inspector hero should render the recipe preview image'
+    const heroRow = target.querySelector('.manager-recipe-browser-inspector-hero');
+    assert.ok(heroRow, 'recipe inspector should lead with its hero');
+    assert.equal(
+      heroRow.querySelector('[data-medallion]').dataset.medallion,
+      'image',
+      'recipe inspector hero should render the resolved recipe image, not only a glyph'
     );
 
     const search = target.querySelector('.manager-toolbar input[type="search"]');
@@ -4153,22 +4244,52 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
 
-    // Row actions are now Edit (1), Duplicate (2), Delete (3). Duplicate and Delete drive
-    // store callbacks and keep the row mounted; the Edit click is exercised separately below
-    // because it navigates away from the browser to the recipe-edit route.
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
+    // Duplicate and Delete moved to the inspector (issue 643): SELECT r2 by clicking its
+    // identity, then drive the inspector's Duplicate and Delete actions, which operate on
+    // the selected recipe. Both keep the browser mounted; Edit is exercised separately
+    // below because it navigates to the recipe-edit route.
+    target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
+    flushSync();
+    target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="duplicate"]').click();
+    target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="delete"]').click();
 
     assert.deepEqual(calls.slice(-2), [
       ['duplicateRecipe', 'r2'],
       ['deleteRecipe', 'r2'],
     ]);
     assert.ok(calls.some((call) => call[0] === 'setRecipeSearch' && call[1] === 'elixir'));
-    assert.ok(
-      calls.some(
-        (call) => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true
-      )
+    const enableCall = calls.find(
+      (call) => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true
     );
+    assert.ok(enableCall, 'the row toggle reaches the store through the root');
+
+    // THE CHAIN, END TO END. `RecipesBrowserView` hands its `onToggleEnabled` prop an
+    // `onBlocked` sink; the ROOT must forward that third argument to
+    // `store.toggleRecipeEnabled`, because supplying it is exactly what makes the real
+    // store suppress its Foundry notification. Two half-proofs (the row emits it; the
+    // store honours it) both stay green while the root quietly drops it — and the flash
+    // dies while the toast returns. So this asserts the whole path: the store received
+    // the sink, and driving that sink renders the in-window flash.
+    assert.equal(
+      typeof enableCall[3]?.onBlocked,
+      'function',
+      'the root must forward the row\'s blocked-message sink to the store — dropping it silently restores the Foundry toast'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-flash]'),
+      null,
+      'nothing has been refused yet'
+    );
+    enableCall[3].onBlocked('This recipe has no result groups.');
+    flushSync();
+    const flash = target.querySelector('[data-recipe-flash]');
+    assert.ok(flash, 'the refusal the store pushes back through the sink renders in-window');
+    assert.equal(flash.getAttribute('role'), 'alert');
+    assert.match(flash.textContent, /This recipe has no result groups\./);
+    target.querySelector('[data-recipe-flash-dismiss]').click();
+    flushSync();
+    assert.equal(target.querySelector('[data-recipe-flash]'), null, 'the flash is dismissible');
+
     // The recipes header no longer renders crafting-system import/export.
     assert.ok(
       !calls.some((call) => call[0] === 'importRecipes'),
@@ -4179,10 +4300,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       'recipes header should not call exportRecipes'
     );
 
-    // The first row action is Edit (fa-edit) and it navigates to the in-manager
-    // recipe-edit route rather than calling a service callback.
-    const editButton = target.querySelector('[data-recipe-id="r2"] .manager-icon-button');
-    assert.ok(editButton.querySelector('.fa-edit'), 'first row action should be the Edit icon');
+    // Edit moved to the inspector (issue 643): r2 is already selected above, so the
+    // inspector's Edit action navigates to the in-manager recipe-edit route rather than
+    // calling a service callback.
+    const editButton = target.querySelector(
+      '.manager-recipe-browser-inspector [data-recipe-action="edit"]'
+    );
+    assert.ok(editButton.querySelector('.fa-pen'), 'the inspector Edit action carries the pen icon');
     editButton.click();
     await tick();
     flushSync();
@@ -4222,6 +4346,84 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager').dataset.managerView,
       'recipes',
       'Back to recipes should return to the recipes browser'
+    );
+  });
+
+  // Issue 643: the browser's filter / sort / group / paginate state is lifted to the
+  // root so it survives the edit round-trip. Opening the editor unmounts the browser;
+  // without the lift it remounted at defaults, throwing away the view the GM left. The
+  // search term already persisted (it lives in the store); this proves the other controls
+  // now do too — open Edit from the ROW pencil, return, and find the same view.
+  it('preserves the recipe browser filters and sort across an edit round-trip', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    craftingParent().click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2, 'both recipes at the default filter');
+
+    // Filter to OFF (leaves only the disabled r2) and flip the sort to descending.
+    const offSegment = target.querySelector('[data-recipe-status-option="off"] input');
+    offSegment.checked = true;
+    offSegment.dispatchEvent(new Event('change', { bubbles: true }));
+    target.querySelector('[data-recipe-sort-direction]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('.manager-recipe-row')).map((row) => row.dataset.recipeId),
+      ['r2'],
+      'the OFF filter leaves only the disabled recipe',
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
+      'desc',
+    );
+
+    // Open the editor from the ROW's own Edit pencil (the restored primary affordance).
+    target.querySelector('[data-recipe-id="r2"] [data-recipe-edit]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-edit',
+      'the row Edit pencil opens the recipe-edit route',
+    );
+
+    // Return via Back to recipes.
+    const backButton = Array.from(
+      target.querySelectorAll('.manager-header-actions .manager-button'),
+    ).find((button) => button.textContent.includes('Back to recipes'));
+    assert.ok(backButton, 'the editor offers Back to recipes');
+    backButton.click();
+    await tick();
+    flushSync();
+
+    // The browser is back with the SAME filters and sort — not reset to defaults.
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.ok(
+      target.querySelector('[data-recipe-filter-chip="status"]'),
+      'the status filter survived the edit round-trip',
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('.manager-recipe-row')).map((row) => row.dataset.recipeId),
+      ['r2'],
+      'the OFF filter is still applied after returning from the editor',
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
+      'desc',
+      'the descending sort survived the edit round-trip',
     );
   });
 
@@ -4285,7 +4487,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
+    // Select r2, then open the editor from the inspector's Edit action (issue 643).
+    target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
+    await tick();
+    flushSync();
+    target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="edit"]').click();
     await tick();
     flushSync();
 
@@ -4533,6 +4739,66 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager').dataset.managerView,
       'recipe-edit',
       'cancelling keeps the editor open'
+    );
+  });
+
+  it('changing the crafting system from the rail scope-select returns to the recipe browser', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
+
+    const scopeSelect = target.querySelector('[data-manager-scope-select]');
+    const current = scopeSelect.value;
+    const other = Array.from(scopeSelect.options)
+      .map((option) => option.value)
+      .find((value) => value !== current);
+    assert.ok(other, 'a second crafting system is available to switch to');
+
+    scopeSelect.value = other;
+    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipes',
+      'switching system from the recipe editor lands on the recipe browser, not a stale editor'
+    );
+    assert.ok(
+      calls.some((call) => call[0] === 'selectSystem' && call[1] === other),
+      'the new system was selected'
+    );
+  });
+
+  it('guards an unsaved recipe editor before a scope-select system switch (cancel keeps it open)', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'cancel' });
+    editRecipeName(target, 'Dirty Draft');
+    await tick();
+    flushSync();
+
+    const scopeSelect = target.querySelector('[data-manager-scope-select]');
+    const other = Array.from(scopeSelect.options)
+      .map((option) => option.value)
+      .find((value) => value !== scopeSelect.value);
+
+    scopeSelect.value = other;
+    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeDraft'),
+      'the discard dialog is consulted before switching system'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-edit',
+      'cancelling the discard keeps the editor open'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'selectSystem' && call[1] === other),
+      'the system is not switched when the discard is cancelled'
     );
   });
 
@@ -6036,7 +6302,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     const parent = target.querySelector('#manager-nav-crafting');
     assert.ok(parent, 'Crafting parent renders when experimental on');
     assert.equal(parent.getAttribute('aria-expanded'), 'false');
-    assert.equal(parent.querySelector('.manager-nav-count').textContent.trim(), '2');
+    // Parent total = 2 recipes + 2 books & scrolls items in the default fixture (issue 643).
+    assert.equal(parent.querySelector('.manager-nav-count').textContent.trim(), '4');
     const toggle = target.querySelector('#manager-nav-crafting + .manager-nav-toggle');
     assert.equal(toggle.getAttribute('aria-controls'), 'manager-crafting-submenu');
     assert.equal(toggle.getAttribute('aria-label'), 'Expand crafting menu');
@@ -6187,8 +6454,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assert.ok(target.querySelector('[data-books-scrolls]'), 'Books & Scrolls surface renders');
-    // The parent nav count reflects the recipes count (2 recipes in the fixture).
-    assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '2');
+    // The parent nav count totals the visible sub-tabs: 2 recipes + 2 books & scrolls
+    // items in the fixture (issue 643).
+    assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '4');
 
     // Both recipe items are listed with their own recipe-count + learning chips.
     const cards = Array.from(target.querySelectorAll('[data-books-scrolls-item]'));
@@ -9529,7 +9797,10 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const recipesNav = craftingParent();
     assert.equal(recipesNav.disabled, false);
-    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
+    // No recipes, but the fixture's 2 books & scrolls items still count toward the
+    // Crafting parent total; the setup guidance below is keyed on empty recipes, not
+    // this badge (issue 643).
+    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);

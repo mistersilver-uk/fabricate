@@ -277,41 +277,71 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
 
   assert.ok(toggleBlock.includes('appearance: none;'), 'system status toggles should normalize host button styles');
   assert.ok(toggleBlock.includes('width: auto;'), 'system status toggles should size to their On/Off label instead of filling the status column');
-  assert.ok(toggleBlock.includes('max-width: 64px;'), 'system status toggles should keep compact geometry');
+  assert.ok(toggleBlock.includes('max-width: 78px;'), 'system status toggles should keep compact geometry');
   assert.ok(toggleBlock.includes('border-radius: 999px;'), 'system status toggles should read as toggle buttons');
   assert.ok(focusBlock.includes('outline: none;') && focusBlock.includes('box-shadow: none;'), 'mouse focus should not inherit the host orange focus ring');
   assert.ok(focusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'keyboard focus should keep a manager focus-visible ring');
   assert.ok(onBlock.includes('var(--fab-success'), 'enabled status should use the manager success accent family');
-  assert.ok(offBlock.includes('var(--fab-warning'), 'disabled status should use a distinct muted warning/off color');
-  assert.ok(trackBlock.includes('width: 24px;'), 'toggle track should reserve only enough space for the compact state control');
+  // Issue 643: OFF is now NEUTRAL (bg-3 / border-strong), not amber. A disabled
+  // recipe, component or environment is an ordinary state, not a warning. The
+  // state colour moved onto the TRACK via the local --fab-toggle-* properties,
+  // so these assertions read the custom-property declarations, not a background.
+  assert.ok(offBlock.includes('var(--fab-bg-3)'), 'disabled status should read as a neutral off switch, not a warning');
+  assert.ok(offBlock.includes('var(--fab-border-strong)'), 'the off track should keep a visible edge');
+  // The switch sets `border: 0` on the BUTTON, so a `:hover { border-color }` rule on
+  // the button is inert. The hover affordance has to live on the TRACK, which is the
+  // part with an edge — otherwise every switch in the manager has no hover state at all.
+  const toggleHoverBlock = blockFor(
+    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track'
+  );
+  assert.ok(
+    toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
+    'hovering a switch must visibly change its track'
+  );
+  assert.equal(
+    /\.manager-status-toggle:hover \{/.test(css),
+    false,
+    'a hover rule on the border-less button itself is dead code'
+  );
+  assert.ok(trackBlock.includes('width: 34px;'), 'toggle track should use the 34x20 switch geometry');
+  assert.ok(trackBlock.includes('height: 20px;'), 'toggle track should use the 34x20 switch geometry');
+  assert.ok(trackBlock.includes('background: var(--fab-toggle-track);'), 'the track should carry the state colour');
+  assert.ok(knobBlock.includes('width: 14px;'), 'toggle knob should use the 14x14 switch geometry');
   assert.ok(knobBlock.includes('transition: transform'), 'toggle knob should expose a clear state change');
-  assert.ok(onKnobBlock.includes('transform: translateX(10px);'), 'enabled status should move the toggle knob on');
+  // 34px track - 2px inset - 14px knob - 2px inset = 14px of travel (left 2 -> 16).
+  assert.ok(onKnobBlock.includes('transform: translateX(14px);'), 'enabled status should move the toggle knob on');
 });
 
-test('manager selected system scope is static text with a return-to-library control', () => {
+// The rail's crafting-system card SELECTS (issue 643). It used to be a fixed 64px box
+// holding the system's name and an icon-only button, with no way to switch system from
+// the rail at all — so the card is now a micro-label, a real `<select>` over every
+// system, and a text back link out to the system library.
+test('the rail crafting-system card selects a system and links back to the library', () => {
   const scopeBlock = blockFor('.fabricate-manager .manager-scope-card');
-  const scopeTitleBlock = blockFor('.fabricate-manager .manager-scope-name');
+  const selectBlock = blockFor('.fabricate-manager .manager-scope-select');
   const returnBlock = blockFor('.fabricate-manager .manager-scope-return');
   const returnFocusBlock = blockFor('.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible');
   const focusBlock = blockFor('.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible');
 
-  assert.ok(scopeBlock.includes('display: grid;'), 'selected system scope should reserve space for the return icon');
-  assert.ok(scopeBlock.includes('grid-template-columns: minmax(0, 1fr) 28px;'), 'scope card should keep name and return icon aligned');
-  assert.ok(scopeBlock.includes('height: 64px;'), 'scope card should keep a stable fixed height');
+  assert.ok(scopeBlock.includes('display: grid;'), 'the card stacks its label, select and back link');
+  assert.ok(scopeBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'the card is one column, not name + icon button');
+  assert.equal(scopeBlock.includes('height: 64px;'), false, 'a select cannot be clamped into the old fixed-height box');
   assert.ok(scopeBlock.includes('white-space: normal;'), 'scope card should not inherit host nowrap rules');
   assert.ok(scopeBlock.includes('overflow: hidden;'), 'scope card should prevent long names from affecting nav layout');
-  assert.ok(scopeBlock.includes('border: 1px solid var(--fab-mv2-border);'), 'scope card should render as a visible rail card');
-  assert.ok(scopeTitleBlock.includes('min-width: 0;'), 'scope title should be allowed to shrink inside the grid');
-  assert.ok(scopeTitleBlock.includes('max-width: 100%;'), 'scope title should not overflow the scope card');
-  assert.ok(scopeTitleBlock.includes('max-height: 2.36em;'), 'scope title should have a hard two-line height cap');
-  assert.ok(scopeTitleBlock.includes('font-size: 1.05rem;'), 'scope title should be prominent in the rail card');
-  assert.ok(scopeTitleBlock.includes('-webkit-line-clamp: 2;'), 'scope title should clamp long selected system names');
-  assert.ok(scopeTitleBlock.includes('overflow: hidden;'), 'scope title should not overflow its parent');
-  assert.ok(scopeTitleBlock.includes('overflow-wrap: anywhere;'), 'scope title should break very long system names before overflow');
-  assert.ok(scopeTitleBlock.includes('white-space: normal;'), 'scope title should not inherit host nowrap rules');
-  assert.ok(returnBlock.includes('width: 28px;'), 'return icon should have a stable hit target inside the scope card');
-  assert.ok(returnBlock.includes('color: var(--fab-mv2-text-muted);'), 'return icon should avoid danger styling');
-  assert.ok(returnFocusBlock.includes('border-color: var(--fab-mv2-border-strong);'), 'return focus should stay within manager styling');
+  assert.ok(scopeBlock.includes('border: 1px solid var(--fab-mv2-border-strong);'), 'scope card should render as a visible rail card');
+
+  // The system's name is set in the display face wherever it is named — here it is the
+  // select's own value, so the serif moves onto the control.
+  assert.ok(selectBlock.includes('font-family: var(--fab-font-serif);'), 'the selected system name keeps the display face');
+  assert.ok(selectBlock.includes('min-width: 0;'), 'the select may shrink inside the rail');
+  assert.ok(selectBlock.includes('text-overflow: ellipsis;'), 'a long system name ellipsises rather than reflowing the nav');
+  assert.equal(css.includes('.fabricate-manager .manager-scope-name'), false, 'the retired static name span should be gone, not merely unused');
+
+  // The back link is a text link inside the card, not a 28px icon button beside a name.
+  assert.ok(returnBlock.includes('color: var(--fab-mv2-text-muted);'), 'the back link reads as quiet navigation, not an action');
+  assert.ok(returnBlock.includes('border: 0;'), 'the back link is a link, not a bordered button');
+  assert.ok(returnBlock.includes('text-overflow: ellipsis;') || returnBlock.includes('min-width: 0;'), 'the back link may shrink');
+  assert.ok(returnFocusBlock.includes('background: var(--fab-surface-soft);'), 'the back link keeps a manager-styled hover');
   assert.ok(focusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager focus should remain visible');
   assert.equal(scopeBlock.includes('orange'), false, 'scope card should not use orange focus styling');
   assert.equal(scopeBlock.includes('red'), false, 'scope card should not use red focus styling');
@@ -360,7 +390,12 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
   assert.equal(expandedToggleBlock, '', 'expanded gathering toggle should not override collapsed geometry');
   assert.ok(submenuBlock.includes('padding-left: var(--fab-space-3);'), 'gathering submenu entries should be nested inside the group');
   assert.ok(subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto;'), 'gathering submenu entries should keep count chips inside their rows');
-  assert.ok(activeSubitemBlock.includes('background: var(--fab-success-soft);'), 'only selected gathering submenu entries should use selected fill');
+  // Issue 643: the rail's selected state is an IDENTITY cue ("you are here"), so it
+  // moved off the success family onto the accent family. Success stays reserved for
+  // the enabled/disabled status the manager screens' rows report.
+  assert.ok(activeSubitemBlock.includes('background: var(--fab-accent-soft);'), 'only selected gathering submenu entries should use selected fill');
+  assert.ok(activeSubitemBlock.includes('border-color: var(--fab-accent-border);'), 'selected gathering submenu entries should carry the accent edge');
+  assert.equal(activeSubitemBlock.includes('var(--fab-success'), false, 'the rail selected state should not reuse the enabled-status success family');
   assert.ok(activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'selected gathering submenu entries should keep the active left accent');
   assert.ok(toggleFocusBlock.includes('outline: none;'), 'mouse focus on gathering toggle should not inherit the host outline');
   assert.ok(toggleFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering toggle should not inherit the host orange focus shadow');
@@ -501,41 +536,271 @@ test('manager gathering settings condition panels use a two-column responsive gr
   );
 });
 
-test('manager recipes browser defines compact responsive table geometry', () => {
+// The recipe library is a list of CARD rows (issue 643), not a column grid. The old
+// assertions pinned `--fab-mv2-recipe-grid`, the `has-no-category` grid variant and
+// the medium-query column stacking — none of which a card row has. What replaces them
+// is the pair that actually prevents horizontal overflow: the identity cell is the ONLY
+// shrinkable flex child, and the control cluster never shrinks.
+test('manager recipes browser defines a non-overflowing card row', () => {
   const tableBlock = blockFor('.fabricate-manager .manager-recipes-table');
-  const identityBlock = blockFor('.fabricate-manager .manager-recipe-identity');
-  const statusCellBlock = blockFor('.fabricate-manager .manager-system-row .manager-status-cell,\n.fabricate-manager .manager-recipe-row .manager-status-cell,\n.fabricate-manager .manager-environment-row .manager-status-cell,\n.fabricate-manager .manager-gathering-task-row .manager-status-cell');
-  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const rowBlock = blockFor('.fabricate-manager .manager-recipe-row');
+  const identityBlock = blockFor('.fabricate-manager .manager-recipe-row .manager-recipe-identity');
+  const clusterBlock = blockFor('.fabricate-manager .manager-recipe-cluster');
+  const groupListBlock = blockFor('.fabricate-manager .manager-recipe-group-list');
+
+  assert.ok(tableBlock.includes('display: flex;'), 'the recipes table stacks its category groups');
+  assert.equal(
+    css.includes('--fab-mv2-recipe-grid'),
+    false,
+    'the retired recipe column grid should be gone, not merely unused'
+  );
+  // A single column header sits above the whole list (issue 643). It mirrors the row's
+  // flex split (identity + cluster) and its cluster shares the row cluster's fixed
+  // template, so the labels line up with the cells beneath them.
+  const headBlock = blockFor('.fabricate-manager .manager-recipe-table-head');
+  assert.ok(headBlock.includes('display: flex;'), 'the column header mirrors the row flex split');
+  const headClusterBlock = blockFor('.fabricate-manager .manager-recipe-head-cluster');
+  assert.ok(
+    headClusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    'the header cluster shares the row cluster column template so the two align'
+  );
+  assert.ok(
+    clusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    'the row cluster consumes the same shared column template'
+  );
+  // The header hides at the stacked breakpoint, where a column header over a stack of
+  // cards means nothing — it rides the same rule as the other browsers' table heads.
+  assert.ok(
+    css.includes('.fabricate-manager .manager-table-head,\n  .fabricate-manager .manager-recipe-table-head {\n    display: none;'),
+    'the recipe column header hides at the stacked breakpoint alongside the shared table head'
+  );
+  assert.ok(rowBlock.includes('display: flex;'), 'the recipe row is a flex card');
+  assert.ok(rowBlock.includes('min-width: 0;'), 'the recipe row may shrink inside the main column');
+  assert.ok(
+    identityBlock.includes('flex: 1 1 0;') && identityBlock.includes('min-width: 0;'),
+    'the identity cell is the row content that gives way'
+  );
+  assert.ok(
+    clusterBlock.includes('flex-shrink: 0;'),
+    'the control cluster (lock / enable / edit) must never be squeezed'
+  );
+  assert.ok(groupListBlock.includes('list-style: none;'), 'the rows render as a real, unstyled list');
+
+  // The recipe row LEFT the shared 76px row-card geometry group: it is a denser card at
+  // 11px/12px and radius 9 (~62px tall), so a page of recipes shows more of the library
+  // and less of the gaps between it. The other four browser rows keep the 76px group.
+  assert.ok(
+    css.includes('.fabricate-manager .manager-component-row,\n.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'),
+    'component, environment, gathering task, and essence rows keep the shared 76px row height'
+  );
+  assert.equal(
+    /\.manager-recipe-row,\n[^{]*min-height: 76px/.test(css),
+    false,
+    'the recipe row must not still be in the 76px geometry group'
+  );
+  assert.ok(rowBlock.includes('min-height: 62px;'), 'the recipe row is the denser library card');
+  assert.ok(rowBlock.includes('padding: 11px 12px;'), 'the recipe row uses the library card padding');
+  assert.ok(rowBlock.includes('border-radius: 9px;'), 'the recipe row uses the library card radius');
+
+  // A disabled row reads at .55, not .62 — far enough back that a page of rows separates
+  // at a glance into what is live and what is not.
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipe-row.is-off').includes('opacity: 0.55;'),
+    'a disabled row recedes'
+  );
+
+  // Selection is the accent BORDER. A ring plus an inset left bar is the same statement
+  // made twice, and the bar bit into the row's medallion.
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipe-row.is-selected').includes('box-shadow: none;'),
+    'the selected recipe row rings in the accent and adds no left bar'
+  );
+});
+
+// The collapse ladder (issue 643 §8). Drop order is fixed and monotonic, and the
+// lock / enable / edit controls are never in it.
+//
+// The ladder measures the ROW's own container, not the manager. `.manager-body` is
+// `220px + 1fr + 300px` above 1120px and only collapses to one column at or below it,
+// so a manager-keyed ladder fired NONE of its steps in the 1121-1280px band — exactly
+// where the row is at its narrowest (~570-760px) — and every step once the layout
+// stacked, where the row has the whole window. Keying it to `.manager-recipes-table`
+// makes each step fire when the row is actually short of room.
+test('manager recipe row collapses in the specified order and never drops its controls', () => {
+  const tableBlock = blockFor('.fabricate-manager .manager-recipes-table');
+  assert.ok(
+    tableBlock.includes('container-type: inline-size;') &&
+      tableBlock.includes('container-name: fabricate-recipes;'),
+    'the row ladder needs a container that measures the ROW, not the whole manager'
+  );
+
+  // The ladder's old fourth rung dropped the switch's "On"/"Off" text at 440px. That text
+  // is no longer rendered in the row at all — the track colour is the state, the aria-label
+  // names it, and the Disabled pill says it in words — so the rung is gone rather than left
+  // as a rule matching nothing.
+  const LADDER = [
+    [680, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
+    [600, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
+    [520, '.fabricate-manager .manager-recipe-row .manager-recipe-check']
+  ];
+
+  for (const [width, selector] of LADDER) {
+    const query = css.slice(css.indexOf(`@container fabricate-recipes (max-width: ${width}px)`));
+    assert.ok(query.length > 0, `a ${width}px recipe-container query should exist`);
+    const rule = query.slice(query.indexOf(selector));
+    assert.ok(
+      query.includes(selector) && rule.slice(0, rule.indexOf('}')).includes('display: none;'),
+      `${selector} should drop at ${width}px of ROW width`
+    );
+  }
+
+  assert.equal(
+    css.includes('.fabricate-manager .manager-recipe-row .manager-status-toggle-label'),
+    false,
+    'the row renders no On/Off text, so nothing should still be styled to hide it'
+  );
+
+  for (const kept of ['.manager-recipe-lock', '.manager-recipe-status', '.manager-action-group']) {
+    assert.equal(
+      new RegExp(`\\.manager-recipe-row \\${kept} \\{\\n  display: none;`).test(css),
+      false,
+      `${kept} must survive every width — it is an operable control`
+    );
+  }
+
+  // The three status pills are all `white-space: nowrap`, and the identity cell set no
+  // overflow: they could spill out of it. The name gives way first; the row clips.
+  const nameRowBlock = blockFor('.fabricate-manager .manager-recipe-name-row');
+  const nameBlock = blockFor('.fabricate-manager .manager-recipe-name-row .manager-system-name');
+  assert.ok(nameRowBlock.includes('overflow: hidden;'), 'the pills cannot escape the identity cell');
+  assert.ok(
+    nameBlock.includes('flex: 0 1 auto;') && nameBlock.includes('min-width: 0;'),
+    'the name is what gives way, so the pills stay readable'
+  );
+});
+
+// Two long-label regressions the shared switch caused, both confirmed on a real smoke
+// frame. `.manager-status-toggle` is a STATUS cell: it caps at 78px and ellipsises its
+// label, which is right for "On"/"Off" and wrong for anything the GM has to read.
+test('long-labelled switches escape the status cell geometry', () => {
+  // (1) The library's grouping switch used to render as "Grou…": 78px - 34px track - gap
+  // leaves ~36px. It now carries NO label of its own — the uppercase micro-label beside it
+  // is its accessible name (`aria-labelledby`) — so it is track-only, and it opts out of
+  // the status-cell cap so the track is not squeezed either.
+  const groupToggleBlock = blockFor(
+    '.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle]'
+  );
+  assert.ok(
+    groupToggleBlock.includes('max-width: none;'),
+    'the group-by-category switch must not inherit the 78px status-cell cap'
+  );
+  assert.ok(groupToggleBlock.includes('width: auto;'), 'a track-only switch is sized by its track');
+
+  // The micro-label is what titles the control, and `white-space: nowrap` is the whole
+  // reason "Sort by" no longer breaks onto two lines in the flagship frame.
+  const filterLabelBlock = blockFor('.fabricate-manager .manager-recipe-filter-label');
+  assert.ok(filterLabelBlock.includes('white-space: nowrap;'), 'a filter micro-label never wraps');
+  assert.ok(filterLabelBlock.includes('text-transform: uppercase;'), 'a filter micro-label is a micro-label');
+  assert.ok(blockFor('.fabricate-manager .manager-recipe-filter-divider').includes('width: 1px;'), 'the view controls are ruled apart');
+
+  // (2) The Overview Enabled/Locked status cards are left-aligned rows (icon + copy
+  // + switch), not the media column's centred, 14ch-clamped stack (issue 643).
+  const statusCardBlock = blockFor('.fabricate-manager .manager-recipe-status-card');
+  const statusSubBlock = blockFor('.fabricate-manager .manager-recipe-status-sub');
+  assert.ok(
+    statusCardBlock.includes('display: flex;') && statusCardBlock.includes('align-items: center;'),
+    'a status card is an icon + copy + switch row, not a centred stack'
+  );
+  assert.equal(
+    statusSubBlock.includes('max-width:'),
+    false,
+    'the status sub-line must not be clamped to the 96px media column width'
+  );
+  assert.equal(
+    statusSubBlock.includes('text-align: center;'),
+    false,
+    'the status sub-line reads left-aligned, not centred mid-card'
+  );
+});
+
+// Selection is an identity cue ("you are here"), never a status. Success/amber stay
+// reserved for enabled and warning states — a selected row tinted `--fab-success-soft`
+// wears the exact colour its own ON switch uses, inches away (issue 643).
+test('a selected browser row reads as an identity cue in the accent family, not a status', () => {
+  const selectedRowBlock = blockFor(
+    '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected,\n.fabricate-manager .manager-environment-row.is-selected,\n.fabricate-manager .manager-gathering-task-row.is-selected,\n.fabricate-manager .manager-essence-row.is-selected'
+  );
+  const selectedSystemBlock = blockFor('.fabricate-manager .manager-system-row.is-selected');
+  const identityFocusBlock = blockFor(
+    '.fabricate-manager .manager-system-identity:focus-visible,\n.fabricate-manager .manager-recipe-identity:focus-visible,\n.fabricate-manager .manager-component-identity:focus-visible,\n.fabricate-manager .manager-environment-identity:focus-visible,\n.fabricate-manager .manager-gathering-task-identity:focus-visible'
+  );
+
+  for (const [name, block] of [
+    ['the selected row', selectedRowBlock],
+    ['the selected system card', selectedSystemBlock]
+  ]) {
+    assert.ok(block.includes('background: var(--fab-surface-soft);'), `${name} uses a neutral soft surface`);
+    assert.ok(block.includes('border-color: var(--fab-accent-border);'), `${name} rings in the accent`);
+    assert.equal(
+      block.includes('var(--fab-success-soft)'),
+      false,
+      `${name} must not wear the enabled-status colour`
+    );
+  }
 
   assert.ok(
-    tableBlock.includes('--fab-mv2-recipe-grid: minmax(0, 1.35fr)'),
-    'recipes table should define shrinkable compact columns for normal Foundry manager widths'
+    identityFocusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    'the identity focus ring follows the accent focus standard, not the success family'
   );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-recipes-table.has-no-category'),
-    'recipes table should have a no-category grid variant'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-recipe-row,\n.fabricate-manager .manager-component-row,\n.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'),
-    'recipe, component, environment, gathering task, and essence rows should have stable row height'
-  );
-  assert.ok(
-    identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
-      || css.includes('.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity'),
-    'recipe identity should reserve thumbnail space'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-recipe-row .manager-status-cell'),
-    'recipe status cells should use the shared compact status-toggle alignment'
-  );
-  assert.ok(statusCellBlock.includes('justify-self: start;'), 'shared status toggle cells should align compact toggles to the start');
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-recipe-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'medium manager layout should stack recipe rows before columns become cramped'
-  );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-labeled-cell::before') && mediumQuery.includes('content: attr(data-label);'),
-    'stacked recipe cells should expose visible labels after table headers are hidden'
+});
+
+// The typographic contract (issue 643, `openspec/specs/ui-integration/spec.md`
+// § Typographic contract): serif on names and headings, mono + tabular figures on
+// every numeric. A count badge that shifts width between 9 and 10 moves the control
+// beside it, so tabular-nums is part of the contract, not a nicety.
+test('the typographic contract sets names in the serif and numerics in the mono face', () => {
+  const SERIF = [
+    '.fabricate-manager .manager-rail-title,\n.fabricate-manager .manager-card-title',
+    '.fabricate-manager .manager-inspector-name',
+    '.fabricate-manager .manager-recipe-name-row .manager-system-name',
+    // The rail's selected system is now the `<select>`'s own value, not a static span.
+    '.fabricate-manager .manager-scope-select',
+    '.fabricate-manager .manager-recipe-ingredient-set-name',
+    '.fabricate-manager input[data-recipe-field="name"]'
+  ];
+  for (const selector of SERIF) {
+    assert.ok(
+      blockFor(selector).includes('font-family: var(--fab-font-serif);'),
+      `${selector} is a name or a heading and belongs in the serif`
+    );
+  }
+
+  const MONO = [
+    '.fabricate-manager .manager-chip.is-mono',
+    '.fabricate-manager .manager-editor-tab-badge',
+    '.fabricate-manager .manager-environment-comp-order',
+    '.fabricate-manager .manager-nav-count'
+  ];
+  for (const selector of MONO) {
+    const block = blockFor(selector);
+    assert.ok(
+      block.includes('font-family: var(--fab-font-mono);'),
+      `${selector} renders a number and belongs in the mono face`
+    );
+    assert.ok(
+      block.includes('font-variant-numeric: tabular-nums;'),
+      `${selector} must not change width between 9 and 10`
+    );
+  }
+
+  // The last clause of the contract, applied: "a control whose text is words rather than
+  // a number stays in the UI face". "2 in · 1 out" is a PHRASE — the mono face marks a
+  // numeric (a quantity, a DC, a count badge), it does not decorate a readout, and the
+  // mono digits visibly widened this one.
+  assert.equal(
+    blockFor('.fabricate-manager .manager-recipe-io-counts').includes('font-family: var(--fab-font-mono);'),
+    false,
+    "the row's I/O readout is a phrase, not a numeric, and stays in the UI face"
   );
 });
 
@@ -1849,9 +2114,110 @@ test('collapsed manager rail reclaims content width and keeps section nav as an 
   );
   assert.ok(collapsedNavButtonBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'collapsed nav buttons should collapse to a single centered icon column');
   assert.ok(
-    css.includes('@container fabricate-manager (max-width: 1120px) {\n  .fabricate-manager .manager-body,\n  .fabricate-manager .manager-body.is-rail-collapsed {'),
+    stackedBodyRule().includes('grid-template-columns: 1fr;'),
     'narrow container query should still stack the collapsed body to a single column'
   );
+});
+
+// The stacked body rule, read out of the 1120px container query rather than off the base
+// `.manager-body` block (`blockFor` returns the FIRST match, which is the base rule).
+function stackedBodyRule() {
+  const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const selector =
+    '.fabricate-manager .manager-body,\n  .fabricate-manager .manager-body.is-rail-collapsed {';
+  const start = query.indexOf(selector);
+  if (start < 0) return '';
+  const rule = query.slice(start);
+  return rule.slice(0, rule.indexOf('}') + 1);
+}
+
+// Issue 643 — the bug that made the recipe library render ZERO visible rows at 900px.
+//
+// Stacked, `.manager-body`'s three children land in implicit `auto` rows inside a box of
+// DEFINITE height, and each of them carries `min-height: 0` + `overflow: hidden` — so each
+// contributes a min-content size of ZERO and the track-sizing algorithm SHARES the body's
+// height between them rather than sizing each to its content. Measured at 900x700: rail
+// 225px (its whole nav clipped away), main 200px, inspector 179px, `.manager-table-scroll`
+// squeezed to 24px, and every recipe row still in the DOM at its full 76px — which is
+// precisely why `assertManagerLayoutStable` (a DOM row count plus an overflow measurement)
+// passed on a library that showed nothing at all.
+//
+// `max-content` tracks cannot be squeezed. This is a correctness rule, not tidiness.
+test('the stacked manager body sizes its regions to content instead of sharing its height', () => {
+  const bodyRule = stackedBodyRule();
+  assert.ok(bodyRule, 'the 1120px query must still carry a stacked-body rule');
+  assert.ok(
+    bodyRule.includes('grid-auto-rows: max-content;'),
+    'stacked rail / main / inspector rows must size to content, or each is squeezed to a share of the body height'
+  );
+  assert.ok(
+    bodyRule.includes('overflow-y: auto;'),
+    'the body is what scrolls once its regions keep their own height'
+  );
+
+  // Left at its content height the stacked rail is ~650px of navigation ABOVE the content
+  // it navigates to, so the GM would scroll past the entire nav to reach row one.
+  const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const railStart = query.indexOf('.fabricate-manager .manager-rail {');
+  const railRule = query.slice(railStart, query.indexOf('}', railStart) + 1);
+  assert.ok(railRule.includes('max-height:'), 'the stacked rail is bounded, not a full-height wall of nav');
+  assert.ok(railRule.includes('overflow: hidden auto;'), 'the bounded stacked rail scrolls its own nav');
+});
+
+// Issue 643: the Studio rail adds a section label, a crafting-system card and count
+// numerals. Each has to opt out of the 56px collapsed strip explicitly, or it blows the
+// icon column out.
+//
+// A rail count is a BARE NUMERAL, not a badge. It used to borrow `.manager-chip` and then
+// spend five declarations undoing it (the 999px border, the fill, the 24px min-height), so
+// every nav row still wore a button-shaped badge. Its own rule owes the chip nothing.
+test('collapsed manager rail hides the section label, the system card and the count numerals', () => {
+  const collapsedRailTitleBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title');
+  const collapsedRailBlockBlock = blockFor('.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-block');
+  const railTitleBlock = blockFor('.fabricate-manager .manager-rail-title');
+  const navCountBlock = blockFor('.fabricate-manager .manager-nav-count');
+
+  assert.ok(collapsedRailTitleBlock.includes('display: none;'), 'collapsed rail should hide the uppercase section label');
+  assert.ok(collapsedRailBlockBlock.includes('display: none;'), 'collapsed rail should hide the crafting-system card and its select');
+  assert.ok(railTitleBlock.includes('letter-spacing:'), 'the rail section label should track wider than a card title');
+
+  assert.ok(navCountBlock.includes('flex: 0 0 auto;'), 'a rail count should not shrink the nav label away');
+  assert.ok(navCountBlock.includes('font-family: var(--fab-font-mono);'), 'a rail count is a numeric and reads in the mono face');
+  assert.ok(navCountBlock.includes('font-variant-numeric: tabular-nums;'), 'a rail count must not change width between 9 and 10');
+  assert.equal(
+    css.includes('.fabricate-manager .manager-nav-count.manager-chip'),
+    false,
+    'the rail count should own its rule rather than borrowing (and undoing) the content chip'
+  );
+
+  const collapsedHideIndex = css.indexOf('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {');
+  const groupedHideIndex = css.indexOf('.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {');
+  assert.ok(collapsedHideIndex >= 0 || groupedHideIndex >= 0, 'collapsed rail must still hide the nav counts');
+});
+
+test('the manager titlebar caps the selected system badge and keeps the status line on one line', () => {
+  const rootBlock = blockFor('.fabricate-manager');
+  const titlebarBlock = blockFor('.fabricate-manager .manager-titlebar');
+  const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
+  const statusBlock = blockFor('.fabricate-manager .manager-titlebar-status');
+  const statusTextBlock = blockFor('.fabricate-manager .manager-titlebar-status-text');
+  const titleBlock = blockFor('.fabricate-manager .manager-title');
+
+  assert.ok(
+    rootBlock.includes('grid-template-rows: auto auto 1fr;'),
+    'the manager shell must reserve a row for the titlebar, or the header takes the 1fr row and the body collapses'
+  );
+  assert.ok(titlebarBlock.includes('display: flex;'), 'the titlebar should lay its identity strip out in one row');
+  assert.ok(titlebarBlock.includes('min-width: 0;'), 'the titlebar must be allowed to shrink inside the manager grid');
+  // The badge carries the SELECTED SYSTEM's name — user-authored text of any length.
+  assert.ok(badgeBlock.includes('background: var(--fab-badge-gold);'), 'the system badge should use the gold badge token');
+  assert.ok(badgeBlock.includes('color: var(--fab-on-badge-gold);'), 'the system badge should use its paired on-gold text token');
+  assert.ok(badgeBlock.includes('max-width:'), 'the system badge must cap its width against long system names');
+  assert.ok(badgeBlock.includes('text-overflow: ellipsis;') && badgeBlock.includes('white-space: nowrap;'), 'the system badge should ellipsis rather than push the status line off the strip');
+  assert.ok(statusBlock.includes('margin-left: auto;'), 'the status line should sit right-aligned');
+  assert.ok(statusBlock.includes('color: var(--fab-mv2-text-muted);'), 'the status line should read as muted metadata');
+  assert.ok(statusTextBlock.includes('text-overflow: ellipsis;'), 'a long resolution-mode label should ellipsis, not wrap the strip');
+  assert.ok(titleBlock.includes('font-family: var(--fab-font-serif);'), 'the manager screen title should override the host h1 font with the studio serif');
 });
 
 test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {
@@ -1972,27 +2338,30 @@ test('recipe tag list spans the full row width on its own line below the control
         <body>
           <main class="fabricate-manager">
             <div class="harness-row-width">
-              <div class="manager-recipe-ingredient-option-row" data-recipe-option>
+              <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
+                <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
                 <div class="manager-recipe-option-target">
-                  <div class="manager-recipe-option-tags">
-                    <div class="manager-recipe-option-tags-controls">
-                      <div class="manager-recipe-tag-match-toggle">
-                        <button type="button" class="manager-recipe-tag-match-option is-selected">Any</button>
-                        <button type="button" class="manager-recipe-tag-match-option">All</button>
-                      </div>
-                      <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
-                    </div>
-                  </div>
+                  <span class="manager-recipe-option-tag-name">any #reagent #rare</span>
+                  <span class="manager-recipe-req-tag is-tag">Tag</span>
                 </div>
                 <div class="manager-recipe-option-controls">
                   <input type="number" class="manager-recipe-option-quantity" value="1">
-                  <button type="button" class="manager-icon-button is-danger manager-recipe-option-remove"><i class="fas fa-minus"></i></button>
+                  <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
                 </div>
-                <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
-                  <ul class="manager-recipe-tag-chips">
-                    <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-                    <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-                  </ul>
+                <div class="manager-recipe-option-tags-detail">
+                  <div class="manager-recipe-option-tags-controls">
+                    <div class="manager-recipe-tag-match-toggle">
+                      <button type="button" class="manager-recipe-tag-match-option is-selected">Any</button>
+                      <button type="button" class="manager-recipe-tag-match-option">All</button>
+                    </div>
+                    <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
+                  </div>
+                  <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
+                    <ul class="manager-recipe-tag-chips">
+                      <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+                      <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2006,17 +2375,27 @@ test('recipe tag list spans the full row width on its own line below the control
         const rect = document.querySelector(selector).getBoundingClientRect();
         return { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width };
       };
+      const row = document.querySelector('.manager-recipe-ingredient-option-row');
+      const style = getComputedStyle(row);
       return {
         row: rectFor('.manager-recipe-ingredient-option-row'),
+        rowPadding:
+          parseFloat(style.paddingLeft) +
+          parseFloat(style.paddingRight) +
+          parseFloat(style.borderLeftWidth) +
+          parseFloat(style.borderRightWidth),
         target: rectFor('.manager-recipe-option-target'),
         controls: rectFor('.manager-recipe-option-controls'),
+        detail: rectFor('.manager-recipe-option-tags-detail'),
         list: rectFor('.manager-recipe-option-tags-list')
       };
     });
 
+    // §B4: the tag detail (controls + chip list) wraps to its own full-width line below
+    // the main row; it fills the row's CONTENT box (row width minus its padding).
     assert.ok(
-      Math.abs(report.list.width - report.row.width) <= 1,
-      `tags list should fill the row width (list ${report.list.width} vs row ${report.row.width})`
+      Math.abs(report.detail.width - (report.row.width - report.rowPadding)) <= 1,
+      `tags detail should fill the row content width (detail ${report.detail.width} vs content ${report.row.width - report.rowPadding})`
     );
     assert.ok(
       report.list.top >= report.controls.bottom - 1 && report.list.top >= report.target.bottom - 1,

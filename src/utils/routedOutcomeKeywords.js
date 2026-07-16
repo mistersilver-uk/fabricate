@@ -120,6 +120,25 @@ export function routedSuccessTierOptions(routed) {
 }
 
 /**
+ * ALL outcome tiers (success AND failure) as `{id, name}`, in authored order. Unlike
+ * {@link routedSuccessTierOptions} this keeps failure tiers, because a result group may
+ * be routed to any tier and a consumer resolving a group's `checkOutcomeIds` to tier
+ * NAMES (e.g. the library inspector's routed-by-check headings) needs every tier's name.
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @returns {Array<{id: string, name: string}>}
+ */
+export function routedOutcomeTierOptions(routed) {
+  if (!routed) return [];
+  const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+  return (Array.isArray(tiers) ? tiers : [])
+    .filter((tier) => tier?.id)
+    .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+}
+
+/**
  * Does the routed check have ANY outcome tier defined (regardless of success)?
  * The active list is `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
  *
@@ -137,6 +156,28 @@ export function routedHasOutcomeTiers(routed) {
   if (!routed) return false;
   const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
   return Array.isArray(tiers) && tiers.some((tier) => tier?.id);
+}
+
+/**
+ * How many outcome tiers a routed check has authored — success AND failure tiers,
+ * counted by id exactly as {@link routedHasOutcomeTiers} tests. The active list is
+ * `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
+ *
+ * The manager titlebar reports this beside the resolution-mode label ("Routed by
+ * check · 4 outcome tiers"), so it must agree with the has-any predicate: a count
+ * derived from tier NAMES would silently drop an id-bearing tier the GM has not
+ * named yet, and the titlebar would disagree with the editor about how many tiers
+ * exist.
+ *
+ * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @returns {number}
+ */
+export function routedOutcomeTierCount(routed) {
+  if (!routed) return 0;
+  const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
+  return (Array.isArray(tiers) ? tiers : []).filter((tier) => tier?.id).length;
 }
 
 /**
