@@ -198,6 +198,85 @@ describe('InventoryView (mounted)', () => {
     assert.ok(card.querySelector('[data-inventory-pip="tool"]'), 'renders a tool pip');
   });
 
+  // D14: the prototype puts the salvageable and tool badges at ONE slot, which is only
+  // safe there because no prototype fixture item is both. Fabricate's flags are
+  // orthogonal and a broken salvageable tool is the headline case, so both-true must
+  // resolve to two distinct badges in one row — nothing else in the suite would catch
+  // an overlap (presence assertions pass either way).
+  it('gives a salvageable tool BOTH corner badges, in one row, distinct elements', async () => {
+    const item = makeItem();
+    item.isTool = true;
+    item.salvage = { enabled: true, mode: 'simple' };
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const card = target.querySelector('[data-inventory-card="sys:c1"]');
+    const salvageable = card.querySelector('[data-inventory-pip="salvageable"]');
+    const tool = card.querySelector('[data-inventory-pip="tool"]');
+    assert.ok(salvageable, 'renders the salvageable badge');
+    assert.ok(tool, 'renders the tool badge');
+    assert.notEqual(salvageable, tool, 'they are two elements, not one shared slot');
+    const badges = card.querySelector('[data-inventory-badges]');
+    assert.equal(salvageable.parentElement, badges, 'the salvageable badge sits in the badge row');
+    assert.equal(tool.parentElement, badges, 'the tool badge sits in the SAME badge row');
+    assert.equal(badges.children.length, 2, 'the row carries exactly the two badges');
+  });
+
+  it('renders no salvageable badge for a component with salvage disabled', async () => {
+    const item = makeItem();
+    item.salvage = { enabled: false };
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const card = target.querySelector('[data-inventory-card="sys:c1"]');
+    assert.equal(card.querySelector('[data-inventory-pip="salvageable"]'), null);
+  });
+
+  // D14: "Broken" REPLACES the quantity pip; they share one slot and one ternary.
+  // Rendering them as separate elements would collide at top-right.
+  it('replaces the quantity pip with a Broken pip on a broken tool', async () => {
+    const item = makeItem();
+    item.broken = true;
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const card = target.querySelector('[data-inventory-card="sys:c1"]');
+    const pips = card.querySelectorAll('[data-inventory-qty]');
+    assert.equal(pips.length, 1, 'exactly one top-right pip — a replacement, not an addition');
+    assert.ok(pips[0].hasAttribute('data-inventory-qty-broken'), 'it is the broken variant');
+    assert.doesNotMatch(pips[0].textContent, /×7/, 'the quantity is not also shown');
+    assert.ok(card.hasAttribute('data-inventory-card-broken'), 'the card carries the broken state');
+  });
+
+  it('shows the quantity pip and no broken state on an intact item', async () => {
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const card = target.querySelector('[data-inventory-card="sys:c1"]');
+    const pips = card.querySelectorAll('[data-inventory-qty]');
+    assert.equal(pips.length, 1);
+    assert.equal(pips[0].hasAttribute('data-inventory-qty-broken'), false);
+    assert.match(pips[0].textContent, /×7/);
+    assert.equal(card.hasAttribute('data-inventory-card-broken'), false);
+  });
+
+  it('shows the read-only broken banner, with no repair action, on the Info body', async () => {
+    const item = makeItem();
+    item.broken = true;
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
+    const banner = detail.querySelector('[data-inventory-broken-banner]');
+    assert.ok(banner, 'renders the broken banner');
+    assert.equal(banner.querySelector('button'), null, 'the banner offers no action');
+  });
+
   it('shows contributing components when an essence is selected', async () => {
     const item = makeEssenceItem();
     const { services } = makeServices(item);

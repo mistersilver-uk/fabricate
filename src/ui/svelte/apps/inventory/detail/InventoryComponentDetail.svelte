@@ -1,13 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
   InventoryComponentDetail is the inspector body for an owned component or
-  essence row: the header (thumbnail + name + "N total" + type/tag/tier chips),
-  a per-source quantity breakdown, essence content, and the recipes that use,
-  require, or produce it.
+  essence row: the header (64px thumbnail + serif name + "N total" + type/tag/tier
+  chips), then the Info content in its canonical order —
 
-  Extracted verbatim from the former double-duty `InventoryDetail.svelte`
-  (issue 675), which now routes here. Each list paginates independently through
-  the shared `InventoryDetailPager`.
+    broken banner -> description -> essences -> sources -> used by -> produced by
+
+  — plus, for a salvageable component, the `Info | Salvage` tab strip and the
+  salvage panel.
+
+  Extracted from the former double-duty `InventoryDetail.svelte` (issue 675),
+  which now routes here. Each list paginates independently through the shared
+  `InventoryDetailPager`.
 
   Prop-driven; navigation routes back through the store seams.
 -->
@@ -24,6 +28,12 @@
 
   const isEssence = $derived(item?.isEssenceSource === true);
   const isTool = $derived(item?.isTool === true);
+  const description = $derived(String(item?.description ?? '').trim());
+  // A derived, read-only runtime verdict: the tool has spent its uses. Nothing
+  // un-breaks a tool, so the banner states WHY it is unusable and offers no action —
+  // and it does NOT gate salvage: recycling a broken tool is the most useful thing
+  // left to do with it.
+  const broken = $derived(item?.broken === true);
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
   );
@@ -86,7 +96,7 @@
     {#if isEssence}
       <span class="inventory-detail-essence" aria-hidden="true"><i class={icon}></i></span>
     {:else}
-      <CraftingThumb src={item.img ?? ''} alt="" size={72} />
+      <CraftingThumb src={item.img ?? ''} alt="" size={64} />
     {/if}
     <div class="inventory-detail-heading">
       <p class="inventory-detail-name">{item.name}</p>
@@ -104,6 +114,35 @@
       </div>
     </div>
   </header>
+
+  {#if broken}
+    <!-- Read-only: brokenness is a derived verdict, no engine method un-breaks a tool,
+         and the only "Repair" string in the codebase is a shopping-list label that
+         repairs nothing. So this states the cause and offers NO action. -->
+    <p class="inventory-detail-broken-banner" data-inventory-broken-banner role="status">
+      <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+      <span>{localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}</span>
+    </p>
+  {/if}
+
+  {#if description}
+    <p class="inventory-detail-description" data-inventory-description>{description}</p>
+  {/if}
+
+  {#if essences.length > 0}
+    <section class="inventory-detail-section">
+      <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}</p>
+      <div class="inventory-detail-essences">
+        {#each essences as essence (essence.id)}
+          <span class="inventory-chip inventory-chip-essence">
+            {#if essence.icon}<i class={essence.icon} aria-hidden="true"></i>{/if}
+            <span>{essence.name}</span>
+            <span class="inventory-chip-qty">×{essence.quantity}</span>
+          </span>
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   <section class="inventory-detail-section">
     <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}</p>
@@ -154,21 +193,6 @@
       {:else}
         <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')}</p>
       {/if}
-    </section>
-  {/if}
-
-  {#if essences.length > 0}
-    <section class="inventory-detail-section">
-      <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}</p>
-      <div class="inventory-detail-essences">
-        {#each essences as essence (essence.id)}
-          <span class="inventory-chip inventory-chip-essence">
-            {#if essence.icon}<i class={essence.icon} aria-hidden="true"></i>{/if}
-            <span>{essence.name}</span>
-            <span class="inventory-chip-qty">×{essence.quantity}</span>
-          </span>
-        {/each}
-      </div>
     </section>
   {/if}
 
@@ -308,12 +332,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 72px;
-    height: 72px;
-    border-radius: 6px;
-    background: var(--fab-accent-soft);
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    background: var(--fab-bg-3);
     color: var(--fab-accent);
-    font-size: 28px;
+    font-size: 24px;
   }
 
   .inventory-detail-heading {
@@ -323,16 +347,20 @@
     gap: 4px;
   }
 
+  /* Serif is reserved for item/product NAMES — nowhere else (brief §2). */
   .inventory-detail-name {
     margin: 0;
-    font-size: 16px;
+    font-family: var(--fab-font-serif);
+    font-size: 18px;
     font-weight: 600;
+    line-height: 1.15;
   }
 
   .inventory-detail-total {
     margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--fab-text-subtle);
     font-variant-numeric: tabular-nums;
   }
 
@@ -357,13 +385,18 @@
     white-space: nowrap;
   }
 
+  /* The type-tag pill (Component / Essence) is a quiet reading of the row's kind, not
+     an accent call-to-action. */
   .inventory-chip-type {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
+    border-color: var(--fab-border);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-secondary);
+    font-size: 10px;
+    font-weight: 600;
   }
 
   .inventory-chip-qty {
+    font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--fab-text);
   }
@@ -374,13 +407,42 @@
     gap: 8px;
   }
 
+  /* Section eyebrows: uppercase, wide-tracked, muted (brief §2 type scale). */
   .inventory-detail-section-title {
     margin: 0;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.12em;
     color: var(--fab-text-muted);
+  }
+
+  .inventory-detail-description {
+    margin: 0;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--fab-text-muted);
+  }
+
+  /* Read-only broken banner: two signals (danger ramp + warning glyph), never colour
+     alone, and no action — nothing repairs a tool. */
+  .inventory-detail-broken-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    flex-shrink: 0;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--fab-danger-border);
+    border-radius: 8px;
+    background: var(--fab-danger-soft);
+    color: var(--fab-danger-text);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.5;
   }
 
   .inventory-detail-list {
@@ -456,8 +518,9 @@
 
   .inventory-detail-row-qty {
     flex: 0 0 auto;
+    font-family: var(--fab-font-mono);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text);
   }

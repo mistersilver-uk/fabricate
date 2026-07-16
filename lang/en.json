@@ -404,11 +404,14 @@
           "SortType": "Type"
         },
         "Card": {
-          "ToolPip": "Tool"
+          "ToolPip": "Tool",
+          "SalvageablePip": "Salvageable",
+          "Broken": "Broken"
         },
         "Detail": {
           "SelectHint": "Select an item to see its sources and where it's used.",
           "Total": "{count} total",
+          "BrokenBanner": "This tool is broken — it has used up its remaining uses and can't be used for crafting.",
           "Tier": "Tier {tier}",
           "TypeComponent": "Component",
           "TypeEssence": "Essence",
