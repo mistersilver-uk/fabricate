@@ -1488,8 +1488,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // The long name is deliberate — it is the stacked frame's ellipsis subject.
       { name: 'Smoke Clay', img: 'icons/commodities/stone/clay-grey.webp' },
       { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' },
-      { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/masonry-tile-grey.webp' },
-      { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/vase-clay-painted-red.webp' }
+      { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/paver-tile-blue.webp' },
+      { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' }
     ];
     const createdItems = await Item.createDocuments(
       worldSpecs.map((s) => ({ name: s.name, type: itemType, img: s.img }))
@@ -1844,7 +1844,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke Kiln Firing',
       description: 'progressive: stage order fixed by the GM (allowPlayerResultReorder: false).',
       craftingSystemId: progressiveSystemId,
-      img: 'icons/commodities/stone/masonry-tile-grey.webp',
+      img: 'icons/commodities/stone/paver-tile-blue.webp',
       allowPlayerResultReorder: false,
       ingredientSets: [{
         ingredientGroups: [{
