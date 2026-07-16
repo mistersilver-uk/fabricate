@@ -280,6 +280,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
+          # The forward-port push authenticates as the bypass App, never as github-actions[bot].
+          # checkout stores its own credential as an http.extraheader, and an Authorization header
+          # BEATS the credential in a remote URL — so any persisted credential silently wins over
+          # the App token. Never persist it here. (checkout writes that header to a temp config
+          # file, not the local one, so a `git config --unset-all` in the push step cannot reach it.)
+          persist-credentials: false
 
       - name: Mint an App installation token (bypass actor + workflow trigger)
         id: apptoken
@@ -295,6 +301,14 @@ jobs:
           GH_TOKEN: ${{ steps.apptoken.outputs.token }}
           VERSION: ${{ inputs.version }}
         run: |
+          # The App token must be in place BEFORE the fetch: the checkout step persists no
+          # credential, so origin's default URL would otherwise fetch anonymously. That happens to
+          # work while this repo is public and would break the day it is not.
+          # The push MUST use the App token, not the default GITHUB_TOKEN:
+          #   1. GITHUB_TOKEN pushes do not trigger downstream workflows (beta.yml on push:[main]).
+          #   2. The App token is the ruleset bypass actor, so required_linear_history on main (which
+          #      forbids the --no-ff merge commit this creates) still lets it push.
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git fetch origin main release --force
           git checkout -B main origin/main
           # Re-run safety: if release's tip is already an ancestor of main, the forward-port has
@@ -305,14 +319,6 @@ jobs:
           fi
           git config user.name "fabricate-release-bot"
           git config user.email "release-bot@users.noreply.github.com"
-          # The push MUST use the App token, not the default GITHUB_TOKEN:
-          #   1. GITHUB_TOKEN pushes do not trigger downstream workflows (beta.yml on push:[main]).
-          #   2. The App token is the ruleset bypass actor, so required_linear_history on main (which
-          #      forbids the --no-ff merge commit this creates) still lets it push.
-          # actions/checkout left an http.extraheader carrying the default GITHUB_TOKEN; clear it or
-          # it overrides the App token in the remote URL.
-          git config --unset-all http.https://github.com/.extraheader || true
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           # --no-ff, NEVER a squash: `release` carries semantic-release's tags and notes.
           git merge --no-ff origin/release -m "chore: forward-port release into main after promoting v${VERSION}"
           git push origin HEAD:main
