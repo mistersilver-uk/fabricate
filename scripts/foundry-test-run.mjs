@@ -3216,16 +3216,34 @@ async function main() {
         // Use 'loot' for all items — safest common type across D&D 5e versions
         const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
 
-        // Create world-level items (all as loot — type doesn't matter for crafting)
+        // Create world-level items (all as loot — type doesn't matter for crafting).
+        //
+        // Each carries a DESCRIPTION (issue 676). These items had none, so every frame
+        // of the component editor photographed its identity strip rendering "—" — the
+        // correct output for a description-less item, and therefore a frame that proved
+        // nothing about the surface whose whole premise is "name, image & description
+        // follow the linked item". The strip reads the LIVE document, so this is also
+        // what exercises that resolution rather than the registration-time snapshot.
+        // `system.description.value` is the dnd5e shape and is HTML, which is exactly
+        // what the plain-text extraction has to cope with.
+        const describe = (html) => ({ description: { value: `<p>${html}</p>` } });
         const itemData = [
-          { name: 'Iron Ore', type: itemType, img: 'icons/commodities/metal/ingot-worn-iron.webp' },
-          { name: 'Mystic Herb', type: itemType, img: 'icons/consumables/plants/leaf-herb-green.webp' },
-          { name: 'Dragon Scale', type: itemType, img: 'icons/commodities/leather/scales-blue-white.webp' },
-          { name: 'Empty Vial', type: itemType, img: 'icons/consumables/potions/vial-cork-empty.webp' },
-          { name: 'Iron Sword', type: itemType, img: 'icons/weapons/swords/sword-guard-brass-worn.webp' },
-          { name: 'Herbalist Sickle', type: itemType, img: 'icons/tools/hand/sickle-worn-steel-grey.webp' },
-          { name: 'Healing Potion', type: itemType, img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
-          { name: 'Dragon Scale Armor', type: itemType, img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp' }
+          { name: 'Iron Ore', type: itemType, img: 'icons/commodities/metal/ingot-worn-iron.webp',
+            system: describe('Unrefined metal, dug from a hillside and still carrying the grit of the seam it came from. Smelt it before you trust it to hold an edge.') },
+          { name: 'Mystic Herb', type: itemType, img: 'icons/consumables/plants/leaf-herb-green.webp',
+            system: describe('A pungent leaf that keeps its colour long after cutting.') },
+          { name: 'Dragon Scale', type: itemType, img: 'icons/commodities/leather/scales-blue-white.webp',
+            system: describe('Shed plate, still faintly warm to the touch.') },
+          { name: 'Empty Vial', type: itemType, img: 'icons/consumables/potions/vial-cork-empty.webp',
+            system: describe('Cheap, corked glass. Holds a single dose.') },
+          { name: 'Iron Sword', type: itemType, img: 'icons/weapons/swords/sword-guard-brass-worn.webp',
+            system: describe('A serviceable blade with a worn brass guard.') },
+          { name: 'Herbalist Sickle', type: itemType, img: 'icons/tools/hand/sickle-worn-steel-grey.webp',
+            system: describe('A short curved blade for taking cuttings without crushing them.') },
+          { name: 'Healing Potion', type: itemType, img: 'icons/consumables/potions/potion-tube-corked-red.webp',
+            system: describe('Tastes of iron and cloves.') },
+          { name: 'Dragon Scale Armor', type: itemType, img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp',
+            system: describe('Overlapping plate, light for its bulk.') }
         ];
 
         const items = await Item.createDocuments(itemData);
