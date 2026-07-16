@@ -36,6 +36,8 @@ Excluded state includes:
 - Per-environment resource-node depletion and respawn timers.
 - Gathering parties, per-character stamina pools, per-character blind-task discovery, and recent gathering history.
 - Active timed gathering runs and any actor, token, or scene state.
+- Each player's own chosen order for progressive result stages.
+Your **Allow player result re-ordering** setting is authoring data, so it is exported with the recipe or the component, but the orders your players picked are theirs and stay behind.
 
 ## How unresolved references are handled
 

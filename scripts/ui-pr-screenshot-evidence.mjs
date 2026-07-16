@@ -327,6 +327,45 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
   },
+  // The progressive player stage list (issue 651). `collect` emits ONE file per view id
+  // (see below), so each state is its own view — a single `player-crafting` entry would
+  // publish only one frame and the other states would never reach the PR.
+  {
+    id: 'player-crafting-progressive',
+    label: 'Player crafting — progressive stage list, reorder allowed (default)',
+    smokeLabels: ['player-crafting-progressive'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    // Its OWN view, not a preferred label on the resting one. `collect` picks
+    // `candidates[0]` from an array sorted by FILENAME — it does NOT honour smokeLabels
+    // order — so listing this first alongside `player-crafting-progressive` silently
+    // published the resting frame instead (its screenshot index sorts lower). Verified by
+    // hash against the collected file.
+    //
+    // This is the frame the checks actually need. At rest the stored order is empty, so
+    // `applyPlayerResultOrder` returns by identity, the store short-circuits, and the
+    // authored thresholds ascend BY CONSTRUCTION — they would ascend with the
+    // carried-threshold defect fully reverted. `orderAnnouncement` is likewise `''`, so
+    // the live region is invisible whatever the CSS says. Only after a move do the
+    // thresholds have to have been recomputed and the region have text to hide.
+    id: 'player-crafting-progressive-reordered',
+    label: 'Player crafting — progressive stage list after a keyboard reorder (thresholds recomputed)',
+    smokeLabels: ['player-crafting-progressive-reordered'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-progressive-fixed',
+    label: 'Player crafting — progressive stage list, order fixed by the GM',
+    smokeLabels: ['player-crafting-progressive-fixed'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-progressive-stacked',
+    label: 'Player crafting — progressive stage list, narrow window',
+    smokeLabels: ['player-crafting-progressive-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
   // The player Alchemy workbench (issue 543) publishes three distinct frames — the
   // discipline chooser, the three-column workbench, and the narrow stacked layout.
   // `collect` emits one file per view id (first matching smoke label wins), so each

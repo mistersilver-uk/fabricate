@@ -19,6 +19,7 @@ import {
 } from '../utils/essenceResolver.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
+import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
@@ -99,7 +100,16 @@ export class CraftingEngine {
     itemPilesIntegration = null,
     salvageRunManager = null,
     actorInventoryCoinSpender = null,
-    actorPropertyCoinSpender = null
+    actorPropertyCoinSpender = null,
+    // 8th positional options bag — additive, so existing `new CraftingEngine(...)` call
+    // sites are unaffected. `getPlayerResultOrder` returns the executing user's stored
+    // progressive result order for a salvage component, or null; it is read ONCE, at run
+    // start, and captured onto the run record (issue 651 D2).
+    //
+    // Salvage deliberately does NOT route this through `this.resolutionModeService`: many
+    // callers construct CraftingEngine without one, which would make the seam silently
+    // unreachable.
+    { getPlayerResultOrder = () => null } = {}
   ) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
@@ -112,6 +122,7 @@ export class CraftingEngine {
     // shared currency-affordance resolver as the spend-strategy → spender seams.
     this.actorInventoryCoinSpender = actorInventoryCoinSpender;
     this.actorPropertyCoinSpender = actorPropertyCoinSpender;
+    this.getPlayerResultOrder = getPlayerResultOrder;
   }
 
   /**
@@ -3678,6 +3689,20 @@ export class CraftingEngine {
         status: 'inProgress',
         startedAt: now,
         usedTools: [],
+        // CAPTURE the starting user's result order onto the run (issue 651 D2). This is
+        // the ONLY settings read on the salvage path, and it happens once, here, at start.
+        // A world-time-resumed salvage is driven by the synced `updateWorldTime` hook,
+        // which fires on EVERY client with no owner filter — so whoever wins that race
+        // executes the resume. Reading the order from the run instead of from settings is
+        // what makes the executing user irrelevant, and makes that defect (F3)
+        // structurally unreachable here rather than merely documented.
+        //
+        // `createRun` spreads `...runData` between its defaults and its re-asserted
+        // authoritative fields — it is NOT an allowlist — and `_normalizeContainer` never
+        // normalizes individual run records, so this field survives the persist/read
+        // round-trip. (Counter-case to this codebase's usual "normalizers strip unknown
+        // fields" rule.)
+        resultOrder: this.getPlayerResultOrder({ scope: 'salvage', id: componentId }),
       });
       salvageRunCreatedThisCall = true;
     }
@@ -3795,7 +3820,12 @@ export class CraftingEngine {
       };
     }
 
-    const resultGroups = this._resolveSalvageResultGroups(component, system, checkResult);
+    const resultGroups = this._resolveSalvageResultGroups(
+      component,
+      system,
+      checkResult,
+      salvageRun
+    );
     const consumedItems = await this._consumeComponentItems(
       actor,
       componentItems,
@@ -3942,9 +3972,15 @@ export class CraftingEngine {
 
   /**
    * Resolve which salvage result groups to use based on mode and check result.
+   *
+   * @param {object} component
+   * @param {object} system
+   * @param {object|null} checkResult
+   * @param {object|null} [salvageRun] The active run, carrying the result order captured
+   *   at start (issue 651 D2). The order is read from HERE and never from settings.
    * @private
    */
-  _resolveSalvageResultGroups(component, system, checkResult) {
+  _resolveSalvageResultGroups(component, system, checkResult, salvageRun = null) {
     // Legacy salvage tokens are normalized to canonical values by the manager
     // (salvage token normalizer) and the 1.4.0 migration before reaching here.
     const mode = system?.salvageResolutionMode || 'simple';
@@ -3973,9 +4009,23 @@ export class CraftingEngine {
       // NOT zero the budget after a `partial` tail award (divergence 2:
       // `zeroRemainingOnPartial: false`) — that divergence is latent because the
       // salvage return shape never exposes `remaining`; see #431.
+      const authored = group.results || [];
+      // Read the order from the RUN RECORD, never from settings (issue 651 D2). The run
+      // carries the order it was started with, so the user executing a world-time resume
+      // is irrelevant — that is the whole point of capturing it at start.
+      //
+      // RUNLESS INVARIANT: no run manager → no run → no captured order → AUTHORED ORDER.
+      // There is deliberately NO settings fallback here. Adding one would look like a
+      // harmless gap-fill and would quietly reintroduce the defect the capture exists to
+      // close: the resume path would start reading the *executing* user's order again.
+      const results =
+        component.salvage?.allowPlayerResultReorder === false
+          ? authored
+          : applyPlayerResultOrder(authored, salvageRun?.resultOrder ?? null);
+
       const managedItems = system?.components || [];
       const { awarded } = resolveProgressiveAward({
-        results: group.results || [],
+        results,
         initialRemaining: Number(checkResult?.value || 0),
         costFor: (result) =>
           Number(

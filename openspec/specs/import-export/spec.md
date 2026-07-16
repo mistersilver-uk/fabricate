@@ -44,7 +44,8 @@ The envelope MUST carry a `runtimeStateIncluded` boolean marker, which is `false
 ### Authoring-versus-runtime boundary
 
 Export MUST exclude runtime and world state by default.
-Excluded state comprises: per-environment `nodeRuntime`; the current-condition selection at both the top level (`conditions.{weather,timeOfDay}`) and per system (`conditions.<kind>.current`); gathering parties; per-character stamina and blind-task discovery; recent gathering history; active timed runs; and actor or scene state.
+Excluded state comprises: per-environment `nodeRuntime`; the current-condition selection at both the top level (`conditions.{weather,timeOfDay}`) and per system (`conditions.<kind>.current`); gathering parties; per-character stamina and blind-task discovery; recent gathering history; active timed runs (including a salvage run's captured `resultOrder`); the stored per-user progressive result order (`progressiveResultOrder`, a user-scoped runtime preference); and actor or scene state.
+The GM-authored reorder **permission** is authoring data and IS exported, via `Recipe.toJSON()` and the salvage definition — only the player's chosen order is excluded.
 When resetting the current-condition selection, export MUST preserve the authoring overrides (`conditions.<kind>.enabled` and `conditions.<kind>.values`) and reset only `current` to defaults.
 The `runtimeStateIncluded: false` marker MUST stay honest with this boundary.
 

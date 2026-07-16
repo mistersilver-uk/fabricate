@@ -335,6 +335,25 @@ Folding per-set essences into `ingredientGroups` makes them signature-bearing, s
 Because `SignatureValidator.validateSystem` is enabled-scoped and every migrated recipe starts enabled, one pass over the all-enabled migrated set finds every collision; the migration DISABLES both participant recipes of each conflict (mirroring the runtime `disableSignatureConflicts` policy at the data level — it never hard-blocks) so the enabled residual is collision-free and the system loads without a `blocks:'system'` gate.
 A post-load GM notification names the disabled recipes.
 
+### Progressive Reorder-Flag Retirement Migration (`1.18.0`, per system, idempotent)
+
+Issue 651 moves the progressive reorder permission off the system's check and onto the entities it describes (`Recipe.allowPlayerResultReorder` and `Component.salvage.allowPlayerResultReorder`, both defaulting to `true`), leaving exactly one owner.
+The `1.18.0` settings-data migration (`migrateRetireProgressiveAllowPlayerReorder.js`) reads and writes the `craftingSystems` payload as pure data.
+
+1. For every system, delete `allowPlayerReorder` from all three progressive check blocks that can carry it: `craftingCheck.progressive`, `salvageCraftingCheck.progressive`, and `gatheringCraftingCheck.progressive`.
+2. Sibling keys on the same object (`awardMode`, `rollFormula`, `checkBreakage`) are untouched — this is a targeted delete, not a rebuild.
+3. Idempotent: the key is deleted, so a second run finds nothing and is a no-op.
+4. Tolerant and non-throwing: a malformed system, check, or progressive block is skipped rather than repaired (normalization is the normalizer's responsibility, not this migration's).
+
+This migration is a **defensive strip of stored settings data, not an export fix**.
+`_normalizeProgressiveCraftingCheck` is an allowlist literal that never spreads its source; `getSettings()` returns the normalized in-memory map and the exporter reads from that map, so the normalizer already drops the field on read and it can never reach an export.
+What the normalizer does not do is rewrite the stored payload, which keeps the dead key until an unrelated save happens to rewrite that system.
+The same allowlist shape is a safety property: because the normalizer enumerates its keys rather than spreading them, **importing a legacy payload cannot reintroduce the flag**.
+
+The migration deliberately does **not seed** `allowPlayerResultReorder` onto recipes or salvage configurations.
+The `Recipe` constructor and `_normalizeSalvage` both read an absent key as `true`, which is exactly the value a seed would write and exactly the pre-migration implicit behaviour (the retired flag was never honoured at runtime, so the authored order always won).
+Seeding would churn stored JSON for zero observable change, so the omission is a decision rather than an oversight.
+
 ### Recipe Item Library Migration (Pre-Release)
 
 The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUuid` values with system-owned recipe item definitions.

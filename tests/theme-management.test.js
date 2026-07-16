@@ -112,6 +112,30 @@ describe('Fabricate theme management', () => {
     assert.equal(railSetting.definition.default, false);
   });
 
+  it('registers the progressive result order preference as USER-scoped, not client-scoped', () => {
+    // Issue 651 flipped this from `client` to `user`: a player's chosen stage order must
+    // follow their account across devices, not sit in one browser's localStorage. Pinned
+    // because the flip is a one-word change that can otherwise be silently reverted —
+    // and because `user` scope makes `set` an async, replicated document write.
+    const registrations = [];
+    globalThis.game.settings.register = (namespace, key, definition) => {
+      registrations.push({ namespace, key, definition });
+    };
+
+    registerFabricateSettings();
+
+    assert.equal(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER, 'progressiveResultOrder');
+    const orderSetting = registrations.find(
+      entry => entry.key === SETTING_KEYS.PROGRESSIVE_RESULT_ORDER
+    );
+    assert.ok(orderSetting, 'progressive result order setting should be registered');
+    assert.equal(orderSetting.namespace, FABRICATE_SETTINGS_NAMESPACE);
+    assert.equal(orderSetting.definition.scope, 'user');
+    assert.equal(orderSetting.definition.config, false);
+    assert.equal(orderSetting.definition.type, Object);
+    assert.deepEqual(orderSetting.definition.default, {});
+  });
+
   it('applies theme changes through the registered setting onChange callback and stamps open Fabricate app roots', () => {
     let themeDefinition;
     globalThis.game.settings.register = (_namespace, key, definition) => {

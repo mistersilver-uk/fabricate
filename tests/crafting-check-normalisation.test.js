@@ -190,7 +190,6 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.progressive, {
     awardMode: 'equal',
-    allowPlayerReorder: false,
     rollFormula: '',
     checkBreakage: { triggers: [] },
   });
@@ -212,7 +211,14 @@ test('_normalizeCraftingCheck migrates progressive crits into unified triggers (
     },
   });
   assert.equal(result.progressive.awardMode, 'partial', 'award settings are preserved');
-  assert.equal(result.progressive.allowPlayerReorder, true);
+  // Issue 651 retired the system-level reorder flag. The allowlist normalizer drops it
+  // on EVERY normalize — including on import of a legacy payload like this one — which
+  // is why a legacy import can never reintroduce it.
+  assert.equal(
+    result.progressive.allowPlayerReorder,
+    undefined,
+    'the retired system-level allowPlayerReorder is dropped'
+  );
   assert.equal(result.progressive.rollFormula, '2d6+@abilities.int.mod');
   assert.equal(result.progressive.diceCrits, undefined, 'the legacy diceCrits field is dropped');
   // Each valid crit converts to a diceGroup/total/== trigger; die-less / non-object dropped.

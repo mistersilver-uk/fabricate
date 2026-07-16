@@ -167,6 +167,12 @@
     if (!stepById(stepId)) return;
     onUpdateStep(stepId, { resultGroups: nextGroups });
   }
+  // GM policy toggle (issue 651). Stages through the draft like every other authoring
+  // edit — the Save button commits it — rather than persisting immediately the way
+  // `onToggleEnabled` does.
+  function toggleAllowPlayerResultReorder(next) {
+    onUpdateRecipe({ allowPlayerResultReorder: next === true });
+  }
   function addTool(toolId) {
     if (!toolId || toolIds.includes(toolId)) return;
     onUpdateRecipe({ toolIds: [...toolIds, toolId] });
@@ -365,6 +371,7 @@
             onAssignIngredientSet={assignIngredientSet}
             onUpdateResultGroups={updateResultGroups}
             onDeleteStep={deleteStepFrom('results')}
+            onToggleAllowPlayerResultReorder={toggleAllowPlayerResultReorder}
           />
         {:else if activeTab === 'tools'}
           <RecipeToolsTab
