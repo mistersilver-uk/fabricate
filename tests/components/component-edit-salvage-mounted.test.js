@@ -54,6 +54,10 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // The salvage result quantity + the progressive DC are the shared Stepper (issue
+    // 676). Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and
+    // the suite HANGS (# cancelled) rather than failing.
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],
@@ -371,7 +375,42 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const badge = target.querySelector('[data-salvage-result-difficulty]');
     assert.equal(badge.getAttribute('data-salvage-result-difficulty'), '');
-    assert.match(badge.textContent, /No difficulty/);
+    // Issue 676 made this a compact mono DC chip, so the unset state reads "DC —"
+    // rather than "No difficulty". The POINT of the test is unchanged and is asserted
+    // explicitly below: an unset difficulty must never render as a DC of 0, which is a
+    // real, meaningful, and completely wrong value.
+    assert.match(badge.textContent, /DC\s+—/);
+    assert.doesNotMatch(badge.textContent, /\b0\b/, 'an unset difficulty is never DC 0');
+    harness.remount();
+  });
+
+  it('progressive salvage KEEPS its quantity stepper, because the award loop honours it', async () => {
+    // READ THIS BEFORE DELETING THE PROGRESSIVE QUANTITY CONTROL.
+    //
+    // The recipe editor hides quantity on progressive result rows, and its comment says
+    // why: "the progressive award loop ignores `quantity` and awards each ordered entry
+    // once". That is TRUE FOR RECIPES AND FALSE FOR SALVAGE, and the difference is not
+    // in the loop — it is one layer above it:
+    //
+    //   * `ResolutionModeService._resolveProgressive` (recipes) FORCES the quantity:
+    //       results: awarded.map((result) => ({ ...result, quantity: 1 }))
+    //   * `CraftingEngine._resolveSalvageResultGroups` (salvage) does NOT:
+    //       return [{ ...group, results: awarded }];
+    //
+    // `resolveProgressiveAward` never mentions `quantity` because it returns the authored
+    // result objects BY IDENTITY — so salvage hands them straight to `_createSingleResult`,
+    // which does `itemData.system.quantity = result.quantity`. Progressive salvage
+    // therefore awards the authored quantity: set 2, get 2.
+    //
+    // So hiding this control would not be "matching the recipe" — it would hide a live,
+    // working, authored field, leaving existing worlds silently awarding a quantity their
+    // GM could no longer see or edit. If salvage should become quantity-less, the ENGINE
+    // must change first; this test fails on purpose when it does.
+    const target = await harness.mount(props());
+    assert.ok(
+      target.querySelector('[data-salvage-result-quantity]'),
+      'progressive salvage rows expose the quantity the award path actually honours'
+    );
     harness.remount();
   });
 

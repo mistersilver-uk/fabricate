@@ -135,25 +135,54 @@ const FIXTURE = `
 
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="component-edit">
         <form class="manager-component-edit-view">
-          <section class="manager-task-core-card manager-component-identity-strip">
+          <section class="manager-component-panel manager-component-identity-strip">
+            <span class="manager-component-identity-chip"><i class="fas fa-box-open"></i></span>
+            <div class="manager-component-identity-copy">
+              <div class="manager-component-identity-name-row">
+                <button type="button" class="manager-component-identity-name" data-m="identity-name">Iron Ore</button>
+                <span class="manager-chip manager-component-identity-lock" data-m="identity-lock"><span>Linked Items Directory</span></span>
+              </div>
+              <p class="manager-component-identity-description" data-m="identity-description">Unrefined metal.</p>
+              <p class="manager-component-identity-note" data-m="identity-note"><span>Name, image &amp; description follow the linked item.</span></p>
+            </div>
+            <div class="manager-component-source-drop-target" data-m="drop-target"><span>Drop a world or compendium item to replace</span></div>
+          </section>
+          <section class="manager-component-panel manager-component-inline-panel">
             <div class="manager-task-card-heading">
               <div>
-                <h3 data-m="panel-title">Identity</h3>
-                <p class="manager-muted" data-m="panel-sub">This component is backed by a Foundry item.</p>
+                <h3 data-m="panel-title">Category</h3>
+                <p class="manager-muted" data-m="panel-sub">Groups this component in the browser.</p>
               </div>
-            </div>
-            <div class="manager-component-identity-fields">
-              <div class="manager-field manager-component-readonly-field">
-                <span class="manager-component-readonly-label" data-m="readonly-label"><span>Name</span></span>
-                <p class="manager-component-readonly-value" data-m="readonly-value">Iron Ore</p>
-              </div>
+              <select class="manager-input manager-component-inline-control" data-m="field-select"><option>General</option></select>
             </div>
           </section>
-          <section class="manager-task-core-card">
-            <label class="manager-field">
-              <span data-m="field-label">Component category</span>
-              <select class="manager-input" data-m="field-select"><option>General</option></select>
-            </label>
+          <section class="manager-component-panel" data-salvage-section>
+            <div class="manager-task-card-heading">
+              <div><h3>Salvage</h3></div>
+              <div class="manager-component-heading-controls">
+                <span class="manager-chip is-info manager-salvage-mode-pill" data-m="salvage-mode-pill"><span>Progressive · ordered</span></span>
+                <span class="manager-component-heading-divider"></span>
+                <span class="manager-component-micro-label" data-m="micro-label">Enabled</span>
+              </div>
+            </div>
+            <p class="manager-component-info-banner" data-m="info-banner"><span>Roll budget flows down the list</span></p>
+            <div class="manager-field">
+              <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
+              <ul class="manager-salvage-stage-list">
+                <li class="manager-salvage-stage-row">
+                  <span class="manager-salvage-result-ordinal" data-m="stage-ordinal">1</span>
+                  <select class="manager-input manager-salvage-stage-component" data-m="stage-select"><option>Brass Casing</option></select>
+                  <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
+                  <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                  <span class="manager-salvage-stage-reorder">
+                    <button class="manager-salvage-stage-move" data-m="stage-move"><i class="fas fa-chevron-up"></i></button>
+                  </span>
+                </li>
+              </ul>
+            </div>
+            <div class="manager-component-tag-toggles">
+              <button type="button" class="manager-component-tag-toggle is-on" data-m="tag-toggle"><span>Brass</span></button>
+            </div>
           </section>
           <input type="text" data-m="bleed-baseline" value="bare">
         </form>
@@ -203,10 +232,31 @@ const EXPECTED = {
   // ── The editor column.
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
-  'readonly-label': 13.12, // 0.82rem — locked-field label
-  'readonly-value': 14.4, // 0.9rem — locked-field value
-  'field-label': 13.12, // 0.82rem — field label
-  'field-select': 13.12, // 0.82rem — field control
+  'readonly-label': 13.12, // 0.82rem — a section micro-label inside a panel
+  // 0.82rem. The Category select renders OUTSIDE a `.manager-field` (the heading row),
+  // and `.manager-field`'s 0.82rem is INHERITED — no rule sizes a select directly. This
+  // measured 14 (Foundry's app base) until `.manager-component-inline-control` stated
+  // the size itself. That is precisely the bleed this gate exists to catch, caught here.
+  'field-select': 13.12,
+  // ── The identity STRIP (issue 676). It is display, not a form: the read-only boxed
+  // Name/Description fields it replaced are gone, and with them `readonly-value`.
+  'identity-name': 18, // 1.125rem serif — prototype identity name 18px/600. Exact.
+  'identity-lock': 12, // 0.75rem — the chip family; prototype lock badge 9px sans
+  'identity-description': 13, // 0.8125rem/1.65 — prototype description 13px/1.65. Exact.
+  'identity-note': 10, // 0.625rem — prototype premise note 10px sans. Exact.
+  'drop-target': 10, // 0.625rem — prototype drop-target label 10px/1.4 sans. Exact.
+  // ── The salvage panel.
+  'salvage-mode-pill': 12, // 0.75rem — the chip family; prototype mode pill 9.5px sans
+  'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
+  'info-banner': 10.56, // 0.66rem — prototype roll-budget banner 10.5px sans
+  'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
+  'stage-select': 13.12, // 0.82rem — inherits the field size
+  'stage-dc': 13, // 0.8125rem mono 700 — prototype read-only DC chip 13px mono. Exact.
+  // 0.72rem. It is the ONLY route to the DC rendered beside it, so it is sized as a real
+  // link rather than the 0.56rem speck it shipped as — smaller than its own caption.
+  'stage-edit': 11.52,
+  'stage-move': 9.6, // 0.6rem — the reorder chevron glyph; reorder IS the authoring act
+  'tag-toggle': 11.2, // 0.7rem — prototype tag toggle pill 11px sans. Near-exact.
   // The cascade context. A bare control inherits Foundry's 14px app base; any role
   // above landing on 14 means its rule stopped applying and Foundry bled through.
   'bleed-baseline': 14,

@@ -2022,7 +2022,25 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const mainBlock = blockFor('.fabricate-manager .manager-system-edit-main');
   const formBlock = blockFor('.fabricate-manager .manager-system-edit-form');
   const gridBlock = blockFor('.fabricate-manager .manager-edit-grid');
-  const fieldInputBlock = blockFor('.fabricate-manager .manager-field input,\n.fabricate-manager .manager-field select');
+  // `:not(.fab-stepper-input)` (issue 676): the shared `Stepper` brings its own
+  // borderless chrome from a component-scoped <style>, which this rule out-specifies —
+  // so a Stepper inside any `.manager-field` was being stretched to 100%/36px and
+  // re-bordered. The exclusion is part of the selector's source text, so this
+  // source-text lookup has to carry it.
+  // `blockFor` anchors on the selector text IMMEDIATELY followed by `{`, so this must
+  // name the whole selector list of the height rule — which is what distinguishes it
+  // from the width rule above it (that one also lists `textarea`).
+  //
+  // `:not(.fab-stepper-input)` (issue 676): the shared `Stepper` brings its own
+  // borderless chrome from a component-scoped <style>, which this rule out-specifies —
+  // so a Stepper inside any `.manager-field` was being stretched to 100%/36px and
+  // re-bordered. `.manager-component-inline-control` joins it because it renders
+  // OUTSIDE a `.manager-field` and would otherwise inherit Foundry's native control.
+  const fieldInputBlock = blockFor(
+    '.fabricate-manager .manager-field input:not(.fab-stepper-input),\n'
+      + '.fabricate-manager .manager-field select,\n'
+      + '.fabricate-manager .manager-component-inline-control'
+  );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
   const featureTileIconBlock = blockFor('.fabricate-manager .manager-feature-tile-icon');

@@ -45,6 +45,9 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // The salvage result quantity + the progressive DC are the shared Stepper (issue
+    // 676). Import-free leaf, so it needs no `rawModules` entry.
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],
@@ -118,7 +121,9 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     });
     const target = await harness.mount(mountProps);
 
-    assert.ok(enableCard(target).classList.contains('is-off'), 'absent reads disabled');
+    // The `is-on`/`is-off` pair now rides the SWITCH rather than a wrapping card: issue
+    // 676 moved salvage enablement into the panel's heading row, so there is no card.
+    assert.ok(enableToggle(target).classList.contains('is-off'), 'absent reads disabled');
     assert.equal(enableToggle(target).getAttribute('aria-pressed'), 'false');
     // ...and rendering it must NOT re-save. Decision 6 is "no migration" — a component
     // that merely gets LOOKED AT must not be flipped and written back.
@@ -131,7 +136,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
       component: { salvage: { enabled: false, resultGroups: RESULT_GROUPS } },
     });
     const target = await harness.mount(mountProps);
-    assert.ok(enableCard(target).classList.contains('is-off'));
+    assert.ok(enableToggle(target).classList.contains('is-off'));
     assert.ok(!dirtyEvents.includes(true));
     harness.remount();
   });
@@ -249,13 +254,17 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const target = await harness.mount(props({ component: { salvage: null } }));
     assert.equal(enableToggle(target).disabled, true);
 
-    // The hint must be VISIBLE TEXT on the sub line — not `toggleTitle`, which lands a
-    // native `title` on a DISABLED <button>. Disabled controls fire no mouse events, so
-    // that tooltip never appears in any browser — and no mounted test would notice,
-    // because the attribute IS present in the DOM. Assert the rendered text.
-    const hint = enableCard(target).querySelector('[data-salvage-enabled-hint]');
-    assert.ok(hint, 'the hint renders on the sub line');
-    assert.match(hint.textContent, /Add at least one result group/);
+    // The hint must be VISIBLE TEXT — not a `title`, which on a DISABLED <button> never
+    // appears in any browser (disabled controls fire no mouse events), and which no
+    // mounted test would notice was broken because the attribute IS present in the DOM.
+    //
+    // Issue 676 moved the toggle into the heading row, so there is no sub-line to carry
+    // it. The zero-group explanation is the disabled-body notice, which was ALREADY
+    // rendering the same information immediately below the toggle — it is now the one
+    // copy of it rather than the second.
+    const hint = target.querySelector('[data-salvage-disabled-notice]');
+    assert.ok(hint, 'the zero-group explanation renders as visible body copy');
+    assert.match(hint.textContent, /Add a result below/);
     assert.equal(
       enableToggle(target).getAttribute('title'),
       null,
@@ -534,13 +543,26 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     }
   });
 
-  it('the mode pill is CHROME — it collapses with the rest when salvage is off', async () => {
-    // Ruling A lists the mode pill as chrome. The group editor never depends on it.
+  it('the mode pill is EXEMPT from Ruling A — it survives salvage being off', async () => {
+    // REVERSED on a user ruling (issue 676). This test used to assert the opposite:
+    // that the pill collapsed with the rest of the chrome when salvage was off.
+    //
+    // Ruling A collapses the chrome that only has meaning once salvage RUNS — the DC
+    // control, outcome routing, the reorder policy. The mode pill is not that. Ruling A
+    // ALSO keeps the result editor authorable while salvage is off, so with the pill
+    // hidden a GM could author an ordered progressive list, or a routed set of groups,
+    // with nothing on screen naming which shape they were looking at — the mode is a
+    // SYSTEM-level setting they cannot see from this route at all.
     const off = await harness.mount(
       props({ component: { salvage: { enabled: false, resultGroups: RESULT_GROUPS } }, salvageResolutionMode: 'routed' })
     );
-    assert.equal(off.querySelector('[data-salvage-mode]'), null, 'no mode pill while salvage is off');
-    assert.ok(off.querySelector('[data-add-salvage-group]'), 'but the group editor stays');
+    const pill = off.querySelector('[data-salvage-mode]');
+    assert.ok(pill, 'the mode pill still names the mode while salvage is off');
+    assert.match(pill.textContent, /Routed by check/);
+    assert.ok(off.querySelector('[data-add-salvage-group]'), 'and the group editor stays');
+    // The rest of the chrome still collapses — the exemption is the PILL, not Ruling A.
+    assert.equal(off.querySelector('[data-salvage-routing]'), null, 'routing still collapses');
+    assert.equal(off.querySelector('[data-salvage-dc-override]'), null, 'the DC control still collapses');
     harness.remount();
   });
 

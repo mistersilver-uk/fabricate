@@ -5281,27 +5281,27 @@ describe('CraftingSystemManager mounted behavior', () => {
       'Essences section should render'
     );
 
-    // Tags are added from a dropdown (like the gathering weather/time-of-day fields),
-    // then appear underneath as removable pills.
+    // Tags are TOGGLE PILLS (issue 676): the system's whole tag vocabulary renders as
+    // pills and the pill IS the control, so the vocabulary and the answer are both
+    // visible without opening anything. This replaced an add-menu + removable-pill-row,
+    // which hid the vocabulary and cost two interactions per tag.
+    const mineral = target.querySelector('[data-component-edit-tag-toggle="mineral"]');
+    assert.ok(mineral, 'every system itemTag renders as a pill, selected or not');
     assert.equal(
-      target.querySelector('[data-component-edit-tag-pill="mineral"]'),
-      null,
-      'mineral should not be a selected pill yet'
+      mineral.getAttribute('aria-pressed'),
+      'false',
+      'mineral should not be applied yet'
     );
-    target.querySelector('[data-component-edit-tag-menu]').click();
-    flushSync();
-    await tick();
-    flushSync();
-    const mineralOption = target.querySelector('[data-component-edit-tag-option="mineral"]');
-    assert.ok(mineralOption, 'tag dropdown should list the unselected system itemTags');
-    mineralOption.click();
+
+    mineral.click();
     flushSync();
     await tick();
     flushSync();
 
-    assert.ok(
-      target.querySelector('[data-component-edit-tag-pill="mineral"]'),
-      'selected tag should appear as a removable pill'
+    assert.equal(
+      target.querySelector('[data-component-edit-tag-toggle="mineral"]').getAttribute('aria-pressed'),
+      'true',
+      'clicking the pill applies the tag'
     );
     assert.ok(
       target.textContent.includes('Unsaved'),
@@ -5394,12 +5394,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(saveCall[2].difficulty, 5, 'the staged truncated integer should persist on Save');
   });
 
-  it('clears a staged progressive difficulty on Save when the input is blanked', async () => {
+  it('clears a staged progressive difficulty on Save when it is taken to zero', async () => {
+    // The CAPABILITY under test — "the GM can clear a difficulty back to null, and the
+    // clear persists" — is unchanged. The GESTURE changed in issue 676, when this control
+    // became the shared `Stepper`: the stepper's input deliberately ignores an empty
+    // string (so a half-typed value is never coerced to 0 mid-keystroke) and re-asserts
+    // the model value on blur, so blanking is structurally not expressible through it.
+    //
+    // Zero is the clear, and it is not a special case invented here: the root's
+    // `normalizeComponentDifficulty` ALREADY maps every value below 1 to null, so 0 has
+    // always meant "no difficulty" everywhere this value is read.
     const calls = [];
     await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
 
     const input = target.querySelector('[data-component-edit-section="difficulty"] input');
-    input.value = '';
+    input.value = '0';
     input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     await tick();
     flushSync();
