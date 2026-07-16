@@ -9,6 +9,7 @@
     COMPONENT_SORT_KEYS,
     componentCategoryOptions,
     createComponentBrowserState,
+    describeActiveComponentFilters,
     filterComponents,
     groupComponentsByCategory,
     paginateComponents,
@@ -21,10 +22,8 @@
 
   let {
     itemCards = [],
-    totalComponentsCount = 0,
     itemSearchTerm = '',
     selectedComponentId = '',
-    selectedSystemName = '',
     selectedSystemId = '',
     selectedSystemResolutionMode = 'simple',
     categoryVocabulary = [],
@@ -33,8 +32,6 @@
     onSelectComponent = () => {},
     onDropComponent = () => {},
     onEditComponent = () => {},
-    onDeleteComponent = () => {},
-    onCopySourceUuid = () => {},
     // The filter / sort / group / paginate view-state (issue 676). The manager root
     // LIFTS this up and binds it here so it survives the editor round-trip: opening a
     // component unmounts this browser, and remounting it with the controls reset to
@@ -83,11 +80,13 @@
   }));
   const groups = $derived(ui.groupByCategory ? groupComponentsByCategory(page.components) : []);
 
-  const filtersActive = $derived(
-    (itemSearchTerm || '').trim().length > 0
-    || ui.categoryFilter !== 'all'
-    || ui.essenceFilter !== 'all'
-  );
+  // The active-filter chips, derived by the pure model so the run and the "is anything
+  // on?" question can never disagree.
+  const chips = $derived(describeActiveComponentFilters({
+    category: ui.categoryFilter,
+    essence: ui.essenceFilter,
+    search: itemSearchTerm
+  }));
 
   const sortOptions = $derived(COMPONENT_SORT_KEYS.map(key => ({
     key,
@@ -97,6 +96,32 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  function format(key, fallback, replacements) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(replacements)) {
+      result = result.replace(`{${token}}`, value);
+    }
+    return result;
+  }
+
+  const CHIP_LABELS = {
+    category: ['FABRICATE.Admin.Manager.Component.ChipCategory', 'Category: {value}'],
+    essence: ['FABRICATE.Admin.Manager.Component.ChipEssence', 'Essence: {value}'],
+    search: ['FABRICATE.Admin.Manager.Component.ChipSearch', 'Search: {value}']
+  };
+
+  function chipLabel(chip) {
+    const [labelKey, fallback] = CHIP_LABELS[chip.id];
+    const value = chip.id === 'category' ? categoryLabel(chip.value) : chip.value;
+    return format(labelKey, fallback, { value });
+  }
+
+  function clearChip(chipId) {
+    if (chipId === 'category') setCategoryFilter('all');
+    if (chipId === 'essence') setEssenceFilter('all');
+    if (chipId === 'search') onSearchChange('');
   }
 
   function sortLabel(key) {
@@ -126,12 +151,18 @@
       .sort((a, b) => a.localeCompare(b));
   }
 
+  // Where the component's linked item lives — a real state, so it reads as a StatusPill
+  // (the shared vehicle the Recipe Studio's row states use) rather than a raw chip.
+  // A resolved link (compendium / world) is ACCENT; an unresolved stored source is the
+  // one WARNING, because a component whose source no longer exists is a thing the GM
+  // must be able to scan a library for.
   function componentSourceOrigin(item) {
     if (item?.sourceMissing) {
       return {
         id: 'missing',
         label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
-        className: 'is-warning'
+        tone: 'warning',
+        icon: 'fas fa-link-slash'
       };
     }
     const origin = item?.sourceOrigin || '';
@@ -139,20 +170,23 @@
       return {
         id: 'compendium',
         label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
-        className: 'is-active'
+        tone: 'accent',
+        icon: 'fas fa-book-atlas'
       };
     }
     if (origin === 'world') {
       return {
         id: 'world',
         label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
-        className: 'is-active'
+        tone: 'accent',
+        icon: 'fas fa-box-archive'
       };
     }
     return {
       id: 'unknown',
       label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
-      className: 'is-disabled'
+      tone: 'subtle',
+      icon: 'fas fa-circle-question'
     };
   }
 
@@ -196,8 +230,12 @@
     return ui.collapsedCategories.has(category);
   }
 
+  // "1 components" is not a sentence. The singular is its own key, exactly as the
+  // Recipe Studio's GroupCount / GroupCountOne pair already is.
   function groupCountText(count) {
-    return text('FABRICATE.Admin.Manager.Component.GroupCount', '{count} components').replace('{count}', count);
+    return count === 1
+      ? text('FABRICATE.Admin.Manager.Component.GroupCountOne', '1 component')
+      : format('FABRICATE.Admin.Manager.Component.GroupCount', '{count} components', { count });
   }
 
   function clearFilters() {
@@ -221,6 +259,9 @@
       : `${label} ${text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}`;
   }
 
+  // The row carries ONE action — Edit. Copy-source-UUID and Delete moved into the
+  // browser inspector (issue 676): three ghost icons on every row turned it into a
+  // toolbar and truncated the description, exactly as the Recipe Studio found.
   function rowProps(item) {
     const origin = componentSourceOrigin(item);
     return {
@@ -229,30 +270,25 @@
       categoryBadge: categoryBadgeFor(item),
       difficultyBadge: difficultyBadgeFor(item),
       originLabel: origin.label,
-      originClass: origin.className,
-      editLabel: text('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}').replace('{name}', item.name),
+      originTone: origin.tone,
+      originIcon: origin.icon,
+      editLabel: format('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}', { name: item.name }),
       editTitle: text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component'),
-      deleteLabel: text('FABRICATE.Admin.Manager.Component.DeleteNamed', 'Delete {name}').replace('{name}', item.name),
-      deleteTitle: text('FABRICATE.Admin.Manager.Component.Delete', 'Delete component'),
-      copyLabel: text('FABRICATE.Admin.Manager.Component.CopySourceNamed', 'Copy source UUID for {name}').replace('{name}', item.name),
       noDescriptionText: text('FABRICATE.Admin.Manager.NoDescription', 'No description'),
       onSelect: onSelectComponent,
-      onEdit: onEditComponent,
-      onDelete: onDeleteComponent,
-      onCopySourceUuid
+      onEdit: onEditComponent
     };
   }
 </script>
 
+<!--
+  There is ONE page header, and the shell owns it. This view used to render a SECOND
+  one — kicker + "Component directory" + a second subtitle — directly under the shell's
+  breadcrumb / "Components" / subtitle block: ~74px of duplicated chrome saying what the
+  breadcrumb and the titlebar's gold system badge already said. The Recipe Studio
+  deleted exactly this; ruling 1 says it wins.
+-->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}>
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Component.Library', 'Component directory')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Component.LibraryHint', 'Crafting metadata on borrowed Foundry items — category, tags, essence contributions and salvage.')}</p>
-    </div>
-  </section>
-
   <section
     class="manager-component-drop-zone"
     use:dragDrop={{ onDrop: onDropComponent, disabled: !dropEnabled, activeClass: 'is-drop-active' }}
@@ -265,8 +301,20 @@
     </span>
   </section>
 
-  <section class="manager-toolbar" aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}>
-    <div class="manager-toolbar-primary">
+  <!--
+    The three-row filter bar, adopted from the Recipe Studio (ruling 1). Row one is
+    every FILTER (search, essence); row two carries the category filter with the two
+    VIEW controls — how the list is grouped, and how it is ordered — split by rules and
+    each titled by an uppercase micro-label that precedes its control and never wraps;
+    row three is the active-filter chips and the count.
+
+    It replaces a flat run of eight sentence-case `.manager-filter` controls, in which
+    the group toggle and the sort-direction button carried NO CSS at all: the toggle had
+    no visual pressed state, and the direction button sat at the boxy base
+    `.manager-button` scale the Recipe Studio already documented fixing.
+  -->
+  <section class="manager-toolbar manager-component-toolbar" aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}>
+    <div class="manager-component-filter-row">
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
         <input
@@ -278,35 +326,54 @@
         />
       </label>
 
-      <label class="manager-filter">
-        <span>{text('FABRICATE.Admin.Manager.Component.CategoryFilter', 'Category')}</span>
+      {#if showComponentEssences && componentEssenceOptions.length > 0}
+        <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose
+             controls each announce themselves in sentence case reads as a form. -->
         <select
-          value={ui.categoryFilter}
-          data-component-category-filter
-          onchange={(event) => setCategoryFilter(event.currentTarget.value)}
-          aria-label={text('FABRICATE.Admin.Manager.Component.CategoryFilterLabel', 'Filter components by category')}
+          class="manager-component-essence-filter"
+          data-component-essence-filter
+          value={ui.essenceFilter}
+          onchange={(event) => setEssenceFilter(event.currentTarget.value)}
+          aria-label={text('FABRICATE.Admin.Manager.Component.EssenceFilterLabel', 'Filter components by essence')}
         >
-          <option value="all">{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option>
-          {#each categoryOptions as category (category)}
-            <option value={category}>{categoryLabel(category)}</option>
+          <option value="all">{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option>
+          {#each componentEssenceOptions as essence (essence)}
+            <option value={essence}>{essence}</option>
           {/each}
         </select>
-      </label>
-
-      {#if showComponentEssences && componentEssenceOptions.length > 0}
-        <label class="manager-filter">
-          <span>{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</span>
-          <select value={ui.essenceFilter} onchange={(event) => setEssenceFilter(event.currentTarget.value)} aria-label={text('FABRICATE.Admin.Manager.Component.EssenceFilterLabel', 'Filter components by essence')}>
-            <option value="all">{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option>
-            {#each componentEssenceOptions as essence (essence)}
-              <option value={essence}>{essence}</option>
-            {/each}
-          </select>
-        </label>
       {/if}
+    </div>
 
-      <label class="manager-filter">
-        <span>{text('FABRICATE.Admin.Manager.Component.SortBy', 'Sort by')}</span>
+    <div class="manager-component-filter-row is-secondary">
+      <select
+        class="manager-component-category-filter"
+        data-component-category-filter
+        value={ui.categoryFilter}
+        onchange={(event) => setCategoryFilter(event.currentTarget.value)}
+        aria-label={text('FABRICATE.Admin.Manager.Component.CategoryFilterLabel', 'Filter components by category')}
+      >
+        <option value="all">{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option>
+        {#each categoryOptions as category (category.name)}
+          <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
+        {/each}
+      </select>
+      <span class="manager-component-filter-divider" aria-hidden="true"></span>
+      <div class="manager-component-filter-field">
+        <span class="manager-component-filter-label" id="manager-component-group-label">{text('FABRICATE.Admin.Manager.Component.GroupByCategory', 'Group by category')}</span>
+        <button
+          type="button"
+          class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
+          data-component-group-by-category
+          aria-pressed={ui.groupByCategory}
+          aria-labelledby="manager-component-group-label"
+          onclick={toggleGroupByCategory}
+        >
+          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+        </button>
+      </div>
+      <span class="manager-component-filter-divider" aria-hidden="true"></span>
+      <div class="manager-component-filter-field">
+        <span class="manager-component-filter-label">{text('FABRICATE.Admin.Manager.Component.SortBy', 'Sort by')}</span>
         <select
           value={ui.sortKey}
           data-component-sort
@@ -317,40 +384,48 @@
             <option value={option.key}>{option.label}</option>
           {/each}
         </select>
-      </label>
-
-      <button
-        type="button"
-        class="manager-button manager-component-sort-direction"
-        data-component-sort-direction={ui.sortDirection}
-        aria-pressed={ui.sortDirection === 'desc'}
-        onclick={toggleSortDirection}
-        title={text('FABRICATE.Admin.Manager.Component.SortDirection', 'Toggle sort direction')}
-      >
-        <i class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-a-z' : 'fas fa-arrow-down-z-a'} aria-hidden="true"></i>
-        <span>{ui.sortDirection === 'asc'
-          ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
-          : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span>
-      </button>
-
-      <button
-        type="button"
-        class="manager-button manager-component-group-toggle"
-        data-component-group-by-category
-        aria-pressed={ui.groupByCategory}
-        onclick={toggleGroupByCategory}
-      >
-        <i class={ui.groupByCategory ? 'fas fa-folder-open' : 'fas fa-folder'} aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Component.GroupByCategory', 'Group by category')}</span>
-      </button>
-
-      <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredComponents.length).replace('{total}', totalComponentsCount)}</span>
-      {#if filtersActive}
-        <button type="button" class="manager-button manager-clear-filters" data-clear-filters="components" onclick={clearFilters}>
-          <i class="fas fa-times" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
+        <button
+          type="button"
+          class="manager-button manager-component-sort-direction"
+          data-component-sort-direction={ui.sortDirection}
+          aria-label={text('FABRICATE.Admin.Manager.Component.SortDirection', 'Toggle sort direction')}
+          onclick={toggleSortDirection}
+        >
+          <i class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
+          <span>{ui.sortDirection === 'asc'
+            ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
+            : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span>
         </button>
-      {/if}
+      </div>
+    </div>
+
+    <div class="manager-component-filter-row is-chips">
+      {#each chips as chip (chip.id)}
+        <span class="manager-chip is-info manager-component-filter-chip" data-component-filter-chip={chip.id}>
+          <span>{chipLabel(chip)}</span>
+          <button
+            type="button"
+            class="manager-component-chip-clear"
+            aria-label={format('FABRICATE.Admin.Manager.Component.ClearChip', 'Clear {filter} filter', { filter: chip.id })}
+            onclick={() => clearChip(chip.id)}
+          >
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </span>
+      {/each}
+      <!--
+        The count is quiet right-aligned metadata, not a control: a bordered chip read as
+        something to press. It reports the page WINDOW ("1–5 of 12") — `paginateComponents`
+        has computed `rangeStart`/`rangeEnd` since it was written and nothing read them —
+        because "6 of 6" never told the GM which page they were looking at.
+      -->
+      <span class="manager-component-count" data-component-count>
+        {format('FABRICATE.Admin.Manager.Component.CountRange', '{start}–{end} of {total}', {
+          start: page.rangeStart,
+          end: page.rangeEnd,
+          total: page.totalCount
+        })}
+      </span>
     </div>
   </section>
 
@@ -364,17 +439,19 @@
         </div>
       </div>
     {:else if filteredComponents.length === 0}
-      <div class="manager-empty">
+      <!-- A filtered-to-nothing library is not an error state and does not want the full
+           empty-panel apparatus: one dashed panel says it, and Clear filters is the way
+           out (the Recipe Studio's treatment). -->
+      <div class="manager-empty manager-component-empty-filtered">
         <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Component.EmptySearchTitle', 'No components match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Component.EmptySearchHint', 'Clear search and filters to show all components in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
+          <p>{text('FABRICATE.Admin.Manager.Component.EmptySearchTitle', 'No components match your filters.')}</p>
+          <button type="button" class="manager-button" data-clear-filters="components" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
         </div>
       </div>
     {:else}
-      <!-- A LIST of rows, not a grid: the table/row/columnheader/cell ARIA scaffolding
-           is dropped rather than left orphaned on a non-table structure. -->
+      <!-- A card row has no columns, so this is a LIST, not a grid: a real
+           `<ul role="list">` of `<li>` cards carrying `aria-current`, mirroring the
+           Recipe Studio, rather than nested `<div>`s with no selection semantics at all. -->
       <div class="manager-components-list">
         {#if ui.groupByCategory}
           {#each groups as group (group.category)}
@@ -387,27 +464,29 @@
                 onToggle={() => toggleCategoryCollapsed(group.category)}
               />
               {#if !isCategoryCollapsed(group.category)}
-                <div class="manager-component-group-body" id={`manager-component-group-${group.category}`}>
+                <ul class="manager-component-group-body" role="list" id={`manager-component-group-${group.category}`}>
                   {#each group.components as item (item.id)}
                     <ComponentRow {...rowProps(item)} />
                   {:else}
-                    <p class="manager-muted manager-component-group-empty">{text('FABRICATE.Admin.Manager.Component.EmptyCategory', 'No components in this category.')}</p>
+                    <li class="manager-muted manager-component-group-empty">{text('FABRICATE.Admin.Manager.Component.EmptyCategory', 'No components in this category.')}</li>
                   {/each}
-                </div>
+                </ul>
               {/if}
             </section>
           {/each}
         {:else}
-          {#each page.components as item (item.id)}
-            <ComponentRow {...rowProps(item)} />
-          {/each}
+          <ul class="manager-component-group-body" role="list">
+            {#each page.components as item (item.id)}
+              <ComponentRow {...rowProps(item)} />
+            {/each}
+          </ul>
         {/if}
       </div>
     {/if}
   </section>
 
   <Pagination
-    totalCount={filteredComponents.length}
+    totalCount={page.totalCount}
     pageSize={ui.pageSize}
     pageIndex={page.pageIndex}
     onPageChange={(next) => ui.pageIndex = next}
