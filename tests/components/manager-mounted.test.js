@@ -184,6 +184,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
+  // The one vocabulary section TagsCategoriesView renders three times (recipe
+  // categories, component categories, item tags — issue 676).
+  writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyPanel.svelte');
   for (const environmentComponent of [
     'EnvironmentEditorTabs',
     'EnvironmentOverviewTab',
@@ -257,6 +260,9 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
+    // The component category vocabulary (issue 676) — the SIBLING of the above, not a
+    // reuse of it. Imported by ComponentEditView and the component browser.
+    'src/utils/componentCategories.js',
     // The recipe library's pure list model (filter / group / sort / paginate + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',

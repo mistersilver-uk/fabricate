@@ -6012,14 +6012,25 @@ describe('createAdminStore', () => {
       const vs = get(store.viewState);
       const [linkedEssence, unlinkedEssence] = vs.selectedSystem.essenceDefinitions;
 
+      // `category` (issue 676) is projected here unconditionally — this is the
+      // PER-COMPONENT field projection, distinct from the system-level
+      // `componentCategories` vocabulary projection. deepEqual (not deepInclude) is
+      // the point: it fails if the field is ever dropped from the allowlist.
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
         {
           id: 'comp-1',
           name: 'Blazing Herb',
           img: 'blazing-herb.png',
           description: 'Bright ember leaf.',
+          category: 'general',
         },
-        { id: 'comp-2', name: 'Moon Salt', img: 'icons/svg/item-bag.svg', description: '' },
+        {
+          id: 'comp-2',
+          name: 'Moon Salt',
+          img: 'icons/svg/item-bag.svg',
+          description: '',
+          category: 'general',
+        },
       ]);
       assert.deepEqual(linkedEssence.associatedItem, {
         id: 'comp-1',
@@ -6061,11 +6072,13 @@ describe('createAdminStore', () => {
         { id: 'comp-3', tags: [], essences: {} },
       ]);
 
-      // The managedItemOptions contract shape is unchanged (no tags leak in).
+      // The managedItemOptions contract shape is unchanged (no tags leak in). It does
+      // carry the per-component `category` (issue 676) — tags and category are
+      // different axes and neither substitutes for the other.
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
-        { id: 'comp-1', name: 'Iron Ore', img: 'item.png', description: '' },
-        { id: 'comp-2', name: 'Herb', img: 'item.png', description: '' },
-        { id: 'comp-3', name: 'Untagged', img: 'item.png', description: '' },
+        { id: 'comp-1', name: 'Iron Ore', img: 'item.png', description: '', category: 'general' },
+        { id: 'comp-2', name: 'Herb', img: 'item.png', description: '', category: 'general' },
+        { id: 'comp-3', name: 'Untagged', img: 'item.png', description: '', category: 'general' },
       ]);
     });
 

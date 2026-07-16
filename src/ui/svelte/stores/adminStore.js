@@ -42,6 +42,10 @@ import {
   normalizeRecipeCategory,
 } from '../../../utils/recipeCategories.js';
 import {
+  isGeneralComponentCategory,
+  normalizeCustomComponentCategories,
+} from '../../../utils/componentCategories.js';
+import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets,
 } from '../../../config/gatheringCharacterModifierPresets.js';
@@ -503,6 +507,12 @@ function _buildManagedItemOptions(managedItems = []) {
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
     description: _plainTextDescription(item.description),
+    // Component category (issue 676). This is the PER-COMPONENT field, and is a
+    // different projection from the system-level `componentCategories` vocabulary
+    // in the `selectedSystem` viewState projection — both are required, for
+    // different things. Normalization guarantees the key, so it is projected
+    // unconditionally rather than through a hasOwnProperty guard.
+    category: item.category || 'general',
     ...(item.originItemUuid ? { originItemUuid: item.originItemUuid } : {}),
     ...(item.registeredItemUuid ? { registeredItemUuid: item.registeredItemUuid } : {}),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty')
@@ -2163,6 +2173,12 @@ function _buildSelectedSystemViewData(
     },
 
     categories: selectedSystem.categories || [],
+    // The system-level COMPONENT category vocabulary (issue 676). This hand-built
+    // projection is an allowlist: without this line the Tags & Categories screen's
+    // component-categories section is permanently EMPTY, however correctly the
+    // normalizer and the write path behave. Distinct from `_buildManagedItemOptions`,
+    // which projects the per-component `category` field.
+    componentCategories: selectedSystem.componentCategories || [],
     itemTags: selectedSystem.itemTags || selectedSystem.tags || [],
     essenceDefinitions,
     managedItemOptions,
@@ -5840,6 +5856,44 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // --- Component category management (issue 676) ---
+  //
+  // Mirrors addCategory/removeCategory above, writing the SIBLING vocabulary
+  // `componentCategories` top-level via updateSystem. Deliberately does not touch
+  // `categories`: the two vocabularies are independent and must never cross-populate.
+  // Note updateSystem's whole-array replace semantics make removal persist without
+  // any `-=` deletion (unlike setFlag's deep merge).
+
+  async function addComponentCategory(value) {
+    if (!value || !value.trim()) return;
+    if (isGeneralComponentCategory(value)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const componentCategories = normalizeCustomComponentCategories([
+      ...(system.componentCategories || []),
+      value.trim(),
+    ]);
+    await systemManager.updateSystem(sysId, { componentCategories });
+    await refresh();
+  }
+
+  async function removeComponentCategory(category) {
+    if (isGeneralComponentCategory(category)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const componentCategories = normalizeCustomComponentCategories(
+      (system.componentCategories || []).filter((c) => c !== category)
+    );
+    await systemManager.updateSystem(sysId, { componentCategories });
+    await refresh();
+  }
+
   // --- Tag management ---
 
   async function addTag(value) {
@@ -7967,6 +8021,8 @@ export function createAdminStore(services) {
     toggleRequirement,
     addCategory,
     removeCategory,
+    addComponentCategory,
+    removeComponentCategory,
     addTag,
     removeTag,
     addEssence,

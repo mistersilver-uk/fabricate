@@ -32,6 +32,10 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/componentEditor.js',
+    // The component category vocabulary (issue 676), imported by ComponentEditView.
+    // A deliberately import-free leaf, so this single entry suffices — but omit it
+    // and the mounted suite HANGS (# cancelled) rather than failing.
+    'src/utils/componentCategories.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],
   // ToggleCard is rendered by the salvage block; a component the tree renders but the

@@ -2,6 +2,12 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
+  import {
+    GENERAL_COMPONENT_CATEGORY,
+    getComponentCategoryLabel,
+    getEffectiveComponentCategories,
+    normalizeComponentCategory
+  } from '../../../../utils/componentCategories.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import {
     adjustComponentEssenceQuantity,
@@ -15,6 +21,7 @@
     showTags = false,
     showEssences = false,
     showSalvage = false,
+    categoryOptions = [],
     salvageResolutionMode = 'simple',
     salvageOutcomeNames = [],
     componentOptions = [],
@@ -25,6 +32,7 @@
   } = $props();
 
   let tagDraft = $state([]);
+  let categoryDraft = $state(GENERAL_COMPONENT_CATEGORY);
   let essenceDraft = $state([]);
   // Deep clone of component.salvage so edits never mutate the upstream card. Only
   // the authoring fields (resultGroups, outcomeRouting, dcOverride) are edited
@@ -43,6 +51,11 @@
   const draftSignature = $derived([
     component?.id || '',
     tagDraft.filter(opt => opt.checked).map(opt => opt.tag).sort().join(','),
+    // `category` is NOT a salvage field, so it gets its own term here rather than
+    // riding in salvageSignature(). Same one-list principle as that allowlist: an
+    // authored field missing from the signature means the editor never re-emits its
+    // draft, so the root's dirty state and Save never see it (issue 676).
+    categoryDraft,
     essenceDraft.map(opt => `${opt.id}:${opt.quantity}`).sort().join(','),
     showSalvage ? salvageSignature() : '',
     dirty ? 'dirty' : 'clean'
@@ -51,6 +64,7 @@
   $effect(() => {
     if (componentKey === lastComponentKey) return;
     tagDraft = cloneTagOptions(tagOptions);
+    categoryDraft = normalizeComponentCategory(component?.category);
     essenceDraft = cloneEssenceOptions(essenceOptions);
     salvageDraft = cloneSalvage(component?.salvage);
     tagMenuOpen = false;
@@ -77,6 +91,19 @@
 
   function componentImage(item) {
     return item?.img || 'icons/svg/item-bag.svg';
+  }
+
+  // `general` first, then the system's authored vocabulary. The reserved bucket is
+  // never persisted in `categoryOptions`, so it is prepended here rather than being
+  // expected in the incoming list.
+  const effectiveCategoryOptions = $derived(getEffectiveComponentCategories(categoryOptions));
+
+  function categoryLabel(category) {
+    return getComponentCategoryLabel(category, localize);
+  }
+
+  function setCategory(value) {
+    categoryDraft = normalizeComponentCategory(value);
   }
 
   function cloneTagOptions(options = []) {
@@ -108,6 +135,16 @@
     return {
       ...source,
       dcOverride: source.dcOverride ?? null,
+      // Default FALSE, matching `_normalizeSalvage` (issue 676, decision 6). Do NOT
+      // copy the `!== false` shape of `allowPlayerResultReorder` below — that would
+      // default this to TRUE, flipping every component in every world to salvageable
+      // on first render and saving it back.
+      //
+      // Its other job is normalizing the DIRTY-CHECK BASELINE (see the note below):
+      // leave the key absent and `enabled`, now in salvageSignatureOf's allowlist,
+      // compares `false` against `undefined` forever, so toggling off→on never
+      // returns to clean.
+      enabled: source.enabled === true,
       // Default TRUE (issue 651), matching the model. `...source` above already
       // preserves a persisted value, so this is purely about the ABSENT key.
       //
@@ -160,6 +197,10 @@
   // in sync. The two-list shape is what let this drift in the first place.
   function salvageSignatureOf(salvage) {
     return JSON.stringify({
+      // The per-component salvage gate (issue 676). Omit it and the 651 bug returns
+      // verbatim for this field: the GM flips the toggle, nothing is ever dirty, Save
+      // never enables, and the edit is silently discarded on exit.
+      enabled: salvage.enabled,
       resultGroups: salvage.resultGroups,
       outcomeRouting: salvage.outcomeRouting,
       dcOverride: salvage.dcOverride,
@@ -193,6 +234,7 @@
 
   function isDirty() {
     if (!component) return false;
+    if (categoryDraft !== normalizeComponentCategory(component?.category)) return true;
     if (showTags && !tagsAreEqual(tagDraft, tagOptions)) return true;
     if (showEssences && !essencesAreEqual(essenceDraft, essenceOptions)) return true;
     if (showSalvage && salvageSignature() !== salvageSignatureOf(cloneSalvage(component?.salvage)))
@@ -202,6 +244,7 @@
 
   function buildUpdates() {
     const updates = {};
+    updates.category = categoryDraft;
     if (showTags) {
       updates.tags = tagDraft.filter(opt => opt.checked).map(opt => opt.tag);
     }
@@ -269,9 +312,21 @@
     });
   }
 
+  // Decision 8(b), issue 676 — defence in depth behind the normalizer clamp.
+  //
+  // This path used to be UNFLOORED: it never touched `enabled`, and buildUpdates()
+  // full-spreads, so enable-at-one-group → delete-that-group → Save persisted
+  // `{enabled: true, resultGroups: []}` — violating Component Requirement 5 through
+  // the sanctioned flow's exact reverse, and then DISABLING the toggle that would
+  // undo it (stuck ON). Forcing `enabled: false` in the SAME staged setSalvage keeps
+  // the correction inside isDirty()/draftSignature so Save sees it.
+  //
+  // House precedent: `_disableInvalidSalvageConfigs` does exactly this.
   function removeSalvageGroup(groupId) {
+    const resultGroups = salvageDraft.resultGroups.filter(group => group.id !== groupId);
     setSalvage({
-      resultGroups: salvageDraft.resultGroups.filter(group => group.id !== groupId)
+      resultGroups,
+      ...(resultGroups.length === 0 ? { enabled: false } : {})
     });
   }
 
@@ -424,6 +479,30 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <section class="manager-task-core-card" data-component-edit-section="category">
+      <div class="manager-task-card-heading">
+        <div>
+          <h3>{text('FABRICATE.Admin.Manager.Component.Category.Title', 'Category')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Category.Hint', 'Group this component in the component directory. Component categories are separate from recipe categories.')}</p>
+        </div>
+      </div>
+      <label class="manager-field">
+        <span>{text('FABRICATE.Admin.Manager.Component.Category.Label', 'Component category')}</span>
+        <select
+          class="manager-input"
+          value={categoryDraft}
+          data-component-edit-category
+          aria-label={text('FABRICATE.Admin.Manager.Component.Category.Label', 'Component category')}
+          onchange={(event) => setCategory(event.currentTarget.value)}
+          disabled={saving}
+        >
+          {#each effectiveCategoryOptions as option (option)}
+            <option value={option}>{categoryLabel(option)}</option>
+          {/each}
+        </select>
+      </label>
     </section>
 
     {#if showTags}

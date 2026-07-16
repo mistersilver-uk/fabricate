@@ -2187,6 +2187,11 @@
             "Title": "Essences",
             "Hint": "Set how much of each essence this component contributes.",
             "NoEssences": "No essences are defined for this system yet."
+          },
+          "Category": {
+            "Title": "Category",
+            "Hint": "Group this component in the component directory. Component categories are separate from recipe categories.",
+            "Label": "Component category"
           }
         },
         "TagsCategories": {
@@ -2195,7 +2200,7 @@
           "Subtitle": "Manage recipe category and item tag vocabulary for the selected crafting system.",
           "Actions": "Tags and categories actions",
           "Library": "Tags & Categories",
-          "LibraryHint": "Define recipe categories and item tags before assigning them elsewhere.",
+          "LibraryHint": "Define recipe categories, component categories and item tags before assigning them elsewhere.",
           "Filters": "Tags and categories filters",
           "SearchPlaceholder": "Search tags and categories...",
           "SearchLabel": "Search tags and categories",
@@ -2205,6 +2210,19 @@
           "CategoryName": "Category name",
           "CategoryPlaceholder": "e.g. Potions",
           "AddCategory": "Add category",
+          "ComponentCategories": "Component categories",
+          "ComponentCategoriesHint": "General is always available. Add custom categories to group components in the component directory. Separate from recipe categories.",
+          "ComponentCategoryName": "Component category name",
+          "ComponentCategoryPlaceholder": "e.g. Reagent",
+          "AddComponentCategory": "Add component category",
+          "CustomComponentCategoryCount": "{count} component categories",
+          "OnlyGeneralComponent": "Only General is available.",
+          "OnlyGeneralComponentHint": "Add a custom category when components need more specific grouping.",
+          "NoComponentCategoryMatches": "No component categories match this search.",
+          "RemoveComponentCategory": "Remove component category",
+          "RemoveComponentCategoryNamed": "Remove component category {name}",
+          "RemoveComponentCategoryConfirm": "Remove the component category \"{name}\"? {count} components use it and will fall back to General.",
+          "ComponentCategoryAddFailedFeedback": "Component category could not be added.",
           "ItemTags": "Item tags",
           "ItemTagsHint": "Use item tags for component organization and tag-based ingredient options.",
           "TagName": "Tag name",

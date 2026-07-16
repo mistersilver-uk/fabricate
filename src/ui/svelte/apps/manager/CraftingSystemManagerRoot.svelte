@@ -515,6 +515,10 @@
       id: item.id,
       name: item.name,
       img: item.img,
+      // Component category (issue 676) — projected here for the same reason
+      // `difficulty` is: an omitted field reaches the editor as undefined and reads
+      // as unauthored data rather than a dropped projection.
+      category: item.category || 'general',
       ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
     }))
   );
@@ -704,12 +708,18 @@
   ));
   const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
   const categoryRows = $derived(buildCategoryRows(selectedSystem?.categories || [], tagCategoryUsage.categoryUsage));
+  const componentCategoryRows = $derived(buildComponentCategoryRows(
+    selectedSystem?.componentCategories || [],
+    tagCategoryUsage.componentCategoryUsage
+  ));
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
   const tagCategoryCounts = $derived({
     baseCategories: 1,
     customCategories: categoryRows.filter(row => row.id !== 'general').length,
+    customComponentCategories: componentCategoryRows.filter(row => row.id !== 'general').length,
     itemTags: tagRows.length,
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
+    componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount
   });
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
@@ -2840,6 +2850,16 @@
     return store.removeCategory?.(category);
   }
 
+  function addComponentCategory(value) {
+    if (!selectedSystemId) return;
+    return store.addComponentCategory?.(value);
+  }
+
+  function removeComponentCategory(category) {
+    if (!selectedSystemId) return;
+    return store.removeComponentCategory?.(category);
+  }
+
   function addTag(value) {
     if (!selectedSystemId) return;
     return store.addTag?.(value);
@@ -2852,12 +2872,24 @@
 
   function confirmTagCategoryRemoval(kind, row) {
     if (!row || (row.totalUsage || 0) <= 0) return true;
-    const messageKey = kind === 'category'
-      ? 'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirm'
-      : 'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirm';
-    const fallback = kind === 'category'
-      ? 'Remove {name}? {count} references may keep this category value until you update them.'
-      : 'Remove {name}? {count} references may keep this tag value until you update them.';
+    // Three vocabularies, three messages (issue 676). The component-category case
+    // says something the other two cannot: removing it does NOT leave the value
+    // dangling — `normalizeComponentCategory` falls those components back to General.
+    const messages = {
+      category: [
+        'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirm',
+        'Remove {name}? {count} references may keep this category value until you update them.'
+      ],
+      'component-category': [
+        'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryConfirm',
+        'Remove the component category "{name}"? {count} components use it and will fall back to General.'
+      ],
+      tag: [
+        'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirm',
+        'Remove {name}? {count} references may keep this tag value until you update them.'
+      ]
+    };
+    const [messageKey, fallback] = messages[kind] || messages.tag;
     const message = text(messageKey, fallback)
       .replace('{name}', row.name)
       .replace('{count}', row.totalUsage || 0);
@@ -4192,6 +4224,10 @@
   function buildTagCategoryUsage(system, recipes, items) {
     const categoryUsage = new Map();
     const tagUsage = new Map();
+    // Component-category usage is counted SEPARATELY from recipe-category usage
+    // (issue 676): the two vocabularies are independent, so folding component
+    // counts into `categoryUsage` would misreport a recipe category as used.
+    const componentCategoryUsage = new Map();
     for (const recipe of recipes || []) {
       const categoryKey = normalizeVocabularyKey(recipe?.category);
       categoryUsage.set(categoryKey, (categoryUsage.get(categoryKey) || 0) + 1);
@@ -4201,12 +4237,19 @@
         const tagKey = normalizeVocabularyKey(tag);
         tagUsage.set(tagKey, (tagUsage.get(tagKey) || 0) + 1);
       }
+      const componentCategoryKey = normalizeVocabularyKey(item?.category);
+      componentCategoryUsage.set(
+        componentCategoryKey,
+        (componentCategoryUsage.get(componentCategoryKey) || 0) + 1
+      );
     }
     return {
       categoryUsage,
       tagUsage,
+      componentCategoryUsage,
       categoryReferenceCount: Array.from(categoryUsage.values()).reduce((sum, count) => sum + count, 0),
-      tagReferenceCount: Array.from(tagUsage.values()).reduce((sum, count) => sum + count, 0)
+      tagReferenceCount: Array.from(tagUsage.values()).reduce((sum, count) => sum + count, 0),
+      componentCategoryReferenceCount: Array.from(componentCategoryUsage.values()).reduce((sum, count) => sum + count, 0)
     };
   }
 
@@ -4230,6 +4273,37 @@
         kind: 'category',
         name: generalName,
         recipeUsageCount: usage.get('general') || 0,
+        totalUsage: usage.get('general') || 0,
+        locked: true
+      },
+      ...customRows
+    ];
+  }
+
+  // Component-category rows (issue 676). Shaped exactly like buildCategoryRows so the
+  // Tags & Categories screen can render both sections through one row component, but
+  // fed from its own vocabulary and its own usage map. `kind` distinguishes them for
+  // the removal-confirmation copy.
+  function buildComponentCategoryRows(categories, usage) {
+    const generalName = text('FABRICATE.Common.General', 'General');
+    const customRows = uniqueSorted(categories || []).map(category => {
+      const key = normalizeVocabularyKey(category);
+      const componentUsageCount = usage.get(key) || 0;
+      return {
+        id: key,
+        kind: 'component-category',
+        name: category,
+        componentUsageCount,
+        totalUsage: componentUsageCount,
+        locked: false
+      };
+    });
+    return [
+      {
+        id: 'general',
+        kind: 'component-category',
+        name: generalName,
+        componentUsageCount: usage.get('general') || 0,
         totalUsage: usage.get('general') || 0,
         locked: true
       },
@@ -5074,10 +5148,13 @@
     {:else if currentView === 'tags' && selectedSystem}
       <TagsCategoriesView
         {categoryRows}
+        {componentCategoryRows}
         {tagRows}
         counts={tagCategoryCounts}
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
+        onAddComponentCategory={addComponentCategory}
+        onRemoveComponentCategory={removeComponentCategory}
         onAddTag={addTag}
         onRemoveTag={removeTag}
         onConfirmRemove={confirmTagCategoryRemoval}
@@ -5091,6 +5168,7 @@
         showTags={componentEditShowTags}
         showEssences={componentEditShowEssences}
         showSalvage={componentSalvageEnabled}
+        categoryOptions={selectedSystem?.componentCategories || []}
         salvageResolutionMode={salvageResolutionMode}
         salvageOutcomeNames={salvageOutcomeNames}
         componentOptions={salvageComponentOptions}

@@ -253,6 +253,7 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 #### Feature Controls
 
 - Category list editor for custom categories only; reserved `General` is always present and not removable
+- The Tags & Categories screen manages recipe categories and component categories as two separate sections, reflecting the two independent vocabularies.
 - Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
@@ -930,6 +931,29 @@ If multistep is enabled:
 If multistep is disabled:
 
 - Show implicit single-step editors at the recipe level
+
+## Component Studio
+
+The GM component surfaces: the component browser and the component editor.
+
+### Requirements
+
+1. The GM component browser groups and filters by `Component.category`.
+Tags are edited only in the component editor and must not be rendered as row chips; rows show a single-line description, mirroring the Recipe Studio.
+2. The GM component editor is a single scrolling column with no right rail.
+Back sits beside Save in the header.
+Source actions (replace by drop, unlink, open item sheet, copy UUID) are reachable from the identity strip; the component's progressive difficulty is authored in the body.
+3. Source actions commit immediately and are never staged into the editor draft.
+Replacing or unlinking a component's source item restamps durable component identity and saves; carrying source fields through the draft's update path would skip that restamping.
+4. The component salvage panel derives its presentation from `salvageResolutionMode` plus salvage-check enablement, gated by `features.salvage` and `component.salvage.enabled`.
+The persisted `routed` token is displayed as "Routed by check".
+5. The result-group editor remains reachable when salvage is disabled.
+Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
+The per-component enable control is disabled, with a visible explanation, until at least one result group exists; since the add-group control lives in the result-group editor, collapsing that editor would make enabling unreachable.
+The disabled-state copy distinguishes "no result groups authored yet" from "authored but disabled".
+6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
+A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
+A "Manage presets" link routes to the system's Checks screen.
 
 ## Step Editor
 
