@@ -327,6 +327,31 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
   },
+  // The progressive player stage list (issue 651). `collect` emits ONE file per view id
+  // (first matching smoke label wins), so each state is its own view — a single
+  // `player-crafting` entry would publish only the alphabetically-first frame and the
+  // other states would never reach the PR.
+  {
+    id: 'player-crafting-progressive',
+    label: 'Player crafting — progressive stage list, reorder allowed (default)',
+    // The reordered frame sorts first and is the better primary evidence: it is the only
+    // state in which the live region carries text and the thresholds have been recomputed,
+    // so it shows the feature working rather than merely present.
+    smokeLabels: ['player-crafting-progressive-reordered', 'player-crafting-progressive'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-progressive-fixed',
+    label: 'Player crafting — progressive stage list, order fixed by the GM',
+    smokeLabels: ['player-crafting-progressive-fixed'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-progressive-stacked',
+    label: 'Player crafting — progressive stage list, narrow window',
+    smokeLabels: ['player-crafting-progressive-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
   // The player Alchemy workbench (issue 543) publishes three distinct frames — the
   // discipline chooser, the three-column workbench, and the narrow stacked layout.
   // `collect` emits one file per view id (first matching smoke label wins), so each

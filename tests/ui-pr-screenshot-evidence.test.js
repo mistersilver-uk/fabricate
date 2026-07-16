@@ -89,7 +89,16 @@ describe('UI PR screenshot evidence', () => {
 
     assert.deepEqual(
       views.map(view => view.id),
-      ['player-crafting', 'player-crafting-stacked']
+      [
+        'player-crafting',
+        'player-crafting-stacked',
+        // The progressive stage list (issue 651) publishes three distinct states;
+        // `collect` emits one file per view id, so each needs its own entry or only the
+        // alphabetically-first frame would ever reach the PR.
+        'player-crafting-progressive',
+        'player-crafting-progressive-fixed',
+        'player-crafting-progressive-stacked',
+      ]
     );
     assert.deepEqual(views[0].smokeLabels, [
       'player-crafting-alternatives',
@@ -99,6 +108,15 @@ describe('UI PR screenshot evidence', () => {
       'player-crafting-run-summary',
     ]);
     assert.deepEqual(views[1].smokeLabels, ['player-crafting-stacked']);
+    // The reordered frame is listed first deliberately: it is the only state whose live
+    // region carries text and whose thresholds have been recomputed, so it is the better
+    // primary evidence for a crafting change.
+    assert.deepEqual(views[2].smokeLabels, [
+      'player-crafting-progressive-reordered',
+      'player-crafting-progressive',
+    ]);
+    assert.deepEqual(views[3].smokeLabels, ['player-crafting-progressive-fixed']);
+    assert.deepEqual(views[4].smokeLabels, ['player-crafting-progressive-stacked']);
   });
 
   it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {
