@@ -40,9 +40,11 @@
 {#if dirty}
   <span class="manager-chip is-warning" data-component-edit-dirty>{dirtyLabel}</span>
 {/if}
+<!-- Ghost, matching the recipe editor's Back (ruling 1): Back is not a peer of Save, and
+     at the base `.manager-button` weight it competed with it. -->
 <button
   type="button"
-  class="manager-button"
+  class="manager-button is-ghost"
   data-component-edit-back
   onclick={() => onBack()}
   disabled={saving}

@@ -19,6 +19,10 @@
     getRecipeCategoryLabel,
     normalizeRecipeCategory
   } from '../../../../utils/recipeCategories.js';
+  import {
+    getComponentCategoryLabel,
+    normalizeComponentCategory
+  } from '../../../../utils/componentCategories.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
   import { createComponentBrowserState } from '../../../../utils/componentBrowserModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
@@ -41,6 +45,10 @@
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeBrowserInspector from './recipes/RecipeBrowserInspector.svelte';
+  // The component library's inspector (issue 676) — the sibling of the above. It lives
+  // under `components/` (the BROWSER's dir), NOT `component/`, which the screenshot map
+  // globs for the component EDITOR's frames.
+  import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
   import CraftingSettingsView from './CraftingSettingsView.svelte';
   import AccessTabView from './AccessTabView.svelte';
@@ -1761,6 +1769,35 @@
     return `${category} · ${mode}${dcSuffix}`;
   }
 
+  // The component editor's header subline: "<category> · Linked <source>" (issue 676,
+  // decision 4). The SOURCE segment names where the linked item lives — the same origin
+  // the browser row's status pill reports — because the editor's whole premise is that
+  // name, image and description follow that item. An unlinked component says so.
+  function componentEditSubtitle() {
+    const category = getComponentCategoryLabel(
+      normalizeComponentCategory(componentForEdit?.category),
+      localize
+    );
+    return `${category} · ${componentEditSourceSegment()}`;
+  }
+
+  function componentEditSourceSegment() {
+    if (!componentForEdit?.hasRegisteredItemUuid) {
+      return text('FABRICATE.Admin.Manager.Component.UnlinkedBadge', 'Not linked');
+    }
+    if (componentForEdit?.sourceMissing) {
+      return text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing');
+    }
+    const origin = componentForEdit?.sourceOrigin || '';
+    const sourceLabel = componentForEdit?.sourceOriginLabel
+      || (origin === 'compendium'
+        ? text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium')
+        : origin === 'world'
+          ? text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory')
+          : text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'));
+    return `${text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')} ${sourceLabel}`;
+  }
+
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
@@ -1967,6 +2004,7 @@
     if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Subtitle', 'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.');
     if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditSubtitle', 'Link a world item and recipes, then set its use and learn caps.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
+    if (currentView === 'component-edit' && componentForEdit) return componentEditSubtitle();
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Subtitle', 'Manage recipe category and item tag vocabulary for the selected crafting system.');
     if (currentView === 'essences') return text('FABRICATE.Admin.Manager.Essence.Subtitle', 'Manage essence definitions for the selected crafting system.');
@@ -4152,34 +4190,10 @@
     return environment;
   }
 
-  function componentSourceState(item) {
-    if (item?.sourceMissing) {
-      return {
-        id: 'missing',
-        label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
-        className: 'is-warning'
-      };
-    }
-    if (item?.sourceOrigin === 'compendium') {
-      return {
-        id: 'compendium',
-        label: item.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
-        className: 'is-active'
-      };
-    }
-    if (item?.sourceOrigin === 'world') {
-      return {
-        id: 'world',
-        label: item.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
-        className: 'is-active'
-      };
-    }
-    return {
-      id: 'unknown',
-      label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
-      className: 'is-disabled'
-    };
-  }
+  // `componentSourceState` lived here to tone the inline components inspector's source
+  // chip. That inspector is now `ComponentBrowserInspector` (issue 676), which derives
+  // its own linked badge, and the browser row derives its origin pill in
+  // `ComponentsBrowserView` — so the helper had no callers left.
 
   function componentEvidenceItems(item) {
     const evidence = [];
@@ -4466,7 +4480,9 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToComponentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span>
+          <!-- Name the component, not the generic "Edit component" — the same rule the
+               recipe breadcrumb follows. -->
+          <span>{componentForEdit?.name || text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span>
         {/if}
         {#if currentView === 'environments'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -4512,6 +4528,19 @@
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={recipeDraft.name || ''}>{recipeDraft.name || viewTitle()}</h1>
             <p class="manager-subtitle" data-recipe-edit-subline>{viewSubtitle()}</p>
+          </div>
+        </div>
+      {:else if currentView === 'component-edit' && componentForEdit}
+        <!-- The component editor's identity header (issue 676, decision 4 — it must match
+             the recipe editor's exactly, and was never implemented: this route fell
+             through to the generic static "Edit component" heading below). The linked
+             item's real image, its NAME, and the "<category> · Linked <source>" subline.
+             It reuses the recipe heading's classes wholesale — same shape, same CSS. -->
+        <div class="manager-recipe-edit-heading" data-component-edit-heading>
+          <Medallion src={componentForEdit.img} icon="fas fa-cube" size={44} />
+          <div class="manager-recipe-edit-heading-copy">
+            <h1 class="manager-title" title={componentForEdit.name || ''}>{componentForEdit.name || viewTitle()}</h1>
+            <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
           </div>
         </div>
       {:else}
@@ -5226,10 +5255,8 @@
     {:else if currentView === 'components'}
       <ComponentsBrowserView
         {itemCards}
-        totalComponentsCount={selectedCounts.components}
         itemSearchTerm={$viewState.itemSearchTerm || ''}
         selectedComponentId={selectedComponent?.id || ''}
-        selectedSystemName={selectedSystem?.name || ''}
         {selectedSystemId}
         selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
         categoryVocabulary={selectedSystem?.componentCategories || []}
@@ -5239,8 +5266,6 @@
         onSelectComponent={(id) => selectComponent(id)}
         onDropComponent={(data) => dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
-        onDeleteComponent={(id) => deleteComponent(id)}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
@@ -6668,67 +6693,15 @@
         {/if}
       {:else if currentView === 'components'}
         {#if selectedComponent}
-          <section class="manager-inspector-card">
-            <div class="manager-inspector-title-row is-hero-large">
-              <img class="manager-component-preview" src={componentImage(selectedComponent)} alt="" />
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Component.Selected', 'Selected component')}</p>
-                <h2 class="manager-inspector-name" title={selectedComponent.name}>{selectedComponent.name}</h2>
-                <div class="manager-chip-row">
-                  <span class={`manager-chip ${componentSourceState(selectedComponent).className}`}>{componentSourceState(selectedComponent).label}</span>
-                </div>
-              </div>
-            </div>
-
-            <p class="manager-muted">
-              {truncateDescription(selectedComponent.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-            </p>
-          </section>
-
-          {#if showComponentTags}
-            <section class="manager-inspector-card" data-component-section="tags">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}</h3>
-              <div class="manager-feature-list">
-                {#each selectedComponent.tags || [] as tag (tag)}
-                  <span class="manager-chip">{tag}</span>
-                {:else}
-                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}</span>
-                {/each}
-              </div>
-            </section>
-          {/if}
-
-          {#if showComponentEssences}
-            <section class="manager-inspector-card" data-component-section="essences">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</h3>
-              <div class="manager-feature-list">
-                {#each selectedComponent.essences || [] as essence (essence.id)}
-                  <span class="manager-chip manager-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
-                    <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
-                  </span>
-                {:else}
-                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoEssences', 'No essences')}</span>
-                {/each}
-              </div>
-            </section>
-          {/if}
-
-          <section class="manager-inspector-card" data-component-section="source">
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Source', 'Source')}</h3>
-            {#if selectedComponent.hasRegisteredItemUuid}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SourceHint', 'This component keeps a stored source ID for import matching and replacement.')}</p>
-              {#if selectedComponent.sourceMissing}
-                <p class="environment-stale-warning" data-component-source-missing>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</p>
-              {/if}
-              <button type="button" class="manager-button" data-component-action="copy-source" title={selectedComponent.registeredItemUuidDisplay} onclick={() => copyComponentSource(selectedComponent.registeredItemUuidDisplay)}>
-                <i class="fas fa-copy" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')}</span>
-              </button>
-            {:else}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoSourceHint', 'This component does not expose a stored source UUID in the current item-card data.')}</p>
-            {/if}
-          </section>
-
+          <ComponentBrowserInspector
+            {selectedComponent}
+            showTags={showComponentTags}
+            showEssences={showComponentEssences}
+            onEdit={() => editComponent(selectedComponent?.id)}
+            onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+            onUnlink={(id) => unlinkComponentSource(id)}
+            onDelete={(id) => deleteComponent(id)}
+          />
         {:else if itemCards.length === 0}
           <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.Component.EmptySetup.Title', 'Set up components')}>
             <div class="manager-setup-card-header">
