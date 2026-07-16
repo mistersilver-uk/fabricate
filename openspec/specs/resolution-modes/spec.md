@@ -1,4 +1,4 @@
-# Specification 004: Resolution Modes
+# Resolution Modes
 
 ## Purpose
 
@@ -10,7 +10,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - `CraftingSystem.resolutionMode` is system-wide.
 - Recipes cannot mix resolution modes inside one crafting system.
 - Mode changes are **migration-first** and governed by
-  `007-destructive-changes-and-migrations.md`:
+  `destructive-changes-and-migrations/spec.md`:
   recipes are migrated to fit the new mode wherever possible and a recipe is
   deleted only when a per-recipe *structural* constraint of the target mode cannot
   be satisfied by clearing the result selection or collapsing a multi-set recipe.
@@ -47,7 +47,7 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
   collapse to the first set, NOT a delete.
   `RI↔RC` never deletes (`carry`); it reconciles stale routing.
   Re-running a `carry` migration with no reconcile pending is a no-op (idempotent).
-- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `007-destructive-changes-and-migrations.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
+- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `destructive-changes-and-migrations/spec.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
 
 ## Mode Matrix
 
@@ -70,7 +70,7 @@ The historical macro-as-check-source and the `checkSource: "builtIn"` game-syste
 ## Player-Facing Mode Labels
 
 The `resolutionMode` token is system-internal and must never surface raw in player UI.
-The player-facing Journal screen (see `003-ui-integration.md` *Journal App*) maps each mode to a localized display label through a frozen label-key map (`RunJournalBuilder.MODE_LABEL_KEYS`), resolved against the `FABRICATE.App.Journal.Mode.*` localization keys.
+The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) maps each mode to a localized display label through a frozen label-key map (`RunJournalBuilder.MODE_LABEL_KEYS`), resolved against the `FABRICATE.App.Journal.Mode.*` localization keys.
 
 | Mode                  | Localization key                                 | Player label          |
 |-----------------------|--------------------------------------------------|-----------------------|
@@ -267,7 +267,7 @@ The captured order is retained but ignored.
 ### Semantics
 
 - Player submits ingredient combinations directly instead of selecting a visible recipe.
-- Recipe visibility is **reveal-not-gate** (see `006`): the system's `visibilityMode` selects which source REVEALS a recipe in a non-GM's Known list (`item` = a held book/scroll, `knowledge` = learned, Manual/`restricted` = a per-recipe access grant, `global` = brew-discovery), with brew-discovery unioned across all modes; brewing is NEVER gated by visibility (a matched ingredient signature is the sole brew gate, so a non-GM alchemy recipe is always `craftable`). `learnOnCraft` governs only whether a matched brew records the brew-discovery reveal, never craftability.
+- Recipe visibility is **reveal-not-gate** (see `recipe-visibility/spec.md`): the system's `visibilityMode` selects which source REVEALS a recipe in a non-GM's Known list (`item` = a held book/scroll, `knowledge` = learned, Manual/`restricted` = a per-recipe access grant, `global` = brew-discovery), with brew-discovery unioned across all modes; brewing is NEVER gated by visibility (a matched ingredient signature is the sole brew gate, so a non-GM alchemy recipe is always `craftable`). `learnOnCraft` governs only whether a matched brew records the brew-discovery reveal, never craftability.
 - An alchemy recipe always has EXACTLY ONE ingredient set and is never routed by ingredients.
 - Result-group selection and check-ness are driven by the SYSTEM-level `alchemy.checkMode` (`none` | `simple` | `tiered`), NOT a per-recipe `resultSelection.provider` (retired, issue 554; this supersedes the earlier "alchemy check optional" behaviour):
   - **None** — one ingredient set + one result group, no check; a matched brew always succeeds and produces that group.

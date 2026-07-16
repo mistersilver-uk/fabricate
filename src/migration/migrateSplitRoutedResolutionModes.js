@@ -1,7 +1,7 @@
 /**
  * 1.9.0 — Split the single crafting `routed` resolution mode into the two
  * first-class modes `routedByIngredients` / `routedByCheck` (pure, idempotent,
- * version-gated). Per `007-destructive-changes-and-migrations §Resolution-Model
+ * version-gated). Per `destructive-changes-and-migrations/spec.md §Resolution-Model
  * Migration`, the routing basis is now a property of the system MODE rather than a
  * per-recipe `resultSelection.provider`, so this one-time migration must make the
  * system-level basis decision the read-time normalizer cannot.

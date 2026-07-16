@@ -1,4 +1,4 @@
-# Specification 009: Gathering and Harvesting
+# Gathering and Harvesting
 
 ## Purpose
 
@@ -7,10 +7,10 @@ This spec introduces environmental resource acquisition without introducing a se
 
 Related specifications:
 
-- `003-ui-integration.md` for UI surfaces and workflows
-- `004-resolution-modes.md` for shared routed/progressive concepts
-- `005-recipes-and-steps.md` for recipe and salvage lifecycle
-- `007-destructive-changes-and-migrations.md` for clean-up and destructive-change principles
+- `ui-integration/spec.md` for UI surfaces and workflows
+- `resolution-modes/spec.md` for shared routed/progressive concepts
+- `recipes-and-steps/spec.md` for recipe and salvage lifecycle
+- `destructive-changes-and-migrations/spec.md` for clean-up and destructive-change principles
 
 ## Terminology
 
@@ -22,7 +22,7 @@ Harvesting is not its own feature; it is expressed through recipes or salvage fo
 - **Environment**: a location where gathering occurs.
 An environment defines what can be gathered there and how gathering attempts are resolved.
 
-To avoid collision with `CraftingSystem.resolutionMode` from `004-resolution-modes.md`, this spec uses:
+To avoid collision with `CraftingSystem.resolutionMode` from `resolution-modes/spec.md`, this spec uses:
 
 - **Environment selection mode** for `targeted` vs `blind`
 - **Task resolution mode** for `progressive`, `routed`, or `d100`
@@ -77,7 +77,7 @@ UI copy or GM-provided description/name may still use the verb "harvest" for fla
 
 ## Data Model References
 
-This spec reuses the following structures from `002-data-models.md`:
+This spec reuses the following structures from `data-models/spec.md`:
 
 - `CraftingSystem`
 - `Component`
@@ -1523,7 +1523,7 @@ Resolve ordered gathering results from a numeric check value.
 
 ### Award Modes
 
-Progressive gathering reuses the award semantics from `004-resolution-modes.md`:
+Progressive gathering reuses the award semantics from `resolution-modes/spec.md`:
 
 - `equal`
 - `exceed`
@@ -1822,7 +1822,7 @@ GM-started blind attempts may retain real task/result details for inspection.
 
 ## Destructive Change and Clean-up Rules
 
-This spec follows the principles of `007-destructive-changes-and-migrations.md`.
+This spec follows the principles of `destructive-changes-and-migrations/spec.md`.
 
 ### Delete Environment
 

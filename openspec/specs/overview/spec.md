@@ -1,4 +1,4 @@
-# Specification 001: Project Overview
+# Project Overview
 
 ## Purpose
 
@@ -65,7 +65,7 @@ A crafting system defines:
 - recipe visibility mode
 - a recipe-level result selection provider (`ingredientSet`, `check`) only when mode is `alchemy`; the routed crafting modes derive their routing basis from the system mode and carry no provider
 
-Changing resolution mode is destructive and governed by `007-destructive-changes-and-migrations.md`.
+Changing resolution mode is destructive and governed by `destructive-changes-and-migrations/spec.md`.
 
 ### Resolution Modes
 
@@ -75,18 +75,18 @@ Changing resolution mode is destructive and governed by `007-destructive-changes
 - `progressive`
 - `alchemy`
 
-Mode semantics and validation are defined in `004-resolution-modes.md`.
+Mode semantics and validation are defined in `resolution-modes/spec.md`.
 
 ### Recipes and Steps
 
 Recipes can be implicit single-step or explicit multistep.
-Execution lifecycle semantics are defined in `005-recipes-and-steps.md`.
+Execution lifecycle semantics are defined in `recipes-and-steps/spec.md`.
 
 ### Recipe Visibility and Learning
 
 Visibility and craftability are determined by per-system visibility settings and per-recipe settings.
 Item-based knowledge matching is identity-based and supports direct UUID plus source UUID matching (`_stats.compendiumSource` with legacy `flags.core.sourceId` fallback).
-Behaviour is defined in `006-recipe-visibility.md`.
+Behaviour is defined in `recipe-visibility/spec.md`.
 
 ## Data Flow
 
@@ -132,7 +132,7 @@ Client:
 - `flags.fabricate.learnedRecipes` for learned recipe records
 - `flags.fabricate.discoveredGatheringRealms` for actor-scoped gathering realm discovery (keyed by system then realm)
 
-Clean-up semantics for stale runs/learned records are defined in `007-destructive-changes-and-migrations.md`.
+Clean-up semantics for stale runs/learned records are defined in `destructive-changes-and-migrations/spec.md`.
 
 ## Permissions
 

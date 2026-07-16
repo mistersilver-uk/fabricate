@@ -14,5 +14,3 @@ These files are the single source of truth for Fabricate specifications.
 - `import-export/spec.md`
 - `agentic-workflow/spec.md`
 - `release-and-distribution/spec.md`
-
-Legacy `spec/*.md` paths are compatibility symlinks that point back to these files.

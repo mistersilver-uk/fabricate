@@ -1,4 +1,4 @@
-# Specification 002: Data Models
+# Data Models
 
 ## Purpose
 
@@ -8,11 +8,11 @@ All settings keys in this specification use the literal `fabricate.*` namespace.
 
 Behavioural semantics are defined in:
 
-- `004-resolution-modes.md`
-- `005-recipes-and-steps.md`
-- `006-recipe-visibility.md`
-- `007-destructive-changes-and-migrations.md`
-- `009-gathering-and-harvesting.md`
+- `resolution-modes/spec.md`
+- `recipes-and-steps/spec.md`
+- `recipe-visibility/spec.md`
+- `destructive-changes-and-migrations/spec.md`
+- `gathering-and-harvesting/spec.md`
 
 ## CraftingSystem
 
@@ -23,7 +23,7 @@ CraftingSystem = {
   description?: string,
 
   // System-level invariant for all recipes in this crafting system.
-  // Mode semantics and validation are defined in 004.
+  // Mode semantics and validation are defined in resolution-modes/spec.md.
   resolutionMode: "simple" | "routedByIngredients" | "routedByCheck" | "progressive" | "alchemy",
 
   // Tool-breakage authority for the whole system.
@@ -764,7 +764,7 @@ Recipe = {
   // success outcome tier. When set, a craft whose rolled tier ranks below it (fixed
   // tiers rank by `start`) fails outright. Null/unset = no override (outcome = the
   // rolled tier). Meaningful only for routedByCheck with a fixed-type check; ignored
-  // otherwise. Semantics in 004.
+  // otherwise. Semantics in resolution-modes/spec.md.
   minSuccessOutcomeId?: string | null,
 
   // Per-recipe access grants for the `restricted` visibility mode (issue 511, PR-B).
@@ -813,7 +813,7 @@ Recipe = {
    Issue 554 retired the per-recipe `resultSelection.provider`, so `Recipe._validateRoutedResultSelection` no longer governs alchemy name-uniqueness.
    `routedByCheck` `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, a per-mode reference-integrity check that always applies), independent of this persistence gate.
    Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
-3. Resolution-mode constraints are defined in `004-resolution-modes.md`.
+3. Resolution-mode constraints are defined in `resolution-modes/spec.md`.
 4. `resultSelection.provider` is RETIRED for alchemy (issue 554): alchemy routes on the SYSTEM-level `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`), not a per-recipe provider.
    The 1.14.0 migration strips `resultSelection` from every alchemy recipe.
    No live mode reads `resultSelection`: `routedByIngredients` routes by `IngredientSet.resultGroupId` and `routedByCheck` routes by `ResultGroup.name`/`checkOutcomeIds` against the system routed check, and alchemy routes per its `checkMode`.
@@ -824,7 +824,7 @@ Recipe = {
 6. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
 7. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
-8. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
+8. If `transferEffects` is true and essences are enabled, transfer behaviour follows `recipes-and-steps/spec.md`.
 9. `access` is the canonical per-recipe grant for `restricted` visibility mode (issue 511, PR-B): `access.characterIds` grants named player-characters and `access.playerIds` grants named players.
 Each normalizes to a deduped list of non-empty id strings (non-string entries are dropped).
 When both lists are empty, the player grants are read-forward once from the legacy `visibility.allowedUserIds`, so a pre-`access` recipe keeps showing to the same players after the runtime switches to reading `access`.
@@ -835,7 +835,7 @@ The legacy `visibility` block is retained on read as the `access` read-forward s
 The legacy scalar `recipeItemId` requirements below still hold for un-migrated systems that resolve membership through the reverse-ref fallback.
 11. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
 12. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition.originItemUuid` is stale or no longer resolves, validation must warn.
-13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `004`); it defaults to `null`.
+13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
 It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
 An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
 
@@ -1456,7 +1456,7 @@ Requirements:
 2. `history` contains only terminal gathering runs (`succeeded`, `failed`, `cancelled`).
 3. When a gathering run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. Within one actor's `gatheringRuns.active`, at most one active run may exist for a given `taskId`.
-5. Detailed `GatheringRun` shape and lifecycle semantics are defined in `009-gathering-and-harvesting.md`.
+5. Detailed `GatheringRun` shape and lifecycle semantics are defined in `gathering-and-harvesting/spec.md`.
 
 ### Learned Recipes Flag
 
@@ -1524,7 +1524,7 @@ Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and ever
 
 ### Purpose
 
-Define the unified, UI-safe projection the player-facing Journal screen reads (see `003-ui-integration.md` *Journal App*).
+Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-integration/spec.md` *Journal App*).
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see *CraftingRun* / *CraftingRunStepState*), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
@@ -1627,9 +1627,9 @@ StepModel = {
    `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
 5. **`manualAdvance` is the Trigger Next Step gate.**
-   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
+   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `recipes-and-steps/spec.md` (*Run Progression — Player-Initiated Advance*).
 6. **`resolutionModeLabel` uses the player-facing label map.**
-   It resolves through the localized mode-label map defined in `004-resolution-modes.md` (*Player-Facing Mode Labels*) and never emits the raw `resolutionMode` token.
+   It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (*Player-Facing Mode Labels*) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**
    It is the count of active (non-terminal) runs the Journal navigation surfaces as its active-run count badge.
 
@@ -1941,7 +1941,7 @@ The same outcome-name normalization the provider routing applies (engine-evaluat
    - miss-family compatibility aliases: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
    - hazard-family compatibility aliases: `hazard`, `danger`, `complication`, `trap`, `oops`
 4. If the normalized `outcome` matches a reserved failure keyword, it does not route to a result group and is treated as failure.
-5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules (explicit `checkOutcomeIds` tier assignment wins first; see `004-resolution-modes.md`).
+5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules (explicit `checkOutcomeIds` tier assignment wins first; see `resolution-modes/spec.md`).
 6. If a non-reserved `outcome` does not match any `ResultGroup.name`, classify as crafting-system misconfiguration error.
 
 ### Property Macro Contract
@@ -1980,10 +1980,10 @@ A step failure is handled entirely by the engine's failure-consumption policy; t
 
 ## Behavioural Ownership
 
-- Resolution mode semantics and mode validation: `004-resolution-modes.md`
-- Recipe and step execution semantics: `005-recipes-and-steps.md`
-- Recipe visibility and learning semantics: `006-recipe-visibility.md`
-- Destructive changes and clean-up semantics: `007-destructive-changes-and-migrations.md`
+- Resolution mode semantics and mode validation: `resolution-modes/spec.md`
+- Recipe and step execution semantics: `recipes-and-steps/spec.md`
+- Recipe visibility and learning semantics: `recipe-visibility/spec.md`
+- Destructive changes and clean-up semantics: `destructive-changes-and-migrations/spec.md`
 
 ## Canonical-Write and Legacy-Read Compatibility Policy
 
