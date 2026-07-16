@@ -422,8 +422,13 @@ class Fabricate {
     // Create managers
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
-    this.craftingRunManager = new CraftingRunManager();
-    this.salvageRunManager = new SalvageRunManager();
+    // Wire the real primary-GM check into the timed world-time resume paths (issue
+    // 656). Both managers default `isPrimaryGM` to `() => true` (fail-open, so unit
+    // fixtures resume), so passing the real `activeGM` check here is load-bearing —
+    // it gates the synced-hook `setFlag` writes to exactly one client.
+    const isPrimaryGM = () => game.users?.activeGM?.id === game.user?.id;
+    this.craftingRunManager = new CraftingRunManager({ isPrimaryGM });
+    this.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
     this.gatheringRunManager = new GatheringRunManager();
     this.gatheringGateAndCheckEvaluator = new GatheringGateAndCheckEvaluator({
       evaluateExpression: evaluateGatheringExpression
@@ -608,6 +613,13 @@ class Fabricate {
    * Run versioned startup data migrations via MigrationRunner.
    */
   async _runMigrations() {
+    // Primary-GM only, so exactly one client runs the migration pass in a multi-GM
+    // world and no player/assistant races the world-scoped setting writes. `isGM` is
+    // true for assistant GMs too (they hold SETTINGS_MODIFY), so an `isGM` gate would
+    // let the full GM AND every assistant transform-and-write concurrently
+    // (last-writer-wins); `activeGM` fires on exactly one client. Mirrors the
+    // primary-GM startup writers below (runRecipeItemFlagAutoStamp et al.).
+    if (game.users?.activeGM?.id !== game.user?.id) return;
     const runner = new MigrationRunner({
       getSetting,
       setSetting,

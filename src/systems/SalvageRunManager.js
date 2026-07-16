@@ -10,8 +10,20 @@ const HISTORY_LIMIT = 50;
  * Manages actor-scoped salvage runs (active + history).
  */
 export class SalvageRunManager {
-  constructor() {
+  /**
+   * @param {object} [deps]
+   * @param {() => boolean} [deps.isPrimaryGM] Primary-GM gate for the timed
+   *   world-time resume path (issue 656). `processWorldTime` runs off the synced
+   *   `updateWorldTime` hook, so without this every connected client resumes a
+   *   maturing run and races the broadcast `setFlag` write. The default `() => true`
+   *   is intentional: unit fixtures build no `activeGM` and must still resume, and
+   *   the immediate `CraftingEngine.salvage()` path never routes through here. Because
+   *   the default fails OPEN, the real `game.users.activeGM?.id === game.user?.id`
+   *   check is WIRED at construction in `main.js` — that wiring is load-bearing.
+   */
+  constructor({ isPrimaryGM = () => true } = {}) {
     this._cache = new Map(); // actorId -> container
+    this._isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
   }
 
   _normalizeContainer(raw = {}) {
@@ -229,6 +241,14 @@ export class SalvageRunManager {
   }
 
   async processWorldTime(worldTime = this._nowWorldTime(), onReadyRun = null) {
+    // Timed resume only (issue 656): this is the exclusively timed path (callers are
+    // CraftingEngine.processPendingSalvageRuns and startup processFabricateWorldTime),
+    // driven from the synced updateWorldTime hook. Gate to the primary GM so exactly
+    // one client resumes maturing runs and persists the broadcast setFlag write.
+    // Immediate CraftingEngine.salvage() never routes here, so it stays on the acting
+    // client. If only players are online the resume defers until the primary GM
+    // connects and its startup pass catches up any matured run.
+    if (this._isPrimaryGM() !== true) return;
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);
       let dirty = false;
