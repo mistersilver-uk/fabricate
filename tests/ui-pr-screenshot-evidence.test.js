@@ -92,10 +92,14 @@ describe('UI PR screenshot evidence', () => {
       [
         'player-crafting',
         'player-crafting-stacked',
-        // The progressive stage list (issue 651) publishes three distinct states;
-        // `collect` emits one file per view id, so each needs its own entry or only the
-        // alphabetically-first frame would ever reach the PR.
+        // The progressive stage list (issue 651) publishes four distinct states;
+        // `collect` emits one file per view id and picks `candidates[0]` from an array
+        // sorted by FILENAME — it does NOT honour smokeLabels order — so each state needs
+        // its own entry or only the lowest-numbered frame would ever reach the PR.
         'player-crafting-progressive',
+        // The reordered state is the load-bearing frame: at rest the thresholds ascend by
+        // construction and the live region is empty, so both checks are vacuous there.
+        'player-crafting-progressive-reordered',
         'player-crafting-progressive-fixed',
         'player-crafting-progressive-stacked',
       ]
@@ -108,15 +112,17 @@ describe('UI PR screenshot evidence', () => {
       'player-crafting-run-summary',
     ]);
     assert.deepEqual(views[1].smokeLabels, ['player-crafting-stacked']);
-    // The reordered frame is listed first deliberately: it is the only state whose live
-    // region carries text and whose thresholds have been recomputed, so it is the better
-    // primary evidence for a crafting change.
-    assert.deepEqual(views[2].smokeLabels, [
-      'player-crafting-progressive-reordered',
-      'player-crafting-progressive',
-    ]);
-    assert.deepEqual(views[3].smokeLabels, ['player-crafting-progressive-fixed']);
-    assert.deepEqual(views[4].smokeLabels, ['player-crafting-progressive-stacked']);
+    // One label per progressive view, and the reordered state is its OWN view rather than
+    // a preferred label on the resting one. Listing both on one view does NOT work:
+    // `collect` picks `candidates[0]` from an array sorted by FILENAME and never consults
+    // smokeLabels order, so the lower-numbered resting frame won and the reordered frame
+    // — the only one where the thresholds must have been recomputed and the live region
+    // must have text to hide — never reached the PR. The earlier arrangement asserted
+    // that intent here and passed while publishing the wrong frame.
+    assert.deepEqual(views[2].smokeLabels, ['player-crafting-progressive']);
+    assert.deepEqual(views[3].smokeLabels, ['player-crafting-progressive-reordered']);
+    assert.deepEqual(views[4].smokeLabels, ['player-crafting-progressive-fixed']);
+    assert.deepEqual(views[5].smokeLabels, ['player-crafting-progressive-stacked']);
   });
 
   it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {
