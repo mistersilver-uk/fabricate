@@ -117,6 +117,34 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.ok(root.querySelector('[data-recipe-item-rules]'), 'effective rules render');
   });
 
+  // AC13 (issue 675). The preview renders the REAL player component, so the split that
+  // added the salvage surface had to leave it routing to the BOOK body. A book is never
+  // salvageable, so the salvage tree is in the module graph but never in the render.
+  it('AC13: the preview renders the real player book detail and NEVER a salvage tab', async () => {
+    const root = await harness.mount({
+      recipeItem: draft(),
+      linkedItem: LINKED_ITEM,
+      linkedRecipes: LINKED_RECIPES,
+      activeTab: 'overview',
+      visibilityMode: 'item',
+    });
+    const preview = root.querySelector('[data-recipe-item-preview]');
+    assert.ok(
+      preview.querySelector('[data-inventory-recipe-item]'),
+      'still the real player book detail, not a re-implementation'
+    );
+    assert.equal(
+      preview.querySelector('[data-inventory-detail-tab="salvage"]'),
+      null,
+      'no Info | Salvage strip'
+    );
+    assert.equal(
+      preview.querySelector('[data-inventory-salvage-panel]'),
+      null,
+      'and no salvage panel'
+    );
+  });
+
   it('switches the rendered tab with the activeTab prop', async () => {
     const root = await harness.mount({
       recipeItem: draft(),
