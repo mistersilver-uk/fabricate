@@ -40,6 +40,10 @@ import {
   evaluateSmokeOutcome,
   isTransientPageTeardown
 } from './lib/foundrySmokeSignal.js';
+import {
+  assertExpectedSelectorsPresent,
+  expectedSelectorsForManagerSurface
+} from './lib/managerLayoutGuards.js';
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being
 // killed while a final screenshot click is still in flight) can leave a FLOATING page
@@ -964,6 +968,13 @@ async function assertManagerLayoutStable(page, label) {
   if (overflowing.length > 0) {
     throw new Error(`Manager horizontal overflow at ${label}: ${JSON.stringify(overflowing.slice(0, 5))}`);
   }
+
+  // Fail LOUD when a per-surface critical class is renamed/removed: the overflow
+  // pass above only measures what it FINDS, so a selector that matches nothing is
+  // silently uncovered. `expected` is the pinned critical selector(s) this exact
+  // surface must render (empty for surfaces with no stable row/edit-form marker,
+  // which still rely on the global row/edit-form backstop below).
+  assertExpectedSelectorsPresent(metrics, expectedSelectorsForManagerSurface(label), label);
 
   const rowCount = metrics.filter(metric =>
     metric.selector === '.manager-system-row'
