@@ -39,6 +39,10 @@ const harness = createMountedComponentHarness({
     // The salvage DC control's pure option model (issue 676). Import-free leaf.
     'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // The identity strip's drop target + its portaled overflow menu (issue 676).
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
   ],
   // ToggleCard is rendered by the salvage block; a component the tree renders but the
   // harness does not list HANGS the suite (# cancelled) rather than failing it. The
@@ -46,6 +50,8 @@ const harness = createMountedComponentHarness({
   // from the temp tree but only compiles what `compiledModules` names.
   compiledModules: [
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',

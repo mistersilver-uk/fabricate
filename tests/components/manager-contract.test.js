@@ -1189,6 +1189,36 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!rootSource.includes('stale source'), 'components browser should not invent source freshness labels');
   });
 
+  it('AC14: confirmComponentRouteExit retains NO component-edit bypass (issue 676)', () => {
+    // LOAD-BEARING ASYMMETRY. `confirmComponentRouteExit` deliberately LACKS the
+    // `|| nextView === '<kind>-edit'` bypass its recipe and environment siblings carry
+    // (`confirmRecipeRouteExit`: `if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;`).
+    //
+    // That omission is exactly what makes `editComponent` guard component -> component
+    // navigation — i.e. it is what makes the salvage "Edit ↗" deep link safe. An
+    // implementer told to "mirror the Recipe Studio" copies the bypass and silently
+    // discards a dirty draft on a deep-link jump, with nothing failing.
+    const guard = rootSource.slice(
+      rootSource.indexOf('function confirmComponentRouteExit'),
+      rootSource.indexOf('function confirmEnvironmentRouteExit')
+    );
+    assert.ok(guard.length > 0, 'expected to locate confirmComponentRouteExit');
+    assert.ok(
+      guard.includes("if (activeView !== 'component-edit') return true;"),
+      'the component route guard should short-circuit only on the ACTIVE view'
+    );
+    assert.ok(
+      !guard.includes("nextView === 'component-edit'"),
+      'the component route guard must NOT gain the recipe/environment nextView bypass'
+    );
+    // The sibling that DOES carry it, pinned so this test cannot pass vacuously by the
+    // bypass string simply having been renamed everywhere.
+    assert.ok(
+      rootSource.includes("if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;"),
+      'the recipe sibling still carries the bypass this one deliberately omits'
+    );
+  });
+
   it('routes the components row Edit action through the in-manager component-edit view', () => {
     assert.ok(
       rootSource.includes("activeView = 'component-edit'"),

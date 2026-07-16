@@ -3225,6 +3225,29 @@
   padding: var(--fab-space-2) var(--fab-space-3);
 }
 
+/* Close the Foundry BLEED on the Component Studio's own roles (issue 676).
+   `.manager-search input`, `.manager-button` and `.manager-system-name` carry no base
+   font-size — only `.manager-recipe-toolbar` scopes its own — so these controls were
+   inheriting Foundry's 14px `.application` base rather than the design's ~12.5px. That
+   is the same defect the Recipe Studio's `.manager-nav-label` once had, and it is what
+   `component-studio-font-size.test.js` pins: a studio role computing to 14 means its
+   rule stopped applying.
+
+   Scoped to the two Component Studio routes so six other manager surfaces keep their
+   established type untouched. */
+.fabricate-manager[data-manager-view="components"] .manager-search input,
+.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button,
+.fabricate-manager[data-manager-view="component-edit"] .manager-toolbar .manager-button {
+  font-size: var(--fab-recipe-control-font);
+}
+
+/* The row name is the prototype's serif display face at ~13.5px; the shared
+   `.manager-system-name` has no base size, so it bled to 14 too. */
+.fabricate-manager .manager-component-row .manager-system-name {
+  font-family: var(--fab-font-serif);
+  font-size: 0.76rem;
+}
+
 .fabricate-manager .manager-component-difficulty-badge {
   font-variant-numeric: tabular-nums;
 }
@@ -12591,6 +12614,49 @@
   min-width: 0;
   padding: var(--fab-space-3);
   overflow: auto;
+}
+
+/* The identity strip (issue 676): the source actions rehomed out of the deleted right
+   rail into the single scrolling column. Its heading row carries the overflow trigger,
+   so it needs the heading and the kebab on one line. */
+.fabricate-manager .manager-component-identity-strip .manager-task-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-component-identity-fields {
+  display: grid;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* The 186px drop target wraps UNDER the identity text rather than compressing beside
+   it: the manager runs on container queries at 1320/1120/960/680px and the smoke
+   harness photographs a stacked component surface whether or not it is designed. */
+.fabricate-manager .manager-component-source-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-source-linked,
+.fabricate-manager .manager-component-source-drop-target {
+  flex: 1 1 186px;
+  min-width: 0;
+}
+
+/* Foundry's button reset: a custom-content `<button>` inherits core's fixed height and
+   centred content, which crops taller children and centres the label. The overflow
+   trigger is one. */
+.fabricate-manager .manager-component-overflow-trigger {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: var(--fab-v2-icon-button);
+  justify-content: center;
+  line-height: normal;
 }
 
 /* The component identity name + description mirror the recipe identity layout but

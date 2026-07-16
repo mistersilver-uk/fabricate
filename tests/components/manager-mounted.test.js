@@ -54,9 +54,15 @@ function compileManagerRoot() {
   // Omitting it here HANGS every mounted manager test rather than failing one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToggleCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentDifficultyInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+  // The Component Studio EDITOR's own components (issue 676). They live under
+  // `component/` — NOT `components/`, which is the BROWSER's dir; the screenshot
+  // evidence map globs the two separately. ComponentSourceInspector and
+  // ComponentDifficultyInspector are gone: decision 4 removed the right rail, and both
+  // rehomed into the single scrolling column.
+  for (const componentEditorPart of ['ComponentEditorHeader', 'ComponentIdentityStrip']) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/component/${componentEditorPart}.svelte`);
+  }
   // The library's row, extracted out of the browser (issue 676). It lives under
   // `components/` — NOT `component/`, which the screenshot map globs for the EDITOR.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
@@ -5122,11 +5128,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-component-edit-section="identity"]'),
       'Identity card should render in the editor'
     );
+    // Issue 676: there is NO right rail. Both hooks survive the rebuild inside the
+    // single scrolling column's identity strip — `scripts/foundry-test-run.mjs`
+    // hard-waits on each, and the "source" wait aborts Phase D0 before every
+    // downstream frame.
     assert.ok(
       target.querySelector('[data-component-edit-section="source"]'),
-      'Linked Source Item card should render in the right column'
+      'the source block renders inside the identity strip, not a rail inspector'
+    );
+    assert.equal(
+      target.querySelector('.manager-inspector .manager-inspector-card'),
+      null,
+      'the component editor renders no right-rail inspector card'
     );
 
+    // AC3: open-sheet stays ON THE SOURCE NAME — the common action keeps its
+    // affordance rather than being buried in the kebab.
     target.querySelector('[data-component-edit-action="open-source"]').click();
     flushSync();
     assert.deepEqual(
@@ -5135,7 +5152,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       'Open Source Item should call onOpenSource with the stored UUID'
     );
 
-    target.querySelector('[data-component-edit-action="unlink-source"]').click();
+    // AC3: unlink lives in the OVERFLOW (rare + destructive — what a kebab is for), so
+    // it must be opened first. The menu is portaled to the `.fabricate-manager` host to
+    // escape the scrolling column's `overflow: hidden`, so query from the root, not the
+    // strip. Options are addressed by their label: SearchablePopover is a shared
+    // component and gives options no per-caller data hook.
+    const overflowOption = (label) =>
+      Array.from(root.querySelectorAll('.manager-travel-option')).find((button) =>
+        button.textContent.includes(label)
+      );
+
+    target.querySelector('.manager-component-overflow-trigger').click();
+    await tick();
+    flushSync();
+    assert.ok(overflowOption('Copy source UUID'), 'the overflow carries Copy source UUID');
+    overflowOption('Unlink Source Item').click();
     flushSync();
     assert.deepEqual(
       unlinked,

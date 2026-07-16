@@ -119,8 +119,13 @@ test('a summarised record with count 0 counts as missing', () => {
 
 test('expectedSelectorsForManagerSurface returns the pinned selectors for a mapped label', () => {
   assert.deepEqual(expectedSelectorsForManagerSurface('recipes normal'), ['.manager-recipe-row']);
+  // Issue 676: the component editor is a single scrolling column with no rail. Both the
+  // form the header's Save submits BY ID and the identity strip that owns the rehomed
+  // source actions are pinned — losing either is a silent break the unit suite cannot
+  // see, because it only surfaces in the serialized smoke run.
   assert.deepEqual(expectedSelectorsForManagerSurface('component edit normal'), [
     '.manager-component-edit-view',
+    '.manager-component-identity-strip',
   ]);
 });
 

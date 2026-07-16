@@ -26,8 +26,7 @@
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
-  import ComponentSourceInspector from './ComponentSourceInspector.svelte';
-  import ComponentDifficultyInspector from './ComponentDifficultyInspector.svelte';
+  import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -4571,17 +4570,16 @@
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
       {:else if currentView === 'component-edit'}
-        {#if componentEditCombinedDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button" onclick={cancelComponentEdit} disabled={componentEditSaving}>
-          <i class="fas fa-times" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Component.Cancel', 'Cancel')}</span>
-        </button>
-        <button type="submit" form="manager-component-edit-form" class="manager-button is-primary" disabled={!canSaveComponentEdit}>
-          <i class={componentEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{componentEditSaveLabel()}</span>
-        </button>
+        <ComponentEditorHeader
+          dirty={componentEditCombinedDirty}
+          saving={componentEditSaving}
+          canSave={canSaveComponentEdit}
+          formId="manager-component-edit-form"
+          dirtyLabel={text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}
+          backLabel={text('FABRICATE.Admin.Manager.Component.Back', 'Back')}
+          saveLabel={componentEditSaveLabel()}
+          onBack={backToComponentsBrowse}
+        />
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
@@ -5197,7 +5195,15 @@
         {salvageCheckDc}
         componentOptions={salvageComponentOptions}
         saving={componentEditSaving}
+        showDifficulty={componentDifficultyShown}
+        difficulty={componentDifficultyDraft}
+        onDifficultyChange={(value) => stageComponentDifficulty(value)}
+        onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
+        onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
+        onOpenSource={(uuid) => openComponentSource(uuid)}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
         onManageCheckPresets={openSalvageCheckPresets}
+        onOpenComponent={(componentId) => editComponent(componentId)}
         onSave={saveComponentEdit}
         onDirtyChange={(dirty) => { componentEditDirty = dirty; }}
         onDraftChange={handleComponentDraftChange}
@@ -6884,29 +6890,10 @@
           </div>
         {/if}
       {:else if currentView === 'component-edit'}
-        {#if componentForEdit}
-          <ComponentSourceInspector
-            component={componentForEdit}
-            onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
-            onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
-            onOpenSource={(uuid) => openComponentSource(uuid)}
-            onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-          />
-          {#if componentDifficultyShown}
-            <ComponentDifficultyInspector
-              value={componentDifficultyDraft}
-              saving={componentEditSaving}
-              onChange={(value) => stageComponentDifficulty(value)}
-            />
-          {/if}
-        {:else}
-          <section class="manager-inspector-card">
-            <div class="manager-inspector-copy">
-              <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h2>
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}</p>
-            </div>
-          </section>
-        {/if}
+        <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single
+             scrolling column: the source actions rehomed into the identity strip and
+             the progressive-difficulty control into the body, both inside
+             ComponentEditView. Nothing was lost — see ComponentIdentityStrip. -->
       {:else if currentView === 'recipe-edit'}
         <RecipeContextRail
           recipe={recipeDraft}

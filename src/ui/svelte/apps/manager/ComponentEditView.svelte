@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
+  import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
@@ -41,10 +42,28 @@
     salvageCheckDc = 0,
     componentOptions = [],
     saving = false,
+    // Progressive difficulty, rehomed out of the deleted right-rail inspector into the
+    // body (decision 4). It is STAGED, not written on change: the value lives in the
+    // manager root's `componentDifficultyDraft` and persists with the rest of the
+    // editor on Save. It is a SIBLING of `salvage`, not part of `updates.salvage`.
+    showDifficulty = false,
+    difficulty = null,
+    onDifficultyChange = () => {},
+    // Source actions. Delegated straight through to the store's services — they COMMIT
+    // IMMEDIATELY and are never staged (see ComponentIdentityStrip's header note).
+    onReplaceSource = () => {},
+    onUnlinkSource = () => {},
+    onOpenSource = () => {},
+    onCopySourceUuid = () => {},
     onSave = () => {},
     onDirtyChange = () => {},
     onDraftChange = () => {},
-    onManageCheckPresets = () => {}
+    onManageCheckPresets = () => {},
+    // "Edit ↗" on a progressive salvage result row: opens the referenced YIELD
+    // component's editor. The root wires this to `editComponent(otherId)`, which routes
+    // through confirmRouteExit — NOT `setView('component-edit')`, which no-ops without
+    // a selectedSystem and would prompt the discard dialog then change nothing.
+    onOpenComponent = () => {}
   } = $props();
 
   let tagDraft = $state([]);
@@ -120,6 +139,21 @@
 
   function setCategory(value) {
     categoryDraft = normalizeComponentCategory(value);
+  }
+
+  // Blank when unset; otherwise the staged number. Read straight off the prop — the
+  // draft itself lives in the manager root, so there is nothing to seed here.
+  const difficultyInputValue = $derived(difficulty === null || difficulty === undefined ? '' : difficulty);
+
+  // Stage on input so the editor's dirty state and Save button track edits live. Blank
+  // / sub-1 / non-integer / invalid stages null (cleared); a valid value stages the
+  // truncated integer. Final coercion also happens on Save.
+  function handleDifficultyInput(raw) {
+    const trimmed = String(raw ?? '').trim();
+    const parsed = Number(trimmed);
+    onDifficultyChange(
+      trimmed === '' || !Number.isFinite(parsed) || parsed < 1 ? null : Math.trunc(parsed)
+    );
   }
 
   function cloneTagOptions(options = []) {
@@ -525,44 +559,19 @@
     class="manager-component-edit-view"
     onsubmit={handleSave}
   >
-    <section class="manager-task-core-card" data-component-edit-section="identity">
-      <div class="manager-task-card-heading">
-        <div>
-          <h3>{text('FABRICATE.Admin.Manager.Component.Identity.Title', 'Identity')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Identity.SourceBackedHint', 'This component is backed by a Foundry item. Changes to its source item’s name, image, or description will be reflected here.')}</p>
-        </div>
-      </div>
-      <div class="manager-task-core-grid">
-        <div class="manager-task-media-column">
-          <span
-            class="manager-task-image-picker is-source-linked"
-            data-component-locked-image
-            title={text('FABRICATE.Admin.Manager.Component.Identity.SourceLockedImageTooltip', "This image comes from the linked Foundry item and can't be edited here.")}
-            aria-label={text('FABRICATE.Admin.Manager.Component.Identity.SourceLockedImage', 'Image provided by the linked Foundry item')}
-          >
-            <img src={componentImage(component)} alt="" />
-            <i class="fas fa-lock" aria-hidden="true"></i>
-          </span>
-        </div>
-        <div class="manager-task-identity-fields">
-          <div class="manager-field manager-component-readonly-field">
-            <span class="manager-component-readonly-label">
-              <i class="fas fa-lock" aria-hidden="true" title={text('FABRICATE.Admin.Manager.Component.Identity.LockedFieldTooltip', "Provided by the linked Foundry item and can't be edited here.")}></i>
-              <span>{text('FABRICATE.Admin.Manager.Component.Identity.NameLabel', 'Name')}</span>
-            </span>
-            <p class="manager-component-readonly-value" data-component-edit-field="name">{component?.name || '—'}</p>
-          </div>
-
-          <div class="manager-field manager-component-readonly-field">
-            <span class="manager-component-readonly-label">
-              <i class="fas fa-lock" aria-hidden="true" title={text('FABRICATE.Admin.Manager.Component.Identity.LockedFieldTooltip', "Provided by the linked Foundry item and can't be edited here.")}></i>
-              <span>{text('FABRICATE.Admin.Manager.Component.Identity.DescriptionLabel', 'Description')}</span>
-            </span>
-            <p class="manager-component-readonly-value is-multiline" data-component-edit-field="description">{component?.description || '—'}</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- Source actions delegate straight through and COMMIT IMMEDIATELY; they never
+         enter isDirty()/draftSignature/buildUpdates(). See the strip's header note:
+         routing a source swap through `updateItem` would skip the durable-identity
+         restamping and strand `flags.fabricate.roles[systemId].componentId` on the OLD
+         item, with no test failing. -->
+    <ComponentIdentityStrip
+      {component}
+      {saving}
+      {onReplaceSource}
+      {onUnlinkSource}
+      {onOpenSource}
+      {onCopySourceUuid}
+    />
 
     <section class="manager-task-core-card" data-component-edit-section="category">
       <div class="manager-task-card-heading">
@@ -587,6 +596,40 @@
         </select>
       </label>
     </section>
+
+    {#if showDifficulty}
+      <!-- Rehomed out of the deleted right-rail inspector (decision 4, "nothing may be
+           lost"). `data-component-edit-section="difficulty"` is PRESERVED VERBATIM:
+           `scripts/foundry-test-run.mjs` locates `[data-component-edit-section="difficulty"] input`
+           and fills it, and that step is not waivable.
+
+           STAGED, not written on change — the value rides the editor's draft and
+           persists on Save, so it contributes to the dirty state and the exit guard.
+           It is a SIBLING of `salvage`, never part of `updates.salvage`. -->
+      <section class="manager-task-core-card" data-component-edit-section="difficulty">
+        <div class="manager-task-card-heading">
+          <div>
+            <h3>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyHint', 'Cost spent against the crafting roll in progressive mode. Whole number, 1 or greater; leave blank to clear. Saved with the editor.')}</p>
+          </div>
+        </div>
+        <label class="manager-field">
+          <span>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyLabel', 'Difficulty value')}</span>
+          <input
+            type="number"
+            min="1"
+            max="35"
+            step="1"
+            class="manager-input"
+            value={difficultyInputValue}
+            placeholder={text('FABRICATE.Admin.Manager.Component.NoDifficulty', 'No difficulty')}
+            aria-label={text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyLabel', 'Difficulty value')}
+            disabled={saving}
+            oninput={(event) => handleDifficultyInput(event.currentTarget.value)}
+          />
+        </label>
+      </section>
+    {/if}
 
     {#if showTags}
       <section class="manager-task-core-card" data-component-edit-section="tags">
@@ -831,6 +874,25 @@
                                 ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset', 'No difficulty')
                                 : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.Difficulty', 'Difficulty')} ${salvageResultDifficulty(result.componentId)}`}</span>
                             </span>
+                          {/if}
+                          {#if salvageProgressive && result.componentId}
+                            <!-- Opens the referenced YIELD component's editor — the
+                                 IN-MANAGER component-edit view, not the standalone
+                                 SvelteComponentEditorApp window. Component -> component
+                                 navigation is guarded (confirmComponentRouteExit
+                                 deliberately has no component-edit bypass), so a dirty
+                                 draft prompts rather than being discarded. -->
+                            <button
+                              type="button"
+                              class="manager-icon-button"
+                              data-salvage-result-edit={result.componentId}
+                              aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult', 'Edit {name}').replace('{name}', salvageComponentName(result.componentId))}
+                              title={text('FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult', 'Edit {name}').replace('{name}', salvageComponentName(result.componentId))}
+                              onclick={() => onOpenComponent(result.componentId)}
+                              disabled={saving}
+                            >
+                              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                            </button>
                           {/if}
                           <input
                             type="number"

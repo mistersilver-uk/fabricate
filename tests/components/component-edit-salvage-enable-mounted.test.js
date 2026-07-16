@@ -32,9 +32,17 @@ const harness = createMountedComponentHarness({
     'src/utils/componentCategories.js',
     'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // The identity strip's drop target + its portaled overflow menu.
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
   ],
+  // A `.svelte` the tree RENDERS but this list omits does not fail — it HANGS, and is
+  // reported as `# cancelled`, never `# fail`.
   compiledModules: [
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',

@@ -61,38 +61,55 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/config\/currency(?:Presets|Providers)\.js$/,
     ],
   },
+  // The Component Studio (issue 676). Two dirs, deliberately distinct: `components/`
+  // is the BROWSER's, `component/` is the EDITOR's — mirroring the Recipe Studio's
+  // `recipes/` vs `recipe/` split.
   {
     id: 'manager-components',
     label: 'Manager components browser',
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+      /^src\/utils\/componentBrowserModel\.js$/,
+    ],
   },
   {
     id: 'manager-components-progressive',
-    label: 'Manager components browser — progressive difficulty column (value + None)',
+    label: 'Manager components browser — progressive difficulty badge (value + None)',
     smokeLabels: ['manager-components-progressive'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+    ],
   },
   {
     id: 'manager-component-edit',
-    label: 'Manager component editor (identity card + linked-source inspector)',
+    label: 'Manager component editor (single column: identity strip + category, no rail)',
     smokeLabels: ['manager-component-edit-normal'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentSourceInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/.+\.svelte$/,
     ],
   },
   {
     id: 'manager-component-edit-difficulty',
-    label: 'Manager component editor — staged progressive difficulty card',
+    label: 'Manager component editor — staged progressive difficulty control',
     smokeLabels: ['manager-component-edit-difficulty'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentDifficultyInspector\.svelte$/],
+    // The difficulty control rehomed from the deleted ComponentDifficultyInspector
+    // into ComponentEditView's body. This entry used to name ONLY that inspector — so
+    // after its deletion it would have matched nothing forever, silently, all green.
+    // That is the exact drift `every matches entry resolves to a real path` now pins.
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   },
   {
     id: 'manager-component-edit-salvage',
-    label: 'Manager component editor — salvage authoring (result groups, routing, DC override)',
+    label: 'Manager component editor — salvage authoring (enable toggle, result groups, routing, DC presets)',
     smokeLabels: ['manager-component-edit-salvage'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/salvageDcPresets\.js$/,
+    ],
   },
   {
     id: 'manager-checks-gathering',

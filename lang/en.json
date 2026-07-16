@@ -2120,6 +2120,7 @@
             "RemoveGroup": "Remove result group",
             "ResultComponent": "Result component",
             "SelectComponent": "Select a component",
+            "EditResult": "Edit {name}",
             "Difficulty": "Difficulty",
             "DifficultyUnset": "No difficulty",
             "ResultQuantity": "Quantity for {name}",
@@ -2184,7 +2185,8 @@
             "Title": "Identity",
             "NameLabel": "Name",
             "DescriptionLabel": "Description",
-            "SourceBackedHint": "This component is backed by a Foundry item. Changes to its source item's name, image, or description will be reflected here.",
+            "SourceBackedHint": "This component is backed by a Foundry item. Changes to its source item’s name, image, or description will be reflected here.",
+            "UnlinkedHint": "This component has no linked Foundry item, so it has no name, image or description to follow. Drop one below to link it.",
             "SourceLockedImage": "Image provided by the linked Foundry item",
             "SourceLockedImageTooltip": "This image comes from the linked Foundry item and can't be edited here.",
             "LockedFieldTooltip": "Provided by the linked Foundry item and can't be edited here."
@@ -2214,6 +2216,8 @@
             "Hint": "Set how much of each essence this component contributes.",
             "NoEssences": "No essences are defined for this system yet."
           },
+          "Back": "Back",
+          "SourceActions": "Source actions",
           "Category": {
             "Title": "Category",
             "Hint": "Group this component in the component directory. Component categories are separate from recipe categories.",

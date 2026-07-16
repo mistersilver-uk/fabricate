@@ -1,7 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
@@ -471,6 +479,61 @@ describe('UI PR screenshot evidence', () => {
         assert.ok(emitted.has(label), `${recipe.id} references smoke label '${label}' not emitted by the harness`);
       }
     }
+  });
+
+  it('keeps every matches entry resolving to a real repo path (issue 676)', () => {
+    // NOTHING asserted this before, and the gap is silent-by-construction: a recipe
+    // whose `matches` names a DELETED file simply matches nothing, forever, all green.
+    // `manager-component-edit-difficulty` matched ONLY ComponentDifficultyInspector, so
+    // deleting that inspector would have stranded its frame with no signal at all.
+    //
+    // Patterns are anchored `^…$` over repo-relative paths, so a purely literal one can
+    // be recovered by stripping the anchors and unescaping. A pattern with a real
+    // wildcard (a directory glob like `component/.+\.svelte`) is checked by walking the
+    // repo for at least one match instead.
+    const literalPathOf = (source) => {
+      // BOTH anchors are required. An unanchored suffix pattern (`/\.css$/`, the
+      // theme-or-global-ui catch-all) has no metacharacters left once escapes are
+      // stripped, so anchor-agnostic parsing would "recover" it as the literal path
+      // `.css` and then fail on a file that was never meant to exist.
+      if (!source.startsWith('^') || !source.endsWith('$')) return null;
+      const body = source.slice(1, -1);
+      const withoutEscapes = body.replace(/\\[.*+?[\]{}()|/\\^$]/g, '');
+      if (/[.*+?[\]{}()|]/.test(withoutEscapes)) return null;
+      return body.replace(/\\(.)/g, '$1');
+    };
+
+    const walk = (dir) => {
+      const out = [];
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) out.push(...walk(full));
+        else out.push(full.split(sep).join('/'));
+      }
+      return out;
+    };
+    const repoFiles = [...walk('src'), ...walk('styles')];
+
+    let checked = 0;
+    for (const recipe of VIEW_RECIPES) {
+      for (const pattern of recipe.matches || []) {
+        checked += 1;
+        const literal = literalPathOf(pattern.source);
+        if (literal) {
+          assert.ok(
+            existsSync(literal),
+            `${recipe.id} matches '${literal}', which does not exist — its frame is stranded`
+          );
+          continue;
+        }
+        assert.ok(
+          repoFiles.some((file) => pattern.test(file)),
+          `${recipe.id} pattern ${pattern} matches no file in the repo — its frame is stranded`
+        );
+      }
+    }
+    assert.ok(checked > 0, 'expected to check at least one matches pattern');
   });
 
   it('exempts a UI PR only when the maintainer label is present', () => {
