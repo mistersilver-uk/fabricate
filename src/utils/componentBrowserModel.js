@@ -175,20 +175,63 @@ export function groupComponentsByCategory(components) {
  * The category filter's options: every category actually present on a row, plus any
  * authored-but-unused vocabulary entry, with `general` pinned LAST as the catch-all.
  *
+ * Each option carries its own `count`, because the Recipe Studio's category select
+ * reads "Reagent (4)": a bare option list makes the GM open the filter to discover it
+ * matches nothing. An authored-but-unused vocabulary entry therefore reports `0`
+ * rather than being hidden — the vocabulary is a real thing the GM authored.
+ *
  * @param {object[]} components
  * @param {string[]} [vocabulary] the system's authored `componentCategories`
- * @returns {string[]}
+ * @returns {{name: string, count: number}[]}
  */
 export function componentCategoryOptions(components, vocabulary = []) {
-  const present = new Set(
-    (Array.isArray(components) ? components : []).map((component) => componentCategoryOf(component))
-  );
+  const counts = new Map();
+  for (const component of Array.isArray(components) ? components : []) {
+    const category = componentCategoryOf(component);
+    counts.set(category, (counts.get(category) || 0) + 1);
+  }
   for (const category of Array.isArray(vocabulary) ? vocabulary : []) {
     const normalized = normalizeComponentCategory(category);
-    if (normalized !== GENERAL_COMPONENT_CATEGORY) present.add(normalized);
+    if (normalized !== GENERAL_COMPONENT_CATEGORY && !counts.has(normalized)) {
+      counts.set(normalized, 0);
+    }
   }
-  present.delete(GENERAL_COMPONENT_CATEGORY);
-  return [...[...present].sort((a, b) => a.localeCompare(b)), GENERAL_COMPONENT_CATEGORY];
+
+  const named = [...counts.keys()]
+    .filter((category) => category !== GENERAL_COMPONENT_CATEGORY)
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({ name, count: counts.get(name) }));
+
+  return [
+    ...named,
+    { name: GENERAL_COMPONENT_CATEGORY, count: counts.get(GENERAL_COMPONENT_CATEGORY) || 0 },
+  ];
+}
+
+/**
+ * The active-filter chips, as data. Each chip names the filter it clears; the view
+ * localizes and renders the dismissible run. The SIBLING of the recipe library's
+ * `describeActiveFilters` — the component browser shipped with only a single
+ * "Clear filters" button, which says that filters are on but never which ones.
+ *
+ * Search is included even though it is not applied here (the admin store filters
+ * before projection): a search term is an active filter the GM must be able to see
+ * and clear.
+ *
+ * @param {{category?: string, essence?: string, search?: string}} [filters]
+ * @returns {{id: 'category' | 'essence' | 'search', value: string}[]}
+ */
+export function describeActiveComponentFilters(filters = {}) {
+  const chips = [];
+  if (filters.category && filters.category !== 'all') {
+    chips.push({ id: 'category', value: filters.category });
+  }
+  if (filters.essence && filters.essence !== 'all') {
+    chips.push({ id: 'essence', value: filters.essence });
+  }
+  const search = String(filters.search || '').trim();
+  if (search) chips.push({ id: 'search', value: search });
+  return chips;
 }
 
 /**

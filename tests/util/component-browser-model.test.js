@@ -12,6 +12,7 @@ import {
   componentCategoryOf,
   componentCategoryOptions,
   createComponentBrowserState,
+  describeActiveComponentFilters,
   filterComponents,
   groupComponentsByCategory,
   paginateComponents,
@@ -121,18 +122,41 @@ describe('component browser model (issue 676)', () => {
     assert.ok(COMPONENT_SORT_KEYS.includes('category'));
   });
 
-  it('category options list every present category plus unused vocabulary, general LAST', () => {
+  it('category options list every present category plus unused vocabulary, general LAST, each with its count', () => {
     // An authored-but-unused category must still be selectable, or a GM cannot see
-    // that a category they created has nothing in it.
+    // that a category they created has nothing in it — and it reports `0` rather than
+    // being silently indistinguishable from a populated one.
     assert.deepEqual(componentCategoryOptions(ROWS, ['Reagent', 'Metal']), [
-      'Herb',
-      'Metal',
-      'Reagent',
-      'general',
+      { name: 'Herb', count: 1 },
+      { name: 'Metal', count: 2 },
+      { name: 'Reagent', count: 0 },
+      { name: 'general', count: 1 },
     ]);
     // `general` is never DUPLICATED out of the vocabulary — it is never persisted there.
-    assert.deepEqual(componentCategoryOptions(ROWS, ['general']), ['Herb', 'Metal', 'general']);
-    assert.deepEqual(componentCategoryOptions([], []), ['general']);
+    assert.deepEqual(componentCategoryOptions(ROWS, ['general']), [
+      { name: 'Herb', count: 1 },
+      { name: 'Metal', count: 2 },
+      { name: 'general', count: 1 },
+    ]);
+    assert.deepEqual(componentCategoryOptions([], []), [{ name: 'general', count: 0 }]);
+  });
+
+  it('describes the active filters as dismissible chips', () => {
+    assert.deepEqual(describeActiveComponentFilters({}), []);
+    assert.deepEqual(
+      describeActiveComponentFilters({ category: 'all', essence: 'all', search: '   ' }),
+      [],
+      'the neutral `all` sentinel and a whitespace-only search are not active filters'
+    );
+    assert.deepEqual(
+      describeActiveComponentFilters({ category: 'Metal', essence: 'Earth', search: ' iron ' }),
+      [
+        { id: 'category', value: 'Metal' },
+        { id: 'essence', value: 'Earth' },
+        { id: 'search', value: 'iron' },
+      ],
+      'the search chip reports the TRIMMED term the GM actually filtered by'
+    );
   });
 
   it('paginates and reports a 1-based inclusive range', () => {
