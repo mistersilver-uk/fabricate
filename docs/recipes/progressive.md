@@ -53,7 +53,8 @@ See [Crafting Checks]({% link crafting-checks.md %}) for how checks work and wha
 ## What Players See
 
 When a player opens a progressive recipe, Fabricate lists that recipe's result stages in the order they will be produced.
-Each stage shows its component, its quantity, and its difficulty.
+Each stage shows its position in that order, its component, and — where the component has one authored — its difficulty.
+Progressive stages carry no quantity: a stage is produced once or not at all, so there is nothing to count.
 
 Where it can be worked out, a stage also shows a **Reached at** value.
 That is the lowest check value that reaches the stage, taking the earlier stages and the system's award mode into account.
