@@ -114,7 +114,7 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 
 ### Requirement: Harness reference integrity
 
-Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `skills/README.md`, `skills/*/SKILL.md`, `skills/*/references/*.md`, `.claude/agents/*.md`, `.codex/agents/*.toml`, and `.github/prompts/*.md` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
+Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `skills/README.md`, `skills/*/SKILL.md`, `skills/*/references/*.md`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
 
 #### Scenario: validating harness references
 

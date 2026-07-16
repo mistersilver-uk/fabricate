@@ -1,7 +1,7 @@
 name: "Foundry Integration Smoke Test"
 
 on:
-  workflow_call:                  # Reusable workflow (called by beta.yml, team-a-research.yml)
+  workflow_call:                  # Reusable workflow (called by beta.yml)
     inputs:
       require_credentials:
         # When true, the job FAILS (rather than skipping green) if Foundry credentials are unset.
