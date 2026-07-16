@@ -909,55 +909,18 @@ Automatic calls publish only a newly-minted tag and never overwrite an existing 
 Note that `isNewerVersion('1.3.0', '1.3.0-rc.85') === false`, so the first public `v1.3.0` is not offered to any client still installed from a legacy `-rc.N` prerelease — that is expected, and those clients rejoin the public line through Foundry's manifest-rewrite offer.
 For the same reason, **do not delete the 179 existing `v*-rc.*` prereleases**: each one's assets bake `releases/download/v<ver>/module.json`, so deleting a prerelease 404s every client installed from it.
 
-### Codex workflows
-
-Codex GitHub Actions workflows are manual-only in this repository.
-Codex does not run automatically on `push`, `pull_request`, `pull_request_target`, `issue_comment`, `schedule`, or any other automatic trigger.
-
-Files:
-
-- `.github/workflows/team-a-research.yml`
-- `.github/workflows/team-b-backlog.yml`
-- `.github/workflows/codex-code-review.yml`
-
-Requirements:
-
-- Repository secret: `OPENAI_API_KEY`
-- Repository secret: `WORKFLOW_GH_TOKEN` — a GitHub token used by `team-b-backlog.yml` (and other agent workflows) to push the implementation branch, create the PR, manage issue/PR labels and comments, delete the branch on cleanup, and patch the PR body when publishing UI screenshots.
-The default `GITHUB_TOKEN` is insufficient because org policy blocks Actions from creating PRs.
-A **fine-grained, repo-scoped** token needs these repository permissions:
-  - **Contents: Read and write** — push commits/branches and delete refs.
-  - **Pull requests: Read and write** — create PRs, apply PR labels, read and patch the PR body.
-  - **Issues: Read and write** — edit issue labels and post issue comments.
-  - **Metadata: Read** — mandatory baseline (auto-selected).
-  - **Workflows: Read and write** — *only* if agent implementations may modify files under `.github/workflows/`; without it, any push that touches a workflow file is rejected.
-
-  The labels it applies (`agent-created`, `in-progress`, `agent-failed`, `screenshots-exempt`) must already exist in the repo.
-  This token grants no AWS access — S3 screenshot uploads authenticate separately via OIDC (see below).
-- AWS for S3 screenshot publishing: in CI, **OIDC only** (never static keys), via a **dedicated, least-privilege role** distinct from the module-release role.
-Repository variable `AWS_SCREENSHOTS_ROLE_TO_ASSUME` (the role ARN) plus the shared `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` variables and `permissions: id-token: write`.
-Local runs use the AWS default provider chain.
-See [Screenshot publishing infrastructure](#screenshot-publishing-infrastructure) for the exact IAM and bucket policies.
-
-Behavior:
-
-- `team-a-research.yml`: manual research and audit workflow
-- `team-b-backlog.yml`: manual backlog implementation workflow, optionally scoped to `workflow_dispatch.issue_number`
-- `codex-code-review.yml`: manual PR review workflow, scoped to `workflow_dispatch.pr_number`
-
-Use these workflows only when you explicitly want a Codex run and have available usage for it.
-
 ### Screenshot publishing infrastructure
 
 `npm run screenshots:ui:publish` uploads UI-PR screenshots to S3 under `pr-screenshots/<pr-number>/` and embeds the public object URLs in the PR body.
-In CI (`team-b-backlog.yml`) this authenticates via GitHub OIDC using a **dedicated, least-privilege IAM role** — deliberately separate from the module-release role so agent-driven workflows can never write or overwrite real release artifacts.
+Publishing now runs only locally (via the AWS default provider chain) — the workflow that published from CI has been removed; `pr-screenshots-cleanup.yml` still deletes the objects afterwards and authenticates via GitHub OIDC.
+That cleanup uses a **dedicated, least-privilege IAM role** — deliberately separate from the module-release role, so a screenshot workflow can never write or overwrite real release artifacts.
 
 Repository variables (role ARNs and bucket names are not secrets):
 
 - `AWS_SCREENSHOTS_ROLE_TO_ASSUME` — ARN of the dedicated screenshot role (below).
 - `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` — shared with the release workflow.
 
-**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the team-b backlog and PR-screenshots-cleanup workflows in this repo may assume it:
+**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the PR-screenshots-cleanup workflow in this repo may assume it:
 
 ```json
 {
@@ -972,10 +935,7 @@ Repository variables (role ARNs and bucket names are not secrets):
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           "token.actions.githubusercontent.com:repository": "mistersilver-uk/fabricate",
           "token.actions.githubusercontent.com:ref": "refs/heads/main",
-          "token.actions.githubusercontent.com:workflow": [
-            "Team B: Codex Backlog Processing Manual Only",
-            "PR screenshots cleanup"
-          ]
+          "token.actions.githubusercontent.com:workflow": ["PR screenshots cleanup"]
         },
         "StringLike": {
           "token.actions.githubusercontent.com:sub": [
@@ -989,8 +949,8 @@ Repository variables (role ARNs and bucket names are not secrets):
 }
 ```
 
-Do not use `token.actions.githubusercontent.com:job_workflow_ref` for these jobs.
-GitHub emits that claim for reusable workflow jobs, while both screenshot workflows here are normal repository workflows.
+Do not use `token.actions.githubusercontent.com:job_workflow_ref` for this job.
+GitHub emits that claim for reusable workflow jobs, while the screenshot cleanup workflow here is a normal repository workflow.
 The cleanup workflow uses `pull_request_target`, so its default `sub` is the pull-request subject (`repo:mistersilver-uk/fabricate:pull_request`) rather than the branch subject.
 
 **IAM role permission policy** (`PublishPrScreenshots`) — `pr-screenshots/*` only, including delete for cleanup:
@@ -1034,7 +994,7 @@ A bucket **lifecycle rule** expiring the `pr-screenshots/` prefix after N days i
 (Set N comfortably above how long PRs stay open, or the images break while a PR is still under review.)
 
 These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots).
-Until the role/variable/bucket policy exist, the team-b publish step warns and the required `check-screenshots` gate fails closed until a maintainer publishes manually or applies the `screenshots-exempt` label.
+The required `check-screenshots` gate fails closed until a maintainer publishes the screenshots manually or applies the `screenshots-exempt` label.
 
 ## Release pipeline
 
