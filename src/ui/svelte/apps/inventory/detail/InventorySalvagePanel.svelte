@@ -56,7 +56,22 @@
   // the list, so the order is now a record of what happened rather than a choice.
   // Leaving the rows draggable under a success ribbon would invite the player to
   // "change" a resolved outcome.
-  const canReorder = $derived(salvage?.allowPlayerResultReorder !== false && !committed);
+  const gmPinned = $derived(salvage?.allowPlayerResultReorder === false);
+  const canReorder = $derived(!gmPinned && !committed);
+
+  // WHY the rows are fixed. Two DIFFERENT reasons collapse into that one boolean, and
+  // the stage list cannot tell them apart — only this component knows. The GM reason
+  // wins where it applies (it stays true whether or not a roll has since been spent);
+  // otherwise a frozen list can only be frozen because this player's own roll ran down
+  // it. Telling a player who ordered the list themselves that the GM set it is false.
+  const fixedNoteKey = $derived(
+    gmPinned
+      ? 'FABRICATE.App.Crafting.Detail.StageOrderFixed'
+      : 'FABRICATE.App.Inventory.Salvage.StageOrderSpent'
+  );
+  const fixedNoteFallback = $derived(
+    gmPinned ? 'Order set by the GM' : 'Order spent — your roll ran down this list.'
+  );
 
   const BANNERS = {
     simple: { icon: 'fas fa-recycle', tone: 'info' },
@@ -125,6 +140,8 @@
       {onReorder}
       {onReorderSettled}
       {result}
+      {fixedNoteKey}
+      {fixedNoteFallback}
     />
   {:else if mode === 'routed'}
     <SalvageRoutedBody {salvage} {result} />

@@ -26,8 +26,14 @@
 
   When `canReorder` is false the row is not merely inert — the drag handlers are NOT
   ATTACHED, the grip glyph is dropped (the grip IS the affordance signal), and a muted
-  line says the GM set the order. Identical rows minus working affordances is the worst
-  outcome: a player grabs a row and nothing happens.
+  line explains why. Identical rows minus working affordances is the worst outcome: a
+  player grabs a row and nothing happens.
+
+  That explanation is a PROP, not a constant, because `canReorder: false` has more than
+  one cause and only the caller knows which one applies. Crafting has exactly one (the
+  GM pinned the order) and is the default; salvage adds a second (the roll has already
+  been spent down the list). Hardcoding the GM string would tell a player who ordered
+  the list themselves that someone else did.
 
   SHARED WITH PLAYER SALVAGE (issue 675). Progressive salvage spends its roll down an
   ordered list under exactly these rules, so it reuses this component rather than
@@ -52,9 +58,15 @@
     // Commit any debounced order write now. A drag has already settled by the time it
     // drops, so there is nothing left to coalesce.
     onReorderSettled = () => {},
-    // Issue 675, both opt-in: omitted, this renders exactly as it did for crafting.
+    // Issue 675, all opt-in: omitted, this renders exactly as it did for crafting.
     showQuantity = false,
-    stateChip = null
+    stateChip = null,
+    // WHY the rows are fixed. `canReorder: false` has MORE THAN ONE CAUSE and only the
+    // caller knows which applies: the GM pinned the order, or (salvage) the roll has
+    // already been spent down the list. Defaulting to the GM string keeps the crafting
+    // tab — where that is the only cause — byte-unchanged.
+    fixedNoteKey = 'FABRICATE.App.Crafting.Detail.StageOrderFixed',
+    fixedNoteFallback = 'Order set by the GM'
   } = $props();
 
   let dragIndex = $state(-1);
@@ -211,9 +223,12 @@
     {/if}
   {/each}
 
+  <!-- The note explains WHY the rows are fixed, so it must track the actual reason.
+       `canReorder: false` has more than one cause, and the caller is the only thing that
+       knows which one applies here. -->
   {#if !canReorder && stages.length > 0}
     <p class="crafting-stage-fixed-note" data-progressive-stage-fixed-note>
-      {text('FABRICATE.App.Crafting.Detail.StageOrderFixed', 'Order set by the GM')}
+      {text(fixedNoteKey, fixedNoteFallback)}
     </p>
   {/if}
 

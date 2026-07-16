@@ -433,6 +433,7 @@
           "StateRecovered": "Recovered",
           "StateRollFellShort": "Roll fell short",
           "StateResolved": "Resolved",
+          "StageOrderSpent": "Order spent — your roll ran down this list.",
           "YourRoll": "Your roll",
           "MisconfiguredTitle": "Salvage isn't ready",
           "MisconfiguredRouted": "This salvage routes on a check, but your GM hasn't set a roll formula for it yet. Ask them to finish configuring it.",

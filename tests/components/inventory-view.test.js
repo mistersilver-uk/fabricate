@@ -1242,7 +1242,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 2);
     assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
     assert.equal(target.querySelector('[data-progressive-stage-status]'), null, 'nothing to announce');
-    assert.ok(target.querySelector('[data-progressive-stage-fixed-note]'), 'says the GM set it');
+    assert.equal(
+      target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
+      'Order set by the GM',
+      'and says the GM set it — which, here, is the reason that actually applies',
+    );
   });
 
   // --- The body reconciles with the resolved roll -------------------------------
@@ -1328,6 +1332,47 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
     assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
     assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 3);
+
+    // The note must give the REASON THAT APPLIES. `canReorder: false` has two causes and
+    // the shared list cannot tell them apart, so a hardcoded string told a player who
+    // had just dragged their OWN order that the GM set it — false, and invisible to an
+    // assertion that only counts drag handles. Reading the text is the whole point.
+    assert.equal(
+      target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
+      'Order spent — your roll ran down this list.',
+      'the order is SPENT, not delegated to the GM',
+    );
+  });
+
+  // The other cause of the same boolean. Here the GM string is the true one, and it must
+  // survive a commit: the GM pinned this order whether or not a roll has since run down
+  // it.
+  it('the GM-pinned reason survives a commit, and is never replaced by the spent one', async () => {
+    const gmPinned = salvageServices(
+      salvageItem({
+        mode: 'progressive',
+        checkUsable: true,
+        stages: RECON_STAGES,
+        awardMode: 'equal',
+        allowPlayerResultReorder: false,
+      }),
+      {
+        salvageResult: {
+          componentId: 'c1',
+          state: 'success',
+          message: '',
+          awarded: [],
+          awardedComponentIds: ['c2'],
+          outcomeId: null,
+        },
+      },
+    );
+    const target = await openSalvage(gmPinned.services);
+    assert.equal(
+      target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
+      'Order set by the GM',
+      'the GM reason stays true after a commit and keeps precedence',
+    );
   });
 
   it('post-roll with NO run record degrades to a neutral resolved state, inventing nothing', async () => {

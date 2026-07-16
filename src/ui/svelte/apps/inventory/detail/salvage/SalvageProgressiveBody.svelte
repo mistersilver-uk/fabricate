@@ -36,7 +36,14 @@
     announcement = '',
     onReorder = () => {},
     onReorderSettled = () => {},
-    result = null
+    result = null,
+    // WHY the rows are fixed, decided by the panel (which is the only thing that knows):
+    // the GM pinned the order, or this player's roll has already been spent down the
+    // list. Declared AND forwarded — a prop that stops at a wrapper silently falls back
+    // to its default, which here is the crafting tab's "Order set by the GM": the exact
+    // falsehood this prop exists to prevent.
+    fixedNoteKey = undefined,
+    fixedNoteFallback = undefined
   } = $props();
 
   const resolved = $derived(result?.state === 'success');
@@ -92,6 +99,8 @@
       {onReorderSettled}
       showQuantity
       {stateChip}
+      {fixedNoteKey}
+      {fixedNoteFallback}
     />
   {/if}
 </div>
