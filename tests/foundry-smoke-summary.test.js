@@ -11,6 +11,7 @@ import {
   classifyCapturedError,
   computeSmokeSignal,
   evaluateSmokeOutcome,
+  isTransientPageTeardown,
 } from '../scripts/lib/foundrySmokeSignal.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -285,4 +286,43 @@ test('stepFailures/consoleErrorCount are assigned in the finally block, beside r
   // through evaluateSmokeOutcome (steps-first ordering, no input waives a step),
   // not an inline re-implementation that could drift from the tested helper.
   assert.match(source, /evaluateSmokeOutcome\(\{ steps: results\.steps, consoleErrors \}\)/);
+});
+
+test('isTransientPageTeardown recognises browser/page teardown, not real failures', () => {
+  // The exact message the beta run hit (the floating rejection that flipped exit 1).
+  assert.equal(
+    isTransientPageTeardown('locator.click: Target page, context or browser has been closed'),
+    true
+  );
+  for (const teardown of [
+    'Target closed',
+    'Session closed. Most likely the page has been closed.',
+    'Page crashed',
+    'Browser has been disconnected',
+  ]) {
+    assert.equal(isTransientPageTeardown(teardown), true, teardown);
+  }
+  // Real product / assertion failures must NOT be treated as transient teardown.
+  for (const real of [
+    'Manager rendered no table rows',
+    'expected 3 recipes but found 0',
+    'locator resolved to hidden element',
+    '',
+    null,
+    undefined,
+  ]) {
+    assert.equal(isTransientPageTeardown(real), false, String(real));
+  }
+});
+
+test('the harness guards the process against a late teardown rejection and exits deterministically', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+  // A process-level unhandledRejection guard routes through the tested predicate,
+  // swallowing teardown-shaped rejections and failing fast on anything else.
+  assert.match(source, /process\.on\('unhandledRejection'/);
+  assert.match(source, /isTransientPageTeardown\(message\)/);
+  // browser.close() on a crashed browser cannot abort the finally before summary.json.
+  assert.match(source, /isTransientPageTeardown\(closeErr\?\.message\)/);
+  // The final exit keys on the harness's own verdict, immediately.
+  assert.match(source, /process\.exit\(results\.passed \? 0 : 1\)/);
 });
