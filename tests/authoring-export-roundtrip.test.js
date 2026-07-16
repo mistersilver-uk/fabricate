@@ -11,97 +11,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// Foundry globals used by the importer's component-resolution + env store.
-globalThis.foundry = globalThis.foundry || {
-  utils: { randomID: () => `id-${Math.random().toString(36).slice(2, 10)}` },
-};
-globalThis.game = globalThis.game || {};
-globalThis.game.user = { isGM: true };
-globalThis.game.packs = [];
-globalThis.fromUuid = async () => null; // all external refs absent (kept verbatim)
-
-const { buildExportPayload, validateImportData, prepareForImport } = await import(
+// The shared harness installs the minimal Foundry globals + the single-store
+// GatheringEnvironmentStore harness and the export resolution helpers.
+const { makeHarness, exportCurrent } = await import('./helpers/authoringExportHarness.js');
+const { validateImportData, prepareForImport } = await import(
   '../src/systems/CraftingSystemExporter.js'
 );
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
-const { GatheringEnvironmentStore } = await import('../src/systems/GatheringEnvironmentStore.js');
 const {
   buildFullAuthoringFixture,
   FIXTURE_SYSTEM_ID,
   FIXTURE_REALM_ID,
   normalizeExportEnvelope,
 } = await import('./helpers/fullAuthoringFixture.js');
-
-const VERSION = '9.9.9';
-
-function makeHarness(fixture) {
-  const settings = new Map();
-  settings.set('gatheringConfig', structuredClone(fixture.gatheringConfig));
-  const getSetting = (key) => settings.get(key);
-  const setSetting = async (key, value) => {
-    settings.set(key, structuredClone(value));
-  };
-
-  const systems = new Map([[fixture.system.id, structuredClone(fixture.system)]]);
-  const systemManager = {
-    getSystems: () => [...systems.values()],
-    getSystem: (id) => systems.get(id) || null,
-    getItems: (id) => systems.get(id)?.components || [],
-    createSystem: async (data) => {
-      const sys = structuredClone({ ...data, id: data.id || `sys-${systems.size + 1}` });
-      systems.set(sys.id, sys);
-      return structuredClone(sys);
-    },
-    updateSystem: async (id, data) => {
-      const sys = structuredClone({ ...data, id });
-      systems.set(id, sys);
-      return structuredClone(sys);
-    },
-  };
-
-  const recipesById = new Map(fixture.recipes.map((r) => [r.id, structuredClone(r)]));
-  const recipeManager = {
-    getRecipes: ({ craftingSystemId } = {}) =>
-      [...recipesById.values()]
-        .filter((r) => !craftingSystemId || r.craftingSystemId === craftingSystemId)
-        .map((r) => ({ ...structuredClone(r), toJSON: () => structuredClone(r) })),
-    getRecipe: (id) => recipesById.get(id) || null,
-    createRecipe: async (data) => {
-      recipesById.set(data.id, structuredClone(data));
-      return data;
-    },
-    updateRecipe: async (id, data) => {
-      recipesById.set(id, structuredClone(data));
-      return data;
-    },
-    notifyRecipesChanged: () => {},
-  };
-
-  const environmentStore = new GatheringEnvironmentStore({
-    getSetting,
-    setSetting,
-    systemManager,
-    getSystems: () => [...systems.values()],
-    randomID: () => `env-${Math.random().toString(36).slice(2, 10)}`,
-  });
-  // Seed environments (normalize on load; no validation on the seed path).
-  settings.set('gatheringEnvironments', structuredClone(fixture.environments));
-  environmentStore.load();
-
-  return { settings, getSetting, setSetting, systemManager, recipeManager, environmentStore };
-}
-
-function exportCurrent(h, systemId) {
-  const system = h.systemManager.getSystem(systemId);
-  const recipes = h.recipeManager.getRecipes({ craftingSystemId: systemId }).map((r) => r.toJSON());
-  return buildExportPayload(
-    system,
-    recipes,
-    VERSION,
-    h.environmentStore.list(),
-    h.getSetting('gatheringConfig')
-  );
-}
 
 test('round-trip: export → import(keep) → export is deep-equal modulo volatile fields', async () => {
   const fixture = buildFullAuthoringFixture();
