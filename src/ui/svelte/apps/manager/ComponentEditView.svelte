@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
+  import Stepper from '../../components/Stepper.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   import {
     GENERAL_COMPONENT_CATEGORY,
@@ -9,7 +10,6 @@
     getEffectiveComponentCategories,
     normalizeComponentCategory
   } from '../../../../utils/componentCategories.js';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import {
     adjustComponentEssenceQuantity,
     clampComponentEssenceQuantity
@@ -75,7 +75,6 @@
   // here; the remaining salvage fields (enabled, ingredientQuantity, toolIds, …)
   // are preserved and spread back through buildUpdates so a save never drops them.
   let salvageDraft = $state(cloneSalvage(null));
-  let tagMenuOpen = $state(false);
   let saveFailed = $state(false);
   let lastComponentKey = $state(null);
   let lastDirty = $state(false);
@@ -103,7 +102,6 @@
     categoryDraft = normalizeComponentCategory(component?.category);
     essenceDraft = cloneEssenceOptions(essenceOptions);
     salvageDraft = cloneSalvage(component?.salvage);
-    tagMenuOpen = false;
     saveFailed = false;
     // The DC control's Custom… choice is transient UI state, not draft data. Reset it
     // with the drafts, or opening a second component would inherit the first's open
@@ -391,10 +389,16 @@
   // The off-body copy MUST branch. "Enable it above to define what it yields" is only
   // true once groups exist; at zero groups it points at a toggle that is (correctly)
   // disabled, so it is actively misleading.
+  //
+  // This is ALSO the zero-group explanation for the disabled toggle, which is why it is
+  // body copy and not a `title` on the toggle: a DISABLED <button> receives no mouse
+  // events, so a tooltip there never appears in any browser — and a mounted test could
+  // not tell, because the attribute would be in the DOM. It used to be said twice (here
+  // AND on the enable card's sub-line); the card is gone and this is the one copy.
   const salvageDisabledNotice = $derived(
     salvageHasGroups
       ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DisabledHasGroups', 'Salvage is disabled for this component. Enable it above to define what it yields when broken down.')
-      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DisabledNoGroups', 'There is nothing to enable yet. Add a result group below to describe what this component yields, then enable salvage.')
+      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DisabledNoGroups', 'There is nothing to enable yet. Add a result below to describe what this component yields, then enable salvage.')
   );
 
   // The salvage mode, displayed READ-ONLY (it is a SYSTEM-level setting, authored on
@@ -410,12 +414,6 @@
   );
   const salvageModeLabel = $derived(
     salvageModeOption ? text(salvageModeOption.labelKey, salvageModeOption.fallback) : ''
-  );
-
-  const salvageToggleHint = $derived(
-    salvageHasGroups
-      ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.EnableSub', 'Players can break this component down into the result groups below.')
-      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.EnableBlockedSub', 'Add at least one result group before enabling salvage.')
   );
 
   // --- DC control (decision 7 + its five cases) ---
@@ -522,6 +520,84 @@
     });
   }
 
+  // ── PROGRESSIVE SALVAGE IS ONE GROUP, WHOSE `results` ARE THE STAGES ─────────────
+  // Read `CraftingEngine.js` `_resolveSalvageGroups` before touching any of this:
+  //
+  //     if (mode === 'progressive') {
+  //       const group = allGroups[0];          // ONLY the first group
+  //       const authored = group.results || []; // its RESULTS are the ordered stages
+  //
+  // So progressive's model is a SINGLE group whose result list is the ordered stage
+  // list; `resultGroups[1..]` are dead data the engine never reads, and the order that
+  // decides what a player is awarded is the order WITHIN `resultGroups[0].results`.
+  //
+  // That is why this surface renders progressive as a flat ordered list with no group
+  // chrome: the groups are a storage detail here, not a thing to author. The redesign
+  // prototype models the same screen as one-group-per-stage and maps `groups.map(g =>
+  // g.results[0])` — porting THAT mapping literally would have authored stage 2+ into
+  // groups the engine never reads, silently awarding only the first stage forever.
+  // The presentation is the prototype's; the mapping is the engine's.
+  const salvageStageGroup = $derived(salvageDraft.resultGroups[0] || null);
+  const salvageStages = $derived(salvageStageGroup?.results || []);
+
+  // Append a stage, creating the backing group on first use. This is ALSO the control
+  // that takes a zero-group component to one group, so it is what keeps Ruling A's
+  // invariant true in progressive mode: without it, `enabled` could never be set
+  // (the normalizer clamps `enabled` to false at zero groups) and salvage would be
+  // permanently unenablable for every progressive component.
+  function addSalvageStage() {
+    const stage = { id: newId(), componentId: componentOptions[0]?.id || '', quantity: 1 };
+    if (!salvageStageGroup) {
+      setSalvage({ resultGroups: [{ id: newId(), name: '', results: [stage] }] });
+      return;
+    }
+    updateSalvageGroupResults(salvageStageGroup.id, (results) => [...results, stage]);
+  }
+
+  // Removing the LAST stage removes the empty group with it, so the normalizer's
+  // groups-based clamp (`enabled && resultGroups.length > 0`) can still see the
+  // component as empty and force `enabled: false`. Leave the empty group behind and the
+  // draft persists `{enabled: true, resultGroups: [{results: []}]}` — one group, so the
+  // clamp holds enabled ON, while the engine awards nothing. Same defence in depth as
+  // `removeSalvageGroup` (decision 8b), reached by the progressive path.
+  function removeSalvageStage(resultId) {
+    if (!salvageStageGroup) return;
+    const results = salvageStages.filter((result) => result.id !== resultId);
+    if (results.length === 0) {
+      removeSalvageGroup(salvageStageGroup.id);
+      return;
+    }
+    updateSalvageGroupResults(salvageStageGroup.id, () => results);
+  }
+
+  // Reorder is the AUTHORING act in progressive mode — the list order is the spend
+  // order. Clamped at the ends rather than wrapping.
+  function moveSalvageStage(index, delta) {
+    const target = index + delta;
+    if (!salvageStageGroup) return;
+    if (target < 0 || target >= salvageStages.length) return;
+    const results = [...salvageStages];
+    const [moved] = results.splice(index, 1);
+    results.splice(target, 0, moved);
+    updateSalvageGroupResults(salvageStageGroup.id, () => results);
+  }
+
+  // Drag-reorder. `draggingStageIndex` is transient UI state and deliberately outside
+  // the draft: picking a row up and dropping it where it started must not mark the
+  // editor dirty.
+  let draggingStageIndex = $state(null);
+
+  function onStageDragStart(index) {
+    draggingStageIndex = index;
+  }
+
+  function onStageDrop(index) {
+    const from = draggingStageIndex;
+    draggingStageIndex = null;
+    if (from === null || from === index) return;
+    moveSalvageStage(from, index - from);
+  }
+
   function setSalvageRoute(outcomeName, groupId) {
     const next = { ...salvageDraft.outcomeRouting };
     if (groupId) next[outcomeName] = groupId;
@@ -548,33 +624,10 @@
     tagDraft = next;
   }
 
-  // Tags author like the gathering availability fields: pick an unselected tag from
-  // the dropdown to add it, then remove it from the pill row underneath.
-  function availableTagOptions() {
-    return tagDraft.filter(option => option.checked !== true);
-  }
-
-  function selectedTagOptions() {
-    return tagDraft.filter(option => option.checked === true);
-  }
-
-  function addTag(tag) {
-    toggleTag(tag, true);
-    tagMenuOpen = false;
-  }
-
-  function removeTag(tag) {
-    toggleTag(tag, false);
-  }
-
-  function tagMenuLabel() {
-    return availableTagOptions().length > 0
-      ? text('FABRICATE.Admin.Manager.Component.TagsEdit.AddTag', 'Add tag')
-      : text('FABRICATE.Admin.Manager.Component.TagsEdit.AllSelected', 'All tags selected');
-  }
-
-  function removeTagLabel(tag) {
-    return text('FABRICATE.Admin.Manager.Component.TagsEdit.RemoveTag', 'Remove {name}').replace('{name}', tag);
+  function toggleTagLabel(tag, checked) {
+    return checked
+      ? text('FABRICATE.Admin.Manager.Component.TagsEdit.RemoveTag', 'Remove {name}').replace('{name}', tag)
+      : text('FABRICATE.Admin.Manager.Component.TagsEdit.ApplyTag', 'Apply {name}').replace('{name}', tag);
   }
 
   async function handleSave(event) {
@@ -615,17 +668,20 @@
       {onCopySourceUuid}
     />
 
-    <section class="manager-task-core-card" data-component-edit-section="category">
+    <!-- Heading LEFT, control RIGHT, on one line (issue 676). A label stacked above a
+         full-width select made a one-word choice occupy a whole panel and read as the
+         start of a form; the category is a single inline decision, so it renders as one.
+         The visible `<h3>` is the control's label, so the select keeps its `aria-label`
+         rather than a stacked `<span>` that would duplicate the heading to a screen
+         reader. -->
+    <section class="manager-component-panel manager-component-inline-panel" data-component-edit-section="category">
       <div class="manager-task-card-heading">
         <div>
           <h3>{text('FABRICATE.Admin.Manager.Component.Category.Title', 'Category')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Category.Hint', 'Group this component in the component directory. Component categories are separate from recipe categories.')}</p>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Category.Hint', 'Groups this component in the browser. Unlike tags, a component has one category.')}</p>
         </div>
-      </div>
-      <label class="manager-field">
-        <span>{text('FABRICATE.Admin.Manager.Component.Category.Label', 'Component category')}</span>
         <select
-          class="manager-input"
+          class="manager-input manager-component-inline-control"
           value={categoryDraft}
           data-component-edit-category
           aria-label={text('FABRICATE.Admin.Manager.Component.Category.Label', 'Component category')}
@@ -636,45 +692,65 @@
             <option value={option}>{categoryLabel(option)}</option>
           {/each}
         </select>
-      </label>
+      </div>
     </section>
 
     {#if showDifficulty}
-      <!-- Rehomed out of the deleted right-rail inspector (decision 4, "nothing may be
-           lost"). `data-component-edit-section="difficulty"` is PRESERVED VERBATIM:
+      <!-- "This component's Progressive DC" (issue 676). Rehomed out of the deleted
+           right-rail inspector (decision 4, "nothing may be lost").
+           `data-component-edit-section="difficulty"` is PRESERVED VERBATIM:
            `scripts/foundry-test-run.mjs` locates `[data-component-edit-section="difficulty"] input`
-           and fills it, and that step is not waivable.
+           and fills it, and that step is not waivable. `Stepper` renders a real
+           `<input type="number">`, so that selector still resolves.
+
+           ── WHY THIS IS A SIBLING SECTION AND NOT INSIDE SALVAGE ──────────────────
+           The redesign prototype renders this card INSIDE the salvage panel, gated on
+           the SALVAGE mode being progressive. Fabricate cannot: this value is
+           `component.difficulty`, and the manager root gates the section on the
+           system's CRAFTING `resolutionMode` (`componentDifficultyShown`), which is a
+           different axis. Nesting it under salvage would hide it for every
+           progressive-CRAFTING system whose salvage is simple or disabled — the exact
+           configuration the smoke harness drives when it fills this input.
 
            STAGED, not written on change — the value rides the editor's draft and
            persists on Save, so it contributes to the dirty state and the exit guard.
            It is a SIBLING of `salvage`, never part of `updates.salvage`. -->
-      <section class="manager-task-core-card" data-component-edit-section="difficulty">
+      <section
+        class="manager-component-panel manager-component-inline-panel"
+        data-component-edit-section="difficulty"
+      >
         <div class="manager-task-card-heading">
           <div>
-            <h3>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyHint', 'Cost spent against the crafting roll in progressive mode. Whole number, 1 or greater; leave blank to clear. Saved with the editor.')}</p>
+            <h3>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'This component’s Progressive DC')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyHint', 'Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its own component.')}</p>
+          </div>
+          <div class="manager-component-inline-stepper">
+            <span class="manager-component-micro-label">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyMicro', 'DC')}</span>
+            <Stepper
+              value={difficultyInputValue === '' ? 0 : difficultyInputValue}
+              min={0}
+              max={35}
+              ariaLabel={text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyLabel', 'Difficulty value')}
+              decrementLabel={text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyDecrement', 'Decrease difficulty')}
+              incrementLabel={text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyIncrement', 'Increase difficulty')}
+              disabled={saving}
+              onChange={(next) => handleDifficultyInput(next)}
+            />
           </div>
         </div>
-        <label class="manager-field">
-          <span>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyLabel', 'Difficulty value')}</span>
-          <input
-            type="number"
-            min="1"
-            max="35"
-            step="1"
-            class="manager-input"
-            value={difficultyInputValue}
-            placeholder={text('FABRICATE.Admin.Manager.Component.NoDifficulty', 'No difficulty')}
-            aria-label={text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyLabel', 'Difficulty value')}
-            disabled={saving}
-            oninput={(event) => handleDifficultyInput(event.currentTarget.value)}
-          />
-        </label>
       </section>
     {/if}
 
     {#if showTags}
-      <section class="manager-task-core-card" data-component-edit-section="tags">
+      <!-- TOGGLE PILLS, not an add-menu (issue 676). Tags are a small, fixed, system-
+           authored vocabulary, and the question the GM is answering is "which of these
+           apply?" — a set of toggles shows the whole vocabulary AND the answer at once.
+           The old dropdown + removable-pill-row was Gathering's vehicle, borrowed for a
+           different question: it hid the vocabulary behind a menu, so the common state
+           (a system with four tags) rendered as "Add tag ▾ / No tags applied" — a
+           control that says nothing about what is on offer, and two interactions per
+           tag instead of one. -->
+      <section class="manager-component-panel" data-component-edit-section="tags">
         <div class="manager-task-card-heading">
           <div>
             <h3>{text('FABRICATE.Admin.Manager.Component.TagsEdit.Title', 'Tags')}</h3>
@@ -682,69 +758,30 @@
           </div>
         </div>
         {#if tagDraft.length > 0}
-          <div class="manager-field manager-availability-multi" data-component-edit-tags>
-            <div
-              class="manager-availability-picker"
-              use:dismissOnOutsideClick={{
-                enabled: tagMenuOpen,
-                onDismiss: () => { tagMenuOpen = false; }
-              }}
-            >
+          <div class="manager-component-tag-toggles" data-component-edit-tags>
+            {#each tagDraft as option (option.tag)}
+              <!-- `aria-pressed` is the state, not a class: this is a toggle button, and
+                   the checked/unchecked ICON is decorative reinforcement of it. -->
               <button
                 type="button"
-                class="manager-availability-menu-button"
-                aria-haspopup="listbox"
-                aria-expanded={tagMenuOpen}
-                data-component-edit-tag-menu
-                onclick={() => tagMenuOpen = !tagMenuOpen}
+                class={`manager-component-tag-toggle ${option.checked ? 'is-on' : ''}`}
+                aria-pressed={option.checked === true}
+                data-component-edit-tag-toggle={option.tag}
+                data-component-tag-checked={option.checked === true}
+                onclick={() => toggleTag(option.tag, option.checked !== true)}
                 disabled={saving}
               >
-                <span>{tagMenuLabel()}</span>
-                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                <i class="fas fa-tag" aria-hidden="true"></i>
+                <span>{option.tag}</span>
+                <i
+                  class={option.checked ? 'fas fa-circle-check' : 'far fa-circle'}
+                  aria-hidden="true"
+                ></i>
               </button>
-              {#if tagMenuOpen}
-                <div class="manager-availability-menu" role="listbox" aria-label={text('FABRICATE.Admin.Manager.Component.TagsEdit.Title', 'Tags')}>
-                  {#if availableTagOptions().length > 0}
-                    {#each availableTagOptions() as option (option.tag)}
-                      <button
-                        type="button"
-                        class="manager-availability-option"
-                        role="option"
-                        aria-selected="false"
-                        data-component-edit-tag-option={option.tag}
-                        onclick={() => addTag(option.tag)}
-                      >
-                        <i class="fas fa-tag" aria-hidden="true"></i>
-                        <span>{option.tag}</span>
-                      </button>
-                    {/each}
-                  {:else}
-                    <span class="manager-availability-empty">{text('FABRICATE.Admin.Manager.Component.TagsEdit.AllSelected', 'All tags selected')}</span>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-            <div class="manager-availability-pill-row" data-component-edit-tag-pills>
-              {#if selectedTagOptions().length > 0}
-                {#each selectedTagOptions() as option (option.tag)}
-                  <!-- `is-tag` maps the shared pill's `--fab-chip-color` to purple. The
-                       vehicle is Gathering's, and without a mapping these inherited its
-                       AMBER `--fab-warning` default — a warning tone on a plain tag. -->
-                  <span class="manager-availability-pill is-tag" data-component-edit-tag-pill={option.tag}>
-                    <i class="fas fa-tag" aria-hidden="true"></i>
-                    <span>{option.tag}</span>
-                    <button type="button" class="manager-availability-remove" aria-label={removeTagLabel(option.tag)} onclick={() => removeTag(option.tag)} disabled={saving}>
-                      <i class="fas fa-xmark" aria-hidden="true"></i>
-                    </button>
-                  </span>
-                {/each}
-              {:else}
-                <span class="manager-muted manager-availability-any">{text('FABRICATE.Admin.Manager.Component.TagsEdit.NoneSelected', 'No tags applied')}</span>
-              {/if}
-            </div>
+            {/each}
           </div>
         {:else}
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.TagsEdit.NoTags', 'No tags are defined for this system yet.')}</p>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.TagsEdit.NoTags', 'This system defines no item tags.')}</p>
         {/if}
         </section>
       {/if}
@@ -820,56 +857,245 @@
       {/if}
 
     {#if showSalvage}
-      <section class="manager-task-core-card" data-component-edit-section="salvage" data-salvage-section>
+      <section class="manager-component-panel" data-component-edit-section="salvage" data-salvage-section>
+        <!-- THE HEADING IS THE CONTROL ROW (issue 676): mode pill · divider · ENABLED ·
+             toggle, all on the heading line. It used to be a heading with the pill, and
+             then a whole separate "Salvage this component" ToggleCard below it — two
+             stacked rows of chrome restating one fact before any content, on a panel
+             whose actual subject is the yield list. -->
         <div class="manager-task-card-heading">
           <div>
             <h3>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Hint', 'Configure what this component yields when it is salvaged.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Hint', 'What this component yields when it is broken down.')}</p>
           </div>
-          {#if salvageShowChrome && salvageModeLabel}
-            <!-- Read-only: the mode is a SYSTEM setting, authored on Crafting Settings.
-                 It names the mode that decides this panel's shape, which the GM
-                 otherwise cannot see from this route. Chrome, so Ruling A collapses it
-                 with the rest when salvage is off — the group editor never depends on
-                 it. `routed` is displayed as "Routed by check"; the persisted token is
-                 never shown. -->
-            <span class="manager-chip is-info manager-salvage-mode-pill" data-salvage-mode={salvageResolutionMode}>
-              {#if salvageModeOption?.icon}
-                <i class={salvageModeOption.icon} aria-hidden="true"></i>
-              {/if}
-              <span>{salvageModeLabel}</span>
-            </span>
-          {/if}
+          <!-- `data-recipe-section` / `data-recipe-field` are ToggleCard's hooks, kept
+               verbatim now the toggle is hand-rolled into the heading: they are what the
+               AC4/AC9/AC10 suites drive, and those pin the salvage ENABLEMENT rulings
+               (the dirty-baseline, the zero-group deadlock, the removal clamp) rather
+               than the vehicle. Renaming them would have silently unpinned all of it. -->
+          <div class="manager-component-heading-controls" data-recipe-section="salvage-enabled">
+            {#if salvageModeLabel}
+              <!-- Read-only: the mode is a SYSTEM setting, authored on Crafting Settings.
+                   It names the mode that decides this panel's shape, which the GM
+                   otherwise cannot see from this route. `routed` is displayed as "Routed
+                   by check"; the persisted token is never shown.
+
+                   EXEMPT FROM RULING A, deliberately (it is NOT gated on
+                   `salvageShowChrome`). Ruling A collapses the chrome that only has
+                   meaning once salvage RUNS — mode/DC/routing/reorder. The mode PILL is
+                   not that: it names the shape of the editor the GM is looking at right
+                   now, and the result editor below stays authorable while salvage is
+                   off. Hiding it meant authoring an ordered progressive list, or a
+                   routed set of groups, with nothing on screen saying which — precisely
+                   when the panel is at its most confusing. -->
+              <span class="manager-chip is-info manager-salvage-mode-pill" data-salvage-mode={salvageResolutionMode}>
+                {#if salvageModeOption?.icon}
+                  <i class={salvageModeOption.icon} aria-hidden="true"></i>
+                {/if}
+                <span>{salvageModeLabel}</span>
+              </span>
+              <span class="manager-component-heading-divider" aria-hidden="true"></span>
+            {/if}
+            <span class="manager-component-micro-label">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.EnabledMicro', 'Enabled')}</span>
+            <!-- The per-component salvage gate (issue 676). It was persisted, normalized
+                 and a live runtime gate long before any control wrote it, so a component
+                 auto-disabled by `_disableInvalidSalvageConfigs` was permanently
+                 unsalvageable from the UI. This toggle is the fix.
+
+                 The zero-groups explanation is VISIBLE body copy
+                 (`[data-salvage-disabled-notice]`), never a `title` on this button: a
+                 DISABLED <button> receives no mouse events, so a tooltip would never
+                 appear in any browser — and no mounted test would notice, because the
+                 attribute IS in the DOM. -->
+            <!-- `is-on`/`is-off` mirror ToggleCard's switch exactly: same class pair,
+                 same `aria-pressed`, so the toggle this replaced is a no-op DOM diff at
+                 the control itself. -->
+            <button
+              type="button"
+              class={`manager-status-toggle ${salvageEnabled ? 'is-on' : 'is-off'}`}
+              data-recipe-field="salvageEnabled"
+              aria-pressed={salvageEnabled}
+              aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.Enable', 'Salvage this component')}
+              disabled={salvageToggleDisabled}
+              onclick={() => setSalvage({ enabled: !salvageEnabled })}
+            >
+              <span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>
+            </button>
+          </div>
         </div>
-
-        <!-- The per-component salvage gate (issue 676). It was persisted, normalized
-             and a live runtime gate long before any control wrote it, so a component
-             auto-disabled by `_disableInvalidSalvageConfigs` was permanently
-             unsalvageable from the UI. This toggle is the fix.
-
-             The zero-groups explanation renders as VISIBLE `sub`-line text, never via
-             `toggleTitle`: that lands a native `title` on a DISABLED <button>, which
-             receives no mouse events, so the tooltip never appears in any browser —
-             and no mounted test would notice, because the attribute IS in the DOM. -->
-        <ToggleCard
-          variant="is-info"
-          icon="fas fa-recycle"
-          section="salvage-enabled"
-          field="salvageEnabled"
-          title={text('FABRICATE.Admin.Manager.Component.SalvageEditor.Enable', 'Salvage this component')}
-          sub={salvageToggleHint}
-          subAttr="data-salvage-enabled-hint"
-          toggleLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.Enable', 'Salvage this component')}
-          on={salvageEnabled}
-          disabled={salvageToggleDisabled}
-          onToggle={(next) => setSalvage({ enabled: next === true })}
-        />
 
         {#if !salvageEnabled}
           <p class="manager-muted" data-salvage-disabled-notice>{salvageDisabledNotice}</p>
         {/if}
 
+        <!-- The banner and the reorder policy sit ABOVE the list, not after it (issue
+             676): both describe what the ORDER MEANS, and the order is the thing being
+             authored below. The reorder card used to render at the very bottom, after
+             "Add group" — the GM read the policy governing the list only after they had
+             finished writing it. -->
+        {#if salvageShowChrome && salvageProgressive}
+          <p class="manager-component-info-banner" data-salvage-roll-budget>
+            <i class="fas fa-dice-d20" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.RollBudget', 'Roll budget flows down the list · each stage consumes its difficulty before the next is recovered')}</span>
+          </p>
+
+          <!-- Progressive-only: the flag has no meaning in the simple/routed salvage
+               modes, which award a whole group rather than spending down a list. -->
+          <ToggleCard
+            variant="is-info"
+            icon="fas fa-arrow-down-a-z"
+            section="salvage-allow-player-result-reorder"
+            field="salvageAllowPlayerResultReorder"
+            title={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Title', 'Allow player result re-ordering')}
+            sub={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Sub', 'Let players drag the salvage order at the table; off keeps this GM order fixed.')}
+            toggleLabel={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Toggle', 'Allow player result re-ordering')}
+            on={salvageDraft.allowPlayerResultReorder !== false}
+            disabled={saving}
+            onToggle={(next) => setSalvage({ allowPlayerResultReorder: next === true })}
+          />
+        {/if}
+
         <div class="manager-field" data-salvage-result-groups>
+        {#if salvageProgressive}
+          <!-- PROGRESSIVE: an ordered list of SINGLE results, with no group chrome.
+               See `salvageStageGroup` for why the groups are still the storage and why
+               this list is `resultGroups[0].results`. -->
+          <span class="manager-component-readonly-label">
+            <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Results', 'Results')}</span>
+          </span>
+          {#if salvageStages.length > 0}
+            <ul class="manager-salvage-stage-list">
+              {#each salvageStages as result, stageIndex (result.id)}
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <li
+                  class={`manager-salvage-stage-row ${draggingStageIndex === stageIndex ? 'is-dragging' : ''}`}
+                  data-salvage-result={result.id}
+                  data-salvage-stage={String(stageIndex + 1)}
+                  draggable={saving ? 'false' : 'true'}
+                  ondragstart={() => onStageDragStart(stageIndex)}
+                  ondragover={(event) => event.preventDefault()}
+                  ondrop={(event) => { event.preventDefault(); onStageDrop(stageIndex); }}
+                  ondragend={() => { draggingStageIndex = null; }}
+                >
+                  <span class="manager-salvage-stage-grip" aria-hidden="true"><i class="fas fa-grip-vertical"></i></span>
+                  <span
+                    class="manager-salvage-result-ordinal"
+                    data-salvage-result-ordinal={String(stageIndex + 1)}
+                    aria-hidden="true">{stageIndex + 1}</span
+                  >
+                  <select
+                    class="manager-input manager-salvage-stage-component"
+                    value={result.componentId}
+                    aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent', 'Result component')}
+                    data-salvage-result-component
+                    onchange={(event) => updateSalvageResult(salvageStageGroup.id, result.id, { componentId: event.currentTarget.value })}
+                    disabled={saving}
+                  >
+                    <option value="">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.SelectComponent', 'Select a component')}</option>
+                    {#each componentOptions as option (option.id)}
+                      <option value={option.id}>{option.name}</option>
+                    {/each}
+                  </select>
+
+                  <Stepper
+                    value={result.quantity}
+                    min={1}
+                    ariaLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultQuantity', 'Quantity for {name}').replace('{name}', salvageComponentName(result.componentId))}
+                    decrementLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.DecrementResult', 'Decrease quantity')}
+                    incrementLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.IncrementResult', 'Increase quantity')}
+                    max={9999}
+                    disabled={saving}
+                    inputProps={{ 'data-salvage-result-quantity': '', class: 'fab-stepper-input manager-component-stepper-quantity' }}
+                    onChange={(next) => updateSalvageResult(salvageStageGroup.id, result.id, { quantity: clampSalvageQuantity(next) })}
+                  />
+
+                  <!-- READ-ONLY: `difficulty` belongs to the RESULT component, whose own
+                       editor owns its save lifecycle; this surface is editing a
+                       different component. The "Edit" link is the way to change it. -->
+                  <span
+                    class="manager-salvage-result-difficulty"
+                    data-salvage-result-difficulty={salvageResultDifficulty(result.componentId) === null
+                      ? ''
+                      : String(salvageResultDifficulty(result.componentId))}
+                  >{salvageResultDifficulty(result.componentId) === null
+                      ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset', 'DC —')
+                      : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${salvageResultDifficulty(result.componentId)}`}</span
+                  >
+
+                  {#if result.componentId}
+                    <!-- Opens the referenced YIELD component's editor — the IN-MANAGER
+                         component-edit view, not the standalone SvelteComponentEditorApp
+                         window. Component -> component navigation is guarded
+                         (confirmComponentRouteExit deliberately has no component-edit
+                         bypass), so a dirty draft prompts rather than being discarded. -->
+                    <button
+                      type="button"
+                      class="manager-salvage-stage-edit"
+                      data-salvage-result-edit={result.componentId}
+                      aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult', 'Edit {name}').replace('{name}', salvageComponentName(result.componentId))}
+                      title={text('FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint', 'Set on this component in its editor')}
+                      onclick={() => onOpenComponent(result.componentId)}
+                      disabled={saving}
+                    >
+                      <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Edit', 'Edit')}</span>
+                      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    </button>
+                  {/if}
+
+                  <!-- Drag is an ENHANCEMENT; the chevrons are the accessible reorder
+                       path and are what a keyboard user gets. Disabled at the ends. -->
+                  <span class="manager-salvage-stage-reorder">
+                    <button
+                      type="button"
+                      class="manager-salvage-stage-move"
+                      data-salvage-stage-up
+                      aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.MoveUp', 'Move up')}
+                      disabled={saving || stageIndex === 0}
+                      onclick={() => moveSalvageStage(stageIndex, -1)}
+                    ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
+                    <button
+                      type="button"
+                      class="manager-salvage-stage-move"
+                      data-salvage-stage-down
+                      aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.MoveDown', 'Move down')}
+                      disabled={saving || stageIndex === salvageStages.length - 1}
+                      onclick={() => moveSalvageStage(stageIndex, 1)}
+                    ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                  </span>
+
+                  <button
+                    type="button"
+                    class="manager-icon-button is-danger"
+                    aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult', 'Remove result')}
+                    data-remove-salvage-result
+                    onclick={() => removeSalvageStage(result.id)}
+                    disabled={saving}
+                  >
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.NoResultsYet', 'No results yet.')}</p>
+          {/if}
+          <!-- `data-add-salvage-group` rides this button ONLY while there is no backing
+               group, because in that state this IS the add-group control: it is what
+               takes a progressive component from zero groups to one, which the
+               normalizer's clamp requires before `enabled` can ever be true. That is
+               Ruling A's invariant in progressive mode, and it stays literally testable. -->
+          <button
+            type="button"
+            class="manager-button"
+            data-add-salvage-result
+            data-add-salvage-group={salvageStageGroup ? undefined : ''}
+            onclick={() => addSalvageStage()}
+            disabled={saving}
+          >
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult', 'Add result')}</span>
+          </button>
+        {:else}
           <span class="manager-component-readonly-label">
             <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultGroups', 'Result groups')}</span>
           </span>
@@ -902,23 +1128,8 @@
 
                   {#if (group.results || []).length > 0}
                     <ul class="manager-salvage-result-list">
-                      {#each group.results as result, resultIndex (result.id)}
+                      {#each group.results as result (result.id)}
                         <li class="manager-salvage-result-row" data-salvage-result={result.id}>
-                          {#if salvageResolutionMode === 'progressive'}
-                            <!-- Ordinal + read-only difficulty badge (issue 651 D3's
-                                 condition). Progressive salvage spends the roll DOWN this
-                                 list, so without these the list is a set of bare selects
-                                 with no visible order — and the reorder-permission card
-                                 above would govern something the GM cannot see.
-                                 Read-only because `component.difficulty` belongs to the
-                                 RESULT component, whose own editor owns its save
-                                 lifecycle; this surface is editing a different component. -->
-                            <span
-                              class="manager-salvage-result-ordinal"
-                              data-salvage-result-ordinal={String(resultIndex + 1)}
-                              aria-hidden="true">{resultIndex + 1}</span
-                            >
-                          {/if}
                           <select
                             class="manager-input"
                             value={result.componentId}
@@ -932,48 +1143,16 @@
                               <option value={option.id}>{option.name}</option>
                             {/each}
                           </select>
-                          {#if salvageResolutionMode === 'progressive'}
-                            <span
-                              class="manager-chip is-info manager-salvage-result-difficulty"
-                              data-salvage-result-difficulty={salvageResultDifficulty(result.componentId) === null
-                                ? ''
-                                : String(salvageResultDifficulty(result.componentId))}
-                            >
-                              <i class="fas fa-gauge-high" aria-hidden="true"></i>
-                              <span>{salvageResultDifficulty(result.componentId) === null
-                                ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset', 'No difficulty')
-                                : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.Difficulty', 'Difficulty')} ${salvageResultDifficulty(result.componentId)}`}</span>
-                            </span>
-                          {/if}
-                          {#if salvageProgressive && result.componentId}
-                            <!-- Opens the referenced YIELD component's editor — the
-                                 IN-MANAGER component-edit view, not the standalone
-                                 SvelteComponentEditorApp window. Component -> component
-                                 navigation is guarded (confirmComponentRouteExit
-                                 deliberately has no component-edit bypass), so a dirty
-                                 draft prompts rather than being discarded. -->
-                            <button
-                              type="button"
-                              class="manager-icon-button"
-                              data-salvage-result-edit={result.componentId}
-                              aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult', 'Edit {name}').replace('{name}', salvageComponentName(result.componentId))}
-                              title={text('FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult', 'Edit {name}').replace('{name}', salvageComponentName(result.componentId))}
-                              onclick={() => onOpenComponent(result.componentId)}
-                              disabled={saving}
-                            >
-                              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                            </button>
-                          {/if}
-                          <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            class="manager-input manager-salvage-result-quantity"
+                          <Stepper
                             value={result.quantity}
-                            aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultQuantity', 'Quantity for {name}').replace('{name}', salvageComponentName(result.componentId))}
-                            data-salvage-result-quantity
-                            oninput={(event) => updateSalvageResult(group.id, result.id, { quantity: clampSalvageQuantity(event.currentTarget.value) })}
+                            min={1}
+                            ariaLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultQuantity', 'Quantity for {name}').replace('{name}', salvageComponentName(result.componentId))}
+                            decrementLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.DecrementResult', 'Decrease quantity')}
+                            incrementLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.IncrementResult', 'Increase quantity')}
+                            max={9999}
                             disabled={saving}
+                            inputProps={{ 'data-salvage-result-quantity': '', class: 'fab-stepper-input manager-component-stepper-quantity' }}
+                            onChange={(next) => updateSalvageResult(group.id, result.id, { quantity: clampSalvageQuantity(next) })}
                           />
                           <button
                             type="button"
@@ -1018,6 +1197,7 @@
             <i class="fas fa-plus" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.AddGroup', 'Add group')}</span>
           </button>
+        {/if}
         </div>
 
         <!-- RULING A: everything below is CHROME — it only has meaning once salvage
@@ -1053,25 +1233,6 @@
               <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.NoOutcomes', 'The routed salvage check has no outcome tiers to route yet.')}</p>
             {/if}
           </div>
-        {/if}
-
-        {#if salvageShowChrome && salvageProgressive}
-          <!-- Reorder-permission card (issue 651), at the END of the salvage block for
-               the same reason as the recipe Results tab: the policy reads after the list
-               it governs. Progressive-only — the flag has no meaning in the simple/routed
-               salvage modes, which award a whole group rather than spending down a list. -->
-          <ToggleCard
-            variant="is-info"
-            icon="fas fa-arrow-down-a-z"
-            section="salvage-allow-player-result-reorder"
-            field="salvageAllowPlayerResultReorder"
-            title={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Title', 'Allow player result re-ordering')}
-            sub={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Sub', 'Players may set their own stage order for this salvage, which is remembered and used every time they salvage this component.')}
-            toggleLabel={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Toggle', 'Allow player result re-ordering')}
-            on={salvageDraft.allowPlayerResultReorder !== false}
-            disabled={saving}
-            onToggle={(next) => setSalvage({ allowPlayerResultReorder: next === true })}
-          />
         {/if}
 
         {#if salvageShowChrome && salvageShowDcOverride}

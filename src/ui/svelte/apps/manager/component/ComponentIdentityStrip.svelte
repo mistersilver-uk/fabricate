@@ -64,6 +64,19 @@
   const registeredItemUuid = $derived(String(component?.registeredItemUuidDisplay || ''));
   const sourceName = $derived(String(component?.name || '') || registeredItemUuid);
 
+  // The lock badge names WHERE the linked item lives ("Linked Items Directory"), which
+  // is the same segment the editor header already renders. Derived from the same
+  // projected fields and the same lang keys as `componentEditSourceSegment()` in the
+  // manager root — one vocabulary, so the badge and the header can never disagree.
+  const sourceOriginLabel = $derived(
+    component?.sourceOriginLabel
+      || (component?.sourceOrigin === 'compendium'
+        ? text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium')
+        : component?.sourceOrigin === 'world'
+          ? text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory')
+          : text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'))
+  );
+
   // TWO negative states, not one. `sourceMissing` (the stored uuid no longer resolves)
   // and `hasRegisteredItemUuid === false` (never linked). The strip's whole premise —
   // "name, image & description follow the linked item" — is MEANINGLESS when unlinked,
@@ -144,10 +157,20 @@
      is never waivable, and none of this is visible to `npm test`.
 
      They were two separate cards (a body section and a rail inspector); the strip
-     merges them, so the outer card keeps "identity" and the source-linkage block below
-     keeps "source". -->
+     merges them, so the outer strip keeps "identity" and the drop target keeps "source".
+
+     ── A STRIP, NOT A FORM ──────────────────────────────────────────────────────────
+     This used to render Name and Description as read-only INPUT-shaped boxes at
+     `opacity: .8`, under an "Identity" panel heading. It read as a disabled form: the
+     GM's eye goes to two controls that cannot be operated, and the actual affordance
+     (drop an item to swap) was a small box below them. The prototype's answer — adopted
+     here — is that the identity is DISPLAY, not fields: a chip, a serif name, a lock
+     badge naming the source, and the description as flowing prose. The only interactive
+     thing in the strip is the drop target, so it is the only thing that looks like a
+     control. There is no "Identity" heading either — the content is self-evidently the
+     component's identity, and the heading was pure chrome. -->
 <section
-  class="manager-task-core-card manager-component-identity-strip"
+  class="manager-component-panel manager-component-identity-strip"
   data-component-edit-section="identity"
   data-component-identity-drop-active={dropActive}
   use:dragDrop={{
@@ -156,114 +179,115 @@
     onActiveChange: (active) => { dropActive = active; }
   }}
 >
-  <div class="manager-task-card-heading">
-    <div>
-      <h3>{text('FABRICATE.Admin.Manager.Component.Identity.Title', 'Identity')}</h3>
-      {#if showPremiseNote}
-        <p class="manager-muted" data-component-identity-premise>
-          {text('FABRICATE.Admin.Manager.Component.Identity.SourceBackedHint', 'This component is backed by a Foundry item. Changes to its source item’s name, image, or description will be reflected here.')}
-        </p>
-      {:else if unlinked}
-        <p class="manager-muted" data-component-identity-unlinked-hint>
-          {text('FABRICATE.Admin.Manager.Component.Identity.UnlinkedHint', 'This component has no linked Foundry item, so it has no name, image or description to follow. Drop one below to link it.')}
-        </p>
-      {/if}
-    </div>
-    {#if showOverflow}
-      <!-- SearchablePopover is the house action-menu vehicle and is PORTALED to the
-           `.fabricate-manager` host, so it escapes the panel's `overflow: hidden`. A
-           naive absolutely-positioned menu clips inside a scrolling column — which is
-           exactly what decision 4's single-column editor creates. -->
-      <SearchablePopover
-        options={overflowOptions}
-        showSearch={false}
-        showChevron={false}
-        disabled={saving}
-        triggerClass="manager-icon-button manager-component-overflow-trigger"
-        triggerIcon="fas fa-ellipsis-vertical"
-        triggerTitle={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
-        popoverClass="manager-component-overflow-popover"
-        onChoose={chooseOverflow}
-      />
+  <span class="manager-component-identity-chip" aria-hidden="true">
+    {#if sourceMissing}
+      <i class="fas fa-link-slash"></i>
+    {:else if component?.img}
+      <img src={component.img} alt="" />
+    {:else}
+      <i class="fas fa-box-open"></i>
     {/if}
-  </div>
+  </span>
 
-  <div class="manager-component-source-block" data-component-edit-section="source">
-  {#if hasRegisteredItemUuid}
-    <!-- Drop-to-replace and right-click-to-unlink are ENHANCEMENTS; the overflow's
-         Unlink and the name's Open provide the accessible path. -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="manager-environment-scene-linked manager-component-source-linked"
-      data-component-edit-action="replace-source"
-      data-component-source-linked
-      role="group"
-      aria-label={text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item')}
-      title={text('FABRICATE.Admin.Manager.Component.SourceCard.ReplaceHint', 'Drop a Foundry item to replace it, or right-click to unlink.')}
-      oncontextmenu={(event) => { event.preventDefault(); unlinkSource(); }}
-      onmousedown={onLinkedSourceMouseDown}
-    >
-      {#if dropActive}
-        <!-- Under a drag the strip stops describing the CURRENT link and describes what
-             releasing will do — the swap is destructive-ish (it restamps the roles map
-             and commits immediately), so it says so before the drop, not after. -->
-        <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-arrow-down-to-bracket"></i></span>
-      {:else if sourceMissing}
-        <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-link-slash"></i></span>
-      {:else if component?.img}
-        <img class="manager-environment-scene-thumb" src={component.img} alt="" />
-      {:else}
-        <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-box-open"></i></span>
-      {/if}
-      {#if dropActive}
-        <span class="manager-environment-scene-name manager-muted" data-component-source-release>{text('FABRICATE.Admin.Manager.Component.SourceCard.ReleaseToSwap', 'Release to swap the linked item')}</span>
-      {:else if sourceMissing}
-        <span class="manager-environment-scene-name manager-muted" data-component-source-unresolved>{text('FABRICATE.Admin.Manager.Component.SourceCard.MissingLabel', 'Source item unresolved')}</span>
-      {:else}
+  <div class="manager-component-identity-copy">
+    <div class="manager-component-identity-name-row">
+      {#if hasRegisteredItemUuid && !sourceMissing}
+        <!-- Open-sheet stays on the source NAME — the common action, where the
+             prototype renders it. `data-component-edit-field="name"` rides the same
+             element: the strip has exactly one name, and splitting the hook off onto a
+             wrapper would let the two drift. -->
         <button
           type="button"
-          class="manager-environment-scene-name"
+          class="manager-component-identity-name"
           data-component-edit-action="open-source"
+          data-component-edit-field="name"
           onclick={(event) => { event.stopPropagation(); openSource(); }}
           title={text('FABRICATE.Admin.Manager.Component.SourceCard.Open', 'Open Source Item')}
         >{sourceName}</button>
+      {:else}
+        <span class="manager-component-identity-name" data-component-edit-field="name">{component?.name || '—'}</span>
+      {/if}
+
+      {#if hasRegisteredItemUuid && !sourceMissing}
+        <span class="manager-chip manager-component-identity-lock" data-component-identity-lock>
+          <i class="fas fa-lock" aria-hidden="true"></i>
+          <span>{`${text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')} ${sourceOriginLabel}`}</span>
+        </span>
+      {:else if sourceMissing}
+        <span class="manager-chip is-warning" data-component-source-unresolved>
+          <i class="fas fa-link-slash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.MissingLabel', 'Source item unresolved')}</span>
+        </span>
+      {/if}
+
+      {#if showOverflow}
+        <!-- SearchablePopover is the house action-menu vehicle and is PORTALED to the
+             `.fabricate-manager` host, so it escapes the panel's `overflow: hidden`. A
+             naive absolutely-positioned menu clips inside a scrolling column — which is
+             exactly what decision 4's single-column editor creates. -->
+        <SearchablePopover
+          options={overflowOptions}
+          showSearch={false}
+          showChevron={false}
+          disabled={saving}
+          triggerClass="manager-icon-button manager-component-overflow-trigger"
+          triggerIcon="fas fa-ellipsis-vertical"
+          triggerTitle={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
+          triggerAriaLabel={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
+          popoverClass="manager-component-overflow-popover"
+          onChoose={chooseOverflow}
+        />
       {/if}
     </div>
-    {#if sourceMissing}
-      <p class="manager-muted" data-component-source-missing-hint>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</p>
+
+    <!-- Flowing prose, not a boxed control. Read from the LIVE prop. -->
+    <p class="manager-component-identity-description" data-component-edit-field="description">{component?.description || '—'}</p>
+
+    {#if showPremiseNote}
+      <p class="manager-component-identity-note" data-component-identity-premise>
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Component.Identity.SourceBackedHint', 'Name, image & description follow the linked item and can’t be edited here.')}</span>
+      </p>
+    {:else if unlinked}
+      <p class="manager-component-identity-note" data-component-identity-unlinked-hint>
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Component.Identity.UnlinkedHint', 'This component has no linked Foundry item, so it has no name, image or description to follow. Drop one here to link it.')}</span>
+      </p>
+    {:else if sourceMissing}
+      <p class="manager-component-identity-note" data-component-source-missing-hint>
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</span>
+      </p>
     {/if}
-  {:else}
-    <!-- The unlinked state, dropzone-forward. -->
-    <div
-      class="manager-environment-scene-dropzone manager-component-source-drop-target"
-      data-component-edit-action="replace-source"
-      data-component-source-dropzone
-    >
-      <i class={dropActive ? 'fas fa-arrow-down-to-bracket' : 'fas fa-box'} aria-hidden="true"></i>
-      <span>{dropActive
-        ? text('FABRICATE.Admin.Manager.Component.SourceCard.ReleaseToSwap', 'Release to swap the linked item')
-        : text('FABRICATE.Admin.Manager.Component.SourceCard.NoSourceHint', 'Drop or replace a Foundry item to link this component to a source.')}</span>
-    </div>
-  {/if}
   </div>
 
-  <!-- The name/description the linked item provides, read from the LIVE prop. -->
-  <div class="manager-component-identity-fields">
-    <div class="manager-field manager-component-readonly-field">
-      <span class="manager-component-readonly-label">
-        <i class="fas fa-lock" aria-hidden="true" title={text('FABRICATE.Admin.Manager.Component.Identity.LockedFieldTooltip', "Provided by the linked Foundry item and can't be edited here.")}></i>
-        <span>{text('FABRICATE.Admin.Manager.Component.Identity.NameLabel', 'Name')}</span>
-      </span>
-      <p class="manager-component-readonly-value" data-component-edit-field="name">{component?.name || '—'}</p>
-    </div>
-
-    <div class="manager-field manager-component-readonly-field">
-      <span class="manager-component-readonly-label">
-        <i class="fas fa-lock" aria-hidden="true" title={text('FABRICATE.Admin.Manager.Component.Identity.LockedFieldTooltip', "Provided by the linked Foundry item and can't be edited here.")}></i>
-        <span>{text('FABRICATE.Admin.Manager.Component.Identity.DescriptionLabel', 'Description')}</span>
-      </span>
-      <p class="manager-component-readonly-value is-multiline" data-component-edit-field="description">{component?.description || '—'}</p>
-    </div>
+  <!-- Drop-to-replace and right-click-to-unlink are ENHANCEMENTS; the overflow's Unlink
+       and the name's Open provide the accessible path. `data-component-edit-section="source"`
+       rides the drop target because that IS the source affordance now that the read-only
+       boxes are gone. -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div
+    class="manager-component-source-drop-target"
+    data-component-edit-section="source"
+    data-component-edit-action="replace-source"
+    data-component-source-linked={hasRegisteredItemUuid ? '' : undefined}
+    data-component-source-dropzone={hasRegisteredItemUuid ? undefined : ''}
+    role="group"
+    aria-label={text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item')}
+    title={hasRegisteredItemUuid
+      ? text('FABRICATE.Admin.Manager.Component.SourceCard.ReplaceHint', 'Drop a Foundry item to replace it, or right-click to unlink.')
+      : text('FABRICATE.Admin.Manager.Component.SourceCard.NoSourceTitle', 'Drop a Foundry item to link this component to a source.')}
+    oncontextmenu={(event) => { event.preventDefault(); unlinkSource(); }}
+    onmousedown={onLinkedSourceMouseDown}
+  >
+    <i class={dropActive ? 'fas fa-arrow-down-to-bracket' : 'fas fa-arrow-right-arrow-left'} aria-hidden="true"></i>
+    {#if dropActive}
+      <!-- Under a drag the strip stops describing the CURRENT link and describes what
+           releasing will do — the swap is destructive-ish (it restamps the roles map and
+           commits immediately), so it says so before the drop, not after. -->
+      <span data-component-source-release>{text('FABRICATE.Admin.Manager.Component.SourceCard.ReleaseToSwap', 'Release to swap the linked item')}</span>
+    {:else}
+      <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.ReplaceLabel', 'Drop a world or compendium item to replace')}</span>
+    {/if}
   </div>
 </section>
