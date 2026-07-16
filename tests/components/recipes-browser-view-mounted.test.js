@@ -22,7 +22,10 @@ const RECIPE_RAW_MODULES = [
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
-  'src/utils/recipeBrowserModel.js'
+  'src/utils/recipeBrowserModel.js',
+  // recipeBrowserModel imports the shared category totals (issue 676); omitting it here
+  // HANGS this suite (`# cancelled`) rather than failing it.
+  'src/utils/browserGroupCounts.js'
 ];
 
 const RECIPE_PRIMITIVES = [
@@ -127,9 +130,10 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(root.querySelector('[role="table"]'), null);
   });
 
-  // The model groups the PAGE, not the filtered list. A header counting the filtered
-  // list therefore reads "12 recipes" above the three rows page 2 actually renders.
-  it('counts what the group RENDERS, not what the whole filtered list holds', async () => {
+  // The model groups the PAGE, not the filtered list — so a header counting only the
+  // filtered list reads "12 recipes" above the three rows page 2 renders, and a header
+  // counting only the page says a 12-strong category holds 10. It says BOTH (issue 676).
+  it('pairs what the group RENDERS with the category total across the filtered list', async () => {
     const many = Array.from({ length: 12 }, (_, index) =>
       makeRecipe({
         id: `r${index + 1}`,
@@ -148,7 +152,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     const renderedRows = () => root.querySelectorAll('.manager-recipe-row').length;
 
     assert.equal(renderedRows(), 12, 'the default page holds all twelve');
-    assert.equal(countText(), '12 recipes');
+    assert.equal(countText(), '12 recipes', 'a wholly-shown group says it once, not "12 of 12"');
 
     const size = root.querySelector('[data-pagination-size]');
     size.value = '10';
@@ -156,13 +160,41 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     flushSync();
 
     assert.equal(renderedRows(), 10, 'page 1 of a 10-row page');
-    assert.equal(countText(), '10 recipes', 'the header counts the page, not the 12 filtered');
+    assert.equal(countText(), '10 of 12 recipes', 'ten rows below it, twelve in the category');
 
     root.querySelector('[data-pagination-next]').click();
     flushSync();
 
     assert.equal(renderedRows(), 2, 'page 2 holds the remaining two');
-    assert.equal(countText(), '2 recipes', 'the header agrees with the two rows below it');
+    assert.equal(countText(), '2 of 12 recipes', 'the header agrees with the two rows below it');
+  });
+
+  // "1 recipes" was the shipped component-browser bug; the singular that reaches the
+  // paged form is "1 of N", whose noun agrees with the total.
+  it('handles the singular on both the whole-group and the paged form', async () => {
+    const many = Array.from({ length: 11 }, (_, index) =>
+      makeRecipe({
+        id: `r${index + 1}`,
+        name: `Draught ${String(index + 1).padStart(2, '0')}`,
+        category: 'alchemy'
+      })
+    );
+    const root = await browser.mount({
+      recipes: many,
+      recipeCategories: [{ name: 'alchemy', count: 11 }],
+      showRecipeCategories: true
+    });
+    const countText = () => root.querySelector('.fab-group-count').textContent.trim();
+
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.equal(root.querySelectorAll('.manager-recipe-row').length, 1, 'page 2 holds one row');
+    assert.equal(countText(), '1 of 11 recipes', 'never "1 recipes", never a bare "1"');
   });
 
   it('collapses and re-expands a category group through its header button', async () => {

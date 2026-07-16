@@ -1706,6 +1706,7 @@
           "GroupByCategory": "Group by category",
           "GroupCount": "{count} recipes",
           "GroupCountOne": "1 recipe",
+          "GroupCountOfTotal": "{count} of {total} recipes",
           "SortBy": "Sort by",
           "SortLabel": "Sort recipes",
           "SortName": "Name",
@@ -2239,6 +2240,7 @@
             "Label": "Component category"
           },
           "GroupCountOne": "1 component",
+          "GroupCountOfTotal": "{count} of {total} components",
           "CountRange": "{start}–{end} of {total}",
           "ChipCategory": "Category: {value}",
           "ChipEssence": "Essence: {value}",

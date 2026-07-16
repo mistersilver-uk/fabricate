@@ -7,6 +7,7 @@
   import ComponentRow from './components/ComponentRow.svelte';
   import {
     COMPONENT_SORT_KEYS,
+    componentCategoryOf,
     componentCategoryOptions,
     createComponentBrowserState,
     describeActiveComponentFilters,
@@ -15,6 +16,7 @@
     paginateComponents,
     sortComponents
   } from '../../../../utils/componentBrowserModel.js';
+  import { countByCategory } from '../../../../utils/browserGroupCounts.js';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel
@@ -78,7 +80,11 @@
     pageIndex: ui.pageIndex,
     pageSize: ui.pageSize
   }));
-  const groups = $derived(ui.groupByCategory ? groupComponentsByCategory(page.components) : []);
+  // The per-category totals the group headers pair with their rendered count. Counted
+  // over the FILTERED rows (`itemCards` arrives already search-filtered by the store),
+  // so a total can never ignore an active filter.
+  const categoryTotals = $derived(countByCategory(filteredComponents, componentCategoryOf));
+  const groups = $derived(ui.groupByCategory ? groupComponentsByCategory(page.components, categoryTotals) : []);
 
   // The active-filter chips, derived by the pure model so the run and the "is anything
   // on?" question can never disagree.
@@ -230,9 +236,24 @@
     return ui.collapsedCategories.has(category);
   }
 
-  // "1 components" is not a sentence. The singular is its own key, exactly as the
-  // Recipe Studio's GroupCount / GroupCountOne pair already is.
-  function groupCountText(count) {
+  // The header says BOTH numbers, because either one alone lies (issue 676). This view
+  // groups the PAGE, so counting `filteredComponents` would put "282 components" above
+  // the 25 rows page 1 renders — but counting only the page put "General · 25 components"
+  // above page 1 of a 282-strong General bucket, which says the bucket holds 25. So a
+  // partially-shown group reads "25 of 282 components"; `group.total` is the category's
+  // size across the FILTERED rows.
+  //
+  // A group shown WHOLE says it once — "25 components", not "25 of 25". Grouping is on by
+  // default and most libraries fit one page, so the "of" form would otherwise be pure
+  // noise on the common case. The plural agrees with the TOTAL, which is >= 2 whenever
+  // the "of" form is used; "1 components" (the shipped bug) is what the GroupCountOne key
+  // exists to prevent.
+  function groupCountText(group) {
+    const count = group.components.length;
+    const total = group.total ?? count;
+    if (total > count) {
+      return format('FABRICATE.Admin.Manager.Component.GroupCountOfTotal', '{count} of {total} components', { count, total });
+    }
     return count === 1
       ? text('FABRICATE.Admin.Manager.Component.GroupCountOne', '1 component')
       : format('FABRICATE.Admin.Manager.Component.GroupCount', '{count} components', { count });
@@ -458,7 +479,7 @@
             <section class="manager-component-group" data-component-group={group.category}>
               <CollapsibleGroupHeader
                 name={categoryLabel(group.category)}
-                countText={groupCountText(group.components.length)}
+                countText={groupCountText(group)}
                 expanded={!isCategoryCollapsed(group.category)}
                 controls={`manager-component-group-${group.category}`}
                 onToggle={() => toggleCategoryCollapsed(group.category)}

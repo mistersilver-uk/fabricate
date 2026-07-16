@@ -18,6 +18,7 @@ import {
   paginateComponents,
   sortComponents,
 } from '../../src/utils/componentBrowserModel.js';
+import { countByCategory } from '../../src/utils/browserGroupCounts.js';
 
 const ROWS = [
   { id: 'a', name: 'Iron Ore', category: 'Metal', essences: [{ id: 'earth', name: 'Earth', quantity: 2 }] },
@@ -82,6 +83,23 @@ describe('component browser model (issue 676)', () => {
       ['Herb', 'Metal', 'general']
     );
     assert.deepEqual(names(groups[1].components), ['Iron Ore', 'Copper Ore']);
+  });
+
+  // The view groups the PAGE, so a bucket's own length is only what is on screen. The
+  // header pairs it with the category's FILTERED total ("2 of 5 components") — issue 676.
+  it('carries the category total from the filtered rows, not the page slice', () => {
+    const totals = countByCategory(ROWS, componentCategoryOf);
+    const pageOne = groupComponentsByCategory([ROWS[0]], totals);
+
+    assert.equal(pageOne[0].category, 'Metal');
+    assert.equal(pageOne[0].components.length, 1, 'the page renders one Metal row');
+    assert.equal(pageOne[0].total, 2, 'but the filtered Metal bucket holds two');
+  });
+
+  it('degrades total to the bucket length when no totals are supplied', () => {
+    for (const group of groupComponentsByCategory(ROWS)) {
+      assert.equal(group.total, group.components.length);
+    }
   });
 
   it('sorts by name, category, essence count and salvage group count, with name as the tiebreak', () => {

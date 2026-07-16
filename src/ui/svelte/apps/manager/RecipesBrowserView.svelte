@@ -178,11 +178,24 @@
     return `manager-recipe-group-${category || 'all'}`;
   }
 
-  // The header counts what the GROUP RENDERS, not what the whole filtered list holds.
+  // The header says BOTH numbers, because either one alone lies (issue 676).
   // `buildRecipeBrowserModel` groups the PAGE, so counting `model.filtered` would put
-  // "12 recipes" above three rows on page 2.
+  // "12 recipes" above the three rows page 2 renders — but counting only the page put
+  // "Alchemy · 25 recipes" above page 1 of a 282-strong Alchemy bucket, which says the
+  // bucket holds 25. So a partially-shown group reads "25 of 282 recipes": `group.total`
+  // is the category's size across the FILTERED list (the model computes it from the same
+  // filtered rows it paged, so an active filter is always respected).
+  //
+  // A group shown WHOLE says it once — "25 recipes", not "25 of 25". Grouping is on by
+  // default and most libraries fit one page, so the "of" form would otherwise be pure
+  // noise on the common case. The plural agrees with the TOTAL, which is >= 2 whenever
+  // the "of" form is used, so "1 of 282 recipes" is the only singular that reaches it.
   function groupCountText(group) {
     const count = (group?.recipes || []).length;
+    const total = group?.total ?? count;
+    if (total > count) {
+      return format('FABRICATE.Admin.Manager.Recipe.GroupCountOfTotal', '{count} of {total} recipes', { count, total });
+    }
     return count === 1
       ? text('FABRICATE.Admin.Manager.Recipe.GroupCountOne', '1 recipe')
       : format('FABRICATE.Admin.Manager.Recipe.GroupCount', '{count} recipes', { count });

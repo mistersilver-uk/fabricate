@@ -1,6 +1,13 @@
 /**
- * Pure list model for the GM component library (issue 676): filter → group → sort →
- * paginate.
+ * Pure list model for the GM component library (issue 676): filter → sort → paginate →
+ * group.
+ *
+ * That order is deliberate and is what `ComponentsBrowserView` composes: the PAGE is
+ * grouped, so the pager stays the unit of truth for how many rows are on screen. (This
+ * header claimed `filter → group → sort → paginate` until issue 676's follow-up — the
+ * opposite of what ships, which is how the group header's page-vs-category count
+ * confusion went unnoticed.) The group header therefore reports both its rendered count
+ * and the category's filtered total; `countByCategory` supplies the latter.
  *
  * A sibling of `recipeBrowserModel.js`, and here for the same reason it is: `src/ui/**`
  * is not covered by the ESLint/Prettier globs, so a module there can be lint-green and
@@ -13,6 +20,7 @@
  * still contributes an active-filter chip.
  */
 
+import { categoryTotalOf } from './browserGroupCounts.js';
 import { GENERAL_COMPONENT_CATEGORY, normalizeComponentCategory } from './componentCategories.js';
 
 /** @typedef {'name' | 'category' | 'essences' | 'salvage'} ComponentSortKey */
@@ -154,10 +162,18 @@ export function sortComponents(components, options = {}) {
  * badge-vs-filter asymmetry; the remaining buckets are name-ordered so the group list
  * is stable across re-sorts of the rows themselves.
  *
- * @param {object[]} components
- * @returns {{category: string, components: object[]}[]}
+ * The rows passed in are the PAGE, so each bucket also carries `total`: how many rows
+ * the category holds across the whole FILTERED list. Without it the header reads
+ * "General · 25 components" above page 1 of a 282-strong General bucket, which says the
+ * bucket holds 25. Pass the map `countByCategory(filteredRows, componentCategoryOf)`
+ * built from the same filters; omit it and `total` degrades to the bucket's own length.
+ *
+ * @param {object[]} components the page's rows.
+ * @param {Map<string, number>} [categoryTotals] from `countByCategory`, over the
+ *   FILTERED rows.
+ * @returns {{category: string, components: object[], total: number}[]}
  */
-export function groupComponentsByCategory(components) {
+export function groupComponentsByCategory(components, categoryTotals) {
   const buckets = new Map();
 
   for (const component of Array.isArray(components) ? components : []) {
@@ -167,7 +183,11 @@ export function groupComponentsByCategory(components) {
   }
 
   return [...buckets]
-    .map(([category, rows]) => ({ category, components: rows }))
+    .map(([category, rows]) => ({
+      category,
+      components: rows,
+      total: categoryTotalOf(categoryTotals, category, rows.length),
+    }))
     .sort((a, b) => compareCategories(a.category, b.category));
 }
 

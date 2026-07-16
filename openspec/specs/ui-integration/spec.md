@@ -538,6 +538,13 @@ Category group headers are `aria-expanded` / `aria-controls` buttons and default
 These defaults are load-bearing: a default that hid rows would leave the GM staring at an empty library.
 A group header is a tight left cluster — chevron, folder, name, count — not a full-width bar with the count flung to the far edge, which reads as a table header.
 
+Both GM libraries group the **page**, not the filtered list, so a group header reports **two** numbers whenever they differ: what the group renders, and the category's total across the **filtered** rows (`25 of 282 recipes`).
+Either number alone is a false statement — a count of the page says a 282-strong category holds 25, and a count of the filtered list puts `12 recipes` above the three rows page 2 renders.
+A group shown **whole** reports one number (`25 recipes`), never `25 of 25`.
+The total counts the filtered rows, so an active search / status / lock / category / essence filter is always respected; a total over the raw roster would be a third wrong number.
+Both singulars are localized — `1 recipe` and `1 of 282 recipes`, never `1 recipes`.
+The Component Studio's library follows the identical rule.
+
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).
 The flash **floats** over the list rather than sitting in flow above it: an in-flow banner shoves every row down the page as it appears, moving the row the GM just clicked out from under the cursor.
@@ -954,6 +961,7 @@ The disabled-state copy distinguishes "no result groups authored yet" from "auth
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
 A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
 A "Manage presets" link routes to the system's Checks screen.
+7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
 
 ## Step Editor
 
