@@ -161,7 +161,7 @@ test('disables BOTH colliding recipes after folding essences into signature-bear
   const { recipes, _essenceCollisionDisabledRecipes } = migrateEssencesToIngredientGroups(data);
 
   // (1) both recipes still present (not deleted).
-  assert.deepEqual(recipes.map((r) => r.id).sort(), ['A', 'B']);
+  assert.deepEqual(recipes.map((r) => r.id).sort((a, b) => a.localeCompare(b)), ['A', 'B']);
   // (2) at least one collider disabled — the reconciliation disables BOTH.
   const byId = Object.fromEntries(recipes.map((r) => [r.id, r]));
   assert.equal(byId.A.enabled, false);

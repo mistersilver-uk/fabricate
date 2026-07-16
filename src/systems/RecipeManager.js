@@ -31,6 +31,10 @@ const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 // resolves to an inventory item — always shows a coin icon.
 const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
 const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
+// An essence match never resolves to an inventory item (it is met by accumulating an
+// essence across items), so its tile shows a generic aura image plus the essence
+// definition's authored icon when one exists.
+const FALLBACK_ESSENCE_IMG = 'icons/svg/aura.svg';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -792,6 +796,16 @@ export class RecipeManager {
       (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
     );
 
+    // Lazily accumulate held essences once (only when a satisfied essence tile needs
+    // it), via the same component-aware `_accumulateEssences` path the resolver uses.
+    let accumulatedEssences = null;
+    const getAccumulatedEssences = () => {
+      if (accumulatedEssences === null) {
+        accumulatedEssences = this._accumulateEssences(availableItems, recipe);
+      }
+      return accumulatedEssences;
+    };
+
     // The option the engine chose per group (issue 553), so the tile always mirrors
     // the option/stack the craft consumes.
     const chosenByGroup = this._chosenOptionByGroup(ingredientSet, selection);
@@ -828,16 +842,34 @@ export class RecipeManager {
       const consumedItem =
         (selection?.plan || []).find((entry) => entry.ingredient === chosenOption)?.item || null;
 
-      const matchingItems = availableItems.filter((item) =>
-        this.ingredientMatchesItem(recipe, chosenOption, item)
-      );
-      const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
       const visual = this._resolveIngredientVisual(
         recipe,
         chosenOption,
         availableItems,
         consumedItem
       );
+
+      // An essence option is amount-based, not occurrence-based: `ingredientMatchesItem`
+      // returns false for it, so use the essence amount as `need` and the accumulated
+      // essence for its id as `have` (the same component-aware `_accumulateEssences`
+      // path the resolver consumes) — else a satisfied essence tile reads have 0 / need 1.
+      if (chosenOption?.match?.type === 'essence') {
+        const essenceId = String(chosenOption.match.essenceId || '').trim();
+        const accumulated = getAccumulatedEssences();
+        return {
+          ...visual,
+          groupId: group?.id ?? null,
+          description,
+          need: Math.max(0, Number(chosenOption.match.amount) || 0),
+          have: accumulated[essenceId] || 0,
+          satisfied: true,
+        };
+      }
+
+      const matchingItems = availableItems.filter((item) =>
+        this.ingredientMatchesItem(recipe, chosenOption, item)
+      );
+      const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
       return {
         ...visual,
         groupId: group?.id ?? null,
@@ -1047,6 +1079,14 @@ export class RecipeManager {
       const name = this.resolveComponentName(recipe, match.componentId);
       return `${ingredient.quantity || 1}x ${name}`;
     }
+    // Resolve the essence NAME (not the raw essenceId, which is a generated id) so an
+    // essence option's tile reads "3x Fire essence" rather than "3x <uuid> essence"
+    // (the issue-595 opaque-id class). The pure handler's describe stays generic.
+    if (match?.type === 'essence' && match.essenceId) {
+      const name = this._resolveEssenceName(recipe, match.essenceId);
+      const amount = Math.max(0, Number(match.amount) || 0);
+      return `${amount}x ${name} essence`;
+    }
     return ingredient.getDescription?.() || '';
   }
 
@@ -1081,6 +1121,18 @@ export class RecipeManager {
         name: this.resolveComponentName(recipe, match.componentId),
         img: this.resolveComponentImg(recipe, match.componentId),
       };
+    }
+
+    // An essence tile resolves its NAME + authored icon from the essence definition
+    // (never the raw essenceId) and shows a generic aura image, mirroring the
+    // currency tile's coin fallback. The FA `icon` class is carried alongside so a
+    // tile that renders an icon can prefer it.
+    if (match?.type === 'essence') {
+      const definition = this._resolveEssenceDefinition(recipe, match.essenceId);
+      const essenceName = this._resolveIngredientDescription(recipe, ingredient);
+      const icon =
+        typeof definition?.icon === 'string' && definition.icon.trim() ? definition.icon : null;
+      return { componentId: null, name: essenceName, img: FALLBACK_ESSENCE_IMG, icon };
     }
 
     const name = ingredient?.getDescription?.() || '';
@@ -1930,7 +1982,30 @@ export class RecipeManager {
     );
 
     const issues = [];
-    for (const [setIndex, set] of (recipe.ingredientSets || []).entries()) {
+
+    // Report a non-positive-quantity essence, preferring the named message when the
+    // essence resolves to a definition (issue 595 — never surface the raw id).
+    const pushBadQuantity = (setLabel, essenceId) => {
+      const essenceName = essenceNames.get(essenceId);
+      issues.push(
+        essenceName
+          ? buildRecipeActivationIssue('ingredientSetEssenceQuantityNamed', {
+              set: setLabel,
+              essence: essenceName,
+            })
+          : buildRecipeActivationIssue('ingredientSetEssenceQuantity', { set: setLabel })
+      );
+    };
+
+    // Walk recipe-level AND step-level ingredient sets, validating BOTH the legacy
+    // per-set essences map (back-compat read) AND first-class essence group OPTIONS
+    // (issue 649) so a dangling essence reference in a group option still raises
+    // `ingredientSetUnknownEssence` on enable.
+    const allSets = [
+      ...(recipe.ingredientSets || []),
+      ...(recipe.steps || []).flatMap((step) => step?.ingredientSets || []),
+    ];
+    for (const [setIndex, set] of allSets.entries()) {
       const setLabel =
         typeof set?.name === 'string' && set.name.trim() ? set.name.trim() : String(setIndex + 1);
       for (const [essenceId, qty] of Object.entries(set.essences || {})) {
@@ -1939,15 +2014,22 @@ export class RecipeManager {
         }
         const num = Number(qty);
         if (!Number.isFinite(num) || num <= 0) {
-          const essenceName = essenceNames.get(essenceId);
-          issues.push(
-            essenceName
-              ? buildRecipeActivationIssue('ingredientSetEssenceQuantityNamed', {
-                  set: setLabel,
-                  essence: essenceName,
-                })
-              : buildRecipeActivationIssue('ingredientSetEssenceQuantity', { set: setLabel })
-          );
+          pushBadQuantity(setLabel, essenceId);
+        }
+      }
+      for (const group of set.ingredientGroups || []) {
+        for (const option of group?.options || []) {
+          if (option?.match?.type !== 'essence') continue;
+          const essenceId = String(option.match.essenceId || '').trim();
+          if (!validEssenceIds.has(essenceId)) {
+            issues.push(
+              buildRecipeActivationIssue('ingredientSetUnknownEssence', { set: setLabel })
+            );
+          }
+          const num = Number(option.match.amount);
+          if (!Number.isFinite(num) || num <= 0) {
+            pushBadQuantity(setLabel, essenceId);
+          }
         }
       }
     }

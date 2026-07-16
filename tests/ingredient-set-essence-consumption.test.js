@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-globalThis.foundry = { utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}` } };
+globalThis.foundry = { utils: { randomID: () => crypto.randomUUID() } };
 
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 

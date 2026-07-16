@@ -1251,3 +1251,135 @@ test('issue 553: two items sharing a tag show the item each group actually consu
     'group2 tile shows the consumed metal-B image, not the re-derived first-match metal-A'
   );
 });
+
+// ---------------------------------------------------------------------------
+// Essence GROUP OPTIONS (issue 649): ingredient-tile name/icon + have/need,
+// consumption through the call site, and unknown-id activation validation.
+// ---------------------------------------------------------------------------
+
+function makeEssenceOptionGroup(essenceId, amount, id = null) {
+  return makeGroupData(
+    [{ quantity: 1, match: { type: 'essence', essenceId, amount } }],
+    id || foundry.utils.randomID()
+  );
+}
+
+test('essence group tile resolves the essence NAME + icon (never the raw id) and correct have/need', () => {
+  const systemId = 'sys-ess-tile';
+  const essenceId = 'restorative-2f1a';
+  const components = [
+    {
+      id: 'red-herb',
+      name: 'Red Herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
+      essences: { [essenceId]: 1 },
+    },
+  ];
+  // The item carries NO essence flag — the essence comes from its COMPONENT (proving
+  // the component-aware resolver is threaded through evaluateCraftability).
+  const redHerb = makeComponentItem('red-herb-item', 'Compendium.test.red-herb', 3);
+  const set = makeIngredientSet([makeEssenceOptionGroup(essenceId, 2, 'g-ess')]);
+
+  const manager = makeRecipeManagerWithEssences(
+    systemId,
+    [{ id: essenceId, name: 'Restorative', icon: 'fas fa-heart' }],
+    components
+  );
+  const recipe = new Recipe({
+    name: 'Healing Potion',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability([makeActor([redHerb])], recipe);
+  assert.equal(result.canCraft, true, 'component-defined essence satisfies the essence group');
+
+  const state = result.ingredientStates.find((s) => s.groupId === 'g-ess');
+  assert.ok(state, 'the essence group has an ingredient tile');
+  // Finding 1: the raw essenceId (a generated id) must NOT appear in the description.
+  assert.equal(state.description, '2x Restorative essence', 'tile shows the resolved essence name');
+  assert.ok(!state.description.includes(essenceId), 'the raw essence id never leaks into the tile');
+  assert.equal(state.icon, 'fas fa-heart', 'the essence definition icon is carried on the tile');
+  // Finding 2: a SATISFIED essence tile shows amount-based need + accumulated have.
+  assert.equal(state.need, 2, 'need is the essence amount, not the option quantity');
+  assert.equal(state.have, 3, 'have is the accumulated essence (3 herbs x 1 each)');
+  assert.equal(state.satisfied, true);
+});
+
+test('a MISSING essence group tile shows the accumulated have and the essence amount need', () => {
+  const systemId = 'sys-ess-missing';
+  const essenceId = 'fire';
+  const flagItem = {
+    uuid: 'ember',
+    id: 'ember',
+    system: { quantity: 1 },
+    getFlag: (scope, key) =>
+      scope === 'fabricate' && key === 'fabricate.essences' ? { fire: 1 } : undefined,
+  };
+  const set = makeIngredientSet([makeEssenceOptionGroup(essenceId, 4, 'g-ess')]);
+  const manager = makeRecipeManagerWithEssences(systemId, [{ id: 'fire', name: 'Fire' }]);
+  const recipe = new Recipe({
+    name: 'Fire Brew',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability([makeActor([flagItem])], recipe);
+  assert.equal(result.canCraft, false, 'one fire essence cannot meet a need of four');
+  const state = result.ingredientStates.find((s) => s.groupId === 'g-ess');
+  assert.equal(state.need, 4);
+  assert.equal(state.have, 1, 'have reflects the accumulated fire essence');
+  assert.equal(state.satisfied, false);
+});
+
+test('consumption threads the component-aware resolver: a component-defined essence draws down via canCraft', () => {
+  // Finding 6: drive through the RecipeManager call site with a component-defined
+  // essence (no essence flag on the item). This FAILS if evaluateCraftability stops
+  // binding `_buildEssenceOptionResolver` (the flag-only default would miss it).
+  const systemId = 'sys-ess-consume';
+  const essenceId = 'aether';
+  const components = [
+    {
+      id: 'crystal',
+      name: 'Crystal',
+      registeredItemUuid: 'Compendium.test.crystal',
+      originItemUuid: 'Compendium.test.crystal',
+      essences: { [essenceId]: 1 },
+    },
+  ];
+  const crystal = makeComponentItem('crystal-item', 'Compendium.test.crystal', 5);
+  const set = makeIngredientSet([makeEssenceOptionGroup(essenceId, 3, 'g-ess')]);
+  const manager = makeRecipeManagerWithEssences(systemId, [{ id: essenceId, name: 'Aether' }], components);
+  const recipe = new Recipe({
+    name: 'Aether Draught',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const { canCraft, satisfiableSet } = manager.canCraft([makeActor([crystal])], recipe);
+  assert.equal(canCraft, true, 'the essence group resolves against the component-defined essence');
+  assert.ok(satisfiableSet, 'a satisfiable set is reported');
+});
+
+test('_validateEssenceReferences flags an essence OPTION referencing a deleted essence id on enable', () => {
+  const systemId = 'sys-ess-validate';
+  const set = makeIngredientSet([makeEssenceOptionGroup('ghost-essence', 2, 'g-ess')]);
+  const manager = makeRecipeManagerWithEssences(systemId, [{ id: 'fire', name: 'Fire' }]);
+  const recipe = new Recipe({
+    name: 'Dangling Essence Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [{ componentId: 'x' }] }],
+  });
+
+  const validation = manager._validateEssenceReferences(recipe);
+  assert.equal(validation.valid, false, 'an unknown essence option id blocks activation');
+  assert.ok(
+    validation.issues.some((issue) => issue.code === 'ingredientSetUnknownEssence'),
+    'the unknown-essence issue is raised for the essence OPTION shape'
+  );
+});

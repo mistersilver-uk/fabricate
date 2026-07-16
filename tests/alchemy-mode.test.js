@@ -1344,7 +1344,7 @@ test('_matchAlchemySignature resolves a cross-group multi-overlap submission to 
 // A single-option essence group — exactly what the 1.17.0 migration produces from a
 // positive `set.essences[essenceId]` entry.
 function essenceOptionGroup(essenceId, amount) {
-  return { id: `ge-${Math.random().toString(36).slice(2)}`, options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }] };
+  return { id: `ge-${crypto.randomUUID()}`, options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }] };
 }
 
 test('_matchAlchemySignature: legacy essences map and migrated essence group give the SAME result', () => {

@@ -78,7 +78,7 @@ test('expandToComponentIds returns every component carrying the essence (positiv
     { id: 'c3', essences: { water: 5 } },
     { id: 'c4', essences: { fire: 1, water: 1 } },
   ]);
-  assert.deepEqual([...ids].sort(), ['c1', 'c4']);
+  assert.deepEqual([...ids].sort((a, b) => a.localeCompare(b)), ['c1', 'c4']);
 });
 
 test('validate accepts a complete essence option under requireComplete', () => {
