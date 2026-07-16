@@ -21,6 +21,7 @@
     normalizeRecipeCategory
   } from '../../../../../utils/recipeCategories.js';
   import { formatTimeRequirementCompact } from '../../../util/recipeDuration.js';
+  import ToggleCard from '../ToggleCard.svelte';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
 
@@ -187,45 +188,35 @@
        players but only a GM can craft it (recipe.locked) — it is unrelated to the image
        picker, which is always editable now that a recipe can belong to many books. -->
   <div class="manager-recipe-overview-status">
-    <div class={`manager-recipe-status-card is-enabled ${enabled ? 'is-on' : 'is-off'}`} data-recipe-section="enabled-status">
-      <span class="manager-recipe-status-icon" aria-hidden="true"><i class="fas fa-power-off"></i></span>
-      <div class="manager-recipe-status-copy">
-        <p class="manager-recipe-status-title">{text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}</p>
-        <p class="manager-recipe-status-sub manager-muted">{enableBlocked
-          ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedHint', 'Resolve the issues on the Validation tab before enabling.')
-          : text('FABRICATE.Admin.Manager.Recipe.EnabledSub', 'Craftable by players')}</p>
-      </div>
-      <button
-        type="button"
-        class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-        data-recipe-field="enabled"
-        aria-pressed={enabled}
-        disabled={saving || enableBlocked}
-        title={enableBlocked ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip', 'Resolve the issues on the Validation tab before enabling this recipe.') : undefined}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}
-        onclick={onToggleEnabled}
-      >
-        <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-      </button>
-    </div>
-    <div class={`manager-recipe-status-card is-locked ${locked ? 'is-on' : 'is-off'}`} data-recipe-section="locked-status">
-      <span class="manager-recipe-status-icon" aria-hidden="true"><i class="fas fa-lock"></i></span>
-      <div class="manager-recipe-status-copy">
-        <p class="manager-recipe-status-title">{text('FABRICATE.Admin.Manager.Recipe.Locked.Title', 'Locked')}</p>
-        <p class="manager-recipe-status-sub manager-muted" data-recipe-locked-state>{text('FABRICATE.Admin.Manager.Recipe.Locked.Sub', 'Visible but GM-only to craft')}</p>
-      </div>
-      <button
-        type="button"
-        class={`manager-status-toggle ${locked ? 'is-on' : 'is-off'}`}
-        data-recipe-field="locked"
-        aria-pressed={locked}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.Locked.Toggle', 'Lock this recipe')}
-        disabled={saving}
-        onclick={() => onToggleLocked(!locked)}
-      >
-        <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-      </button>
-    </div>
+    <ToggleCard
+      variant="is-enabled"
+      section="enabled-status"
+      field="enabled"
+      icon="fas fa-power-off"
+      title={text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}
+      sub={enableBlocked
+        ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedHint', 'Resolve the issues on the Validation tab before enabling.')
+        : text('FABRICATE.Admin.Manager.Recipe.EnabledSub', 'Craftable by players')}
+      on={enabled}
+      disabled={saving || enableBlocked}
+      toggleTitle={enableBlocked
+        ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip', 'Resolve the issues on the Validation tab before enabling this recipe.')
+        : ''}
+      onToggle={() => onToggleEnabled()}
+    />
+    <ToggleCard
+      variant="is-locked"
+      section="locked-status"
+      field="locked"
+      icon="fas fa-lock"
+      title={text('FABRICATE.Admin.Manager.Recipe.Locked.Title', 'Locked')}
+      sub={text('FABRICATE.Admin.Manager.Recipe.Locked.Sub', 'Visible but GM-only to craft')}
+      subAttr="data-recipe-locked-state"
+      on={locked}
+      disabled={saving}
+      toggleLabel={text('FABRICATE.Admin.Manager.Recipe.Locked.Toggle', 'Lock this recipe')}
+      onToggle={onToggleLocked}
+    />
   </div>
 
   {#if isMultiStep}
