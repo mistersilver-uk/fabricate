@@ -7,15 +7,14 @@ nav_order: 3.3
 # Salvage
 
 When the salvage feature is enabled on a system, players can dismantle components to recover partial materials.
-Salvage has no dedicated UI toggle today.
-It is set up by a developer through the API.
+Salvage is on by default for every system, and you turn it off with the **Salvage** toggle in the **Features** card on the System tab of the Crafting Admin panel.
 You configure salvage at two levels:
 
 - the system, which determines how salvage checks work
 - each component, which determines what that component yields when broken down
 
-Enabling the salvage feature is done through the API today.
-See the [CraftingSystemManager API]({% link api/system-manager.md %}).
+Players salvage from the **Inventory** tab of the Fabricate window.
+See [Salvaging From the Inventory Tab](#salvaging-from-the-inventory-tab).
 
 ## Salvage Resolution Mode
 
@@ -45,6 +44,8 @@ See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 When the salvage resolution mode is Routed or Progressive, you must configure a salvage check.
 This is separate from the recipe crafting check.
 A system can have both.
+
+Everything a player is shown when they salvage comes from the salvage check, never from the recipe crafting check.
 
 ## Component Salvage
 
@@ -97,17 +98,84 @@ A DC you set that does not match any tier is kept exactly as you typed it.
 It shows under **Custom** with its own value, and it is never rounded to the nearest tier.
 
 When the system's salvage DC is set by a macro rather than a fixed number, the **System default** option says so instead of showing a DC, because there is no single number to show.
+## Salvaging From the Inventory Tab
+
+Players salvage from the **Inventory** tab of the Fabricate window.
+Selecting an owned component opens the inspector beside the grid.
+When the component is salvageable, the inspector shows an **Info** tab and a **Salvage** tab.
+An item that cannot be salvaged shows no tab bar at all.
+
+Salvage happens inline in the inspector, so nothing opens in a separate window.
+Cards in the grid carry a recycle badge in their top-left corner when the component is salvageable, so players can see what can be broken down without opening each item.
+
+### What the Salvage Tab Shows
+
+The tab opens with a short banner naming the rule the component follows, then lists what the player stands to recover.
+What it lists depends on the system's salvage resolution mode, and on whether you have given that mode a salvage check roll formula.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Setup | What the player sees |
+|:------|:---------------------|
+| Simple, with no salvage check roll formula | **You will recover**, then the materials, each tagged **Guaranteed**. No roll is made. |
+| Simple, with a salvage check roll formula | **On a success**, the materials, the DC to beat, and a note that a failed roll can cost the component. |
+| Routed by check | Every outcome you authored, with the materials each one recovers. |
+| Progressive | The result stages in order, each with the check value that reaches it. |
+| Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+A component's DC override shifts the DC shown for a simple check, and it shifts the thresholds shown for relative outcome tiers.
+Fixed tiers own absolute segments of the roll range and have no DC, so they are shown exactly as you authored them and no DC appears.
+Progressive salvage has no DC either.
+See [Relative and fixed tiers]({% link crafting-checks.md %}#relative-and-fixed-tiers).
+
+### Making the Attempt
+
+The footer holds a single button that rolls and commits in one press.
+It reads **Salvage** when the mode needs no roll, and **Salvage roll** when it has a usable check.
+Pressing it opens the standard roll prompt, where the player picks Advantage, Normal or Disadvantage when the formula allows it, adds a situational bonus, and chooses a roll mode.
+The roll is posted to chat, so Dice So Nice animates it.
+There is no reroll and no separate confirmation step.
+
+Dismissing the prompt cancels the attempt.
+Nothing is consumed, no tool breaks, and no message is shown.
+The tab returns to how it looked before the roll.
+
+Once the roll resolves, a read-only summary appears, the body marks what was recovered and what the roll fell short of, and a ribbon confirms the materials were added.
+**Salvage again** clears the summary and returns the tab to its pre-roll state.
+The ribbon stays with the component that was salvaged, even when the last copy was consumed and its card has left the grid.
+
+When the component carries a time requirement, the press starts a run rather than finishing the salvage.
+The tab then shows the run's waiting message instead of a ribbon, and the materials arrive as world time advances.
+
+### Broken Tools
+
+A broken tool still shows its **Salvage** tab and can still be salvaged.
+Being broken stops a tool being used for crafting, but it does not stop it being recycled, which is usually the most useful thing left to do with it.
+
+The **Info** tab carries a banner saying the tool is broken and cannot be used for crafting, and the card shows a **Broken** marker in place of its quantity.
+Both are read-only, and Fabricate offers no repair action.
+
+A tool reads as broken in the Inventory tab when its on-break action has flagged it as broken, or when it has spent all of its limited uses.
+The spent-uses reading is skipped while the system's **Tool breakage source** is **Check-driven**, because under that source the check decides breakage and a tool's use count decides nothing.
+See [Tools]({% link tools.md %}#on-break-actions).
 
 ## Player Result Re-ordering
 
 A component set up for progressive salvage carries an **Allow player result re-ordering** setting on its salvage setup, and it is on by default.
 It decides whether a player's own preferred stage order is used when that component is salvaged, or whether your authored order always is.
 
-There is no player-facing salvage screen today, so players have no way to choose a salvage order in the interface.
-The setting is in place for when that screen ships.
-A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
+When it is on, the player can drag a stage on the **Salvage** tab, or move it with the move up and move down controls on each stage.
+Each move is announced for screen readers, and the reached-at values update to match the new order.
+A chosen order is a standing preference rather than a one-off choice, remembered per player and per component, in this world only.
 
-See [Progressive Mode]({% link recipes/progressive.md %}#player-result-re-ordering) for how the same setting behaves on recipes, where players do have a screen.
+When it is off, the stage list is shown in your authored order, marked **Order set by the GM**, and players cannot rearrange it.
+
+A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
+Once a salvage has resolved, the list locks and a note explains that the roll has already run down it.
+
+See [Progressive Mode]({% link recipes/progressive.md %}#player-result-re-ordering) for how the same setting behaves on recipes.
 
 ---
 

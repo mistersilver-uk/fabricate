@@ -86,9 +86,11 @@ Their order is simply ignored while the setting is off.
 ## Re-ordering and Salvage
 
 Components configured for progressive salvage carry the same **Allow player result re-ordering** setting, on the component's salvage setup, and it is on by default.
-There is no player-facing salvage screen today, so players have no way to choose a salvage order in the interface.
-The setting is in place for when that screen ships.
+Players re-order those stages on the **Salvage** tab of the Inventory inspector, exactly as they re-order a recipe's stages here.
 A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
+Once a salvage has resolved, its stage list locks, with a note explaining that the roll has already run down it rather than the **Order set by the GM** note used here.
+
+See [Salvaging From the Inventory Tab]({% link salvage.md %}#salvaging-from-the-inventory-tab).
 
 ## Creating a Progressive Recipe
 

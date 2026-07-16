@@ -78,6 +78,7 @@ Most optional features are off by default and must be explicitly enabled by a GM
 
 | Feature             | Default | Description                                                                                                                                               |
 |:--------------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Salvage             | On      | Enable component salvage, its check configuration, and the player Salvage tab in the Inventory inspector. Turning it off preserves whatever salvage you have already authored |
 | Essences            | Off     | Enable the essences system for abstract ingredient properties                                                                                             |
 | Property macros     | Off     | Allow result items to have their properties set by a macro                                                                                                |
 | Effect transfer     | Off     | Transfer active effects from essence source items to crafted results                                                                                      |

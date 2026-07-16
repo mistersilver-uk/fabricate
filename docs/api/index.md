@@ -40,6 +40,7 @@ game.fabricate.getRecipeManager()          // Recipe CRUD and queries
 game.fabricate.getCraftingEngine()          // Execute crafting
 game.fabricate.getCraftingSystemManager()   // System and component CRUD
 game.fabricate.getCraftingRunManager()      // Multi-step run management
+game.fabricate.salvageComponent({ actorId, systemId, componentId, interactive }) // Salvage one owned component
 game.fabricate.getGatheringEnvironmentStore() // Gathering environment persistence
 game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
@@ -182,6 +183,62 @@ Hooks.once('fabricate.ready', async () => {
 - `setSelectedAlchemySystemId(id)` persists the selection to that same client setting.
 
 The `fabricate.lastAlchemySystem` setting is `scope: 'client'`, so the choice is remembered per client/device, not per user account.
+
+### Salvage Runtime Facade
+
+`salvageComponent({ actorId, systemId, componentId, interactive })` salvages one owned component.
+It backs the player Inventory tab's Salvage panel and is the supported entry point for macros and integrations.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const actorId = game.user.character?.id;
+  const systemId = game.fabricate.listCraftingSystems()[0]?.id;
+
+  const outcome = await game.fabricate.salvageComponent({
+    actorId,
+    systemId,
+    componentId: 'my-component-id'
+  });
+
+  if (outcome.cancelled) return;            // The player dismissed the roll prompt.
+  if (!outcome.success) {
+    console.log(`Salvage failed: ${outcome.message}`);
+  } else if (outcome.results === null) {
+    console.log(`Salvage started: ${outcome.message}`); // Time-gated run.
+  } else {
+    console.log(`Recovered: ${outcome.results.map((item) => item.name).join(', ')}`);
+  }
+});
+```
+
+**It takes an `actorId`, never an `actorUuid`.**
+The facade resolves that id through the same ownership gate as `craftRecipe`, and that gate is the only ownership check on the salvage path.
+`CraftingEngine.salvage` performs none of its own: it resolves the UUID it is handed and mutates that actor's items directly.
+Passing a uuid straight to the engine therefore bypasses the gate, and a stale or foreign uuid throws at the server rather than returning a message.
+`actorId` defaults to the persisted last-crafting selection, and an unresolved actor returns `{ success: false, results: null, message: 'No crafting actor selected' }`.
+
+`interactive` prompts the player to roll (with Advantage / Normal / Disadvantage where the formula allows it, a situational-bonus field, and a roll-mode picker) and posts the roll to chat so Dice So Nice animates it.
+It defaults to `false`, so macros and automation stay silent.
+The player Inventory tab passes `true`.
+
+The returned object has **four** shapes, and `cancelled` is distinct from a failure:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Outcome | Shape | Meaning |
+|:--------|:------|:--------|
+| Cancelled | `{ success: false, cancelled: true, results: null }` | The player dismissed the roll prompt. Nothing was consumed, no tool broke, and any run created by the call was discarded. Do not report this as an error. |
+| Started | `{ success: true, results: null, message }` | The component has a time requirement, so a run started and awarded nothing yet. It settles as world time advances. |
+| Awarded | `{ success: true, results: [...], salvageRun }` | The salvage resolved and created the result items. |
+| Failed | `{ success: false, message }` | An ordinary failure: actor, system or component not found, salvage disabled, validation failed, or the mode requires a roll formula the GM has not authored. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The engine returns these rather than throwing, so ordinary failures need no `try`/`catch`.
+
+Do not thread a result order into this call.
+For a progressive salvage, the engine captures the player's standing order (`salvage:<componentId>` in `fabricate.progressiveResultOrder`) onto the run record when the run starts, and reads it back at award time.
+A caller that wants a different order writes that setting first and lets the capture happen.
 
 ### Actor Selection
 
