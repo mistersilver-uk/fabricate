@@ -1741,13 +1741,49 @@ function _sourceOriginForUuid(uuid, sourceMissing = false) {
   };
 }
 
-async function _sourceMissingForUuid(uuid) {
-  if (!uuid || typeof globalThis.fromUuid !== 'function') return false;
+/**
+ * Resolve a component's linked source document ONCE, returning both the document and
+ * the `missing` verdict derived from the same lookup.
+ *
+ * The `missing` contract is preserved EXACTLY as `_sourceMissingForUuid` defined it,
+ * and the two clauses are load-bearing in opposite directions:
+ *  - no uuid, or no `fromUuid` (every non-Foundry test env): `missing: false`. Deriving
+ *    it as `Boolean(uuid) && !doc` instead would report EVERY component's source as
+ *    unresolved the moment `fromUuid` is absent.
+ *  - a throw: `missing: true`.
+ *
+ * Returning the doc as well is what lets the component card follow the LINKED ITEM for
+ * description (issue 676) without resolving the same uuid twice per component — which,
+ * for a compendium-linked library, is real async I/O per row.
+ *
+ * @param {string} uuid
+ * @returns {Promise<{doc: object|null, missing: boolean}>}
+ */
+async function _resolveSourceDocumentState(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return { doc: null, missing: false };
   try {
-    return !(await globalThis.fromUuid(uuid));
+    const doc = await globalThis.fromUuid(uuid);
+    return { doc: doc || null, missing: !doc };
   } catch (_) {
-    return true;
+    return { doc: null, missing: true };
   }
+}
+
+/**
+ * The linked document's description, in a SYSTEM-AGNOSTIC way.
+ *
+ * dnd5e keeps it at `system.description.value` as HTML; others use a bare
+ * `description`. Both are handed to `_plainTextDescription`, which recurses objects
+ * (`_descriptionTextCandidate`) and strips markup — so the `{value, chat}` shape and a
+ * plain string both resolve. `doc.system` is NEVER passed whole: the recursion would
+ * happily flatten every unrelated field on the sheet into the "description".
+ *
+ * @param {object|null} doc
+ * @returns {string}
+ */
+function _documentDescriptionCandidate(doc) {
+  if (!doc) return '';
+  return _plainTextDescription(doc.system?.description ?? doc.description ?? '');
 }
 
 // ---------------------------------------------------------------------------
@@ -1926,9 +1962,21 @@ async function _buildItemCards(
   const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
   return Promise.all(
     items.map(async (item) => {
-      const description = _plainTextDescription(item.description);
       const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
-      const sourceMissing = await _sourceMissingForUuid(registeredItemUuidDisplay);
+      // Resolve the LINKED DOCUMENT, not just its existence (issue 676). The editor's
+      // identity strip promises "name, image & description follow the linked item and
+      // can't be edited here" — and for description that promise was FALSE: this read
+      // `item.description` off the stored component record, which holds whatever was
+      // captured at registration. For a compendium-linked component that is routinely
+      // empty, so the strip rendered a bare "—" while the item's sheet showed prose.
+      //
+      // The stored value remains the FALLBACK, so an unresolvable source (and every
+      // environment without `fromUuid`) renders exactly what it rendered before.
+      // A genuinely description-less item still yields '' -> the strip's own "—".
+      const { doc: sourceDoc, missing: sourceMissing } =
+        await _resolveSourceDocumentState(registeredItemUuidDisplay);
+      const description =
+        _documentDescriptionCandidate(sourceDoc) || _plainTextDescription(item.description);
       const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
       return {
         ...item,
