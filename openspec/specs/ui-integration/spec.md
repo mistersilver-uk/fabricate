@@ -1216,9 +1216,13 @@ Identical rows minus working affordances are not acceptable: a player must not b
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 **Optional per-caller extensions.**
-The component supports an optional per-stage **quantity** and an optional per-stage **state chip**, both **opt-in and default-off**.
-A caller that passes neither MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
+The extension set is exactly three, all **opt-in and default-off**: an optional per-stage **quantity**, an optional per-stage **state chip**, and an optional **fixed-state note** overriding the explanation shown when reordering is unavailable.
+A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
 This exists so a second consumer can add rendering without re-skinning the first.
+The fixed-state note is overridable because `canReorder: false` has **two** causes the component cannot distinguish: the GM pinned the order (the permission is off), or the player's order has already been **spent** by a resolved roll.
+Defaulting to the GM reason keeps the crafting rendering unchanged, since there it is the only cause; a caller with a second cause MUST supply the note, or the surface asserts something untrue about the roll that just happened.
+The GM reason takes precedence where both apply — it stays true whether or not a roll has since been spent.
+The set is enumerated deliberately: a future extension is added to this list, so "not listed" means "not supported", not "not yet noticed".
 
 **Progressive salvage deltas.**
 
