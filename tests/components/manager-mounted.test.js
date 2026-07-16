@@ -50,6 +50,9 @@ function rewriteClientImports(code) {
 
 function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+  // Rendered by BOTH ComponentEditView (salvage) and RecipeResultsTab (issue 651).
+  // Omitting it here HANGS every mounted manager test rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ToggleCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentDifficultyInspector.svelte');

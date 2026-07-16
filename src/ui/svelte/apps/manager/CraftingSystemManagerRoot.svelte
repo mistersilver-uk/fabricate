@@ -506,8 +506,17 @@
     routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
   );
   // System components offered to the salvage result picker ({id, name, img}).
+  // `difficulty` is projected so the progressive salvage result rows can render their
+  // read-only difficulty badge (issue 651). This map is an ALLOWLIST — an omitted field
+  // reaches the editor as undefined and the badge silently reads "No difficulty" for
+  // every row, which looks like unauthored data rather than a dropped projection.
   const salvageComponentOptions = $derived(
-    itemCards.map((item) => ({ id: item.id, name: item.name, img: item.img }))
+    itemCards.map((item) => ({
+      id: item.id,
+      name: item.name,
+      img: item.img,
+      ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
+    }))
   );
 
   // Reseed the routed + simple check drafts and baselines when the selected system

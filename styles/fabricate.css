@@ -3612,6 +3612,22 @@
   background: var(--fab-accent-soft);
 }
 
+/* Informational policy card (issue 651), reusing the `--fab-info-*` tokens the
+   `.manager-recipe-info-strip` wears. Toned on `.is-on` only — `.is-off` needs no
+   variant because the base rule above already covers it. A default-on card is then
+   permanently tinted in its resting state, which is precedent-following rather than
+   semantics-inventing: `.is-enabled.is-on` is already exactly that, since
+   `Recipe.enabled` also defaults true. The switch position and title carry the state;
+   the tint is atmosphere. */
+.fabricate-manager .manager-recipe-status-card.is-info.is-on {
+  border-color: var(--fab-info-border);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-recipe-status-card.is-info.is-on .manager-recipe-status-icon {
+  color: var(--fab-info-text);
+}
+
 .fabricate-manager .manager-recipe-status-icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -7615,6 +7631,24 @@
 .fabricate-manager .manager-salvage-result-row .manager-input {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Progressive salvage stage ordinal (issue 651): the roll is spent DOWN this list, so
+   the row's position is data, not decoration. Fixed width keeps the selects aligned as
+   the list passes 9 entries. */
+.fabricate-manager .manager-salvage-result-ordinal {
+  flex: 0 0 1.25rem;
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Read-only difficulty badge on a progressive salvage row; never shrinks below its
+   content, so a long component name cannot squeeze the number out of view. */
+.fabricate-manager .manager-salvage-result-difficulty {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-salvage-result-quantity {

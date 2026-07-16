@@ -322,3 +322,34 @@ describe('adminStore recipe I/O projection', () => {
     assert.equal(row.ingredientCount, 2);
   });
 });
+
+// The recipe-list projection is a hand-built ALLOWLIST: a field it omits is invisible
+// to the editor, which then seeds its draft from `undefined`. For a default-true flag
+// that failure is SILENT and inverted — the toggle card reads default-true and renders
+// ON for a recipe the GM had explicitly authored OFF, and saving that draft writes the
+// wrong value back. Only a `false` fixture can catch it (issue 651).
+describe('adminStore recipe projection — allowPlayerResultReorder', () => {
+  it('projects an authored FALSE (the mutation: drop it from the projection)', async () => {
+    const store = createAdminStore(
+      createServices({
+        recipes: [makeRecipe({ id: 'r1', allowPlayerResultReorder: false })],
+        updateRecipe: async () => {},
+      })
+    );
+    await store.refresh();
+
+    assert.equal(rowFor(store, 'r1').allowPlayerResultReorder, false);
+  });
+
+  it('defaults an absent flag to true, matching the model constructor', async () => {
+    const store = createAdminStore(
+      createServices({
+        recipes: [makeRecipe({ id: 'r1' })],
+        updateRecipe: async () => {},
+      })
+    );
+    await store.refresh();
+
+    assert.equal(rowFor(store, 'r1').allowPlayerResultReorder, true);
+  });
+});
