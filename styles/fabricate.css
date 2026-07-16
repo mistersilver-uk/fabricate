@@ -153,17 +153,15 @@
   --fab-editor-danger-soft: var(--fab-danger-soft);
   --fab-editor-shadow: var(--fab-shadow-md);
 
-  /* Component Studio dimension aliases (issue 676).
+  /* Component Studio token mapping (issue 676) — kept as the record of the calls,
+   * since the studio introduces no tokens of its own to hang them on.
    *
-   * NON-COLOUR and THEME-INVARIANT, which is why they belong in this :root alias
-   * layer beside --fab-v2-radius-control and NOT in any of the seven theme blocks.
-   *
-   * The Component Studio adds ZERO colour tokens and edits NONE of the theme
-   * blocks. Its prototype's raw ramp maps INDEX-ALIGNED onto the existing one
-   * (--bg0 -> --fab-bg-0 ... --bg3 -> --fab-bg-3), accepting small hex drift: a
-   * tempting shift-by-one (--bg1 -> --fab-bg-0, since three values match one step
-   * out) would leave --bg0 with no token, force a new raw colour into all seven
-   * themes, and silently rewrite every other theme's ramp contour.
+   * It adds ZERO colour tokens and edits NONE of the theme blocks. Its prototype's
+   * raw ramp maps INDEX-ALIGNED onto the existing one (--bg0 -> --fab-bg-0 ...
+   * --bg3 -> --fab-bg-3), accepting small hex drift: a tempting shift-by-one
+   * (--bg1 -> --fab-bg-0, since three values match one step out) would leave --bg0
+   * with no token, force a new raw colour into all seven themes, and silently
+   * rewrite every other theme's ramp contour.
    *
    * The prototype's one genuine colour gap — the item chip's decorative two-stop
    * diagonal gradient — is DROPPED rather than mapped: Product UI Visual Style
@@ -174,14 +172,13 @@
    *
    * Typography needs no tokens and no Google Fonts link: --fab-font-serif
    * (Spectral) and --fab-font-mono (JetBrains Mono) already exist here with real
-   * @font-face rules, and sans is Foundry core's Signika via --font-primary. */
-  --fab-cs-radius-row: 8px;
-  --fab-cs-radius-control: 9px;
-  --fab-cs-radius-panel: 12px;
-  --fab-cs-control-height: 38px;
-  --fab-cs-chip-sm: 40px;
-  --fab-cs-chip-md: 42px;
-  --fab-cs-chip-lg: 60px;
+   * @font-face rules, and sans is Foundry core's Signika via --font-primary.
+   *
+   * A --fab-cs-* dimension-alias block lived here and is gone: nothing ever
+   * consumed it, and its --fab-cs-radius-row: 8px recorded the row geometry the
+   * drift audit then corrected to 9px, so the obviously-named token had become a
+   * trap. The studio's dimensions are authored where they are used, alongside the
+   * Recipe Studio rules they must match. */
 }
 
 :root,
