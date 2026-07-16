@@ -1,4 +1,5 @@
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
+import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import {
   matchResultGroupsByName,
@@ -37,8 +38,19 @@ import {
  * resolution branch survives here.
  */
 export class ResolutionModeService {
-  constructor(craftingSystemManager) {
+  /**
+   * @param {object} craftingSystemManager
+   * @param {object} [options]
+   * @param {(entry: { scope: string, id: string }) => string[]|null} [options.getPlayerResultOrder]
+   *   Injected seam returning the EXECUTING user's stored progressive result order for a
+   *   recipe, or null. Returning an id list (rather than a sorted array) keeps the Foundry
+   *   edge a one-line settings read and makes ordering unit-testable with no settings stub.
+   *   The `() => null` default makes unwired behaviour identical to pre-651 — which is what
+   *   keeps `new ResolutionModeService()` (systemValidation.js, no args) working.
+   */
+  constructor(craftingSystemManager, { getPlayerResultOrder = () => null } = {}) {
     this.craftingSystemManager = craftingSystemManager;
+    this.getPlayerResultOrder = getPlayerResultOrder;
   }
 
   getSystem(recipe) {
@@ -482,7 +494,7 @@ export class ResolutionModeService {
       return this._resolveRoutedByCheckResultGroups({ checkResult, system, allGroups });
     }
     if (mode === 'progressive') {
-      return this._resolveProgressiveResultGroups({ checkResult, system, allGroups });
+      return this._resolveProgressiveResultGroups({ recipe, checkResult, system, allGroups });
     }
     if (mode === 'alchemy') {
       return this._resolveAlchemyResultGroups({ recipe, checkResult, allGroups });
@@ -681,17 +693,40 @@ export class ResolutionModeService {
   /**
    * Progressive mode resolution: spend the check `value` against ordered result
    * difficulties using the system `awardMode` (`equal` | `exceed` | `partial`).
+   *
+   * Order is applied HERE, not in `resolveProgressiveAward` — that helper orders nothing
+   * by contract; the caller owns order (issue 651 D0).
    * @returns {{groups: Array, meta: object}}
    */
-  _resolveProgressiveResultGroups({ checkResult, system, allGroups }) {
+  _resolveProgressiveResultGroups({ recipe, checkResult, system, allGroups }) {
     const group = allGroups[0];
     if (!group) return { groups: [], meta: { awardedResultIds: [], remaining: 0 } };
+
+    const authored = group.results || [];
+    // The recipe's GM-authored permission decides whether the player's stored order is
+    // honoured at all; default-true, so only an explicit `false` pins the authored order.
+    //
+    // This reads the EXECUTING user's order, not the actor owner's: a GM invoking `craft`
+    // via the API resolves down the GM's order. That is deliberate and specified — the
+    // recipe path resolves on the acting client. (Salvage cannot do this; its order is
+    // captured onto the run at start — see `_resolveSalvageResultGroups`.)
+    //
+    // ONE flat id list reconciles EVERY step's results. That is only correct while result
+    // ids are unique across a recipe's steps, which nothing enforces (copy-mode import
+    // preserves ids by design) — issue 651 D6 records the assumption.
+    const results =
+      recipe?.allowPlayerResultReorder === false
+        ? authored
+        : applyPlayerResultOrder(
+            authored,
+            this.getPlayerResultOrder({ scope: 'recipe', id: recipe?.id })
+          );
 
     // Crafting normalizes the budget with `Number(value || 0)` (divergence 4) and
     // skips invalid-cost results (divergence 1: `invalidCost: 'skip'`), zeroing the
     // budget after a `partial` tail award (divergence 2: `zeroRemainingOnPartial`).
     const { awarded, remaining } = resolveProgressiveAward({
-      results: group.results || [],
+      results,
       initialRemaining: Number(checkResult?.value || 0),
       costFor: (result) => this._getDifficulty(system, result?.componentId || result?.systemItemId),
       awardMode: system?.craftingCheck?.progressive?.awardMode || 'equal',

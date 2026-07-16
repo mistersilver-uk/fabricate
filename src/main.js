@@ -43,6 +43,7 @@ import {
   gatheringRunItemRef
 } from './gatheringResultCreation.js';
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
+import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
@@ -434,7 +435,9 @@ class Fabricate {
       evaluateExpression: evaluateGatheringExpression
     });
     this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
-    this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
+    this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager, {
+      getPlayerResultOrder: entry => this._readPlayerResultOrder(entry)
+    });
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
     // The generic actor-inventory spender resolves a per-system coin adapter by
@@ -452,7 +455,8 @@ class Fabricate {
       this.itemPilesIntegration,
       this.salvageRunManager,
       this.actorInventoryCoinSpender,
-      this.actorPropertyCoinSpender
+      this.actorPropertyCoinSpender,
+      { getPlayerResultOrder: entry => this._readPlayerResultOrder(entry) }
     );
 
     // Initialize recipe manager
@@ -1648,6 +1652,24 @@ class Fabricate {
   getProgressiveResultOrder() {
     const stored = getSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER);
     return stored && typeof stored === 'object' ? stored : {};
+  }
+
+  /**
+   * The Foundry edge for the `getPlayerResultOrder` seam injected into
+   * `ResolutionModeService` and `CraftingEngine` (issue 651 D1).
+   *
+   * Deliberately a one-line settings read returning DATA (an id list), not a sorted
+   * array: the reconciliation itself lives in the pure `applyPlayerResultOrder`, so the
+   * ordering logic is unit-testable with no settings stub.
+   *
+   * @param {{ scope: 'recipe'|'salvage', id: string }} entry
+   * @returns {string[]|null} The executing user's stored order, or null when there is none.
+   */
+  _readPlayerResultOrder(entry) {
+    const key = progressiveOrderKey(entry);
+    if (!key) return null;
+    const order = this.getProgressiveResultOrder()[key];
+    return Array.isArray(order) ? order : null;
   }
 
   /**
