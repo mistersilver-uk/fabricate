@@ -13,6 +13,12 @@
     adjustComponentEssenceQuantity,
     clampComponentEssenceQuantity
   } from '../../util/componentEditor.js';
+  import {
+    SALVAGE_DC_CUSTOM,
+    buildSalvageDcOptions,
+    resolveSalvageDcSelection,
+    salvageDcOverrideForSelection
+  } from './component/salvageDcPresets.js';
 
   let {
     component = null,
@@ -24,11 +30,21 @@
     categoryOptions = [],
     salvageResolutionMode = 'simple',
     salvageOutcomeNames = [],
+    // Whether the SYSTEM's salvage check is enabled. With salvageResolutionMode this
+    // is the second axis the four brief presentations are derived from — they are a
+    // projection of these two, not a model (decision 2). No new persisted token.
+    salvageCheckEnabled = false,
+    // `salvageCraftingCheck.simple.tiers` — the DC preset source in EVERY resolution
+    // mode, routed included (decision 7, case 5). There is no `.routed.tiers` sibling.
+    salvageCheckTiers = [],
+    salvageCheckDcMode = 'static',
+    salvageCheckDc = 0,
     componentOptions = [],
     saving = false,
     onSave = () => {},
     onDirtyChange = () => {},
-    onDraftChange = () => {}
+    onDraftChange = () => {},
+    onManageCheckPresets = () => {}
   } = $props();
 
   let tagDraft = $state([]);
@@ -298,9 +314,76 @@
 
   // Salvage authoring mutators. Each writes a fresh salvageDraft (preserving the
   // untouched fields) so the draftSignature effect re-emits onDraftChange.
+  // ---------------------------------------------------------------------------
+  // The four presentations, DERIVED from the two-axis model (decision 2).
+  //
+  // Fabricate's real model is `salvageResolutionMode ∈ {simple, progressive, routed}`
+  // plus the off/on axis on the salvage check. The brief's four presentations are a
+  // read-only projection of those two — no persisted token changes, no migration.
+  // The brief's own descriptors for them are deliberately absent from this code.
+  // ---------------------------------------------------------------------------
+
+  const salvageEnabled = $derived(salvageDraft.enabled === true);
+  const salvageHasGroups = $derived(salvageDraft.resultGroups.length > 0);
+  const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
+  const salvageRouted = $derived(salvageResolutionMode === 'routed');
+  // The DC control belongs to modes that compare a roll against a DC. `progressive`
+  // spends a roll down a list instead, so it shows read-only per-result DC chips.
   const salvageShowDcOverride = $derived(
-    salvageResolutionMode === 'simple' || salvageResolutionMode === 'routed'
+    salvageCheckEnabled && (salvageResolutionMode === 'simple' || salvageRouted)
   );
+
+  // RULING A (issue 676). What collapses when salvage is OFF is the chrome that only
+  // has meaning once salvage RUNS — mode/DC/routing/reorder. The result-group editor
+  // stays usable.
+  //
+  // This is not cosmetic. `data-add-salvage-group` is the ONLY add-group control in
+  // the entire codebase and it lives INSIDE the group editor. Collapse the whole body
+  // and: off → body collapsed → add-group hidden → resultGroups can never reach 1 →
+  // the toggle is disabled forever. Salvage would be unenablable for every new
+  // component and every existing one with no groups. The prototype dodges this only
+  // because its `salvageOn` defaults ON, which decision 6 correctly rejects.
+  const salvageShowChrome = $derived(salvageEnabled);
+
+  // Decision 8(c): UX only — NOT the invariant. The invariant is the normalizer clamp
+  // (`_normalizeSalvage`) plus the removal-path auto-disable in removeSalvageGroup.
+  const salvageToggleDisabled = $derived(saving || !salvageHasGroups);
+
+  // The off-body copy MUST branch. "Enable it above to define what it yields" is only
+  // true once groups exist; at zero groups it points at a toggle that is (correctly)
+  // disabled, so it is actively misleading.
+  const salvageDisabledNotice = $derived(
+    salvageHasGroups
+      ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DisabledHasGroups', 'Salvage is disabled for this component. Enable it above to define what it yields when broken down.')
+      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DisabledNoGroups', 'There is nothing to enable yet. Add a result group below to describe what this component yields, then enable salvage.')
+  );
+
+  const salvageToggleHint = $derived(
+    salvageHasGroups
+      ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.EnableSub', 'Players can break this component down into the result groups below.')
+      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.EnableBlockedSub', 'Add at least one result group before enabling salvage.')
+  );
+
+  // --- DC control (decision 7 + its five cases) ---
+  const salvageDcOptions = $derived(buildSalvageDcOptions({
+    tiers: salvageCheckTiers,
+    dcMode: salvageCheckDcMode,
+    systemDc: salvageCheckDc,
+    systemDefaultLabel: (dc) => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefault', 'System default — DC {dc}').replace('{dc}', String(dc)),
+    systemDefaultDynamicLabel: () => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefaultDynamic', 'System default — set by macro'),
+    tierLabel: (name, dc) => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcTier', '{name} — DC {dc}').replace('{name}', name).replace('{dc}', String(dc)),
+    customLabel: () => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustom', 'Custom…')
+  }));
+  // Pure derivation from the PERSISTED value — never an $effect that writes back. An
+  // off-tier `dcOverride: 14` against a tier list with no DC 14 selects Custom… and
+  // displays 14 verbatim; it must never snap to the nearest tier, and rendering must
+  // never mark the editor dirty (AC8a).
+  const salvageDcSelection = $derived(resolveSalvageDcSelection(salvageDraft.dcOverride, salvageCheckTiers));
+  const salvageDcShowCustomInput = $derived(salvageDcSelection === SALVAGE_DC_CUSTOM);
+
+  function setSalvageDcSelection(selection) {
+    setSalvage({ dcOverride: salvageDcOverrideForSelection(selection, salvageDraft.dcOverride) });
+  }
 
   function setSalvage(next) {
     salvageDraft = { ...salvageDraft, ...next };
@@ -646,6 +729,33 @@
           </div>
         </div>
 
+        <!-- The per-component salvage gate (issue 676). It was persisted, normalized
+             and a live runtime gate long before any control wrote it, so a component
+             auto-disabled by `_disableInvalidSalvageConfigs` was permanently
+             unsalvageable from the UI. This toggle is the fix.
+
+             The zero-groups explanation renders as VISIBLE `sub`-line text, never via
+             `toggleTitle`: that lands a native `title` on a DISABLED <button>, which
+             receives no mouse events, so the tooltip never appears in any browser —
+             and no mounted test would notice, because the attribute IS in the DOM. -->
+        <ToggleCard
+          variant="is-info"
+          icon="fas fa-recycle"
+          section="salvage-enabled"
+          field="salvageEnabled"
+          title={text('FABRICATE.Admin.Manager.Component.SalvageEditor.Enable', 'Salvage this component')}
+          sub={salvageToggleHint}
+          subAttr="data-salvage-enabled-hint"
+          toggleLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.Enable', 'Salvage this component')}
+          on={salvageEnabled}
+          disabled={salvageToggleDisabled}
+          onToggle={(next) => setSalvage({ enabled: next === true })}
+        />
+
+        {#if !salvageEnabled}
+          <p class="manager-muted" data-salvage-disabled-notice>{salvageDisabledNotice}</p>
+        {/if}
+
         <div class="manager-field" data-salvage-result-groups>
           <span class="manager-component-readonly-label">
             <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultGroups', 'Result groups')}</span>
@@ -778,7 +888,10 @@
           </button>
         </div>
 
-        {#if salvageResolutionMode === 'routed'}
+        <!-- RULING A: everything below is CHROME — it only has meaning once salvage
+             runs, so it collapses when salvage is off. The result-group editor above
+             deliberately does NOT, because it owns the only add-group control. -->
+        {#if salvageShowChrome && salvageRouted}
           <div class="manager-field" data-salvage-routing>
             <span class="manager-component-readonly-label">
               <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Routing', 'Outcome routing')}</span>
@@ -810,7 +923,7 @@
           </div>
         {/if}
 
-        {#if salvageResolutionMode === 'progressive'}
+        {#if salvageShowChrome && salvageProgressive}
           <!-- Reorder-permission card (issue 651), at the END of the salvage block for
                the same reason as the recipe Results tab: the policy reads after the list
                it governs. Progressive-only — the flag has no meaning in the simple/routed
@@ -829,22 +942,53 @@
           />
         {/if}
 
-        {#if salvageShowDcOverride}
-          <label class="manager-field" data-salvage-dc-override>
+        {#if salvageShowChrome && salvageShowDcOverride}
+          <div class="manager-field" data-salvage-dc-override>
             <span class="manager-component-readonly-label">
               <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride', 'DC override')}</span>
             </span>
             <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverrideHint', 'Leave blank to use the system salvage check default.')}</p>
-            <input
-              type="number"
-              step="1"
+            <!-- Presets are the SYSTEM'S authored salvage check tiers (decision 7),
+                 never a hard-coded DC list — that would misreport the world's real
+                 DCs. Storage is unchanged: null = system default, else an integer. -->
+            <select
               class="manager-input"
-              value={salvageDraft.dcOverride === null || salvageDraft.dcOverride === undefined ? '' : salvageDraft.dcOverride}
+              value={salvageDcSelection}
+              data-salvage-dc-preset
               aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride', 'DC override')}
-              oninput={(event) => setSalvageDcOverride(event.currentTarget.value)}
+              onchange={(event) => setSalvageDcSelection(event.currentTarget.value)}
               disabled={saving}
-            />
-          </label>
+            >
+              {#each salvageDcOptions as option (option.value)}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+            {#if salvageDcShowCustomInput}
+              <input
+                type="number"
+                step="1"
+                class="manager-input"
+                value={salvageDraft.dcOverride === null || salvageDraft.dcOverride === undefined ? '' : salvageDraft.dcOverride}
+                aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel', 'Custom salvage DC')}
+                data-salvage-dc-custom
+                oninput={(event) => setSalvageDcOverride(event.currentTarget.value)}
+                disabled={saving}
+              />
+            {/if}
+            <!-- Kept by decision 7 (it replaced the hard-coded tier list, not this
+                 link). The zero-authored-tiers case is the COMMON one and is exactly
+                 why it exists: with no presets to choose, this is the way forward. -->
+            <button
+              type="button"
+              class="manager-button manager-salvage-manage-presets"
+              data-salvage-manage-presets
+              onclick={() => onManageCheckPresets()}
+              disabled={saving}
+            >
+              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.ManagePresets', 'Manage presets')}</span>
+            </button>
+          </div>
         {/if}
       </section>
     {/if}

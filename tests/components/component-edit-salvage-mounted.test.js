@@ -36,6 +36,8 @@ const harness = createMountedComponentHarness({
     // A deliberately import-free leaf, so this single entry suffices — but omit it
     // and the mounted suite HANGS (# cancelled) rather than failing.
     'src/utils/componentCategories.js',
+    // The salvage DC control's pure option model (issue 676). Import-free leaf.
+    'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],
   // ToggleCard is rendered by the salvage block; a component the tree renders but the
@@ -180,13 +182,36 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  it('renders the card ON when salvage is null (the cloneSalvage default)', async () => {
-    // `cloneSalvage(null)` spreads `{}` → the field is absent. Without the default the
-    // switch renders off against a default-on spec.
-    const target = await harness.mount(props({ component: { salvage: null } }));
-    assert.ok(card(target), 'the card renders for a component with no salvage config');
+  it('renders the card ON when allowPlayerResultReorder is absent (the cloneSalvage default)', async () => {
+    // `cloneSalvage` spreads the source → an absent field stays absent. Without the
+    // default the switch renders off against a default-on spec.
+    //
+    // UPDATED for issue 676: this used to mount `salvage: null`, but `null` now
+    // normalizes to salvage DISABLED (decision 6), and the reorder card is part of the
+    // chrome Ruling A collapses when salvage is off — so the card no longer exists on
+    // that fixture and `card(target).classList` threw on undefined. The fixture now
+    // carries an ENABLED salvage with the reorder key absent, which is what this test
+    // was always actually about.
+    const target = await harness.mount(
+      props({ component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS } } })
+    );
+    assert.ok(card(target), 'the card renders for an enabled salvage config');
     assert.ok(card(target).classList.contains('is-on'), 'absent reads default-true');
     assert.equal(toggle(target).getAttribute('aria-pressed'), 'true');
+    harness.remount();
+  });
+
+  it('Ruling A: salvage: null collapses the reorder chrome but keeps the group editor', async () => {
+    // `salvage: null` normalizes to disabled (decision 6), so the reorder card — which
+    // only has meaning once salvage RUNS — collapses. The result-group editor must NOT,
+    // because it owns `data-add-salvage-group`, the ONLY add-group control in the
+    // codebase. Hide that and enabling salvage becomes impossible forever.
+    const target = await harness.mount(props({ component: { salvage: null } }));
+    assert.equal(card(target), null, 'the reorder chrome collapses when salvage is off');
+    assert.ok(
+      target.querySelector('[data-add-salvage-group]'),
+      'the add-group control stays reachable while salvage is off'
+    );
     harness.remount();
   });
 

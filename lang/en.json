@@ -2086,6 +2086,17 @@
             "Toggle": "Allow player result re-ordering"
           },
           "SalvageEditor": {
+            "Enable": "Salvage this component",
+            "EnableSub": "Players can break this component down into the result groups below.",
+            "EnableBlockedSub": "Add at least one result group before enabling salvage.",
+            "DisabledHasGroups": "Salvage is disabled for this component. Enable it above to define what it yields when broken down.",
+            "DisabledNoGroups": "There is nothing to enable yet. Add a result group below to describe what this component yields, then enable salvage.",
+            "DcSystemDefault": "System default — DC {dc}",
+            "DcSystemDefaultDynamic": "System default — set by macro",
+            "DcTier": "{name} — DC {dc}",
+            "DcCustom": "Custom…",
+            "DcCustomLabel": "Custom salvage DC",
+            "ManagePresets": "Manage presets",
             "Title": "Salvage",
             "Hint": "Configure what this component yields when it is salvaged.",
             "ResultGroups": "Result groups",

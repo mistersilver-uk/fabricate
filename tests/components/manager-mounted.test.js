@@ -159,6 +159,16 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);
   }
+  // Plain modules under `component/` — copied raw (NOT compiled), the same way
+  // recipe/recipeReadiness.js is (issue 676).
+  for (const componentModule of ['salvageDcPresets.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/component/${componentModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/component/${componentModule}`), 'utf8')
+    );
+  }
   for (const recipeModule of ['recipeReadiness.js']) {
     const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`);
     mkdirSync(dirname(moduleDestination), { recursive: true });
@@ -5405,6 +5415,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       'add group should render an editable result group'
     );
 
+    // Issue 676: the per-component salvage gate now defaults OFF (decision 6), and the
+    // routing/DC chrome collapses while it is (Ruling A). This fixture's component has
+    // no authored salvage, so it opens disabled — walking the real GM path from zero
+    // groups to enabled here is also the end-to-end proof that the deadlock (AC12)
+    // cannot form in the assembled manager tree, not just in the isolated view.
+    const enableToggle = target.querySelector('[data-recipe-field="salvageEnabled"]');
+    assert.equal(enableToggle.disabled, false, 'one result group enables the salvage toggle');
+    enableToggle.click();
+    await tick();
+    flushSync();
+
     // One routing select per non-empty outcome name on the routed salvage check.
     const routes = target.querySelectorAll('[data-salvage-routing] [data-salvage-route]');
     assert.equal(routes.length, 3, 'one routing select per routed outcome tier name');
@@ -5415,7 +5436,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     assert.ok(
-      target.querySelector('[data-salvage-section] [data-salvage-dc-override] input'),
+      target.querySelector('[data-salvage-section] [data-salvage-dc-override] [data-salvage-dc-preset]'),
       'routed mode should render the DC-override field'
     );
   });

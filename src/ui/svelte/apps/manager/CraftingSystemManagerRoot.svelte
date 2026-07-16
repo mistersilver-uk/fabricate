@@ -505,6 +505,14 @@
   const salvageOutcomeNames = $derived(
     routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
   );
+  // The second axis of the per-component salvage panel's derived presentation
+  // (issue 676, decision 2): salvageResolutionMode × salvage-check enablement.
+  const salvageCheckEnabled = $derived(selectedSystem?.salvageCraftingCheck?.enabled === true);
+  // DC presets come from `salvageCraftingCheck.simple.tiers` in EVERY resolution mode,
+  // routed included (decision 7, case 5) — there is no `.routed.tiers` sibling.
+  const salvageCheckTiers = $derived(selectedSystem?.salvageCraftingCheck?.simple?.tiers || []);
+  const salvageCheckDcMode = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static');
+  const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
   // System components offered to the salvage result picker ({id, name, img}).
   // `difficulty` is projected so the progressive salvage result rows can render their
   // read-only difficulty badge (issue 651). This map is an ALLOWLIST — an omitted field
@@ -2764,6 +2772,13 @@
 
   function backToComponentsBrowse() {
     afterTruthyResult(confirmRouteExit('components'), () => { activeView = 'components'; });
+  }
+
+  // The salvage DC control's "Manage presets" deep link (issue 676, decision 7).
+  // Routed through setView so it passes confirmRouteExit like every other navigation
+  // — never by assigning `activeView`, which would silently discard a dirty draft.
+  function openSalvageCheckPresets() {
+    setView('checks');
   }
 
   function cancelComponentEdit() {
@@ -5171,8 +5186,13 @@
         categoryOptions={selectedSystem?.componentCategories || []}
         salvageResolutionMode={salvageResolutionMode}
         salvageOutcomeNames={salvageOutcomeNames}
+        {salvageCheckEnabled}
+        {salvageCheckTiers}
+        {salvageCheckDcMode}
+        {salvageCheckDc}
         componentOptions={salvageComponentOptions}
         saving={componentEditSaving}
+        onManageCheckPresets={openSalvageCheckPresets}
         onSave={saveComponentEdit}
         onDirtyChange={(dirty) => { componentEditDirty = dirty; }}
         onDraftChange={handleComponentDraftChange}
