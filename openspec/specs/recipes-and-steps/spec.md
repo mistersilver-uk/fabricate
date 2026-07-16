@@ -1,9 +1,9 @@
-# Specification 005: Recipes and Steps
+# Recipes and Steps
 
 ## Purpose
 
 Define recipe structure, step execution lifecycle, and recipe-run behaviour.
-This spec does not redefine mode semantics; mode-specific resolution is defined in `004-resolution-modes.md`.
+This spec does not redefine mode semantics; mode-specific resolution is defined in `resolution-modes/spec.md`.
 
 ## Recipe Structure
 
@@ -92,7 +92,7 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 ### Start or Resume
 
 1. Resolve recipe and active step.
-2. Re-check visibility/knowledge guards from `006-recipe-visibility.md`.
+2. Re-check visibility/knowledge guards from `recipe-visibility/spec.md`.
 3. Validate actor and component sources.
 
 ### Pre-Resolution Validation
@@ -141,11 +141,11 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    roll-formula checks (`engineEvaluated === true`).
 
    The check/tier/trigger data-model shapes (`RoutedCheck`, `CheckBreakage` triggers, `thresholdMode`,
-   `breakTools`, recipe tiers, dynamic DC) are defined in `002-data-models.md`;
+   `breakTools`, recipe tiers, dynamic DC) are defined in `data-models/spec.md`;
    the per-mode routing rules (including `ResultGroup.checkOutcomeIds` tier→result-group
-   assignment) are defined in `004-resolution-modes.md`.
+   assignment) are defined in `resolution-modes/spec.md`.
 
-2. Resolve the result group by active mode rules in `004-resolution-modes.md`.
+2. Resolve the result group by active mode rules in `resolution-modes/spec.md`.
    For `routedByCheck` mode, an authored success-outcome tier that resolves by name but
    that no result group assigns via `checkOutcomeIds` (when the recipe otherwise uses tier
    assignment) yields a distinct **unrouted-tier** diagnostic rather than silently falling back
@@ -177,7 +177,7 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 Crafting is the only player-triggerable run type.
 A matured crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
-The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `003-ui-integration.md` *Journal App*).
+The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-integration/spec.md` *Journal App*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
 - On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.
@@ -189,7 +189,7 @@ A non-owner is told to ask an owner or GM rather than the run advancing silently
 #### Maturity Asymmetry Between Run Types
 
 A matured crafting step waits for the manual trigger above.
-By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `009-gathering-and-harvesting.md`).
+By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
 The Journal therefore presents gathering and salvage runs as auto-resolving and offers them no trigger button.
 
 ## Alchemy Execution Lifecycle
@@ -199,7 +199,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 ### Preconditions
 
 1. `features.multiStepRecipes` must be `false`.
-2. Candidate recipes must satisfy alchemy signature uniqueness invariants from `002` and `004`.
+2. Candidate recipes must satisfy alchemy signature uniqueness invariants from `data-models/spec.md` and `resolution-modes/spec.md`.
 
 ### Attempt Flow
 
@@ -258,11 +258,11 @@ Transfer scaling by essence quantity is out of scope for this phase.
 
 - In-progress runs may be stored under `Actor.flags.fabricate.craftingRuns`.
 - Run records should include recipe ID, current step index, selected ingredient data, and time-gate state.
-- Runs must be cleaned up when recipe/system destructive operations invalidate them (see `007`).
+- Runs must be cleaned up when recipe/system destructive operations invalidate them (see `destructive-changes-and-migrations/spec.md`).
 
 ## Run-History Retention
 
-The actor-flag shape for `craftingRuns` and `salvageRuns` is defined in `002-data-models.md`.
+The `craftingRuns` actor-flag shape is defined in `data-models/spec.md` (*Crafting Runs Flag*); the `salvageRuns` shape is defined in this spec (see *SalvageRun Actor Flag* below).
 
 ### Retention Limit
 
@@ -308,7 +308,7 @@ Salvage is a single-step operation (no multi-step salvage):
 3. **Check**: Roll the salvage check for the active `salvageResolutionMode`.
 A salvage check is usable only when its mode has an authored roll formula (`salvageCraftingCheck.simple|routed|progressive.rollFormula`); the optional simple check runs only when `salvageCraftingCheck.simple.rollFormula` is authored.
 Routed and progressive salvage require their roll formula and fail loudly (with zero mutation) when it is missing.
-4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
+4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `resolution-modes/spec.md`, but using salvage-specific settings).
 5. **Consume**: `ingredientQuantity` is always 1 for salvage.
 Remove that many instances of the component from the actor's inventory.
 Apply tool usage/breakage as applicable.

@@ -1,4 +1,4 @@
-# Specification 003: UI Integration
+# UI Integration
 
 ## Purpose
 
@@ -6,11 +6,11 @@ Define Foundry UI integration points and user workflows for Fabricate.
 This file is UI-only.
 Domain behaviour is defined in:
 
-- `004-resolution-modes.md`
-- `005-recipes-and-steps.md`
-- `006-recipe-visibility.md`
-- `007-destructive-changes-and-migrations.md`
-- `009-gathering-and-harvesting.md`
+- `resolution-modes/spec.md`
+- `recipes-and-steps/spec.md`
+- `recipe-visibility/spec.md`
+- `destructive-changes-and-migrations/spec.md`
+- `gathering-and-harvesting/spec.md`
 
 Global rule: if a system feature is disabled, controls for that feature are hidden.
 
@@ -230,7 +230,7 @@ Display list + detail editor for crafting systems.
 
 Recipe resolution mode and salvage resolution mode remain system fields, but their editor cards moved to the Crafting group's Settings page (`crafting-settings`), gated behind `fabricate.experimentalFeatures`.
 They are no longer edited on the System Overview page.
-Changing recipe resolution mode is destructive and must follow `007` confirmation/cleanup rules.
+Changing recipe resolution mode is destructive and must follow `destructive-changes-and-migrations/spec.md` confirmation/cleanup rules.
 
 #### Salvage Resolution Mode Card
 
@@ -277,7 +277,7 @@ For a `routedByCheck` system whose routed check `type` is `fixed`, the tier `Cra
 The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEditor` only; the DC and comparison stay shown for relative-type `routedByCheck` and for the salvage/gathering check editors.
 `routedByIngredients` no longer renders the tier `CraftingCheckEditor` at all — it authors its optional pass/fail check via the shared `SimpleCraftingCheckEditor` (bound to `craftingCheck.simple`), which shows the DC, the meet/exceed comparison, the static/dynamic DC source, and the recipe DC tiers.
 
-Mode semantics are defined in `004`.
+Mode semantics are defined in `resolution-modes/spec.md`.
 
 ##### Check Tool-Breakage Controls
 
@@ -347,7 +347,7 @@ Recipe item definitions are distinct from components:
 - selecting a recipe item for knowledge gating must not require importing that item into the component library
 
 When `visibilityMode === "global"` (or a legacy `listMode === "global"`), no per-recipe player allow-list controls are shown.
-Visibility and learning semantics are defined in `006`.
+Visibility and learning semantics are defined in `recipe-visibility/spec.md`.
 
 ### System Overview
 
@@ -421,7 +421,7 @@ For actor-owned items, Fabricate may add item sheet header controls tied to reci
 - The manual learn control is shown only when the current user can update the owning actor and at least one matched recipe is learnable.
 - When an owned item matches recipes from multiple systems, the header control reflects only the manual-learning subset: matching recipes whose systems have `learn.dragDropEnabled === false`.
 - Clicking the control opens a confirmation prompt before learning.
-- On confirmation, run the learning flow from `006`, including `consumeOnLearn` behavior and item removal when required.
+- On confirmation, run the learning flow from `recipe-visibility/spec.md`, including `consumeOnLearn` behavior and item removal when required.
 - If `learn.dragDropEnabled === true`, the manual header learn control is hidden by default.
 
 ### Items Tab
@@ -623,7 +623,7 @@ Selecting a row opens the `GrantAccessInspector` for that recipe.
 The inspector authors the grant through **two independent rosters** — Characters and Players — each with its own search box and pager:
 
 - The **Characters** roster is the player-character actor roster (`adminStore.getPcRoster` → `services.getPlayerCharacterActors`); toggling a character grants or revokes its actor id in `access.characterIds`.
-A granted character makes the recipe visible to any viewer who **controls** that actor (assigned character or Foundry `OWNER` permission — see `006`), not to a fixed user.
+A granted character makes the recipe visible to any viewer who **controls** that actor (assigned character or Foundry `OWNER` permission — see `recipe-visibility/spec.md`), not to a fixed user.
 - The **Players** roster reuses the world-users projection; toggling a player grants or revokes its user id in `access.playerIds`, making the recipe visible to that user directly.
 - Each toggle persists the **full** `{ characterIds, playerIds }` snapshot via `adminStore.saveRecipeAccess` (live-apply, no dirty draft), so searching or paging never loses a grant.
 
@@ -727,7 +727,7 @@ This shell is not a configured player-visible gathering path until configured an
 - Validation identifies invalid node counts, invalid respawn policies, invalid stamina formulas/providers, invalid condition modifiers, invalid encounter table links, invalid attempt-limit settings, and risk values outside supported vocabulary.
 - Narrow-window layout behavior is implemented with app/container-width rules so list/editor panes and advanced controls remain reachable in resized Foundry windows.
 
-Validation rules from `009-gathering-and-harvesting.md` must be enforced before save.
+Validation rules from `gathering-and-harvesting/spec.md` must be enforced before save.
 
 The environments editor must block save when:
 
@@ -870,7 +870,7 @@ The editor header shows the recipe's image, its name, and a `⟨category⟩ · �
 
 The Overview tab additionally offers an optional **Minimum success tier** dropdown, shown only when the selected system runs a `routedByCheck` check whose routed `type` is `fixed`.
 Its options are that fixed check's success outcome tiers ranked ascending by `start`, preceded by a default `No override (use rolled tier)` entry, and it authors the recipe's `minSuccessOutcomeId`.
-Selecting a tier makes a craft that rolls below it fail outright (see `004`); the control is hidden for relative-type checks and for non-`routedByCheck` systems.
+Selecting a tier makes a craft that rolls below it fail outright (see `resolution-modes/spec.md`); the control is hidden for relative-type checks and for non-`routedByCheck` systems.
 
 ### Visibility Form
 
@@ -954,7 +954,7 @@ Required tools are **not** authored here.
 The persisted per-**set** `IngredientSet.toolIds` field has no editor of its own; it round-trips unchanged.
 
 Result editor changes by mode.
-The UI must expose required data fields from `004`, but mode logic itself is defined in `004`.
+The UI must expose required data fields from `resolution-modes/spec.md`, but mode logic itself is defined in `resolution-modes/spec.md`.
 
 ### Simple UI
 
@@ -1210,7 +1210,7 @@ Identical rows minus working affordances are not acceptable: a player must not b
   recipes, sorted non-`general` A→Z with "General" pinned last.
 - Category grouping headers and nested/expandable category folders are explicitly
   deferred follow-ups; this first cut ships the badge and filter only.
-- Row status badges from `006` evaluation, drawn from the `browseStatus`
+- Row status badges from `recipe-visibility/spec.md` evaluation, drawn from the `browseStatus`
   vocabulary:
   - Available
   - Locked
@@ -1298,7 +1298,7 @@ The a11y contract: the status pill is `aria-live="polite"`; the bench chip body 
 - Chip interactions: the chip body adds one (left-click / Enter / Space); a right-click, Shift+Enter, or the focus/hover `−` control removes one; the `×` control removes all (delete the key).
 The `−` and `×` `stopPropagation` so they never also add.
 - Supports: add from palette, add/remove/remove-all on a chip, clear all, submit.
-- Submit triggers signature matching per existing Signature Resolution rules in `004`.
+- Submit triggers signature matching per existing Signature Resolution rules in `resolution-modes/spec.md`.
 - The Produces preview surfaces the result component's essence icons + counts when essences are enabled.
 - Drives the **five-mode status model** (`empty` / `assembling` / `ready` / `untried` / `no-reaction`, per `resolution-modes`) governing the status pill, Produces panel, and Brew button; client mode is advisory and fails safe to `untried` for any non-concrete signature (the engine is authoritative on brew).
 - A brew-in-flight busy/disabled guard on Brew prevents double-submit (mirrors CraftingView's `busy` guard).
@@ -1311,7 +1311,7 @@ The `−` and `×` `stopPropagation` so they never also add.
 - Selecting a revealed recipe **auto-loads** its signature onto the bench (a selection side effect, not a per-recipe button), scoped to recipes reducible to a concrete plain-component multiset.
 - The "Craftable only" filter is DEFERRED this iteration.
 - The non-revealed-recipe **count** (`valid − revealed`, never names/results/signatures) is shown in a footer.
-- Visibility and learning semantics defined in `006`.
+- Visibility and learning semantics defined in `recipe-visibility/spec.md`.
 
 #### Active Runs and History (cross-reference reconciliation)
 
@@ -1344,7 +1344,7 @@ A fizzle brew runs no check and shows no roll animation.
 
 ### Run Guardrails
 
-Before start/resume and before each step action, UI must invoke guard checks defined in `006`.
+Before start/resume and before each step action, UI must invoke guard checks defined in `recipe-visibility/spec.md`.
 
 ## Gathering App (Player)
 
@@ -1612,7 +1612,7 @@ When stamina economy is enabled:
 ## Journal App (Player)
 
 The **Journal** is the unified player-facing home for monitoring runs.
-It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`, `Journal`, `Inventory`), rendered beneath the shared Actor selection top bar, and reads the selected player-character's existing crafting, gathering, and salvage runs through one UI-safe projection (the `RunModel` / `StepModel` shapes defined in `002-data-models.md` *Run Journal Projection*).
+It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`, `Journal`, `Inventory`), rendered beneath the shared Actor selection top bar, and reads the selected player-character's existing crafting, gathering, and salvage runs through one UI-safe projection (the `RunModel` / `StepModel` shapes defined in `data-models/spec.md` *Run Journal Projection*).
 
 Scope:
 
@@ -1632,11 +1632,11 @@ Those per-activity sections remain authoritative for their own tab, and the Jour
 
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
 - Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface; each row presents the run's title, run type, status pill, step progress (crafting), and a time-remaining/countdown where a `timeGate` exists.
-- Each run's status pill reflects the projection's `derivedStatus` (`waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), which is derived from the active step/run time gate against world time, not the persisted status (see `002-data-models.md`).
+- Each run's status pill reflects the projection's `derivedStatus` (`waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), which is derived from the active step/run time gate against world time, not the persisted status (see `data-models/spec.md`).
 - Selecting a run opens a centre detail panel (steps, requirements, and — for a succeeded run — its crafted items, titled `FABRICATE.App.Journal.Results.Title` so it does not collide with the right column's "Recent results" card) plus a right column ordered "about this run" → "what to expect" → "recent results" → "tips".
 - All countdowns and timestamps are world-time based.
 - **Single-step recipes suppress redundant step chrome.**
-A run whose projection reports `multiStep: false` (see `002-data-models.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip and the "Step requirements" card are retained.
+A run whose projection reports `multiStep: false` (see `data-models/spec.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip and the "Step requirements" card are retained.
 A single-step crafting run's "what to expect" card uses the single-step explainer (`FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep`) instead of the multi-step crafting copy.
 
 ### Run-Type-Aware Actions Panel
@@ -1646,7 +1646,7 @@ The run detail's actions area is keyed on the projection's `manualAdvance` flag:
 - **Crafting (`manualAdvance: true`)** shows a primary advance button.
 On a non-final step it reads **"Trigger Next Step"** with the `FABRICATE.App.Journal.Actions.TriggerHint` ready hint and the `FABRICATE.App.Journal.TimeRemaining.WhenPassed` gate hint; on the **final step** (`isFinalStep: true` — a single-step recipe, or the last step of a multi-step recipe, where there is no next step to trigger) it reads **"Finish Crafting"** with the `FinishHint` ready hint and the `WhenPassedFinal` gate hint, and the left run card's matured countdown reads "Ready to finish" (`Countdown.ReadyToFinish`) rather than "Ready to continue".
 It is DISABLED until the active step's time gate has matured — readiness is derived from `timeGate.availableAt <= worldTime` (race-free), NOT from the run's persisted status — and while an advance is in flight.
-Triggering invokes the crafting advance contract in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*); the final-step variant is copy-only and re-enters the same advance flow.
+Triggering invokes the crafting advance contract in `recipes-and-steps/spec.md` (*Run Progression — Player-Initiated Advance*); the final-step variant is copy-only and re-enters the same advance flow.
 - **Gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because matured gathering and salvage runs auto-resolve on world time.
 
 ### World-Time Disclosure
@@ -1659,7 +1659,7 @@ Runs of recipes the viewer cannot see are redacted, mirroring the gathering blin
 
 - A crafting or alchemy run whose recipe is undiscovered or knowledge-gated for the viewer, or whose recipe no longer resolves, is shown with a generic localized title (`FABRICATE.App.Journal.Redacted.Title`), a default image, and no recipe id, steps, results, or failure detail.
 - GM viewers and globally-visible recipes are never redacted.
-- The redaction is enforced in the projection (`002-data-models.md` *Run Journal Projection*), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
+- The redaction is enforced in the projection (`data-models/spec.md` *Run Journal Projection*), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
 
 ## Data Storage (UI-relevant)
 

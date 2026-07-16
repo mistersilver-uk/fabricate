@@ -1,4 +1,4 @@
-# Specification 010: Complete Authoring Import/Export
+# Complete Authoring Import/Export
 
 ## Purpose
 
@@ -20,7 +20,7 @@ This spec governs:
 
 ## Data Model References
 
-From `002-data-models.md`:
+From `data-models/spec.md`:
 
 - `CraftingSystem` and its `recipeItemDefinitions`, `tools`, `gatheringRealms`.
 - The `gatheringEnvironments` world setting (per-system environment records).
@@ -93,6 +93,6 @@ For supported authoring data, a single-store keep-mode `export → import → ex
 
 ## Out of Scope
 
-- Gathering parties, which remain excluded from system import/export (see `002-data-models.md`).
+- Gathering parties, which remain excluded from system import/export (see `data-models/spec.md`).
 - An opt-in "include runtime state" export toggle, which is deferred; the schema is versioned so it can be added additively.
 - Cross-world document creation (scenes, macros, source items); Fabricate preserves and reports these references but does not create the referenced documents in the target world.

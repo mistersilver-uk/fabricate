@@ -1,4 +1,4 @@
-# Specification 007: Destructive Changes and Migrations
+# Destructive Changes and Migrations
 
 ## Purpose
 
@@ -21,7 +21,7 @@ When `CraftingSystem.resolutionMode` changes:
    The confirmation reports accurate counts from a dry run: how many recipes will be migrated to the new mode and, only when any cannot be migrated, how many will be deleted and their names.
    When no recipe will be deleted the confirmation must not mention deletion.
 2. Persist the merged system (with its new mode) before migrating recipes, so recipe migration and validation read the new mode.
-3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `004-resolution-modes.md § Mode Invariant` (clear the routed selection, collapse a multi-ingredient-set recipe into alchemy, or carry it verbatim).
+3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `resolution-modes/spec.md § Mode Invariant` (clear the routed selection, collapse a multi-ingredient-set recipe into alchemy, or carry it verbatim).
    Migrating *into* `alchemy` seeds NO per-recipe provider (retired, issue 554): it clears any `resultSelection` and collapses a multi-INGREDIENT-SET recipe to its first set; the system-level `alchemy.checkMode` is seeded separately (defaults to `none`).
    Migrated recipes are persisted on structural validity alone.
 4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-STEP recipe into `alchemy` (a multi-INGREDIENT-SET recipe is collapsed, not deleted).
@@ -66,7 +66,7 @@ If disabling `features.multiStepRecipes` for a system with multistep recipes:
 When switching `recipeVisibility.listMode` or `knowledge.mode`:
 
 - Existing learned flags are retained.
-- Access behaviour changes immediately according to `006`.
+- Access behaviour changes immediately according to `recipe-visibility/spec.md`.
 - UI must hide controls that are no longer applicable.
 
 ### Delete Recipe Item Definition
@@ -77,7 +77,7 @@ When deleting a `RecipeItemDefinition` from a crafting system:
 - Clear `recipeItemId` from every recipe in that system that references the deleted definition.
 - Warn in the recipe editor.
 - Learned recipe flags remain stored.
-- Access behaviour changes immediately according to `006`.
+- Access behaviour changes immediately according to `recipe-visibility/spec.md`.
 
 ### Recipe Item Source Template Deletion
 
@@ -214,7 +214,7 @@ The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, document
 
 ### Canonical-Write and Legacy-Read Policy
 
-The migration framework supports the canonical-write / legacy-read compatibility policy defined in `002-data-models.md § Canonical-Write and Legacy-Read Compatibility Policy`.
+The migration framework supports the canonical-write / legacy-read compatibility policy defined in `data-models/spec.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
 - Migrations MUST rewrite legacy field names to their canonical equivalents (e.g., `systemItemId` -> `componentId`, `managedItems` -> `components`).
 - Migration output payloads SHOULD be canonical-first and SHOULD remove retired legacy keys where safe.
@@ -224,7 +224,7 @@ They are deprecated and must not be introduced for new fields.
 - During the transitional window, persisted settings MAY still include documented transitional aliases when written by runtime managers.
 This does not invalidate migration correctness.
 - Each migration entry in the registry should document which legacy aliases it retires from persisted data.
-- Cross-reference: full alias tables are maintained in `002-data-models.md § Canonical-Write and Legacy-Read Compatibility Policy`.
+- Cross-reference: full alias tables are maintained in `data-models/spec.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
 ### Resolution-Model Migration (Pre-Release)
 

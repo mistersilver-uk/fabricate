@@ -1,4 +1,4 @@
-# Spec 008 — Module Integrations
+# Module Integrations
 
 ## Purpose
 
