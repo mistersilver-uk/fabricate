@@ -6086,8 +6086,18 @@
   min-width: 0;
 }
 
+/* The two-column editor routes. `component-edit` joined this list in issue 676:
+   decision 4 deleted its right-rail inspectors, but the column they occupied was
+   never released, so the editor rendered against a ~300px dead strip. `recipe-edit`
+   is deliberately ABSENT — it fills the third column with `RecipeContextRail`.
+
+   This list and the `<aside class="manager-inspector">` render condition in
+   `CraftingSystemManagerRoot.svelte` are ONE decision expressed twice: release the
+   column here without suppressing the aside and its (empty) box wraps to an implicit
+   grid row BELOW the editor instead of vanishing. Keep the two in step. */
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
 .fabricate-manager[data-manager-view="checks"] .manager-body,
+.fabricate-manager[data-manager-view="component-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body {
@@ -6096,6 +6106,7 @@
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="component-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
@@ -7058,9 +7069,25 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-field input,
+/* The manager's control treatment. NOTE the vehicle: it is the `.manager-field` WRAPPER
+   that styles the control, not the `.manager-input` class the markup puts on the control
+   itself — `.manager-input` has no rule anywhere in this file and never has. A control
+   that leaves a `.manager-field` therefore silently reverts to Foundry's unstyled native
+   widget against a dark panel, and keeping `class="manager-input"` on it makes that look
+   intentional. `.manager-component-inline-control` is joined here for exactly that
+   reason: it renders OUTSIDE a `.manager-field`, in the Category panel's heading row. */
+
+/* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
+   (48px wide, 22px tall, transparent) from its component-scoped <style>. This rule is
+   `.fabricate-manager .manager-field input`, which OUT-SPECIFIES that scoped rule, so a
+   Stepper placed inside any `.manager-field` was silently stretched to 100% width and
+   36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
+   rows dodge this only by not living in a `.manager-field`. Excluding the stepper here
+   fixes it for EVERY surface rather than per-caller. */
+.fabricate-manager .manager-field input:not(.fab-stepper-input),
 .fabricate-manager .manager-field select,
-.fabricate-manager .manager-field textarea {
+.fabricate-manager .manager-field textarea,
+.fabricate-manager .manager-component-inline-control {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);
@@ -7069,13 +7096,15 @@
   background: var(--fab-mv2-bg);
 }
 
-.fabricate-manager .manager-field input,
-.fabricate-manager .manager-field select {
+.fabricate-manager .manager-field input:not(.fab-stepper-input),
+.fabricate-manager .manager-field select,
+.fabricate-manager .manager-component-inline-control {
   height: 36px;
   padding: 0 var(--fab-space-2);
 }
 
-.fabricate-manager .manager-field select:disabled {
+.fabricate-manager .manager-field select:disabled,
+.fabricate-manager select.manager-component-inline-control:disabled {
   color: var(--fab-mv2-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
@@ -7778,21 +7807,157 @@
   min-width: 0;
 }
 
-/* Progressive salvage stage ordinal (issue 651): the roll is spent DOWN this list, so
-   the row's position is data, not decoration. Fixed width keeps the selects aligned as
-   the list passes 9 entries. */
-.fabricate-manager .manager-salvage-result-ordinal {
-  flex: 0 0 1.25rem;
-  color: var(--fab-text-muted);
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+/* ── Progressive salvage stages (issue 676) ───────────────────────────────────────
+   Progressive renders an ordered list of SINGLE results — no group boxes. The roll is
+   spent DOWN this list, so the row's POSITION is data: it gets a grip, an order badge
+   and reorder chevrons rather than being a bare select in an unlabelled sequence. */
+.fabricate-manager .manager-salvage-stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* Read-only difficulty badge on a progressive salvage row; never shrinks below its
-   content, so a long component name cannot squeeze the number out of view. */
+.fabricate-manager .manager-salvage-stage-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-bg);
+}
+
+/* The row being dragged. `--fab-accent-border` + a lifted surface, so the GM can see
+   which row is travelling. */
+.fabricate-manager .manager-salvage-stage-row.is-dragging {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+.fabricate-manager .manager-salvage-stage-grip {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 0.7rem;
+  cursor: grab;
+}
+
+.fabricate-manager .manager-salvage-stage-row:active .manager-salvage-stage-grip {
+  cursor: grabbing;
+}
+
+.fabricate-manager .manager-salvage-stage-component {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-stage-reorder {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Foundry's button reset — core's fixed button height would blow the row open.
+   Sized as a REAL stacked control, not a hairline: reorder is the authoring act in
+   progressive mode (the list order decides what a player is awarded), so the chevrons
+   are the primary affordance for it and the drag is the enhancement. They were 20x12 at
+   a 0.44rem glyph, which is smaller than the row's own icons and an unhittable target. */
+.fabricate-manager .manager-salvage-stage-move {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 4px;
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 0.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-salvage-stage-move:hover:not(:disabled) {
+  color: var(--fab-mv2-text);
+  border-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-salvage-stage-move:disabled {
+  color: var(--fab-text-disabled);
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* The "Edit ↗" deep link to the yield component's own editor. It is the ONLY way to
+   change the DC shown beside it (the DC belongs to the yield component, whose own editor
+   owns its save lifecycle), so it has to read as a legible link rather than a 0.56rem
+   speck — it was smaller than the caption text next to it. */
+.fabricate-manager .manager-salvage-stage-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2xs);
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  min-height: 24px;
+  margin: 0;
+  padding: var(--fab-space-2xs) var(--fab-space-chip);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-accent);
+  background: var(--fab-surface-soft);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-salvage-stage-edit i {
+  font-size: 0.62rem;
+}
+
+.fabricate-manager .manager-salvage-stage-edit:hover:not(:disabled) {
+  border-color: var(--fab-mv2-accent);
+}
+
+/* The order badge: mono, on a raised surface, so it reads as an index rather than a
+   label. Fixed 22px keeps the selects aligned as the list passes 9 entries. */
+.fabricate-manager .manager-salvage-result-ordinal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--fab-surface-raised);
+  color: var(--fab-text-subtle);
+  font-family: var(--fab-font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Read-only DC on a progressive salvage row. Mono + `--fab-info`, matching the roll
+   budget banner it belongs to; never shrinks, so a long component name cannot squeeze
+   the number out of view. */
 .fabricate-manager .manager-salvage-result-difficulty {
   flex: 0 0 auto;
+  color: var(--fab-info);
+  font-family: var(--fab-font-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -8429,8 +8594,12 @@
 
 /* §B1: the quantity is the shared horizontal Stepper; its input carries this class
    alongside `.fab-stepper-input`, so only mono alignment is added here — the stepper
-   supplies the borderless chrome. */
-.fabricate-manager .manager-recipe-option-quantity {
+   supplies the borderless chrome.
+   The Component Studio's salvage quantities join the SAME rule (issue 676) rather than
+   restating it, so a salvage quantity and a recipe quantity are the same control down
+   to the pixel. */
+.fabricate-manager .manager-recipe-option-quantity,
+.fabricate-manager .manager-component-stepper-quantity {
   font-family: var(--fab-font-mono);
 }
 
@@ -12698,18 +12867,209 @@
   overflow: auto;
 }
 
-/* The identity strip (issue 676): the source actions rehomed out of the deleted right
-   rail into the single scrolling column. Its heading row carries the overflow trigger,
-   so it needs the heading and the kebab on one line. */
-.fabricate-manager .manager-component-identity-strip .manager-task-card-heading {
+/* ── The component editor's panel surface (issue 676) ──────────────────────────────
+   The editor's panels used to be `.manager-task-core-card` — GATHERING's card, on
+   `--fab-mv2-surface-2`. That is the wrong design system: the Component Studio's
+   sibling is the RECIPE Studio, which is already migrated and whose editor panels are
+   `--fab-surface-soft` on `--fab-border` at radius 12 (see `.manager-recipe-duration-card`).
+   This is that treatment, in a component-scoped class rather than a re-skin of the
+   shared gathering card — re-skinning `.manager-task-core-card` would silently re-surface
+   six other editors that never asked for it. */
+.fabricate-manager .manager-component-panel {
+  display: grid;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-border);
+  border-radius: 12px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-component-panel > .manager-task-card-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: var(--fab-space-3);
+}
+
+/* A panel whose whole content is ONE inline decision (Category): the heading and its
+   hint take the free space, the control sits at the right at its own width. Wraps on
+   the manager's narrow container queries rather than crushing the select. */
+.fabricate-manager .manager-component-inline-panel > .manager-task-card-heading {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-component-inline-panel > .manager-task-card-heading > div {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-inline-control {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 200px;
+
+  /* `.manager-field` sets `font-size: 0.82rem` and its controls INHERIT it — no rule
+     sizes a `select` directly. A control outside a `.manager-field` therefore falls back
+     to Foundry's 14px app base, which is the bleed the font gate exists to catch. State
+     it explicitly at the same size. */
+  font-size: 0.82rem;
+}
+
+/* The identity strip (issue 676): chip · copy · drop target on ONE row. It is display,
+   not a form — see the component's header note. */
+.fabricate-manager .manager-component-identity-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-component-identity-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 12px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text-muted);
+  font-size: 1.4rem;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-component-identity-chip img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-component-identity-copy {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-identity-name-row {
+  display: flex;
+  align-items: center;
   gap: var(--fab-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Foundry's button reset: a custom-content `<button>` inherits core's fixed height,
+   centred content and control font. The name is a button (it opens the source sheet)
+   but must read as a heading. */
+.fabricate-manager .manager-component-identity-name {
+  height: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fab-mv2-text);
+  font-family: var(--fab-font-serif);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager button.manager-component-identity-name {
+  cursor: pointer;
+}
+
+.fabricate-manager button.manager-component-identity-name:hover {
+  color: var(--fab-mv2-accent);
+  text-decoration: underline;
+}
+
+.fabricate-manager .manager-component-identity-lock {
+  flex: 0 0 auto;
+}
+
+/* The kebab belongs at the far edge of the name row, not tucked against the lock badge
+   as though it acted on it. */
+.fabricate-manager .manager-component-identity-name-row .manager-component-overflow-trigger {
+  margin-left: auto;
+}
+
+/* Flowing prose, at the prototype's 400 13px/1.65. `text-wrap: pretty` keeps the last
+   line from stranding a single word. */
+.fabricate-manager .manager-component-identity-description {
+  margin: 0;
+
+  /* The prototype's `--text2`. Fabricate's manager palette has no second-tier text
+     token; `--fab-mv2-text-muted` is what the component browser inspector's flavour
+     text already uses for this exact content (the item's description as prose), so the
+     two surfaces render the same string the same way. */
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.65;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager .manager-component-identity-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fab-space-chip);
+  margin: var(--fab-space-chip) 0 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.625rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.fabricate-manager .manager-component-identity-note i {
+  flex: 0 0 auto;
+  font-size: 0.56rem;
+}
+
+/* The 186px drop target sits at the RIGHT of the strip and wraps UNDER the copy rather
+   than compressing beside it: the manager runs on container queries at 1320/1120/960/680px
+   and the smoke harness photographs a stacked component surface whether or not it is
+   designed. */
+.fabricate-manager .manager-component-source-drop-target {
+  display: flex;
+  flex: 0 1 186px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1.5px dashed var(--fab-border-strong);
+  border-radius: 10px;
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
+}
+
+.fabricate-manager .manager-component-source-drop-target i {
+  font-size: 1.0625rem;
 }
 
 /* The WHOLE strip is the drop target (issue 676, brief §C6). Only the small inner zone
-   used to react, so a GM aiming at the strip's heading — most of its area — got no
+   used to react, so a GM aiming at the strip's name — most of its area — got no
    feedback and had to hunt for the box. `dragDrop` is attached at strip level and this
    is its `activeClass`. */
 .fabricate-manager .manager-component-identity-strip.is-drop-active {
@@ -12717,47 +13077,142 @@
   background: var(--fab-accent-soft);
 }
 
-/* The inner zone stops competing for the cue once the strip carries it: one dashed
-   accent boundary, not two nested ones. */
-.fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target,
-.fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-linked {
-  border-color: transparent;
-  background: transparent;
+.fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target {
+  border-color: var(--fab-accent);
+  color: var(--fab-mv2-accent);
 }
 
-.fabricate-manager .manager-component-identity-fields {
-  display: grid;
-  gap: var(--fab-space-2);
-  min-width: 0;
+/* The salvage panel's heading IS its control row (issue 676): mode pill · divider ·
+   ENABLED · toggle, sharing the line with the heading copy. */
+.fabricate-manager [data-salvage-section] > .manager-task-card-heading {
+  align-items: center;
 }
 
-/* The salvage card's heading carries the read-only mode pill, so the heading copy and
-   the pill share one line (issue 676). */
-.fabricate-manager [data-salvage-section] .manager-task-card-heading {
+/* Pinned to the RIGHT EDGE of the heading row. `flex: 0 0 auto` alone left the cluster
+   floating mid-row against the heading's hint text, so it read as part of the copy
+   rather than as the panel's controls. */
+.fabricate-manager .manager-component-heading-controls {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: var(--fab-space-2);
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-component-heading-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-salvage-mode-pill {
   flex: 0 0 auto;
 }
 
-/* The 186px drop target wraps UNDER the identity text rather than compressing beside
-   it: the manager runs on container queries at 1320/1120/960/680px and the smoke
-   harness photographs a stacked component surface whether or not it is designed. */
-.fabricate-manager .manager-component-source-block {
+/* The eyebrow beside a heading-row control ("ENABLED", "DC"). */
+.fabricate-manager .manager-component-micro-label {
+  color: var(--fab-text-subtle);
+  font-size: 0.53rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-inline-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  flex: 0 0 auto;
+}
+
+/* The roll-budget banner above the progressive stage list. */
+.fabricate-manager .manager-component-info-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-info-border);
+  border-radius: 8px;
+  background: var(--fab-info-soft);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.fabricate-manager .manager-component-info-banner i {
+  flex: 0 0 auto;
+  color: var(--fab-info);
+  font-size: 0.7rem;
+}
+
+/* ── Tag toggle pills (issue 676) ─────────────────────────────────────────────────
+   One pill per tag in the system's vocabulary; the pill IS the control. Purple comes
+   from the same `--fab-chip-color` + color-mix vehicle the selected availability pill
+   already uses (`.manager-availability-pill.is-tag`), so the tag tone is defined once.
+   `height: auto` + the font reset are Foundry's button reset: core gives every
+   `<button>` a fixed height and a control font, which crops the pill and re-types it. */
+.fabricate-manager .manager-component-tag-toggles {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
-.fabricate-manager .manager-component-source-linked,
-.fabricate-manager .manager-component-source-drop-target {
-  flex: 1 1 186px;
+.fabricate-manager .manager-component-tag-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  width: auto;
+  height: auto;
+  min-height: 28px;
+  max-width: 100%;
+  margin: 0;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 999px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-mv2-text-muted);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-component-tag-toggle:hover:not(:disabled) {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-component-tag-toggle.is-on {
+  --fab-chip-color: var(--fab-purple);
+
+  border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
+  background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-mv2-surface-2));
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-component-tag-toggle.is-on .fa-circle-check {
+  color: var(--fab-purple);
+}
+
+.fabricate-manager .manager-component-tag-toggle .fa-circle {
+  color: var(--fab-text-disabled);
+}
+
+.fabricate-manager .manager-component-tag-toggle span {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-component-tag-toggle:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* Foundry's button reset: a custom-content `<button>` inherits core's fixed height and
@@ -12771,10 +13226,11 @@
   line-height: normal;
 }
 
-/* The component identity name + description mirror the recipe identity layout but
-   are NOT editable — they come from the linked Foundry item. They render in the same
-   bordered boxes as the editor fields, but with a leading lock badge and greyed-out
-   text, so they read as "provided, not editable" rather than clickable inputs. */
+/* A section micro-label inside the editor's panels (the salvage block's "Result groups",
+   "Outcome routing", "DC override"). The identity strip's read-only VALUE boxes that
+   used to share this family are gone: they rendered the linked item's name and
+   description as inert, `opacity: .8`, input-shaped boxes, which read as a disabled
+   form. Identity is display now — see `.manager-component-identity-description`. */
 .fabricate-manager .manager-component-readonly-label {
   display: inline-flex;
   align-items: center;
@@ -12785,32 +13241,6 @@
   color: var(--fab-mv2-text-muted);
   font-size: 0.7rem;
   opacity: 0.85;
-}
-
-.fabricate-manager .manager-component-readonly-value {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  min-height: 36px;
-  margin: 0;
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-mv2-bg);
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.9rem;
-  font-weight: 400;
-  line-height: 1.4;
-  overflow-wrap: break-word;
-  opacity: 0.8;
-  cursor: default;
-}
-
-.fabricate-manager .manager-component-readonly-value.is-multiline {
-  display: block;
-  min-height: 92px;
-  white-space: pre-wrap;
 }
 
 .fabricate-manager .manager-component-source-drop-zone {

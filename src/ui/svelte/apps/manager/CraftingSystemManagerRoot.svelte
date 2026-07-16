@@ -5428,8 +5428,15 @@
 
     <!-- The recipe editor's context rail is ALWAYS present (issue 643 §8): recipe-edit
          is absent from the two-column override list, so a hidden inspector used to
-         leave a 300px dead column. An always-present rail incidentally fixes that. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit'}
+         leave a 300px dead column. An always-present rail incidentally fixes that.
+
+         `component-edit` takes the OTHER route out of that trap: decision 4 deleted its
+         rail inspectors outright, so it has nothing to put in a third column and is in
+         the two-column override list instead. Suppressing the aside here and releasing
+         the column in `styles/fabricate.css` are one decision — do only the first and a
+         300px empty box still holds the strip open; do only the second and this
+         (empty) aside wraps to an implicit grid row underneath the editor. -->
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card">
