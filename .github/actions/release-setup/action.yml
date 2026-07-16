@@ -22,11 +22,11 @@ inputs:
     required: false
     default: "false"
   aws-role:
-    description: "IAM role ARN to assume. Pass ${{ vars.AWS_ROLE_TO_ASSUME }} — a composite cannot read vars.*."
+    description: "IAM role ARN to assume. Callers forward vars.AWS_ROLE_TO_ASSUME (a composite cannot read vars.*)."
     required: false
     default: ""
   aws-region:
-    description: "AWS region. Pass ${{ vars.AWS_REGION }} — a composite cannot read vars.*."
+    description: "AWS region. Callers forward vars.AWS_REGION (a composite cannot read vars.*)."
     required: false
     default: ""
 
