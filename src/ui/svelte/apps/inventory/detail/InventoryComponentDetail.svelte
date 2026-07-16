@@ -19,8 +19,20 @@
   import { localize } from '../../../util/foundryBridge.js';
   import CraftingThumb from '../../crafting/CraftingThumb.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
+  import InventorySalvagePanel from './InventorySalvagePanel.svelte';
 
-  let { item = null, onOpenRecipe = null } = $props();
+  let {
+    item = null,
+    onOpenRecipe = null,
+    salvaging = false,
+    salvageResult = null,
+    onSalvage = null,
+    onResetSalvage = null,
+    salvageStages = [],
+    salvageAnnouncement = '',
+    onReorderSalvageStage = () => {},
+    onSalvageReorderSettled = () => {}
+  } = $props();
 
   // Each detail list (sources, used-by, required-for, produced-by, contributors)
   // paginates independently at this many rows.
@@ -89,6 +101,37 @@
   function openRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
   }
+
+  // --- Info | Salvage ---------------------------------------------------------
+  // The strip renders only when the row is salvageable — INCLUDING when the item is a
+  // broken tool. Brokenness does not gate salvageability (the engine has no broken
+  // check), and hiding the tab would read as "this isn't salvageable": wrong, and
+  // unfixable by the player.
+  const salvage = $derived(item?.salvage?.enabled === true ? item.salvage : null);
+  const salvageable = $derived(salvage !== null);
+
+  const TABS = [
+    { id: 'info', icon: 'fas fa-circle-info', key: 'FABRICATE.App.Inventory.Detail.TabInfo' },
+    { id: 'salvage', icon: 'fas fa-recycle', key: 'FABRICATE.App.Inventory.Detail.TabSalvage' }
+  ];
+  let activeTab = $state('info');
+  // Reset to Info whenever the selected item changes: a Salvage tab left active would
+  // otherwise carry over onto a component whose panel is a different shape — or which
+  // is not salvageable at all, leaving no tab bar and an orphaned panel.
+  $effect(() => {
+    void item?.key;
+    activeTab = 'info';
+  });
+
+  function onTabKeydown(event, index) {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (index + delta + TABS.length) % TABS.length;
+    activeTab = TABS[nextIndex].id;
+    const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
+    buttons?.[nextIndex]?.focus();
+  }
 </script>
 
 <div class="inventory-detail" data-inventory-detail={item.key}>
@@ -115,6 +158,62 @@
     </div>
   </header>
 
+  {#if salvageable}
+    <!-- ARIA contract reproduced from the in-repo precedent, GatheringDetailTabs:
+         role=tablist/tab, aria-selected, aria-controls, roving tabindex, Arrow-key
+         navigation. No tab bar at all when the item is not salvageable. -->
+    <div
+      class="inventory-detail-tabs"
+      role="tablist"
+      aria-label={localize('FABRICATE.App.Inventory.Detail.TabsLabel')}
+    >
+      {#each TABS as tab, index (tab.id)}
+        <button
+          type="button"
+          role="tab"
+          id={`inventory-detail-tab-${tab.id}`}
+          class="inventory-detail-tab"
+          class:is-active={activeTab === tab.id}
+          aria-selected={activeTab === tab.id}
+          aria-controls={`inventory-detail-panel-${tab.id}`}
+          tabindex={activeTab === tab.id ? 0 : -1}
+          data-inventory-detail-tab={tab.id}
+          onclick={() => (activeTab = tab.id)}
+          onkeydown={(event) => onTabKeydown(event, index)}
+        >
+          <i class={tab.icon} aria-hidden="true"></i>
+          <span>{localize(tab.key)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+
+  {#if salvageable && activeTab === 'salvage'}
+    <div
+      class="inventory-detail-panel"
+      id="inventory-detail-panel-salvage"
+      role="tabpanel"
+      aria-labelledby="inventory-detail-tab-salvage"
+    >
+      <InventorySalvagePanel
+        {salvage}
+        busy={salvaging}
+        result={salvageResult}
+        {onSalvage}
+        onReset={onResetSalvage}
+        stages={salvageStages}
+        announcement={salvageAnnouncement}
+        onReorder={onReorderSalvageStage}
+        onReorderSettled={onSalvageReorderSettled}
+      />
+    </div>
+  {:else}
+  <div
+    class="inventory-detail-panel"
+    id="inventory-detail-panel-info"
+    role={salvageable ? 'tabpanel' : undefined}
+    aria-labelledby={salvageable ? 'inventory-detail-tab-info' : undefined}
+  >
   {#if broken}
     <!-- Read-only: brokenness is a derived verdict, no engine method un-breaks a tool,
          and the only "Repair" string in the codebase is a shopping-list label that
@@ -308,6 +407,8 @@
       {/if}
     </section>
   {/if}
+  </div>
+  {/if}
 </div>
 
 <style>
@@ -325,6 +426,68 @@
     display: flex;
     gap: 12px;
     align-items: flex-start;
+  }
+
+  /* Info | Salvage: a segmented control on a soft track, the active segment filled
+     with the accent. */
+  .inventory-detail-tabs {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--fab-surface-soft);
+  }
+
+  /* Foundry's global `.app button` fixed height + centering would crop these; reset
+     the inherited box (the EnvironmentCard pattern). */
+  .inventory-detail-tab {
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    height: auto;
+    margin: 0;
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 999px;
+    background: none;
+    color: var(--fab-text-muted);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .inventory-detail-tab:hover {
+    color: var(--fab-text);
+  }
+
+  .inventory-detail-tab.is-active {
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+    font-weight: 700;
+  }
+
+  .inventory-detail-tab:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: -2px;
+  }
+
+  /* The panel is a transparent pass-through: the sections keep the detail column's
+     own rhythm rather than nesting inside a second box. */
+  .inventory-detail-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-4);
+    min-height: 0;
   }
 
   .inventory-detail-essence {

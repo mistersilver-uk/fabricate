@@ -24,12 +24,24 @@
   import InventoryBookDetail from './detail/InventoryBookDetail.svelte';
   import InventoryComponentDetail from './detail/InventoryComponentDetail.svelte';
 
+  // Every prop the component body needs must be declared AND forwarded here: a prop
+  // that stops at this router silently falls back to its default in the body, and the
+  // control it drives never renders. The manager preview mounts this router, so it is
+  // the real entry point — tests that feed a body directly would miss the gap.
   let {
     item = null,
     onOpenRecipe = null,
     onLearn = null,
     onLearnAll = null,
-    learningRecipeId = null
+    learningRecipeId = null,
+    salvaging = false,
+    salvageResult = null,
+    onSalvage = null,
+    onResetSalvage = null,
+    salvageStages = [],
+    salvageAnnouncement = '',
+    onReorderSalvageStage = () => {},
+    onSalvageReorderSettled = () => {}
   } = $props();
 
   const isRecipeItem = $derived(item?.isRecipeItem === true);
@@ -43,7 +55,18 @@
 {:else if isRecipeItem}
   <InventoryBookDetail {item} {onOpenRecipe} {onLearn} {onLearnAll} {learningRecipeId} />
 {:else}
-  <InventoryComponentDetail {item} {onOpenRecipe} />
+  <InventoryComponentDetail
+    {item}
+    {onOpenRecipe}
+    {salvaging}
+    {salvageResult}
+    {onSalvage}
+    {onResetSalvage}
+    {salvageStages}
+    {salvageAnnouncement}
+    {onReorderSalvageStage}
+    {onSalvageReorderSettled}
+  />
 {/if}
 
 <style>

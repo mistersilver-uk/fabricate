@@ -39,6 +39,11 @@ function makeServices(overrides = {}) {
 describe('inventoryStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-inventory-store-');
+    // The store reconciles the player's stage order and recomputes cumulative
+    // thresholds through these two leaves (issue 675). Both are import-free, so
+    // copying them verbatim is enough for the compiled store's imports to resolve.
+    compiler.copyPlain('src/utils/progressiveResultOrder.js');
+    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
     ({ createInventoryStore } = await compiler.load(
       'src/ui/svelte/stores/inventoryStore.svelte.js'
     ));
@@ -525,22 +530,27 @@ describe('inventoryStore', () => {
 
     it('refuses a double-submit while a salvage is in flight', async () => {
       let resolveCall;
-      const { services, calls } = salvageServices({
-        result: () => new Promise((resolve) => (resolveCall = resolve)),
-      });
+      // Built up front, not inside the factory: `salvage()` awaits the order flush
+      // before it ever calls the seam, so the factory has not run yet at the point the
+      // second press is made.
+      const inFlight = new Promise((resolve) => (resolveCall = resolve));
+      const { services, calls } = salvageServices({ result: () => inFlight });
       const store = createInventoryStore({ services });
       await store.load();
       flushSync();
 
       const first = store.salvage('c1');
       flushSync();
+      // The busy state is claimed SYNCHRONOUSLY, ahead of the awaited order flush, so a
+      // second press inside that window is refused before it can reach the engine.
       assert.equal(store.salvagingKey, 'c1');
-      await store.salvage('c1');
-      assert.equal(calls.length, 1, 'the second press is refused');
+      const second = await store.salvage('c1');
+      assert.deepEqual(second, { success: false }, 'the second press is refused');
 
       resolveCall({ success: true, results: [{}] });
       await first;
       flushSync();
+      assert.equal(calls.length, 1, 'exactly one run reached the engine');
       assert.equal(store.salvagingKey, null);
     });
 
@@ -597,4 +607,238 @@ describe('inventoryStore', () => {
       assert.equal(store.salvageResult, null);
     });
   });
+
+  // --- Progressive salvage reorder (issue 675) ----------------------------------
+  //
+  // The first consumer of `Component.salvage.allowPlayerResultReorder`. The store's
+  // only job is writing the STANDING PREFERENCE (`salvage:<componentId>`); the engine
+  // captures it onto the run record at start, and there is deliberately no settings
+  // fallback there.
+
+  function progressiveRow() {
+    return row('sys:c1', 'Iron', {
+      systemId: 'sys',
+      componentId: 'c1',
+      salvage: {
+        enabled: true,
+        mode: 'progressive',
+        checkUsable: true,
+        misconfigured: false,
+        allowPlayerResultReorder: true,
+        awardMode: 'equal',
+        results: [],
+        routedOutcomes: [],
+        stages: [
+          { id: 's1', componentId: 'c2', name: 'Shard', difficulty: 5, threshold: 5 },
+          { id: 's2', componentId: 'c3', name: 'Slag', difficulty: 3, threshold: 8 },
+        ],
+        targetActorId: 'a1',
+      },
+    });
+  }
+
+  function orderServices({ setOrder, orders = {}, salvageResult } = {}) {
+    const log = [];
+    const services = {
+      listInventoryForActor: async () => ({ selectedActorId: 'hero', rows: [progressiveRow()] }),
+      getSelectedCraftingActorId: () => 'hero',
+      getCraftingComponentSourceIds: () => [],
+      getProgressiveResultOrder: () => orders,
+      progressiveOrderRevertMessage: () => 'Your order could not be saved and was restored.',
+      notify: () => {},
+      setProgressiveResultOrder: async (key, order) => {
+        log.push(['setProgressiveResultOrder', key, order]);
+        if (setOrder) return setOrder(key, order);
+        return undefined;
+      },
+      salvageComponent: async (opts) => {
+        log.push(['salvageComponent', opts.componentId]);
+        return salvageResult ?? { success: true, results: [{ name: 'Shard' }] };
+      },
+    };
+    return { services, log };
+  }
+
+  async function loadedProgressiveStore(overrides) {
+    const { services, log } = orderServices(overrides);
+    const store = createInventoryStore({ services });
+    await store.load();
+    flushSync();
+    store.select('sys:c1');
+    flushSync();
+    return { store, log, services };
+  }
+
+  describe('inventoryStore - progressive salvage order', () => {
+    it('reorders under the salvage: key, storing IDS (not indices) so a GM edit survives', async () => {
+      const { store, log } = await loadedProgressiveStore();
+
+      store.reorderSalvageStage(0, 1, 'Shard moved to position 2 of 2');
+      flushSync();
+
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => s.id),
+        ['s2', 's1'],
+        'the move is optimistic - it shows immediately'
+      );
+      assert.equal(store.salvageOrderAnnouncement, 'Shard moved to position 2 of 2');
+      assert.deepEqual(log, [], 'the write is debounced, not issued per gesture');
+
+      const flush = await store.flushSalvageOrder();
+      flushSync();
+      assert.deepEqual(flush, { ok: true });
+      assert.deepEqual(log, [['setProgressiveResultOrder', 'salvage:c1', ['s2', 's1']]]);
+    });
+
+    // The threshold is CUMULATIVE - a property of a stage's POSITION, not of the stage.
+    // `applyPlayerResultOrder` returns elements ===-identical to its inputs, so a carried
+    // threshold would have the top row claiming a HIGHER bar than the row beneath it.
+    it('RECOMPUTES thresholds for the new order rather than carrying them', async () => {
+      const { store } = await loadedProgressiveStore();
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => [s.id, s.threshold]),
+        [
+          ['s1', 5],
+          ['s2', 8],
+        ],
+        'authored order: 5 then 5+3'
+      );
+
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => [s.id, s.threshold]),
+        [
+          ['s2', 3],
+          ['s1', 8],
+        ],
+        'moved up, Slag is now reached at its own cost - NOT its authored-position 8'
+      );
+    });
+
+    it('refuses to reorder when the GM pinned the order', async () => {
+      const { services } = orderServices();
+      services.listInventoryForActor = async () => {
+        const target = progressiveRow();
+        target.salvage.allowPlayerResultReorder = false;
+        return { selectedActorId: 'hero', rows: [target] };
+      };
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+      store.select('sys:c1');
+
+      store.reorderSalvageStage(0, 1, 'nope');
+      flushSync();
+
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => s.id),
+        ['s1', 's2'],
+        'the authored order stands'
+      );
+    });
+
+    // AC5. Stated as an ORDERED CALL LOG against a DEFERRED mock because "await the
+    // flush" is not pinnable against the crafting store's shape: its
+    // `commitProgressiveOrder` swallows rejections, so its flush resolves successfully
+    // even when the write failed and the order was silently reverted.
+    it('AC5: the order write is SETTLED before salvageComponent is invoked', async () => {
+      let releaseWrite;
+      const deferred = new Promise((resolve) => (releaseWrite = resolve));
+      const { store, log } = await loadedProgressiveStore({ setOrder: () => deferred });
+
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+
+      // Press Salvage INSIDE the debounce window: without the flush, the engine would
+      // capture the stale order.
+      const attempt = store.salvage('c1');
+      await Promise.resolve();
+      assert.deepEqual(
+        log.map((entry) => entry[0]),
+        ['setProgressiveResultOrder'],
+        'the write is issued first, and the run has NOT started while it is in flight'
+      );
+
+      releaseWrite();
+      await attempt;
+      flushSync();
+
+      assert.deepEqual(
+        log.map((entry) => entry[0]),
+        ['setProgressiveResultOrder', 'salvageComponent'],
+        'and only then does the run start'
+      );
+      assert.deepEqual(log[0][2], ['s2', 's1'], 'the order captured is the CURRENT one');
+    });
+
+    // AC6 / decision 9. The write is optimistic, so by the time a rejection returns the
+    // row has already moved and the live region has already announced it. Proceeding
+    // would consume the component against an order the player can see was undone.
+    it('AC6: a REJECTED order write reverts, announces, and ABORTS the salvage', async () => {
+      const { store, log } = await loadedProgressiveStore({
+        setOrder: () => Promise.reject(new Error('user setting write failed')),
+      });
+
+      store.reorderSalvageStage(0, 1, 'Shard moved to position 2 of 2');
+      flushSync();
+
+      const result = await store.salvage('c1');
+      flushSync();
+
+      assert.equal(result.success, false, 'the salvage is aborted');
+      assert.deepEqual(
+        log.map((entry) => entry[0]),
+        ['setProgressiveResultOrder'],
+        'salvageComponent is NEVER invoked - nothing is consumed'
+      );
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => s.id),
+        ['s1', 's2'],
+        'the order reverts to the last persisted one'
+      );
+      assert.equal(
+        store.salvageOrderAnnouncement,
+        'Your order could not be saved and was restored.',
+        'the revert is announced through the SAME live region - a toast is not enough for a keyboard user'
+      );
+    });
+
+    // The whole reason the failure is a RETURN STATUS and not a rethrow: this flush is
+    // wired into `SvelteFabricateApp._flushPendingOrderWrite`, whose `void` + sync-only
+    // try/catch would turn a rejection into an unhandled rejection at window teardown.
+    it('flushSalvageOrder never REJECTS - it reports {ok:false}', async () => {
+      const { store } = await loadedProgressiveStore({
+        setOrder: () => Promise.reject(new Error('user setting write failed')),
+      });
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+
+      const flush = await store.flushSalvageOrder();
+      assert.deepEqual(flush, { ok: false });
+    });
+
+    it('flushSalvageOrder is a no-op when nothing is pending, so a double call writes once', async () => {
+      const { store, log } = await loadedProgressiveStore();
+      assert.deepEqual(await store.flushSalvageOrder(), { ok: true });
+      assert.deepEqual(log, []);
+
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      await store.flushSalvageOrder();
+      await store.flushSalvageOrder();
+      assert.equal(log.length, 1, 'close() and _onClose() both flushing must write once');
+    });
+
+    it('seeds the stored order from settings on load', async () => {
+      const { store } = await loadedProgressiveStore({ orders: { 'salvage:c1': ['s2', 's1'] } });
+      assert.deepEqual(
+        store.orderedSalvageStages.map((s) => s.id),
+        ['s2', 's1'],
+        'the standing preference is honoured on first render'
+      );
+    });
+  });
+
 });

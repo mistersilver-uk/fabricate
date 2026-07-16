@@ -23,6 +23,10 @@ const harness = createMountedComponentHarness({
     // craftingImageDefaults (issue 544).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // Reached through the salvage tree's ProgressiveStageList (issue 675). Import-free
+    // leaves, so one entry each suffices.
+    'src/utils/progressiveStageThresholds.js',
+    'src/utils/progressiveResultOrder.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
@@ -35,6 +39,15 @@ const harness = createMountedComponentHarness({
     // must be compiled here too or this suite HANGS (`# cancelled`), never fails.
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    // The preview NEVER renders the salvage tree (a book is never salvageable), but the
+    // component branch statically imports it, so it must still be compiled here.
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',

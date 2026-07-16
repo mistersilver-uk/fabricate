@@ -711,6 +711,14 @@ export class InventoryListingBuilder {
         mode === 'progressive' && !misconfigured
           ? this._salvageStages({ system, salvage, componentById })
           : [],
+      // SALVAGE'S OWN award mode (`salvageCraftingCheck.progressive.awardMode`),
+      // independently authored from the recipe's. Surfaced because a stage threshold is
+      // a property of its POSITION, so reordering invalidates the baked values and the
+      // store must recompute them — which it cannot do without knowing the mode.
+      awardMode:
+        mode === 'progressive'
+          ? system?.salvageCraftingCheck?.progressive?.awardMode || 'equal'
+          : null,
       // Decision 8: the first OWNED actor holding it. Every listed source is already
       // owned (non-owned actors are filtered out before the listing is built).
       targetActorId: rowSources[0]?.actorId ?? null,

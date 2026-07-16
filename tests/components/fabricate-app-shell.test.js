@@ -385,4 +385,42 @@ describe('SvelteFabricateApp shell window', () => {
       'should fall back off the Alchemy tab when it disappears'
     );
   });
+
+  // The window teardown is the ONLY net either progressive-order writer has: a player
+  // who reorders and immediately closes, refreshes, or logs out inside the debounce
+  // window loses the write silently otherwise. Source-contract, because the class
+  // extends ApplicationV2 and cannot be instantiated headless.
+  describe('_flushPendingOrderWrite (issues 651, 675)', () => {
+    it('flushes BOTH progressive-order writers on teardown', () => {
+      assert.ok(
+        appSource.includes('this._services?.crafting?.flushProgressiveOrder?.()'),
+        'the crafting store is flushed'
+      );
+      assert.ok(
+        appSource.includes('this._services?.inventory?.flushSalvageOrder?.()'),
+        'and the inventory store, which writes the salvage stage order'
+      );
+    });
+
+    it('is called from both close() and _onClose(), so a forced teardown still writes', () => {
+      const calls = appSource.split('this._flushPendingOrderWrite();').length - 1;
+      assert.equal(calls, 2, 'close() and _onClose() both flush; the stores no-op the second');
+    });
+
+    it('attaches a .catch() to each flush, so no rejection can escape this seam', () => {
+      // `void` discards the promise and the surrounding try/catch only catches
+      // SYNCHRONOUS throws, so a rejecting flush would become an unhandled promise
+      // rejection at window teardown — a console error on a path with no user to see
+      // it, which the smoke run counts and fails on. The stores report failure by
+      // return status rather than rejecting; this is the second line of defence.
+      assert.ok(
+        appSource.includes("flushProgressiveOrder?.()?.catch?.(noop)"),
+        'the crafting flush cannot reject out of the teardown'
+      );
+      assert.ok(
+        appSource.includes("flushSalvageOrder?.()?.catch?.(noop)"),
+        'nor the inventory flush'
+      );
+    });
+  });
 });

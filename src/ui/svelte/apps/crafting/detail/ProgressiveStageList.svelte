@@ -28,6 +28,18 @@
   ATTACHED, the grip glyph is dropped (the grip IS the affordance signal), and a muted
   line says the GM set the order. Identical rows minus working affordances is the worst
   outcome: a player grabs a row and nothing happens.
+
+  SHARED WITH PLAYER SALVAGE (issue 675). Progressive salvage spends its roll down an
+  ordered list under exactly these rules, so it reuses this component rather than
+  growing a twin. Two OPTIONAL, DEFAULT-OFF extensions exist for it:
+
+    `showQuantity`  render each stage's `×N`.
+    `stateChip`     a snippet, rendered per stage, for a per-row state (salvage's
+                    Recovered / Roll fell short / Not reached / Awaiting roll).
+
+  Both default to today's rendering, so the Crafting tab — which passes neither — is
+  byte-unchanged. A required prop or an always-on chip would have re-skinned crafting
+  as a side effect of a salvage feature.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -39,7 +51,10 @@
     onReorder = () => {},
     // Commit any debounced order write now. A drag has already settled by the time it
     // drops, so there is nothing left to coalesce.
-    onReorderSettled = () => {}
+    onReorderSettled = () => {},
+    // Issue 675, both opt-in: omitted, this renders exactly as it did for crafting.
+    showQuantity = false,
+    stateChip = null
   } = $props();
 
   let dragIndex = $state(-1);
@@ -126,6 +141,9 @@
         {/if}
         <span class="crafting-stage-name">{stage.name}</span>
         <span class="crafting-stage-meta">
+          {#if showQuantity && stage.quantity !== null && stage.quantity !== undefined}
+            <span class="crafting-stage-quantity" data-progressive-stage-quantity={String(stage.quantity)}>×{stage.quantity}</span>
+          {/if}
           {#if stage.difficulty !== null && stage.difficulty !== undefined}
             <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
               <i class="fas fa-gauge-high" aria-hidden="true"></i>{stage.difficulty}
@@ -138,6 +156,7 @@
               {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', { threshold: stage.threshold })}
             </span>
           {/if}
+          {#if stateChip}{@render stateChip(stage)}{/if}
         </span>
         <span class="crafting-stage-move" data-progressive-stage-move>
           <button
@@ -173,6 +192,9 @@
         {/if}
         <span class="crafting-stage-name">{stage.name}</span>
         <span class="crafting-stage-meta">
+          {#if showQuantity && stage.quantity !== null && stage.quantity !== undefined}
+            <span class="crafting-stage-quantity" data-progressive-stage-quantity={String(stage.quantity)}>×{stage.quantity}</span>
+          {/if}
           {#if stage.difficulty !== null && stage.difficulty !== undefined}
             <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
               <i class="fas fa-gauge-high" aria-hidden="true"></i>{stage.difficulty}
@@ -183,6 +205,7 @@
               {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', { threshold: stage.threshold })}
             </span>
           {/if}
+          {#if stateChip}{@render stateChip(stage)}{/if}
         </span>
       </div>
     {/if}
@@ -276,6 +299,14 @@
   .crafting-stage-threshold {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Opt-in (issue 675): only rendered when a caller passes `showQuantity`. */
+  .crafting-stage-quantity {
+    white-space: nowrap;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--fab-text-secondary);
   }
 
   .crafting-stage-move {

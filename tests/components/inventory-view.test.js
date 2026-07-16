@@ -18,6 +18,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
+    // Reached through the salvage tree's ProgressiveStageList. Both are deliberately
+    // import-free leaves, so one entry each suffices.
+    'src/utils/progressiveStageThresholds.js',
+    'src/utils/progressiveResultOrder.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
@@ -32,6 +36,14 @@ const harness = createMountedComponentHarness({
     // HANGS this suite (reported as `# cancelled`), it never fails it.
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    // The salvage tree, plus the shared stage list it reuses.
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
@@ -853,5 +865,368 @@ describe('InventoryView (mounted) — recipe-item books', () => {
       null,
       'no requirement row without requirements'
     );
+  });
+});
+
+// --- Player salvage surface (issue 675) ---------------------------------------
+
+function salvageItem(salvage = {}, overrides = {}) {
+  return {
+    ...makeItem(),
+    salvage: {
+      enabled: true,
+      mode: 'simple',
+      checkUsable: false,
+      misconfigured: false,
+      routedType: null,
+      dc: null,
+      allowPlayerResultReorder: true,
+      results: [],
+      routedOutcomes: [],
+      stages: [],
+      awardMode: null,
+      targetActorId: 'a1',
+      ...salvage,
+    },
+    ...overrides,
+  };
+}
+
+function salvageServices(item, storeOverrides = {}) {
+  const { services, calls, store } = makeServices(item);
+  calls.salvage = [];
+  calls.reset = [];
+  calls.reorder = [];
+  store.salvagingKey = null;
+  store.salvageResult = null;
+  store.orderedSalvageStages = item.salvage?.stages ?? [];
+  store.salvageOrderAnnouncement = '';
+  store.salvage = (componentId) => calls.salvage.push(componentId);
+  store.resetSalvage = () => calls.reset.push(true);
+  store.reorderSalvageStage = (...args) => calls.reorder.push(args);
+  store.flushSalvageOrder = () => Promise.resolve({ ok: true });
+  Object.assign(store, storeOverrides);
+  return { services, calls, store };
+}
+
+describe('InventoryView (mounted) — player salvage surface', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  // AC1.
+  it('shows the Info | Salvage control for a salvageable component, Info active first', async () => {
+    const { services } = salvageServices(salvageItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const tablist = target.querySelector('[role="tablist"]');
+    assert.ok(tablist, 'renders a tab strip');
+    const info = target.querySelector('[data-inventory-detail-tab="info"]');
+    const salvage = target.querySelector('[data-inventory-detail-tab="salvage"]');
+    assert.ok(info && salvage, 'both segments render');
+    assert.equal(info.getAttribute('aria-selected'), 'true');
+    assert.equal(salvage.getAttribute('aria-selected'), 'false');
+    // Roving tabindex, per the GatheringDetailTabs precedent.
+    assert.equal(info.getAttribute('tabindex'), '0');
+    assert.equal(salvage.getAttribute('tabindex'), '-1');
+    assert.equal(target.querySelector('[data-inventory-salvage-panel]'), null, 'Info is the body');
+  });
+
+  // AC1. Brokenness is about usability, not salvageability: the engine has no broken
+  // check, so hiding the tab would read as "this isn't salvageable" - wrong, and
+  // unfixable by the player.
+  it('AC1: a BROKEN salvageable tool still gets the Salvage tab, and the broken banner', async () => {
+    const { services } = salvageServices(salvageItem({}, { broken: true, isTool: true }));
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.ok(
+      target.querySelector('[data-inventory-detail-tab="salvage"]'),
+      'a broken tool is still salvageable'
+    );
+    assert.ok(target.querySelector('[data-inventory-broken-banner]'), 'and says why it is unusable');
+  });
+
+  it('AC1: a non-salvageable item shows NO tab bar at all', async () => {
+    const item = makeItem();
+    item.salvage = null;
+    const { services } = salvageServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.equal(target.querySelector('[role="tablist"]'), null);
+    assert.equal(target.querySelector('[data-inventory-detail-tab="salvage"]'), null);
+  });
+
+  it('switching to Salvage renders the panel in a labelled tabpanel', async () => {
+    const { services } = salvageServices(salvageItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+
+    const panel = target.querySelector('#inventory-detail-panel-salvage');
+    assert.ok(panel, 'the salvage panel renders');
+    assert.equal(panel.getAttribute('role'), 'tabpanel');
+    assert.equal(panel.getAttribute('aria-labelledby'), 'inventory-detail-tab-salvage');
+    assert.ok(panel.querySelector('[data-inventory-salvage-panel]'));
+  });
+
+  async function openSalvage(services) {
+    const target = await harness.mount({ services });
+    await settle();
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    return target;
+  }
+
+  // D5: "no check" and "pass/fail" are ONE mode at two usability states.
+  it('simple with NO usable check renders the guaranteed body and a "Salvage" footer', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        checkUsable: false,
+        results: [{ id: 'r1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 2 }],
+      })
+    );
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-body="no-check"]'));
+    assert.match(target.textContent, /Guaranteed/);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-loss-note]'),
+      null,
+      'nothing can be lost without a roll'
+    );
+    assert.equal(target.querySelector('[data-inventory-salvage-dc]'), null, 'and there is no DC');
+    // The harness localizer echoes keys, so assert the KEY the footer selected: with no
+    // usable check the label is "Salvage", not "Salvage roll".
+    assert.match(
+      target.querySelector('[data-inventory-salvage-action]').textContent,
+      /Salvage\.Action$/,
+      'the footer names the gesture: no roll'
+    );
+  });
+
+  it('simple WITH a usable check renders the on-success body, its DC, and the loss note', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        checkUsable: true,
+        dc: 14,
+        results: [{ id: 'r1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1 }],
+      })
+    );
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-body="simple-check"]'));
+    assert.equal(target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc, '14');
+    assert.ok(target.querySelector('[data-inventory-salvage-loss-note]'), 'a roll can cost you');
+    assert.match(
+      target.querySelector('[data-inventory-salvage-action]').textContent,
+      /Salvage\.ActionRoll$/,
+      'a usable check makes the gesture a roll'
+    );
+  });
+
+  // AC2, rendering half. The builder decides the numbers; this pins that the panel
+  // renders the FIXED shape as a range and shows no DC chip.
+  it('routed + fixed renders authored ranges and NO DC; routed + relative renders thresholds', async () => {
+    const fixed = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: true,
+        routedType: 'fixed',
+        dc: null,
+        routedOutcomes: [
+          { id: 'o1', name: 'Fail', success: false, threshold: null, start: 1, end: 9, results: [] },
+          {
+            id: 'o2',
+            name: 'Pass',
+            success: true,
+            threshold: null,
+            start: 10,
+            end: 20,
+            results: [{ id: 'r1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1 }],
+          },
+        ],
+      })
+    );
+    let target = await openSalvage(fixed.services);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-body="routed"]').dataset.inventoryRoutedType,
+      'fixed'
+    );
+    assert.equal(target.querySelector('[data-inventory-salvage-dc]'), null, 'a fixed check has no DC');
+    assert.equal(
+      target.querySelector('[data-inventory-outcome-range]').dataset.inventoryOutcomeRange,
+      '1-9'
+    );
+    assert.equal(target.querySelector('[data-inventory-outcome-threshold]'), null);
+
+    harness.remount();
+    const relative = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: true,
+        routedType: 'relative',
+        dc: 15,
+        routedOutcomes: [
+          { id: 'o1', name: 'Pass', success: true, threshold: 15, start: null, end: null, results: [] },
+        ],
+      })
+    );
+    target = await openSalvage(relative.services);
+    assert.equal(target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc, '15');
+    assert.equal(
+      target.querySelector('[data-inventory-outcome-threshold]').dataset.inventoryOutcomeThreshold,
+      '15'
+    );
+    assert.equal(target.querySelector('[data-inventory-outcome-range]'), null);
+  });
+
+  // AC2. A routed/progressive salvage with no formula aborts in the engine with a
+  // GM-config message and zero mutation, so showing its tiers would put a plausible
+  // contract under a footer that ALWAYS fails.
+  it('AC2: a misconfigured salvage renders the config state, no outcomes, and a disabled footer', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: false,
+        misconfigured: true,
+        routedType: 'relative',
+        routedOutcomes: [],
+      })
+    );
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-body="misconfigured"]'));
+    assert.equal(target.querySelector('[data-inventory-salvage-outcomes]'), null);
+    assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
+  });
+
+  it('the footer is one-shot: pressing it asks the store to salvage this component', async () => {
+    const { services, calls } = salvageServices(salvageItem({ checkUsable: true, dc: 12 }));
+    const target = await openSalvage(services);
+
+    target.querySelector('[data-inventory-salvage-action]').click();
+    await settle();
+
+    assert.deepEqual(calls.salvage, ['c1'], 'one gesture, one call - no separate confirm');
+  });
+
+  it('AC3: the read-only summary renders only AFTER resolution', async () => {
+    const { services, store } = salvageServices(salvageItem({ checkUsable: true, dc: 12 }));
+    let target = await openSalvage(services);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-summary]'),
+      null,
+      'no summary before the roll - there is no pre-roll dice box'
+    );
+
+    harness.remount();
+    store.salvageResult = {
+      componentId: 'c1',
+      state: 'success',
+      message: 'Salvaged Mordant Gland',
+      awarded: [{ name: 'Iron Shard', img: null }],
+    };
+    target = await openSalvage(services);
+    const summary = target.querySelector('[data-inventory-salvage-summary]');
+    assert.ok(summary, 'the summary appears after resolution');
+    assert.match(summary.textContent, /Iron Shard/, 'and names what was recovered');
+    assert.doesNotMatch(target.textContent, /d20/, 'it never invents a formula');
+  });
+
+  it('a committed salvage swaps the footer for the ribbon plus a Salvage again reset', async () => {
+    const { services, calls, store } = salvageServices(salvageItem());
+    store.salvageResult = { componentId: 'c1', state: 'success', message: '', awarded: [] };
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'));
+    assert.equal(target.querySelector('[data-inventory-salvage-action]'), null, 'one-shot: no reroll');
+    target.querySelector('[data-inventory-salvage-again]').click();
+    await settle();
+    assert.deepEqual(calls.reset, [true]);
+  });
+
+  // AC9.
+  it('AC9: a time-gated salvage shows a waiting state with the engine message, no ribbon', async () => {
+    const { services, store } = salvageServices(salvageItem());
+    store.salvageResult = {
+      componentId: 'c1',
+      state: 'waiting',
+      message: 'Salvage started for Mordant Gland (60s remaining)',
+      awarded: [],
+    };
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-summary="waiting"]'));
+    assert.match(target.textContent, /60s remaining/);
+    assert.equal(target.querySelector('[data-inventory-salvage-ribbon]'), null, 'nothing was awarded');
+    assert.equal(target.querySelector('[data-inventory-salvage-again]'), null);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-action]').disabled,
+      true,
+      'pressing again would only re-enter the time gate'
+    );
+  });
+
+  // AC8, rendering half.
+  it('AC8: a progressive salvage renders reorderable stages with a live region', async () => {
+    const stages = [
+      { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 2, difficulty: 4, threshold: 4 },
+      { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+    ];
+    const { services, calls } = salvageServices(
+      salvageItem({ mode: 'progressive', checkUsable: true, stages, awardMode: 'equal' })
+    );
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-flow-note]'), 'says the roll flows down');
+    const rows = target.querySelectorAll('[data-progressive-stage-reorderable]');
+    assert.equal(rows.length, 2, 'both stages are reorderable');
+    assert.ok(target.querySelector('[data-progressive-stage-status]'), 'the live region is present');
+    // The opt-in extensions the salvage body passes.
+    assert.equal(
+      target.querySelector('[data-progressive-stage-quantity]').dataset.progressiveStageQuantity,
+      '2'
+    );
+    assert.ok(target.querySelector('[data-progressive-stage-state]'), 'renders a state chip');
+    // No exclude affordance exists: the reconciliation contract guarantees a result is
+    // never dropped, and there is nowhere to persist an exclusion.
+    assert.equal(target.querySelector('input[type="checkbox"]'), null, 'no exclude checkbox');
+
+    // Keyboard reorder routes through the store.
+    target.querySelectorAll('[data-progressive-stage-move-down]')[0].click();
+    await settle();
+    assert.equal(calls.reorder.length, 1);
+    assert.equal(calls.reorder[0][0], 0, 'from index 0');
+    assert.equal(calls.reorder[0][1], 1, 'to index 1');
+  });
+
+  // AC8. `canReorder: false` DETACHES the handlers rather than leaving inert rows: a
+  // player grabbing a row that does nothing is the worst outcome.
+  it('AC8: allowPlayerResultReorder:false drops the grip and detaches the handlers', async () => {
+    const stages = [
+      { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1, difficulty: 4, threshold: 4 },
+      { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+    ];
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'progressive',
+        checkUsable: true,
+        stages,
+        awardMode: 'equal',
+        allowPlayerResultReorder: false,
+      })
+    );
+    const target = await openSalvage(services);
+
+    assert.equal(target.querySelectorAll('[data-progressive-stage-reorderable]').length, 0);
+    assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 2);
+    assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
+    assert.equal(target.querySelector('[data-progressive-stage-status]'), null, 'nothing to announce');
+    assert.ok(target.querySelector('[data-progressive-stage-fixed-note]'), 'says the GM set it');
   });
 });

@@ -125,6 +125,20 @@ function compileManagerRoot() {
   // so the whole `detail/` tree has to be compiled here as well.
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte');
+  // The salvage tree is never RENDERED by the preview (a book is never salvageable),
+  // but the component branch imports it statically, so it is still in the module graph.
+  // That includes the shared stage list the progressive salvage body reuses.
+  writeCompiledSvelte('src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte');
+  for (const salvageComponent of [
+    'SalvageRollSummary',
+    'SalvageSimpleBody',
+    'SalvageRoutedBody',
+    'SalvageProgressiveBody',
+    'SalvageMisconfiguredBody',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/inventory/detail/salvage/${salvageComponent}.svelte`);
+  }
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');
@@ -302,6 +316,10 @@ function compileManagerRoot() {
     // The category totals both browser models group with (issue 676). Imported by BOTH
     // of the two above, so omitting it HANGS every mounted manager test.
     'src/utils/browserGroupCounts.js',
+    // Reached through the inventory salvage tree's ProgressiveStageList (issue 675).
+    // Both are deliberately import-free leaves, so one entry each suffices.
+    'src/utils/progressiveStageThresholds.js',
+    'src/utils/progressiveResultOrder.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',

@@ -87,12 +87,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     window: {
       title: 'FABRICATE.App.Title',
       icon: 'fa-solid fa-flask',
-      resizable: true,
+      resizable: true
     },
     position: {
       width: 1280,
-      height: 860,
-    },
+      height: 860
+    }
   };
 
   // Minimum window size enforced on the resizable Fabricate window so it can
@@ -184,21 +184,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getActiveCanvasTool: () => this._activeCanvasTool ?? null,
-      listGatheringForActor: (opts = {}) =>
-        game?.fabricate?.listGatheringForActor?.({
-          presentTools: presentTools(),
-          ...opts,
-        }) ?? null,
-      startGatheringAttempt: (opts = {}) =>
-        game?.fabricate?.startGatheringAttempt?.({
-          presentTools: presentTools(),
-          // Thread the session-scoped interactable ref (issue 302) unless the caller
-          // overrode it. Inert when null (the engine uses the environment scope).
-          interactableRef: this._scopedInteractableRef,
-          ...opts,
-        }) ?? null,
-      getGatheringDropBreakdown: (opts = {}) =>
-        game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
+      listGatheringForActor: (opts = {}) => game?.fabricate?.listGatheringForActor?.({
+        presentTools: presentTools(),
+        ...opts
+      }) ?? null,
+      startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.({
+        presentTools: presentTools(),
+        // Thread the session-scoped interactable ref (issue 302) unless the caller
+        // overrode it. Inert when null (the engine uses the environment scope).
+        interactableRef: this._scopedInteractableRef,
+        ...opts
+      }) ?? null,
+      getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
       // Player Crafting tab seams. The listing/craft/source reads mirror the
       // gathering seams: every Foundry-facing call routes through the
       // `game.fabricate` facade so the stores stay Foundry-free.
@@ -274,8 +271,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // GM economy authoring + manual state controls (Manager app).
       getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
       setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
-      getGatheringStaminaState: (opts = {}) =>
-        game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
+      getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
       setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),
       adjustGatheringStamina: (opts = {}) => game?.fabricate?.adjustGatheringStamina?.(opts),
       restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts),
@@ -285,10 +281,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       isTravelMarkerActor: (actorUuid) => {
         if (!actorUuid) return false;
         const parties = game?.fabricate?.getGatheringPartyStore?.()?.list?.() ?? [];
-        return (Array.isArray(parties) ? parties : []).some(
-          (party) => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid)
-        );
-      },
+        return (Array.isArray(parties) ? parties : [])
+          .some(party => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid));
+      }
     };
     // One shared actor-bar store instance, reused across renders, so the shell
     // and the gathering tab read/write the same reactive selection state.
@@ -341,7 +336,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Session-scoped interacting actor: when a region activation is granted the
       // shell seeds this actor as the default top-bar selection (once per distinct
       // value). Null on a plain manual open.
-      scopedActorId: this._scopedActorId,
+      scopedActorId: this._scopedActorId
     };
   }
 
@@ -381,7 +376,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
     this._hookIds = {
       systems: Hooks.on('fabricate.craftingSystemsChanged', () => this._refreshAlchemy()),
-      recipes: Hooks.on('fabricate.recipesChanged', () => this._refreshAlchemy()),
+      recipes: Hooks.on('fabricate.recipesChanged', () => this._refreshAlchemy())
     };
   }
 
@@ -443,12 +438,24 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * window must not discard it. Safe to call from both `close()` and `_onClose()`: the
    * store's flush is a no-op when no write is pending, so a double call writes once.
    *
+   * Flushes BOTH progressive-order writers: the crafting store (issue 651) and the
+   * inventory store's salvage stage order (issue 675). This is the only teardown net
+   * either has.
+   *
    * Deliberately NOT awaited and never throws — a rejected write is the store's business
    * (it reverts and announces), and a teardown must not be blocked or broken by it.
+   *
+   * The `try/catch` below catches only SYNCHRONOUS throws, and `void` discards the
+   * promise, so a store flush that REJECTED would surface as an unhandled promise
+   * rejection here — a console error on a path with no user to see it. Both stores
+   * therefore report failure by return status rather than rejecting; the `.catch()`
+   * below is a second line of defence so this seam is safe regardless.
    */
   _flushPendingOrderWrite() {
     try {
-      void this._services?.crafting?.flushProgressiveOrder?.();
+      const noop = () => {};
+      void this._services?.crafting?.flushProgressiveOrder?.()?.catch?.(noop);
+      void this._services?.inventory?.flushSalvageOrder?.()?.catch?.(noop);
     } catch {
       // A failed order write must never break the window close.
     }
@@ -499,10 +506,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    *   manual open never re-fires a stale interactable re-prompt.
    * @returns {Promise<SvelteFabricateApp>}
    */
-  static async show(
-    tab = DEFAULT_TAB,
-    { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {}
-  ) {
+  static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {}) {
     const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
     const nextCanvasTool = activeCanvasTool ?? null;
     const nextEnvironmentId = typeof environmentId === 'string' ? environmentId : null;
@@ -530,7 +534,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         activeCanvasTool: nextCanvasTool,
         scopedEnvironmentId: nextEnvironmentId,
         scopedTaskId: nextTaskId,
-        scopedActorId: nextActorId,
+        scopedActorId: nextActorId
       });
       existing._selectTab(initialTab);
       existing.bringToFront();
@@ -543,7 +547,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       taskId: nextTaskId,
       actorId: nextActorId,
       interactableRef: nextInteractableRef,
-      onClose: nextOnClose,
+      onClose: nextOnClose
     });
     SvelteFabricateApp._instance = app;
     await app.render(true);

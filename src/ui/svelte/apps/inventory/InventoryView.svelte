@@ -56,6 +56,29 @@
   function onLearnAll(recipeIds) {
     return store?.learnAll?.(recipeIds);
   }
+  function onSalvage() {
+    return store?.salvage?.(store?.selectedItem?.componentId ?? null);
+  }
+  function onResetSalvage() {
+    store?.resetSalvage?.();
+  }
+  function onReorderSalvageStage(index, target, announcement) {
+    store?.reorderSalvageStage?.(index, target, announcement);
+  }
+  function onSalvageReorderSettled() {
+    // A drag has already settled by the time it drops, so flush rather than coalesce.
+    // The returned status is the store's business here; the FOOTER is what must gate
+    // the run on a successful flush.
+    return store?.flushSalvageOrder?.();
+  }
+  // The salvage panel only ever sees the outcome of the component it belongs to: the
+  // store holds the salvaged row selected while its ribbon is up, but the row's own
+  // identity is still the gate.
+  const salvageResult = $derived(
+    store?.salvageResult && store.salvageResult.componentId === store?.selectedItem?.componentId
+      ? store.salvageResult
+      : null
+  );
 
   // Refetch on mount and whenever the shared actor selection changes. The shared
   // top bar is the single source of truth for the selected character; persist its
@@ -139,9 +162,17 @@
         <InventoryDetail
           item={store?.selectedItem ?? null}
           learningRecipeId={store?.learningRecipeId ?? null}
+          salvaging={store?.salvagingKey != null}
+          {salvageResult}
+          salvageStages={store?.orderedSalvageStages ?? []}
+          salvageAnnouncement={store?.salvageOrderAnnouncement ?? ''}
           {onOpenRecipe}
           {onLearn}
           {onLearnAll}
+          {onSalvage}
+          {onResetSalvage}
+          {onReorderSalvageStage}
+          {onSalvageReorderSettled}
         />
       </section>
     </div>
