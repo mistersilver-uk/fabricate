@@ -20,6 +20,7 @@
     resolveSalvageDcSelection,
     salvageDcOverrideForSelection
   } from './component/salvageDcPresets.js';
+  import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
 
   let {
     component = null,
@@ -104,6 +105,10 @@
     salvageDraft = cloneSalvage(component?.salvage);
     tagMenuOpen = false;
     saveFailed = false;
+    // The DC control's Custom… choice is transient UI state, not draft data. Reset it
+    // with the drafts, or opening a second component would inherit the first's open
+    // custom input and misreport a system-default DC as custom.
+    salvageDcCustomSelected = false;
     lastComponentKey = componentKey;
   });
 
@@ -392,6 +397,21 @@
       : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DisabledNoGroups', 'There is nothing to enable yet. Add a result group below to describe what this component yields, then enable salvage.')
   );
 
+  // The salvage mode, displayed READ-ONLY (it is a SYSTEM-level setting, authored on
+  // the Crafting Settings screen — this route only reports it).
+  //
+  // Without it the panel silently changes shape — routing rows, ordinals, and the DC
+  // control appearing and vanishing — driven by a setting the GM cannot see from here,
+  // with nothing saying which mode they are in. Reuses `salvageResolutionModeOptions`,
+  // which already carries "Routed by check" as `routed`'s label: the persisted token is
+  // never displayed, and this is the list whose comment records that.
+  const salvageModeOption = $derived(
+    salvageResolutionModeOptions.find((option) => option.value === salvageResolutionMode) || null
+  );
+  const salvageModeLabel = $derived(
+    salvageModeOption ? text(salvageModeOption.labelKey, salvageModeOption.fallback) : ''
+  );
+
   const salvageToggleHint = $derived(
     salvageHasGroups
       ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.EnableSub', 'Players can break this component down into the result groups below.')
@@ -408,14 +428,36 @@
     tierLabel: (name, dc) => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcTier', '{name} — DC {dc}').replace('{name}', name).replace('{dc}', String(dc)),
     customLabel: () => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustom', 'Custom…')
   }));
-  // Pure derivation from the PERSISTED value — never an $effect that writes back. An
+  // The PERSISTED value derives the selection — never an $effect that writes back. An
   // off-tier `dcOverride: 14` against a tier list with no DC 14 selects Custom… and
   // displays 14 verbatim; it must never snap to the nearest tier, and rendering must
   // never mark the editor dirty (AC8a).
-  const salvageDcSelection = $derived(resolveSalvageDcSelection(salvageDraft.dcOverride, salvageCheckTiers));
+  //
+  // But the persisted value ALONE cannot drive the control, because `Custom…` and
+  // `System default` both persist a `dcOverride` of `null`. Deriving visibility purely
+  // from storage made Custom… DEAD from the state every component starts in: pick it →
+  // stages null → selection derives back to `system` → the input never renders → the
+  // GM can never author a custom DC. That is a regression of a capability `main` ships
+  // today (a plain number input accepting any DC) and it contradicts decision 7 and
+  // this change's own canonical requirement ("a Custom… option exposing an arbitrary
+  // integer"). The zero-authored-tiers case — the COMMON one — is where it bites
+  // hardest: two options, one of them inert.
+  //
+  // So the GM's CHOICE is staged separately from the value. It is intentionally NOT in
+  // the draft: choosing Custom… without typing a number changes nothing persisted, so
+  // it must not make the editor dirty.
+  let salvageDcCustomSelected = $state(false);
+  const salvageDcSelection = $derived(
+    salvageDcCustomSelected
+      ? SALVAGE_DC_CUSTOM
+      : resolveSalvageDcSelection(salvageDraft.dcOverride, salvageCheckTiers)
+  );
   const salvageDcShowCustomInput = $derived(salvageDcSelection === SALVAGE_DC_CUSTOM);
 
   function setSalvageDcSelection(selection) {
+    // Sticky only while Custom… is the live choice; picking a tier or the system
+    // default hands control back to the persisted value.
+    salvageDcCustomSelected = selection === SALVAGE_DC_CUSTOM;
     setSalvage({ dcOverride: salvageDcOverrideForSelection(selection, salvageDraft.dcOverride) });
   }
 
@@ -770,6 +812,20 @@
             <h3>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}</h3>
             <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Hint', 'Configure what this component yields when it is salvaged.')}</p>
           </div>
+          {#if salvageShowChrome && salvageModeLabel}
+            <!-- Read-only: the mode is a SYSTEM setting, authored on Crafting Settings.
+                 It names the mode that decides this panel's shape, which the GM
+                 otherwise cannot see from this route. Chrome, so Ruling A collapses it
+                 with the rest when salvage is off — the group editor never depends on
+                 it. `routed` is displayed as "Routed by check"; the persisted token is
+                 never shown. -->
+            <span class="manager-chip is-info manager-salvage-mode-pill" data-salvage-mode={salvageResolutionMode}>
+              {#if salvageModeOption?.icon}
+                <i class={salvageModeOption.icon} aria-hidden="true"></i>
+              {/if}
+              <span>{salvageModeLabel}</span>
+            </span>
+          {/if}
         </div>
 
         <!-- The per-component salvage gate (issue 676). It was persisted, normalized

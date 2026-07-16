@@ -2251,7 +2251,7 @@
           "NoComponentCategoryMatches": "No component categories match this search.",
           "RemoveComponentCategory": "Remove component category",
           "RemoveComponentCategoryNamed": "Remove component category {name}",
-          "RemoveComponentCategoryConfirm": "Remove the component category \"{name}\"? {count} components use it and will fall back to General.",
+          "RemoveComponentCategoryConfirm": "Remove {name}? {count} components may keep this category value until you update them.",
           "ComponentCategoryAddFailedFeedback": "Component category could not be added.",
           "ItemTags": "Item tags",
           "ItemTagsHint": "Use item tags for component organization and tag-based ingredient options.",

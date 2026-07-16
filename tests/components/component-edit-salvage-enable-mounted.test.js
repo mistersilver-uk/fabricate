@@ -31,6 +31,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/componentEditor.js',
     'src/utils/componentCategories.js',
     'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
+    // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
+    // check' for the persisted 'routed' token. Import-free leaf.
+    'src/ui/svelte/apps/manager/resolutionModeOptions.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     // The identity strip's drop target + its portaled overflow menu.
     'src/ui/svelte/actions/dragDrop.js',
@@ -386,6 +389,109 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     harness.remount();
   });
 
+  it('selecting Custom… from the SYSTEM DEFAULT reveals an authorable input', async () => {
+    // THE REGRESSION THIS EXISTS TO CATCH. `dcOverride: null` is the state EVERY
+    // component starts in — nothing seeds it. Custom… and System default BOTH persist
+    // `null`, so deriving the input's visibility purely from the persisted value made
+    // Custom… dead on arrival: pick it -> stages null -> selection derives back to
+    // `system` -> the input never renders -> an arbitrary DC is unauthorable.
+    //
+    // `main` ships a plain number input accepting any DC today, so this would have been
+    // a REGRESSION of a shipped capability, and it contradicts this change's own
+    // canonical requirement ("a Custom… option exposing an arbitrary integer"). The
+    // zero-authored-tiers case — the COMMON one — is where it bites hardest: two
+    // options, one inert.
+    //
+    // Every other DC test here starts from `dcOverride: 14`, so none of them ever
+    // SELECTS Custom… and none of them could see this.
+    const { dirtyEvents, props: mountProps } = track();
+    const target = await harness.mount(mountProps);
+
+    const preset = target.querySelector('[data-salvage-dc-preset]');
+    assert.equal(preset.value, 'system', 'every component starts at the system default');
+    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'no custom input yet');
+
+    preset.value = 'custom';
+    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    await flushRender();
+
+    const custom = target.querySelector('[data-salvage-dc-custom]');
+    assert.ok(custom, 'Custom… reveals its input');
+    assert.equal(custom.value, '', 'and it opens empty rather than inventing a DC');
+    // Choosing Custom… persists nothing until a number is typed, so it is not an edit.
+    assert.ok(!dirtyEvents.includes(true), 'merely choosing Custom… does not dirty the editor');
+    harness.remount();
+  });
+
+  it('typing into the revealed Custom… input stages an arbitrary DC', async () => {
+    const { drafts, props: mountProps } = track();
+    const target = await harness.mount(mountProps);
+
+    const preset = target.querySelector('[data-salvage-dc-preset]');
+    preset.value = 'custom';
+    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    await flushRender();
+
+    // 14 is deliberately OFF-tier (the tiers are 12 and 17) — an arbitrary integer.
+    const custom = target.querySelector('[data-salvage-dc-custom]');
+    custom.value = '14';
+    custom.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    await flushRender();
+
+    assert.equal(drafts.at(-1).updates.salvage.dcOverride, 14, 'the arbitrary DC reaches the payload');
+    assert.equal(
+      target.querySelector('[data-salvage-dc-preset]').value,
+      'custom',
+      'and the control stays on Custom…'
+    );
+    harness.remount();
+  });
+
+  it('Custom… stays open while its input is cleared, and hands back on picking a tier', async () => {
+    const target = await harness.mount(props());
+    const preset = target.querySelector('[data-salvage-dc-preset]');
+    const change = () =>
+      preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+
+    preset.value = 'custom';
+    change();
+    await flushRender();
+    const custom = target.querySelector('[data-salvage-dc-custom]');
+    custom.value = '';
+    custom.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    await flushRender();
+    assert.ok(
+      target.querySelector('[data-salvage-dc-custom]'),
+      'clearing the input must not yank the control back to the system default mid-edit'
+    );
+
+    // Picking a real option hands control back to the persisted value.
+    preset.value = 'dc:12';
+    change();
+    await flushRender();
+    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'the custom input closes');
+    assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'dc:12');
+    harness.remount();
+  });
+
+  it('the Custom… choice does not leak across components', async () => {
+    // It is transient UI state, not draft data, so it resets with the drafts on
+    // re-seed. Without that reset a second component would open showing a
+    // system-default DC as custom.
+    const target = await harness.mount(props());
+    const preset = target.querySelector('[data-salvage-dc-preset]');
+    preset.value = 'custom';
+    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.ok(target.querySelector('[data-salvage-dc-custom]'));
+    harness.remount();
+
+    const next = await harness.mount(props({ component: { id: 'comp-2', name: 'Other' } }));
+    assert.equal(next.querySelector('[data-salvage-dc-preset]').value, 'system');
+    assert.equal(next.querySelector('[data-salvage-dc-custom]'), null);
+    harness.remount();
+  });
+
   it('"Manage presets" is reachable in the zero-tier case (why decision 7 kept it)', async () => {
     const calls = [];
     const target = await harness.mount(
@@ -396,6 +502,45 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
 
     target.querySelector('[data-salvage-manage-presets]').click();
     assert.deepEqual(calls, [true], 'the deep link fires');
+    harness.remount();
+  });
+
+  it('AC5: the persisted `routed` token is DISPLAYED as "Routed by check", never raw', async () => {
+    // `ui-integration` -> Component Studio req 4, added by this change: "The persisted
+    // `routed` token is displayed as 'Routed by check'." Nothing displayed it — there
+    // was no mode pill in either state — so the panel silently changed shape (routing
+    // rows, ordinals, the DC control appearing/vanishing) driven by a SYSTEM-level
+    // setting the GM cannot see from this route.
+    const target = await harness.mount(props({ salvageResolutionMode: 'routed' }));
+    const pill = target.querySelector('[data-salvage-mode]');
+    assert.ok(pill, 'the salvage card names its mode');
+    assert.equal(pill.dataset.salvageMode, 'routed', 'the PERSISTED token is unchanged');
+    assert.match(pill.textContent, /Routed by check/, 'and is displayed as "Routed by check"');
+    assert.ok(
+      !/\brouted\b/.test(pill.textContent),
+      'the raw token is never shown to the GM'
+    );
+    harness.remount();
+  });
+
+  it('AC5: each mode names itself', async () => {
+    for (const [mode, label] of [
+      ['simple', /Simple/],
+      ['progressive', /Progressive/],
+    ]) {
+      const target = await harness.mount(props({ salvageResolutionMode: mode }));
+      assert.match(target.querySelector('[data-salvage-mode]').textContent, label);
+      harness.remount();
+    }
+  });
+
+  it('the mode pill is CHROME — it collapses with the rest when salvage is off', async () => {
+    // Ruling A lists the mode pill as chrome. The group editor never depends on it.
+    const off = await harness.mount(
+      props({ component: { salvage: { enabled: false, resultGroups: RESULT_GROUPS } }, salvageResolutionMode: 'routed' })
+    );
+    assert.equal(off.querySelector('[data-salvage-mode]'), null, 'no mode pill while salvage is off');
+    assert.ok(off.querySelector('[data-add-salvage-group]'), 'but the group editor stays');
     harness.remount();
   });
 

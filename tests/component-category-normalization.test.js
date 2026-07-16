@@ -15,9 +15,23 @@ globalThis.foundry = {
     getProperty: () => undefined,
   },
 };
-globalThis.game = {};
+// `updateItem` calls `_assertGM`, so the stub user must be a GM.
+globalThis.game = { user: { isGM: true } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+
+// A manager holding real, normalized systems with `save()` stubbed — the house pattern
+// (`buildManager` in compendium-drop.test.js). Needed to exercise the REAL `updateItem`
+// rather than a hand-rebuilt imitation of it.
+function makeLoadedManager(systems = []) {
+  const manager = makeManager();
+  for (const system of systems) {
+    manager.systems.set(system.id, manager._normalizeSystem(system));
+  }
+  manager.initialized = true;
+  manager.save = async () => {};
+  return manager;
+}
 
 function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
@@ -140,15 +154,35 @@ test('enabled survives normalization when at least one result group exists', () 
 // updateItem's shallow spread — the Scope-out assertion the delta requires
 // ---------------------------------------------------------------------------
 
-test('a save payload that omits category preserves it (updateItem shallow spread)', () => {
-  const manager = makeManager();
+test('a save payload that omits category preserves it (the REAL updateItem)', async () => {
   // The standalone `SvelteComponentEditorApp` (ComponentEditorRoot.svelte) does not
   // author `category` and is deliberately out of scope for issue 676. It stays safe
-  // ONLY because `updateItem` spreads `{...existing, ...updates}` — so an omitted key
-  // is preserved rather than dropped. Asserted, not assumed.
-  const existing = manager._normalizeComponent({ id: 'c1', name: 'Iron Ore', category: 'Metal' });
-  const updates = { tags: ['ore'] };
-  const merged = manager._normalizeComponent({ ...existing, ...updates, id: 'c1' });
-  assert.equal(merged.category, 'Metal');
-  assert.deepEqual(merged.tags, ['ore']);
+  // ONLY because `updateItem` spreads `{...existing, ...updates}`, so an omitted key is
+  // preserved rather than dropped. The delta said "asserted, not assumed".
+  //
+  // This calls the REAL `updateItem`. An earlier version hand-rebuilt the spread inline
+  // and so asserted JS spread semantics rather than Fabricate's: mutating updateItem to
+  // `{ ...updates, id: itemId }` — dropping the existing-spread, which is exactly the
+  // regression the Scope-out fears — left it green.
+  const manager = makeLoadedManager([
+    {
+      id: 'sys1',
+      name: 'System One',
+      items: [{ id: 'c1', name: 'Iron Ore', category: 'Metal', tags: ['metal'] }],
+    },
+  ]);
+
+  const updated = await manager.updateItem('sys1', 'c1', { tags: ['ore'] });
+
+  assert.equal(updated.category, 'Metal', 'an omitted category survives the save');
+  assert.deepEqual(updated.tags, ['ore'], 'and the authored field is applied');
+  assert.equal(manager.getSystem('sys1').components[0].category, 'Metal', 'persisted, not just returned');
+});
+
+test('updateItem applies an explicitly authored category', async () => {
+  const manager = makeLoadedManager([
+    { id: 'sys1', name: 'System One', items: [{ id: 'c1', name: 'Iron Ore', category: 'Metal' }] },
+  ]);
+  const updated = await manager.updateItem('sys1', 'c1', { category: 'Reagent' });
+  assert.equal(updated.category, 'Reagent');
 });

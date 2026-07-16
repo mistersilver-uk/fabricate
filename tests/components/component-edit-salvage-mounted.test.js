@@ -38,6 +38,9 @@ const harness = createMountedComponentHarness({
     'src/utils/componentCategories.js',
     // The salvage DC control's pure option model (issue 676). Import-free leaf.
     'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
+    // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
+    // check' for the persisted 'routed' token. Import-free leaf.
+    'src/ui/svelte/apps/manager/resolutionModeOptions.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     // The identity strip's drop target + its portaled overflow menu (issue 676).
     'src/ui/svelte/actions/dragDrop.js',

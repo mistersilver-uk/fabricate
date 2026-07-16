@@ -3233,11 +3233,13 @@
    `component-studio-font-size.test.js` pins: a studio role computing to 14 means its
    rule stopped applying.
 
-   Scoped to the two Component Studio routes so six other manager surfaces keep their
-   established type untouched. */
+   Scoped to the components BROWSER route so six other manager surfaces keep their
+   established type untouched. The editor route is deliberately absent: it has no
+   `.manager-toolbar` at all, and its Back/Save live in `.manager-header-actions` —
+   shell chrome shared by all seven editor kinds, so re-typing it here would silently
+   re-type six unrelated editors. */
 .fabricate-manager[data-manager-view="components"] .manager-search input,
-.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button,
-.fabricate-manager[data-manager-view="component-edit"] .manager-toolbar .manager-button {
+.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button {
   font-size: var(--fab-recipe-control-font);
 }
 
@@ -12630,6 +12632,19 @@
   display: grid;
   gap: var(--fab-space-2);
   min-width: 0;
+}
+
+/* The salvage card's heading carries the read-only mode pill, so the heading copy and
+   the pill share one line (issue 676). */
+.fabricate-manager [data-salvage-section] .manager-task-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-salvage-mode-pill {
+  flex: 0 0 auto;
 }
 
 /* The 186px drop target wraps UNDER the identity text rather than compressing beside

@@ -2891,9 +2891,13 @@
 
   function confirmTagCategoryRemoval(kind, row) {
     if (!row || (row.totalUsage || 0) <= 0) return true;
-    // Three vocabularies, three messages (issue 676). The component-category case
-    // says something the other two cannot: removing it does NOT leave the value
-    // dangling — `normalizeComponentCategory` falls those components back to General.
+    // Three vocabularies, three messages (issue 676) — all saying the same true thing,
+    // because all three behave the same way: removing a vocabulary entry does NOT
+    // rewrite the records carrying it. `normalizeComponentCategory` surfaces a custom
+    // token VERBATIM, so a component keeps `category: 'Reagent'` after the entry is
+    // deleted and its row badge still reads "Reagent"; only the editor's <select> loses
+    // the option. An earlier draft promised a fall-back to General that the code does
+    // not perform — in a DESTRUCTIVE confirm.
     const messages = {
       category: [
         'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirm',
@@ -2901,7 +2905,7 @@
       ],
       'component-category': [
         'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryConfirm',
-        'Remove the component category "{name}"? {count} components use it and will fall back to General.'
+        'Remove {name}? {count} components may keep this category value until you update them.'
       ],
       tag: [
         'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirm',
