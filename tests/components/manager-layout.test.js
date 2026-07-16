@@ -1990,6 +1990,10 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const fieldInputBlock = blockFor('.fabricate-manager .manager-field input,\n.fabricate-manager .manager-field select');
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
+  const featureTileIconBlock = blockFor('.fabricate-manager .manager-feature-tile-icon');
+  const featureTileIconOnBlock = blockFor('.fabricate-manager .manager-feature-tile-icon.is-on');
+  const featureTileIconOffBlock = blockFor('.fabricate-manager .manager-feature-tile-icon.is-off');
+  const featureTileBodyBlock = blockFor('.fabricate-manager .manager-feature-tile-body');
   const featureTileHeadBlock = blockFor('.fabricate-manager .manager-feature-tile-head');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const narrowQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
@@ -1999,7 +2003,18 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   assert.ok(gridBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'system edit fields should use a stable two-column grid');
   assert.ok(fieldInputBlock.includes('height: 36px;'), 'system edit inputs and selects should have stable control height');
   assert.ok(toggleListBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'feature toggles should use stable two-column rows');
-  assert.ok(featureTileBlock.includes('flex-direction: column;'), 'feature tiles should stack heading and hint vertically');
+  assert.ok(featureTileBlock.includes('flex-direction: row;'), 'feature tiles should seat the state icon beside the copy');
+  assert.ok(featureTileIconBlock.includes('flex: 0 0 40px;'), 'feature tile icon should hold the resolution card chip width without shrinking');
+  assert.ok(
+    featureTileIconOnBlock.includes('background: var(--fab-bg-3);') && featureTileIconOnBlock.includes('color: var(--fab-mv2-accent);'),
+    'an enabled feature chip should match the resolution mode card chip fill'
+  );
+  assert.ok(
+    featureTileIconOffBlock.includes('background: transparent;') && featureTileIconOffBlock.includes('border-style: dashed;'),
+    'a disabled feature chip should read as a hollow outline rather than a lit chip'
+  );
+  assert.ok(featureTileBodyBlock.includes('flex-direction: column;'), 'feature tile body should stack heading and hint vertically');
+  assert.ok(featureTileBodyBlock.includes('min-width: 0;'), 'feature tile body should allow the label and hint to wrap in the grid track');
   assert.ok(featureTileHeadBlock.includes('justify-content: space-between;'), 'feature tile heading should push the pill toggle to the trailing edge');
   assert.ok(
     mediumQuery.includes('.fabricate-manager .manager-toggle-list') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),

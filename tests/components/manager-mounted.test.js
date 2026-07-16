@@ -11400,6 +11400,65 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('gives every feature tile an icon chip whose state class tracks the feature', async () => {
+    await mountCurrencyEditor({
+      selectedFeatures: {
+        essences: true,
+        itemTags: true,
+        recipeCategories: true,
+        gathering: true,
+        salvage: false,
+      },
+    });
+
+    for (const tile of target.querySelectorAll('[data-feature-key]')) {
+      const chip = tile.querySelector('.manager-feature-tile-icon');
+      const key = tile.getAttribute('data-feature-key');
+      assert.ok(chip, `the ${key} tile renders an icon chip`);
+      assert.ok(
+        chip.querySelector('i')?.className.trim(),
+        `the ${key} chip renders a non-empty icon glyph`
+      );
+      // The chip is decorative: the toggle already carries the state accessibly.
+      assert.equal(chip.getAttribute('aria-hidden'), 'true', `the ${key} chip is hidden from AT`);
+    }
+
+    assert.ok(
+      target.querySelector('[data-feature-key="essences"] .manager-feature-tile-icon').classList.contains('is-on'),
+      'an enabled feature reads as on in the chip'
+    );
+    assert.ok(
+      target.querySelector('[data-feature-key="salvage"] .manager-feature-tile-icon').classList.contains('is-off'),
+      'a disabled feature reads as off in the chip'
+    );
+  });
+
+  it('flips the feature chip state class when the feature toggles', async () => {
+    await mountCurrencyEditor({
+      selectedFeatures: {
+        essences: true,
+        itemTags: true,
+        recipeCategories: true,
+        gathering: true,
+        salvage: false,
+      },
+    });
+    const chipClasses = () =>
+      target.querySelector('[data-feature-key="salvage"] .manager-feature-tile-icon').classList;
+    assert.ok(chipClasses().contains('is-off'), 'the salvage chip starts off');
+
+    await mountCurrencyEditor({
+      selectedFeatures: {
+        essences: true,
+        itemTags: true,
+        recipeCategories: true,
+        gathering: true,
+        salvage: true,
+      },
+    });
+    assert.ok(chipClasses().contains('is-on'), 'the salvage chip reads on once the feature is enabled');
+  });
+
   it('renders the currency spend-strategy control with three options and routes its change', async () => {
     const { calls } = await mountCurrencyEditor({
       selectedCurrency: {

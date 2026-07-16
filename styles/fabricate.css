@@ -8387,13 +8387,56 @@
 
 .fabricate-manager .manager-feature-tile {
   display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-surface);
+}
+
+/* Mirrors the resolution mode card's 40px chip so the two surfaces read alike.
+   Unlike that chip, this one also carries the feature's on/off state. */
+.fabricate-manager .manager-feature-tile-icon {
+  box-sizing: border-box;
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+
+  /* The transparent border reserves the off state's outline, so the chip stays
+     40x40 and the glyph stays put across states. */
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 0.95rem;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.fabricate-manager .manager-feature-tile-icon.is-on {
+  background: var(--fab-bg-3);
+  color: var(--fab-mv2-accent);
+}
+
+/* Off reads as a hollow, dashed outline. Every theme hues its text tokens, so a
+   colour-only shift is too weak to signal state — filled vs hollow is not. */
+.fabricate-manager .manager-feature-tile-icon.is-off {
+  border-color: var(--fab-mv2-border);
+  border-style: dashed;
+  background: transparent;
+  color: var(--fab-mv2-text-muted);
+  opacity: 0.6;
+}
+
+.fabricate-manager .manager-feature-tile-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
 }
 
 .fabricate-manager .manager-feature-tile-head {

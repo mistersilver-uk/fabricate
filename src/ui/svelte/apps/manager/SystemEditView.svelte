@@ -331,13 +331,13 @@
   });
 
   const featureDefinitions = [
-    { systemKey: 'gathering', storeKey: 'gathering', labelKey: 'FABRICATE.Admin.Manager.Feature.Gathering', fallback: 'Gathering', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Gathering', hintFallback: 'Shows gathering environments and player gathering flows for this system.' },
-    { systemKey: 'salvage', storeKey: 'salvage', labelKey: 'FABRICATE.Admin.Manager.Feature.Salvage', fallback: 'Salvage', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Salvage', hintFallback: 'Enables component salvage and the salvage check configuration for this system.' },
-    { systemKey: 'essences', storeKey: 'essences', labelKey: 'FABRICATE.Admin.Manager.Feature.Essences', fallback: 'Essences', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Essences', hintFallback: 'Enables essence definitions and essence requirements.' },
-    { systemKey: 'multiStepRecipes', storeKey: 'multiStepRecipes', labelKey: 'FABRICATE.Admin.Manager.Feature.MultiStepRecipes', fallback: 'Multi-step recipes', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.MultiStepRecipes', hintFallback: 'Enables explicit recipe steps and step-level requirements.' },
-    { systemKey: 'propertyMacros', storeKey: 'propertyMacros', labelKey: 'FABRICATE.Admin.Manager.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
-    { systemKey: 'effectTransfer', storeKey: 'effectTransfer', labelKey: 'FABRICATE.Admin.Manager.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' },
-    { systemKey: 'chatOutput', storeKey: 'chatOutput', labelKey: 'FABRICATE.Admin.Manager.Feature.ChatOutput', fallback: 'Chat output', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.ChatOutput', hintFallback: 'Posts a summary chat card after crafting and gathering attempts.' }
+    { systemKey: 'gathering', storeKey: 'gathering', icon: 'fas fa-wheat-awn', labelKey: 'FABRICATE.Admin.Manager.Feature.Gathering', fallback: 'Gathering', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Gathering', hintFallback: 'Shows gathering environments and player gathering flows for this system.' },
+    { systemKey: 'salvage', storeKey: 'salvage', icon: 'fas fa-recycle', labelKey: 'FABRICATE.Admin.Manager.Feature.Salvage', fallback: 'Salvage', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Salvage', hintFallback: 'Enables component salvage and the salvage check configuration for this system.' },
+    { systemKey: 'essences', storeKey: 'essences', icon: 'fas fa-flask', labelKey: 'FABRICATE.Admin.Manager.Feature.Essences', fallback: 'Essences', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Essences', hintFallback: 'Enables essence definitions and essence requirements.' },
+    { systemKey: 'multiStepRecipes', storeKey: 'multiStepRecipes', icon: 'fas fa-diagram-project', labelKey: 'FABRICATE.Admin.Manager.Feature.MultiStepRecipes', fallback: 'Multi-step recipes', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.MultiStepRecipes', hintFallback: 'Enables explicit recipe steps and step-level requirements.' },
+    { systemKey: 'propertyMacros', storeKey: 'propertyMacros', icon: 'fas fa-code', labelKey: 'FABRICATE.Admin.Manager.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
+    { systemKey: 'effectTransfer', storeKey: 'effectTransfer', icon: 'fas fa-wand-sparkles', labelKey: 'FABRICATE.Admin.Manager.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' },
+    { systemKey: 'chatOutput', storeKey: 'chatOutput', icon: 'fas fa-comment', labelKey: 'FABRICATE.Admin.Manager.Feature.ChatOutput', fallback: 'Chat output', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.ChatOutput', hintFallback: 'Posts a summary chat card after crafting and gathering attempts.' }
   ];
 
   const visibleFeatures = $derived(featureDefinitions.filter(feature => hasFeatureKey(selectedSystem, feature.systemKey)));
@@ -421,42 +421,51 @@
         <div class="manager-toggle-list">
           {#each visibleFeatures as feature (feature.systemKey)}
             <div class="manager-feature-tile" data-feature-key={feature.systemKey}>
+              <span
+                class={`manager-feature-tile-icon ${selectedSystem.features?.[feature.systemKey] === true ? 'is-on' : 'is-off'}`}
+                aria-hidden="true"
+              ><i class={feature.icon}></i></span>
+              <div class="manager-feature-tile-body">
+                <div class="manager-feature-tile-head">
+                  <strong>{text(feature.labelKey, feature.fallback)}</strong>
+                  <button
+                    type="button"
+                    class={`manager-status-toggle ${selectedSystem.features?.[feature.systemKey] === true ? 'is-on' : 'is-off'}`}
+                    aria-pressed={selectedSystem.features?.[feature.systemKey] === true}
+                    aria-label={text(feature.labelKey, feature.fallback)}
+                    onclick={() => handleToggleFeature(feature)}
+                  >
+                    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                    <span class="manager-status-toggle-label">{selectedSystem.features?.[feature.systemKey] === true
+                      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+                  </button>
+                </div>
+                <small>{text(feature.hintKey, feature.hintFallback)}</small>
+              </div>
+            </div>
+          {/each}
+          <div class="manager-feature-tile" data-feature-key="currency">
+            <span class={`manager-feature-tile-icon ${currencyEnabled ? 'is-on' : 'is-off'}`} aria-hidden="true"><i class="fas fa-coins"></i></span>
+            <div class="manager-feature-tile-body">
               <div class="manager-feature-tile-head">
-                <strong>{text(feature.labelKey, feature.fallback)}</strong>
+                <strong>{text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}</strong>
                 <button
                   type="button"
-                  class={`manager-status-toggle ${selectedSystem.features?.[feature.systemKey] === true ? 'is-on' : 'is-off'}`}
-                  aria-pressed={selectedSystem.features?.[feature.systemKey] === true}
-                  aria-label={text(feature.labelKey, feature.fallback)}
-                  onclick={() => handleToggleFeature(feature)}
+                  class={`manager-status-toggle ${currencyEnabled ? 'is-on' : 'is-off'}`}
+                  aria-pressed={currencyEnabled}
+                  aria-label={text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}
+                  data-system-currency-toggle
+                  onclick={handleToggleCurrency}
                 >
                   <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                  <span class="manager-status-toggle-label">{selectedSystem.features?.[feature.systemKey] === true
+                  <span class="manager-status-toggle-label">{currencyEnabled
                     ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
                     : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
                 </button>
               </div>
-              <small>{text(feature.hintKey, feature.hintFallback)}</small>
+              <small>{text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency', 'Enables step currency requirements and the currency configuration for this system.')}</small>
             </div>
-          {/each}
-          <div class="manager-feature-tile" data-feature-key="currency">
-            <div class="manager-feature-tile-head">
-              <strong>{text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}</strong>
-              <button
-                type="button"
-                class={`manager-status-toggle ${currencyEnabled ? 'is-on' : 'is-off'}`}
-                aria-pressed={currencyEnabled}
-                aria-label={text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}
-                data-system-currency-toggle
-                onclick={handleToggleCurrency}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                <span class="manager-status-toggle-label">{currencyEnabled
-                  ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-                  : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
-              </button>
-            </div>
-            <small>{text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency', 'Enables step currency requirements and the currency configuration for this system.')}</small>
           </div>
         </div>
       </section>
