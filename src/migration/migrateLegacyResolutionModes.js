@@ -1,7 +1,7 @@
 /**
  * 1.4.0 — Hard-migrate legacy crafting resolution modes `mapped`/`tiered` to the
  * canonical routed modes (pure, idempotent, version-gated). Per
- * `007-destructive-changes-and-migrations §Resolution-Model Migration
+ * `destructive-changes-and-migrations/spec.md §Resolution-Model Migration
  * (Pre-Release)`, this is a TRUE one-time read-legacy → write-canonical migration:
  * no permanent live `tiered` branch and no permanent `outcomeRouting` read-shim
  * are retained anywhere in the active runtime.
