@@ -92,6 +92,29 @@ export function classifyCapturedError(text, patterns) {
 }
 
 /**
+ * True when an error message is a transient BROWSER/PAGE TEARDOWN — the headless Chromium
+ * (or one of its pages/contexts) being closed, disconnected, or crashed. At the very END
+ * of a long run (e.g. a final screenshot click as the browser is being torn down) this is
+ * an INFRA hiccup, not a product failure.
+ *
+ * The harness already skips its flaky last (Journal) step on this class; the process-level
+ * `unhandledRejection` guard reuses this predicate so a teardown promise that rejects AFTER
+ * the run's verdict is recorded cannot flip an otherwise-PASSED smoke run to a non-zero
+ * exit (the false red the beta publish hit). Anything not matching still fails fast.
+ *
+ * @param {unknown} message
+ * @returns {boolean}
+ */
+export function isTransientPageTeardown(message) {
+  return (
+    typeof message === 'string' &&
+    /has been closed|target closed|session closed|page crashed|has been disconnected|browser has disconnected/i.test(
+      message
+    )
+  );
+}
+
+/**
  * The split smoke signal, computed from the accumulated results.
  *
  * `stepFailures` counts failed steps; `consoleErrorCount` counts the NON-waived

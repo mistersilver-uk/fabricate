@@ -37,8 +37,26 @@ import {
   appendAllowedConsoleErrorPatterns,
   classifyCapturedError,
   computeSmokeSignal,
-  evaluateSmokeOutcome
+  evaluateSmokeOutcome,
+  isTransientPageTeardown
 } from './lib/foundrySmokeSignal.js';
+
+// A browser/page teardown at the very end of a long headless run (the Chromium being
+// killed while a final screenshot click is still in flight) can leave a FLOATING page
+// promise that rejects AFTER the run's verdict is already recorded in summary.json. Node's
+// default unhandled-rejection handling would then flip a PASSED smoke to exit 1 — a false
+// red that blocks the beta publish. The run already tolerates this class for its flaky last
+// (Journal) step; extend that tolerance to the process so a late teardown rejection is
+// swallowed. Any OTHER unhandled rejection still fails fast, as before.
+process.on('unhandledRejection', (reason) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  if (isTransientPageTeardown(message)) {
+    process.stderr.write(`Ignoring transient teardown rejection after the run: ${message}\n`);
+    return;
+  }
+  process.stderr.write(`foundry-test-run unhandled rejection: ${message}\n`);
+  process.exit(1);
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -6473,10 +6491,6 @@ async function main() {
         // genuine UI failure (locator not visible / wrong journal state) with a
         // LIVE page still fails hard and still captures a journal-failure frame.
         const JOURNAL_CAPTURE_ATTEMPTS = 3;
-        const isTransientPageTeardown = (message) =>
-          /has been closed|target closed|session closed|page crashed|has been disconnected/i.test(
-            String(message || '')
-          );
         const captureJournalScreen = async () => {
           await closeOpenApplications(page);
           // Ensure the crafter (the actor that owns the terminal run) is the
@@ -6732,7 +6746,15 @@ async function main() {
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
     results.phaseTimings = phaseTimings;
-    await browser.close();
+    // A browser that already CRASHED (the teardown case) can make close() reject. This is
+    // the finally block and the run's verdict is already recorded in `results`, so a close
+    // failure is post-run cleanup noise — never re-throw here (it would mask the try's
+    // outcome and skip the summary.json write below). Log and continue.
+    try {
+      await browser.close();
+    } catch (closeErr) {
+      process.stderr.write(`browser.close() failed (ignored): ${closeErr.message}\n`);
+    }
 
     const combinedTimings = [
       ...bootTimings.map(entry => ({ ...entry, phase: `boot:${entry.phase}` })),
@@ -6758,9 +6780,9 @@ async function main() {
     process.stdout.write(`Results written to test-results/\n`);
   }
 
-  if (!results.passed) {
-    process.exit(1);
-  }
+  // Exit DETERMINISTICALLY on the harness's own verdict, immediately — so a floating
+  // teardown promise that settles during the event-loop drain cannot influence the code.
+  process.exit(results.passed ? 0 : 1);
 }
 
 main().catch(err => {
