@@ -1502,6 +1502,11 @@ export class CraftingSystemManager {
     if (!salvage || typeof salvage !== 'object') {
       return {
         enabled: false,
+        // Default TRUE (issue 651), matching the `Recipe.allowPlayerResultReorder`
+        // default. This non-object path returns its own literal, so the default has to
+        // be stated on BOTH return paths or a component with no salvage config renders
+        // the GM toggle off against a default-on spec.
+        allowPlayerResultReorder: true,
         ingredientQuantity: 1,
         toolIds: [],
         resultGroups: [],
@@ -1525,6 +1530,10 @@ export class CraftingSystemManager {
 
     return {
       enabled: salvage.enabled === true,
+      // GM-authored policy: may a player reorder this salvage's progressive result
+      // stages? Default TRUE (issue 651) — an absent key reads as `true`, which is why
+      // the 1.17.0 migration does not seed it.
+      allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
       ingredientQuantity,
       dcOverride,
       // Preserve migrated salvage tool references so they are not orphaned on the

@@ -596,9 +596,16 @@ class Fabricate {
     );
     await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
+    // Flatten the per-system salvage component sets the run cleanup above already
+    // computed: the progressive-order map's `salvage:<componentId>` keys are not
+    // system-scoped, so the prune needs one flat id set.
+    const validComponentIds = new Set(
+      [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
+    );
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
       resolveGatheringActor,
-      isSelectableGatheringActor
+      isSelectableGatheringActor,
+      validComponentIds
     });
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
@@ -1624,6 +1631,43 @@ class Fabricate {
       ? current.filter((id) => id !== recipeId)
       : [...current, recipeId];
     setSetting(SETTING_KEYS.FAVOURITE_RECIPES, next);
+    return next;
+  }
+
+  /**
+   * The player's stored progressive result orders, keyed `recipe:<id>` / `salvage:<id>`
+   * (`PROGRESSIVE_RESULT_ORDER`).
+   *
+   * USER-scoped, NOT client-scoped: this preference is per-user and follows the account
+   * across devices, but it is per-user PER WORLD — the same player in another world gets
+   * a fresh map. (The `getFavouriteRecipeIds` neighbour above IS client-scoped; do not
+   * read its JSDoc as describing this one.)
+   *
+   * @returns {Record<string, string[]>}
+   */
+  getProgressiveResultOrder() {
+    const stored = getSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER);
+    return stored && typeof stored === 'object' ? stored : {};
+  }
+
+  /**
+   * Persist the player's preferred result order for one namespaced key.
+   *
+   * ASYNC AND MUST BE AWAITED. Under `user` scope `set` is a real, replicated document
+   * write that can REJECT — unlike the fire-and-forget `setSetting(...)` used by
+   * `toggleFavouriteRecipe` above, which is correct only because that setting is
+   * client-scoped (a synchronous localStorage write that cannot fail). Swallowing the
+   * promise here would let a caller believe an order that was never stored.
+   *
+   * @param {string} key Namespaced key from `progressiveOrderKey` (`recipe:<id>`/`salvage:<id>`).
+   * @param {string[]} orderedIds The player's preferred result ids.
+   * @returns {Promise<Record<string, string[]>>} The updated map.
+   */
+  async setProgressiveResultOrder(key, orderedIds) {
+    const current = this.getProgressiveResultOrder();
+    if (!key) return current;
+    const next = { ...current, [key]: Array.isArray(orderedIds) ? orderedIds : [] };
+    await setSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER, next);
     return next;
   }
 

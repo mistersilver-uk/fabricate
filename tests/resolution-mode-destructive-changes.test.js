@@ -109,9 +109,10 @@ function multiGroupRecipe(id, systemId, overrides = {}) {
 test('changing resolutionMode migrates 1×1 recipes instead of deleting them (inverted) and cleans stale progressive preferences', async () => {
   settingsStore.clear();
   settingsStore.set('lastManagedCraftingSystem', 'sys-1');
+  // Keys are namespaced `recipe:<id>` (issue 651); values are result ids.
   settingsStore.set('progressiveResultOrder', {
-    'recipe-1': ['a', 'b'],
-    'recipe-2': ['c', 'd']
+    'recipe:recipe-1': ['a', 'b'],
+    'recipe:recipe-2': ['c', 'd']
   });
 
   const recipeManager = makeRecipeManager([
@@ -142,7 +143,7 @@ test('changing resolutionMode migrates 1×1 recipes instead of deleting them (in
 
 test('updating a system without changing resolutionMode does not migrate or delete recipes', async () => {
   settingsStore.clear();
-  settingsStore.set('progressiveResultOrder', { 'recipe-1': ['a', 'b'] });
+  settingsStore.set('progressiveResultOrder', { 'recipe:recipe-1': ['a', 'b'] });
 
   const recipeManager = makeRecipeManager([oneByOneRecipe('recipe-1', 'sys-1')]);
   const manager = makeManager(recipeManager);
@@ -157,7 +158,7 @@ test('updating a system without changing resolutionMode does not migrate or dele
   assert.equal(manager.getSystem('sys-1').name, 'Grand Forge');
   assert.deepEqual(recipeManager.getDeletedRecipeIds(), []);
   assert.deepEqual(recipeManager.getUpdatedRecipeIds(), []);
-  assert.deepEqual(settingsStore.get('progressiveResultOrder'), { 'recipe-1': ['a', 'b'] });
+  assert.deepEqual(settingsStore.get('progressiveResultOrder'), { 'recipe:recipe-1': ['a', 'b'] });
 });
 
 test('widening simple → routed deletes zero recipes and seeds providers', async () => {
