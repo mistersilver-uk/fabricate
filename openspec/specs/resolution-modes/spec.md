@@ -202,8 +202,56 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 ### Player Reorder
 
-- If `allowPlayerReorder` is false, recipe-defined order is authoritative.
-- If true, player may reorder before execution; the reordered list is used for award evaluation.
+Progressive awarding spends the roll down an ordered list, so the order decides what the player actually receives.
+Two distinct concepts govern it and MUST NOT be collapsed: the GM-authored **Result Order Permission** (on the aggregate, exported) and the per-user **Player Result Order** (runtime preference, never exported).
+
+#### Result Order Permission (GM-authored)
+
+- The permission lives on the entity whose results are being ordered, and nowhere else: `Recipe.allowPlayerResultReorder` for crafting, `Component.salvage.allowPlayerResultReorder` for salvage.
+- Both default to `true`.
+- An absent key reads as `true`, so no migration seeds the field; only an explicit `false` pins the authored order.
+- The retired system-level `craftingCheck.progressive.allowPlayerReorder` is gone from all three progressive check blocks (crafting, salvage, gathering).
+- Gathering has no reorder feature: it exposes no ordered result-stage surface, so the retired flag was removed without replacement.
+- When the permission is `false` the authored order is authoritative and any stored player order is ignored.
+
+#### Player Result Order (per-user runtime state)
+
+- The order is stored as a list of **result ids**, not indices, so it survives a GM editing the recipe.
+- Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<componentId>`.
+- One key per recipe, not per step.
+- The order is a **standing preference**: it applies to every craft of that recipe until the player changes it, and is NOT a per-attempt gesture.
+- It is stored per-user **within a world**, not per-account globally: the same player in a second world starts from the authored order.
+
+#### Reconciliation contract
+
+Reconciling a stored order against the authored list MUST satisfy all of the following.
+
+- The result count is preserved exactly: reconciliation never drops a result, because the award loop spends budget down the list and a dropped result silently denies the player an award they were entitled to.
+- Ids in the stored order that match no authored result are skipped.
+- Authored results the stored order does not name are **tail-appended in authored order**, so an unranked stage can never displace a ranked one: a GM adding a stage cannot silently demote a player's ranked stage, and the new stage is awarded only if budget remains.
+- A result with **no id** is never reorderable and always retains its authored position (it matches nothing and tail-appends).
+- **Duplicate ids: first match wins.** The second copy tail-appends rather than vanishing or doubling.
+- An absent or empty stored order yields the authored list unchanged.
+
+#### Cross-step id uniqueness (assumption)
+
+- One flat id list reconciles every step of a multi-step progressive recipe.
+- This is correct only while result ids are **unique across a recipe's steps**, which nothing enforces — copy-mode import preserves result ids by design.
+- A result id colliding across two steps therefore ranks independently in each.
+- This is a recorded assumption, not a guarantee.
+
+#### Which user's order is read
+
+- **Crafting reads the order live, at resolve time, and it is the EXECUTING user's** — not the actor owner's.
+A GM invoking `craft` through the API resolves down the *GM's* order.
+This is deliberate: the recipe path resolves on the acting client.
+- **Salvage reads the order captured on its run record at start**, never from settings.
+- This asymmetry is deliberate and load-bearing, not drift.
+A world-time-resumed salvage is driven by the synced `updateWorldTime` hook, which fires on every client with no ownership filter, so whichever client wins the race executes the resume.
+Capturing the order at start makes the executing user irrelevant, which makes that class of defect structurally unreachable on the salvage path rather than merely documented.
+- A salvage with **no run record uses the authored order**, and there is deliberately **no settings fallback**; adding one would reintroduce the executing-user read the capture exists to prevent.
+- Salvage gates on the permission at **read time, not capture time**, so a GM toggling the permission off mid-run takes effect on that run's award.
+The captured order is retained but ignored.
 
 ### Validation
 

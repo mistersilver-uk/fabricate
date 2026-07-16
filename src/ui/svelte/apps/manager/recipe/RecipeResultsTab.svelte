@@ -15,6 +15,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import ToggleCard from '../ToggleCard.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
 
@@ -41,8 +42,14 @@
     onOpenComponent = () => {},
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
-    onDeleteStep = () => {}
+    onDeleteStep = () => {},
+    // GM policy: may a player reorder this recipe's progressive stages? Default true
+    // (issue 651). Written back through onUpdateRecipe by the shell.
+    onToggleAllowPlayerResultReorder = () => {}
   } = $props();
+
+  // Default-true: only an explicit `false` turns the switch off, matching the model.
+  const allowPlayerResultReorder = $derived(recipe?.allowPlayerResultReorder !== false);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -125,6 +132,31 @@
       onAssignIngredientSet={(groupId, setId, assigned) =>
         onAssignIngredientSet(null, groupId, setId, assigned)}
       onChange={(nextGroups) => onUpdateResultGroups(null, nextGroups)}
+    />
+  {/if}
+
+  {#if progressive}
+    <!-- Reorder-permission card (§C4, issue 651), placed at the END of the progressive
+         block — AFTER the result sets, never directly beneath the info strip. The two
+         info-toned surfaces would otherwise stack as one undifferentiated block. This
+         adjacency also reads correctly on its own terms: strip = "here is how this list
+         is spent" (preamble) → list = the thing → card = "here is who may reorder it"
+         (policy about the thing you have now seen).
+
+         The strip's copy is NOT folded into this card's sub-line: the strip states an
+         INVARIANT (the award mechanic is true of every progressive recipe regardless of
+         this toggle) while the card states a CONDITIONAL. When the toggle is off the
+         budget explanation must still be true, so a merged sub-line would caveat itself. -->
+    <ToggleCard
+      variant="is-info"
+      icon="fas fa-arrow-down-a-z"
+      section="allow-player-result-reorder"
+      field="allowPlayerResultReorder"
+      title={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderTitle', 'Allow player result re-ordering')}
+      sub={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderSub', 'Players may set their own stage order for this recipe, which is remembered and used every time they craft it.')}
+      toggleLabel={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderToggle', 'Allow player result re-ordering')}
+      on={allowPlayerResultReorder}
+      onToggle={(next) => onToggleAllowPlayerResultReorder(next)}
     />
   {/if}
 </section>

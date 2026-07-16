@@ -188,7 +188,22 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
     name: 'Progressive Result Order Preferences',
-    scope: 'client',
+    // `user` scope (issue 651), NOT `client`: a player's chosen stage order is a standing
+    // preference that must reach them on any device they open this world from, rather
+    // than sit in one browser's localStorage. This is per user PER WORLD (the same player
+    // in a second world gets a fresh order) — never describe it as following the account,
+    // which is wrong for `user` scope. Note also that `set` is now an async, replicated
+    // document write that can reject, not a synchronous localStorage write.
+    //
+    // The flip needed no data migration, and the reason is NOT "nothing reads it" —
+    // that would not imply absence. The real reason: NO WRITER HAS EVER EXISTED. The
+    // only `setSetting` call for this key lives in `cleanupStalePreferences`, which
+    // fires only when `changed` is true, which requires entries nothing creates; the map
+    // has permanently been its `{}` default. Foundry also has no scope-migration
+    // facility (`ClientSettings#get` dispatches on scope at read time), so any
+    // pre-existing localStorage key is orphaned in place — never read, never deleted,
+    // never an error.
+    scope: 'user',
     config: false,
     type: Object,
     default: {},

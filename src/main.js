@@ -43,6 +43,7 @@ import {
   gatheringRunItemRef
 } from './gatheringResultCreation.js';
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
+import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
@@ -434,7 +435,9 @@ class Fabricate {
       evaluateExpression: evaluateGatheringExpression
     });
     this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
-    this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
+    this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager, {
+      getPlayerResultOrder: entry => this._readPlayerResultOrder(entry)
+    });
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
     // The generic actor-inventory spender resolves a per-system coin adapter by
@@ -452,7 +455,8 @@ class Fabricate {
       this.itemPilesIntegration,
       this.salvageRunManager,
       this.actorInventoryCoinSpender,
-      this.actorPropertyCoinSpender
+      this.actorPropertyCoinSpender,
+      { getPlayerResultOrder: entry => this._readPlayerResultOrder(entry) }
     );
 
     // Initialize recipe manager
@@ -596,9 +600,16 @@ class Fabricate {
     );
     await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
+    // Flatten the per-system salvage component sets the run cleanup above already
+    // computed: the progressive-order map's `salvage:<componentId>` keys are not
+    // system-scoped, so the prune needs one flat id set.
+    const validComponentIds = new Set(
+      [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
+    );
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
       resolveGatheringActor,
-      isSelectableGatheringActor
+      isSelectableGatheringActor,
+      validComponentIds
     });
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
@@ -1624,6 +1635,63 @@ class Fabricate {
       ? current.filter((id) => id !== recipeId)
       : [...current, recipeId];
     setSetting(SETTING_KEYS.FAVOURITE_RECIPES, next);
+    return next;
+  }
+
+  /**
+   * The player's stored progressive result orders, keyed `recipe:<id>` / `salvage:<id>`
+   * (`PROGRESSIVE_RESULT_ORDER`).
+   *
+   * USER-scoped, NOT client-scoped: this preference is per user PER WORLD. It reaches
+   * that user on any device they open THIS world from, and the same player in another
+   * world gets a fresh map. It does NOT follow the account globally — that phrasing is
+   * wrong for `scope: 'user'` and is banned in `AGENTS.md` for exactly this reason.
+   * (The `getFavouriteRecipeIds` neighbour above IS client-scoped, i.e. per device; do
+   * not read its JSDoc as describing this one.)
+   *
+   * @returns {Record<string, string[]>}
+   */
+  getProgressiveResultOrder() {
+    const stored = getSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER);
+    return stored && typeof stored === 'object' ? stored : {};
+  }
+
+  /**
+   * The Foundry edge for the `getPlayerResultOrder` seam injected into
+   * `ResolutionModeService` and `CraftingEngine` (issue 651 D1).
+   *
+   * Deliberately a one-line settings read returning DATA (an id list), not a sorted
+   * array: the reconciliation itself lives in the pure `applyPlayerResultOrder`, so the
+   * ordering logic is unit-testable with no settings stub.
+   *
+   * @param {{ scope: 'recipe'|'salvage', id: string }} entry
+   * @returns {string[]|null} The executing user's stored order, or null when there is none.
+   */
+  _readPlayerResultOrder(entry) {
+    const key = progressiveOrderKey(entry);
+    if (!key) return null;
+    const order = this.getProgressiveResultOrder()[key];
+    return Array.isArray(order) ? order : null;
+  }
+
+  /**
+   * Persist the player's preferred result order for one namespaced key.
+   *
+   * ASYNC AND MUST BE AWAITED. Under `user` scope `set` is a real, replicated document
+   * write that can REJECT — unlike the fire-and-forget `setSetting(...)` used by
+   * `toggleFavouriteRecipe` above, which is correct only because that setting is
+   * client-scoped (a synchronous localStorage write that cannot fail). Swallowing the
+   * promise here would let a caller believe an order that was never stored.
+   *
+   * @param {string} key Namespaced key from `progressiveOrderKey` (`recipe:<id>`/`salvage:<id>`).
+   * @param {string[]} orderedIds The player's preferred result ids.
+   * @returns {Promise<Record<string, string[]>>} The updated map.
+   */
+  async setProgressiveResultOrder(key, orderedIds) {
+    const current = this.getProgressiveResultOrder();
+    if (!key) return current;
+    const next = { ...current, [key]: Array.isArray(orderedIds) ? orderedIds : [] };
+    await setSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER, next);
     return next;
   }
 

@@ -111,7 +111,6 @@ The returned system object also includes the following top-level salvage fields,
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools even when the salvage check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback) |
 | `progressive.rollFormula` | `string` | `""` | Roll formula for the progressive salvage check (`progressive` salvage mode). The check is usable only when this is set. |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
-| `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -135,10 +134,15 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 | `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
-| `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+{: .note }
+> `progressive.allowPlayerReorder` is retired (issue 651) and is dropped from the crafting, salvage, and gathering progressive check blocks on every normalise, including on import of a legacy payload.
+> The 1.17.0 migration strips it from stored systems.
+> The permission it carried now lives on the recipe as `allowPlayerResultReorder` and on the component as `salvage.allowPlayerResultReorder`, and it defaults to `true` where it previously defaulted to `false`.
+> Gathering never had an ordered result-stage surface, so it has no replacement field.
 
 The `alchemy` field is present only when `resolutionMode` is `"alchemy"`.
 It carries the alchemy check mode and the discovery/consumption options.
@@ -533,8 +537,13 @@ A check becomes usable only when its resolution-mode sub-object carries an autho
 Normalises the `salvage` sub-object for a single component.
 Called by `_normalizeComponent` when `features.salvage` is `true` on the system.
 
-Applies defaults: `enabled: false`, `ingredientQuantity: 1`, `toolIds: []`, `resultGroups: []`.
+Applies defaults: `enabled: false`, `allowPlayerResultReorder: true`, `ingredientQuantity: 1`, `toolIds: []`, `resultGroups: []`.
 The optional fields `outcomeRouting`, `timeRequirement`, and `currencyRequirement` are included only when present and non-null in the input.
+
+`allowPlayerResultReorder` is the GM-authored permission for player re-ordering of this component's progressive salvage result stages (issue 651).
+It is normalised as `salvage.allowPlayerResultReorder !== false`, so an absent key reads as `true` and only an explicit `false` pins the authored order.
+The same default is applied when the component carries no `salvage` object at all.
+It is read in progressive salvage mode only, and it replaces the retired system-level `salvageCraftingCheck.progressive.allowPlayerReorder`.
 
 ### _normalizeToolIds(toolIds)
 

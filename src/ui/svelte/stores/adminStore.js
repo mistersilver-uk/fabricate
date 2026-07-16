@@ -1654,6 +1654,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       },
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
+      // GM policy: may a player reorder this recipe's progressive result stages
+      // (issue 651)? This projection is a hand-built ALLOWLIST — an omitted field is
+      // invisible to the editor, so the Results tab's toggle card would seed from
+      // `undefined`, read default-true, and silently render ON for a recipe the GM had
+      // authored OFF. Default-true here mirrors the model's constructor.
+      allowPlayerResultReorder: recipe.allowPlayerResultReorder !== false,
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),

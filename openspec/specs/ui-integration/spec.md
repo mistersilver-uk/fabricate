@@ -271,7 +271,7 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 - Failure macro
 - Failure consumption policy
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
-- Progressive settings (`awardMode`, `allowPlayerReorder`) (progressive only)
+- Progressive settings (`awardMode`) (progressive only)
 
 For a `routedByCheck` system whose routed check `type` is `fixed`, the tier `CraftingCheckEditor` hides the DC field and the meet/exceed comparison, because fixed tiers match by explicit value range rather than against a DC.
 The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEditor` only; the DC and comparison stay shown for relative-type `routedByCheck` and for the salvage/gathering check editors.
@@ -1009,7 +1009,14 @@ A component with no authored difficulty reads as unset, not as `0`.
 - Drag reorder controls
 - **Keyboard reorder controls** alongside them: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the result they move, with the new position announced through an `aria-live="polite"` region.
 Result order is load-bearing in progressive mode (the award loop spends the check budget down the list), so a drag-only reorder is an accessibility gap, not a convenience one.
-- Reorder indicator if `allowPlayerReorder` is true
+- A **reorder-permission toggle card** at the END of the progressive block, after the result sets — never directly beneath the roll-budget info strip.
+The card is info-toned, defaults **on**, and writes `Recipe.allowPlayerResultReorder`.
+Placement is a requirement, not a preference: the strip and the card are both info-toned, so adjacency renders them as one undifferentiated block, and the resulting reading order (strip = how this list is spent, list = the thing, card = who may reorder it) states the policy after the thing it governs.
+The strip's copy is NOT folded into the card's sub-line, because the strip states an invariant true of every progressive recipe while the card states a conditional the GM can switch off.
+- The **salvage editor** renders the same toggle card, gated on `salvageResolutionMode === 'progressive'`, writing `Component.salvage.allowPlayerResultReorder`.
+- The progressive **salvage** result list shows **ordinals** and a **read-only difficulty badge** per row.
+These are required alongside the salvage toggle card and not severable from it: progressive salvage spends the roll down the list, so without them the card would govern an order the GM cannot see, and a card reading "players may reorder the stages" above a list of bare selects asserts a model the surface contradicts.
+The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 
 ## Crafting App (Player)
 
@@ -1109,6 +1116,30 @@ Each
   present on Discovery-Mode teaser models too (category is GM-authored grouping
   metadata, not a redacted spoiler field).
 - The listing exposes `counts.available` / `counts.total` for header summaries.
+
+##### Progressive Stage List
+
+- A progressive recipe's detail body renders an **ordered stage list**, replacing the generic input/output table: a progressive output is not a flat set, because one roll is spent down the list and the order decides what the player receives.
+- The stage list is built from the **authored** result group and deliberately bypasses the award loop.
+Browsing has no roll, so routing it through the award loop yields a zero budget, awards nothing, and renders an empty output list.
+- Each row carries: its **ordinal** (the row's position, not the stage's identity), the component **name** and **image**, a **read-only difficulty**, and the **cumulative threshold** at which the stage is reached.
+- The cumulative threshold is the player's decision input: per-stage difficulty alone forces the player to do the arithmetic and redo it after every move.
+- The threshold is **derived from the award mode**, not a running sum of difficulties.
+A running sum is correct only for `equal`; `exceed` gates on a strict comparison and sits one above each cumulative sum, and `partial` awards a tail result whenever any budget remains, making its final stage reachable *below* its cumulative sum.
+- A stage the award loop skips (an invalid or absent difficulty) is reached at **no** budget, so its threshold is **omitted** rather than shown as zero or as a running total.
+Such a stage must not advance the cumulative total for later stages.
+- The displayed threshold and the awarded result MUST agree with the award loop for every award mode and every budget.
+- Stages are shown in the **player's** order (see `resolution-modes` §Player Reorder), reconciled against the authored list.
+- When the permission is true the rows are reorderable by **drag** and by **keyboard**: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the stage they move, with the new position announced through an `aria-live="polite"` region.
+Drag is a mouse-only enhancement — HTML5 drag does not fire on touch, so the move buttons are the only touch path and must meet the touch-target size.
+- The announcement names the stage that MOVED, read before the move is applied, and is a single localized string carrying name, position and total (never assembled from fragments).
+- Reorder writes are **debounced** and committed on settle, not per intermediate move, because each write is a replicated document write.
+- If a write **fails**, the rows revert to the last persisted order and the revert is announced through the **same** `aria-live` region.
+A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
+- When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip glyph** (the grip is the affordance signal), use a default cursor, attach **no** drag handlers, and show one muted line explaining that the GM set the order.
+No live region is rendered in this state, because nothing can change.
+Identical rows minus working affordances are not acceptable: a player must not be able to grab a row and have nothing happen.
+- A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 ##### Browse Status
 

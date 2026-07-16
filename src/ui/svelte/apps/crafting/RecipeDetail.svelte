@@ -23,7 +23,17 @@
     busy = false,
     onChoose = null,
     onChooseOption = null,
-    onCraft = null
+    onCraft = null,
+    // Progressive stage list + player reorder (issue 651). The BODIES dispatcher below
+    // passes ONE identical prop set to all four bodies, so these must be declared and
+    // forwarded here even though only ProgressiveBody reads them — the other three
+    // ignore them. A prop that skips this dispatcher silently drops to its default and
+    // the stage list never renders.
+    progressiveStages = [],
+    canReorderStages = true,
+    stageAnnouncement = '',
+    onReorderStage = null,
+    onReorderStageSettled = null
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -61,7 +71,19 @@
     <RecipeDetailHeader {recipe} />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>
-        <Body {recipe} {selectedSetId} {craftability} {rollResult} {onChoose} {onChooseOption} />
+        <Body
+          {recipe}
+          {selectedSetId}
+          {craftability}
+          {rollResult}
+          {onChoose}
+          {onChooseOption}
+          {progressiveStages}
+          {canReorderStages}
+          {stageAnnouncement}
+          {onReorderStage}
+          {onReorderStageSettled}
+        />
       </div>
       <div class="crafting-detail-footer">
         <CraftButton

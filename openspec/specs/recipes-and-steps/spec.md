@@ -63,7 +63,11 @@ Each step can define:
 - A recipe/step is craftable when at least one `IngredientSet` is satisfied (OR across sets).
 - Within an `IngredientSet`, all `ingredientGroups` must be satisfied (AND across groups).
 - Within an `IngredientGroup`, any one option in `options` satisfies the group (OR within group).
-- By default a group resolves to the first item-satisfiable option in author order (then the first affordable currency option); items strictly beat currency.
+- **Order-independence (the user-facing guarantee):** an ingredient set is satisfiable iff there EXISTS an assignment of items to its AND-groups that satisfies every group (one option each, respecting per-option quantity and the shared no-double-count ledger).
+The resolver finds such an assignment whenever one exists — including reassigning a dual-purpose item (one that could satisfy more than one group) away from the group that would strand another — so craftability does NOT depend on inventory or group iteration order.
+- **Items strictly beat currency (the ordering MECHANISM):** a currency option is chosen for a group only when no item/essence assignment across the set can satisfy that group; currency options (free — no ledger draw) are considered only after every item/essence branch is exhausted.
+- **Deterministic pick:** the greedy author-order assignment whenever one satisfies (byte-for-byte the pre-663 behaviour, zero churn), otherwise the first satisfying assignment found by an item-level search under a fixed author-order traversal (per group, non-currency options in author order then currency; per option, the greedy item subset first then alternatives).
+The search is bounded by a generous node/subset safeguard; on the rare bound-hit it degrades to the greedy author-order pass (never worse than the pre-663 behaviour, never a double-count) — an implementation safeguard, not user-facing behaviour.
 - A player MAY override which option a multi-option group consumes, and — for a tag option matching more than one held stack — which specific held item, via `IngredientSet.resolveIngredientSelection`'s `optionOverrides` argument (keyed by `group.id` → `{ optionIndex, heldItemId? }`).
 An override is honoured whether satisfiable or not: a satisfiable option wins; an insufficient option reports that option's have/need and blocks the craft with the missing-materials message (it is never silently redirected to a different option).
 An explicit override MAY select a currency alternative over an available item option (routing to `currencySpends` when affordable); with no override the default items-first resolution is byte-for-byte unchanged.
@@ -328,6 +332,15 @@ On success, produce the single result group.
   The engine-evaluated progressive salvage check rolls the configured formula to produce the
   numeric `value`; with no authored formula the salvage fails loudly (zero mutation).
   Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
+  The order the awards are spent down is governed by `Component.salvage.allowPlayerResultReorder`
+  (default `true`) — see `resolution-modes` §Player Reorder for the full contract.
+  The order is read from the run record's captured `resultOrder`, never from settings, and a
+  salvage with no run record uses the authored order with no settings fallback.
+  The permission is gated at read time, so a GM toggling it off mid-run takes effect on that run.
+  This is honoured at runtime today (via the API/macro path), but **no player salvage authoring
+  surface exists**: `CraftingEngine.salvage` has no UI callers, so the captured order is only ever
+  non-null once a player-facing salvage app exists.
+  The GM toggle is therefore authored policy, exported and honoured, rather than a dead control.
 
 ### Failure Consumption Policy
 
@@ -354,9 +367,15 @@ Actor.flags.fabricate.salvageRuns = {
 SalvageRun = {
   id: string,
   actorUuid: string,
-  userId: string,
+  userId: string,           // the user who STARTED the run
   craftingSystemId: string,
   componentId: string,
+
+  // The player's progressive result order, CAPTURED at run start (a list of result ids,
+  // or null when there was none). The award path reads the order from here and never
+  // from settings, so a world-time resume awards down the starting user's order however
+  // wins the resume race. See resolution-modes §Player Reorder.
+  resultOrder?: string[] | null,
 
   status: "inProgress" | "waitingTime" | "succeeded" | "failed" | "cancelled",
 

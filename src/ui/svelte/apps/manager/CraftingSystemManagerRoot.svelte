@@ -251,15 +251,13 @@
 
   // Progressive crafting check draft — same staged pattern, used for progressive
   // resolution mode. Only the roll formula and crit table are edited here; the
-  // award settings (awardMode/allowPlayerReorder) are carried through untouched so
-  // a save never drops them.
+  // award setting (awardMode) is carried through untouched so a save never drops it.
   function cloneProgressiveCheck(progressive) {
     const source = progressive && typeof progressive === 'object' ? progressive : {};
     return {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
-      allowPlayerReorder: source.allowPlayerReorder === true,
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
@@ -508,8 +506,17 @@
     routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
   );
   // System components offered to the salvage result picker ({id, name, img}).
+  // `difficulty` is projected so the progressive salvage result rows can render their
+  // read-only difficulty badge (issue 651). This map is an ALLOWLIST — an omitted field
+  // reaches the editor as undefined and the badge silently reads "No difficulty" for
+  // every row, which looks like unauthored data rather than a dropped projection.
   const salvageComponentOptions = $derived(
-    itemCards.map((item) => ({ id: item.id, name: item.name, img: item.img }))
+    itemCards.map((item) => ({
+      id: item.id,
+      name: item.name,
+      img: item.img,
+      ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
+    }))
   );
 
   // Reseed the routed + simple check drafts and baselines when the selected system
