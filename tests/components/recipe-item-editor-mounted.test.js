@@ -36,6 +36,8 @@ const harness = createMountedComponentHarness({
     // preview only ever reaches the BOOK branch, but module resolution is not rendering:
     // the compiled router imports every child statically, so the whole `detail/` tree
     // must be compiled here too or this suite HANGS (`# cancelled`), never fails.
+    // The shell BOTH bodies render inside (header + shared body leaves).
+    'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The preview NEVER renders the salvage tree (a book is never salvageable), but the

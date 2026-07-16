@@ -6,12 +6,19 @@
   several in a searchable, paginated accordion — each with a Learn button
   (knowledge mode) or a Craft button (item mode).
 
-  Extracted verbatim from the former double-duty `InventoryDetail.svelte`
-  (issue 675). `InventoryDetail` remains the entry point that routes here, which
-  is what keeps the GM "How players see it" preview in `RecipeItemEditor.svelte`
-  rendering the REAL player component rather than a re-implementation — a
-  no-drift guarantee that is canonical spec text. A book is never salvageable, so
-  this branch never reaches the salvage tree.
+  Extracted from the former double-duty `InventoryDetail.svelte` (issue 675).
+  `InventoryDetail` remains the entry point that routes here, which is what keeps
+  the GM "How players see it" preview in `RecipeItemEditor.svelte` rendering the
+  REAL player component rather than a re-implementation — a no-drift guarantee
+  that is canonical spec text. A book is never salvageable, so this branch never
+  reaches the salvage tree.
+
+  It renders inside the shared `InventoryDetailHeader` shell, which owns the
+  scrolling column, the identity header and the shared body leaves. It used to
+  hand-roll all of those itself, at PRE-redesign values, so clicking component ->
+  book silently changed the name face, the thumb size, the eyebrow and the
+  "N total" colour. It also reuses the shared `InventoryDetailPager` rather than
+  re-declaring one — the component inspector's five lists already page through it.
 
   Prop-driven; learning routes back through the store seams.
 -->
@@ -19,6 +26,8 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { recipeItemAccessBadge } from '../../../util/recipeItemAccessBadge.js';
   import CraftingThumb from '../../crafting/CraftingThumb.svelte';
+  import InventoryDetailHeader from './InventoryDetailHeader.svelte';
+  import InventoryDetailPager from './InventoryDetailPager.svelte';
 
   let {
     item = null,
@@ -59,6 +68,20 @@
       badgeText
     )
   );
+  // The shell renders the header chip row from data; the access badge is this book's
+  // only header chip.
+  const headerChips = $derived([
+    {
+      id: 'access',
+      label: accessBadge.label,
+      icon: accessBadge.icon,
+      tone: accessBadge.tone,
+      attrs: {
+        'data-inventory-access-badge': '',
+        'data-badge-tone': accessBadge.tone
+      }
+    }
+  ]);
 
   // Knowledge-mode "Read & learn all N recipes" convenience: shown ONLY when the reader
   // can actually learn everything — no learn limit, or a limit that meets/exceeds the
@@ -190,27 +213,16 @@
   </button>
 {/snippet}
 
-<div class="inventory-detail" data-inventory-detail={item.key} data-inventory-recipe-item>
-  <header class="inventory-detail-header">
-    <CraftingThumb src={item.img ?? ''} alt="" size={72} />
-    <div class="inventory-detail-heading">
-      <p class="inventory-detail-name">{item.name}</p>
-      <p class="inventory-detail-total">
-        {localize('FABRICATE.App.Inventory.Detail.Total', { count: Number(item.totalQuantity ?? 0) })}
-      </p>
-      <div class="inventory-detail-chips">
-        <span
-          class="inventory-chip inventory-detail-access-badge is-{accessBadge.tone}"
-          data-inventory-access-badge
-          data-badge-tone={accessBadge.tone}
-        >
-          <i class={accessBadge.icon} aria-hidden="true"></i>
-          <span>{accessBadge.label}</span>
-        </span>
-      </div>
-    </div>
-  </header>
-
+<InventoryDetailHeader
+  detailKey={item.key}
+  attrs={{ 'data-inventory-recipe-item': '' }}
+  img={item.img ?? ''}
+  name={item.name}
+  total={localize('FABRICATE.App.Inventory.Detail.Total', {
+    count: Number(item.totalQuantity ?? 0)
+  })}
+  chips={headerChips}
+>
   <!-- Requirements + description span the FULL detail width below the header (not
        squeezed into the narrow heading column beside the thumbnail). -->
   {#if requirements.length > 0}
@@ -344,167 +356,21 @@
                 {/each}
               </select>
             </label>
-            <div class="inventory-detail-pager">
-              <button
-                type="button"
-                class="inventory-detail-pager-btn"
-                disabled={recipePage === 0}
-                aria-label={localize('FABRICATE.App.Inventory.Detail.PagePrevious')}
-                onclick={() => (recipePage = Math.max(0, recipePage - 1))}
-              >
-                <i class="fas fa-chevron-left" aria-hidden="true"></i>
-              </button>
-              <span class="inventory-detail-pager-range">
-                {Math.min(recipePage, recipePageCount - 1) + 1} / {recipePageCount}
-              </span>
-              <button
-                type="button"
-                class="inventory-detail-pager-btn"
-                disabled={recipePage >= recipePageCount - 1}
-                aria-label={localize('FABRICATE.App.Inventory.Detail.PageNext')}
-                onclick={() => (recipePage = Math.min(recipePageCount - 1, recipePage + 1))}
-              >
-                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              </button>
-            </div>
+            <InventoryDetailPager
+              list={filteredRecipes}
+              sectionKey="recipes"
+              page={Math.min(recipePage, recipePageCount - 1)}
+              pageSize={recipePageSize}
+              onPage={(value) => (recipePage = value)}
+            />
           </div>
         {/if}
       {/if}
     {/if}
   </section>
-</div>
+</InventoryDetailHeader>
 
 <style>
-  .inventory-detail {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-4);
-    height: 100%;
-    min-height: 0;
-    padding: var(--fab-space-4);
-    overflow-y: auto;
-  }
-
-  .inventory-detail-header {
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .inventory-detail-heading {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .inventory-detail-name {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-  }
-
-  .inventory-detail-total {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .inventory-detail-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 2px;
-  }
-
-  .inventory-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 1px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .inventory-detail-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .inventory-detail-section-title {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--fab-text-muted);
-  }
-
-  .inventory-detail-row-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
-  .inventory-detail-empty-note {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
-  .inventory-detail-pager {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    padding-top: 2px;
-    font-size: 11px;
-    color: var(--fab-text-muted);
-  }
-
-  .inventory-detail-pager-range {
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .inventory-detail-pager-btn {
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    cursor: pointer;
-  }
-
-  .inventory-detail-pager-btn:hover:not(:disabled) {
-    background: var(--fab-surface-raised);
-  }
-
-  .inventory-detail-pager-btn:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-detail-pager-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
   /* --- Recipe-item "book" learning ------------------------------------------ */
   .inventory-detail-book-desc {
     margin: 0;
@@ -556,29 +422,6 @@
     opacity: 0.5;
     cursor: default;
     filter: none;
-  }
-
-  /* Access badge under the book name — the SAME learn/use badge as the GM preview. */
-  .inventory-detail-access-badge {
-    gap: 5px;
-  }
-
-  .inventory-detail-access-badge.is-warning {
-    border-color: var(--fab-warning-border);
-    background: var(--fab-warning-soft);
-    color: var(--fab-warning-text);
-  }
-
-  .inventory-detail-access-badge.is-info {
-    border-color: var(--fab-info-border);
-    background: var(--fab-info-soft);
-    color: var(--fab-info-text);
-  }
-
-  .inventory-detail-access-badge.is-success {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-    color: var(--fab-success-text);
   }
 
   /* The static (non-toggle) headline for a single-recipe book, mirroring the

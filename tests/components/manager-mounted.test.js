@@ -123,6 +123,8 @@ function compileManagerRoot() {
   // InventoryDetail is a thin router (issue 675); its `{#if}` branches do NOT keep the
   // bodies out of the module graph (the compiled `.svelte.js` imports them statically),
   // so the whole `detail/` tree has to be compiled here as well.
+  // The shell BOTH bodies render inside (header + shared body leaves).
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte');
   // The salvage tree is never RENDERED by the preview (a book is never salvageable),

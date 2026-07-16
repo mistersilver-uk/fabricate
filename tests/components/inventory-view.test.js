@@ -1,6 +1,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -34,6 +35,8 @@ const harness = createMountedComponentHarness({
     // `.svelte.js` carries STATIC imports of every child — so the whole `detail/`
     // tree is listed here even though only one branch renders at a time. An omission
     // HANGS this suite (reported as `# cancelled`), it never fails it.
+    // The shell BOTH bodies render inside (header + shared body leaves).
+    'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The salvage tree, plus the shared stage list it reuses.
@@ -1431,5 +1434,78 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(marked.length, 1, 'exactly one tier is marked');
     assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
     assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
+  });
+});
+
+// The inspector shell exists to make ONE class of bug impossible: the two detail
+// bodies hand-rolling the same class names in their own scoped `<style>` blocks,
+// which Svelte scoping guarantees will drift again, silently and invisibly (issue
+// 675 shipped exactly that — serif 18/600 vs sans 16/600, a 64px vs 72px thumb, two
+// different eyebrows). A review note cannot hold that line; this test can.
+describe('InventoryDetailHeader (source contract)', () => {
+  const SHELL_OWNED = [
+    '.inventory-detail',
+    '.inventory-detail-header',
+    '.inventory-detail-heading',
+    '.inventory-detail-name',
+    '.inventory-detail-total',
+    '.inventory-detail-chips',
+    '.inventory-chip',
+    '.inventory-detail-section',
+    '.inventory-detail-section-title',
+    '.inventory-detail-row-name',
+    '.inventory-detail-empty-note',
+  ];
+
+  // A scoped rule OPENING a block — `.x {` or `.x,` — as opposed to a mere mention
+  // inside a longer modifier (`.inventory-chip-role {`) or a comment. Matched by
+  // exact line rather than a regex: the escaping needed to build one of these
+  // selectors into a pattern is exactly how this assertion silently stops matching
+  // anything and reads green forever.
+  function declaresSelector(source, selector) {
+    return source
+      .slice(source.indexOf('<style>'))
+      .split('\n')
+      .map((line) => line.trim())
+      .some((line) => line === `${selector} {` || line === `${selector}{` || line === `${selector},`);
+  }
+
+  for (const body of ['InventoryComponentDetail', 'InventoryBookDetail']) {
+    it(`${body} never re-declares a shell-owned selector`, () => {
+      const source = readFileSync(
+        resolve(repoRoot, `src/ui/svelte/apps/inventory/detail/${body}.svelte`),
+        'utf8'
+      );
+      for (const selector of SHELL_OWNED) {
+        assert.equal(
+          declaresSelector(source, selector),
+          false,
+          `${body} re-declares ${selector}; it belongs to InventoryDetailHeader`
+        );
+      }
+    });
+  }
+
+  it('the shell publishes every shared body leaf at overridable specificity', () => {
+    const shell = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte'),
+      'utf8'
+    );
+    // `:where()` zeroes the ancestor guard, so the base is one class (0-1-0) and ANY
+    // consumer rule — always 0-2-0 or more once Svelte appends its scope hash — wins.
+    // A plain `:global(.inventory-detail .x)` would be 0-2-0 and would TIE with
+    // `.inventory-chip-type`, resolving on injection order.
+    for (const leaf of [
+      '.inventory-chip',
+      '.inventory-detail-section',
+      '.inventory-detail-section-title',
+      '.inventory-detail-row-name',
+      '.inventory-detail-empty-note',
+    ]) {
+      assert.ok(
+        shell.includes(`:global(:where(.inventory-detail) ${leaf})`),
+        `${leaf} must be published globally, ancestor-guarded and :where()-zeroed`
+      );
+    }
   });
 });

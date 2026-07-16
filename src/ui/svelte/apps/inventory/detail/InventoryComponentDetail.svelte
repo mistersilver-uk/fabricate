@@ -1,8 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
   InventoryComponentDetail is the inspector body for an owned component or
-  essence row: the header (64px thumbnail + serif name + "N total" + type/tag/tier
-  chips), then the Info content in its canonical order —
+  essence row. It renders inside the shared `InventoryDetailHeader` shell (which
+  owns the scrolling column, the identity header and the shared body leaves — see
+  that file), supplying its type/tier/tag chips as data, then the Info content in
+  its canonical order —
 
     broken banner -> description -> essences -> sources -> used by -> produced by
 
@@ -18,6 +20,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import CraftingThumb from '../../crafting/CraftingThumb.svelte';
+  import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
   import InventorySalvagePanel from './InventorySalvagePanel.svelte';
 
@@ -66,6 +69,13 @@
         : 'FABRICATE.App.Inventory.Detail.TypeComponent'
     )
   );
+  // The header's chip row, as data for the shared shell: the kind reads quiet, tier and
+  // the GM's tags read neutral.
+  const headerChips = $derived([
+    { id: 'type', label: typeLabel, tone: 'quiet' },
+    ...(tierLabel ? [{ id: 'tier', label: tierLabel }] : []),
+    ...tags.map((tag) => ({ id: `tag:${tag}`, label: tag }))
+  ]);
 
   // Per-section current page, keyed by section id, reset when the item changes.
   let pages = $state({});
@@ -134,30 +144,16 @@
   }
 </script>
 
-<div class="inventory-detail" data-inventory-detail={item.key}>
-  <header class="inventory-detail-header">
-    {#if isEssence}
-      <span class="inventory-detail-essence" aria-hidden="true"><i class={icon}></i></span>
-    {:else}
-      <CraftingThumb src={item.img ?? ''} alt="" size={64} />
-    {/if}
-    <div class="inventory-detail-heading">
-      <p class="inventory-detail-name">{item.name}</p>
-      <p class="inventory-detail-total">
-        {localize('FABRICATE.App.Inventory.Detail.Total', { count: Number(item.totalQuantity ?? 0) })}
-      </p>
-      <div class="inventory-detail-chips">
-        <span class="inventory-chip inventory-chip-type">{typeLabel}</span>
-        {#if tierLabel}
-          <span class="inventory-chip">{tierLabel}</span>
-        {/if}
-        {#each tags as tag (tag)}
-          <span class="inventory-chip inventory-chip-tag">{tag}</span>
-        {/each}
-      </div>
-    </div>
-  </header>
-
+<InventoryDetailHeader
+  detailKey={item.key}
+  img={item.img ?? ''}
+  icon={isEssence ? icon : ''}
+  name={item.name}
+  total={localize('FABRICATE.App.Inventory.Detail.Total', {
+    count: Number(item.totalQuantity ?? 0)
+  })}
+  chips={headerChips}
+>
   {#if salvageable}
     <!-- ARIA contract reproduced from the in-repo precedent, GatheringDetailTabs:
          role=tablist/tab, aria-selected, aria-controls, roving tabindex, Arrow-key
@@ -409,25 +405,9 @@
   {/if}
   </div>
   {/if}
-</div>
+</InventoryDetailHeader>
 
 <style>
-  .inventory-detail {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-4);
-    height: 100%;
-    min-height: 0;
-    padding: var(--fab-space-4);
-    overflow-y: auto;
-  }
-
-  .inventory-detail-header {
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
   /* Info | Salvage: the prototype's segmented control — a ruled, soft track carrying
      two rounded-rect segments, the active one filled with the accent. (The ARIA on top
      of it — tablist/roving tabindex/arrow keys — is ours; the prototype has none.) */
@@ -494,95 +474,10 @@
     min-height: 0;
   }
 
-  .inventory-detail-essence {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
-    background: var(--fab-bg-3);
-    color: var(--fab-accent);
-    font-size: 24px;
-  }
-
-  .inventory-detail-heading {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  /* Serif is reserved for item/product NAMES — nowhere else (brief §2). */
-  .inventory-detail-name {
-    margin: 0;
-    font-family: var(--fab-font-serif);
-    font-size: 18px;
-    font-weight: 600;
-    line-height: 1.15;
-  }
-
-  .inventory-detail-total {
-    margin: 0;
-    font-size: 11.5px;
-    font-weight: 400;
-    color: var(--fab-text-subtle);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .inventory-detail-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 2px;
-  }
-
-  .inventory-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 1px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  /* The type-tag pill (Component / Essence) is a quiet reading of the row's kind, not
-     an accent call-to-action. */
-  .inventory-chip-type {
-    border-color: var(--fab-border);
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-secondary);
-    font-size: 10px;
-    font-weight: 600;
-  }
-
   .inventory-chip-qty {
     font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--fab-text);
-  }
-
-  .inventory-detail-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  /* Section eyebrows: uppercase, wide-tracked, muted (brief §2 type scale). */
-  .inventory-detail-section-title {
-    margin: 0;
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--fab-text-muted);
   }
 
   .inventory-detail-description {
@@ -674,15 +569,6 @@
     object-fit: cover;
   }
 
-  .inventory-detail-row-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
   .inventory-detail-row-qty {
     flex: 0 0 auto;
     font-family: var(--fab-font-mono);
@@ -704,11 +590,5 @@
 
   .inventory-chip-essence i {
     font-size: 10px;
-  }
-
-  .inventory-detail-empty-note {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 </style>
