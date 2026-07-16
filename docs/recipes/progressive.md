@@ -103,7 +103,7 @@ See the [API reference]({% link api/recipe-manager.md %}) for the methods that c
 
 A result's difficulty is a property of the managed component it points to, not of the recipe, so you set it on the component itself.
 When the system's recipe resolution mode is Progressive, you can set it from the GM admin panel without the API.
-Open the **Items** tab, open a component for edit, and use the **Progressive difficulty** card in the right-hand inspector.
+Open the **Items** tab, open a component for edit, and scroll to the **Progressive difficulty** card.
 Enter a whole number of 1 or greater, or leave it blank to clear the value.
 The difficulty is staged with the rest of your edits and is written when you save the component.
 

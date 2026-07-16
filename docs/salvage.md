@@ -46,6 +46,58 @@ When the salvage resolution mode is Routed or Progressive, you must configure a 
 This is separate from the recipe crafting check.
 A system can have both.
 
+## Component Salvage
+
+Every component decides for itself whether it can be salvaged and what it yields.
+You set this up in the **Salvage** panel of the component editor.
+Open the **Items** tab of the Crafting Admin panel, open a component, and scroll to **Salvage**.
+
+The panel shows a read-only label naming the system's salvage resolution mode, such as **Routed by check**.
+That mode is a system setting and decides the shape of the panel below it.
+You change it on the **Settings** page of the **Crafting** menu, not here.
+See [Salvage Resolution Mode](#salvage-resolution-mode).
+
+### Turning Salvage On For a Component
+
+A component is not salvageable until you turn it on with the **Salvage this component** toggle.
+Setting one up is two steps, in this order:
+
+1. Add at least one result group under **Result groups**, describing what the component yields when it is broken down.
+2. Turn on **Salvage this component**.
+
+The toggle stays unavailable until the component has a result group, because there is nothing to enable yet.
+The panel tells you which of the two states you are in, so you are never left guessing why the toggle will not move.
+
+Removing a component's last result group turns salvage back off for that component.
+This is deliberate.
+A component that can be salvaged but yields nothing is not a setup Fabricate will save.
+
+{: .note }
+> **Existing components show this toggle turned off, and that is correct.**
+> Before this toggle existed, per-component salvage was already stored and already enforced, but nothing in the interface could turn it on.
+> Components you set up with result groups therefore render with **Salvage this component** off.
+> This is the true stored state being shown for the first time rather than a setting that has been lost, and nothing has been reset or migrated.
+> Turn the toggle on for each component you want salvageable.
+
+### The Salvage DC
+
+When the salvage check applies, a component can override the DC that check uses.
+
+The **DC** control offers:
+
+- **System default**, which uses the system's own salvage check DC and stores no override on the component
+- one option per salvage check outcome tier you have authored, each naming the tier and its DC
+- **Custom**, which reveals a number field for any DC you like
+
+The preset options are your system's real authored tiers, not a fixed list of suggested numbers, so they always reflect the DCs your world actually uses.
+If you have not authored any tiers yet, the control offers **System default** and **Custom** only.
+Either way, the **Manage presets** link takes you to the Checks screen where the tiers are authored.
+
+A DC you set that does not match any tier is kept exactly as you typed it.
+It shows under **Custom** with its own value, and it is never rounded to the nearest tier.
+
+When the system's salvage DC is set by a macro rather than a fixed number, the **System default** option says so instead of showing a DC, because there is no single number to show.
+
 ## Player Result Re-ordering
 
 A component set up for progressive salvage carries an **Allow player result re-ordering** setting on its salvage setup, and it is on by default.
