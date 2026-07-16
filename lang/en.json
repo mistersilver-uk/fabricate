@@ -1772,7 +1772,6 @@
           "AddTagRequirement": "Add tag requirement",
           "AddAlternativeTagRequirement": "Add alternative tag requirement",
           "AddAlternativeCost": "Add alternative cost",
-          "AddAlternativeEssence": "Add alternative essence",
           "OrTrigger": "or…",
           "OrTriggerHint": "Accept another kind of ingredient in place of this one.",
           "OrSearchPlaceholder": "Search options...",

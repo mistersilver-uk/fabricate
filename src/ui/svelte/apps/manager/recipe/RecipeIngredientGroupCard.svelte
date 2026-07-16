@@ -89,7 +89,7 @@
             id: 'essence',
             addMarker: 'alternative-essence',
             icon: 'fas fa-flask-vial',
-            label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeEssence', 'Add alternative essence')
+            label: text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence')
           }
         ]
       : [])
@@ -243,7 +243,7 @@
           onclick={() => appendAlternative('essence')}
         >
           <i class="fas fa-flask-vial" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.AddAlternativeEssence', 'Add alternative essence')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence')}</span>
         </button>
       {/if}
     </div>

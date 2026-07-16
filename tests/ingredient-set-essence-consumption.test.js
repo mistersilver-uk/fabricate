@@ -80,6 +80,37 @@ test('anti-double-consume: an item claimed by a component group is not recounted
   assert.equal(selection.missingGroups[0].ingredient.match.type, 'essence');
 });
 
+test('anti-double-consume (tag + essence): one component carrying both cannot satisfy both requirements', () => {
+  // The user's scenario (issue 649): "any tag:iron  AND  2 fire essence", where a
+  // single "Blazing Iron" carries BOTH the iron tag and the fire essence. The shared
+  // `remaining` ledger must stop that one component from satisfying both AND groups.
+  const set = new IngredientSet({
+    id: 's',
+    ingredientGroups: [
+      { id: 'g-tag', options: [{ quantity: 1, match: { type: 'tags', tags: ['iron'], tagMatch: 'any' } }] },
+      essenceGroup('fire', 2),
+    ],
+  });
+  // Only Blazing Iron carries the iron tag (matcher), and it also carries fire (probe).
+  const matcher = (ingredient, it) => ingredient?.match?.type === 'tags' && it.uuid === 'blazing-iron';
+  const blazing = item('blazing-iron', 1, {});
+
+  const alone = set.resolveIngredientSelection([blazing], matcher, {
+    resolveItemEssences: () => ({ fire: 2 }),
+  });
+  assert.equal(alone.success, false, 'Blazing Iron alone cannot satisfy both the tag and the essence requirement');
+  assert.equal(alone.missingGroups.length, 1);
+  assert.equal(alone.missingGroups[0].ingredient.match.type, 'essence', 'the essence group is left unsatisfied');
+
+  // Adding a DEDICATED fire source (no iron tag) makes it craftable: the tag group
+  // consumes Blazing Iron, the essence group draws the dedicated source — no double count.
+  const bottled = item('bottled-fire', 1, {});
+  const withBottle = set.resolveIngredientSelection([blazing, bottled], matcher, {
+    resolveItemEssences: (it) => (it.uuid === 'bottled-fire' || it.uuid === 'blazing-iron' ? { fire: 2 } : {}),
+  });
+  assert.equal(withBottle.success, true, 'a separate fire source satisfies the essence group without reusing Blazing Iron');
+});
+
 test('unit-granular: an indivisible item may over-consume past the amount', () => {
   const set = new IngredientSet({ id: 's', ingredientGroups: [essenceGroup('fire', 2)] });
   const items = [item('i1', 1, { fire: 3 })]; // one unit worth 3 essence, need 2
