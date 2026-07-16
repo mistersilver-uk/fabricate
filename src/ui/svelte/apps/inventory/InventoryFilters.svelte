@@ -176,15 +176,12 @@
     font-size: 11px;
   }
 
-  /* Counts read as data, so they take the mono family (brief §2). */
+  /* NOT mono. The brief scopes mono to quantities, roll totals and DC values; a chip's
+     population count is part of the chip's own label, and the chip is pinned to the sans
+     face. So it inherits the chip's family, weight AND colour (which is what makes the
+     active state track automatically) and only drops back in emphasis. */
   .inventory-pill-count {
-    font-family: var(--fab-font-mono);
-    font-variant-numeric: tabular-nums;
-    color: var(--fab-text-muted);
-  }
-
-  .inventory-pill.is-active .inventory-pill-count {
-    color: var(--fab-accent);
+    opacity: 0.7;
   }
 
   .inventory-sort {

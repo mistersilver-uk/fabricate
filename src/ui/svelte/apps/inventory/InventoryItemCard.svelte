@@ -21,10 +21,14 @@
 
   The card owns its thumbnail markup rather than reusing CraftingThumb: that
   component takes a px `size` and hard-sets width/height from it, so it cannot
-  render this responsive `width:100%; aspect-ratio:1/1` square.
+  render this responsive `width:100%; aspect-ratio:1/1` square. It DOES reuse
+  CraftingThumb's fallback constant, so a component with no authored art shows the
+  same blueprint every other tab shows rather than a broken-image glyph. The glyph
+  path is for ESSENCES only, which have an authored icon and no artwork.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
 
   let { item = null, selected = false, onSelect = null } = $props();
 
@@ -75,12 +79,12 @@
   >
     <span class="inventory-card-thumb">
       <span class="inventory-card-art" class:is-dimmed={broken}>
-        {#if isEssence || !img}
+        {#if isEssence}
           <span class="inventory-card-essence" aria-hidden="true">
             <i class={icon}></i>
           </span>
         {:else}
-          <img src={img} alt="" draggable="false" />
+          <img src={img || DEFAULT_CRAFTING_IMAGE} alt="" draggable="false" />
         {/if}
       </span>
       {#if broken}
@@ -165,7 +169,11 @@
     padding: 11px;
     border: 1px solid var(--fab-border);
     border-radius: 10px;
-    background: var(--fab-surface-soft);
+    /* The RESTING card is the darker page fill, NOT --surface-soft. That baseline is
+       what makes selection's --accent-soft fill a visible change: filling a
+       --surface-soft card with --surface-soft is a no-op, and selection then collapses
+       to a 1px border shifting alpha. */
+    background: var(--fab-bg-2);
     color: var(--fab-text);
     font: inherit;
     line-height: 1.15;
@@ -173,7 +181,11 @@
     text-align: center;
   }
 
-  .inventory-card-button:hover {
+  /* Written explicitly, as every sibling selectable card does
+     (`.gathering-env-card.is-available:not(.is-selected):hover`,
+     `.journal-run-card:not(.is-selected):hover`): hover must not repaint over the
+     selected fill. */
+  .inventory-card:not(.is-selected) .inventory-card-button:hover {
     background: var(--fab-surface-raised);
   }
 
@@ -182,9 +194,11 @@
     outline-offset: 2px;
   }
 
+  /* Full-strength accent border + a tinted fill, matching all four sibling selectable
+     surfaces. */
   .inventory-card.is-selected .inventory-card-button {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
+    border-color: var(--fab-accent);
+    background: var(--fab-accent-soft);
   }
 
   /* A broken item's card border is the outermost signal; it survives selection. */
@@ -248,7 +262,7 @@
     right: 5px;
     z-index: 2;
     min-width: 20px;
-    padding: 1px 6px;
+    padding: 2px 7px;
     border-radius: 999px;
     border: 1px solid var(--fab-border);
     background: var(--fab-bg-0);
@@ -293,7 +307,7 @@
   }
 
   .inventory-card-badge i {
-    font-size: 9px;
+    font-size: 8px;
     line-height: 1;
   }
 

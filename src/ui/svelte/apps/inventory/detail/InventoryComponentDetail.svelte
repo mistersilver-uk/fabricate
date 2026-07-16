@@ -428,15 +428,19 @@
     align-items: flex-start;
   }
 
-  /* Info | Salvage: a segmented control on a soft track, the active segment filled
-     with the accent. */
+  /* Info | Salvage: the prototype's segmented control — a ruled, soft track carrying
+     two rounded-rect segments, the active one filled with the accent. (The ARIA on top
+     of it — tablist/roving tabindex/arrow keys — is ours; the prototype has none.) */
   .inventory-detail-tabs {
+    box-sizing: border-box;
     flex: 0 0 auto;
     display: flex;
     align-items: stretch;
-    gap: 2px;
-    padding: 2px;
-    border-radius: 999px;
+    gap: 4px;
+    height: 38px;
+    padding: 3px;
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
     background: var(--fab-surface-soft);
   }
 
@@ -453,10 +457,10 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-height: 28px;
+    min-height: 30px;
     padding: 0 12px;
     border: none;
-    border-radius: 999px;
+    border-radius: 7px;
     background: none;
     color: var(--fab-text-muted);
     font: inherit;
