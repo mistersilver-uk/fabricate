@@ -1251,9 +1251,30 @@
   // the component editor's save flow (it persists on Save, not on change). The
   // draft is seeded on edit-entry (editComponent); these derive its visibility,
   // dirtiness, and the combined dirty state the Save button + route guard use.
+  // `component.difficulty` is ONE component-level scalar read by SEVERAL
+  // progressive surfaces, each with its OWN resolution mode:
+  //   - progressive recipes   → ResolutionModeService  (system.resolutionMode)
+  //   - progressive salvage   → CraftingEngine         (system.salvageResolutionMode)
+  //   - progressive gathering → GatheringEngine        (the system's gathering
+  //     economy `resolutionMode`; `difficultyForResult` costs each result by the
+  //     component's difficulty)
+  // Gating on the RECIPE mode alone was the bug (issue 676): a system that is
+  // `routedByCheck` for recipes but progressive for salvage reads difficulty and
+  // could never author it. Read the gathering economy straight off viewState
+  // rather than via `gatheringResolutionMode` (declared further down) so this
+  // derivation carries no declaration-order coupling. The economy is ONE block
+  // per system (`gatheringConfig.systems[systemId].economy`), so this is a direct
+  // read of the edited system's mode, not a scan.
+  const gatheringProgressive = $derived(
+    $viewState.gatheringConfig?.systems?.[selectedSystemId]?.economy?.resolutionMode === 'progressive'
+  );
   const componentDifficultyShown = $derived(
     currentView === 'component-edit'
-    && selectedSystem?.resolutionMode === 'progressive'
+    && (
+      selectedSystem?.resolutionMode === 'progressive'
+      || salvageResolutionMode === 'progressive'
+      || gatheringProgressive
+    )
     && !!componentForEdit
   );
   const componentDifficultyDirty = $derived(

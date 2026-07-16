@@ -288,9 +288,12 @@ function compileManagerRoot() {
     // the sibling of recipeBrowserModel below. Imported by ComponentsBrowserView AND by
     // the root (which lifts the browser state).
     'src/utils/componentBrowserModel.js',
-    // The recipe library's pure list model (filter / group / sort / paginate + the
+    // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
+    // The category totals both browser models group with (issue 676). Imported by BOTH
+    // of the two above, so omitting it HANGS every mounted manager test.
+    'src/utils/browserGroupCounts.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
@@ -5357,6 +5360,75 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     return target;
   }
+
+  // `component.difficulty` is ONE scalar consumed by several progressive surfaces
+  // (recipes via ResolutionModeService, salvage via CraftingEngine, gathering via
+  // GatheringEngine#difficultyForResult), each with its OWN resolution mode. The
+  // control gated on the RECIPE mode alone, so a system that resolved recipes by
+  // check but salvaged progressively read difficulty and could never author it —
+  // exactly the shape that shipped broken in issue 676, with no test to catch it.
+  const difficultyConsumerCases = [
+    {
+      name: 'progressive recipes',
+      options: { alchemyResolutionMode: 'progressive' },
+    },
+    {
+      name: 'routedByCheck recipes with progressive salvage (the issue 676 regression)',
+      options: { alchemyResolutionMode: 'routedByCheck', salvageResolutionMode: 'progressive' },
+    },
+    {
+      name: 'routedByCheck recipes with a progressive gathering economy',
+      options: {
+        alchemyResolutionMode: 'routedByCheck',
+        gatheringConfig: { systems: { alchemy: { economy: { resolutionMode: 'progressive' } } } },
+      },
+    },
+  ];
+
+  for (const { name, options } of difficultyConsumerCases) {
+    it(`shows the component difficulty control for ${name}`, async () => {
+      await openComponentEditor([], options);
+      const card = target.querySelector('[data-component-edit-section="difficulty"]');
+      assert.ok(card, `difficulty control should render for ${name}`);
+      assert.ok(card.querySelector('input'), 'the difficulty control should expose an input');
+    });
+  }
+
+  it('hides the component difficulty control when no progressive surface consumes it', async () => {
+    await openComponentEditor([], {
+      alchemyResolutionMode: 'routedByCheck',
+      salvageResolutionMode: 'simple',
+    });
+    assert.equal(
+      target.querySelector('[data-component-edit-section="difficulty"]'),
+      null,
+      'a difficulty control nothing reads is clutter and must stay hidden'
+    );
+  });
+
+  it('saves a staged difficulty when only salvage is progressive', async () => {
+    // Guards the half-fix: if dirtiness/save kept the old recipe-mode gate the field
+    // would render and then silently refuse to persist.
+    const calls = [];
+    await openComponentEditor(calls, {
+      alchemyResolutionMode: 'routedByCheck',
+      salvageResolutionMode: 'progressive',
+    });
+    const input = target.querySelector('[data-component-edit-section="difficulty"] input');
+    input.value = '9';
+    input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
+    assert.equal(saveButton.disabled, false, 'a staged difficulty change should enable Save');
+    saveButton.click();
+    await tick();
+    flushSync();
+    const saveCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(saveCall, 'Save should call store.updateComponent');
+    assert.equal(saveCall[2].difficulty, 9, 'the staged difficulty should persist on Save');
+  });
 
   it('stages progressive-difficulty edits into the component editor save flow', async () => {
     const calls = [];
