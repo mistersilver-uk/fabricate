@@ -226,6 +226,17 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
       getFavouriteRecipeIds: () => game?.fabricate?.getFavouriteRecipeIds?.() ?? [],
       toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
+      // Progressive stage order (issue 651). Unlike the favourites seam directly above,
+      // the setter is ASYNC and its promise is RETURNED, not dropped: under `scope: user`
+      // this is a replicated document write that can reject, and the store's failure path
+      // (revert + announce) depends on seeing the rejection.
+      getProgressiveResultOrder: () => game?.fabricate?.getProgressiveResultOrder?.() ?? {},
+      setProgressiveResultOrder: (key, order) =>
+        game?.fabricate?.setProgressiveResultOrder?.(key, order),
+      // Announced through the stage list's live region when a write fails — a toast alone
+      // is insufficient, since a keyboard user reordering by chevron never sees one.
+      progressiveOrderRevertMessage: () =>
+        localize('FABRICATE.App.Crafting.Detail.StageOrderSaveFailed'),
       // Player-facing notification seam (a failed craft surfaces as a warning).
       notify: (message) => notifyWarn(message),
       // Localized generic craft-failure message for a thrown craft (the engine can

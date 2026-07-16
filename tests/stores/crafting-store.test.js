@@ -68,6 +68,10 @@ describe('craftingStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-crafting-store-');
     compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
+    // The store reconciles the player's stored stage order through this import-free leaf
+    // (issue 651). A dependency the store imports but the compiler does not copy makes
+    // the whole suite HANG (# cancelled), never fail.
+    compiler.copyPlain('src/utils/progressiveResultOrder.js');
     ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
   });
 
@@ -595,5 +599,261 @@ describe('craftingStore', () => {
     flushSync();
     assert.deepEqual(store.selectedIngredientOptions, {});
     assert.equal(store.selectedCraftability.marker, 'baked', 'clearing the last override restores baked');
+  });
+
+  // ── Progressive stage order (issue 651) ──────────────────────────────────
+  //
+  // The ordering COMPOSITION lives here, not in the mounted component: craftingStore
+  // is in neither harness list, so a mounted ProgressiveBody test can only prove
+  // presentation-given-props and cannot reach this at all. These also carry the D7/D7a
+  // claims, which are otherwise unfalsifiable and would ship green against a
+  // fire-and-forget write.
+
+  const STAGES = [
+    { id: 's1', name: 'Rough', difficulty: 2, threshold: 2 },
+    { id: 's2', name: 'Fine', difficulty: 3, threshold: 5 },
+    { id: 's3', name: 'Master', difficulty: 4, threshold: 9 },
+  ];
+
+  function orderListing(extra = {}) {
+    return {
+      recipes: [
+        recipe('r1', 'Blade', {
+          progressiveStages: STAGES,
+          allowPlayerResultReorder: true,
+          ...extra,
+        }),
+      ],
+    };
+  }
+
+  function makeOrderServices({ stored = {}, setImpl, ...rest } = {}) {
+    const writes = [];
+    const { services, calls } = makeServices({ listing: orderListing(), ...rest });
+    services.getProgressiveResultOrder = () => ({ ...stored });
+    services.setProgressiveResultOrder = async (key, order) => {
+      writes.push({ key, order });
+      if (setImpl) return setImpl(key, order);
+      return {};
+    };
+    services.progressiveOrderRevertMessage = () =>
+      'Could not save your order. Restored the last saved order.';
+    return { services, calls, writes };
+  }
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const pinnedRecipe = () => ({
+    recipes: [
+      recipe('r1', 'Blade', { progressiveStages: STAGES, allowPlayerResultReorder: false }),
+    ],
+  });
+
+  it('seeds the stored orders on load and applies them to the selected recipe', async () => {
+    const { services } = makeOrderServices({ stored: { 'recipe:r1': ['s3', 's1'] } });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s3', 's1', 's2'],
+      'ranked first, the rest tail-appended in authored order'
+    );
+  });
+
+  it('an unordered recipe keeps the authored order', async () => {
+    const { services } = makeOrderServices();
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s1', 's2', 's3']
+    );
+  });
+
+  it('allowPlayerResultReorder false IGNORES a stored order', async () => {
+    const { services } = makeOrderServices({ stored: { 'recipe:r1': ['s3', 's2', 's1'] } });
+    services.listCraftingForActor = async () => pinnedRecipe();
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s1', 's2', 's3']
+    );
+  });
+
+  it('reorderProgressiveStage moves a stage optimistically and announces it', async () => {
+    const { services } = makeOrderServices();
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 0, 'Master moved to position 1 of 3');
+    flushSync();
+
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s3', 's1', 's2'],
+      'the row moves immediately, before the write resolves'
+    );
+    assert.equal(store.orderAnnouncement, 'Master moved to position 1 of 3');
+    assert.deepEqual(store.progressiveOrders['recipe:r1'], ['s3', 's1', 's2'], 'stored as IDS');
+    await store.flushProgressiveOrder();
+  });
+
+  it('reorderProgressiveStage is a no-op when the GM has pinned the order', async () => {
+    const { services, writes } = makeOrderServices();
+    services.listCraftingForActor = async () => pinnedRecipe();
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 0, 'nope');
+    flushSync();
+    await store.flushProgressiveOrder();
+
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s1', 's2', 's3']
+    );
+    assert.equal(writes.length, 0, 'and nothing is written');
+  });
+
+  it('D7: DEBOUNCE — N intermediate moves commit ONCE on settle', async () => {
+    // Every commit is a replicated document write under `scope: user`; a drag emits a
+    // move per hovered row. Mutation: await the write per move instead of debouncing.
+    const { services, writes } = makeOrderServices();
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 1, 'a');
+    store.reorderProgressiveStage(1, 0, 'b');
+    store.reorderProgressiveStage(0, 1, 'c');
+    flushSync();
+    assert.equal(writes.length, 0, 'nothing is written mid-drag');
+
+    await sleep(600);
+    assert.equal(writes.length, 1, 'exactly one write on settle');
+    assert.equal(writes[0].key, 'recipe:r1');
+  });
+
+  it('D7: flushProgressiveOrder commits immediately (drop/settle) without waiting', async () => {
+    const { services, writes } = makeOrderServices();
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 0, 'a');
+    await store.flushProgressiveOrder();
+
+    assert.equal(writes.length, 1);
+    assert.deepEqual(writes[0].order, ['s3', 's1', 's2']);
+  });
+
+  it('D7a: a REJECTED write reverts the rows AND announces the revert', async () => {
+    // The failure this pins: with an optimistic write the row has already moved and the
+    // live region has already announced the new position. A silent failure leaves the
+    // player believing an order that was never stored, while the next craft awards down
+    // the old one — this issue's own defect class at the UI edge.
+    const { services } = makeOrderServices({
+      stored: { 'recipe:r1': ['s2', 's1', 's3'] },
+      setImpl: () => {
+        throw new Error('setting rejected');
+      },
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s2', 's1', 's3']
+    );
+
+    store.reorderProgressiveStage(2, 0, 'Master moved to position 1 of 3');
+    flushSync();
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s3', 's2', 's1'],
+      'optimistic: the row moved'
+    );
+
+    await store.flushProgressiveOrder();
+    flushSync();
+
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s2', 's1', 's3'],
+      'reverted to the last PERSISTED order'
+    );
+    assert.equal(
+      store.orderAnnouncement,
+      'Could not save your order. Restored the last saved order.',
+      'and the revert is announced through the SAME live region the move used'
+    );
+  });
+
+  it('D7a: a rejected FIRST-EVER write drops the key rather than stranding it', async () => {
+    const { services } = makeOrderServices({
+      setImpl: () => {
+        throw new Error('setting rejected');
+      },
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 0, 'moved');
+    await store.flushProgressiveOrder();
+    flushSync();
+
+    assert.equal(store.progressiveOrders['recipe:r1'], undefined, 'no phantom stored order');
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s1', 's2', 's3']
+    );
+  });
+
+  it('D7a: a SUCCESSFUL write becomes the new revert target', async () => {
+    let fail = false;
+    const { services } = makeOrderServices({
+      setImpl: () => {
+        if (fail) throw new Error('rejected');
+        return {};
+      },
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 0, 'first');
+    await store.flushProgressiveOrder();
+    flushSync();
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s3', 's1', 's2']
+    );
+
+    fail = true;
+    store.reorderProgressiveStage(2, 0, 'second');
+    await store.flushProgressiveOrder();
+    flushSync();
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.id),
+      ['s3', 's1', 's2'],
+      'reverts to the first (successfully persisted) order, not the authored one'
+    );
   });
 });

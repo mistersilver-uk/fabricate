@@ -131,6 +131,10 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
   'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
+  // ProgressiveBody's stage list (issue 651). ProgressiveBody is already listed above and
+  // renders this, so omitting it HANGS every mounted crafting test (# cancelled), not
+  // just the stage-list one.
+  'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
