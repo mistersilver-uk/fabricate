@@ -419,7 +419,7 @@
               : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
           />
           {#if selectedRecipe.locked}
-            <StatusPill tone="accent" icon="fas fa-lock" label={text('FABRICATE.Admin.Manager.Recipe.Locked', 'Locked')} />
+            <StatusPill tone="accent" icon="fas fa-lock" label={text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')} />
           {/if}
           {#if selectedRecipe.incomplete}
             <StatusPill
