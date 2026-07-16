@@ -71,6 +71,8 @@ The same override threads through both the display (`RecipeManager.evaluateCraft
 - AND-across-ingredient-sets is not supported.
 - OR groups are always enabled and are not feature-toggled.
 - Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are always supported, including simple recipes, when their tag IDs exist in the crafting system's `itemTags` list.
+- An `IngredientGroup` option MAY be an essence alternative (`Ingredient.match.type === "essence"`), consuming essence-carrying items to meet `match.amount`, and participates in `optionOverrides` like any other option — so "component OR essence" is authorable.
+The legacy per-set `IngredientSet.essences` map is a back-compat read for one release (the 1.17.0 migration folds each positive entry into a single-option essence group).
 - **Tools** are the required-but-not-always-consumed, potentially-breakable prerequisite primitive (replacing recipe-side catalysts).
 They are referenced by id at recipe level, step level, and ingredient-set level via `toolIds`; the applicable set for an ingredient set is the union of those ids resolved against the per-system Tools library (`RecipeManager.getToolsForSet`).
 Every applicable Tool must be present (matched via the shared tool matcher) and pass its optional `requirement` before the recipe is craftable; `RecipeManager.evaluateCraftability` returns `toolStates` and `missing.tools`.
@@ -91,8 +93,8 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 ### Pre-Resolution Validation
 
-1. Validate ingredient/tool availability.
-2. Validate optional essence requirements when enabled.
+1. Validate ingredient/tool availability, including essence-option requirements inside ingredient-set resolution (an essence option is satisfied by consuming essence-carrying items to meet `match.amount`).
+2. Honor the legacy per-set essence map for one release (back-compat read) alongside the essence options.
 3. Validate step-level time requirements when enabled.
 
 ### Check and Resolution

@@ -682,6 +682,21 @@ class Fabricate {
         { droppedRollTableRecipes, strippedGatheringTasks }
       );
     }
+
+    // One-time GM-facing notice: when the 1.17.0 essence-group migration disabled
+    // recipes to clear a newly-introduced alchemy signature collision (folding
+    // per-set essences into signature-bearing groups can overlap two sets). Name the
+    // disabled recipes so the GM can rework and re-enable them.
+    const essenceCollisionDisabledRecipes = Array.isArray(summary?.essenceCollisionDisabledRecipes)
+      ? summary.essenceCollisionDisabledRecipes
+      : [];
+    if (essenceCollisionDisabledRecipes.length > 0 && game.user?.isGM) {
+      const recipeList = essenceCollisionDisabledRecipes.join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
+        recipes: recipeList,
+      }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
+      ui.notifications?.warn?.(message);
+    }
   }
 
   /**

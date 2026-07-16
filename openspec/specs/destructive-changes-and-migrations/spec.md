@@ -316,6 +316,25 @@ The rename mapping is `sourceUuid` → `registeredItemUuid`, `sourceItemUuid` �
 
 The essence definition's own `sourceItemUuid` pointer and the `fabricate.interactable` RegionBehaviour `sourceUuid` DataModel field are DIFFERENT field families outside this migration's scope and are left unchanged.
 
+### Essences → Ingredient Groups Migration (`1.17.0`, per recipe, destructive, irreversible)
+
+Issue 649 supersedes the per-set `IngredientSet.essences` map with first-class essence ingredient options (`match.type === "essence"`).
+The `1.17.0` settings-data migration (`migrateEssencesToIngredientGroups.js`) reads and returns the `recipes` payload as pure data via `crypto.randomUUID()` for new ids (`foundry.utils.randomID()` throws under `node --test`, and `crypto.randomUUID` also satisfies the Sonar S2245 no-`Math.random` gate).
+It additionally reads the `systems` payload READ-ONLY for each alchemy system's components (the ingredient sets live under the recipes setting; `systems` carries zero ingredient sets).
+
+1. For each recipe, walk recipe-level `ingredientSets[]` AND step-level `steps[].ingredientSets[]` (a step-level `set.essences` would orphan when the back-compat read is later removed).
+2. Rewrite each positive `set.essences[essenceId]` entry into a single-option essence group `{ id, name, options: [{ quantity: 1, match: { type: "essence", essenceId, amount } }] }` appended to `ingredientGroups`, then delete `set.essences`.
+Because all groups in a set are AND-required, one single-option essence group per essence preserves the old "in addition to" AND semantics exactly.
+3. Drop empty / non-positive essence entries (already runtime no-ops) — behaviour-preserving.
+4. Idempotent: guarded on a non-empty `essences` map, so a set already lacking it (re-run, or authored post-migration) is untouched.
+5. One-way and irreversible: this framework has no reverse-migration mechanism; `downgradeTo` is only GM-guidance printed on abort.
+6. `IngredientSet` constructors keep the back-compat READ of `data.essences` for one release; nothing new writes it.
+
+**Post-migration alchemy-collision reconciliation.**
+Folding per-set essences into `ingredientGroups` makes them signature-bearing, so a required essence group grows a set's transversal coverage and can silently introduce new alchemy signature collisions.
+Because `SignatureValidator.validateSystem` is enabled-scoped and every migrated recipe starts enabled, one pass over the all-enabled migrated set finds every collision; the migration DISABLES both participant recipes of each conflict (mirroring the runtime `disableSignatureConflicts` policy at the data level — it never hard-blocks) so the enabled residual is collision-free and the system loads without a `blocks:'system'` gate.
+A post-load GM notification names the disabled recipes.
+
 ### Recipe Item Library Migration (Pre-Release)
 
 The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUuid` values with system-owned recipe item definitions.

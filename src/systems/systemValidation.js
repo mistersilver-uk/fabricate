@@ -83,12 +83,15 @@ function trimmed(value) {
 }
 
 /**
- * `{ id, tags }` projection of the managed components, matching the admin store's
- * `_buildComponentTagOptions`: tags are trimmed and blanks dropped so a tag
- * requirement's `match.tags` line up with a component's `tags` during expansion.
+ * `{ id, tags, essences }` projection of the managed components, matching the admin
+ * store's `_buildComponentTagOptions`: tags are trimmed and blanks dropped so a tag
+ * requirement's `match.tags` line up with a component's `tags` during expansion, and
+ * `essences` carries the numeric-positive essence quantities so an essence option's
+ * `expandToComponentIds` resolves the components carrying that essence (without it,
+ * essence overlap detection would silently no-op).
  *
  * @param {object[]} components
- * @returns {{ id: string, tags: string[] }[]}
+ * @returns {{ id: string, tags: string[], essences: Record<string, number> }[]}
  */
 function projectComponentTagOptions(components) {
   return asArray(components).map((component) => ({
@@ -96,7 +99,29 @@ function projectComponentTagOptions(components) {
     tags: Array.isArray(component?.tags)
       ? component.tags.map((tag) => String(tag ?? '').trim()).filter(Boolean)
       : [],
+    essences: normalizeComponentEssences(component?.essences),
   }));
+}
+
+/**
+ * Numeric-positive essence quantities of a component, keyed by trimmed essence id.
+ * Mirrors the admin store's essence normalization so essence expansion agrees across
+ * the readiness/signature layers.
+ *
+ * @param {object} essences
+ * @returns {Record<string, number>}
+ */
+function normalizeComponentEssences(essences) {
+  const out = {};
+  if (!essences || typeof essences !== 'object') return out;
+  for (const [rawId, rawQty] of Object.entries(essences)) {
+    const id = String(rawId ?? '').trim();
+    if (!id) continue;
+    const qty = Number(rawQty);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    out[id] = qty;
+  }
+  return out;
 }
 
 /**

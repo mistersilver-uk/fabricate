@@ -529,7 +529,32 @@ function _buildComponentTagOptions(managedItems = []) {
     tags: Array.isArray(item.tags)
       ? item.tags.map((tag) => String(tag ?? '').trim()).filter(Boolean)
       : [],
+    // Numeric-positive essence quantities so an essence option's
+    // `expandToComponentIds` resolves the components carrying that essence during
+    // readiness/signature checks (without it, essence overlap detection no-ops).
+    essences: _normalizeComponentEssences(item.essences),
   }));
+}
+
+/**
+ * Numeric-positive essence quantities of a managed component, keyed by trimmed
+ * essence id. Mirrors `systemValidation.normalizeComponentEssences` so essence
+ * expansion agrees across the readiness/signature layers.
+ *
+ * @param {object} essences
+ * @returns {Record<string, number>}
+ */
+function _normalizeComponentEssences(essences) {
+  const out = {};
+  if (!essences || typeof essences !== 'object') return out;
+  for (const [rawId, rawQty] of Object.entries(essences)) {
+    const id = String(rawId ?? '').trim();
+    if (!id) continue;
+    const qty = Number(rawQty);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    out[id] = qty;
+  }
+  return out;
 }
 
 function _resolutionModeLabel(mode, localizeFn) {

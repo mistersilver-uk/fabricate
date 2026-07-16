@@ -983,6 +983,9 @@ IngredientSet = {
   id: string,
   name: string,
   ingredientGroups: IngredientGroup[],
+  // LEGACY read-only compatibility field (superseded by essence ingredient options).
+  // The 1.17.0 migration rewrites each positive entry into a single-option essence
+  // group; constructors keep reading it for one release, nothing new writes it.
   essences: { [essenceId: string]: number },
   toolIds: string[], // references library Tools required for this ingredient set
 
@@ -993,7 +996,7 @@ IngredientSet = {
 
 ### Requirements
 
-1. `ingredientGroups` must contain at least one `IngredientGroup`, unless `essences` contains one or more positive requirements.
+1. `ingredientGroups` must contain at least one `IngredientGroup` (essence options included), unless the legacy `essences` map contains one or more positive requirements (back-compat read for one release).
 2. Ingredient-set evaluation is always OR-across-sets at recipe/step level.
 3. AND-across-ingredient-sets is not supported.
 4. `toolIds` normalizes to `[]` when absent; each id coerces to a trimmed string and empties are dropped.
@@ -1048,9 +1051,15 @@ Ingredient = {
     // type = "currency"
     unit?: string,    // a configured requirements.currency.units[].id
     amount?: number,  // positive cost in that unit
+
+    // type = "essence"
+    essenceId?: string, // a configured CraftingSystem.essences key
+    amount?: number,    // positive essence quantity (shared field name with currency)
   },
 }
 ```
+
+`match.type` is one of `"component" | "tags" | "currency" | "essence"`.
 
 ### Requirements
 
@@ -1062,6 +1071,9 @@ Ingredient = {
 6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
 7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured `requirements.currency.units[].id` and `amount` is a positive cost.
 A currency option matches no inventory item and contributes no alchemy signature.
+8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
+It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
+An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
 
 ### Currency-Alternative Spend (Craft-Time)
 
@@ -1079,6 +1091,16 @@ On a shortfall the craft aborts with an `Insufficient currency` message and zero
 Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
 
+### Essence-Alternative Consumption (Craft-Time)
+
+An essence option satisfies its ingredient group by consuming essence-carrying items until its `amount` is met, symmetric with component/tag alternatives:
+
+1. The per-item essence contribution is read through an injected bound `resolveItemEssences(item) => essenceMap` collaborator, keeping the pure model Foundry-free.
+The default resolver is **flag-only** (`fabricate.essences` item flag), so the no-probe `canBeCraftedWith`/display path stays byte-for-byte the legacy behaviour; callers (`RecipeManager`, `CraftingEngine`, the per-slot selector) bind a **component-aware** resolver that also credits component-defined essences — an intentional capability increase over the old flag-only per-set gate.
+2. Consumption reads the shared `remaining` map and commits through `_commitItemPlan` (keyed by `uuid || id`), so an item already claimed by a component/tag group in the same set is not recounted toward the essence group (anti-double-consume).
+3. Consumption is **unit-granular**: an indivisible item may over-consume past `amount` (e.g. one item worth 3 essence to meet `amount: 2`), acceptable and symmetric with tag/component options.
+4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and `system.quantity`-summed in standard craft, mirroring the existing documented divergence between the two matchers.
+
 ## Alchemy Signature Uniqueness (Validation Contract)
 
 ### Purpose
@@ -1088,14 +1110,17 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 ### Contract
 
 1. Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
-2. Scope is all recipes in the crafting system.
+2. Scope is the **enabled** recipes in the crafting system.
+`SignatureValidator.validateSystem` scans only enabled recipes — the exact complement of the runtime matcher's `if (!recipe.enabled) continue;` skip — so the scanned set equals the matchable set.
+The invariant is *"the set of **enabled** recipes is collision-free"*: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through `validateSystem`, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
 3. Signature overlap is based on satisfiable ingredient assignments, not just textual equality.
 4. Matching expansion must include:
    - direct component matches (`match.type === "component"`)
-   - tag matches (`match.type === "tags"`) expanded against current system components/tags.
+   - tag matches (`match.type === "tags"`) expanded against current system components/tags
+   - essence matches (`match.type === "essence"`) expanded to components carrying the essence, counted by AMOUNT (not occurrence) with `computeGroupOptions` capacity `min(amount, ids.size)`.
 5. Ingredient groups may resolve to the same component ID when inventory quantity is sufficient to satisfy the aggregate quantity across those groups.
 6. Any overlapping satisfiable signatures between ingredient sets in the same system are invalid.
-7. Save is blocked for any collision in the system, including when editing an unrelated recipe.
+7. Save is blocked for any collision among enabled recipes in the system, including when editing an unrelated recipe.
 8. Import behavior is partial:
    - non-conflicting recipes are imported,
    - conflicting recipes are rejected,
@@ -2014,6 +2039,7 @@ The following legacy aliases are accepted by constructors and normalization func
 | `catalystItemUsage` / `catalystUses` (bare number) | `toolUsage.timesUsed` | Item flag | Runtime reads `toolUsage` first; when absent, falls back to `catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) so migrated `limitedUses` tools preserve in-flight usage. Legacy flag is never back-filled or cleared. |
 | `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` (pre-`1.16.0`) | `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` | Component, RecipeItemDefinition, Tool | Issue 560 rename: normalization reads the old names new-name-first, old-name-tolerant, and emits the new names |
 | `linkedRecipeItemUuid` | `recipeItemId` | Recipe | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `originItemUuid` within the recipe's crafting system |
+| `IngredientSet.essences` (map) | essence ingredient options (`match.type === "essence"`) | IngredientSet | The 1.17.0 migration rewrites each positive `essences[essenceId]` entry into a single-option essence group; constructors keep reading the map for one release |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2023,6 +2049,7 @@ The following aliases are currently emitted in `toJSON()` / normalization output
 These are transitional and will be removed in a future version once all dependent UI code paths have been updated:
 
 - `systemItemId` (emitted alongside `componentId` in Tool, Ingredient, Result)
+- `essences` (emitted by `IngredientSet.toJSON` as `essences: this.essences`, `{}` post-migration; superseded by essence ingredient options — one-release window)
 - `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
 - `results` (emitted alongside `resultGroups` in Recipe)
 - `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `originItemUuid` in Component)

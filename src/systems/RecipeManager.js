@@ -4,7 +4,11 @@ import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringTo
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
-import { accumulateItemEssences, findMatchingComponent } from '../utils/essenceResolver.js';
+import {
+  accumulateItemEssences,
+  findMatchingComponent,
+  resolveItemEssences,
+} from '../utils/essenceResolver.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import {
   itemResolvesToComponent,
@@ -455,6 +459,11 @@ export class RecipeManager {
     // it. A null actor yields a probe that is always false (currency shows missing).
     const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
 
+    // Bind the component-aware essence resolver so an essence GROUP option can draw
+    // down items carrying that essence (issue 649). Byte-for-byte for recipes with no
+    // essence options; a capability increase for those that do.
+    const resolveItemEssencesForSet = this._buildEssenceOptionResolver(recipe, resolveComponent);
+
     // Attempt to find a satisfiable ingredient set.
     // We capture both the satisfiable set (if any) and the first-set result for
     // the fallback display path.
@@ -472,7 +481,7 @@ export class RecipeManager {
               availableItems,
               (ingredient, item) =>
                 this.ingredientMatchesItem(recipe, ingredient, item, resolveComponent),
-              { affordCurrency, optionOverrides }
+              { affordCurrency, optionOverrides, resolveItemEssences: resolveItemEssencesForSet }
             )
           : {
               success: true,
@@ -640,6 +649,7 @@ export class RecipeManager {
     const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
     const features = this._getSystemFeatures(recipe);
     const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+    const resolveItemEssencesForSet = this._buildEssenceOptionResolver(recipe);
 
     const ingredientByKey = new Map();
     const essenceByType = new Map();
@@ -651,7 +661,7 @@ export class RecipeManager {
           ? set.resolveIngredientSelection(
               availableItems,
               (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item),
-              { affordCurrency }
+              { affordCurrency, resolveItemEssences: resolveItemEssencesForSet }
             )
           : {
               success: true,
@@ -1215,8 +1225,10 @@ export class RecipeManager {
     const features = this._getSystemFeatures(recipe);
     const selection =
       typeof ingredientSet.resolveIngredientSelection === 'function'
-        ? ingredientSet.resolveIngredientSelection(availableItems, (ingredient, item) =>
-            this.ingredientMatchesItem(recipe, ingredient, item)
+        ? ingredientSet.resolveIngredientSelection(
+            availableItems,
+            (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item),
+            { resolveItemEssences: this._buildEssenceOptionResolver(recipe) }
           )
         : { success: true, missingGroups: [] };
 
@@ -1609,6 +1621,23 @@ export class RecipeManager {
     });
   }
 
+  /**
+   * A per-item essence resolver bound to a recipe's system components + id (and the
+   * optional alchemy-path component resolver), for threading into
+   * `IngredientSet.resolveIngredientSelection` so an essence GROUP option draws down
+   * items carrying that essence — the component-aware capability increase over the
+   * flag-only default (issue 649).
+   * @param {Recipe} recipe
+   * @param {Function} [resolveComponent]
+   * @returns {(item: object) => Record<string, number>}
+   * @private
+   */
+  _buildEssenceOptionResolver(recipe, resolveComponent = findMatchingComponent) {
+    const components = this._getSystemComponents(recipe);
+    const systemId = recipe?.craftingSystemId;
+    return (item) => resolveItemEssences(item, components, systemId, resolveComponent);
+  }
+
   _getSystemComponents(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return [];
@@ -1787,7 +1816,16 @@ export class RecipeManager {
 
     const csm = {
       getSystem: (id) => systemManager.getSystem(id),
-      getRecipesForSystem: (id) => this.getRecipes({ craftingSystemId: id }),
+      // The validator is now enabled-scoped (issue 649). This gate runs on an ENABLE
+      // transition, but the store copy of `recipe` is still disabled (it is persisted
+      // only after this passes). Substitute the candidate recipe (enabled = its target
+      // state) so the scan evaluates the collision the enable would create; without the
+      // swap the enabled-scoped validator would exclude the still-disabled store copy
+      // and miss the conflict.
+      getRecipesForSystem: (id) =>
+        this.getRecipes({ craftingSystemId: id }).map((existing) =>
+          existing.id === recipe.id ? recipe : existing
+        ),
       getComponentsForSystem: (id) => {
         const system = systemManager.getSystem(id);
         if (!system) return [];
@@ -1810,6 +1848,12 @@ export class RecipeManager {
    * In an alchemy system, disable every currently-enabled recipe that participates in any ingredient
    * signature conflict. Used to reconcile recipes after an essence/component deletion changes
    * signatures. No-op for non-alchemy systems.
+   *
+   * `SignatureValidator.validateSystem` is enabled-scoped (issue 649), so the conflicts it
+   * reports are only among ENABLED recipes — the exact set the runtime matcher can pick.
+   * A recipe whose sole collision partner is already disabled therefore does NOT appear as a
+   * conflict and STAYS enabled: the enabled residual is the collision-free set the runtime
+   * needs. Disabling all participants of a conflict genuinely clears the gate.
    * @param {string} systemId
    * @returns {Promise<Array<{id: string, name: string}>>} the recipes that were disabled
    */

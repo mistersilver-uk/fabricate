@@ -13,6 +13,7 @@ import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateEssencesToIngredientGroups } from './migrateEssencesToIngredientGroups.js';
 import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
@@ -277,6 +278,22 @@ const MIGRATIONS = [
       'recipe-item definitions, and tools',
     migrate: (data) => migrateRenameSourceUuidFields(data.systems),
   },
+  {
+    version: '1.17.0',
+    label:
+      'Supersede the per-set IngredientSet.essences map with first-class essence ingredient ' +
+      'groups (single-option essence groups preserve AND semantics); reconcile alchemy signature ' +
+      'collisions by disabling both colliding recipes',
+    migrate(data) {
+      // Reads/returns `{ recipes }` (ingredient sets live under the recipes setting;
+      // data.systems holds zero sets and is read read-only for alchemy components).
+      // Surfaces the collision-disabled recipe names via the transient
+      // `_essenceCollisionDisabledRecipes` field (consumed by the runner for a
+      // one-time GM notice, then stripped — never persisted).
+      const { recipes, _essenceCollisionDisabledRecipes } = migrateEssencesToIngredientGroups(data);
+      return { recipes, _essenceCollisionDisabledRecipes };
+    },
+  },
   // Future migrations added here in version order
 ];
 
@@ -332,6 +349,7 @@ export class MigrationRunner {
           droppedRollTableRecipes: [],
           strippedGatheringTasks: [],
         },
+        essenceCollisionDisabledRecipes: [],
       };
     }
 
@@ -410,6 +428,7 @@ export class MigrationRunner {
               droppedRollTableRecipes: [],
               strippedGatheringTasks: [],
             },
+            essenceCollisionDisabledRecipes: [],
           };
         }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
@@ -446,6 +465,15 @@ export class MigrationRunner {
     }
     delete data._removedResultSelectionProviders;
 
+    // The 1.17.0 essence-group migration reports the recipes it disabled to clear a
+    // newly-introduced alchemy signature collision. Capture the names for the GM
+    // notice and strip the transient field so it is never persisted.
+    let essenceCollisionDisabledRecipes = [];
+    if (Array.isArray(data._essenceCollisionDisabledRecipes)) {
+      essenceCollisionDisabledRecipes = data._essenceCollisionDisabledRecipes.map(String);
+    }
+    delete data._essenceCollisionDisabledRecipes;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -480,6 +508,7 @@ export class MigrationRunner {
       migratedCatalystCount,
       unifiedRegionSystems,
       removedResultSelectionProviders,
+      essenceCollisionDisabledRecipes,
     };
   }
 

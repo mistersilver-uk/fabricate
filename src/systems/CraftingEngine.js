@@ -1799,45 +1799,87 @@ export class CraftingEngine {
       });
     }
 
+    // A group is essence-only iff every one of its options is an essence match. When
+    // essences are disabled, such a group is inert (issue 649 group-granular rule).
+    const isEssenceOnlyGroup = (group) => {
+      const opts = Array.isArray(group?.options) ? group.options : [];
+      return opts.length > 0 && opts.every((option) => option?.match?.type === 'essence');
+    };
+
+    // Whether a single group is satisfied by the submitted multiset. Options are
+    // alternatives, so any one satisfying option satisfies the group. An essence
+    // option is amount-based (`submittedEssences[essenceId] >= amount`), NOT
+    // occurrence-based; when `skipEssence` is set (essences disabled) essence options
+    // are ignored so the group falls to its non-essence arm.
+    const groupSatisfied = (group, groupComponentIds, skipEssence) => {
+      const groupOptions = Array.isArray(group?.options) ? group.options : [];
+      if (groupOptions.length === 0) {
+        // No structured options (defensive): fall back to mere presence in the
+        // merged component-ID set for this group.
+        return availableForComponentIds(groupComponentIds) > 0;
+      }
+      return groupOptions.some((option) => {
+        if (option?.match?.type === 'essence') {
+          if (skipEssence) return false;
+          const essenceId = String(option.match.essenceId || '').trim();
+          const amount = Math.max(0, Number(option.match.amount) || 0);
+          // A no-op essence option (id-less / zero amount) is trivially satisfied.
+          if (!essenceId || amount <= 0) return true;
+          return (submittedEssences?.[essenceId] || 0) >= amount;
+        }
+        const optionComponentIds = signatureValidator.expandIngredientToComponentIds(
+          option,
+          components
+        );
+        const required = Math.max(1, Number(option?.quantity) || 1);
+        return availableForComponentIds(optionComponentIds) >= required;
+      });
+    };
+
     for (const recipe of recipes) {
       if (!recipe.enabled) continue;
       const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       for (const set of ingredientSets) {
+        // The signature is computed 1:1 from `set.ingredientGroups`, so they align by
+        // index. Counting differs from IngredientSet.resolveIngredientSelection (that
+        // method sums each item's system.quantity, whereas this counts submission
+        // occurrences per unit); only the option-as-alternative semantics is shared.
         const signature = signatureValidator.computeSignature(set, components);
+        const groups = Array.isArray(set.ingredientGroups) ? set.ingredientGroups : [];
+        // Legacy back-compat READ of the retired per-set essences map (one release):
+        // migrated data carries essences as groups instead, so `setEssences` is {}.
         const setEssences = set.essences || {};
         const hasEssences = essencesEnabled && Object.keys(setEssences).length > 0;
 
-        // Skip sets that have neither ingredient groups nor essence requirements
+        if (!essencesEnabled) {
+          // Group-granular essences-disabled rule (issue 649): evaluate only the
+          // non-essence-only groups and skip essence options inside them. A set whose
+          // every group is essence-only is unmatchable (reproduces the old
+          // `signature.length === 0 && !hasEssences → continue` for a migrated
+          // essence-only set, and skips a legacy essence-only set with no groups).
+          const nonEssenceGroupIndexes = [];
+          for (const [index, group] of groups.entries()) {
+            if (!isEssenceOnlyGroup(group)) nonEssenceGroupIndexes.push(index);
+          }
+          if (nonEssenceGroupIndexes.length === 0) continue;
+          const allGroupsSatisfied = nonEssenceGroupIndexes.every((index) =>
+            groupSatisfied(groups[index], signature[index], true)
+          );
+          if (allGroupsSatisfied) {
+            return { matched: true, recipe, ingredientSetId: set.id };
+          }
+          continue;
+        }
+
+        // Essences enabled: evaluate every group (essence options amount-based).
+        // Skip sets that carry neither ingredient groups nor a legacy essence map.
         if (signature.length === 0 && !hasEssences) continue;
 
-        // Check ingredient groups: a group is satisfied only when one of its
-        // options has its required quantity met by the available submissions
-        // matching that option's component IDs. Options are alternatives, so any
-        // single satisfied option satisfies the group. Only that option-as-
-        // alternative semantics is shared with
-        // IngredientSet.resolveIngredientSelection; the counting differs (that
-        // method sums each item's system.quantity, whereas this counts
-        // submission occurrences per unit). The signature is computed 1:1 from
-        // `set.ingredientGroups`, so they align by index.
-        const allGroupsSatisfied = signature.every((groupComponentIds, groupIndex) => {
-          const group = set.ingredientGroups?.[groupIndex];
-          const groupOptions = Array.isArray(group?.options) ? group.options : [];
-          if (groupOptions.length === 0) {
-            // No structured options (defensive): fall back to mere presence in
-            // the merged component-ID set for this group.
-            return availableForComponentIds(groupComponentIds) > 0;
-          }
-          return groupOptions.some((option) => {
-            const optionComponentIds = signatureValidator.expandIngredientToComponentIds(
-              option,
-              components
-            );
-            const required = Math.max(1, Number(option?.quantity) || 1);
-            return availableForComponentIds(optionComponentIds) >= required;
-          });
-        });
+        const allGroupsSatisfied = signature.every((groupComponentIds, groupIndex) =>
+          groupSatisfied(groups[groupIndex], groupComponentIds, false)
+        );
 
-        // Check essences
+        // Legacy per-set essences map (back-compat read): AND-required as before.
         let essencesSatisfied = true;
         if (hasEssences && submittedEssences) {
           for (const [essenceType, requiredQty] of Object.entries(setEssences)) {
@@ -1858,11 +1900,12 @@ export class CraftingEngine {
 
   /**
    * For a matched alchemy attempt, consume any submitted items that standard
-   * ingredient matching did not already consume (e.g. items supplied only for
-   * essence requirements). Mutates `consumedItems` in place with `{ item, quantity,
-   * ingredient: null }` entries. Shared by the success path AND the Simple
-   * failure path so a matched fail consumes the same submitted multiset as a pass.
-   * No-op unless this is an alchemy attempt carrying `alchemySubmittedItems`.
+   * ingredient matching did not already consume (extras / essence-option
+   * contributors — items supplied to satisfy an essence group option, or surplus
+   * beyond the matched component/tag groups). Mutates `consumedItems` in place with
+   * `{ item, quantity, ingredient: null }` entries. Shared by the success path AND
+   * the Simple failure path so a matched fail consumes the same submitted multiset
+   * as a pass. No-op unless this is an alchemy attempt carrying `alchemySubmittedItems`.
    * @private
    */
   async _consumeAlchemyExtraItems(consumedItems, componentSourceActors, options) {
@@ -2010,9 +2053,16 @@ export class CraftingEngine {
       this.recipeManager.ingredientMatchesItem(recipe, ingredient, item, resolveComponent);
     if (typeof ingredientSet?.resolveIngredientSelection === 'function') {
       const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
+      // Bind the component-aware essence resolver so an essence GROUP option consumes
+      // items carrying that essence at craft time (issue 649).
+      const resolveItemEssences =
+        typeof this.recipeManager?._buildEssenceOptionResolver === 'function'
+          ? this.recipeManager._buildEssenceOptionResolver(recipe, resolveComponent)
+          : undefined;
       return ingredientSet.resolveIngredientSelection(availableItems, matcher, {
         affordCurrency,
         optionOverrides,
+        resolveItemEssences,
       });
     }
     // Back-compat: an ingredient set exposing only matchIngredients (older duck-typed

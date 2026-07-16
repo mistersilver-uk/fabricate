@@ -117,10 +117,16 @@ export class IngredientSet {
   /**
    * Check if this ingredient set can be crafted with the given items
    * @param {Item[]} availableItems - Items from actor(s)
+   * @param {{ resolveItemEssences?: (item: object) => Record<string, number> }} [opts] -
+   *   the bound essence resolver forwarded to {@link resolveIngredientSelection} so an
+   *   essence group option can draw down essence-carrying items. Defaults (undefined)
+   *   to the flag-only resolver, keeping the legacy item-only path byte-for-byte.
    * @returns {boolean}
    */
-  canBeCraftedWith(availableItems) {
-    const selection = this.resolveIngredientSelection(availableItems);
+  canBeCraftedWith(availableItems, { resolveItemEssences } = {}) {
+    const selection = this.resolveIngredientSelection(availableItems, null, {
+      resolveItemEssences,
+    });
     if (!selection.success) return false;
 
     // Check if all essence requirements are satisfied
@@ -213,8 +219,16 @@ export class IngredientSet {
   resolveIngredientSelection(
     availableItems,
     matcher = null,
-    { affordCurrency, optionOverrides } = {}
+    { affordCurrency, optionOverrides, resolveItemEssences } = {}
   ) {
+    // Default to a flag-only essence resolver (mirroring the legacy
+    // `_accumulateEssences`), so the no-probe `canBeCraftedWith`/display path stays
+    // byte-for-byte. Component-aware callers (RecipeManager/CraftingEngine) bind the
+    // real resolver so standard craft can also resolve component-defined essences.
+    const resolveEssences =
+      typeof resolveItemEssences === 'function'
+        ? resolveItemEssences
+        : (item) => getFabricateFlag(item, 'essences', {});
     const remaining = new Map();
     for (const item of availableItems) {
       remaining.set(this._itemKey(item), Number(item.system?.quantity || 1));
@@ -243,6 +257,26 @@ export class IngredientSet {
           }
           continue;
         }
+        if (option?.match?.type === 'essence') {
+          const essenceCandidate = this._buildPlanForEssenceOption(
+            option,
+            availableItems,
+            remaining,
+            resolveEssences
+          );
+          if (essenceCandidate.ok) {
+            selectedIngredients.push(option);
+            this._commitItemPlan(essenceCandidate.plan, plan, remaining);
+          } else {
+            missingGroups.push({
+              group,
+              ingredient: option,
+              have: essenceCandidate.have,
+              need: Math.max(0, Number(option?.match?.amount) || 0),
+            });
+          }
+          continue;
+        }
         const candidate = this._buildPlanForIngredient(
           option,
           availableItems,
@@ -267,16 +301,22 @@ export class IngredientSet {
       let chosen = null;
       let bestMissing = null;
 
-      // Items-first: try every non-currency option; first item-satisfiable wins.
+      // Items-first: try every non-currency option; first item-satisfiable wins. An
+      // essence option is item-satisfiable too — it draws down items carrying the
+      // essence via `_buildPlanForEssenceOption` (parallel to `_buildPlanForIngredient`).
       for (const option of options) {
         if (option?.match?.type === 'currency') continue;
-        const candidate = this._buildPlanForIngredient(option, availableItems, remaining, matcher);
+        const isEssence = option?.match?.type === 'essence';
+        const candidate = isEssence
+          ? this._buildPlanForEssenceOption(option, availableItems, remaining, resolveEssences)
+          : this._buildPlanForIngredient(option, availableItems, remaining, matcher);
         if (candidate.ok) {
           chosen = { option, plan: candidate.plan };
           break;
         }
+        const need = isEssence ? Math.max(0, Number(option?.match?.amount) || 0) : option.quantity;
         if (!bestMissing || candidate.have > bestMissing.have) {
-          bestMissing = { ingredient: option, have: candidate.have, need: option.quantity };
+          bestMissing = { ingredient: option, have: candidate.have, need };
         }
       }
 
@@ -416,6 +456,66 @@ export class IngredientSet {
 
     return {
       ok: neededQuantity <= 0,
+      plan: optionPlan,
+      have: totalAvailable,
+    };
+  }
+
+  /**
+   * Build the item-consumption plan for an ESSENCE option: draw down items whose
+   * accumulated `essenceId` essence reaches the option's `amount`, unit-granular.
+   * Parallel to {@link _buildPlanForIngredient} — it reads the shared `remaining`
+   * Map (skipping items already exhausted by a component/tag group in the same set,
+   * the anti-double-consume invariant) and returns entries committed through
+   * {@link _commitItemPlan}. Consumption is unit-granular, so an indivisible item
+   * may over-consume past `amount` (symmetric with tag/component options).
+   *
+   * The per-item essence map comes from the injected `resolveItemEssences` probe
+   * (flag-only by default, component-aware in callers), NEVER from
+   * `Ingredient.matches()`.
+   *
+   * @param {object} option - the essence Ingredient option
+   * @param {Item[]} availableItems
+   * @param {Map<string, number>} remaining
+   * @param {(item: object) => Record<string, number>} resolveItemEssences
+   * @returns {{ ok: boolean, plan: Array<{item: object, quantity: number, ingredient: object}>, have: number }}
+   * @private
+   */
+  _buildPlanForEssenceOption(option, availableItems, remaining, resolveItemEssences) {
+    const essenceId = String(option?.match?.essenceId || '').trim();
+    const amount = Math.max(0, Number(option?.match?.amount) || 0);
+    if (!essenceId || amount <= 0) {
+      // A zero-amount / id-less essence option is a runtime no-op — satisfied with no
+      // consumption (mirrors dropping non-positive essence entries at migration).
+      return { ok: true, plan: [], have: 0 };
+    }
+
+    let accumulated = 0;
+    let totalAvailable = 0;
+    const optionPlan = [];
+
+    for (const item of availableItems) {
+      const key = this._itemKey(item);
+      const availableUnits = Number(remaining.get(key) || 0);
+      if (availableUnits <= 0) continue;
+
+      const essences = resolveItemEssences ? resolveItemEssences(item) : {};
+      const perUnit = Number(essences?.[essenceId]) || 0;
+      if (perUnit <= 0) continue;
+
+      totalAvailable += perUnit * availableUnits;
+      if (accumulated >= amount) continue;
+
+      // Units needed to reach the remaining requirement (unit-granular; the last
+      // unit may over-consume past `amount` when the item is worth more per unit).
+      const unitsNeeded = Math.ceil((amount - accumulated) / perUnit);
+      const unitsToConsume = Math.min(unitsNeeded, availableUnits);
+      optionPlan.push({ item, quantity: unitsToConsume, ingredient: option });
+      accumulated += perUnit * unitsToConsume;
+    }
+
+    return {
+      ok: accumulated >= amount,
       plan: optionPlan,
       have: totalAvailable,
     };
