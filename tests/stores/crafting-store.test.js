@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
+import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
 
 let compiler;
 let createCraftingStore;
@@ -72,6 +74,8 @@ describe('craftingStore', () => {
     // (issue 651). A dependency the store imports but the compiler does not copy makes
     // the whole suite HANG (# cancelled), never fail.
     compiler.copyPlain('src/utils/progressiveResultOrder.js');
+    // And the threshold helper: the store recomputes thresholds after a reorder.
+    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
     ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
   });
 
@@ -855,5 +859,212 @@ describe('craftingStore', () => {
       ['s3', 's1', 's2'],
       'reverts to the first (successfully persisted) order, not the authored one'
     );
+  });
+
+  // ── Thresholds are POSITIONAL, so a reorder must recompute them ──────────
+  //
+  // The threshold is a CUMULATIVE property of a stage's POSITION in the list the roll is
+  // spent down — not an intrinsic property of the stage. Reordering therefore invalidates
+  // every threshold at or after the move.
+  //
+  // The builder bakes thresholds in AUTHORED order, and `applyPlayerResultOrder` returns
+  // elements ===-identical to its inputs (D5, load-bearing), so a reordered stage carries
+  // its AUTHORED-position threshold with it unless something recomputes. Worked example,
+  // `equal`, authored [A(5), B(3)] -> A>=5, B>=8; move B to the top and the rendered rows
+  // read "B >=8, A >=5" — inverted, with the top row claiming a higher bar than the row
+  // beneath, so the badge argues against the move the player just made. At budget 5 the
+  // engine awards B while the badge claims A: the wrong STAGE, not merely a wrong number.
+  //
+  // These fixtures deliberately DERIVE their thresholds from the helper rather than
+  // hardcoding them — a hardcoded-threshold fixture is exactly how this hid, since it
+  // asserts the value the test author expected instead of the value the award loop implies.
+
+  const COST_OF = (stage) => stage.difficulty ?? NaN;
+
+  /** Authored stages with builder-equivalent thresholds baked in authored order. */
+  function bakedStages(difficulties, awardMode) {
+    const authored = difficulties.map((difficulty, i) => ({
+      id: `s${i + 1}`,
+      name: `Stage ${i + 1}`,
+      difficulty,
+    }));
+    const thresholds = progressiveStageThresholds({ results: authored, costFor: COST_OF, awardMode });
+    return authored.map((stage, i) => ({ ...stage, threshold: thresholds[i] }));
+  }
+
+  function thresholdStore(difficulties, awardMode, stored) {
+    const stages = bakedStages(difficulties, awardMode);
+    const { services } = makeServices({});
+    services.listCraftingForActor = async () => ({
+      recipes: [
+        recipe('r1', 'Blade', {
+          progressiveStages: stages,
+          allowPlayerResultReorder: true,
+          progressiveAwardMode: awardMode,
+        }),
+      ],
+    });
+    services.getProgressiveResultOrder = () => ({ 'recipe:r1': [...stored] });
+    services.setProgressiveResultOrder = async () => ({});
+    return createCraftingStore({ services });
+  }
+
+  for (const awardMode of ['equal', 'exceed', 'partial']) {
+    it(`COMPOSED (${awardMode}): thresholds are recomputed for the PLAYER'S order, not the authored one`, async () => {
+      // The store's stages are rendered verbatim (ProgressiveStageList emits
+      // `data-progressive-stage-threshold={stage.threshold}` with no arithmetic of its
+      // own), so a correct store here is a correct badge there.
+      const store = thresholdStore([5, 3, 4], awardMode, ['s2', 's3', 's1']);
+      await store.load();
+      store.select('r1');
+      flushSync();
+
+      const ordered = store.orderedProgressiveStages;
+      assert.deepEqual(
+        ordered.map((stage) => stage.id),
+        ['s2', 's3', 's1'],
+        'precondition: the player order applied'
+      );
+
+      const expected = progressiveStageThresholds({
+        results: ordered,
+        costFor: COST_OF,
+        awardMode,
+      });
+      assert.deepEqual(
+        ordered.map((stage) => stage.threshold),
+        expected,
+        `${awardMode}: each threshold reflects the stage's NEW position`
+      );
+    });
+  }
+
+  it('COMPOSED: the reordered thresholds are non-decreasing down the list', async () => {
+    // The invariant the defect broke most visibly: budget is spent top-down, so a lower
+    // row can never be reached at a LOWER threshold than the row above it.
+    const store = thresholdStore([5, 3, 4], 'equal', ['s2', 's3', 's1']);
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    const thresholds = store.orderedProgressiveStages.map((stage) => stage.threshold);
+    for (let i = 1; i < thresholds.length; i++) {
+      assert.ok(
+        thresholds[i] >= thresholds[i - 1],
+        `row ${i + 1} (>=${thresholds[i]}) must not be reached before row ${i} (>=${thresholds[i - 1]})`
+      );
+    }
+  });
+
+  it('COMPOSED: the displayed threshold agrees with the award loop at every budget', async () => {
+    // The spec requirement in ui-integration §Crafting App (Player), asserted through the
+    // real composition rather than against the helper in isolation.
+    const store = thresholdStore([5, 3, 4], 'equal', ['s2', 's3', 's1']);
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    const ordered = store.orderedProgressiveStages;
+    for (let budget = 0; budget <= 20; budget++) {
+      const { awarded } = resolveProgressiveAward({
+        results: ordered,
+        initialRemaining: budget,
+        costFor: COST_OF,
+        awardMode: 'equal',
+        invalidCost: 'skip',
+      });
+      const claimed = ordered.filter(
+        (stage) => stage.threshold !== null && budget >= stage.threshold
+      );
+      assert.deepEqual(
+        claimed.map((stage) => stage.id),
+        awarded.map((stage) => stage.id),
+        `budget ${budget}: the badge must claim exactly what the loop awards`
+      );
+    }
+  });
+
+  it('COMPOSED: an unreachable stage keeps a null threshold after a reorder', async () => {
+    // difficulty null -> costFor NaN -> the award loop skips it -> reached at NO budget,
+    // so the badge must stay omitted rather than acquire a number from its new position.
+    const stages = [
+      { id: 's1', name: 'One', difficulty: 2, threshold: 2 },
+      { id: 's2', name: 'Broken', difficulty: null, threshold: null },
+      { id: 's3', name: 'Three', difficulty: 3, threshold: 5 },
+    ];
+    const { services } = makeServices({});
+    services.listCraftingForActor = async () => ({
+      recipes: [
+        recipe('r1', 'Blade', {
+          progressiveStages: stages,
+          allowPlayerResultReorder: true,
+          progressiveAwardMode: 'equal',
+        }),
+      ],
+    });
+    services.getProgressiveResultOrder = () => ({ 'recipe:r1': ['s2', 's3', 's1'] });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    const ordered = store.orderedProgressiveStages;
+    assert.deepEqual(ordered.map((s) => s.id), ['s2', 's3', 's1']);
+    assert.equal(ordered[0].threshold, null, 'the skipped stage still has no threshold');
+    assert.deepEqual(
+      ordered.map((stage) => stage.threshold),
+      [null, 3, 5],
+      'and it consumes no budget, so the stages after it are unaffected by its position'
+    );
+  });
+
+  it('COMPOSED: a GM-pinned order leaves the authored thresholds untouched', async () => {
+    const stages = bakedStages([5, 3, 4], 'equal');
+    const { services } = makeServices({});
+    services.listCraftingForActor = async () => ({
+      recipes: [
+        recipe('r1', 'Blade', {
+          progressiveStages: stages,
+          allowPlayerResultReorder: false,
+          progressiveAwardMode: 'equal',
+        }),
+      ],
+    });
+    services.getProgressiveResultOrder = () => ({ 'recipe:r1': ['s2', 's3', 's1'] });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.threshold),
+      [5, 8, 12],
+      'no reorder, so the builder-baked authored thresholds stand'
+    );
+  });
+
+  it('COMPOSED: a live reorder recomputes the thresholds immediately', async () => {
+    const store = thresholdStore([5, 3, 4], 'equal', []);
+    await store.load();
+    store.select('r1');
+    flushSync();
+    assert.deepEqual(
+      store.orderedProgressiveStages.map((stage) => stage.threshold),
+      [5, 8, 12],
+      'authored order first'
+    );
+
+    // Move the LAST stage (difficulty 4) to the top.
+    store.reorderProgressiveStage(2, 0, 'moved');
+    flushSync();
+
+    const ordered = store.orderedProgressiveStages;
+    assert.deepEqual(ordered.map((stage) => stage.id), ['s3', 's1', 's2']);
+    assert.deepEqual(
+      ordered.map((stage) => stage.threshold),
+      [4, 9, 12],
+      'the moved stage is now reached first, at its own difficulty'
+    );
+    await store.flushProgressiveOrder();
   });
 });

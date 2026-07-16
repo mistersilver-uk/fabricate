@@ -836,6 +836,44 @@ describe('CraftingListingBuilder — progressive stages (F1)', () => {
     assert.deepEqual(recipe.progressiveStages, []);
   });
 
+  it('projects progressiveAwardMode so the store can RECOMPUTE thresholds after a reorder', () => {
+    // A threshold belongs to a stage's POSITION, so reordering invalidates the baked
+    // values and the store must recompute — which it cannot do without the mode.
+    // Mutation: drop `progressiveAwardMode` from the projection.
+    assert.equal(buildOne(progressiveOpts()).recipe.progressiveAwardMode, 'equal');
+    const system = {
+      ...PROGRESSIVE_SYSTEM,
+      craftingCheck: {
+        ...PROGRESSIVE_SYSTEM.craftingCheck,
+        progressive: { rollFormula: '2d6', awardMode: 'partial' },
+      },
+    };
+    assert.equal(buildOne(progressiveOpts({}, system)).recipe.progressiveAwardMode, 'partial');
+  });
+
+  it('progressiveAwardMode is null outside progressive mode', () => {
+    assert.equal(buildOne().recipe.progressiveAwardMode, null);
+  });
+
+  it('a teaser still carries progressiveAwardMode (a system rule, not a spoiler)', () => {
+    // The stage list is redacted to [], but the shape stays uniform so the store never
+    // branches on a missing key.
+    const { recipe } = buildOne({
+      system: PROGRESSIVE_SYSTEM,
+      entries: [
+        {
+          recipe: makeRecipe({ resultGroups: PROGRESSIVE_GROUPS }),
+          access: {
+            reason: 'teaser',
+            teaserState: { hiddenFields: ['ingredients', 'results', 'description'] },
+          },
+        },
+      ],
+    });
+    assert.deepEqual(recipe.progressiveStages, []);
+    assert.equal(recipe.progressiveAwardMode, 'equal');
+  });
+
   it('projects allowPlayerResultReorder, defaulting true', () => {
     assert.equal(buildOne(progressiveOpts()).recipe.allowPlayerResultReorder, true);
     assert.equal(

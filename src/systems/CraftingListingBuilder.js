@@ -312,6 +312,11 @@ export class CraftingListingBuilder {
       progressiveStages: this._buildProgressiveStages({ recipe, system, mode }),
       // GM policy: may this player reorder the stages? Default true (issue 651).
       allowPlayerResultReorder: recipe.allowPlayerResultReorder !== false,
+      // The award mode the stage thresholds are derived from. Surfaced because a
+      // threshold is a property of a stage's POSITION, so reordering invalidates the
+      // baked values and the store must recompute — which it cannot do without knowing
+      // the mode. See `_buildProgressiveStages`.
+      progressiveAwardMode: this._progressiveAwardMode(system, mode),
     };
   }
 
@@ -357,6 +362,9 @@ export class CraftingListingBuilder {
       // can cover this.
       progressiveStages: showResults ? this._buildProgressiveStages({ recipe, system, mode }) : [],
       allowPlayerResultReorder: recipe.allowPlayerResultReorder !== false,
+      // Not redacted: the award mode is a system-level rule, not a per-recipe spoiler,
+      // and a teaser's stage list is empty anyway. Present so the shape stays uniform.
+      progressiveAwardMode: this._progressiveAwardMode(system, mode),
     };
   }
 
@@ -615,6 +623,16 @@ export class CraftingListingBuilder {
    *
    * @private
    */
+  /**
+   * The award mode progressive thresholds are derived from (`null` outside progressive).
+   * Single source for both projections and the value the store recomputes against.
+   * @private
+   */
+  _progressiveAwardMode(system, mode) {
+    if (mode !== 'progressive') return null;
+    return system?.craftingCheck?.progressive?.awardMode || 'equal';
+  }
+
   _buildProgressiveStages({ recipe, system, mode }) {
     if (mode !== 'progressive') return [];
     const step = this._firstStep(recipe);
@@ -639,10 +657,13 @@ export class CraftingListingBuilder {
         result?.componentId || result?.systemItemId
       ) ?? NaN;
 
+    // Baked in AUTHORED order. These are correct only while the list is in authored
+    // order — a threshold is cumulative, so it belongs to a stage's POSITION, not to the
+    // stage. `craftingStore` recomputes them after applying the player's order.
     const thresholds = progressiveStageThresholds({
       results,
       costFor,
-      awardMode: system?.craftingCheck?.progressive?.awardMode || 'equal',
+      awardMode: this._progressiveAwardMode(system, mode),
     });
 
     return results.map((result, index) => {

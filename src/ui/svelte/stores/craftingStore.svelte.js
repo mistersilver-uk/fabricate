@@ -29,11 +29,15 @@
 
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 import { applyPlayerResultOrder, progressiveOrderKey } from '../../../utils/progressiveResultOrder.js';
+import { progressiveStageThresholds } from '../../../utils/progressiveStageThresholds.js';
 
 const DEFAULT_PAGE_SIZE = 12;
-// Drag emits a move per hovered row. Under `scope: 'user'` every commit is a REPLICATED
-// document write (`#setWorld` broadcasts createSetting/updateSetting to every client), so
-// the write is debounced to one per settle rather than one per intermediate move.
+// Under `scope: 'user'` every commit is a REPLICATED document write (`#setWorld` broadcasts
+// createSetting/updateSetting to every client), so a burst of moves must not become a burst
+// of writes. The burst comes from the KEYBOARD path — a player walking a stage up several
+// places emits one move per chevron click. Drag emits only ONE move, on drop
+// (`ProgressiveStageList` fires `onReorder` from `ondrop`, never from `ondragover`), so it
+// settles immediately and the drop-path flush below commits it without waiting.
 const ORDER_COMMIT_DEBOUNCE_MS = 400;
 const MAX_RECENTS = 8;
 // Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (systems/CraftingListingBuilder.js). A
@@ -175,20 +179,45 @@ export function createCraftingStore({ services } = {}) {
     return recipes.find((recipe) => recipe?.id === selectedRecipeId) ?? visibleRecipes[0] ?? null;
   });
 
-  // The selected recipe's stages in the PLAYER'S order (issue 651).
+  // The selected recipe's stages in the PLAYER'S order, with thresholds recomputed for
+  // that order (issue 651).
   //
   // Ordering is applied HERE and not in the builder: the order must re-derive when the
   // player reorders, without a rebuild round-trip, and both award call sites plus this
   // one then share ONE reconciliation rule (`applyPlayerResultOrder`) rather than three
   // hand-rolled sorts. The GM's permission gates it — default-true, so only an explicit
   // `false` pins the authored order.
+  //
+  // THE THRESHOLD MUST BE RECOMPUTED, NOT CARRIED. A threshold is cumulative, so it is a
+  // property of a stage's POSITION in the list the roll is spent down — not of the stage.
+  // The builder bakes thresholds in AUTHORED order, and `applyPlayerResultOrder` returns
+  // elements ===-identical to its inputs (deliberately — downstream depends on it), so a
+  // reordered stage would otherwise carry its authored-position threshold with it: for
+  // authored [A(5), B(3)] the rows would read "B >=8, A >=5" after moving B up, inverted,
+  // with the top row claiming a higher bar than the row beneath. Recomputing through the
+  // SAME helper the builder used (pinned by an oracle against the award loop) is what
+  // keeps the badge and the award in step.
   const orderedProgressiveStages = $derived.by(() => {
     const stages = Array.isArray(selectedRecipe?.progressiveStages)
       ? selectedRecipe.progressiveStages
       : [];
     if (selectedRecipe?.allowPlayerResultReorder === false) return stages;
     const key = progressiveOrderKey({ scope: 'recipe', id: selectedRecipe?.id });
-    return key ? applyPlayerResultOrder(stages, progressiveOrders[key] ?? null) : stages;
+    if (!key) return stages;
+
+    const ordered = applyPlayerResultOrder(stages, progressiveOrders[key] ?? null);
+    // Identity means nothing moved, so the builder's authored thresholds already stand.
+    if (ordered === stages) return stages;
+
+    // `difficulty` is already null for an absent/invalid cost, so `?? NaN` reproduces the
+    // award loop's skip: no budget reaches the stage, and its threshold stays null (the
+    // row omits the badge rather than inventing a number for its new position).
+    const thresholds = progressiveStageThresholds({
+      results: ordered,
+      costFor: (stage) => stage?.difficulty ?? NaN,
+      awardMode: selectedRecipe?.progressiveAwardMode || 'equal',
+    });
+    return ordered.map((stage, index) => ({ ...stage, threshold: thresholds[index] }));
   });
 
   const selectedSet = $derived.by(() => {
@@ -365,7 +394,15 @@ export function createCraftingStore({ services } = {}) {
     }, ORDER_COMMIT_DEBOUNCE_MS);
   }
 
-  /** Flush a pending debounced order write immediately (drop/settle, or teardown). */
+  /**
+   * Flush a pending debounced order write immediately.
+   *
+   * Called on drop (a drag has already settled, so there is nothing to coalesce) and on
+   * window teardown via `SvelteFabricateApp._flushPendingOrderWrite` — without the latter,
+   * a player who reorders and immediately closes or refreshes inside the debounce window
+   * loses the order silently. A no-op when no write is pending, so a double call from both
+   * `close()` and `_onClose()` writes once.
+   */
   function flushProgressiveOrder() {
     if (!orderCommitTimer) return Promise.resolve();
     clearTimeout(orderCommitTimer);
