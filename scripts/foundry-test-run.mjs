@@ -1035,6 +1035,123 @@ async function assertRecipeRowsHittable(page, label) {
 }
 
 /**
+ * Assert the player's progressive stage list is SOUND — the checks no unit test can make
+ * (issue 651).
+ *
+ * Every one of these fails only against real Foundry CSS + a real layout engine:
+ *
+ *  - **Chevrons are not cropped.** The crafting app has no icon-button primitive, so a
+ *    bare `<button>` inherits Foundry core's fixed `.app button` height and centred
+ *    content. The component resets that (`height: auto` + a 34px `min-height`), and a
+ *    mounted test cannot see the regression because happy-dom computes no cascade.
+ *  - **The two chevrons stay adjacent.** Foundry's `.app button` margin, if it leaks past
+ *    the reset, spaces them apart and can push them off the row.
+ *  - **The live region is INVISIBLE.** `.sr-only` was `.fabricate-manager`-scoped only, so
+ *    the region — copied from the GM pattern — would paint as visible text under the list
+ *    until a `.fabricate-app .sr-only` block existed. Only meaningful once the region
+ *    HAS text, which is why the caller announces a move first.
+ *  - **Thresholds ascend.** Budget is spent top-down, so a row reached at a LOWER value
+ *    than the row above it is impossible. This is the carried-threshold defect, visible
+ *    without knowing the fixture — but ONLY after a reorder: at rest the builder's
+ *    authored thresholds are ascending by construction, so the check is vacuous there.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} label
+ * @param {object} [options]
+ * @param {boolean} [options.expectAnnouncement] require the live region to carry text
+ *   (pass `true` only after a move has been made).
+ */
+async function assertProgressiveStageListSound(page, label, { expectAnnouncement = false } = {}) {
+  const report = await withDeadline(page.evaluate(() => {
+    const contains = (outer, inner) =>
+      inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5 &&
+      inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5;
+
+    const rows = Array.from(document.querySelectorAll('[data-progressive-stage]'));
+    const thresholds = Array.from(document.querySelectorAll('[data-progressive-stage-threshold]'))
+      .map((node) => Number(node.getAttribute('data-progressive-stage-threshold')));
+
+    const chevrons = Array.from(document.querySelectorAll('[data-progressive-stage-move] button'))
+      .map((button) => {
+        const box = button.getBoundingClientRect();
+        const glyph = button.querySelector('i')?.getBoundingClientRect() ?? null;
+        return {
+          height: box.height,
+          width: box.width,
+          glyphContained: glyph ? contains(box, glyph) : false,
+          hasGlyph: Boolean(glyph)
+        };
+      });
+
+    // Per row: the horizontal gap between the up and down buttons.
+    const chevronGaps = Array.from(document.querySelectorAll('[data-progressive-stage-move]'))
+      .map((group) => {
+        const buttons = Array.from(group.querySelectorAll('button'));
+        if (buttons.length < 2) return null;
+        const a = buttons[0].getBoundingClientRect();
+        const b = buttons[1].getBoundingClientRect();
+        return Math.round(b.left - a.right);
+      })
+      .filter((gap) => gap !== null);
+
+    const region = document.querySelector('[data-progressive-stage-status]');
+    const regionBox = region?.getBoundingClientRect() ?? null;
+
+    return {
+      rowCount: rows.length,
+      thresholds,
+      chevrons,
+      chevronGaps,
+      region: region
+        ? {
+            text: region.textContent?.trim() ?? '',
+            width: regionBox.width,
+            height: regionBox.height
+          }
+        : null
+    };
+  }), 30_000, `assertProgressiveStageListSound ${label}`);
+
+  if (report.rowCount < 3) {
+    throw new Error(`${label}: expected >= 3 progressive stages, saw ${report.rowCount}`);
+  }
+
+  const cropped = report.chevrons.filter((c) => !c.hasGlyph || !c.glyphContained || c.height < 30);
+  if (cropped.length > 0) {
+    throw new Error(
+      `${label}: chevron buttons cropped or under-sized (Foundry .app button reset leaked): ${JSON.stringify(cropped.slice(0, 4))}`
+    );
+  }
+
+  const spaced = report.chevronGaps.filter((gap) => gap > 8);
+  if (spaced.length > 0) {
+    throw new Error(`${label}: chevrons not adjacent — a leaked .app button margin: gaps ${JSON.stringify(spaced)}`);
+  }
+
+  if (expectAnnouncement) {
+    if (!report.region) throw new Error(`${label}: no aria-live region rendered`);
+    if (report.region.text.length === 0) {
+      throw new Error(`${label}: the live region carries no text, so its visibility proves nothing`);
+    }
+    if (report.region.width > 2 || report.region.height > 2) {
+      throw new Error(
+        `${label}: the live region is VISIBLE (${report.region.width}x${report.region.height}) — the .fabricate-app .sr-only block is missing or overridden. Text: "${report.region.text}"`
+      );
+    }
+  }
+
+  for (let i = 1; i < report.thresholds.length; i++) {
+    if (report.thresholds[i] < report.thresholds[i - 1]) {
+      throw new Error(
+        `${label}: thresholds are not monotonic (${JSON.stringify(report.thresholds)}) — a stage cannot be reached at a lower budget than the stage above it. This is the carried-threshold defect.`
+      );
+    }
+  }
+
+  return report;
+}
+
+/**
  * Click a target only if it is present, swallowing transient failures. For
  * non-essential pointer-exercise interactions whose availability depends on a
  * manager UI still in flux — never hangs on a missing element, never fails the run.
@@ -1365,9 +1482,14 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Bar', img: 'icons/commodities/metal/ingot-plain-steel.webp' },
       { name: 'Smoke Masterwork Blade', img: 'icons/weapons/swords/sword-guard-blue.webp' },
       { name: 'Smoke Standard Blade', img: 'icons/weapons/swords/greatsword-blue.webp' },
-      // progressive system
+      // progressive system — THREE result stages with DISTINCT difficulties (issue 651).
+      // Distinct is the point: the player stage list shows a cumulative "Reached at >=N"
+      // per row, and equal difficulties would make a carried/stale threshold invisible.
+      // The long name is deliberate — it is the stacked frame's ellipsis subject.
       { name: 'Smoke Clay', img: 'icons/commodities/stone/clay-grey.webp' },
-      { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' }
+      { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' },
+      { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/paver-tile-blue.webp' },
+      { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' }
     ];
     const createdItems = await Item.createDocuments(
       worldSpecs.map((s) => ({ name: s.name, type: itemType, img: s.img }))
@@ -1667,9 +1789,26 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     const progressiveSystemId = progressiveSystem.id;
     const progressiveMap = await registerComponents(
       progressiveSystemId,
-      ['Smoke Clay', 'Smoke Brick'],
+      ['Smoke Clay', 'Smoke Brick', 'Smoke Kiln-Fired Ceramic Roofing Tile', 'Smoke Glazed Amphora'],
       1
     );
+    // `registerComponents` applies ONE difficulty to every name, so re-stamp the three
+    // result stages individually. Difficulties 1/4/9 give ascending `equal`-mode
+    // thresholds of >=1, >=5, >=14 — far enough apart that a wrong (e.g. carried) value
+    // is obvious in a screenshot without knowing the fixture.
+    const progressiveStageDifficulty = {
+      'Smoke Brick': 1,
+      'Smoke Kiln-Fired Ceramic Roofing Tile': 4,
+      'Smoke Glazed Amphora': 9
+    };
+    for (const [name, difficulty] of Object.entries(progressiveStageDifficulty)) {
+      await csm.updateItem(progressiveSystemId, progressiveMap[name], { difficulty });
+    }
+    const progressiveStageResults = [
+      { id: 'smoke-brick-result', componentId: progressiveMap['Smoke Brick'], quantity: 1 },
+      { id: 'smoke-tile-result', componentId: progressiveMap['Smoke Kiln-Fired Ceramic Roofing Tile'], quantity: 1 },
+      { id: 'smoke-amphora-result', componentId: progressiveMap['Smoke Glazed Amphora'], quantity: 1 }
+    ];
     await csm.updateSystem(progressiveSystemId, {
       resolutionMode: 'progressive',
       features: { craftingChecks: true },
@@ -1693,7 +1832,29 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       }],
       resultGroups: [{
         name: 'Brick',
-        results: [{ id: 'smoke-brick-result', componentId: progressiveMap['Smoke Brick'], quantity: 1 }]
+        results: progressiveStageResults
+      }]
+    });
+
+    // Flag-OFF sibling (issue 651): the same three stages with the GM's reorder
+    // permission withheld, so the player stage list renders its fixed state (no grips,
+    // no move buttons, ordinals + difficulty retained, "Order set by the GM" line).
+    // Default-true means the ONLY way to shoot that state is to author an explicit false.
+    await rm.createRecipe({
+      name: 'Smoke Kiln Firing',
+      description: 'progressive: stage order fixed by the GM (allowPlayerResultReorder: false).',
+      craftingSystemId: progressiveSystemId,
+      img: 'icons/commodities/stone/paver-tile-blue.webp',
+      allowPlayerResultReorder: false,
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Clay',
+          options: [{ quantity: 1, match: { type: 'component', componentId: progressiveMap['Smoke Clay'] } }]
+        }]
+      }],
+      resultGroups: [{
+        name: 'Fired ware',
+        results: progressiveStageResults
       }]
     });
 
@@ -6232,6 +6393,134 @@ async function main() {
               error: String(altError?.message ?? altError)
             });
             process.stdout.write(`  Player Crafting alternatives capture skipped: ${altError?.message ?? altError}\n`);
+          }
+
+          // ── Progressive player stage list (issue 651) ─────────────────────
+          // The change's main new player surface. Four frames plus programmatic
+          // assertions that cannot be made anywhere else: happy-dom computes no
+          // cascade, so the Foundry `.app button` reset and the `.fabricate-app
+          // .sr-only` block are only observable against real CSS.
+          try {
+            const recipeSearch = appShell.locator('.crafting-browser-search input').first();
+            const selectRecipeByName = async (name) => {
+              await recipeSearch.fill(name);
+              await page.waitForTimeout(350);
+              const row = appShell.locator(`[data-recipe-id]:has-text("${name}")`).first();
+              await row.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+              await row.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
+              await appShell.locator('[data-recipe-section="progressive-stages"]').first()
+                .waitFor({ state: 'visible', timeout: 10_000 });
+            };
+
+            // (1) Flag ON — the default. Settles the chevron box: the buttons render
+            // whether or not anything has moved, so the reset is checkable at rest.
+            await selectRecipeByName('Smoke Mold Brick');
+            await assertProgressiveStageListSound(page, 'player-crafting-progressive');
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-progressive');
+
+            // (2) Reordered. The live region and the monotonic-threshold invariant are
+            // BOTH vacuous at rest — the region is empty until a move announces, and the
+            // builder's authored thresholds ascend by construction — so those checks only
+            // bite once a move has happened. This frame is what would catch a regression
+            // of the carried-threshold defect or a missing .fabricate-app .sr-only block.
+            const moveDown = appShell.locator('[data-progressive-stage-move-down]').first();
+            await moveDown.click({ timeout: 5_000 });
+            await page.waitForTimeout(250);
+            const reordered = await assertProgressiveStageListSound(
+              page,
+              'player-crafting-progressive-reordered',
+              { expectAnnouncement: true }
+            );
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-progressive-reordered');
+            results.steps.push({
+              step: 'player-crafting-progressive-reordered',
+              passed: true,
+              thresholds: reordered.thresholds,
+              announcement: reordered.region?.text ?? ''
+            });
+
+            // (3) Flag OFF (D13): no grips, no move buttons, ordinals + difficulty kept,
+            // and the muted "Order set by the GM" line. Default-true means an explicit
+            // false has to be authored to reach this state at all.
+            await selectRecipeByName('Smoke Kiln Firing');
+            const fixedReport = await page.evaluate(() => ({
+              rows: document.querySelectorAll('[data-progressive-stage-fixed]').length,
+              grips: document.querySelectorAll('.crafting-stage-handle').length,
+              moves: document.querySelectorAll('[data-progressive-stage-move]').length,
+              ordinals: document.querySelectorAll('[data-progressive-stage-ordinal]').length,
+              difficulties: document.querySelectorAll('[data-progressive-stage-difficulty]').length,
+              note: document.querySelector('[data-progressive-stage-fixed-note]')?.textContent?.trim() ?? '',
+              liveRegions: document.querySelectorAll('[data-progressive-stage-status]').length
+            }));
+            if (fixedReport.rows < 3) throw new Error(`fixed state rendered ${fixedReport.rows} rows`);
+            if (fixedReport.grips > 0 || fixedReport.moves > 0) {
+              throw new Error(`fixed state still offers reorder affordances: ${JSON.stringify(fixedReport)}`);
+            }
+            if (fixedReport.ordinals < 3 || fixedReport.difficulties < 3) {
+              throw new Error(`fixed state dropped ordinals/difficulty: ${JSON.stringify(fixedReport)}`);
+            }
+            if (fixedReport.note.length === 0) throw new Error('fixed state shows no "order set by the GM" line');
+            if (fixedReport.liveRegions > 0) throw new Error('fixed state renders a live region for an order that cannot change');
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-progressive-fixed');
+            results.steps.push({ step: 'player-crafting-progressive-fixed', passed: true, ...fixedReport });
+
+            // (4) Narrow: the long component name must ellipse while the difficulty and
+            // "Reached at >=N" chips survive and the chevrons stay on-row.
+            await selectRecipeByName('Smoke Mold Brick');
+            const progressiveStackedSize = await page.evaluate(() => {
+              const app = document.querySelector('#fabricate-app');
+              if (!app) return null;
+              Object.assign(app.style, { minWidth: '0px', minHeight: '0px', width: '780px', height: '760px', left: '20px', top: '20px' });
+              return { width: app.getBoundingClientRect().width, height: app.getBoundingClientRect().height };
+            });
+            await page.waitForTimeout(600);
+            const narrow = await assertProgressiveStageListSound(page, 'player-crafting-progressive-stacked');
+            const narrowChips = await page.evaluate(() => {
+              const visible = (selector) => Array.from(document.querySelectorAll(selector))
+                .filter((node) => node.getBoundingClientRect().width > 1).length;
+              const names = Array.from(document.querySelectorAll('.crafting-stage-name'));
+              return {
+                difficulties: visible('[data-progressive-stage-difficulty]'),
+                thresholds: visible('[data-progressive-stage-threshold]'),
+                ellipsed: names.filter((n) => n.scrollWidth > n.clientWidth + 1).length,
+                rowOverflow: Array.from(document.querySelectorAll('.crafting-stage-row'))
+                  .filter((row) => row.scrollWidth > row.clientWidth + 2).length
+              };
+            });
+            if (narrowChips.difficulties < 3 || narrowChips.thresholds < 3) {
+              throw new Error(`narrow layout squeezed out the chips: ${JSON.stringify(narrowChips)}`);
+            }
+            if (narrowChips.rowOverflow > 0) {
+              throw new Error(`narrow layout overflows the row (chevrons pushed off): ${JSON.stringify(narrowChips)}`);
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-progressive-stacked');
+            results.steps.push({
+              step: 'player-crafting-progressive-stacked',
+              passed: true,
+              size: progressiveStackedSize,
+              thresholds: narrow.thresholds,
+              ...narrowChips
+            });
+
+            // Restore width + the unfiltered list for the frames that follow.
+            await page.evaluate(() => {
+              const app = document.querySelector('#fabricate-app');
+              if (app) Object.assign(app.style, { width: '1100px', height: '760px', left: '40px', top: '40px' });
+            });
+            await recipeSearch.fill('').catch(() => {});
+            await page.waitForTimeout(300);
+            results.steps.push({ step: 'player-crafting-progressive', passed: true });
+          } catch (progressiveError) {
+            results.steps.push({
+              step: 'player-crafting-progressive',
+              passed: false,
+              error: String(progressiveError?.message ?? progressiveError)
+            });
+            process.stdout.write(`  Player Crafting progressive capture failed: ${progressiveError?.message ?? progressiveError}\n`);
           }
 
           // Narrow-window stacked evidence: shrink below the grid's 900px stacking

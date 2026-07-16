@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import ToggleCard from './ToggleCard.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import {
     adjustComponentEssenceQuantity,
@@ -107,6 +108,16 @@
     return {
       ...source,
       dcOverride: source.dcOverride ?? null,
+      // Default TRUE (issue 651), matching the model. `...source` above already
+      // preserves a persisted value, so this is purely about the ABSENT key.
+      //
+      // Its load-bearing job is normalizing the DIRTY-CHECK BASELINE, not rendering:
+      // `isDirty()` compares the draft's signature against `cloneSalvage(component.salvage)`.
+      // Leave the key absent and a component that has never been toggled has an
+      // `undefined` baseline, so toggling off then back ON leaves the editor stuck
+      // DIRTY forever (`true` never re-equals `undefined`) — Save stays enabled with
+      // nothing to save, and the exit guard nags on a no-op edit.
+      allowPlayerResultReorder: source.allowPlayerResultReorder !== false,
       outcomeRouting:
         source.outcomeRouting && typeof source.outcomeRouting === 'object'
           ? { ...source.outcomeRouting }
@@ -125,17 +136,39 @@
     };
   }
 
+  // `difficulty` is projected onto the component options; a component that has never
+  // been given one reads null and the badge says so rather than showing a spurious 0.
+  function salvageResultDifficulty(componentId) {
+    const option = componentOptions.find((opt) => opt.id === componentId);
+    const numeric = Number(option?.difficulty);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
   function clampSalvageQuantity(value) {
     const numeric = Math.trunc(Number(value));
     return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
   }
 
-  function salvageSignature() {
+  // The dirty-check allowlist: every AUTHORED salvage field must appear here or the
+  // Save button never enables for it and the GM's edit is silently discarded on exit.
+  // That is exactly what happened when `allowPlayerResultReorder` was added (issue 651):
+  // persistence worked (buildUpdates spreads the draft), but nothing could be saved
+  // because nothing was ever dirty.
+  //
+  // Taking a salvage OBJECT (rather than reading `salvageDraft` and having isDirty()
+  // hand-build a matching literal) means there is ONE list, not two that must be kept
+  // in sync. The two-list shape is what let this drift in the first place.
+  function salvageSignatureOf(salvage) {
     return JSON.stringify({
-      resultGroups: salvageDraft.resultGroups,
-      outcomeRouting: salvageDraft.outcomeRouting,
-      dcOverride: salvageDraft.dcOverride
+      resultGroups: salvage.resultGroups,
+      outcomeRouting: salvage.outcomeRouting,
+      dcOverride: salvage.dcOverride,
+      allowPlayerResultReorder: salvage.allowPlayerResultReorder
     });
+  }
+
+  function salvageSignature() {
+    return salvageSignatureOf(salvageDraft);
   }
 
   function tagsAreEqual(left, right) {
@@ -162,11 +195,8 @@
     if (!component) return false;
     if (showTags && !tagsAreEqual(tagDraft, tagOptions)) return true;
     if (showEssences && !essencesAreEqual(essenceDraft, essenceOptions)) return true;
-    if (showSalvage && salvageSignature() !== JSON.stringify({
-      resultGroups: cloneSalvage(component?.salvage).resultGroups,
-      outcomeRouting: cloneSalvage(component?.salvage).outcomeRouting,
-      dcOverride: cloneSalvage(component?.salvage).dcOverride
-    })) return true;
+    if (showSalvage && salvageSignature() !== salvageSignatureOf(cloneSalvage(component?.salvage)))
+      return true;
     return false;
   }
 
@@ -190,7 +220,8 @@
         ...salvageDraft,
         resultGroups: salvageDraft.resultGroups,
         outcomeRouting: salvageDraft.outcomeRouting,
-        dcOverride: salvageDraft.dcOverride
+        dcOverride: salvageDraft.dcOverride,
+        allowPlayerResultReorder: salvageDraft.allowPlayerResultReorder
       };
     }
     return updates;
@@ -569,8 +600,23 @@
 
                   {#if (group.results || []).length > 0}
                     <ul class="manager-salvage-result-list">
-                      {#each group.results as result (result.id)}
+                      {#each group.results as result, resultIndex (result.id)}
                         <li class="manager-salvage-result-row" data-salvage-result={result.id}>
+                          {#if salvageResolutionMode === 'progressive'}
+                            <!-- Ordinal + read-only difficulty badge (issue 651 D3's
+                                 condition). Progressive salvage spends the roll DOWN this
+                                 list, so without these the list is a set of bare selects
+                                 with no visible order — and the reorder-permission card
+                                 above would govern something the GM cannot see.
+                                 Read-only because `component.difficulty` belongs to the
+                                 RESULT component, whose own editor owns its save
+                                 lifecycle; this surface is editing a different component. -->
+                            <span
+                              class="manager-salvage-result-ordinal"
+                              data-salvage-result-ordinal={String(resultIndex + 1)}
+                              aria-hidden="true">{resultIndex + 1}</span
+                            >
+                          {/if}
                           <select
                             class="manager-input"
                             value={result.componentId}
@@ -584,6 +630,19 @@
                               <option value={option.id}>{option.name}</option>
                             {/each}
                           </select>
+                          {#if salvageResolutionMode === 'progressive'}
+                            <span
+                              class="manager-chip is-info manager-salvage-result-difficulty"
+                              data-salvage-result-difficulty={salvageResultDifficulty(result.componentId) === null
+                                ? ''
+                                : String(salvageResultDifficulty(result.componentId))}
+                            >
+                              <i class="fas fa-gauge-high" aria-hidden="true"></i>
+                              <span>{salvageResultDifficulty(result.componentId) === null
+                                ? text('FABRICATE.Admin.Manager.Component.Salvage.DifficultyUnset', 'No difficulty')
+                                : `${text('FABRICATE.Admin.Manager.Component.Salvage.Difficulty', 'Difficulty')} ${salvageResultDifficulty(result.componentId)}`}</span>
+                            </span>
+                          {/if}
                           <input
                             type="number"
                             min="1"
@@ -670,6 +729,25 @@
               <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.NoOutcomes', 'The routed salvage check has no outcome tiers to route yet.')}</p>
             {/if}
           </div>
+        {/if}
+
+        {#if salvageResolutionMode === 'progressive'}
+          <!-- Reorder-permission card (issue 651), at the END of the salvage block for
+               the same reason as the recipe Results tab: the policy reads after the list
+               it governs. Progressive-only — the flag has no meaning in the simple/routed
+               salvage modes, which award a whole group rather than spending down a list. -->
+          <ToggleCard
+            variant="is-info"
+            icon="fas fa-arrow-down-a-z"
+            section="salvage-allow-player-result-reorder"
+            field="salvageAllowPlayerResultReorder"
+            title={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Title', 'Allow player result re-ordering')}
+            sub={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Sub', 'Players may set their own stage order for this salvage, which is remembered and used every time they salvage this component.')}
+            toggleLabel={text('FABRICATE.Admin.Manager.Component.SalvageReorder.Toggle', 'Allow player result re-ordering')}
+            on={salvageDraft.allowPlayerResultReorder !== false}
+            disabled={saving}
+            onToggle={(next) => setSalvage({ allowPlayerResultReorder: next === true })}
+          />
         {/if}
 
         {#if salvageShowDcOverride}

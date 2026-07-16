@@ -11,8 +11,7 @@
   this numeric context) and, under `checkDriven` authority, break tools.
 
   Controlled component: renders `value` and emits the next value via `onChange`.
-  `value` carries `{ awardMode, allowPlayerReorder, rollFormula, checkBreakage }`;
-  `allowPlayerReorder` is preserved across edits.
+  `value` carries `{ awardMode, rollFormula, checkBreakage }`.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

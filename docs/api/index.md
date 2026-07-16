@@ -345,6 +345,8 @@ Hooks.once('fabricate.ready', () => {
 
 Fabricate stores data in Foundry's settings and flags:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Location | Key | Contents |
 |:---------|:----|:---------|
 | World setting | `fabricate.craftingSystems` | All crafting system configurations, including each system's gathering realms and realm settings |
@@ -362,7 +364,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system (discipline) for the Alchemy Workbench tab |
 | Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
 | Client setting | `fabricate.recentlyCrafted` | Recently crafted recipe entries for the current client |
-| Client setting | `fabricate.progressiveResultOrder` | Per-recipe player reorder preferences for progressive mode results (Object, default `{}`) |
+| User setting | `fabricate.progressiveResultOrder` | Player progressive result-stage order, keyed `recipe:<recipeId>` / `salvage:<componentId>` to a list of result ids (Object, default `{}`). Registered with `scope: 'user'`, which is per user **within one world**. The same player in a second world reads the default. Writing it is an asynchronous, replicated document write that can reject, not a synchronous `localStorage` write, so a caller must `await` it. |
 | Client setting | `fabricate.gatheringHideUnavailableEnvironments` | Player "hide unavailable (locked) environments" toggle for the Gathering app Environments column (Boolean, default `false`, per client/device) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |
 | Actor flag | `fabricate.craftingRuns.history` | Completed crafting runs |
@@ -373,6 +375,8 @@ Fabricate stores data in Foundry's settings and flags:
 | Item flag | `fabricate.toolUsage` | `{ timesUsed }` for `limitedUses` tool tracking (falls back to legacy `fabricate.catalystItemUsage` when absent) |
 | Item flag | `fabricate.toolBroken` | `true` when a tool's `flagBroken` on-break action has fired |
 | Item flag | `fabricate.recipeItemUsage` | `{ timesUsed }` for recipe item tracking |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Hooks
 

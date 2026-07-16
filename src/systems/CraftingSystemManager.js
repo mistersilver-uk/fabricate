@@ -524,9 +524,17 @@ export class CraftingSystemManager {
   // total is the numeric value progressive result-awarding spends against result
   // difficulties — no DC, no comparison, no recipe tiers. The unified `checkBreakage`
   // trigger list (issue 419) forces award-all/award-none and (under checkDriven) may
-  // break tools; legacy `diceCrits` are migrated into it on read. The `awardMode` and
-  // `allowPlayerReorder` award settings live on this same object (read by the
-  // ResolutionModeService progressive branch) and are preserved here.
+  // break tools; legacy `diceCrits` are migrated into it on read. The `awardMode` award
+  // setting lives on this same object (read by the ResolutionModeService progressive
+  // branch) and is preserved here.
+  //
+  // This allowlist literal is shared by the crafting, salvage and gathering checks
+  // (`_normalizeCraftingCheck`, `_normalizeSalvageCraftingCheck` and
+  // `_normalizeGatheringCraftingCheck` all delegate here), so a key omitted here is
+  // dropped from all three on every normalize — including on import of a legacy
+  // payload. Issue 651 retired the system-level `allowPlayerReorder` this way: the
+  // reorder permission now lives on the recipe (`Recipe.allowPlayerResultReorder`) and
+  // on salvage (`Component.salvage.allowPlayerResultReorder`).
   _normalizeProgressiveCraftingCheck(progressive = {}) {
     const source = !progressive || typeof progressive !== 'object' ? {} : progressive;
     const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
@@ -534,7 +542,6 @@ export class CraftingSystemManager {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
-      allowPlayerReorder: source.allowPlayerReorder === true,
       rollFormula,
       checkBreakage: this._normalizeUnifiedTriggers(
         rollFormula,
@@ -1495,6 +1502,11 @@ export class CraftingSystemManager {
     if (!salvage || typeof salvage !== 'object') {
       return {
         enabled: false,
+        // Default TRUE (issue 651), matching the `Recipe.allowPlayerResultReorder`
+        // default. This non-object path returns its own literal, so the default has to
+        // be stated on BOTH return paths or a component with no salvage config renders
+        // the GM toggle off against a default-on spec.
+        allowPlayerResultReorder: true,
         ingredientQuantity: 1,
         toolIds: [],
         resultGroups: [],
@@ -1518,6 +1530,10 @@ export class CraftingSystemManager {
 
     return {
       enabled: salvage.enabled === true,
+      // GM-authored policy: may a player reorder this salvage's progressive result
+      // stages? Default TRUE (issue 651) — an absent key reads as `true`, which is why
+      // the 1.17.0 migration does not seed it.
+      allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
       ingredientQuantity,
       dcOverride,
       // Preserve migrated salvage tool references so they are not orphaned on the

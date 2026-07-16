@@ -97,6 +97,12 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
   // imports of its own, so this single entry suffices.
   'src/utils/recipeCategories.js',
+  // Same rule, issue 651: the builder now derives each progressive stage's cumulative
+  // "reached at >=N" threshold through this helper. Both of these are deliberately
+  // import-free leaves, so one entry each suffices.
+  'src/utils/progressiveStageThresholds.js',
+  // The player's stored stage order is reconciled against the authored list here.
+  'src/utils/progressiveResultOrder.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 
@@ -125,6 +131,10 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
   'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
+  // ProgressiveBody's stage list (issue 651). ProgressiveBody is already listed above and
+  // renders this, so omitting it HANGS every mounted crafting test (# cancelled), not
+  // just the stage-list one.
+  'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',

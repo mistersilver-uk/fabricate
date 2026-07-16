@@ -29,6 +29,12 @@ export class Recipe {
     this.system = data.system || 'all';
     this.tags = Array.isArray(data.tags) ? data.tags : [];
     this.enabled = data.enabled === undefined ? true : data.enabled;
+    // GM-authored policy: may a player reorder this recipe's progressive result stages
+    // before the check roll is spent down them? Defaults TRUE (issue 651) — an absent
+    // key reads as `true`, which is why the 1.17.0 migration does not seed it. Follows
+    // the `enabled` default-true idiom above.
+    this.allowPlayerResultReorder =
+      data.allowPlayerResultReorder === undefined ? true : data.allowPlayerResultReorder;
     this.locked = data.locked === true;
     this.recipeItemId = data.recipeItemId || null;
     this.linkedRecipeItemUuid = data.linkedRecipeItemUuid || null;
@@ -441,6 +447,7 @@ export class Recipe {
       system: this.system,
       tags: this.tags,
       enabled: this.enabled,
+      allowPlayerResultReorder: this.allowPlayerResultReorder,
       locked: this.locked,
       recipeItemId: this.recipeItemId,
       linkedRecipeItemUuid: this.linkedRecipeItemUuid,

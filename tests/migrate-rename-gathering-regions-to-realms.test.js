@@ -169,7 +169,7 @@ test('runs through MigrationRunner from 1.0.0, rewrites the data, and lands at t
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.17.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.18.0', 'advances to the new highest version');
 
   const savedSystems = settings.store.get('craftingSystems');
   assert.ok(Array.isArray(savedSystems[0].gatheringRealms), 'systems persisted under gatheringRealms');
@@ -197,5 +197,5 @@ test('runner: gatheringParties is left untouched (no write) when it carries no l
 
   const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringParties'), false, 'no rewrite when nothing to rename');
-  assert.equal(settings.store.get('migrationVersion'), '1.17.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.18.0');
 });

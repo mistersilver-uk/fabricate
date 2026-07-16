@@ -50,18 +50,50 @@ A progressive check rolls a skill check and reports a numeric value (the total o
 That value is spent against the ordered results.
 See [Crafting Checks]({% link crafting-checks.md %}) for how checks work and what they report.
 
-## Player Reorder
+## What Players See
 
-When the crafting system allows it, players can reorder the results before the check.
-This lets them prioritise which items they want to attempt first.
+When a player opens a progressive recipe, Fabricate lists that recipe's result stages in the order they will be produced.
+Each stage shows its position in that order, its component, and — where the component has one authored — its difficulty.
+Progressive stages carry no quantity: a stage is produced once or not at all, so there is nothing to count.
 
-Each player's chosen order is remembered per recipe on their own device.
+Where it can be worked out, a stage also shows a **Reached at** value.
+That is the lowest check value that reaches the stage, taking the earlier stages and the system's award mode into account.
+It is not a plain running total of the difficulties above it, because each award mode spends the check value differently.
+A stage whose component has no valid difficulty is never produced, so it shows no **Reached at** value rather than a misleading one.
+
+## Player Result Re-ordering
+
+Each recipe carries an **Allow player result re-ordering** setting, which you author on the recipe's **Results** tab.
+It is on by default.
+
+When it is on, a player can put that recipe's result stages into the order they prefer.
+They can drag a stage, or move it with the keyboard using the move up and move down controls on each stage.
+Each move is announced for screen readers, and the **Reached at** values update to match the new order.
+
+A player's chosen order is a standing preference, not a one-off choice for the next craft.
+Fabricate remembers it and uses it every time that player crafts that recipe, until they change it again.
+The order is remembered per player and per recipe, in this world only.
+Other players are unaffected, and the same player in another world starts from your authored order.
+
+When you turn the setting off, the stage list is shown in your authored order, marked **Order set by the GM**, and players cannot rearrange it.
+Turning it off does not erase any order a player already chose.
+Their order is simply ignored while the setting is off.
+
+{: .note }
+> Adding a new result stage to a recipe never displaces a stage a player has already ranked.
+> The new stage goes to the end of that player's order, so it is produced only if check value is left over.
+
+## Re-ordering and Salvage
+
+Components configured for progressive salvage carry the same **Allow player result re-ordering** setting, on the component's salvage setup, and it is on by default.
+There is no player-facing salvage screen today, so players have no way to choose a salvage order in the interface.
+The setting is in place for when that screen ships.
+A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
 
 ## Creating a Progressive Recipe
 
 A progressive recipe has one ingredient set and one result group whose results are listed in difficulty order.
 For example, this means Iron Filings, then Steel Ingot, then Fine Steel Ingot, then Masterwork Ingot.
-Recipes can be authored through the API only.
 See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
 {: .note }

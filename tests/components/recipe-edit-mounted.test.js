@@ -56,6 +56,10 @@ const RAW_MODULES = [
 const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  // The Results tab's progressive reorder-permission card (issue 651). A component the
+  // mounted tree renders but the harness does not list HANGS the suite (# cancelled)
+  // rather than failing it.
+  'src/ui/svelte/apps/manager/ToggleCard.svelte',
   // The resolution-mode banner heads every editor tab (issue 643 §5).
   'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
@@ -1679,6 +1683,93 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'only progressive results are ordered, so only they get move controls'
     );
+    editHarness.remount();
+  });
+
+  // ── Reorder-permission toggle card (issue 651) ────────────────────────────
+  //
+  // These mount RecipeEditView (the WRAPPER), not RecipeResultsTab. A prop that is
+  // declared on the tab but never forwarded by the wrapper silently drops to its
+  // default and the control never renders — a test that mounts the tab directly
+  // bypasses the wrapper and cannot see that.
+
+  const reorderCard = (target) =>
+    target.querySelector('[data-recipe-section="allow-player-result-reorder"]');
+
+  it('progressive: the Results tab renders the reorder-permission card, on by default', async () => {
+    const { target } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+    ]);
+    const card = reorderCard(target);
+    assert.ok(card, 'the card renders through the wrapper');
+    assert.ok(card.classList.contains('is-info'), 'it wears the info variant');
+    assert.ok(card.classList.contains('is-on'), 'an unset recipe reads default-true');
+    assert.equal(
+      card.querySelector('[data-recipe-field="allowPlayerResultReorder"]').getAttribute('aria-pressed'),
+      'true'
+    );
+    editHarness.remount();
+  });
+
+  it('progressive: the card is placed AFTER the result sets, not under the info strip', async () => {
+    // D10: two info-toned surfaces must not stack. The reading order is
+    // strip ("how this list is spent") → list → card ("who may reorder it").
+    const { target } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+    ]);
+    const strip = target.querySelector('[data-recipe-info-strip]');
+    const results = target.querySelector('[data-recipe-section="results"]');
+    const card = reorderCard(target);
+    assert.ok(strip && results && card);
+    assert.ok(
+      strip.compareDocumentPosition(results) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the result sets follow the info strip'
+    );
+    assert.ok(
+      results.compareDocumentPosition(card) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the card follows the result sets — it is not adjacent to the strip'
+    );
+    editHarness.remount();
+  });
+
+  it('progressive: an authored FALSE renders the card off', async () => {
+    // A `false` fixture is the only one that can fail: a `true` fixture reads green
+    // through a dropped projection/prop, because the default re-supplies true.
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      { props: { recipe: { ...RECIPE, complex: false, allowPlayerResultReorder: false, resultGroups: [{ id: 'grp-1', name: '', results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }] }] } } }
+    );
+    const card = reorderCard(target);
+    assert.ok(card.classList.contains('is-off'), 'an authored false renders off');
+    assert.equal(
+      card.querySelector('[data-recipe-field="allowPlayerResultReorder"]').getAttribute('aria-pressed'),
+      'false'
+    );
+    editHarness.remount();
+  });
+
+  it('progressive: toggling the card stages allowPlayerResultReorder through onUpdateRecipe', async () => {
+    // Mutation this catches: remove `onToggleAllowPlayerResultReorder` from the
+    // wrapper's forward in its `activeTab === 'results'` block.
+    const { target, patches } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+    ]);
+    reorderCard(target).querySelector('[data-recipe-field="allowPlayerResultReorder"]').click();
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { allowPlayerResultReorder: false },
+      'the wrapper stages the toggle through the draft'
+    );
+    editHarness.remount();
+  });
+
+  it('non-progressive: no reorder-permission card renders', async () => {
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      { progressive: false }
+    );
+    assert.equal(reorderCard(target), null, 'only progressive recipes spend a roll down a list');
     editHarness.remount();
   });
 

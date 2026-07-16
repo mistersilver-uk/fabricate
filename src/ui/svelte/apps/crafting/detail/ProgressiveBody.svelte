@@ -10,6 +10,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeBodyShell from './RecipeBodyShell.svelte';
   import IoTable from './IoTable.svelte';
+  import ProgressiveStageList from './ProgressiveStageList.svelte';
 
   let {
     recipe = null,
@@ -17,8 +18,18 @@
     craftability = null,
     rollResult = null,
     onChoose = null,
-    onChooseOption = null
+    onChooseOption = null,
+    // The ordered stage list (issue 651), already reconciled against the player's stored
+    // order by craftingStore. Ordering lives in the store, not here: this component
+    // renders what it is given.
+    progressiveStages = [],
+    canReorderStages = true,
+    stageAnnouncement = '',
+    onReorderStage = null,
+    onReorderStageSettled = null
   } = $props();
+
+  const stages = $derived(Array.isArray(progressiveStages) ? progressiveStages : []);
 </script>
 
 <div data-recipe-mode="progressive">
@@ -28,7 +39,22 @@
   </p>
   <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet results()}
-      <IoTable {craftability} result={recipe?.result} {onChooseOption} />
+      <!-- The ordered stage list REPLACES the generic IoTable here. A progressive
+           recipe's output is not a flat set: one roll is spent DOWN this list, so the
+           order is the whole point and a table cannot express it. IoTable remains the
+           fallback only when a recipe has no stages (an unconfigured progressive
+           recipe), so the inputs half of the body still renders something. -->
+      {#if stages.length > 0}
+        <ProgressiveStageList
+          {stages}
+          canReorder={canReorderStages}
+          announcement={stageAnnouncement}
+          onReorder={(index, target, announcement) => onReorderStage?.(index, target, announcement)}
+          onReorderSettled={() => onReorderStageSettled?.()}
+        />
+      {:else}
+        <IoTable {craftability} result={recipe?.result} {onChooseOption} />
+      {/if}
     {/snippet}
   </RecipeBodyShell>
 </div>
