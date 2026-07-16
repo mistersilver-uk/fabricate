@@ -1503,7 +1503,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // Issue 675: the progressive-salvage subject. Breaking it down spends ONE roll
       // down the same three stages the progressive craft awards, so its reorderable
       // stage list is the player salvage surface's headline frame.
-      { name: 'Smoke Cracked Amphora', img: 'icons/containers/kitchenware/vase-clay-painted-blue.webp' },
+      { name: 'Smoke Cracked Amphora', img: 'icons/containers/kitchenware/vase-clay-painted-blue-gold.webp' },
       { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' },
       { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/paver-tile-blue.webp' },
       { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' }
