@@ -9,9 +9,19 @@
   message, and the materials awarded. It NEVER renders a formula: the formula is
   system-authored, the prompt already displayed the (optionally @-resolved) one,
   and inventing "d20 + 6" here would print a number no world necessarily uses.
+
+  Built on the crafting tab's RollResultBox spec (the house post-roll box) rather
+  than a fourth private one: same box, same head-plus-message-plus-awards
+  structure, same 12px muted prose. Two deliberate departures from what shipped
+  first: the message is NOT mono — the brief's mono rule covers numbers that read
+  as data, and what the engine returns here is a prose sentence, which set bold in
+  a mono face in a 300px column reads as a stack trace — and the success ramp is
+  NOT repeated on this box, because the panel's ribbon already carries green and
+  two stacked green boxes make neither one mean anything.
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
+  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { result = null } = $props();
 
@@ -47,9 +57,9 @@
       <ul class="salvage-summary-awarded" data-inventory-salvage-awarded>
         {#each awarded as entry, index (entry.name + ':' + index)}
           <li class="salvage-summary-award">
-            {#if entry.img}
-              <img src={entry.img} alt="" draggable="false" />
-            {/if}
+            <!-- CraftingThumb, not a raw <img>: missing art gets the house fallback
+                 rather than a broken-image glyph. -->
+            <CraftingThumb src={entry.img ?? ''} alt="" size={14} />
             <span>{entry.name}</span>
           </li>
         {/each}
@@ -63,31 +73,28 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 10px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--fab-surface-soft);
   }
 
-  .salvage-summary.is-success {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-  }
-
+  /* No success ramp here. The panel's ribbon is already a full-width --success-soft box
+     directly below; tinting this one too stacks two green boxes and neither reads. The
+     outcome line's own --success-text is the signal. */
   .salvage-summary.is-waiting {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
   }
 
+  /* RollResultBox's head: a title beside its glyph, sentence case. */
   .salvage-summary-outcome {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     margin: 0;
-    font-size: 10.5px;
+    font-size: 13px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
     color: var(--fab-text);
   }
 
@@ -99,13 +106,13 @@
     color: var(--fab-info-text);
   }
 
-  /* The engine's message reads as data (it carries counts / remaining seconds). */
+  /* The engine returns a PROSE SENTENCE here, not a numeric readout, so it takes the
+     house body treatment (RollResultBox's `.crafting-roll-message`) — not mono, not
+     bold. Mono is for quantities, roll totals and DC values. */
   .salvage-summary-message {
     margin: 0;
-    font-family: var(--fab-font-mono);
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--fab-text-secondary);
+    font-size: 12px;
+    color: var(--fab-text-muted);
   }
 
   .salvage-summary-awarded {
@@ -130,11 +137,4 @@
     font-weight: 600;
   }
 
-  .salvage-summary-award img {
-    width: 14px;
-    height: 14px;
-    border: 0;
-    border-radius: 3px;
-    object-fit: cover;
-  }
 </style>

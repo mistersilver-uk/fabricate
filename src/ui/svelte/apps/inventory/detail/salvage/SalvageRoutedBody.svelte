@@ -23,6 +23,8 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
+  import StatusPill from '../../../../components/StatusPill.svelte';
+  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { salvage = null, result = null } = $props();
 
@@ -62,7 +64,11 @@
             <span class="salvage-outcome-name">{outcome.name}</span>
             {#if rolled}
               <span class="salvage-outcome-rolled" data-inventory-outcome-your-roll>
-                {localize('FABRICATE.App.Inventory.Salvage.YourRoll')}
+                <StatusPill
+                  tone="accent"
+                  icon="fas fa-circle"
+                  label={localize('FABRICATE.App.Inventory.Salvage.YourRoll')}
+                />
               </span>
             {/if}
             {#if routedType === 'fixed'}
@@ -81,9 +87,9 @@
             <ul class="salvage-outcome-results">
               {#each outcome.results as entry, resultIndex (entry.id ?? entry.componentId ?? resultIndex)}
                 <li class="salvage-outcome-result" data-inventory-salvage-result={entry.componentId}>
-                  {#if entry.img}
-                    <img src={entry.img} alt="" draggable="false" />
-                  {/if}
+                  <!-- CraftingThumb, not a raw <img>: missing art gets the house fallback
+                       rather than a broken-image glyph. -->
+                  <CraftingThumb src={entry.img ?? ''} alt="" size={14} />
                   <span class="salvage-outcome-result-name">{entry.name}</span>
                   <span class="salvage-outcome-result-qty">×{entry.quantity}</span>
                 </li>
@@ -162,18 +168,10 @@
     background: var(--fab-accent-soft);
   }
 
+  /* A positioning wrapper only — the shared StatusPill inside owns the ramp and type. */
   .salvage-outcome-rolled {
+    display: inline-flex;
     flex: 0 0 auto;
-    padding: 1px 7px;
-    border-radius: 999px;
-    border: 1px solid var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
   }
 
   .salvage-outcome-head {
@@ -225,14 +223,6 @@
     background: var(--fab-surface-raised);
     color: var(--fab-text);
     font-size: 11px;
-  }
-
-  .salvage-outcome-result img {
-    width: 14px;
-    height: 14px;
-    border: 0;
-    border-radius: 3px;
-    object-fit: cover;
   }
 
   .salvage-outcome-result-name {

@@ -28,6 +28,7 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
+  import StatusPill from '../../../../components/StatusPill.svelte';
   import ProgressiveStageList from '../../../crafting/detail/ProgressiveStageList.svelte';
 
   let {
@@ -66,26 +67,58 @@
     return awardedIds.has(stage.componentId) ? 'recovered' : 'short';
   }
 
-  const STATE_KEYS = {
-    recovered: 'FABRICATE.App.Inventory.Salvage.StateRecovered',
-    short: 'FABRICATE.App.Inventory.Salvage.StateRollFellShort',
-    unreachable: 'FABRICATE.App.Inventory.Salvage.StateNotReached',
-    awaiting: 'FABRICATE.App.Inventory.Salvage.StateAwaitingRoll',
-    resolved: 'FABRICATE.App.Inventory.Salvage.StateResolved'
+  // Each state's localized label plus the house pill's tone + icon. Never colour alone:
+  // every pill states its outcome in words AND carries a glyph.
+  const STATES = {
+    recovered: {
+      key: 'FABRICATE.App.Inventory.Salvage.StateRecovered',
+      tone: 'success',
+      icon: 'fas fa-circle-check'
+    },
+    short: {
+      key: 'FABRICATE.App.Inventory.Salvage.StateRollFellShort',
+      tone: 'danger',
+      icon: 'fas fa-circle-xmark'
+    },
+    unreachable: {
+      key: 'FABRICATE.App.Inventory.Salvage.StateNotReached',
+      tone: 'subtle',
+      icon: 'fas fa-lock'
+    },
+    awaiting: {
+      key: 'FABRICATE.App.Inventory.Salvage.StateAwaitingRoll',
+      tone: 'subtle',
+      icon: 'fas fa-circle'
+    },
+    resolved: {
+      key: 'FABRICATE.App.Inventory.Salvage.StateResolved',
+      tone: 'subtle',
+      icon: 'fas fa-circle'
+    }
   };
 </script>
 
+<!-- The house chip primitive, not a fourth hand-rolled one: StatusPill is what the
+     Journal (a player surface) and the manager already use. -->
 {#snippet stateChip(stage)}
   {@const state = stateOf(stage)}
-  <span class="salvage-state-chip is-{state}" data-progressive-stage-state={state}>
-    {localize(STATE_KEYS[state])}
+  {@const pill = STATES[state]}
+  <span class="salvage-state-chip" data-progressive-stage-state={state}>
+    <StatusPill tone={pill.tone} icon={pill.icon} label={localize(pill.key)} />
   </span>
 {/snippet}
 
 <div class="salvage-body" data-inventory-salvage-body="progressive">
-  <p class="salvage-progressive-banner" data-inventory-salvage-flow-note>
-    <i class="fas fa-arrow-down-long" aria-hidden="true"></i>
-    <span>{localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}</span>
+  <!-- The panel's mode banner already explains that one roll flows down this list; a
+       second --info-soft box directly beneath it saying the same thing was two boxes for
+       one idea. This is the section's eyebrow instead. -->
+  <p class="salvage-body-title">
+    <span>{localize('FABRICATE.App.Inventory.Salvage.OrderedResultsTitle')}</span>
+    {#if !resolved}
+      <span class="salvage-body-hint" data-inventory-salvage-roll-hint>
+        {localize('FABRICATE.App.Inventory.Salvage.RollToResolve')}
+      </span>
+    {/if}
   </p>
 
   {#if stages.length === 0}
@@ -102,6 +135,15 @@
       {fixedNoteKey}
       {fixedNoteFallback}
     />
+    <!-- The stage list explains itself only when the rows are FIXED. Silence in the
+         other state leaves the affordance to be discovered: the grip is a small glyph,
+         and reordering is the whole of this feature. Said here rather than in the shared
+         list so the crafting tab stays byte-unchanged. -->
+    {#if canReorder}
+      <p class="salvage-reorder-note" data-inventory-salvage-reorder-note>
+        {localize('FABRICATE.App.Inventory.Salvage.StageOrderYours')}
+      </p>
+    {/if}
   {/if}
 </div>
 
@@ -112,18 +154,25 @@
     gap: 8px;
   }
 
-  .salvage-progressive-banner {
+  /* The section eyebrow, matching its two sibling bodies. */
+  .salvage-body-title {
     display: flex;
     align-items: center;
     gap: 6px;
     margin: 0;
-    padding: 8px 10px;
-    border: 1px solid var(--fab-info-border);
-    border-radius: 9px;
-    background: var(--fab-info-soft);
-    color: var(--fab-info-text);
-    font-size: 11px;
-    line-height: 1.5;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--fab-text-muted);
+  }
+
+  .salvage-body-hint {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--fab-text-subtle);
   }
 
   .salvage-empty {
@@ -132,30 +181,16 @@
     color: var(--fab-text-muted);
   }
 
+  /* A positioning wrapper only — the pill inside is the shared StatusPill, which owns
+     every ramp, the radius, the padding and the type. */
   .salvage-state-chip {
-    padding: 1px 7px;
-    border-radius: 999px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-raised);
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  .salvage-reorder-note {
+    margin: 0;
+    font-size: 12px;
     color: var(--fab-text-muted);
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-  }
-
-  /* Post-roll states carry a ramp so the outcome reads at a glance. Never colour alone:
-     each chip states its outcome in words. */
-  .salvage-state-chip.is-recovered {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-    color: var(--fab-success-text);
-  }
-
-  .salvage-state-chip.is-short {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-    color: var(--fab-danger-text);
   }
 </style>

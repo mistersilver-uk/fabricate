@@ -409,7 +409,7 @@
           "Broken": "Broken"
         },
         "Salvage": {
-          "BannerNoCheckTitle": "Salvage",
+          "BannerNoCheckTitle": "Breaks down automatically",
           "BannerNoCheckRule": "Breaking this down always recovers the materials below. No roll is needed.",
           "BannerSimpleTitle": "Salvage check",
           "BannerSimpleRule": "Roll to break this down. Meet the DC to recover the materials below.",
@@ -427,7 +427,9 @@
           "NoResults": "This salvage recovers nothing.",
           "NoOutcomes": "No outcomes are configured for this salvage.",
           "OutcomeAwardsNothing": "Recovers nothing.",
-          "ProgressiveFlow": "One roll flows down this list — each result spends its difficulty before the next is recovered, so the order decides what you get.",
+          "OrderedResultsTitle": "Ordered results",
+          "RollToResolve": "Roll to resolve",
+          "StageOrderYours": "Drag a result, or use its arrows, to change what your roll reaches first.",
           "StateAwaitingRoll": "Awaiting roll",
           "StateNotReached": "Not reached",
           "StateRecovered": "Recovered",
@@ -440,6 +442,7 @@
           "MisconfiguredProgressive": "This salvage spends a roll down its results, but your GM hasn't set a roll formula for it yet. Ask them to finish configuring it.",
           "Action": "Salvage",
           "ActionRoll": "Salvage roll",
+          "FooterNote": "Breaking this down consumes one of the item.",
           "Ribbon": "Salvaged — materials added to your pack",
           "Again": "Salvage again",
           "OutcomeSuccess": "Salvaged",

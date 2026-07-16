@@ -26,6 +26,8 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
+    // The house chip primitive the salvage bodies render.
+    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/inventory/InventoryFilters.svelte',
@@ -1194,9 +1196,19 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
     const target = await openSalvage(services);
 
-    assert.ok(target.querySelector('[data-inventory-salvage-flow-note]'), 'says the roll flows down');
+    // The body's own --info-soft "one roll flows down this list" box is gone: the panel's
+    // mode banner directly above already says exactly that, and two adjacent boxes making
+    // one point is what the redesign removed. The section keeps an eyebrow + a pre-roll
+    // hint instead.
+    assert.ok(target.querySelector('[data-inventory-salvage-roll-hint]'), 'hints that a roll resolves it');
     const rows = target.querySelectorAll('[data-progressive-stage-reorderable]');
     assert.equal(rows.length, 2, 'both stages are reorderable');
+    // Reorder is the whole of this feature, so the permitted state says so too — the
+    // stage list only ever explained itself when the rows were FIXED.
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-reorder-note]'),
+      'the reorderable state explains the affordance'
+    );
     const liveRegion = target.querySelector('[data-progressive-stage-status]');
     assert.ok(liveRegion, 'the live region is present');
     assert.equal(liveRegion.getAttribute('aria-live'), 'polite');

@@ -73,12 +73,18 @@
     gmPinned ? 'Order set by the GM' : 'Order spent — your roll ran down this list.'
   );
 
-  const BANNERS = {
-    simple: { icon: 'fas fa-recycle', tone: 'info' },
-    routed: { icon: 'fas fa-code-branch', tone: 'accent' },
-    progressive: { icon: 'fas fa-arrow-down-long', tone: 'info' }
-  };
-  const banner = $derived(BANNERS[mode] ?? BANNERS.simple);
+  // The banner reads the SAME pair the body dispatch does — `(mode, checkUsable)` — not
+  // the mode alone. Keying it on `mode` made the no-check case blue, which is the one
+  // case that promises the player something unconditional: it takes the success ramp.
+  const banner = $derived(
+    mode === 'routed'
+      ? { icon: 'fas fa-code-branch', tone: 'accent' }
+      : mode === 'progressive'
+        ? { icon: 'fas fa-arrow-down-long', tone: 'info' }
+        : checkUsable
+          ? { icon: 'fas fa-dice-d20', tone: 'info' }
+          : { icon: 'fas fa-recycle', tone: 'success' }
+  );
   const bannerTitle = $derived(
     localize(
       mode === 'routed'
@@ -149,22 +155,29 @@
     <SalvageSimpleBody {salvage} />
   {/if}
 
-  <div class="salvage-footer">
-    {#if committed}
-      <p class="salvage-ribbon" data-inventory-salvage-ribbon role="status">
-        <i class="fas fa-circle-check" aria-hidden="true"></i>
-        <span>{localize('FABRICATE.App.Inventory.Salvage.Ribbon')}</span>
-      </p>
+  {#if committed}
+    <!-- ONE box. The reset is an inline text button INSIDE the ribbon, not a second
+         full-width control stacked beneath it: "Salvage again" is a quiet way back, not
+         a second call to action competing with the result it sits under. -->
+    <p class="salvage-ribbon" data-inventory-salvage-ribbon role="status">
+      <i class="fas fa-circle-check" aria-hidden="true"></i>
+      <span class="salvage-ribbon-text">{localize('FABRICATE.App.Inventory.Salvage.Ribbon')}</span>
       <button
         type="button"
         class="salvage-again"
         data-inventory-salvage-again
         onclick={() => onReset?.()}
       >
-        <i class="fas fa-rotate-right" aria-hidden="true"></i>
-        <span>{localize('FABRICATE.App.Inventory.Salvage.Again')}</span>
+        {localize('FABRICATE.App.Inventory.Salvage.Again')}
       </button>
-    {:else}
+    </p>
+  {:else}
+    <!-- A ruled row, not a full-width slab: the note explains the gesture's cost on the
+         left and the action sits right, at its own width. -->
+    <div class="salvage-footer">
+      <p class="salvage-footer-note">
+        {localize('FABRICATE.App.Inventory.Salvage.FooterNote')}
+      </p>
       <button
         type="button"
         class="salvage-action"
@@ -182,8 +195,8 @@
         ></i>
         <span>{actionLabel}</span>
       </button>
-    {/if}
-  </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -216,6 +229,12 @@
     color: var(--fab-accent);
   }
 
+  .salvage-banner.is-success {
+    border-color: var(--fab-success-border);
+    background: var(--fab-success-soft);
+    color: var(--fab-success-text);
+  }
+
   .salvage-banner-text {
     display: flex;
     flex-direction: column;
@@ -223,10 +242,23 @@
     min-width: 0;
   }
 
+  /* The title takes its TONE's text colour, not a flat one: a tinted box whose headline
+     is the same grey in every state throws the ramp away. */
   .salvage-banner-title {
     font-size: 11.5px;
     font-weight: 700;
-    color: var(--fab-text);
+  }
+
+  .salvage-banner.is-info .salvage-banner-title {
+    color: var(--fab-info-text);
+  }
+
+  .salvage-banner.is-accent .salvage-banner-title {
+    color: var(--fab-accent);
+  }
+
+  .salvage-banner.is-success .salvage-banner-title {
+    color: var(--fab-success-text);
   }
 
   .salvage-banner-rule {
@@ -236,10 +268,24 @@
     color: var(--fab-text-muted);
   }
 
+  /* The prototype's ruled action row: a note left, the action right. */
   .salvage-footer {
     display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--fab-space-3);
+    border-top: 1px solid var(--fab-border);
+    padding-top: var(--fab-space-3);
+  }
+
+  .salvage-footer-note {
+    margin: 0;
+    min-width: 0;
+    font-size: 10.5px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--fab-text-subtle);
   }
 
   /* Foundry's global `.app button` pins a fixed height and centers content; a button
@@ -253,29 +299,33 @@
     -webkit-appearance: none;
     height: auto;
     margin: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    width: 100%;
     font: inherit;
     line-height: 1;
     cursor: pointer;
   }
 
+  /* CraftButton's spec — the house action primitive — rather than a fourth private one:
+     radius 8, an --accent border, 600/14. It differs only where it must: this button
+     sits in a row at its own width, so it is not the primitive's full-width 44px slab. */
   .salvage-action {
-    min-height: 44px;
-    padding: 12px 16px;
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 9px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fab-space-2);
+    min-height: 30px;
+    padding: 6px 14px;
+    border: 1px solid var(--fab-accent);
+    border-radius: 8px;
     background: var(--fab-accent);
     color: var(--fab-on-accent);
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
   }
 
   .salvage-action:hover:not(:disabled) {
-    filter: brightness(1.08);
+    filter: brightness(1.05);
   }
 
   .salvage-action:focus-visible,
@@ -284,32 +334,35 @@
     outline-offset: 2px;
   }
 
+  /* CraftButton's disabled treatment, so a blocked salvage reads like a blocked craft. */
   .salvage-action:disabled {
-    opacity: 0.5;
-    cursor: default;
+    cursor: not-allowed;
+    opacity: 0.55;
+    border-color: var(--fab-border);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-muted);
     filter: none;
   }
 
+  /* An inline text button inside the ribbon: no box of its own. */
   .salvage-again {
-    min-height: 32px;
-    padding: 6px 12px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-    font-size: 11.5px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--fab-success-text);
+    font-size: 11px;
     font-weight: 600;
+    text-decoration: underline;
   }
 
   .salvage-again:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
+    filter: brightness(1.1);
   }
 
   .salvage-ribbon {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: var(--fab-space-2);
     box-sizing: border-box;
     margin: 0;
@@ -321,6 +374,11 @@
     color: var(--fab-success-text);
     font-size: 12.5px;
     font-weight: 700;
-    text-align: center;
+  }
+
+  /* Takes the slack so the inline reset stays pinned right. */
+  .salvage-ribbon-text {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 </style>

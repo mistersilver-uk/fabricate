@@ -17,6 +17,8 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
+  import StatusPill from '../../../../components/StatusPill.svelte';
+  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { salvage = null } = $props();
 
@@ -43,15 +45,17 @@
     <ul class="salvage-result-list" data-inventory-salvage-results>
       {#each results as entry, index (entry.id ?? entry.componentId ?? index)}
         <li class="salvage-result-row" data-inventory-salvage-result={entry.componentId}>
-          {#if entry.img}
-            <img class="salvage-result-img" src={entry.img} alt="" draggable="false" />
-          {/if}
+          <!-- CraftingThumb, not a raw <img>: a result whose component has no authored
+               art renders the house fallback rather than a broken-image glyph. -->
+          <CraftingThumb src={entry.img ?? ''} alt="" size={24} />
           <span class="salvage-result-name">{entry.name}</span>
           <span class="salvage-result-qty">×{entry.quantity}</span>
           {#if !checkUsable}
-            <span class="salvage-chip is-guaranteed">
-              {localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-            </span>
+            <StatusPill
+              tone="success"
+              icon="fas fa-circle-check"
+              label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
+            />
           {/if}
         </li>
       {/each}
@@ -119,14 +123,6 @@
     background: var(--fab-surface-soft);
   }
 
-  .salvage-result-img {
-    width: 24px;
-    height: 24px;
-    border: 0;
-    border-radius: 4px;
-    object-fit: cover;
-  }
-
   .salvage-result-name {
     flex: 1 1 auto;
     min-width: 0;
@@ -144,26 +140,6 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-secondary);
-  }
-
-  .salvage-chip {
-    flex: 0 0 auto;
-    padding: 1px 7px;
-    border-radius: 999px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-  }
-
-  .salvage-chip.is-guaranteed {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-    color: var(--fab-success-text);
   }
 
   /* Two signals, never colour alone: the danger ramp AND a warning glyph. */
