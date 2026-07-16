@@ -18,10 +18,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
-    // Reached through the salvage tree's ProgressiveStageList. Both are deliberately
-    // import-free leaves, so one entry each suffices.
-    'src/utils/progressiveStageThresholds.js',
-    'src/utils/progressiveResultOrder.js',
+    // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed
+    // here. `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); the
+    // real importer is `inventoryStore.svelte.js`, which this suite mocks with a POJO.
+    // The store's own suite copies them instead.
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
@@ -1179,14 +1179,29 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
     ];
     const { services, calls } = salvageServices(
-      salvageItem({ mode: 'progressive', checkUsable: true, stages, awardMode: 'equal' })
+      salvageItem({ mode: 'progressive', checkUsable: true, stages, awardMode: 'equal' }),
+      // AC6's live-region half. `salvageOrderAnnouncement` threads FIVE wrapper hops
+      // (InventoryView → InventoryDetail → InventoryComponentDetail →
+      // InventorySalvagePanel → SalvageProgressiveBody → ProgressiveStageList). Drop the
+      // prop at ANY hop and it silently defaults to '': the revert announcement never
+      // reaches the player, a keyboard reorder announces nothing, and an
+      // existence-only assertion stays green. So the fixture carries a REAL string and
+      // the assertion below reads it back out of the DOM, through the real chain.
+      { salvageOrderAnnouncement: 'Iron Shard moved to position 2 of 2' }
     );
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-flow-note]'), 'says the roll flows down');
     const rows = target.querySelectorAll('[data-progressive-stage-reorderable]');
     assert.equal(rows.length, 2, 'both stages are reorderable');
-    assert.ok(target.querySelector('[data-progressive-stage-status]'), 'the live region is present');
+    const liveRegion = target.querySelector('[data-progressive-stage-status]');
+    assert.ok(liveRegion, 'the live region is present');
+    assert.equal(liveRegion.getAttribute('aria-live'), 'polite');
+    assert.equal(
+      liveRegion.textContent.trim(),
+      'Iron Shard moved to position 2 of 2',
+      'the announcement REACHES the live region across all five wrapper hops (AC6)'
+    );
     // The opt-in extensions the salvage body passes.
     assert.equal(
       target.querySelector('[data-progressive-stage-quantity]').dataset.progressiveStageQuantity,
@@ -1228,5 +1243,148 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
     assert.equal(target.querySelector('[data-progressive-stage-status]'), null, 'nothing to announce');
     assert.ok(target.querySelector('[data-progressive-stage-fixed-note]'), 'says the GM set it');
+  });
+
+  // --- The body reconciles with the resolved roll -------------------------------
+  //
+  // The pre-roll list is a PLAN; once the roll resolves it is a RECORD. A stage row
+  // still chipped "Awaiting roll" directly beneath the green "Salvaged" ribbon is a
+  // contradiction the player has to resolve for us — and an existence-only chip
+  // assertion cannot see it.
+
+  const RECON_STAGES = [
+    { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1, difficulty: 4, threshold: 4 },
+    { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+    // Unreachable at ANY budget (the award loop skips an invalid cost), so it is "Not
+    // reached" before AND after a roll — never "Roll fell short".
+    { id: 's3', componentId: 'c4', name: 'Dust', img: null, quantity: 1, difficulty: null, threshold: null },
+  ];
+
+  function progressiveServices(storeOverrides = {}) {
+    return salvageServices(
+      salvageItem({
+        mode: 'progressive',
+        checkUsable: true,
+        stages: RECON_STAGES,
+        awardMode: 'equal',
+      }),
+      storeOverrides,
+    );
+  }
+
+  const chipStates = target =>
+    [...target.querySelectorAll('[data-progressive-stage-state]')].map(
+      chip => chip.dataset.progressiveStageState,
+    );
+
+  it('pre-roll: reachable stages await the roll, an unreachable one never does', async () => {
+    const { services } = progressiveServices();
+    const target = await openSalvage(services);
+    assert.deepEqual(chipStates(target), ['awaiting', 'awaiting', 'unreachable']);
+  });
+
+  it('post-roll: chips reconcile against the run record — and NOTHING still awaits a roll', async () => {
+    const { services } = progressiveServices({
+      salvageResult: {
+        componentId: 'c1',
+        state: 'success',
+        message: 'Salvaged Mordant Gland',
+        awarded: [{ name: 'Iron Shard', img: null }],
+        // The engine's OWN record of what it awarded, keyed by componentId: the roll
+        // reached stage 1 and fell short of stage 2.
+        awardedComponentIds: ['c2'],
+        outcomeId: null,
+      },
+    });
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'), 'the ribbon is up');
+    assert.deepEqual(chipStates(target), ['recovered', 'short', 'unreachable']);
+    // The regression this test exists for.
+    assert.equal(
+      target.querySelector('[data-progressive-stage-state="awaiting"]'),
+      null,
+      'no row still claims to await a roll beneath the success ribbon',
+    );
+  });
+
+  it('post-roll: reorder is FROZEN — the roll has already been spent down the list', async () => {
+    const { services } = progressiveServices({
+      salvageResult: {
+        componentId: 'c1',
+        state: 'success',
+        message: '',
+        awarded: [],
+        awardedComponentIds: ['c2'],
+        outcomeId: null,
+      },
+    });
+    const target = await openSalvage(services);
+
+    assert.equal(
+      target.querySelectorAll('[data-progressive-stage-reorderable]').length,
+      0,
+      'a committed order is a record, not a choice',
+    );
+    assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
+    assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 3);
+  });
+
+  it('post-roll with NO run record degrades to a neutral resolved state, inventing nothing', async () => {
+    // The runless invariant: a salvage with no run manager records no createdResults, so
+    // there is nothing to reconcile against. Claiming every stage fell short would be a
+    // lie; claiming they still await a roll would be the contradiction above.
+    const { services } = progressiveServices({
+      salvageResult: {
+        componentId: 'c1',
+        state: 'success',
+        message: '',
+        awarded: [],
+        awardedComponentIds: [],
+        outcomeId: null,
+      },
+    });
+    const target = await openSalvage(services);
+    assert.deepEqual(chipStates(target), ['resolved', 'resolved', 'unreachable']);
+    assert.equal(target.querySelector('[data-progressive-stage-state="awaiting"]'), null);
+  });
+
+  it('routed: the rolled tier is marked "Your roll" only AFTER resolution', async () => {
+    const routed = {
+      mode: 'routed',
+      checkUsable: true,
+      routedType: 'relative',
+      dc: 15,
+      routedOutcomes: [
+        { id: 'o1', name: 'Fail', success: false, threshold: 10, start: null, end: null, results: [] },
+        { id: 'o2', name: 'Pass', success: true, threshold: 15, start: null, end: null, results: [] },
+      ],
+    };
+
+    const before = salvageServices(salvageItem(routed));
+    let target = await openSalvage(before.services);
+    assert.equal(
+      target.querySelector('[data-inventory-outcome-your-roll]'),
+      null,
+      'no tier is marked before a roll',
+    );
+
+    harness.remount();
+    const after = salvageServices(salvageItem(routed), {
+      salvageResult: {
+        componentId: 'c1',
+        state: 'success',
+        message: '',
+        awarded: [],
+        awardedComponentIds: [],
+        // The engine's own record of the tier it routed through.
+        outcomeId: 'o2',
+      },
+    });
+    target = await openSalvage(after.services);
+    const marked = target.querySelectorAll('[data-outcome-rolled="true"]');
+    assert.equal(marked.length, 1, 'exactly one tier is marked');
+    assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
+    assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
   });
 });

@@ -498,6 +498,24 @@ export function createInventoryStore({ services } = {}) {
             name: String(entry?.name ?? ''),
             img: typeof entry?.img === 'string' ? entry.img : null,
           })),
+          // What the run RECORDED, so the body can reconcile itself with the roll rather
+          // than keep asserting a pre-roll state under a success ribbon.
+          //
+          // `createdResults` is the engine's own record of what it awarded, keyed by
+          // componentId — the only honest source for a per-stage "Recovered" chip
+          // (the created Items are matched by name otherwise, which is fragile).
+          // `data.outcomeId` is the routed tier the roll actually matched.
+          //
+          // Both are null/empty when the salvage ran WITHOUT a run manager (the runless
+          // invariant), in which case the bodies fall back to a neutral resolved state
+          // rather than inventing one.
+          awardedComponentIds: (Array.isArray(result?.salvageRun?.createdResults)
+            ? result.salvageRun.createdResults
+            : []
+          )
+            .map((entry) => entry?.componentId)
+            .filter(Boolean),
+          outcomeId: result?.salvageRun?.checkResult?.data?.outcomeId ?? null,
         };
         await load(true);
         return result;

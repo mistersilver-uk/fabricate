@@ -45,15 +45,18 @@
   const mode = $derived(salvage?.mode ?? 'simple');
   const checkUsable = $derived(salvage?.checkUsable === true);
   const misconfigured = $derived(salvage?.misconfigured === true);
-  // Default TRUE — an absent key reads as permitted; only an explicit false pins the
-  // GM's authored order.
-  const canReorder = $derived(salvage?.allowPlayerResultReorder !== false);
-
   // The ribbon is up: the attempt resolved and awarded. "Salvage again" resets.
   const committed = $derived(result?.state === 'success');
   // A time-gated run has STARTED and awarded nothing. No ribbon, and no "Salvage
   // again" — that would only re-enter the time gate.
   const waiting = $derived(result?.state === 'waiting');
+
+  // Default TRUE — an absent key reads as permitted; only an explicit false pins the
+  // GM's authored order. FROZEN once committed: the roll has already been spent down
+  // the list, so the order is now a record of what happened rather than a choice.
+  // Leaving the rows draggable under a success ribbon would invite the player to
+  // "change" a resolved outcome.
+  const canReorder = $derived(salvage?.allowPlayerResultReorder !== false && !committed);
 
   const BANNERS = {
     simple: { icon: 'fas fa-recycle', tone: 'info' },
@@ -108,12 +111,23 @@
        is the roll step. -->
   <SalvageRollSummary {result} />
 
+  <!-- Every body takes `result`: once the roll has resolved, the body must reconcile
+       itself with it rather than keep asserting its pre-roll plan. A stage row still
+       chipped "Awaiting roll" directly beneath a success ribbon is a contradiction the
+       player has to resolve for us. -->
   {#if misconfigured}
     <SalvageMisconfiguredBody {mode} />
   {:else if mode === 'progressive'}
-    <SalvageProgressiveBody {stages} {canReorder} {announcement} {onReorder} {onReorderSettled} />
+    <SalvageProgressiveBody
+      {stages}
+      {canReorder}
+      {announcement}
+      {onReorder}
+      {onReorderSettled}
+      {result}
+    />
   {:else if mode === 'routed'}
-    <SalvageRoutedBody {salvage} />
+    <SalvageRoutedBody {salvage} {result} />
   {:else}
     <SalvageSimpleBody {salvage} />
   {/if}

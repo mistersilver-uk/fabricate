@@ -15,15 +15,21 @@
               reads a DC, so an override shifts NOTHING and there is no DC to show.
 
   All of that arithmetic is decided builder-side; this component only reads it.
+
+  Once the roll resolves, the tier it MATCHED is marked "Your roll" — read from the run
+  record's `checkResult.data.outcomeId`, the engine's own record of which tier it routed
+  through, so the marker cannot disagree with the award. Before a roll — and on a
+  runless salvage, which records nothing — no tier is marked.
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
 
-  let { salvage = null } = $props();
+  let { salvage = null, result = null } = $props();
 
   const routedType = $derived(salvage?.routedType === 'fixed' ? 'fixed' : 'relative');
   const outcomes = $derived(Array.isArray(salvage?.routedOutcomes) ? salvage.routedOutcomes : []);
   const dc = $derived(Number.isFinite(salvage?.dc) ? salvage.dc : null);
+  const rolledOutcomeId = $derived(result?.state === 'success' ? (result?.outcomeId ?? null) : null);
 </script>
 
 <div class="salvage-body" data-inventory-salvage-body="routed" data-inventory-routed-type={routedType}>
@@ -43,14 +49,22 @@
   {:else}
     <ul class="salvage-outcome-list" data-inventory-salvage-outcomes>
       {#each outcomes as outcome, index (outcome.id ?? index)}
+        {@const rolled = rolledOutcomeId !== null && outcome.id === rolledOutcomeId}
         <li
           class="salvage-outcome"
           class:is-success={outcome.success}
+          class:is-rolled={rolled}
           data-inventory-salvage-outcome={outcome.id ?? String(index)}
           data-outcome-success={outcome.success}
+          data-outcome-rolled={rolled ? 'true' : undefined}
         >
           <div class="salvage-outcome-head">
             <span class="salvage-outcome-name">{outcome.name}</span>
+            {#if rolled}
+              <span class="salvage-outcome-rolled" data-inventory-outcome-your-roll>
+                {localize('FABRICATE.App.Inventory.Salvage.YourRoll')}
+              </span>
+            {/if}
             {#if routedType === 'fixed'}
               {#if outcome.start !== null && outcome.end !== null}
                 <span class="salvage-outcome-threshold" data-inventory-outcome-range={`${outcome.start}-${outcome.end}`}>
@@ -141,6 +155,27 @@
     border-color: var(--fab-success-border);
   }
 
+  /* The tier the roll actually matched. Two signals, never colour alone: the accent
+     ramp AND the "Your roll" tag. */
+  .salvage-outcome.is-rolled {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+  }
+
+  .salvage-outcome-rolled {
+    flex: 0 0 auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
   .salvage-outcome-head {
     display: flex;
     align-items: center;
@@ -148,7 +183,10 @@
     gap: var(--fab-space-2);
   }
 
+  /* Takes the slack so the "Your roll" tag and the threshold stay pinned right, and a
+     long authored tier name truncates rather than pushing them out of the tile. */
   .salvage-outcome-name {
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

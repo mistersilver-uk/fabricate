@@ -15,8 +15,16 @@
   result is never dropped (`out.length === results.length` ALWAYS) and has nowhere to
   persist an exclusion.
 
-  The state chips are read-only. Before a roll every stage is "Awaiting roll"; after
-  one, the summary above carries the outcome — so this stays the plan, not the record.
+  The state chips are read-only, and they RECONCILE WITH THE ROLL. Before a roll the
+  list is a plan and every reachable stage reads "Awaiting roll"; after one it is a
+  record. A stage still claiming to await a roll directly beneath a success ribbon is a
+  contradiction the player would have to resolve for us.
+
+  The post-roll truth comes from the run record's `createdResults` — the engine's OWN
+  list of what it awarded, keyed by componentId — not from matching the created Items
+  by name, which is fragile. A salvage that ran without a run manager (the runless
+  invariant) leaves no record, so the rows degrade to a neutral resolved state rather
+  than inventing one and claiming every stage fell short.
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
@@ -27,19 +35,43 @@
     canReorder = true,
     announcement = '',
     onReorder = () => {},
-    onReorderSettled = () => {}
+    onReorderSettled = () => {},
+    result = null
   } = $props();
+
+  const resolved = $derived(result?.state === 'success');
+  const awardedIds = $derived(
+    new Set(Array.isArray(result?.awardedComponentIds) ? result.awardedComponentIds : [])
+  );
+  // No run record → nothing to reconcile against.
+  const hasRecord = $derived(resolved && awardedIds.size > 0);
+
+  /**
+   * The stage's state, in precedence order. `Excluded` is deliberately absent: there is
+   * no exclude affordance, and the reconciliation contract has nowhere to store one.
+   */
+  function stateOf(stage) {
+    // A stage the award loop SKIPS is reached at NO budget, ever — before or after a
+    // roll. That is not "the roll fell short"; it is unreachable outright.
+    if (stage.threshold === null || stage.threshold === undefined) return 'unreachable';
+    if (!resolved) return 'awaiting';
+    if (!hasRecord) return 'resolved';
+    return awardedIds.has(stage.componentId) ? 'recovered' : 'short';
+  }
+
+  const STATE_KEYS = {
+    recovered: 'FABRICATE.App.Inventory.Salvage.StateRecovered',
+    short: 'FABRICATE.App.Inventory.Salvage.StateRollFellShort',
+    unreachable: 'FABRICATE.App.Inventory.Salvage.StateNotReached',
+    awaiting: 'FABRICATE.App.Inventory.Salvage.StateAwaitingRoll',
+    resolved: 'FABRICATE.App.Inventory.Salvage.StateResolved'
+  };
 </script>
 
 {#snippet stateChip(stage)}
-  <!-- Read-only. `Excluded` is deliberately absent: there is no exclude affordance. -->
-  <span
-    class="salvage-state-chip"
-    data-progressive-stage-state={stage.threshold === null ? 'unreachable' : 'awaiting'}
-  >
-    {stage.threshold === null
-      ? localize('FABRICATE.App.Inventory.Salvage.StateNotReached')
-      : localize('FABRICATE.App.Inventory.Salvage.StateAwaitingRoll')}
+  {@const state = stateOf(stage)}
+  <span class="salvage-state-chip is-{state}" data-progressive-stage-state={state}>
+    {localize(STATE_KEYS[state])}
   </span>
 {/snippet}
 
@@ -102,5 +134,19 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     white-space: nowrap;
+  }
+
+  /* Post-roll states carry a ramp so the outcome reads at a glance. Never colour alone:
+     each chip states its outcome in words. */
+  .salvage-state-chip.is-recovered {
+    border-color: var(--fab-success-border);
+    background: var(--fab-success-soft);
+    color: var(--fab-success-text);
+  }
+
+  .salvage-state-chip.is-short {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+    color: var(--fab-danger-text);
   }
 </style>
