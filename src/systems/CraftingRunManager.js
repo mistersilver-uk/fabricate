@@ -10,8 +10,20 @@ const HISTORY_LIMIT = 50;
  * Manages actor-scoped crafting runs (active + history).
  */
 export class CraftingRunManager {
-  constructor() {
+  /**
+   * @param {object} [deps]
+   * @param {() => boolean} [deps.isPrimaryGM] Primary-GM gate for the timed
+   *   world-time resume path (issue 656). `processWorldTime` runs off the synced
+   *   `updateWorldTime` hook and flips a matured `waitingTime` step to `inProgress`,
+   *   then persists via `_persist` → `actor.setFlag(...)` — a broadcast document write
+   *   on every connected client (duplicate racing writes + player permission-denied
+   *   noise). The default `() => true` keeps unit fixtures (which build no `activeGM`)
+   *   resuming; because it fails OPEN, the real `game.users.activeGM?.id ===
+   *   game.user?.id` check is WIRED at construction in `main.js` (load-bearing).
+   */
+  constructor({ isPrimaryGM = () => true } = {}) {
     this._cache = new Map(); // actorId -> container
+    this._isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
   }
 
   _normalizeContainer(raw = {}) {
@@ -352,6 +364,11 @@ export class CraftingRunManager {
   }
 
   async processWorldTime(worldTime = this._nowWorldTime()) {
+    // Timed resume only (issue 656): driven from the synced updateWorldTime hook, and
+    // flipping waitingTime→inProgress triggers _persist → actor.setFlag, a broadcast
+    // document write. Gate to the primary GM so exactly one client performs the write
+    // and players don't emit swallowed permission-denied errors per actor per tick.
+    if (this._isPrimaryGM() !== true) return;
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);
       let dirty = false;

@@ -422,8 +422,13 @@ class Fabricate {
     // Create managers
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
-    this.craftingRunManager = new CraftingRunManager();
-    this.salvageRunManager = new SalvageRunManager();
+    // Wire the real primary-GM check into the timed world-time resume paths (issue
+    // 656). Both managers default `isPrimaryGM` to `() => true` (fail-open, so unit
+    // fixtures resume), so passing the real `activeGM` check here is load-bearing —
+    // it gates the synced-hook `setFlag` writes to exactly one client.
+    const isPrimaryGM = () => game.users?.activeGM?.id === game.user?.id;
+    this.craftingRunManager = new CraftingRunManager({ isPrimaryGM });
+    this.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
     this.gatheringRunManager = new GatheringRunManager();
     this.gatheringGateAndCheckEvaluator = new GatheringGateAndCheckEvaluator({
       evaluateExpression: evaluateGatheringExpression
