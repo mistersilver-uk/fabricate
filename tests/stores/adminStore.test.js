@@ -943,6 +943,75 @@ describe('createAdminStore', () => {
       assert.ok(savedCategories.includes('Weapons'));
     });
 
+    // ── The COMPONENT category vocabulary (issue 676) ──────────────────────────
+    // A sibling of the recipe handlers above, mirroring their coverage. The write path
+    // had none, and the root calls these optional-chained (`store.addComponentCategory?.()`)
+    // — so deleting the store export no-ops silently and ships green.
+
+    function trackComponentCategoryWrites(seed = null) {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      if (seed) {
+        const sys = origManager.getSystem('sys1');
+        if (sys) sys.componentCategories = seed;
+      }
+      const saved = { componentCategories: null, categories: null, updateCalled: false };
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          saved.updateCalled = true;
+          if (updates.componentCategories) saved.componentCategories = updates.componentCategories;
+          if (updates.categories) saved.categories = updates.categories;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      return { services, saved };
+    }
+
+    it('addComponentCategory appends to componentCategories and deduplicates', async () => {
+      const { services, saved } = trackComponentCategoryWrites();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addComponentCategory('Reagent');
+      await store.addComponentCategory('Reagent'); // duplicate
+      assert.ok(saved.componentCategories !== null, 'the write reaches updateSystem');
+      assert.equal(saved.componentCategories.filter((c) => c === 'Reagent').length, 1);
+      // Written TOP-LEVEL and alone — never folded into the recipe vocabulary.
+      assert.equal(saved.categories, null, 'the recipe categories are never touched');
+    });
+
+    it('removeComponentCategory filters out the category', async () => {
+      const { services, saved } = trackComponentCategoryWrites(['Reagent', 'Metal']);
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.removeComponentCategory('Reagent');
+      assert.ok(saved.componentCategories !== null);
+      assert.ok(!saved.componentCategories.includes('Reagent'));
+      assert.ok(saved.componentCategories.includes('Metal'));
+    });
+
+    it('addComponentCategory does nothing with an empty string', async () => {
+      const { services, saved } = trackComponentCategoryWrites();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addComponentCategory('');
+      await store.addComponentCategory('   ');
+      assert.ok(!saved.updateCalled, 'updateSystem should not be called for a blank category');
+    });
+
+    it('the reserved general bucket can be neither added nor removed', async () => {
+      // `general` is implied, never persisted in the array. The guard is what stops a
+      // GM authoring a duplicate "General" entry, or deleting the catch-all.
+      const { services, saved } = trackComponentCategoryWrites(['Reagent']);
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      for (const reserved of ['general', 'General', ' GENERAL ']) {
+        await store.addComponentCategory(reserved);
+        await store.removeComponentCategory(reserved);
+      }
+      assert.ok(!saved.updateCalled, 'the reserved bucket never reaches updateSystem');
+    });
+
     it('addCategory does nothing with empty string', async () => {
       let updateCalled = false;
       const services = createMockServices();
@@ -5965,6 +6034,39 @@ describe('createAdminStore', () => {
       assert.equal(vs.itemCards[1].description, '');
       assert.equal(vs.itemCards[1].hasDescription, false);
       assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
+    });
+
+    it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {
+      // AC6 clause 3. This hand-built projection is an ALLOWLIST, and its failure mode
+      // is silent: without the line, the Tags & Categories screen's component-categories
+      // section is permanently EMPTY however correctly the normalizer and the write path
+      // behave. A NON-EMPTY fixture is the point — an `|| []` fallback or a stubbed-out
+      // line reads green against an empty one.
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.categories = ['Potions'];
+        sys.componentCategories = ['Reagent', 'Metal'];
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+
+      assert.deepEqual(vs.selectedSystem.componentCategories, ['Reagent', 'Metal']);
+      // The two vocabularies are SIBLINGS and must never cross-populate: reuse would
+      // have leaked component categories into the Recipe Studio's filter and vice versa.
+      assert.deepEqual(vs.selectedSystem.categories, ['Potions']);
+      assert.ok(!vs.selectedSystem.categories.includes('Reagent'));
+      assert.ok(!vs.selectedSystem.componentCategories.includes('Potions'));
+    });
+
+    it('viewState.selectedSystem.componentCategories defaults to an empty array', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      assert.deepEqual(get(store.viewState).selectedSystem.componentCategories, []);
     });
 
     it('viewState.selectedSystem exposes managed item images and resolved essence source item metadata', async () => {

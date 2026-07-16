@@ -1083,6 +1083,10 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(rootSource.includes('store.addCategory?.(value)'), 'category add should delegate to the admin store');
     assert.ok(rootSource.includes('store.removeCategory?.(category)'), 'category remove should delegate to the admin store');
+    // The COMPONENT category vocabulary (issue 676) — the sibling of the two above,
+    // and a SEPARATE store action: it must never be folded into addCategory.
+    assert.ok(rootSource.includes('store.addComponentCategory?.(value)'), 'component category add should delegate to the admin store');
+    assert.ok(rootSource.includes('store.removeComponentCategory?.(category)'), 'component category remove should delegate to the admin store');
     assert.ok(rootSource.includes('store.addTag?.(value)'), 'tag add should delegate to the admin store');
     assert.ok(rootSource.includes('store.removeTag?.(tag)'), 'tag remove should delegate to the admin store');
     assert.ok(rootSource.includes('confirmTagCategoryRemoval'), 'in-use removals should flow through a confirmation seam');

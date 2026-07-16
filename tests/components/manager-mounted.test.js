@@ -530,6 +530,10 @@ function createStore(calls = [], options = {}) {
       ],
       itemTags: ['herb', 'mineral', 'ore'],
       categories: ['potions'],
+      // The COMPONENT category vocabulary (issue 676) — a SIBLING of `categories`, kept
+      // deliberately disjoint from it here so a test asserting one can never pass on
+      // the other's data.
+      componentCategories: ['Reagent'],
       sceneOptions: [
         {
           uuid: 'Scene.forest',
@@ -1302,6 +1306,14 @@ function createStore(calls = [], options = {}) {
       return options.addCategoryResult ?? true;
     },
     removeCategory: (value) => calls.push(['removeCategory', value]),
+    // The COMPONENT category vocabulary (issue 676). The root calls these
+    // optional-chained, so an absent store export no-ops SILENTLY — these stubs plus
+    // the call-site assertions below are what make that detectable at all.
+    addComponentCategory: (value) => {
+      calls.push(['addComponentCategory', value]);
+      return options.addComponentCategoryResult ?? true;
+    },
+    removeComponentCategory: (value) => calls.push(['removeComponentCategory', value]),
     addTag: (value) => {
       calls.push(['addTag', value]);
       if (options.addTagReject) return Promise.reject(new Error('add tag failed'));
@@ -5660,6 +5672,86 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('No custom categories match this search.'));
     assert.ok(target.textContent.includes('No item tags match this search.'));
     assert.ok(target.textContent.includes('General'));
+  });
+
+  it('manages COMPONENT categories as a third, independent vocabulary section (issue 676)', async () => {
+    // AC6 clause 3, at the call site. The screen renders THREE VocabularyPanel
+    // instances over independent vocabularies; the root calls the store's component
+    // handlers optional-chained, so without this an absent export no-ops silently.
+    const calls = [];
+    const confirmations = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: {
+          openCurrentAdmin: () => {},
+          confirmVocabularyRemoval: (kind, row) => {
+            confirmations.push([kind, row.name]);
+            return false;
+          },
+        },
+      },
+    });
+    flushSync();
+    navButton('Tags & Categories').click();
+    await tick();
+    flushSync();
+
+    const panel = target.querySelector('[aria-label="Component categories"]');
+    assert.ok(panel, 'the component-categories section renders');
+    // The seeded vocabulary reaches it through the selectedSystem viewState projection.
+    assert.ok(
+      target.querySelector('[data-component-category-id="reagent"]'),
+      'the authored component category renders as its own row'
+    );
+    // Its rows use a DISTINCT hook, so the three sections cannot collide on one.
+    assert.ok(
+      target.querySelector('[data-component-category-id="general"]'),
+      'the reserved General row renders, locked'
+    );
+    assert.equal(
+      panel.querySelector('[data-category-id]'),
+      null,
+      'the recipe vocabulary never leaks into the component section'
+    );
+    assert.equal(
+      target.querySelector('[aria-label="Recipe categories"] [data-component-category-id]'),
+      null,
+      'and the component vocabulary never leaks into the recipe section'
+    );
+
+    // The reserved bucket is refused before it can reach the store.
+    const input = target.querySelector('#manager-component-category-add');
+    input.value = 'General';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.ok(!calls.some((call) => call[0] === 'addComponentCategory'));
+
+    // A real add reaches the store's COMPONENT action — not addCategory.
+    input.value = 'Metal';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'addComponentCategory' && call[1] === 'Metal'));
+    assert.ok(
+      !calls.some((call) => call[0] === 'addCategory'),
+      'the recipe vocabulary is never written by the component section'
+    );
+    assert.equal(input.value, '');
+
+    // Removal is confirmed under its own kind, and refusing it does not write.
+    target.querySelector('[aria-label="Remove component category Reagent"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(confirmations.at(-1), ['component-category', 'Reagent']);
+    assert.ok(!calls.some((call) => call[0] === 'removeComponentCategory'));
   });
 
   it('keeps tags and categories add inputs when store add callbacks fail', async () => {
