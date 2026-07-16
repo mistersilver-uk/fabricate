@@ -6987,6 +6987,7 @@
      right; non-reorderable tabs have only the badge, so the direction is moot there. */
   flex-direction: row-reverse;
   align-items: center;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-recipe-steps-row-head .manager-environment-comp-order {
