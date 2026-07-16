@@ -120,7 +120,7 @@
   const lockOptions = $derived([
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
     { value: 'unlocked', labelKey: 'FABRICATE.Admin.Manager.Recipe.Unlocked', fallback: 'Unlocked' },
-    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.Locked', fallback: 'Locked' }
+    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.LockedLabel', fallback: 'Locked' }
   ]);
 
   const SORT_LABELS = {
@@ -204,7 +204,7 @@
   // would be REFUSED, so the row says so rather than merely "incomplete".
   const STATUS_LABELS = {
     disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
-    locked: ['FABRICATE.Admin.Manager.Recipe.Locked', 'Locked'],
+    locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
     blocked: ['FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable"],
     incomplete: ['FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete']
   };

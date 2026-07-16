@@ -1102,6 +1102,13 @@
       "Manager": {
         "WindowTitle": "Crafting Systems",
         "GMOnly": "Only GMs can manage crafting systems.",
+        "Done": "Done",
+        "ItemPicker": {
+          "Close": "Close",
+          "Empty": "No items found.",
+          "SearchLabel": "Search items",
+          "SearchPlaceholder": "Search items..."
+        },
         "Economy": {
           "GatheringResolutionMode": "Gathering resolution mode",
           "Resolution": {
@@ -1449,6 +1456,7 @@
           "Checks": "Checks",
           "Rules": "Rules",
           "Graph": "Graph",
+          "Access": "Access",
           "SectionLabel": "GM management"
         },
         "Titlebar": {
@@ -1631,7 +1639,6 @@
           "IngredientRoutingHint": "The chosen ingredient set selects which result group is produced.",
           "Steps": "Steps",
           "StepsHint": "Order the named steps used to craft this recipe. Drag to reorder.",
-          "StepLabel": "Step",
           "UnnamedRecipe": "this recipe",
           "AddStep": "Add a step",
           "DeleteStep": "Delete step",
@@ -1686,7 +1693,8 @@
           "NoRequirements": "No requirements",
           "AlternativeSets": "{count} alternative sets",
           "StepRequirements": "{count} steps",
-          "Locked": "Locked",
+          "LockedLabel": "Locked",
+          "Results": "Results",
           "Unlocked": "Unlocked",
           "Incomplete": "Incomplete",
           "CantEnable": "Can't enable",
@@ -2076,6 +2084,30 @@
             "Title": "Allow player result re-ordering",
             "Sub": "Players may set their own stage order for this salvage, which is remembered and used every time they salvage this component.",
             "Toggle": "Allow player result re-ordering"
+          },
+          "SalvageEditor": {
+            "Title": "Salvage",
+            "Hint": "Configure what this component yields when it is salvaged.",
+            "ResultGroups": "Result groups",
+            "GroupName": "Result group name",
+            "GroupNamePlaceholder": "Group {n}",
+            "RemoveGroup": "Remove result group",
+            "ResultComponent": "Result component",
+            "SelectComponent": "Select a component",
+            "Difficulty": "Difficulty",
+            "DifficultyUnset": "No difficulty",
+            "ResultQuantity": "Quantity for {name}",
+            "RemoveResult": "Remove result",
+            "NoResults": "No results in this group yet.",
+            "AddResult": "Add result",
+            "NoGroups": "No result groups yet.",
+            "AddGroup": "Add group",
+            "Routing": "Outcome routing",
+            "RoutingHint": "Map each check outcome to the result group it awards.",
+            "Unrouted": "Unrouted",
+            "NoOutcomes": "The routed salvage check has no outcome tiers to route yet.",
+            "DcOverride": "DC override",
+            "DcOverrideHint": "Leave blank to use the system salvage check default."
           },
           "SalvageQuantity": "{count} required",
           "SalvageTools": "{count} tools",
@@ -3500,6 +3532,8 @@
           "SecondaryRarityFallback": "Common",
           "SourceItem": "Item source",
           "SourceComponent": "Component",
+          "ClearComponentHint": "Right-click to clear component",
+          "DropToReplaceComponent": "Drop a component here to replace this tool component",
           "SelectedKicker": "Selected tool",
           "SelectEmpty": "Select a tool to inspect.",
           "OverviewTitle": "Overview",
@@ -4003,7 +4037,17 @@
         "SalvageResolutionRoutedDesc": "Multiple result groups; the salvage check outcome selects which result group is returned.",
         "SalvageResolutionModeChangeTitle": "Change Salvage Resolution Mode?",
         "SalvageResolutionModeChangeContent": "Changing the salvage resolution mode for {name}: components incompatible with the new salvage mode will have salvage disabled.",
-        "SaveDetails": "Save Details"
+        "SaveDetails": "Save Details",
+        "Alchemy": {
+          "CheckModeHeading": "Alchemy check",
+          "CheckModeIntro": "Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.",
+          "CheckModeNone": "No check",
+          "CheckModeNoneDesc": "A matched brew always succeeds and produces its single result set. No crafting check.",
+          "CheckModeSimple": "Simple check",
+          "CheckModeSimpleDesc": "A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.",
+          "CheckModeTiered": "Tiered check",
+          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check."
+        }
       },
       "Features": {
         "Enable": "Enable",
@@ -4090,15 +4134,7 @@
           "Hint": "Configure the learning and failure behavior used by alchemy attempts in this crafting system.",
           "LearnOnCraft": "Learn recipes after a successful attempt",
           "ConsumeOnFail": "Consume submitted ingredients on failed attempts",
-          "ShowAttemptHistoryToPlayers": "Show attempt history to players",
-          "CheckModeHeading": "Alchemy check",
-          "CheckModeIntro": "Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.",
-          "CheckModeNone": "No check",
-          "CheckModeNoneDesc": "A matched brew always succeeds and produces its single result set. No crafting check.",
-          "CheckModeSimple": "Simple check",
-          "CheckModeSimpleDesc": "A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.",
-          "CheckModeTiered": "Tiered check",
-          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check."
+          "ShowAttemptHistoryToPlayers": "Show attempt history to players"
         },
         "OutcomeRouting": {
           "Title": "Outcome Routing",

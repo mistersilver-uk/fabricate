@@ -562,14 +562,14 @@
       <section class="manager-task-core-card" data-component-edit-section="salvage" data-salvage-section>
         <div class="manager-task-card-heading">
           <div>
-            <h3>{text('FABRICATE.Admin.Manager.Component.Salvage.Title', 'Salvage')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.Hint', 'Configure what this component yields when it is salvaged.')}</p>
+            <h3>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Hint', 'Configure what this component yields when it is salvaged.')}</p>
           </div>
         </div>
 
         <div class="manager-field" data-salvage-result-groups>
           <span class="manager-component-readonly-label">
-            <span>{text('FABRICATE.Admin.Manager.Component.Salvage.ResultGroups', 'Result groups')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultGroups', 'Result groups')}</span>
           </span>
           {#if salvageDraft.resultGroups.length > 0}
             <ul class="manager-recipe-ingredient-sets">
@@ -580,8 +580,8 @@
                       type="text"
                       class="manager-input"
                       value={group.name}
-                      placeholder={text('FABRICATE.Admin.Manager.Component.Salvage.GroupNamePlaceholder', 'Group {n}').replace('{n}', String(groupIndex + 1))}
-                      aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.GroupName', 'Result group name')}
+                      placeholder={text('FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder', 'Group {n}').replace('{n}', String(groupIndex + 1))}
+                      aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.GroupName', 'Result group name')}
                       data-salvage-group-name
                       oninput={(event) => updateSalvageGroup(group.id, { name: event.currentTarget.value })}
                       disabled={saving}
@@ -589,7 +589,7 @@
                     <button
                       type="button"
                       class="manager-icon-button is-danger"
-                      aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.RemoveGroup', 'Remove result group')}
+                      aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveGroup', 'Remove result group')}
                       data-remove-salvage-group
                       onclick={() => removeSalvageGroup(group.id)}
                       disabled={saving}
@@ -620,12 +620,12 @@
                           <select
                             class="manager-input"
                             value={result.componentId}
-                            aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.ResultComponent', 'Result component')}
+                            aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent', 'Result component')}
                             data-salvage-result-component
                             onchange={(event) => updateSalvageResult(group.id, result.id, { componentId: event.currentTarget.value })}
                             disabled={saving}
                           >
-                            <option value="">{text('FABRICATE.Admin.Manager.Component.Salvage.SelectComponent', 'Select a component')}</option>
+                            <option value="">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.SelectComponent', 'Select a component')}</option>
                             {#each componentOptions as option (option.id)}
                               <option value={option.id}>{option.name}</option>
                             {/each}
@@ -639,8 +639,8 @@
                             >
                               <i class="fas fa-gauge-high" aria-hidden="true"></i>
                               <span>{salvageResultDifficulty(result.componentId) === null
-                                ? text('FABRICATE.Admin.Manager.Component.Salvage.DifficultyUnset', 'No difficulty')
-                                : `${text('FABRICATE.Admin.Manager.Component.Salvage.Difficulty', 'Difficulty')} ${salvageResultDifficulty(result.componentId)}`}</span>
+                                ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset', 'No difficulty')
+                                : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.Difficulty', 'Difficulty')} ${salvageResultDifficulty(result.componentId)}`}</span>
                             </span>
                           {/if}
                           <input
@@ -649,7 +649,7 @@
                             step="1"
                             class="manager-input manager-salvage-result-quantity"
                             value={result.quantity}
-                            aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.ResultQuantity', 'Quantity for {name}').replace('{name}', salvageComponentName(result.componentId))}
+                            aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultQuantity', 'Quantity for {name}').replace('{name}', salvageComponentName(result.componentId))}
                             data-salvage-result-quantity
                             oninput={(event) => updateSalvageResult(group.id, result.id, { quantity: clampSalvageQuantity(event.currentTarget.value) })}
                             disabled={saving}
@@ -657,7 +657,7 @@
                           <button
                             type="button"
                             class="manager-icon-button is-danger"
-                            aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.RemoveResult', 'Remove result')}
+                            aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult', 'Remove result')}
                             data-remove-salvage-result
                             onclick={() => removeSalvageResult(group.id, result.id)}
                             disabled={saving}
@@ -668,7 +668,7 @@
                       {/each}
                     </ul>
                   {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.NoResults', 'No results in this group yet.')}</p>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.NoResults', 'No results in this group yet.')}</p>
                   {/if}
 
                   <button
@@ -679,13 +679,13 @@
                     disabled={saving}
                   >
                     <i class="fas fa-plus" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.Component.Salvage.AddResult', 'Add result')}</span>
+                    <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult', 'Add result')}</span>
                   </button>
                 </li>
               {/each}
             </ul>
           {:else}
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.NoGroups', 'No result groups yet.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.NoGroups', 'No result groups yet.')}</p>
           {/if}
           <button
             type="button"
@@ -695,16 +695,16 @@
             disabled={saving}
           >
             <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Component.Salvage.AddGroup', 'Add group')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.AddGroup', 'Add group')}</span>
           </button>
         </div>
 
         {#if salvageResolutionMode === 'routed'}
           <div class="manager-field" data-salvage-routing>
             <span class="manager-component-readonly-label">
-              <span>{text('FABRICATE.Admin.Manager.Component.Salvage.Routing', 'Outcome routing')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Routing', 'Outcome routing')}</span>
             </span>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.RoutingHint', 'Map each check outcome to the result group it awards.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.RoutingHint', 'Map each check outcome to the result group it awards.')}</p>
             {#if salvageOutcomeNames.length > 0}
               <div class="manager-salvage-routing-list">
                 {#each salvageOutcomeNames as outcomeName (outcomeName)}
@@ -717,16 +717,16 @@
                       onchange={(event) => setSalvageRoute(outcomeName, event.currentTarget.value)}
                       disabled={saving}
                     >
-                      <option value="">{text('FABRICATE.Admin.Manager.Component.Salvage.Unrouted', 'Unrouted')}</option>
+                      <option value="">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Unrouted', 'Unrouted')}</option>
                       {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
-                        <option value={group.id}>{group.name || text('FABRICATE.Admin.Manager.Component.Salvage.GroupNamePlaceholder', 'Group {n}').replace('{n}', String(groupIndex + 1))}</option>
+                        <option value={group.id}>{group.name || text('FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder', 'Group {n}').replace('{n}', String(groupIndex + 1))}</option>
                       {/each}
                     </select>
                   </label>
                 {/each}
               </div>
             {:else}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.NoOutcomes', 'The routed salvage check has no outcome tiers to route yet.')}</p>
+              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.NoOutcomes', 'The routed salvage check has no outcome tiers to route yet.')}</p>
             {/if}
           </div>
         {/if}
@@ -753,15 +753,15 @@
         {#if salvageShowDcOverride}
           <label class="manager-field" data-salvage-dc-override>
             <span class="manager-component-readonly-label">
-              <span>{text('FABRICATE.Admin.Manager.Component.Salvage.DcOverride', 'DC override')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride', 'DC override')}</span>
             </span>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.Salvage.DcOverrideHint', 'Leave blank to use the system salvage check default.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverrideHint', 'Leave blank to use the system salvage check default.')}</p>
             <input
               type="number"
               step="1"
               class="manager-input"
               value={salvageDraft.dcOverride === null || salvageDraft.dcOverride === undefined ? '' : salvageDraft.dcOverride}
-              aria-label={text('FABRICATE.Admin.Manager.Component.Salvage.DcOverride', 'DC override')}
+              aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride', 'DC override')}
               oninput={(event) => setSalvageDcOverride(event.currentTarget.value)}
               disabled={saving}
             />
