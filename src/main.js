@@ -608,6 +608,13 @@ class Fabricate {
    * Run versioned startup data migrations via MigrationRunner.
    */
   async _runMigrations() {
+    // Primary-GM only, so exactly one client runs the migration pass in a multi-GM
+    // world and no player/assistant races the world-scoped setting writes. `isGM` is
+    // true for assistant GMs too (they hold SETTINGS_MODIFY), so an `isGM` gate would
+    // let the full GM AND every assistant transform-and-write concurrently
+    // (last-writer-wins); `activeGM` fires on exactly one client. Mirrors the
+    // primary-GM startup writers below (runRecipeItemFlagAutoStamp et al.).
+    if (game.users?.activeGM?.id !== game.user?.id) return;
     const runner = new MigrationRunner({
       getSetting,
       setSetting,
