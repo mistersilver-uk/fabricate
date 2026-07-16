@@ -120,6 +120,12 @@ function compileManagerRoot() {
   // InventoryDetail (which pulls in CraftingThumb → craftingImageDefaults) fed a
   // synthetic row from recipeItemPreviewRow.js (issue 544). Compile/copy them here too
   // or mounting the manager tree that renders the editor HANGS (# cancelled).
+  // InventoryDetail is a thin router (issue 675); its `{#if}` branches do NOT keep the
+  // bodies out of the module graph (the compiled `.svelte.js` imports them statically),
+  // so the whole `detail/` tree has to be compiled here as well.
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');
   for (const recipeItemComponent of [

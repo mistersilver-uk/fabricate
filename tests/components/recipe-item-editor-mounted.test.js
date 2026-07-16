@@ -29,6 +29,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ItemPickerModal.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+    // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
+    // preview only ever reaches the BOOK branch, but module resolution is not rendering:
+    // the compiled router imports every child statically, so the whole `detail/` tree
+    // must be compiled here too or this suite HANGS (`# cancelled`), never fails.
+    'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',

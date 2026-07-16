@@ -25,6 +25,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/inventory/InventoryFilters.svelte',
     'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
+    // The inspector is a thin ROUTER over these bodies (issue 675). A `{#if}` in a
+    // router does NOT keep a branch out of the module graph — the compiled
+    // `.svelte.js` carries STATIC imports of every child — so the whole `detail/`
+    // tree is listed here even though only one branch renders at a time. An omission
+    // HANGS this suite (reported as `# cancelled`), it never fails it.
+    'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
   ],
