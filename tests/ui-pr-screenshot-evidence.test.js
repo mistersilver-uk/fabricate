@@ -183,7 +183,9 @@ describe('UI PR screenshot evidence', () => {
     }
 
     const view = VIEW_RECIPES.find(recipe => recipe.id === 'player-salvage');
-    assert.deepEqual(view.smokeLabels, ['player-salvage']);
+    // Two frames, neither substituting for the other: the progressive stage list and
+    // the no-check body. The smoke-label guard below pins both to real captures.
+    assert.deepEqual(view.smokeLabels, ['player-salvage', 'player-salvage-no-check']);
 
     // An ordinary inventory file must NOT pull in the salvage frame.
     assert.deepEqual(

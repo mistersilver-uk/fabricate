@@ -430,7 +430,10 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'player-salvage',
     label: 'Player salvage panel',
-    smokeLabels: ['player-salvage'],
+    // TWO frames, because neither can stand in for the other: the PROGRESSIVE body (the
+    // reorderable stage list — the headline feature) and the NO-CHECK body (Smoke
+    // Relic's real shape, and the shape most real worlds have).
+    smokeLabels: ['player-salvage', 'player-salvage-no-check'],
     matches: [
       /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\//,
       /^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySalvagePanel\.svelte$/,

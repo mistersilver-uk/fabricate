@@ -316,10 +316,6 @@ function compileManagerRoot() {
     // The category totals both browser models group with (issue 676). Imported by BOTH
     // of the two above, so omitting it HANGS every mounted manager test.
     'src/utils/browserGroupCounts.js',
-    // Reached through the inventory salvage tree's ProgressiveStageList (issue 675).
-    // Both are deliberately import-free leaves, so one entry each suffices.
-    'src/utils/progressiveStageThresholds.js',
-    'src/utils/progressiveResultOrder.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',

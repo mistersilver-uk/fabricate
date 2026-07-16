@@ -23,10 +23,9 @@ const harness = createMountedComponentHarness({
     // craftingImageDefaults (issue 544).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
-    // Reached through the salvage tree's ProgressiveStageList (issue 675). Import-free
-    // leaves, so one entry each suffices.
-    'src/utils/progressiveStageThresholds.js',
-    'src/utils/progressiveResultOrder.js',
+    // NOTE: the progressive order/threshold leaves are deliberately NOT listed.
+    // `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); their real
+    // importer is `inventoryStore.svelte.js`, which no mounted suite loads.
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',

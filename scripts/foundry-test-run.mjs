@@ -6295,6 +6295,30 @@ async function main() {
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage');
+
+        // The SECOND salvage frame: the no-check body — Smoke Relic's real shape, and
+        // the shape most real worlds have (a simple-mode salvage with no authored check
+        // formula recovers its materials outright, with every result tagged
+        // "Guaranteed"). The progressive frame above cannot show it, and this is the
+        // body a wrong (mode, checkUsable) dispatch would silently replace with a
+        // pass/fail contract under a footer that never prompts.
+        //
+        // This capture does NOT commit a salvage, so the two seeded Smoke Relic copies
+        // remain sufficient (the exec-salvage-run step consumes exactly one). Fails
+        // loudly, for the same reason as the frame above.
+        await salvageSearch.fill('Smoke Relic');
+        await page.waitForTimeout(200);
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        const relicSalvageTab = appShell.locator('[data-inventory-detail-tab="salvage"]').first();
+        await relicSalvageTab.waitFor({ state: 'visible', timeout: 10_000 });
+        await relicSalvageTab.click();
+        await appShell.locator('[data-inventory-salvage-body="no-check"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-salvage-no-check');
+
         // Clear the search so the tab is left in its browsable state for any later
         // inventory work (and so a re-entry does not inherit this filter).
         await salvageSearch.fill('');
