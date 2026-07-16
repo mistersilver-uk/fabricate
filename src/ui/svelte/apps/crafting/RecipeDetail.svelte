@@ -32,7 +32,8 @@
     progressiveStages = [],
     canReorderStages = true,
     stageAnnouncement = '',
-    onReorderStage = null
+    onReorderStage = null,
+    onReorderStageSettled = null
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -81,6 +82,7 @@
           {canReorderStages}
           {stageAnnouncement}
           {onReorderStage}
+          {onReorderStageSettled}
         />
       </div>
       <div class="crafting-detail-footer">

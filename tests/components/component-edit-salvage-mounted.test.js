@@ -45,6 +45,17 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
 
+// ToggleCard mounted directly, to constrain the two props that exist ONLY for issue 658's
+// retrofit. Neither call site passes them today, so without this they would be unverified
+// forward-compatibility seams — present, but not proven to emit anything.
+const cardHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-toggle-card-',
+  rawModules: [],
+  compiledModules: ['src/ui/svelte/apps/manager/ToggleCard.svelte'],
+  componentPath: 'src/ui/svelte/apps/manager/ToggleCard.svelte',
+});
+
 const COMPONENT_OPTIONS = [
   { id: 'cmp-scrap', name: 'Scrap Metal', img: 'icons/svg/item-bag.svg', difficulty: 4 },
   { id: 'cmp-dust', name: 'Dust', img: 'icons/svg/item-bag.svg', difficulty: 9 },
@@ -98,6 +109,68 @@ function trackDirty(overrides = {}) {
     }),
   };
 }
+
+describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
+  before(() => cardHarness.setup());
+  after(() => cardHarness.teardown());
+
+  const mountCard = (overrides = {}) =>
+    cardHarness.mount({ title: 'Enabled', sub: 'Craftable by players', on: true, ...overrides });
+
+  it('toggleTitle emits a tooltip on the SWITCH, not on the card', async () => {
+    // The Overview Enabled card's conditional tooltip is the only explanation a GM gets
+    // for a validation-disabled switch. Named `toggleTitle` because `title` is already
+    // the card heading — a collision the retrofit would otherwise hit.
+    const target = await mountCard({ toggleTitle: 'Resolve the issues on the Validation tab.', disabled: true });
+    const button = target.querySelector('button.manager-status-toggle');
+    assert.equal(button.getAttribute('title'), 'Resolve the issues on the Validation tab.');
+    assert.equal(button.disabled, true);
+    assert.equal(
+      target.querySelector('.manager-recipe-status-card').getAttribute('title'),
+      null,
+      'the tooltip lands on the control, not the card'
+    );
+    cardHarness.remount();
+  });
+
+  it('an empty toggleTitle emits NO title attribute', async () => {
+    const target = await mountCard();
+    assert.equal(target.querySelector('button.manager-status-toggle').hasAttribute('title'), false);
+    cardHarness.remount();
+  });
+
+  it('subAttr emits the sub-line hook the Locked card needs', async () => {
+    // Mirrors `data-recipe-locked-state` on the Overview Locked card.
+    const target = await mountCard({ subAttr: 'data-recipe-locked-state' });
+    assert.ok(
+      target.querySelector('.manager-recipe-status-sub[data-recipe-locked-state]'),
+      'the hook lands on the sub-line'
+    );
+    cardHarness.remount();
+  });
+
+  it('an unset subAttr adds no stray attribute', async () => {
+    const target = await mountCard();
+    const sub = target.querySelector('.manager-recipe-status-sub');
+    assert.deepEqual(
+      [...sub.attributes].map((a) => a.name).sort(),
+      ['class'],
+      'the sub-line carries only its class'
+    );
+    cardHarness.remount();
+  });
+
+  it('the switch carries aria-pressed and no role=switch', async () => {
+    const on = await mountCard({ on: true });
+    assert.equal(on.querySelector('button.manager-status-toggle').getAttribute('aria-pressed'), 'true');
+    cardHarness.remount();
+    const off = await mountCard({ on: false });
+    const button = off.querySelector('button.manager-status-toggle');
+    assert.equal(button.getAttribute('aria-pressed'), 'false');
+    assert.equal(button.getAttribute('role'), null, 'the repo uses no role=switch anywhere');
+    cardHarness.remount();
+  });
+});
 
 describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   before(() => harness.setup());
@@ -184,6 +257,38 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       assert.equal(card(target), null, `no card in ${mode} salvage`);
       harness.remount();
     }
+  });
+
+  // ── D9: the card must stay a byte-faithful extraction ────────────────────
+
+  it('D9: the card reproduces the Overview status-card element tree', async () => {
+    // Issue 658 retrofits the Overview Enabled/Locked cards onto this component, and that
+    // is only a no-op DOM diff while the structure matches. If this drifts, the retrofit
+    // stops being a no-op and this becomes a third source of truth rather than the second
+    // being retired.
+    const target = await harness.mount(props());
+    const node = card(target);
+    assert.ok(node.classList.contains('manager-recipe-status-card'));
+    assert.ok(node.querySelector('.manager-recipe-status-icon[aria-hidden="true"]'));
+    assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-title'));
+    assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-sub'));
+    const button = node.querySelector('button.manager-status-toggle');
+    assert.ok(button, 'the switch is a plain button');
+    assert.equal(button.getAttribute('role'), null, 'aria-pressed is the house pattern, not role=switch');
+    assert.ok(
+      button.querySelector('.manager-status-toggle-track[aria-hidden="true"] > .manager-status-toggle-knob'),
+      'track + knob, both aria-hidden'
+    );
+  });
+
+  it('D9: an unset toggleTitle emits NO title attribute, not an empty one', async () => {
+    // The Overview Enabled card's tooltip is conditional (`... : undefined`), and it is
+    // the only explanation a GM gets for why that switch is disabled when validation
+    // blocks enabling. `toggleTitle` exists so the retrofit can carry it; the falsy
+    // branch must reproduce the `undefined` branch exactly, since an empty string would
+    // render a present-but-blank tooltip.
+    const target = await harness.mount(props());
+    assert.equal(toggle(target).hasAttribute('title'), false);
   });
 
   // ── D3's condition: ordinals + read-only difficulty badge ────────────────

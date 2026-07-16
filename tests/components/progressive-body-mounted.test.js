@@ -250,6 +250,68 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     );
   });
 
+  it('stage artwork is NOT natively draggable, in either state', async () => {
+    // An <img> is draggable by default, so a drag started on the artwork becomes an image
+    // drag with the wrong ghost — and dropping it outside the app can navigate away.
+    // This is the repo's first drag row containing an image; the GM's row has none.
+    for (const canReorder of [true, false]) {
+      const target = await mountBody({ canReorder });
+      const images = [...target.querySelectorAll('.crafting-stage-img')];
+      assert.ok(images.length > 0, `precondition: artwork renders (canReorder=${canReorder})`);
+      for (const image of images) {
+        assert.equal(
+          image.getAttribute('draggable'),
+          'false',
+          `artwork is not draggable (canReorder=${canReorder})`
+        );
+      }
+      harness.remount();
+    }
+  });
+
+  it('a drop commits the pending order write immediately (no debounce wait)', async () => {
+    // A drag has already settled by the time it drops, so there is nothing to coalesce.
+    // Mutation: drop the onReorderSettled call from handleDrop.
+    const settled = [];
+    const target = await harness.mount({
+      recipe: progressiveRecipe(),
+      craftability: craftability(),
+      progressiveStages: STAGES,
+      canReorderStages: true,
+      stageAnnouncement: '',
+      onReorderStage: () => {},
+      onReorderStageSettled: () => settled.push(true),
+    });
+
+    rows(target)[0].dispatchEvent(
+      new globalThis.window.Event('dragstart', { bubbles: true, cancelable: true })
+    );
+    rows(target)[2].dispatchEvent(
+      new globalThis.window.Event('drop', { bubbles: true, cancelable: true })
+    );
+    flushSync();
+
+    assert.equal(settled.length, 1, 'the drop settles the write');
+  });
+
+  it('a KEYBOARD move does not settle — it is the burst the debounce exists for', async () => {
+    const settled = [];
+    const target = await harness.mount({
+      recipe: progressiveRecipe(),
+      craftability: craftability(),
+      progressiveStages: STAGES,
+      canReorderStages: true,
+      stageAnnouncement: '',
+      onReorderStage: () => {},
+      onReorderStageSettled: () => settled.push(true),
+    });
+
+    [...target.querySelectorAll('[data-progressive-stage-move-up]')][2].click();
+    flushSync();
+
+    assert.deepEqual(settled, [], 'chevron clicks coalesce; only the drop settles');
+  });
+
   it('D13: reorderable rows DO attach the drag handlers (the converse)', async () => {
     // Without this, the absence assertions above could pass for the wrong reason.
     const moves = [];

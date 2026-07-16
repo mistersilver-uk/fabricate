@@ -36,7 +36,10 @@
     stages = [],
     canReorder = true,
     announcement = '',
-    onReorder = () => {}
+    onReorder = () => {},
+    // Commit any debounced order write now. A drag has already settled by the time it
+    // drops, so there is nothing left to coalesce.
+    onReorderSettled = () => {}
   } = $props();
 
   let dragIndex = $state(-1);
@@ -92,6 +95,7 @@
         { name, position: index + 1, total }
       )
     );
+    onReorderSettled();
   }
 </script>
 
@@ -114,7 +118,11 @@
           <span class="crafting-stage-ordinal" data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span>
         </span>
         {#if stage.img}
-          <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" />
+          <!-- draggable="false" is REQUIRED, not decorative: an <img> is natively
+               draggable, so a drag started on the artwork becomes an image drag with the
+               wrong ghost, and dropping it outside the app can navigate away. This is the
+               first drag row in the repo to contain an image — the GM's row has none. -->
+          <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" draggable="false" />
         {/if}
         <span class="crafting-stage-name">{stage.name}</span>
         <span class="crafting-stage-meta">
@@ -159,7 +167,9 @@
       <div class="crafting-stage-row is-fixed" data-progressive-stage={stage.id} data-progressive-stage-fixed>
         <span class="crafting-stage-ordinal" aria-hidden="true" data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span>
         {#if stage.img}
-          <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" />
+          <!-- Also non-draggable in the fixed state: the row is not a drag source, but a
+               bare <img> still is, and dragging it out of the app can navigate away. -->
+          <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" draggable="false" />
         {/if}
         <span class="crafting-stage-name">{stage.name}</span>
         <span class="crafting-stage-meta">
@@ -285,6 +295,11 @@
   */
   .crafting-stage-move-button {
     appearance: none;
+    /* Both of these complete the house reset (EnvironmentCard.svelte). `margin: 0` is the
+       load-bearing one: Foundry's `.app button` carries a margin that would space the
+       chevrons apart and can push them past the row edge. Mounted tests cannot see it. */
+    -webkit-appearance: none;
+    margin: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;

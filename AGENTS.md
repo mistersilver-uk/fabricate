@@ -240,8 +240,9 @@ Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam
 - A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - A Foundry `game.settings.register` **`scope: 'client'`** setting persists in that browser/device's `localStorage`, so it is **per device, not per user account** — the same user opening the world on a second machine sees the client default, and it never follows the account.
-`scope: 'user'` is the cross-device per-user account scope, and `scope: 'world'` is shared for the world.
-Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user" — a preference that must follow the account needs `scope: 'user'`.
+`scope: 'user'` is the cross-device per-user scope **within one world** (NOT a per-account-globally scope — see the next bullet), and `scope: 'world'` is shared for the world.
+Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user".
+A preference that must follow the user across devices needs `scope: 'user'` — but say "per user, per world", never "follows the account".
 - **`scope: 'user'` is a replicated async DOCUMENT write, not localStorage** (`PROGRESSIVE_RESULT_ORDER` is the only one Fabricate registers; issue 651 flipped it from `client`).
 `ClientSettings#set` forks on scope: `client` is a synchronous `storage.setItem`, `user` is an `await`ed document create/update that **can reject** and **throws before `game.ready`**.
 So the fire-and-forget `setSetting(...)` idiom used for client-scoped settings (e.g. `toggleFavouriteRecipe`) is **unsafe** on a user-scoped one — `await` it and define the failure path, or the UI reports a write that never happened.

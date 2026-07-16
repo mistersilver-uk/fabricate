@@ -395,6 +395,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
+    // Commit any debounced progressive-order write before the window goes away
+    // (issue 651). Without this a player who reorders and immediately closes,
+    // refreshes, or logs out inside the debounce window loses the order silently.
+    this._flushPendingOrderWrite();
     const result = await super.close(options);
     // Fire the canvas re-prompt callback AFTER the window has fully closed (issue
     // 332) so the Interact prompt re-appears against a settled canvas. One-shot
@@ -410,11 +414,33 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._scopedTaskId = null;
     this._scopedActorId = null;
     this._scopedInteractableRef = null;
+    // Safety net mirroring close(): a forced teardown bypasses our close() override,
+    // and a pending order write must survive that too (issue 651).
+    this._flushPendingOrderWrite();
     super._onClose(options);
     // Safety net mirroring close(): if the window is torn down via the _onClose
     // lifecycle without our close() override (e.g. a forced teardown), still fire
     // the one-shot re-prompt callback.
     this._fireCloseCallback();
+  }
+
+  /**
+   * Commit a debounced progressive stage-order write immediately (issue 651).
+   *
+   * Reorder writes are debounced because each is a replicated document write, which
+   * leaves a window where the player's chosen order exists only in memory. Closing the
+   * window must not discard it. Safe to call from both `close()` and `_onClose()`: the
+   * store's flush is a no-op when no write is pending, so a double call writes once.
+   *
+   * Deliberately NOT awaited and never throws — a rejected write is the store's business
+   * (it reverts and announces), and a teardown must not be blocked or broken by it.
+   */
+  _flushPendingOrderWrite() {
+    try {
+      void this._services?.crafting?.flushProgressiveOrder?.();
+    } catch {
+      // A failed order write must never break the window close.
+    }
   }
 
   /**

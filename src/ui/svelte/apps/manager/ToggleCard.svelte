@@ -30,9 +30,21 @@
     disabled = false,
     // Pre-localized accessible name for the switch; falls back to the visible title.
     toggleLabel = '',
+    // Pre-localized tooltip for the SWITCH (not the card). Named `toggleTitle` because
+    // `title` above is already the card heading. This exists for the Overview Enabled
+    // card, whose conditional tooltip is the ONLY explanation a GM gets for why the
+    // switch is disabled when validation blocks enabling — without a prop for it, the
+    // issue-658 retrofit would have to drop a real affordance on a disabled control.
+    // Emitted as `|| undefined` to reproduce that card's existing undefined branch: an
+    // empty string would render a present-but-blank tooltip.
+    toggleTitle = '',
     // Test/automation hook, mirroring the Overview cards' `data-recipe-section`.
     section = '',
     field = '',
+    // Attribute hook for the sub-line, mirroring the Overview Locked card's
+    // `data-recipe-locked-state`. Without it the retrofit hits the same wall on the
+    // second card that `toggleTitle` clears on the first.
+    subAttr = '',
     onToggle = () => {}
   } = $props();
 </script>
@@ -44,7 +56,9 @@
   <span class="manager-recipe-status-icon" aria-hidden="true"><i class={icon}></i></span>
   <div class="manager-recipe-status-copy">
     <p class="manager-recipe-status-title">{title}</p>
-    <p class="manager-recipe-status-sub manager-muted">{sub}</p>
+    <p class="manager-recipe-status-sub manager-muted" {...(subAttr ? { [subAttr]: true } : {})}>
+      {sub}
+    </p>
   </div>
   <button
     type="button"
@@ -52,6 +66,7 @@
     data-recipe-field={field || undefined}
     aria-pressed={on}
     aria-label={toggleLabel || title}
+    title={toggleTitle || undefined}
     {disabled}
     onclick={() => onToggle(!on)}
   >

@@ -111,6 +111,9 @@
   function onReorderStage(index, target, announcement) {
     store?.reorderProgressiveStage(index, target, announcement);
   }
+  function onReorderStageSettled() {
+    void store?.flushProgressiveOrder();
+  }
   async function onCraft() {
     if (!selectedRecipe) return;
     // A fresh craft re-opens the run summary for this recipe.
@@ -212,6 +215,7 @@
           {canReorderStages}
           {stageAnnouncement}
           {onReorderStage}
+          {onReorderStageSettled}
         />
       </section>
 

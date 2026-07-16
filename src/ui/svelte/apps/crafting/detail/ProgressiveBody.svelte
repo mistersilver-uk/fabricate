@@ -25,7 +25,8 @@
     progressiveStages = [],
     canReorderStages = true,
     stageAnnouncement = '',
-    onReorderStage = null
+    onReorderStage = null,
+    onReorderStageSettled = null
   } = $props();
 
   const stages = $derived(Array.isArray(progressiveStages) ? progressiveStages : []);
@@ -49,6 +50,7 @@
           canReorder={canReorderStages}
           announcement={stageAnnouncement}
           onReorder={(index, target, announcement) => onReorderStage?.(index, target, announcement)}
+          onReorderSettled={() => onReorderStageSettled?.()}
         />
       {:else}
         <IoTable {craftability} result={recipe?.result} {onChooseOption} />
