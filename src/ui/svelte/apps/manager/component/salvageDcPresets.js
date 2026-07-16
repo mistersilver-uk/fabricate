@@ -49,7 +49,15 @@ export function usableSalvageDcTiers(tiers) {
  * On load, an override matching no tier MUST select Custom… and display its value
  * verbatim — never snap to the nearest tier, and never re-save on mere render.
  *
- * @param {number|null|undefined} dcOverride
+ * The persisted field is only ever `number|null` (`setSalvageDcOverride` folds a cleared
+ * input to `null` before it lands, and `_normalizeSalvage` coerces to int-or-null). The
+ * empty string is accepted anyway because this is an exported pure helper over a value
+ * that originates in a DOM number input, where `''` is the cleared reading — the guard
+ * is input validation, not a live branch, and `resolveSalvageDcSelection('') === SYSTEM_DEFAULT`
+ * is pinned by test. Declaring the narrower persisted type here made the `=== ''` check
+ * provably-false to static analysis (sonar `javascript:S3403`) rather than merely unreachable.
+ *
+ * @param {number|string|null|undefined} dcOverride
  * @param {Array<{name: string, dc: number}>} tiers
  * @returns {string} `SALVAGE_DC_SYSTEM_DEFAULT`, `dc:<n>`, or `SALVAGE_DC_CUSTOM`
  */
