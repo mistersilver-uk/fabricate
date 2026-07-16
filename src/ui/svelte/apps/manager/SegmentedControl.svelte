@@ -19,6 +19,10 @@
      test/host hooks, e.g. 'data-when-spent-control').
    - optionDataAttr?: optional data-* attribute name stamped with each option's
      `value` on its segment (e.g. 'data-when-spent-option').
+   - fill?: when true the track spans its container full-width and the segments
+     share it equally (each `flex: 1 1 0`), rather than the default inline track
+     hugging its content. The recipe rail's Step-mode control opts in; the other
+     uses (whenSpent, learning scope) keep the default inline sizing.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -30,7 +34,8 @@
     groupName = '',
     ariaLabel = '',
     dataAttr = '',
-    optionDataAttr = ''
+    optionDataAttr = '',
+    fill = false
   } = $props();
 
   function text(key, fallback) {
@@ -45,7 +50,7 @@
 </script>
 
 <div
-  class="manager-segmented"
+  class={`manager-segmented ${fill ? 'is-fill' : ''}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...dataAttr ? { [dataAttr]: true } : {}}
@@ -79,12 +84,26 @@
     border-radius: 9px;
   }
 
+  /* Full-width variant (issue 643): the track fills its container and the segments
+     share it equally, so a two-option control reads as one balanced bar rather than
+     two content-hugging tiles floating at the left. */
+  .manager-segmented.is-fill {
+    display: flex;
+    width: 100%;
+  }
+
+  .manager-segmented.is-fill .manager-segment {
+    flex: 1 1 0;
+  }
+
   .manager-segment {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--fab-space-chip);
     padding: var(--fab-space-chip) var(--fab-space-3);
+    /* A transparent border so the active tile's border adds no width jump. */
+    border: 1px solid transparent;
     border-radius: 7px;
     color: var(--fab-text-muted);
     font-weight: 500;
@@ -93,9 +112,12 @@
     cursor: pointer;
   }
 
+  /* Active option is a raised dark tile (issue 643 §G3), not a solid peach accent
+     fill — the accent fill out-shouted the green Save button on the editor rail. */
   .manager-segment.is-active {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
+    border: 1px solid var(--fab-border-strong);
+    background: var(--fab-surface-active);
+    color: var(--fab-text);
     font-weight: 600;
   }
 

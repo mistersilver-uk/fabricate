@@ -15,6 +15,9 @@ const craftingSettingsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/Craft
 const resolutionModeOptionsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js');
 const systemsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
 const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+// The library inspector, extracted out of the root (issue 643). It sits under
+// `recipes/`, NOT `recipe/` — the latter is the recipe EDITOR's screenshot-map glob.
+const recipeBrowserInspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
 const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
@@ -35,6 +38,7 @@ const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
 const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
+const recipeBrowserInspectorSource = readFileSync(recipeBrowserInspectorPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
@@ -46,7 +50,7 @@ const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerSource = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, craftingSettingsSource, resolutionModeOptionsSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
+const managerSource = [rootSource, recipeBrowserInspectorSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, craftingSettingsSource, resolutionModeOptionsSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
@@ -110,6 +114,81 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  // The access rosters are the manager's only Foundry user/ownership surface, and every
+  // rule below is one a naive implementation gets WRONG in a way that silently
+  // UNDER- or OVER-reports who can craft a recipe (issue 643 §4b).
+  it('derives the access rosters from the non-GM roster, never by testing a GM', () => {
+    // `Document#testUserPermission` short-circuits EVERY GM (Assistant included, since
+    // `User#isGM` is `hasRole(ASSISTANT)`) to OWNER, so GMs must be filtered FIRST.
+    assert.ok(appSource.includes('game.users?.players'), 'uses the canonical Foundry non-GM roster');
+    assert.ok(appSource.includes('_playerUsers()'), 'both rosters go through the one GM filter');
+    assert.equal(
+      appSource.includes('actor.isOwner'),
+      false,
+      'never uses the game.user-scoped Actor#isOwner (always true on a GM client)'
+    );
+    // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
+    // A `!isGM` filter alone admits role-NONE users, offering the GM a grantable target
+    // the engine ignores.
+    const fallback = appSource.slice(
+      appSource.indexOf('_playerUsers() {'),
+      appSource.indexOf('_userRoleLabel(role) {')
+    );
+    assert.ok(
+      fallback.includes("hasRole('PLAYER')") && fallback.includes('USER_ROLES?.PLAYER'),
+      'the fallback applies the same role floor as the canonical roster'
+    );
+    // Everything this labels comes from the GM-free roster, so a GAMEMASTER/ASSISTANT
+    // branch would be unreachable code claiming to handle a case that cannot arrive.
+    const roleLabel = appSource.slice(appSource.indexOf('_userRoleLabel(role) {'));
+    assert.equal(
+      roleLabel.slice(0, roleLabel.indexOf('_userColor')).includes('RoleGamemaster'),
+      false,
+      'a GM never reaches the role label — the roster excludes them'
+    );
+  });
+
+  it('models "who plays this character" as a SET, with the whole-table case explicit', () => {
+    assert.ok(
+      appSource.includes("actor.testUserPermission?.(user, 'OWNER')"),
+      'OWNER holders control the actor'
+    );
+    assert.ok(appSource.includes('user.character.id === actor.id'), 'the assigned player too');
+    assert.ok(appSource.includes('controlledBy'), 'the union is exposed as a set');
+    assert.ok(
+      appSource.includes('sharedWithAllPlayers'),
+      'ownership.default >= OWNER reaches the whole table'
+    );
+    assert.ok(appSource.includes('actor.ownership?.default'), 'reads the default ownership level');
+    assert.equal(appSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  });
+
+  it('resolves granted character ids over EVERY world actor, not the PC-filtered roster', () => {
+    // The runtime predicate applies no type filter, so a grant naming a non-PC actor is
+    // still honoured — resolving over the filtered roster would drop it from display.
+    assert.ok(appSource.includes('getAccessCharacterActors:'), 'exposes the unfiltered roster');
+    const unfiltered = appSource.slice(
+      appSource.indexOf('getAccessCharacterActors:'),
+      appSource.indexOf('getWorldItemOptions:')
+    );
+    assert.equal(
+      unfiltered.includes('isPlayerCharacterActor'),
+      false,
+      'the access roster applies no player-character type filter'
+    );
+  });
+
+  it('key-filters the noisy updateActor hook so an HP tick does not reproject', () => {
+    assert.ok(appSource.includes("Hooks.on('updateActor'"), 'actor updates are hooked');
+    assert.ok(
+      appSource.includes("'ownership' in diff || 'name' in diff || 'img' in diff"),
+      'only ownership / name / img reproject the rosters'
+    );
+    assert.ok(appSource.includes("'createActor'"), 'actor creation reprojects');
+    assert.ok(appSource.includes("'deleteActor'"), 'actor deletion reprojects');
+    assert.ok(appSource.includes('refreshAccessRosters'), 'reprojects both rosters, not just users');
+  });
+
   it('guards manager startup against unready Fabricate services', () => {
     assert.ok(appSource.includes('isFabricateReady'), 'manager app should expose readiness through services');
     assert.ok(appSource.includes('onFabricateReady'), 'manager app should expose a ready callback service');
@@ -123,6 +202,78 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.StartupPending,
       'Fabricate is still loading. The crafting system manager will open when startup finishes.'
+    );
+  });
+
+  // Issue 643 — the manager titlebar. The gold badge names the SELECTED CRAFTING
+  // SYSTEM. The prototype's "MYTHWRIGHT" is a THEME name and must never leak into
+  // the shipped chrome, and the badge's content is user-authored, so it also needs a
+  // `title` for the truncated case.
+  it('renders a titlebar naming the selected crafting system and its resolution', () => {
+    for (const snippet of [
+      'class="manager-titlebar"',
+      'data-manager-titlebar',
+      'class="manager-titlebar-badge"',
+      'data-manager-titlebar-system',
+      'title={selectedSystem.name}',
+      '>{selectedSystem.name}</span>',
+      'data-manager-titlebar-status',
+      '{titlebarStatusLabel()}'
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root titlebar should include ${snippet}`);
+    }
+    // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
+    // the Foundry window's own title bar already names the app, so a second copy inside
+    // the window was duplicated chrome. The gold badge is now the left-most element.
+    assert.equal(
+      rootSource.includes('manager-titlebar-icon'),
+      false,
+      'the duplicated titlebar app icon should be removed'
+    );
+    assert.equal(
+      rootSource.includes('manager-titlebar-product'),
+      false,
+      'the duplicated "Crafting Systems" titlebar label should be removed'
+    );
+    assert.equal(
+      /mythwright/i.test(rootSource),
+      false,
+      'the gold badge names the selected crafting system; "Mythwright" is a theme name and must not be hard-coded'
+    );
+    // The status line reports the SYSTEM's resolution mode, and counts outcome tiers
+    // only where tiers exist to count (routedByCheck).
+    assert.ok(
+      rootSource.includes("selectedSystem?.resolutionMode === 'routedByCheck'\n      ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)"),
+      'the titlebar outcome-tier count should only be resolved for a routed-by-check system'
+    );
+    assert.ok(
+      lang.FABRICATE.Admin.Manager.Titlebar.OutcomeTiers === 'outcome tiers',
+      'lang should expose the pluralized outcome-tier label the titlebar formats'
+    );
+  });
+
+  it('renders the rail section label and bare mono count numerals without elevating the dead Graph row', () => {
+    assert.ok(rootSource.includes('class="manager-rail-title"'), 'the rail should carry an uppercase section label');
+    assert.ok(rootSource.includes('data-manager-rail-section'), 'the rail section label should be addressable');
+    assert.ok(
+      lang.FABRICATE.Admin.Manager.Nav.SectionLabel === 'GM management',
+      'the rail section label should be localized'
+    );
+    // A rail count is a BARE NUMERAL, not a badge (issue 643). Borrowing `.manager-chip`
+    // meant every nav row wore a bordered, 24px-tall, button-shaped pill that the CSS then
+    // spent five declarations undoing; `.manager-nav-count` owns its own rule instead.
+    assert.ok(
+      rootSource.includes('<span class="manager-nav-count">{selectedCounts.components}</span>'),
+      'a rail count should render as a bare numeral, not a chip'
+    );
+    assert.equal(
+      rootSource.includes('manager-nav-count manager-chip'),
+      false,
+      'no rail count should borrow the content chip'
+    );
+    assert.ok(
+      rootSource.includes("<span class=\"manager-nav-count\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"),
+      'the disabled Graph placeholder should keep its plain Soon span, not gain a chip'
     );
   });
 
@@ -414,21 +565,60 @@ describe('CraftingSystemManager source contract', () => {
       'class="manager-recipes-table"',
       'manager-recipe-row',
       'class="manager-recipe-identity"',
-      'manager-recipe-status'
+      'manager-recipe-status',
+      // The row's restored Edit pencil and the column header above the list (issue 643).
+      'data-recipe-edit={recipe.id}',
+      'class="manager-recipe-table-head"',
+      'FABRICATE.Admin.Manager.Recipe.Column.Recipe',
+      // The lifted browser view-state seam.
+      'browserState = $bindable(null)',
+      'createRecipeBrowserState'
     ]) {
       assert.ok(recipesBrowserSource.includes(snippet), `RecipesBrowserView should include ${snippet}`);
     }
+    // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom, and the
+    // filter/sort/paging state is lifted (no local $state for those controls remains).
+    assert.ok(
+      recipesBrowserSource.includes('class="manager-icon-button manager-recipe-edit"'),
+      'the row Edit affordance should be a manager-icon-button, matching Books & Scrolls'
+    );
+    assert.equal(
+      /let\s+statusFilter\s*=\s*\$state/.test(recipesBrowserSource),
+      false,
+      'the browser view-state must be lifted, not held as local component $state'
+    );
     assert.ok(
       recipesBrowserSource.includes('recipe.incomplete'),
-      'RecipesBrowserView should render the derived Incomplete chip'
+      'RecipesBrowserView should render the derived Incomplete state'
     );
     assert.ok(
       recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
-      'RecipesBrowserView should use the localized Incomplete chip label'
+      'RecipesBrowserView should use the localized Incomplete label'
+    );
+    // The four row states are one component (StatusPill) rather than four ad-hoc
+    // chips. The tones stay distinguishable: warning = incomplete-but-enabled,
+    // danger = incomplete AND off, i.e. enabling would be REFUSED (issue 643).
+    assert.ok(
+      recipesBrowserSource.includes("import StatusPill from '../../components/StatusPill.svelte'"),
+      'the row should render its states through the shared StatusPill'
     );
     assert.ok(
-      /recipe\.incomplete[\s\S]*?manager-chip is-warning/.test(recipesBrowserSource),
-      'Incomplete chip should use the is-warning tone to distinguish it from the locked chip'
+      /incomplete:\s*\['FABRICATE\.Admin\.Manager\.Recipe\.Incomplete'/.test(recipesBrowserSource),
+      'the Incomplete state should carry its localized label'
+    );
+    assert.ok(
+      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.CantEnable'),
+      "an incomplete + disabled recipe should say enabling is refused, not merely 'incomplete'"
+    );
+    // A card row has no columns: the list is a real <ul role="list"> of <li> cards.
+    assert.ok(
+      recipesBrowserSource.includes('<ul class="manager-recipe-group-list" role="list"'),
+      'recipe rows should be a list, not a role="table"'
+    );
+    assert.equal(
+      recipesBrowserSource.includes('role="table"'),
+      false,
+      'the card row must not retain the table role'
     );
   });
 
@@ -670,11 +860,65 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(systemEditSource.includes('SystemOverviewView'), 'the Validation tab renders the overview list');
     assert.ok(systemEditSource.includes('manager-system-workspace'), 'the workspace mirrors the environment workspace');
 
-    // Recipe detail facts still use the shared inline fact-line/fact-label
-    // typography as the environment details card (the layout reference).
+    // The library inspector's detail card is a 2x2 STAT grid (issue 643, brief §3.3),
+    // not the generic fact-line list: it answers Ingredients / Results / Steps /
+    // Crafting check. Structure and Result-groups were restatements of the row the GM
+    // had just clicked, and Produces — the one thing the old inspector could not tell
+    // them — is now a first-class section.
     assert.ok(
-      rootSource.includes('<span class="manager-fact-line"><strong>{structureLabel(selectedRecipe)}</strong> <span class="manager-fact-label">'),
-      'recipe details facts use the shared manager-fact-line/label styling'
+      recipeBrowserInspectorSource.includes('class="manager-recipe-stat-grid"'),
+      'the library inspector renders the 2x2 stat grid'
+    );
+    for (const fact of ['ingredients', 'results', 'steps', 'check']) {
+      assert.ok(
+        recipeBrowserInspectorSource.includes(`id: '${fact}'`),
+        `the stat grid answers "${fact}"`
+      );
+    }
+    assert.ok(
+      recipeBrowserInspectorSource.includes('data-recipe-produces-empty'),
+      'a recipe that makes nothing on a success says so'
+    );
+    assert.ok(
+      recipeBrowserInspectorSource.includes('buildRecipeRequirementRows') &&
+        recipeBrowserInspectorSource.includes('buildRecipeProduceRows'),
+      'the Requires/Produces walk lives in the pure model, not in the component'
+    );
+
+    // The inspector is ONE column on the panel background (issue 643): section labels are
+    // uppercase micro-labels directly on the panel, not five nested `.manager-inspector-card`
+    // boxes under `<h3>` titles, and there is no invented "Recipe details" heading.
+    assert.equal(
+      recipeBrowserInspectorSource.includes('manager-inspector-card'),
+      false,
+      'the inspector sections are micro-labels on the panel, not nested cards'
+    );
+    assert.equal(
+      recipeBrowserInspectorSource.includes('Recipe.Details'),
+      false,
+      'the invented "Recipe details" heading is gone'
+    );
+
+    // `Edit recipe` is the point of the inspector: the accent-filled primary. There used to
+    // be no Edit at all, and Delete sat as a peer of Duplicate.
+    assert.ok(
+      recipeBrowserInspectorSource.includes('data-recipe-action="edit"'),
+      'the inspector exposes the primary Edit action'
+    );
+    assert.ok(
+      recipeBrowserInspectorSource.includes('onEdit = () => {}'),
+      'the inspector takes an onEdit callback'
+    );
+    assert.ok(
+      recipeBrowserInspectorSource.includes('manager-recipe-browser-inspector-delete'),
+      'Delete is a dark danger button below Edit, not a peer of Duplicate'
+    );
+
+    // The reserved alchemy-Simple failure group is SHOWN (danger-toned), not filtered out —
+    // deleting it made an alchemy recipe's failure output invisible.
+    assert.ok(
+      recipeBrowserInspectorSource.includes("data-recipe-produces={row.failure ? 'failure' : 'success'}"),
+      'every produced group is rendered, toned by role'
     );
   });
 
@@ -694,7 +938,13 @@ describe('CraftingSystemManager source contract', () => {
       'root should keep disabled Recipes in the planned placeholder list when experimental features are off'
     );
     assert.ok(rootSource.includes('selectSystemAndShowBrowser'), 'root should keep an explicit systems-browser route');
-    assert.ok(rootSource.includes('manager-scope-card'), 'root should render selected system scope as static rail text');
+    assert.ok(rootSource.includes('manager-scope-card'), 'root should render the selected system in a rail card');
+    // The rail card SELECTS (issue 643): before this the rail could name the selected
+    // system but offered no way at all to switch to another one.
+    assert.ok(rootSource.includes('data-manager-scope-select'), 'the rail card should carry a real system select');
+    assert.ok(!rootSource.includes('manager-scope-name'), 'the static rail name span is retired, not merely hidden');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.AllCraftingSystems'), 'the rail back link should be localized');
+    assert.ok(!rootSource.includes('FABRICATE.Admin.Manager.Workspace'), 'the rail should not repeat "GM management" below its own section label');
     assert.ok(rootSource.includes('manager-scope-return'), 'root should expose a return-to-system-library rail action');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.ReturnToSystemLibrary'), 'return-to-library action should be localized');
     assert.ok(!rootSource.includes('SystemEdit.EditBadge'), 'system settings nav should not render the former Edit badge');
@@ -741,7 +991,8 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes("manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}"), 'expanded gathering rail should style as one submenu group');
     assert.ok(rootSource.includes('const gatheringEventDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : [])'), 'root should derive reusable gathering event counts from selected gathering config');
     assert.ok(rootSource.includes('total: environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length'), 'gathering parent count should summarize environments, tasks, and events');
-    assert.ok(rootSource.includes('<span class="manager-nav-count">{gatheringNavCounts.total}</span>'), 'gathering parent should render a summary count chip');
+    // Issue 643: a rail count is a bare mono numeral, not a chip.
+    assert.ok(rootSource.includes('<span class="manager-nav-count">{gatheringNavCounts.total}</span>'), 'gathering parent should render a summary count numeral');
     assert.ok(rootSource.includes('gatheringNavCounts[gatheringItem.id]'), 'gathering submenu items should render their count chips from gathered section counts');
     assert.equal(rootSource.includes("manager-nav-parent ${isGatheringRoute ? 'is-active' : ''}"), false, 'gathering parent should not use the selected pill class');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandGathering'), 'gathering rail expand label should be localized');
@@ -787,10 +1038,14 @@ describe('CraftingSystemManager source contract', () => {
       'Prepare event options that can be reused across your locations.'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
-    assert.ok(rootSource.includes('https://mistersilver-uk.github.io/fabricate/recipes'), 'empty recipes inspector should link to published recipe docs');
-    assert.ok(rootSource.includes('selectedCounts.components > 0'), 'empty recipes inspector should branch on selected-system component count');
-    assert.ok(rootSource.includes("setView('components')"), 'empty recipes inspector should route zero-component setup to Components');
+    // The empty-recipes setup card moved into the extracted library inspector with
+    // the rest of the aside (issue 643); the root still supplies the component count
+    // and the Components deep-link.
+    assert.ok(recipeBrowserInspectorSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
+    assert.ok(recipeBrowserInspectorSource.includes('https://mistersilver-uk.github.io/fabricate/recipes'), 'empty recipes inspector should link to published recipe docs');
+    assert.ok(recipeBrowserInspectorSource.includes('componentCount > 0'), 'empty recipes inspector should branch on selected-system component count');
+    assert.ok(rootSource.includes('componentCount={selectedCounts.components}'), 'the root should feed the inspector its component count');
+    assert.ok(rootSource.includes("onAddComponents={() => setView('components')}"), 'empty recipes inspector should route zero-component setup to Components');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.Title, 'Set up recipes');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint,
@@ -892,9 +1147,12 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes('function createRecipe('), 'createRecipe handler should be defined');
     assert.ok(!rootSource.includes('onclick={importRecipes}'), 'recipes header should not render import');
     assert.ok(!rootSource.includes('onclick={exportRecipes}'), 'recipes header should not render export');
-    // The row Edit action navigates to the in-manager recipe-edit route, so the
-    // editRecipe / backToRecipesBrowse / onEditRecipe wiring must be present.
-    assert.ok(rootSource.includes('onEditRecipe'), 'recipe edit prop should be wired to RecipesBrowserView');
+    // The recipe-edit route is reached BOTH from the inspector's Edit action and from
+    // each row's own Edit pencil, restored to match the Books & Scrolls row edit (issue
+    // 643): the inspector wires onEdit → editRecipe, and the row wires onEditRecipe →
+    // editRecipe(id).
+    assert.ok(rootSource.includes('onEdit={() => editRecipe(selectedRecipe?.id)}'), 'inspector Edit should be wired to editRecipe');
+    assert.ok(rootSource.includes('onEditRecipe={(id) => editRecipe(id)}'), 'the row Edit pencil should be wired to editRecipe(id)');
     assert.ok(rootSource.includes('function editRecipe('), 'editRecipe navigation should be defined');
     assert.ok(rootSource.includes('function backToRecipesBrowse('), 'backToRecipesBrowse navigation should be defined');
     assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');

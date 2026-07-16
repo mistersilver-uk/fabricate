@@ -1,14 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Overview "Steps" card: the single drag-to-reorder surface for a multi-step
-  recipe. Each step's header shows its editable duration control and a delete
-  button (both owned by RecipeStepAccordion); the expanded body edits only the
-  step's name and description. Order and identity are set here; a step's
-  ingredients, results, and tools are authored on their own tabs.
+  Overview "Step durations" card: the single drag-to-reorder surface for a
+  multi-step recipe. Each step's header shows its editable duration control (the
+  smoke-pinned `[data-recipe-duration-trigger]`) and a delete button (both owned by
+  RecipeStepAccordion); the expanded body carries the always-visible inline
+  five-column duration steppers (prototype §5.1) plus the step's name and
+  description. Order and identity are set here; a step's ingredients, results, and
+  tools are authored on their own tabs.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import RecipeStepAccordion from './recipe/RecipeStepAccordion.svelte';
+  import RecipeDurationSteppers from './recipe/RecipeDurationSteppers.svelte';
 
   let {
     steps = [],
@@ -24,16 +27,23 @@
   }
 </script>
 
-<section class="manager-task-core-card manager-recipe-steps" data-recipe-section="steps">
-  <div class="manager-task-card-heading">
+<section class="manager-recipe-steps-card manager-recipe-steps" data-recipe-section="steps">
+  <div class="manager-recipe-steps-card-head">
     <div>
-      <h3>{text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps')}</h3>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.StepsHint', 'Order the named steps used to craft this recipe. Drag to reorder.')}</p>
+      <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.StepDurations', 'Step durations')}</h3>
+      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.StepDurationsHint', 'Each step takes its own time; they craft in sequence. Set the ingredients per step on the Ingredients tab.')}</p>
     </div>
   </div>
 
   <RecipeStepAccordion {steps} reorderable {onReorderSteps} {onUpdateStep} {onDeleteStep}>
     {#snippet body(step)}
+      <div class="manager-recipe-step-durations">
+        <RecipeDurationSteppers
+          timeRequirement={step.timeRequirement || null}
+          showLabel={false}
+          onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
+        />
+      </div>
       <label class="manager-field">
         <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>
         <input

@@ -1,0 +1,139 @@
+name: "Beta"
+
+# Publishes every releasing push to `main` as a `-beta.N` prerelease to the PRIVATE beta channel.
+# Replaces the retired release-candidate.yml (issue #627, task 3.2).
+#
+# Model:
+#   * semantic-release runs on `main` and computes a `-beta.N` version, then creates and pushes its
+#     git tag. Because release.config.js OMITS @semantic-release/github on `main`, NO GitHub release
+#     object is ever created here — that omission is the privacy mechanism, so this workflow does
+#     NOT assert a GitHub release/asset. The S3 publish IS the assertion.
+#   * The version/tag come from the config's successCmd, which writes next_version/next_tag to
+#     $GITHUB_OUTPUT — but ONLY when a release is actually minted. A `main` push with no releasing
+#     commits computes "no release" and leaves both empty; the publish job is gated on next_version
+#     and skips, and the job does NOT fail.
+#   * The tested beta tag is published to the beta channel by the reusable release-s3.yml.
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
+      - uses: ./.github/actions/release-setup
+      - run: npx playwright install chromium --with-deps
+      - run: npm test
+      - run: npm run build
+
+  smoke-test:
+    needs: unit-tests
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/foundry-integration.yml
+    # require_credentials: true makes the smoke job FAIL (not skip green) when Foundry credentials
+    # are unset — a beta publish must never ship on a build whose smoke test silently did not run.
+    with:
+      require_credentials: true
+    secrets: inherit
+
+  semantic-release:
+    needs: smoke-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      next_version: ${{ steps.semrel.outputs.next_version }}
+      next_tag: ${{ steps.semrel.outputs.next_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      # Shared Node + npm ci preamble (no OIDC — the S3 publish runs in the reusable release-s3.yml).
+      - uses: ./.github/actions/release-setup
+
+      - name: Create the local release/hotfix branches semantic-release validates
+        # semantic-release expands its configured branches against ORIGIN's branches, then runs
+        # `git tag --merged <name>` per match. On a `main` checkout `main` is a local ref but
+        # `release` and any `N.N.x` hotfix line are NOT, so semantic-release dies with
+        # `fatal: malformed object name <name>` unless each exists locally. Create a local ref for
+        # `release` AND every `N.N.x` branch on origin (the config glob is `+([0-9]).+([0-9]).x`,
+        # i.e. two numeric parts). Today no hotfix line exists so only `release` is created; the
+        # moment issue #627's model pushes a `1.4.x` line, this keeps every `main` push alive.
+        run: |
+          git fetch origin --tags --force
+          for b in $(git ls-remote --heads origin \
+            | sed 's#.*refs/heads/##' \
+            | grep -E '^(release|[0-9]+\.[0-9]+\.x)$'); do
+            echo "Creating local ref for origin/$b"
+            git fetch origin "+refs/heads/$b:refs/remotes/origin/$b" --force
+            git branch -f "$b" "origin/$b"
+          done
+
+      - name: Semantic Release
+        id: semrel
+        # GITHUB_REF_NAME/GITHUB_REF are reserved and cannot be overridden by a step `env:`; they
+        # are naturally `main` here because this workflow is push-triggered on `main`, which is what
+        # keeps classifyBranch on the beta line. The config's successCmd writes next_version/next_tag
+        # to this step's $GITHUB_OUTPUT, but ONLY when a release is minted (no release ⇒ both empty).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+  publish-s3:
+    needs: semantic-release
+    # Skip the publish when semantic-release minted nothing (no releasing commits on this push).
+    if: ${{ needs.semantic-release.outputs.next_version != '' }}
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/release-s3.yml
+    with:
+      tag: ${{ needs.semantic-release.outputs.next_tag }}
+      channel: beta
+      check_heads: false
+      dry_run: false
+      overwrite: false
+    secrets:
+      # Reusable workflows don't inherit repo secrets; pass the tester-path secrets through
+      # explicitly. beta uses S3_TESTER_PATH_SECRET; S3_EARLY_ACCESS_PATH_SECRET is forwarded because
+      # release-s3.yml declares it (a later early-access caller needs it) — beta does not use it.
+      S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+      S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+
+  verify-publish:
+    needs: [semantic-release, publish-s3]
+    # Runs whenever a version was minted (even if the publish failed) so the failure is explicit.
+    if: ${{ always() && needs.semantic-release.outputs.next_version != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Assert the S3 publish succeeded
+        # No GitHub release exists on `main`, so the S3 publish IS the release assertion: a minted
+        # beta version MUST have been published to the beta channel. release-s3.js's monotonic-head
+        # guard runs before any write and its publish sets the head, so a successful publish-s3 job
+        # guarantees the beta channel head then advertises next_version.
+        env:
+          PUBLISH_RESULT: ${{ needs.publish-s3.result }}
+          NEXT_VERSION: ${{ needs.semantic-release.outputs.next_version }}
+        run: |
+          if [ "$PUBLISH_RESULT" != "success" ]; then
+            echo "::error::beta v$NEXT_VERSION was minted but the S3 publish did not succeed (result=$PUBLISH_RESULT)."
+            exit 1
+          fi
+          echo "beta v$NEXT_VERSION published to the beta channel; its head now advertises v$NEXT_VERSION."

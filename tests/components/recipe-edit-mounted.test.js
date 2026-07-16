@@ -19,6 +19,9 @@ const RAW_MODULES = [
   // (the single low-layer source of truth), so the harness must copy that
   // module and its transitive model dependencies.
   'src/ui/svelte/util/recipeImageIcons.js',
+  // The Overview tab resolves the recipe image (bag → blueprint) through this
+  // standalone (dependency-free) resolver; a missing raw module HANGS the suite.
+  'src/ui/svelte/util/craftingImageDefaults.js',
   // Shared duration formatter consumed by the step accordion + duration editor.
   'src/ui/svelte/util/recipeDuration.js',
   // Shared currency label/icon helpers consumed by the ingredient option editor.
@@ -38,6 +41,12 @@ const RAW_MODULES = [
   // The validation tab localizes a signature-collision blocker row via this pure
   // leaf (issue 549).
   'src/utils/recipeActivationMessages.js',
+  // The resolution-mode banner reuses the CANONICAL option list (value/icon/label/
+   // desc) rather than re-authoring a MODE_INFO table. It was not in this allowlist
+  // before, and a missing raw module HANGS the suite (`# cancelled`) instead of
+  // failing it.
+  'src/ui/svelte/apps/manager/resolutionModeOptions.js',
+  // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
   ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -46,6 +55,9 @@ const RAW_MODULES = [
 // The new tab + section components the editor shell composes.
 const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  // The resolution-mode banner heads every editor tab (issue 643 §5).
+  'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
@@ -62,7 +74,9 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
@@ -76,12 +90,16 @@ const editHarness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 });
 
-const inspectorHarness = createMountedComponentHarness({
+// The recipe editor's context rail (issue 643 §4b) — it REPLACED RecipeItemInspector.
+const railHarness = createMountedComponentHarness({
   repoRoot,
-  tmpPrefix: 'fabricate-recipe-item-inspector-',
+  tmpPrefix: 'fabricate-recipe-context-rail-',
   rawModules: RAW_MODULES,
-  compiledModules: ['src/ui/svelte/apps/manager/RecipeItemInspector.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/RecipeItemInspector.svelte',
+  compiledModules: [
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
+  ],
+  componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
 });
 
 const stepsHarness = createMountedComponentHarness({
@@ -89,7 +107,9 @@ const stepsHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-steps-',
   rawModules: RAW_MODULES,
   compiledModules: [
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   ],
@@ -116,14 +136,17 @@ function identityProps(overrides = {}) {
   };
 }
 
-function inspectorProps(overrides = {}) {
+// The rail's default effect is the `knowledge` row of the craftingVisibility matrix
+// (showBooksScrolls), which is also the manager's default visibility mode.
+function railProps(overrides = {}) {
   return {
     recipe: RECIPE,
+    visibilityEffect: { showAccess: false, showBooksScrolls: true },
+    accessPlayers: [],
+    accessCharacters: [],
     recipeItemDefinitions: [],
-    onAddRecipeItem: () => false,
-    onSetRecipeItem: () => {},
+    readiness: { checks: [], issues: [] },
     onOpenItem: () => {},
-    onCopyItemUuid: () => {},
     ...overrides,
   };
 }
@@ -264,14 +287,30 @@ async function pickPopoverOption(target, trigger, optionPattern) {
   await flushRender();
 }
 
-// Drive a drop through the dragDrop action using a plain Event + a dataTransfer
-// stub (text/plain JSON), not a synthetic native DragEvent.
-function dispatchDrop(node, payload) {
-  const event = new globalThis.window.Event('drop', { bubbles: true, cancelable: true });
-  event.dataTransfer = {
-    getData: (type) => (type === 'text/plain' ? JSON.stringify(payload) : ''),
-  };
-  node.dispatchEvent(event);
+// Open a BARE row's single "or..." popover (bare rows keep the compact popover;
+// multi-alternative boxes use explicit dashed buttons instead — see pickOrOption).
+async function openOrMenu(target, groupId) {
+  target.querySelector(`[data-recipe-group-id="${groupId}"] .manager-recipe-or-trigger`).click();
+  await flushRender();
+}
+
+// Choose the add-affordance carrying the given data-recipe-add token, handling both
+// shapes the requirement now takes (issue 643): a BARE single-alternative row keeps
+// the compact "or..." popover (portaled out of the group, so its option resolves at
+// document level, as pickPopoverOption does); a multi-alternative BOX renders the
+// four explicit dashed add-buttons inline in its `.manager-recipe-requirement-adds`
+// footer, clicked directly.
+async function pickOrOption(target, groupId, addToken) {
+  const group = target.querySelector(`[data-recipe-group-id="${groupId}"]`);
+  const trigger = group.querySelector('.manager-recipe-or-trigger');
+  if (trigger) {
+    trigger.click();
+    await flushRender();
+    document.querySelector(`[data-recipe-add="${addToken}"]`).click();
+  } else {
+    group.querySelector(`.manager-recipe-requirement-adds [data-recipe-add="${addToken}"]`).click();
+  }
+  await flushRender();
 }
 
 describe('RecipeEditView (mounted)', () => {
@@ -679,6 +718,37 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('simple-with-check: the same two-slot result editor renders (success + reserved failure)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        simpleFailureSlot: true,
+        complex: false,
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: {
+          ...RECIPE,
+          resultGroups: [{ id: 'rg-ok', results: [{ componentId: 'cmp-herb', quantity: 1 }] }],
+        },
+        onUpdateRecipe: () => {},
+      })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+
+    const view = target.querySelector('[data-recipe-result-alchemy-simple]');
+    assert.ok(view, 'a simple system with a check gets the two-slot success/failure editor');
+    assert.equal(
+      view.querySelectorAll('[data-recipe-set]').length,
+      2,
+      'exactly two result sets (success + reserved failure)'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-add="result-set"]'),
+      null,
+      'no "Add result set" in the two-slot view'
+    );
+    editHarness.remount();
+  });
+
   it('check mode: result sets assign outcome tiers, disabling tiers used elsewhere', async () => {
     const groups = [
       {
@@ -892,7 +962,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders a single-step Duration control on the Overview tab whose edits emit onUpdateRecipe({ timeRequirement })', async () => {
+  it('renders always-visible inline Duration steppers on the Overview tab whose edits emit onUpdateRecipe({ timeRequirement })', async () => {
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
@@ -901,12 +971,22 @@ describe('RecipeEditView (mounted)', () => {
     );
     const durationSection = target.querySelector('[data-recipe-section="duration"]');
     assert.ok(durationSection, 'the single-step Overview shows the Duration section');
-    const trigger = durationSection.querySelector('[data-recipe-duration-trigger]');
-    assert.match(trigger.textContent, /Add duration/, 'an unset duration reads Add duration');
-    trigger.click();
-    await flushRender();
-    const daysInput = document.querySelector('[data-recipe-duration-unit="days"]');
-    assert.ok(daysInput, 'the duration editor exposes a days input');
+    // The steppers are ALWAYS visible now (no popover trigger) — the tab is no longer
+    // the sole path behind a click (issue 643 §10).
+    assert.ok(durationSection.querySelector('[data-recipe-duration-steppers]'), 'inline duration steppers render');
+    assert.equal(
+      durationSection.querySelector('[data-recipe-duration-trigger]'),
+      null,
+      'the single-step Duration card no longer routes through a popover trigger'
+    );
+    // Each unit is the shared Stepper: the PRIMARY control is a real, typeable number
+    // input; the chevron buttons are adjuncts. A click-only stepper would be a keyboard
+    // regression.
+    const daysInput = durationSection.querySelector(
+      '[data-recipe-duration-unit="days"] [data-stepper-input]'
+    );
+    assert.ok(daysInput, 'the duration editor exposes a typeable days input');
+    assert.equal(daysInput.getAttribute('type'), 'number', 'it is a real number input');
     daysInput.value = '3';
     daysInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(patches.length, 1, 'editing the duration emits exactly one patch');
@@ -929,13 +1009,12 @@ describe('RecipeEditView (mounted)', () => {
         onUpdateRecipe: (patch) => patches.push(patch),
       })
     );
-    const trigger = target.querySelector(
-      '[data-recipe-section="duration"] [data-recipe-duration-trigger]'
+    const hoursInput = target.querySelector(
+      '[data-recipe-section="duration"] [data-recipe-duration-unit="hours"] [data-stepper-input]'
     );
-    assert.match(trigger.textContent, /5 hours/, 'a set duration reads its formatted value');
-    trigger.click();
-    await flushRender();
-    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
+    assert.equal(hoursInput.value, '5', 'the hours stepper reflects the set duration');
+    // The Stepper ignores a partially-typed empty field mid-keystroke, so a zeroing
+    // edit is typed as '0' and commits on input.
     hoursInput.value = '0';
     hoursInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(patches.length, 1, 'zeroing the only unit emits a patch');
@@ -943,17 +1022,15 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('increments a duration unit via the up stepper button', async () => {
+  it('increments a duration unit via the up stepper chevron', async () => {
     const patches = [];
     const target = await editHarness.mount(
       identityProps({ onUpdateRecipe: (patch) => patches.push(patch) })
     );
-    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
-    await flushRender();
-    const upDays = document.querySelector(
-      '[data-recipe-duration-stepper="days"] [data-recipe-duration-step="up"]'
+    const upDays = target.querySelector(
+      '[data-recipe-section="duration"] [data-recipe-duration-unit="days"] [data-stepper-increment]'
     );
-    assert.ok(upDays, 'each unit exposes an up stepper');
+    assert.ok(upDays, 'each unit exposes an increment adjunct');
     upDays.click();
     assert.deepEqual(
       patches.at(-1),
@@ -963,47 +1040,20 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('increments a duration unit via the ArrowUp key on the input', async () => {
+  it('clamps a duration unit at zero and never commits a negative', async () => {
+    // The decrement adjunct is disabled at the Stepper's `min`, so the hand-rolled
+    // "clamp at 0" arithmetic the old editor carried is now the primitive's job — and
+    // this is the test that keeps it honest.
     const patches = [];
     const target = await editHarness.mount(
       identityProps({ onUpdateRecipe: (patch) => patches.push(patch) })
     );
-    target.querySelector('[data-recipe-section="duration"] [data-recipe-duration-trigger]').click();
-    await flushRender();
-    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
-    hoursInput.dispatchEvent(
-      new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })
+    const downHours = target.querySelector(
+      '[data-recipe-section="duration"] [data-recipe-duration-unit="hours"] [data-stepper-decrement]'
     );
-    assert.deepEqual(
-      patches.at(-1),
-      { timeRequirement: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 } },
-      'ArrowUp increments the focused unit'
-    );
-    editHarness.remount();
-  });
-
-  it('clears the single-step recipe duration when the trigger is right-clicked', async () => {
-    const patches = [];
-    const target = await editHarness.mount(
-      identityProps({
-        recipe: {
-          ...RECIPE,
-          timeRequirement: { minutes: 0, hours: 5, days: 0, months: 0, years: 0 },
-        },
-        onUpdateRecipe: (patch) => patches.push(patch),
-      })
-    );
-    const trigger = target.querySelector(
-      '[data-recipe-section="duration"] [data-recipe-duration-trigger]'
-    );
-    trigger.dispatchEvent(
-      new globalThis.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true })
-    );
-    assert.deepEqual(
-      patches.at(-1),
-      { timeRequirement: null },
-      'right-clicking a set duration clears it'
-    );
+    assert.equal(downHours.disabled, true, 'the decrement adjunct is disabled at zero');
+    downHours.click();
+    assert.equal(patches.length, 0, 'a zero unit cannot be decremented below zero');
     editHarness.remount();
   });
 
@@ -1039,47 +1089,43 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('locks the image picker to the linked recipe item image when recipeItemId is set', async () => {
+  it('keeps the image editable and independent of the recipe item even when recipeItemId is set', async () => {
+    // A recipe can belong to many books & scrolls, so its image no longer mirrors or
+    // locks to a linked recipe item (issue 643): the editable picker always renders and
+    // shows the recipe's OWN img, never a linked item image.
     const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri1' },
-        linkedItemImage: 'icons/consumables/potions/potion-tube-corked-blue.webp',
+        recipe: { ...RECIPE, recipeItemId: 'ri1', img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
         onPickImagePath: async () => 'icons/should-not-be-used.webp',
       })
     );
-    const locked = target.querySelector('[data-recipe-item-locked-image]');
-    assert.ok(locked, 'locked-image span renders when linked');
-    assert.ok(
-      locked.classList.contains('is-recipe-item-linked'),
-      'uses the recipe-specific locked class'
-    );
-    assert.ok(locked.querySelector('.fa-lock'), 'shows a lock icon');
     assert.equal(
-      target.querySelector('button[data-recipe-field="img"]'),
+      target.querySelector('[data-recipe-item-locked-image]'),
       null,
-      'no editable picker button when locked'
+      'no locked-image span when a recipe item is linked'
     );
-    const img = locked.querySelector('img');
+    const button = target.querySelector('button[data-recipe-field="img"]');
+    assert.ok(button, 'the editable picker button renders even when linked');
+    assert.ok(button.querySelector('.fa-pen'), 'shows the edit (pen) affordance, not a lock');
     assert.ok(
-      img.getAttribute('src').includes('potion-tube-corked-blue'),
-      'shows the linked item image'
+      button.querySelector('img').getAttribute('src').includes('potion-tube-corked-red'),
+      "shows the recipe's own image, not a linked recipe item image"
     );
-
-    // Regression: the locked image is fully controlled by the (staged) linkedItemImage
-    // prop, so staging a different recipe-item link updates the preview without a save.
     editHarness.remount();
-    const restaged = await editHarness.mount(
+  });
+
+  it('resolves the generic item-bag icon to the alchemical blueprint default', async () => {
+    // A recipe that never got a real icon carries Foundry's generic item-bag; the picker
+    // resolves that to the blueprint default rather than showing the bag (issue 643).
+    const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri2' },
-        linkedItemImage: 'icons/consumables/potions/potion-tube-corked-green.webp',
-        onPickImagePath: async () => 'icons/should-not-be-used.webp',
+        recipe: { ...RECIPE, img: 'icons/svg/item-bag.svg' },
+        onPickImagePath: async () => '',
       })
     );
-    const restagedImg = restaged.querySelector('[data-recipe-item-locked-image] img');
-    assert.ok(
-      restagedImg.getAttribute('src').includes('potion-tube-corked-green'),
-      'a staged link change swaps the locked preview image without a save'
-    );
+    const src = target.querySelector('button[data-recipe-field="img"] img').getAttribute('src');
+    assert.ok(src.includes('blueprint-recipe-alchemical'), 'the bag resolves to the alchemical blueprint');
+    assert.equal(src.includes('item-bag'), false, 'the generic bag is not shown');
     editHarness.remount();
   });
 
@@ -1132,8 +1178,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders the single-step ingredient/results/tools sections on their tabs', async () => {
+    // An empty recipe in a multi-set-capable mode: complexity is emergent, so the
+    // single (empty) ingredient set renders chromeless with the "Add ingredient set"
+    // promotion affordance below it, and the single result group renders chromeless.
     const target = await editHarness.mount(
-      identityProps({ complex: true, toolsLibrary: TOOLS_LIBRARY })
+      identityProps({ canAddSet: true, toolsLibrary: TOOLS_LIBRARY })
     );
 
     clickTab(target, 'ingredients');
@@ -1142,19 +1191,21 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="ingredients"]'),
       'ingredients section renders'
     );
-    assert.match(target.textContent, /No ingredients yet/, 'ingredients empty text shown');
+    assert.ok(
+      target.querySelector('.manager-recipe-ingredient-set.is-chromeless'),
+      'the single set renders chromeless (no Set 1 box)'
+    );
     assert.ok(
       target.querySelector('[data-recipe-add="ingredient-set"]'),
-      'add ingredient set button shown'
+      'the Add ingredient set promotion button shows where the mode allows it'
     );
 
     clickTab(target, 'results');
     await flushRender();
     assert.ok(target.querySelector('[data-recipe-section="results"]'), 'results section renders');
-    assert.match(target.textContent, /No results yet/, 'results empty text shown');
     assert.ok(
-      target.querySelector('[data-recipe-add="result-set"]'),
-      'add result set button shown'
+      target.querySelector('[data-recipe-result-simple]'),
+      'the single result group renders chromeless'
     );
 
     clickTab(target, 'tools');
@@ -1163,7 +1214,7 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-section="tools"]'),
       'tools section renders on the Tools tab'
     );
-    assert.match(target.textContent, /No tools yet/, 'tools empty text shown');
+    assert.match(target.textContent, /No tools required/, 'tools empty panel shown');
     editHarness.remount();
   });
 
@@ -1222,30 +1273,56 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('shows full ingredient/result set scaffolding in Complex mode', async () => {
-    const target = await editHarness.mount(identityProps({ complex: true }));
+  it('shows full multi-set scaffolding once a recipe holds more than one set/group', async () => {
+    // Emergent complexity: chrome + add-affordances appear because the recipe already
+    // holds multiple sets/groups, not because of any stored Complex flag.
+    const target = await editHarness.mount(
+      identityProps({
+        canAddSet: true,
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [
+            { id: 'set-1', name: 'Alpha', ingredientGroups: [] },
+            { id: 'set-2', name: 'Beta', ingredientGroups: [] },
+          ],
+          resultGroups: [
+            { id: 'grp-1', name: 'Primary', results: [] },
+            { id: 'grp-2', name: 'Bonus', results: [] },
+          ],
+        },
+      })
+    );
     clickTab(target, 'ingredients');
     await flushRender();
+    const setOr = target.querySelector('.manager-recipe-ingredient-set-or');
+    assert.ok(setOr, 'multiple sets get the OR chrome');
+    // The between-set OR now wraps its label in a pill span, like the within-requirement
+    // OR, so both read as "[ — OR — ]" flanked breaks (issue 643).
+    assert.equal(
+      setOr.querySelector('span')?.textContent.trim(),
+      'OR',
+      'the set OR label sits in a pill span'
+    );
     assert.ok(
       target.querySelector('[data-recipe-add="ingredient-set"]'),
-      'Add set button shown in Complex mode'
+      'Add ingredient set button shown for a multi-set recipe'
     );
 
     clickTab(target, 'results');
     await flushRender();
     assert.ok(
       target.querySelector('[data-recipe-add="result-set"]'),
-      'Add result set button shown in Complex mode'
+      'Add result set button shown for a multi-group recipe'
     );
     editHarness.remount();
   });
 
-  it('appends an ingredient set via onUpdateRecipe when + Add set is clicked', async () => {
+  it('appends an ingredient set via onUpdateRecipe when + Add ingredient set is clicked', async () => {
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
-        recipe: { ...RECIPE, complex: true, ingredientSets: [{ id: 'set-1' }] },
+        canAddSet: true,
+        recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1' }] },
         onUpdateRecipe: (patch) => patches.push(patch),
       })
     );
@@ -1323,12 +1400,13 @@ describe('RecipeEditView (mounted)', () => {
 
   it('appends a result set via onUpdateRecipe({ resultGroups }) when + Add result set is clicked', async () => {
     const patches = [];
+    // A routed system keeps chrome (and its Add result set button) even for a single
+    // group, because routed result groups carry a per-group routing head.
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
+        routingProvider: 'ingredientSet',
         recipe: {
           ...RECIPE,
-          complex: true,
           resultGroups: [{ id: 'grp-1', name: 'Primary', results: [] }],
         },
         onUpdateRecipe: (patch) => patches.push(patch),
@@ -1357,7 +1435,7 @@ describe('RecipeEditView (mounted)', () => {
   // a drag handle on each result row. A progressive recipe holds a single result
   // group (multi-set is forbidden), rendered chromeless. `progressive` is threaded
   // from the system resolution mode through the editor shell to the group card.
-  function mountProgressiveResults(results, { progressive = true } = {}) {
+  function mountProgressiveResults(results, { progressive = true, props = {} } = {}) {
     const patches = [];
     return editHarness
       .mount(
@@ -1371,6 +1449,7 @@ describe('RecipeEditView (mounted)', () => {
             resultGroups: [{ id: 'grp-1', name: '', results }],
           },
           onUpdateRecipe: (patch) => patches.push(patch),
+          ...props,
         })
       )
       .then(async (target) => {
@@ -1381,7 +1460,7 @@ describe('RecipeEditView (mounted)', () => {
   }
 
   // Fire a native drag lifecycle event (the handlers read no dataTransfer, so a
-  // plain bubbling Event suffices, mirroring dispatchDrop above).
+  // plain bubbling Event suffices).
   function fireDrag(node, type) {
     node.dispatchEvent(
       new globalThis.window.Event(type, { bubbles: true, cancelable: true })
@@ -1515,6 +1594,153 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // Reorder was DRAG-ONLY: an aria-hidden grip on a draggable div, with an
+  // a11y_no_static_element_interactions suppression and NO keyboard path at all. Order
+  // is load-bearing in progressive mode (the award loop spends the check budget down the
+  // list), so that was a live accessibility hole. These are real buttons (issue 643 §6).
+  it('progressive: result rows expose keyboard move buttons, disabled at the ends', async () => {
+    const { target } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ]);
+    const rows = target.querySelectorAll('[data-recipe-result-row]');
+    const firstUp = rows[0].querySelector('[data-recipe-result-move-up]');
+    const firstDown = rows[0].querySelector('[data-recipe-result-move-down]');
+    const lastUp = rows[1].querySelector('[data-recipe-result-move-up]');
+    const lastDown = rows[1].querySelector('[data-recipe-result-move-down]');
+
+    assert.ok(firstUp && firstDown && lastUp && lastDown, 'both rows expose move buttons');
+    assert.equal(firstUp.disabled, true, 'the first row cannot move up');
+    assert.equal(firstDown.disabled, false, 'the first row can move down');
+    assert.equal(lastUp.disabled, false, 'the last row can move up');
+    assert.equal(lastDown.disabled, true, 'the last row cannot move down');
+
+    // The accessible name NAMES the row, so a screen-reader user knows what moves.
+    assert.match(
+      firstDown.getAttribute('aria-label'),
+      /Move down .* Mountain Herb/,
+      'the move button names the result it moves'
+    );
+
+    // Layout (issue 643): the reorder controls sit to the RIGHT of the component's DC —
+    // inside the row's controls cluster, after the difficulty badge and before the remove
+    // control — not as a separate column on the left.
+    const row = rows[0];
+    const dc = row.querySelector('[data-recipe-result-difficulty]');
+    const move = row.querySelector('[data-recipe-result-move]');
+    const remove = row.querySelector('[data-recipe-remove="result-item"]');
+    assert.ok(move.closest('.manager-recipe-option-controls'), 'reorder lives in the row controls, right of the component');
+    assert.ok(
+      dc.compareDocumentPosition(move) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'reorder follows the difficulty badge'
+    );
+    assert.ok(
+      move.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the remove control follows the reorder controls'
+    );
+    editHarness.remount();
+  });
+
+  it('progressive: a keyboard move reorders the group and announces the new position', async () => {
+    const { target, patches } = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ]);
+    const rows = target.querySelectorAll('[data-recipe-result-row]');
+    rows[1].querySelector('[data-recipe-result-move-up]').click();
+    await flushRender();
+
+    assert.deepEqual(
+      patches.at(-1).resultGroups[0].results.map((result) => result.id),
+      ['res-2', 'res-1'],
+      'moving the second row up reorders the group'
+    );
+    const status = target.querySelector('[data-recipe-result-order-status]');
+    assert.equal(status.getAttribute('aria-live'), 'polite', 'the change is announced politely');
+    assert.match(status.textContent, /Pure Water moved to position 1 of 2/, 'and it names the move');
+    editHarness.remount();
+  });
+
+  it('non-progressive: result rows expose no move buttons', async () => {
+    const { target } = await mountProgressiveResults(
+      [
+        { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+        { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { progressive: false }
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-result-move]'),
+      null,
+      'only progressive results are ordered, so only they get move controls'
+    );
+    editHarness.remount();
+  });
+
+  // `component.difficulty` is consumed by progressive recipes, progressive salvage,
+  // progressive gathering AND the system-validation blocker. An inline stepper here
+  // would either write cross-aggregate immediately (bypassing both dirty guards) or make
+  // "Save recipe" silently persist a *Component* change — so it is a READ-ONLY badge
+  // with a deep-link to the component editor's Difficulty card.
+  it('progressive: renders a READ-ONLY difficulty badge that deep-links to the component editor', async () => {
+    const opened = [];
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      {
+        props: {
+          componentOptions: [
+            { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp', difficulty: 12 },
+          ],
+          onOpenComponent: (id) => opened.push(id),
+        },
+      }
+    );
+    const badge = target.querySelector('[data-recipe-result-difficulty]');
+    assert.ok(badge, 'the difficulty badge renders');
+    assert.equal(badge.getAttribute('data-recipe-result-difficulty'), '12', 'it shows the value');
+    assert.match(badge.textContent, /Difficulty 12/, 'and reads it out');
+    // It is a deep-link, NOT an editor: no input of any kind inside the badge.
+    assert.equal(badge.querySelector('input'), null, 'the badge carries no editable control');
+    badge.click();
+    assert.deepEqual(opened, ['cmp-herb'], 'it routes to the component that owns the difficulty');
+    editHarness.remount();
+  });
+
+  it('progressive: a component with no authored difficulty reads as unset, not as zero', async () => {
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }],
+      {
+        props: {
+          componentOptions: [{ id: 'cmp-water', name: 'Pure Water', img: 'icons/water.webp' }],
+        },
+      }
+    );
+    const badge = target.querySelector('[data-recipe-result-difficulty]');
+    assert.equal(badge.getAttribute('data-recipe-result-difficulty'), '', 'no fabricated value');
+    assert.match(badge.textContent, /No difficulty/, 'it says so rather than showing a 0');
+    editHarness.remount();
+  });
+
+  it('non-progressive: result rows show no difficulty badge', async () => {
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      {
+        progressive: false,
+        props: {
+          componentOptions: [
+            { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp', difficulty: 12 },
+          ],
+        },
+      }
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-result-difficulty]'),
+      null,
+      'difficulty only participates in progressive resolution'
+    );
+    editHarness.remount();
+  });
+
   it('opens the recipe-level tools popover on the Tools tab, lists the library, and adds a chosen tool', async () => {
     const patches = [];
     const target = await editHarness.mount(
@@ -1639,10 +1865,9 @@ describe('RecipeEditView (mounted)', () => {
     const updates = [];
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
+        canAddSet: true,
         recipe: {
           ...RECIPE,
-          complex: true,
           steps: [{ id: 'sa', name: 'Forge', ingredientSets: [{ id: 'pre' }] }],
         },
         onUpdateStep: (id, patch) => updates.push([id, patch]),
@@ -1668,10 +1893,16 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('renders a populated set as component + tag requirements, with images, an OR separator, and no group-name/match toggle', async () => {
+    // Two sets, so this set renders with chrome (a Set-N box + editable name). A single
+    // set would render chromeless (issue 643); the requirement rendering under test is
+    // identical either way, so a multi-set recipe keeps the name-field coverage too.
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
-        recipe: { ...RECIPE, complex: true, ingredientSets: [POPULATED_SET] },
+        canAddSet: true,
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [POPULATED_SET, { id: 'set-2', name: '', ingredientGroups: [] }],
+        },
         componentOptions: COMPONENT_OPTIONS,
         essenceOptions: ESSENCE_OPTIONS,
         itemTags: ITEM_TAGS,
@@ -1741,18 +1972,12 @@ describe('RecipeEditView (mounted)', () => {
       'tag match defaults to Any'
     );
 
-    // The two AND'd requirements are separated by a labelled "AND" divider that
-    // mirrors the within-group "OR" divider (same casing/markup, different label).
-    const andSeparators = set.querySelectorAll('.manager-recipe-ingredient-and-separator');
+    // §B7: the invented "AND" hairline dividers between requirements are gone — the
+    // prototype has none; the AND relationship lives in the tab intro copy.
     assert.equal(
-      andSeparators.length,
-      1,
-      'one AND divider sits between the two AND’d requirements'
-    );
-    assert.equal(
-      andSeparators[0].querySelector('span').textContent.trim(),
-      'AND',
-      'the AND divider reads "AND"'
+      set.querySelectorAll('.manager-recipe-ingredient-and-separator').length,
+      0,
+      'no AND divider is rendered between AND’d requirements'
     );
 
     // The per-set essence row renders.
@@ -1811,24 +2036,21 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a component alternative via the row-end Add component popover', async () => {
+  it('appends a component alternative via the "or..." Accept-instead popover', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS } }
     );
-    await pickPopoverOption(
-      target,
-      '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]',
-      /Pure Water/
-    );
-    assert.equal(patches.length, 1, 'choosing an alternative patches the recipe');
+    await pickOrOption(target, 'grp-1', 'alternative-component');
+    assert.equal(patches.length, 1, 'choosing an alternative kind patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the alternative list grew by one');
     assert.deepEqual(
       options[1].match,
-      { type: 'component', componentId: 'cmp-water' },
-      'the new alternative is a component match'
+      { type: 'component', componentId: null },
+      'the new alternative is an EMPTY component match for the row picker to fill'
     );
+    assert.equal(options[1].quantity, 1, 'it defaults to quantity 1');
     editHarness.remount();
   });
 
@@ -1854,40 +2076,34 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('increments an existing component alternative instead of duplicating it', async () => {
+  it('leaves an existing alternative untouched when a new one is appended', async () => {
+    // The old row-end add was itself a component PICKER, so it could dedupe-and-bump an
+    // alternative that already named the chosen component. The "or..." popover picks a
+    // KIND, not a component, so there is nothing to dedupe against at add time: the new
+    // alternative is born empty and the row's own picker fills it. A GM who then picks a
+    // component the requirement already lists gets the Validation tab's
+    // `duplicateAlternative` issue, which is the honest place for that check.
     const { target, patches } = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS } }
     );
-    await pickPopoverOption(
-      target,
-      '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-component"]',
-      /Mountain Herb/
-    );
-    assert.equal(
-      patches.length,
-      1,
-      'choosing the existing alternative component patches the recipe'
-    );
+    await pickOrOption(target, 'grp-1', 'alternative-component');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
-    assert.equal(options.length, 1, 'no duplicate alternative is appended');
-    assert.equal(options[0].quantity, 2, 'the existing alternative quantity is incremented by one');
+    assert.equal(options.length, 2, 'the existing alternative is kept and a new one appended');
     assert.deepEqual(
-      options[0].match,
-      { type: 'component', componentId: 'cmp-herb' },
-      'the match is unchanged'
+      options[0],
+      { quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } },
+      'the existing alternative is untouched'
     );
     editHarness.remount();
   });
 
-  it('appends a tag alternative via the row-end Add tag requirement button', async () => {
+  it('appends a tag alternative via the "or..." Accept-instead popover', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]')
-      .click();
+    await pickOrOption(target, 'grp-1', 'alternative-tag');
     assert.equal(patches.length, 1, 'adding a tag alternative patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the alternative list grew by one');
@@ -1904,11 +2120,8 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    // Starting from a one-component requirement, add a tag alternative from the row.
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-tag"]')
-      .click();
-    await flushRender();
+    // Starting from a one-component requirement, add a tag alternative from "or...".
+    await pickOrOption(target, 'grp-1', 'alternative-tag');
     const options = patches.at(-1).ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the requirement now holds two alternatives');
     const matchTypes = options.map((option) => option.match.type).sort();
@@ -1995,10 +2208,13 @@ describe('RecipeEditView (mounted)', () => {
       2,
       'both alternatives render'
     );
-    assert.ok(
-      req.querySelector('.manager-recipe-ingredient-or-separator'),
-      'the "— or —" separator renders between alternatives'
-    );
+    const separator = req.querySelector('.manager-recipe-ingredient-or-separator');
+    assert.ok(separator, 'the "— or —" separator renders between alternatives');
+    // The label is wrapped in its own span so the CSS can render it as a pill flanked
+    // by rules ("[ — OR — ]", issue 643), rather than as bare centred text.
+    const pill = separator.querySelector('span');
+    assert.ok(pill, 'the OR label is wrapped in a pill span');
+    assert.equal(pill.textContent.trim(), 'OR', 'the pill reads OR');
     editHarness.remount();
   });
 
@@ -2037,39 +2253,70 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders the per-row add cluster (with tooltips) for a single-alternative requirement', async () => {
+  it('renders ONE "or..." control per requirement, and no per-row add cluster', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
     const req = target.querySelector('[data-recipe-group-id="grp-1"]');
-    const row = req.querySelector('[data-recipe-option]');
-    // The add cluster lives inside the option row for a single-alternative requirement.
-    const rowAddComponent = row.querySelector('[data-recipe-add="alternative-component"]');
-    const rowAddTag = row.querySelector('[data-recipe-add="alternative-tag"]');
-    assert.ok(rowAddComponent, 'the per-row add-component control renders in the option row');
-    assert.ok(rowAddTag, 'the per-row add-tag control renders in the option row');
-    // No footer add cluster for a single-alternative requirement.
+    const triggers = req.querySelectorAll('.manager-recipe-or-trigger');
+    assert.equal(triggers.length, 1, 'exactly one "or..." trigger per requirement');
     assert.equal(
-      req.querySelector('.manager-recipe-requirement-adds'),
-      null,
-      'no footer add cluster for a bare requirement'
+      triggers[0].getAttribute('aria-haspopup'),
+      'dialog',
+      'it reuses SearchablePopover (aria-haspopup, Escape-dismiss, focus-on-open)'
     );
-    // Both inline add controls carry title tooltips.
-    assert.equal(
-      rowAddComponent.getAttribute('title'),
-      'Add alternative component',
-      'the add-component trigger has a tooltip'
-    );
-    assert.equal(
-      rowAddTag.getAttribute('title'),
-      'Add alternative tag requirement',
-      'the add-tag button has a tooltip'
-    );
+    for (const row of req.querySelectorAll('[data-recipe-option]')) {
+      assert.equal(
+        row.querySelector('[data-recipe-add]'),
+        null,
+        'option rows carry no add controls of their own'
+      );
+    }
     editHarness.remount();
   });
 
-  it('renders exactly one footer add cluster (and no per-row adds) for a multi-alternative OR group', async () => {
+  it('renders the multi-alternative box footer as four explicit dashed add-buttons', async () => {
+    // A box (2+ alternatives) drops the compact "or..." popover the bare rows keep and
+    // renders four explicit dashed add-buttons instead (issue 643), each preserving its
+    // data-recipe-add marker. Cost shows only with configured currency, essence only
+    // while the set can still take one.
+    const { target } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    const adds = target.querySelector(
+      '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
+    );
+    assert.ok(adds, 'the box carries an add-button footer');
+    assert.equal(
+      adds.querySelector('.manager-recipe-or-trigger'),
+      null,
+      'the box has no compact "or..." popover'
+    );
+    const buttons = [...adds.querySelectorAll('button[data-recipe-add]')];
+    assert.deepEqual(
+      buttons.map((button) => button.getAttribute('data-recipe-add')),
+      ['alternative-component', 'alternative-tag', 'alternative-cost', 'alternative-essence'],
+      'four dashed add-buttons in order, each keeping its marker'
+    );
+    for (const button of buttons) {
+      assert.ok(button.classList.contains('is-dashed'), 'each add-button is dashed');
+    }
+    editHarness.remount();
+  });
+
+  it('drops the cost and essence box buttons when the system configures neither', async () => {
     const { target } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -2077,52 +2324,251 @@ describe('RecipeEditView (mounted)', () => {
       ],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    const req = target.querySelector('[data-recipe-group-id="grp-1"]');
-    // Exactly one add-component and one add-tag control in the whole requirement.
-    assert.equal(
-      req.querySelectorAll('[data-recipe-add="alternative-component"]').length,
-      1,
-      'one add-component control per OR group'
+    const adds = target.querySelector(
+      '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
     );
-    assert.equal(
-      req.querySelectorAll('[data-recipe-add="alternative-tag"]').length,
-      1,
-      'one add-tag control per OR group'
-    );
-    // The single add cluster lives in the requirement footer, not in any option row.
-    const footer = req.querySelector('.manager-recipe-requirement-adds');
-    assert.ok(footer, 'the footer add cluster renders for an OR group');
-    assert.ok(
-      footer.querySelector('[data-recipe-add="alternative-component"]'),
-      'the add-component control is in the footer'
-    );
-    for (const optionRow of req.querySelectorAll('[data-recipe-option]')) {
-      assert.equal(
-        optionRow.querySelector('.manager-recipe-option-alternative-adds'),
-        null,
-        'option rows have no per-row add cluster'
-      );
-      assert.equal(
-        optionRow.querySelector('[data-recipe-add="alternative-component"]'),
-        null,
-        'option rows have no add-component control'
-      );
-    }
-    // The footer add controls keep their tooltips.
-    assert.equal(
-      footer.querySelector('[data-recipe-add="alternative-component"]').getAttribute('title'),
-      'Add alternative component',
-      'footer add-component tooltip'
-    );
-    assert.equal(
-      footer.querySelector('[data-recipe-add="alternative-tag"]').getAttribute('title'),
-      'Add alternative tag requirement',
-      'footer add-tag tooltip'
+    assert.deepEqual(
+      [...adds.querySelectorAll('button[data-recipe-add]')].map((button) =>
+        button.getAttribute('data-recipe-add')
+      ),
+      ['alternative-component', 'alternative-tag'],
+      'only component and tag buttons without currency units or system essences'
     );
     editHarness.remount();
   });
 
-  it('appends an alternative from the OR-group footer add-component control', async () => {
+  it('offers FOUR kinds in the "or..." menu, each keeping its data-recipe-add token', async () => {
+    // The token family is PRESERVED on the popover's type choices rather than renamed:
+    // this file drives ~25 call sites through it. Currency and Essence appear only when
+    // the system configures them, so the menu never offers what it cannot honour.
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+    for (const token of [
+      'alternative-component',
+      'alternative-tag',
+      'alternative-currency',
+      'alternative-essence',
+    ]) {
+      assert.ok(
+        document.querySelector(`[data-recipe-add="${token}"]`),
+        `the "or..." menu offers ${token}`
+      );
+    }
+    editHarness.remount();
+  });
+
+  it('splits the "or..." menu into Accept instead (OR) and Require as well (AND on the set)', async () => {
+    // The four choices do NOT all mean the same thing. Component / Tag / Currency are
+    // real OR alternatives appended to THIS requirement; Essence is an AND requirement
+    // that bubbles to the owning ingredient SET (there is no essence match type). One
+    // flat list named "Accept instead" would tell a screen-reader user that the essence
+    // choice replaces the ingredient — the exact mislabelling the split exists to stop.
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+
+    const groups = [...document.querySelectorAll('[data-popover-group]')];
+    assert.deepEqual(
+      groups.map((group) => group.getAttribute('aria-label')),
+      ['Accept instead', 'Require as well'],
+      'two ARIA groups, in that order'
+    );
+    for (const group of groups) {
+      assert.equal(group.getAttribute('role'), 'group');
+    }
+
+    const accept = groups[0];
+    const require_ = groups[1];
+    assert.deepEqual(
+      [...accept.querySelectorAll('[data-recipe-add]')].map((option) =>
+        option.getAttribute('data-recipe-add')
+      ),
+      ['alternative-component', 'alternative-tag', 'alternative-currency'],
+      'the three real match types are the OR alternatives'
+    );
+    assert.deepEqual(
+      [...require_.querySelectorAll('[data-recipe-add]')].map((option) =>
+        option.getAttribute('data-recipe-add')
+      ),
+      ['alternative-essence'],
+      'essence is an AND requirement on the SET, never an OR alternative'
+    );
+    editHarness.remount();
+  });
+
+  it('gives the "or..." trigger, dialog and search a NEUTRAL accessible name', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    const NEUTRAL = 'Add an alternative or an extra requirement';
+
+    const trigger = target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-or-trigger');
+    assert.equal(trigger.getAttribute('aria-label'), NEUTRAL, 'the trigger does not claim to be Accept instead');
+
+    await openOrMenu(target, 'grp-1');
+    const dialog = document.querySelector('.manager-travel-popover[role="dialog"]');
+    assert.equal(dialog.getAttribute('aria-label'), NEUTRAL);
+    assert.equal(dialog.querySelector('[role="listbox"]').getAttribute('aria-label'), NEUTRAL);
+    // The row-level "or..." popover drops the search box entirely (issue 643): only a
+    // handful of fixed choices, and the search was squeezing the option wording. So
+    // there is no search field to name — the trigger + dialog carry the neutral name.
+    assert.equal(
+      dialog.querySelector('input[type="text"]'),
+      null,
+      'the search-less row popover renders no search input'
+    );
+    editHarness.remount();
+  });
+
+  it('drops the Require as well heading entirely when the system has no essences', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
+    await openOrMenu(target, 'grp-1');
+
+    assert.deepEqual(
+      [...document.querySelectorAll('[data-popover-group]')].map((group) =>
+        group.getAttribute('aria-label')
+      ),
+      ['Accept instead'],
+      'an empty heading is not rendered'
+    );
+    editHarness.remount();
+  });
+
+  it('omits currency and essence from the "or..." menu when the system configures neither', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
+    await openOrMenu(target, 'grp-1');
+    assert.ok(document.querySelector('[data-recipe-add="alternative-component"]'));
+    assert.ok(document.querySelector('[data-recipe-add="alternative-tag"]'));
+    assert.equal(
+      document.querySelector('[data-recipe-add="alternative-currency"]'),
+      null,
+      'no currency choice without configured currency units'
+    );
+    assert.equal(
+      document.querySelector('[data-recipe-add="alternative-essence"]'),
+      null,
+      'no essence choice without system essences'
+    );
+    editHarness.remount();
+  });
+
+  it('adds an ESSENCE requirement to the SET, not an OR alternative to the requirement', async () => {
+    // There is NO essence ingredient match type: `IngredientSet.essences` is an AND
+    // requirement on the whole set. The menu offers it under its own heading and the
+    // choice bubbles to the set — mislabelling it as an "alternative" would promise OR
+    // semantics the engine does not implement.
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    await pickOrOption(target, 'grp-1', 'alternative-essence');
+    assert.equal(patches.length, 1, 'choosing Essence patches the recipe');
+    const set = patches[0].ingredientSets[0];
+    assert.deepEqual(set.essences, { 'ess-life': 1 }, 'the first unrequired essence is seeded at 1');
+    assert.equal(
+      set.ingredientGroups[0].options.length,
+      1,
+      'the requirement gains NO new alternative'
+    );
+    editHarness.remount();
+  });
+
+  it('drops the essence choice once the SET already requires every system essence', async () => {
+    // The handler seeds "the first essence the set does not already require" — so with
+    // every essence required it returned silently while the menu still offered the entry
+    // and clicking it did nothing. A dead choice is a bug, not a no-op: the set OWNS
+    // `essences`, so it is the set that decides whether another can still be added.
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+        set: { essences: { 'ess-life': 2, 'ess-water': 1 } },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+
+    assert.equal(
+      document.querySelector('[data-recipe-add="alternative-essence"]'),
+      null,
+      'the exhausted essence choice is not offered'
+    );
+    assert.deepEqual(
+      [...document.querySelectorAll('[data-popover-group]')].map((group) =>
+        group.getAttribute('aria-label')
+      ),
+      ['Accept instead'],
+      'and its now-empty heading goes with it'
+    );
+    // The real OR alternatives are untouched — only the dead choice is gone.
+    assert.ok(document.querySelector('[data-recipe-add="alternative-component"]'));
+    assert.ok(document.querySelector('[data-recipe-add="alternative-tag"]'));
+    assert.equal(patches.length, 0, 'opening the menu authors nothing');
+    editHarness.remount();
+  });
+
+  it('still offers the essence choice while the set requires only SOME of the essences', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+        set: { essences: { 'ess-life': 2 } },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+    assert.ok(
+      document.querySelector('[data-recipe-add="alternative-essence"]'),
+      'one essence is still addable, so the choice stays'
+    );
+    editHarness.remount();
+  });
+
+  it('appends a third alternative to an already-mixed OR group from the "or..." menu', async () => {
     const { target, patches } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -2130,21 +2576,14 @@ describe('RecipeEditView (mounted)', () => {
       ],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    const footer = target.querySelector(
-      '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
-    );
-    await pickPopoverOption(
-      target,
-      footer.querySelector('[data-recipe-add="alternative-component"]'),
-      /Pure Water/
-    );
-    assert.equal(patches.length, 1, 'choosing from the footer patches the recipe');
+    await pickOrOption(target, 'grp-1', 'alternative-component');
+    assert.equal(patches.length, 1, 'choosing from the "or..." menu patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 3, 'the alternative list grew by one');
     assert.deepEqual(
       options[2].match,
-      { type: 'component', componentId: 'cmp-water' },
-      'the appended alternative is the chosen component'
+      { type: 'component', componentId: null },
+      'the appended alternative is an empty component match'
     );
     editHarness.remount();
   });
@@ -2192,8 +2631,10 @@ describe('RecipeEditView (mounted)', () => {
       false,
       'no visible Quantity text label in the row'
     );
+    // §B1: the quantity is now the shared Stepper, whose typeable input commits on
+    // blur (re-asserting the clamped value), not on a `change` event.
     qty.value = '5';
-    qty.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    qty.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(patches.length, 1, 'editing the quantity patches the recipe');
     assert.equal(
       patches[0].ingredientSets[0].ingredientGroups[0].options[0].quantity,
@@ -2293,14 +2734,12 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a currency alternative via the row-end Add cost button', async () => {
+  it('appends a currency alternative via the "or..." Accept-instead popover', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS } }
     );
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-cost"]')
-      .click();
+    await pickOrOption(target, 'grp-1', 'alternative-currency');
     assert.equal(patches.length, 1, 'adding a cost alternative patches the recipe');
     const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.length, 2, 'the alternative list grew by one');
@@ -2596,21 +3035,15 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(target, 'tools');
     await flushRender();
-    // Recipe-level tools section (idPrefix '') shows the recipe-wide tool.
+    // Recipe-level (global) tools section (idPrefix '') shows the recipe-wide tool.
     assert.ok(
       target.querySelector('[data-recipe-section="tools"] [data-recipe-tool-id="tool-anvil"]'),
       'recipe-level tools section lists the recipe-wide tool'
     );
-    // Per-step tool section is collapsed until the step is expanded.
-    assert.equal(
-      target.querySelector('[data-recipe-section="step-sa-tools"]'),
-      null,
-      'per-step tools section is collapsed'
-    );
-    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
-    await flushRender();
+    // Per-step tool sections render ALWAYS-OPEN on the Tools tab (issue 643 §C1) — the
+    // old single-expand accordion showed nothing until a step was clicked.
     const stepTools = target.querySelector('[data-recipe-section="step-sa-tools"]');
-    assert.ok(stepTools, 'expanding the step reveals its tools section');
+    assert.ok(stepTools, 'the per-step tools section renders without expanding');
     stepTools.querySelector('.manager-recipe-tools-trigger').click();
     await flushRender();
     document.querySelectorAll('.manager-travel-option').forEach((option) => {
@@ -2628,17 +3061,18 @@ describe('RecipeEditView (mounted)', () => {
 
   it('routes a per-step result add through onUpdateStep({ resultGroups }) for a multi-step recipe', async () => {
     const updates = [];
+    // A routed system keeps chrome + the Add result set affordance even for an empty
+    // step scope, so the GM can author the first routed result group.
     const target = await editHarness.mount(
       identityProps({
-        complex: true,
-        recipe: { ...RECIPE, complex: true, steps: [{ id: 'sa', name: 'Forge' }] },
+        routingProvider: 'check',
+        recipe: { ...RECIPE, steps: [{ id: 'sa', name: 'Forge' }] },
         onUpdateStep: (id, patch) => updates.push([id, patch]),
       })
     );
     clickTab(target, 'results');
     await flushRender();
-    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
-    await flushRender();
+    // Per-step result sections render always-open on the Results tab (issue 643 §C1).
     target
       .querySelector('[data-recipe-section="step-sa-results"] [data-recipe-add="result-set"]')
       .click();
@@ -2672,8 +3106,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('edits a result group name, preserving its id', async () => {
+    // Two groups, so the group renders with chrome (the free-text name field). A single
+    // non-routed group renders chromeless (issue 643), which has no name field.
     const { target, patches } = await mountResultGroups([
       { id: 'grp-1', name: 'Primary', results: [] },
+      { id: 'grp-2', name: 'Bonus', results: [] },
     ]);
     const nameInput = target.querySelector('[data-recipe-result-set-field="name"]');
     assert.equal(nameInput.value, 'Primary', 'the group name is editable and populated');
@@ -2779,15 +3216,17 @@ describe('RecipeEditView (mounted)', () => {
     ]);
     const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
     assert.equal(input.value, '2', 'the quantity input reflects the item quantity');
+    // The result quantity is the shared Stepper (as in Ingredients); its typeable
+    // input commits on blur, not on a `change` event.
     input.value = '999999';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].results[0].quantity,
       9999,
       'over-cap input is capped to 9999'
     );
     input.value = '0';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].results[0].quantity,
       1,
@@ -2837,7 +3276,7 @@ describe('RecipeEditView (mounted)', () => {
     // A simple-mode edit preserves the existing group id/name.
     const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
     input.value = '4';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].id,
       'grp-1',
@@ -2870,11 +3309,15 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('shows the Add result set button in Complex mode', async () => {
-    const { target } = await mountResultGroups([]);
+  it('shows the Add result set button for a routed system (empty scope)', async () => {
+    // Routed modes need multiple result groups (one per outcome / ingredient set), so
+    // they keep the Add result set affordance even when no group exists yet.
+    const { target } = await mountResultGroups([], {
+      props: { routingProvider: 'check', routedOutcomeTierOptions: TIER_OPTIONS, routedOutcomeTiersDefined: true },
+    });
     assert.ok(
       target.querySelector('[data-recipe-add="result-set"]'),
-      'Add result set button shown in Complex mode'
+      'Add result set button shown for a routed result scope'
     );
     editHarness.remount();
   });
@@ -2927,9 +3370,10 @@ describe('RecipeEditView (mounted)', () => {
       }
     );
     // Edit the group's only item (a quantity change) — the lightest-touch edit path.
+    // The shared Stepper commits on blur, not on a `change` event.
     const input = target.querySelector('[data-recipe-result-item] [data-recipe-option-quantity]');
     input.value = '5';
-    input.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    input.dispatchEvent(new globalThis.window.Event('blur', { bubbles: true }));
     assert.equal(
       patches.at(-1).resultGroups[0].id,
       'grp-1',
@@ -2944,9 +3388,9 @@ describe('RecipeEditView (mounted)', () => {
   });
 });
 
-describe('RecipeItemInspector (mounted)', () => {
+describe('RecipeContextRail (mounted)', () => {
   before(async () => {
-    await inspectorHarness.setup();
+    await railHarness.setup();
     // The harness installs game.i18n but not fromUuid; provide a default stub.
     globalThis.foundry = {};
     globalThis.fromUuid = async () => null;
@@ -2955,164 +3399,55 @@ describe('RecipeItemInspector (mounted)', () => {
   after(() => {
     delete globalThis.fromUuid;
     delete globalThis.foundry;
-    inspectorHarness.teardown();
+    railHarness.teardown();
   });
 
   beforeEach(() => {
     globalThis.fromUuid = async () => null;
   });
 
-  it('renders the recipe-item card with an empty dropzone', async () => {
-    const target = await inspectorHarness.mount(inspectorProps());
+  it('renders the "Appears in" card with no drop zone and no "link another" affordance', async () => {
+    const target = await railHarness.mount(railProps());
     assert.ok(
       target.querySelector('[data-recipe-section="recipe-item"]'),
-      'recipe-item card renders'
+      'the books & scrolls card renders under the knowledge/item effect'
     );
-    assert.ok(target.querySelector('[data-recipe-item-dropzone]'), 'empty dropzone present');
-    inspectorHarness.remount();
+    // §2c: adding a recipe to a book is authored on Books & Scrolls. The recipe-side
+    // drop zone was a SECOND authoring path for the same many-to-many and is removed.
+    assert.equal(
+      target.querySelector('[data-recipe-item-dropzone]'),
+      null,
+      'no drop zone: adding a recipe to a book happens on Books & Scrolls'
+    );
+    assert.ok(target.querySelector('[data-recipe-item-empty]'), 'shows the empty summary copy');
+    railHarness.remount();
   });
 
-  it('links an item on a valid Item drop and ignores a non-Item drop', async () => {
-    const added = [];
-    const set = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        onAddRecipeItem: (uuid) => {
-          added.push(uuid);
-          return { item: { id: 'ri1' }, action: 'added' };
-        },
-        onSetRecipeItem: (id) => set.push(id),
-      })
+  it('deep-links to Books & Scrolls', async () => {
+    const opened = [];
+    const target = await railHarness.mount(
+      railProps({ onOpenBooksScrolls: () => opened.push(true) })
     );
-    const dropzone = target.querySelector('[data-recipe-item-dropzone]');
-    assert.ok(dropzone, 'empty dropzone present');
-
-    // Non-Item drop is a no-op.
-    dispatchDrop(dropzone, { type: 'Scene', uuid: 'Scene.s1' });
-    await Promise.resolve();
-    assert.equal(added.length, 0, 'non-Item drop ignored');
-
-    // Valid Item drop links it.
-    dispatchDrop(dropzone, { type: 'Item', uuid: 'Item.it1' });
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.deepEqual(added, ['Item.it1'], 'onAddRecipeItem called with the item uuid');
-    assert.deepEqual(set, ['ri1'], 'onSetRecipeItem called with the new definition id');
-    inspectorHarness.remount();
+    target.querySelector('[data-recipe-open-books]').click();
+    assert.deepEqual(opened, [true], 'the Open Books & Scrolls button routes to the owning screen');
+    railHarness.remount();
   });
 
-  it('still links a deduped (skipped) drop', async () => {
-    const set = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        onAddRecipeItem: () => ({ item: { id: 'ri-existing' }, action: 'skipped' }),
-        onSetRecipeItem: (id) => set.push(id),
-      })
+  it('omits the books card entirely under the global visibility mode', async () => {
+    const target = await railHarness.mount(
+      railProps({ visibilityEffect: { showAccess: false, showBooksScrolls: false } })
     );
-    dispatchDrop(target.querySelector('[data-recipe-item-dropzone]'), {
-      type: 'Item',
-      uuid: 'Item.dupe',
-    });
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.deepEqual(set, ['ri-existing'], 'skipped action still sets the recipeItemId');
-    inspectorHarness.remount();
-  });
-
-  it('derives the linked image/name from the STAGED recipeItemId against the definitions', async () => {
-    // Two definitions; fromUuid resolves a doc per uuid so the thumb/name come from
-    // the resolved source. The displayed pair must track the recipe draft's
-    // recipeItemId — the staged source — not any persisted projection.
-    const DOCS = {
-      'Item.blue': { name: 'Blue Potion', img: 'icons/blue-potion.webp' },
-      'Item.green': { name: 'Green Potion', img: 'icons/green-potion.webp' },
-    };
-    globalThis.fromUuid = async (uuid) => DOCS[uuid] || null;
-    const DEFS = [
-      { id: 'ri-blue', name: 'Blue Def', img: 'icons/blue-def.webp', originItemUuid: 'Item.blue' },
-      {
-        id: 'ri-green',
-        name: 'Green Def',
-        img: 'icons/green-def.webp',
-        originItemUuid: 'Item.green',
-      },
-    ];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri-blue' },
-        recipeItemDefinitions: DEFS,
-      })
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-item"]'),
+      null,
+      'a globally-visible system uses no books'
     );
-    await new Promise((r) => setTimeout(r, 10));
-    const imgEl = target.querySelector(
-      '[data-recipe-item-linked] img.manager-environment-scene-thumb'
+    assert.equal(
+      target.querySelector('[data-recipe-section="access"]'),
+      null,
+      'a globally-visible system grants no per-recipe access'
     );
-    const nameEl = target.querySelector(
-      '[data-recipe-item-linked] .manager-environment-scene-name'
-    );
-    assert.ok(
-      imgEl.getAttribute('src').includes('blue-potion'),
-      'shows the blue source image for the staged ri-blue link'
-    );
-    assert.ok(
-      nameEl.textContent.includes('Blue Potion'),
-      'shows the blue source name for the staged ri-blue link'
-    );
-
-    // Regression: staging a different recipeItemId updates the preview WITHOUT a
-    // save — the inspector resolves from the (staged) draft, not a persisted record.
-    inspectorHarness.remount();
-    const restaged = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri-green' },
-        recipeItemDefinitions: DEFS,
-      })
-    );
-    await new Promise((r) => setTimeout(r, 10));
-    const imgAfter = restaged.querySelector(
-      '[data-recipe-item-linked] img.manager-environment-scene-thumb'
-    );
-    const nameAfter = restaged.querySelector(
-      '[data-recipe-item-linked] .manager-environment-scene-name'
-    );
-    assert.ok(
-      imgAfter.getAttribute('src').includes('green-potion'),
-      'staged ri-green link swaps the displayed image without a save'
-    );
-    assert.ok(
-      nameAfter.textContent.includes('Green Potion'),
-      'staged ri-green link swaps the displayed name without a save'
-    );
-    inspectorHarness.remount();
-  });
-
-  it('renders the missing state when fromUuid resolves to null', async () => {
-    globalThis.fromUuid = async () => null;
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri1' },
-        recipeItemDefinitions: [
-          {
-            id: 'ri1',
-            name: 'Old Item',
-            img: 'icons/svg/item-bag.svg',
-            originItemUuid: 'Item.gone',
-          },
-        ],
-      })
-    );
-    // Let the async resolution $effect settle before asserting.
-    await new Promise((r) => setTimeout(r, 10));
-    assert.ok(
-      target.querySelector('[data-recipe-item-missing]'),
-      'missing state renders when the source item no longer resolves'
-    );
-    // The link is retained (the linked container, not the empty dropzone).
-    assert.ok(
-      target.querySelector('[data-recipe-item-linked]'),
-      'the link is retained in the missing state'
-    );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('enumerates every linked book (many-to-many) and unlinks one via onRemoveRecipeItem', async () => {
@@ -3122,8 +3457,8 @@ describe('RecipeItemInspector (mounted)', () => {
       { id: 'ri-a', name: 'Alpha Tome', img: 'icons/a.webp', originItemUuid: 'Item.a' },
       { id: 'ri-b', name: 'Beta Scroll', img: 'icons/b.webp', originItemUuid: 'Item.b' },
     ];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, recipeItemId: 'ri-a', recipeItemIds: ['ri-a', 'ri-b'] },
         recipeItemDefinitions: DEFS,
         onRemoveRecipeItem: (id) => removed.push(id),
@@ -3134,31 +3469,227 @@ describe('RecipeItemInspector (mounted)', () => {
     assert.equal(rows.length, 2, 'both linked books are listed');
     assert.ok(target.querySelector('[data-recipe-item-link="ri-a"]'), 'lists the first book');
     assert.ok(target.querySelector('[data-recipe-item-link="ri-b"]'), 'lists the second book');
-    // A compact dropzone remains for linking another book.
-    assert.ok(target.querySelector('[data-recipe-item-dropzone]'), 'keeps a link-another dropzone');
 
     // The per-row unlink removes only that book.
-    target
-      .querySelector('[data-recipe-item-link="ri-b"] .manager-icon-button.is-danger')
-      .click();
+    target.querySelector('[data-recipe-item-link="ri-b"] .manager-icon-button.is-danger').click();
     assert.deepEqual(removed, ['ri-b'], 'unlink calls onRemoveRecipeItem with the book id');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
+  it('resolves each linked book image/name from its source document', async () => {
+    const DOCS = { 'Item.blue': { name: 'Blue Potion', img: 'icons/blue-potion.webp' } };
+    globalThis.fromUuid = async (uuid) => DOCS[uuid] || null;
+    const target = await railHarness.mount(
+      railProps({
+        recipe: { ...RECIPE, recipeItemId: 'ri-blue', recipeItemIds: ['ri-blue'] },
+        recipeItemDefinitions: [
+          {
+            id: 'ri-blue',
+            name: 'Blue Def',
+            img: 'icons/blue-def.webp',
+            originItemUuid: 'Item.blue',
+          },
+        ],
+      })
+    );
+    await new Promise((r) => setTimeout(r, 10));
+    assert.ok(
+      target
+        .querySelector('[data-recipe-item-linked] img.manager-environment-scene-thumb')
+        .getAttribute('src')
+        .includes('blue-potion'),
+      'shows the resolved source image'
+    );
+    assert.ok(
+      target
+        .querySelector('[data-recipe-item-linked] .manager-environment-scene-name')
+        .textContent.includes('Blue Potion'),
+      'shows the resolved source name'
+    );
+    railHarness.remount();
+  });
+
+  it('renders the missing state when fromUuid resolves to null', async () => {
+    globalThis.fromUuid = async () => null;
+    const target = await railHarness.mount(
+      railProps({
+        recipe: { ...RECIPE, recipeItemId: 'ri1', recipeItemIds: ['ri1'] },
+        recipeItemDefinitions: [
+          {
+            id: 'ri1',
+            name: 'Old Item',
+            img: 'icons/svg/item-bag.svg',
+            originItemUuid: 'Item.gone',
+          },
+        ],
+      })
+    );
+    await new Promise((r) => setTimeout(r, 10));
+    assert.ok(
+      target.querySelector('[data-recipe-item-missing]'),
+      'missing state renders when the source item no longer resolves'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-item-linked]'),
+      'the link is retained in the missing state'
+    );
+    railHarness.remount();
+  });
+
+  // --- the RESTRICTED branch (issue 643 §4b) ----------------------------------
+  const RESTRICTED = { showAccess: true, showBooksScrolls: false };
+
+  it('lists players and characters with access under the restricted mode, and no books card', async () => {
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessPlayers: [{ id: 'u1', name: 'Ada', avatar: 'icons/ada.webp' }],
+        accessCharacters: [
+          {
+            id: 'a1',
+            name: 'Thorin',
+            img: 'icons/thorin.webp',
+            controlledBy: [{ id: 'u1', name: 'Ada', avatar: '', assigned: true }],
+            sharedWithAllPlayers: false,
+          },
+        ],
+      })
+    );
+    const accessCard = target.querySelector('[data-recipe-section="access"]');
+    assert.ok(accessCard, 'access card renders');
+    // `.manager-inspector-title-row` is a `44px | 1fr` grid built for a medallion +
+    // copy pair. A lone heading in it lands in the 44px column and wraps one word per
+    // line ("WHO / CAN / CRAFT / THIS"), so this card must use a bare card title.
+    assert.equal(
+      accessCard.querySelector('.manager-inspector-title-row'),
+      null,
+      'the access heading must not sit in the medallion title grid, which would wrap it to one word per line'
+    );
+    assert.ok(
+      accessCard.querySelector(':scope > h3.manager-recipe-rail-label'),
+      'the access heading is a bare uppercase micro-label, like every rail section (issue 643 §G1)'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-item"]'),
+      null,
+      'restricted systems use no books'
+    );
+    assert.ok(target.querySelector('[data-recipe-access-player="u1"]'), 'lists the granted player');
+    assert.ok(
+      target.querySelector('[data-recipe-access-character="a1"]'),
+      'lists the granted character'
+    );
+    assert.equal(
+      target
+        .querySelector('[data-recipe-access-character="a1"] [data-recipe-access-subline]')
+        .textContent.trim(),
+      'Played by Ada',
+      'a single controller reads "Played by <name>"'
+    );
+    railHarness.remount();
+  });
+
+  it('says "Shared with all players" rather than naming one player when ownership.default is OWNER', async () => {
+    // THE bug this field exists to prevent: `getUserLevel` falls through to
+    // ownership.default, so an "All Players = Owner" actor is controlled by EVERY
+    // player. Naming one of them would tell the GM the opposite of the truth.
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessCharacters: [
+          {
+            id: 'a1',
+            name: 'The Party Wagon',
+            img: '',
+            controlledBy: [
+              { id: 'u1', name: 'Ada', avatar: '', assigned: false },
+              { id: 'u2', name: 'Brin', avatar: '', assigned: false },
+            ],
+            sharedWithAllPlayers: true,
+          },
+        ],
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-access-subline]').textContent.trim(),
+      'Shared with all players',
+      'the whole-table grant is stated as such, never as "Played by <one name>"'
+    );
+    railHarness.remount();
+  });
+
+  it('renders no sub-line at all when nobody controls the granted character', async () => {
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessCharacters: [
+          { id: 'a1', name: 'Orphan NPC', img: '', controlledBy: [], sharedWithAllPlayers: false },
+        ],
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-access-subline]'),
+      null,
+      'an empty control set invents no attribution'
+    );
+    railHarness.remount();
+  });
+
+  it('collapses three or more controllers to "+N" and keeps the full list in the title', async () => {
+    const target = await railHarness.mount(
+      railProps({
+        visibilityEffect: RESTRICTED,
+        accessCharacters: [
+          {
+            id: 'a1',
+            name: 'Shared Hireling',
+            img: '',
+            controlledBy: [
+              { id: 'u1', name: 'Ada', avatar: '', assigned: true },
+              { id: 'u2', name: 'Brin', avatar: '', assigned: false },
+              { id: 'u3', name: 'Cade', avatar: '', assigned: false },
+            ],
+            sharedWithAllPlayers: false,
+          },
+        ],
+      })
+    );
+    const subline = target.querySelector('[data-recipe-access-subline]');
+    assert.equal(subline.textContent.trim(), 'Played by Ada +2', 'collapses to +N');
+    assert.equal(
+      subline.getAttribute('title'),
+      'Ada, Brin, Cade',
+      'the "+N" collapse never hides a name — the full list is in the title'
+    );
+    railHarness.remount();
+  });
+
+  it('shows an empty-grant message and still deep-links to Manage access', async () => {
+    const opened = [];
+    const target = await railHarness.mount(
+      railProps({ visibilityEffect: RESTRICTED, onOpenAccess: () => opened.push(true) })
+    );
+    assert.ok(target.querySelector('[data-recipe-access-empty]'), 'states that nothing is granted');
+    target.querySelector('[data-recipe-open-access]').click();
+    assert.deepEqual(opened, [true], 'Manage access routes to the Access tab');
+    railHarness.remount();
+  });
+
+  // --- category (moved to Overview, threaded through RecipeEditView) ------------
   it('disables the category selector and shows only General when no categories exist', async () => {
-    const target = await inspectorHarness.mount(inspectorProps({ categories: [] }));
+    const target = await editHarness.mount(identityProps({ categories: [] }));
     const select = target.querySelector('[data-recipe-category-select]');
-    assert.ok(select, 'category selector renders');
+    assert.ok(select, 'category selector renders on Overview');
     assert.equal(select.disabled, true, 'selector is disabled with no custom categories');
     const options = [...select.querySelectorAll('option')];
     assert.equal(options.length, 1, 'only one option present');
     assert.equal(options[0].value, 'general', 'the sole option is the General fallback');
-    inspectorHarness.remount();
+    editHarness.remount();
   });
 
   it('enables the selector with custom categories and reports the current category', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await editHarness.mount(
+      identityProps({
         recipe: { ...RECIPE, category: 'Potions' },
         categories: ['Potions', 'Weapons'],
       })
@@ -3172,13 +3703,13 @@ describe('RecipeItemInspector (mounted)', () => {
       'General precedes the custom categories'
     );
     assert.equal(select.value, 'Potions', 'reflects the recipe category');
-    inspectorHarness.remount();
+    editHarness.remount();
   });
 
-  it('calls onSetCategory when a different category is chosen', async () => {
+  it('threads onSetCategory through RecipeEditView when a different category is chosen', async () => {
     const chosen = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await editHarness.mount(
+      identityProps({
         recipe: { ...RECIPE, category: 'general' },
         categories: ['Potions'],
         onSetCategory: (category) => chosen.push(category),
@@ -3187,43 +3718,38 @@ describe('RecipeItemInspector (mounted)', () => {
     const select = target.querySelector('[data-recipe-category-select]');
     select.value = 'Potions';
     select.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
-    await Promise.resolve();
+    await flushRender();
     assert.deepEqual(chosen, ['Potions'], 'onSetCategory receives the selected category');
-    inspectorHarness.remount();
+    editHarness.remount();
   });
 
-  it('hides the step-mode toggle when multi-step is not enabled and the recipe is single-step', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, steps: [] },
-        multiStepEnabled: false,
-      })
+  // --- step mode / recipe mode (now SegmentedControls) ---------------------------
+  it('hides the step-mode control when multi-step is not enabled and the recipe is single-step', async () => {
+    const target = await railHarness.mount(
+      railProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: false })
     );
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       null,
       'step-mode card is hidden'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
-  it('shows the step-mode toggle for a single-step recipe when multi-step is enabled', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, steps: [] },
-        multiStepEnabled: true,
-      })
+  it('shows the step-mode control for a single-step recipe when multi-step is enabled', async () => {
+    const target = await railHarness.mount(
+      railProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: true })
     );
     assert.ok(
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       'step-mode card renders when enabled'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
-  it('still shows the step-mode toggle for a multi-step recipe even when the feature is off (to allow revert)', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+  it('still shows the step-mode control for a multi-step recipe even when the feature is off (to allow revert)', async () => {
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
         multiStepEnabled: false,
       })
@@ -3232,14 +3758,14 @@ describe('RecipeItemInspector (mounted)', () => {
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       'step-mode card stays visible so multi-step can be reverted'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('shows single-step selected and fires onEnterMultiStep when switching to multi', async () => {
     const entered = [];
     const reverted = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, steps: [] },
         multiStepEnabled: true,
         onEnterMultiStep: () => entered.push(true),
@@ -3248,148 +3774,214 @@ describe('RecipeItemInspector (mounted)', () => {
     );
     const single = target.querySelector('[data-recipe-step-mode-option="single"]');
     const multi = target.querySelector('[data-recipe-step-mode-option="multi"]');
-    assert.ok(
-      single.classList.contains('is-selected'),
-      'single is selected when there are no steps'
-    );
-    assert.equal(multi.classList.contains('is-selected'), false, 'multi is not selected');
+    assert.ok(single.classList.contains('is-active'), 'single is active when there are no steps');
+    assert.equal(multi.classList.contains('is-active'), false, 'multi is not active');
 
-    single.click();
-    assert.equal(entered.length, 0, 'clicking the already-active single mode is a no-op');
-
-    multi.click();
-    assert.deepEqual(entered, [true], 'clicking multi fires onEnterMultiStep');
+    // The SegmentedControl's real control is the (visually hidden) radio — the label
+    // is only the styled surface, so the keyboard/AT path is what the test drives.
+    multi.querySelector('input[type="radio"]').click();
+    await flushRender();
+    assert.deepEqual(entered, [true], 'choosing multi fires onEnterMultiStep');
     assert.equal(reverted.length, 0, 'revert not called when entering multi');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   it('shows multi-step selected and fires onRevertToSingleStep when switching to single', async () => {
     const entered = [];
     const reverted = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
+    const target = await railHarness.mount(
+      railProps({
         recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
         onEnterMultiStep: () => entered.push(true),
         onRevertToSingleStep: () => reverted.push(true),
       })
     );
-    const single = target.querySelector('[data-recipe-step-mode-option="single"]');
     const multi = target.querySelector('[data-recipe-step-mode-option="multi"]');
-    assert.ok(multi.classList.contains('is-selected'), 'multi is selected when steps exist');
+    assert.ok(multi.classList.contains('is-active'), 'multi is active when steps exist');
 
-    multi.click();
-    assert.equal(reverted.length, 0, 'clicking the already-active multi mode is a no-op');
-
-    single.click();
-    assert.deepEqual(reverted, [true], 'clicking single fires onRevertToSingleStep');
+    target.querySelector('[data-recipe-step-mode-option="single"] input[type="radio"]').click();
+    await flushRender();
+    assert.deepEqual(reverted, [true], 'choosing single fires onRevertToSingleStep');
     assert.equal(entered.length, 0, 'enter not called when reverting');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
-  it('renders the recipe-mode toggle with Simple selected when the system allows complex', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        recipe: { ...RECIPE, steps: [] },
-        multiStepEnabled: false,
-        multiSetAllowed: true,
-      })
-    );
-    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
-    assert.ok(card, 'recipe-mode card renders when complex is an available choice');
-    const simple = card.querySelector('[data-recipe-mode-option="simple"]');
-    assert.ok(simple.classList.contains('is-selected'), 'Simple is selected when complex is false');
-    inspectorHarness.remount();
-  });
-
-  it('hides the recipe-mode section when the system forbids multiple sets and the recipe is not already complex', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        complex: false,
-        multiSetAllowed: false,
-      })
-    );
+  // The Simple/Complex toggle was removed (issue 643): recipe complexity is emergent
+  // from the ingredient-set count, authored via the Ingredients tab's "Add ingredient
+  // set" affordance, so the rail renders no recipe-mode control in any configuration.
+  it('renders NO recipe-mode control (complexity is emergent from structure)', async () => {
+    const single = await railHarness.mount(railProps({ recipe: { ...RECIPE, steps: [] } }));
     assert.equal(
-      target.querySelector('[data-recipe-section="recipe-mode"]'),
+      single.querySelector('[data-recipe-section="recipe-mode"]'),
       null,
-      'a simple-resolution system does not show the recipe-mode toggle at all'
-    );
-    inspectorHarness.remount();
-  });
-
-  it('still shows the recipe-mode section for an already-complex recipe even when the system forbids multiple sets', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        complex: true,
-        multiSetAllowed: false,
-      })
-    );
-    const card = target.querySelector('[data-recipe-section="recipe-mode"]');
-    assert.ok(card, 'an already-complex recipe keeps the recipe-mode toggle so it can be reverted');
-    const complex = card.querySelector('[data-recipe-mode-option="complex"]');
-    assert.ok(
-      complex.classList.contains('is-selected'),
-      'Complex is selected for an already-complex recipe'
-    );
-    inspectorHarness.remount();
-  });
-
-  it('enables the Complex option when multiSetAllowed is true', async () => {
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        complex: false,
-        multiSetAllowed: true,
-      })
-    );
-    const complex = target.querySelector('[data-recipe-mode-option="complex"]');
-    assert.equal(
-      complex.disabled,
-      false,
-      'Complex is enabled when the system allows multiple sets'
+      'no recipe-mode section for a single-set recipe'
     );
     assert.equal(
-      target.querySelector('[data-recipe-mode-hint="locked"]'),
+      single.querySelector('[data-recipe-mode-option]'),
       null,
-      'no locked hint when allowed'
+      'no Simple/Complex segmented control'
     );
-    inspectorHarness.remount();
-  });
+    railHarness.remount();
 
-  it('fires onSetComplexity(true) on Complex and onSetComplexity(false) on Simple', async () => {
-    const calls = [];
-    const target = await inspectorHarness.mount(
-      inspectorProps({
-        complex: false,
-        multiSetAllowed: true,
-        onSetComplexity: (next) => calls.push(next),
-      })
+    // Even a multi-set / multi-step recipe gets no toggle — there is nothing to toggle.
+    const multi = await railHarness.mount(
+      railProps({ recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] } })
     );
-    target.querySelector('[data-recipe-mode-option="complex"]').click();
-    assert.deepEqual(calls, [true], 'clicking Complex requests complex mode');
-
-    inspectorHarness.remount();
-    const target2 = await inspectorHarness.mount(
-      inspectorProps({
-        complex: true,
-        multiSetAllowed: true,
-        onSetComplexity: (next) => calls.push(next),
-      })
+    assert.equal(
+      multi.querySelector('[data-recipe-section="recipe-mode"]'),
+      null,
+      'no recipe-mode section for a multi-step recipe either'
     );
-    target2.querySelector('[data-recipe-mode-option="simple"]').click();
-    assert.deepEqual(calls, [true, false], 'clicking Simple requests simple mode');
-    inspectorHarness.remount();
+    railHarness.remount();
   });
 
   // The per-recipe Check/Ingredient routing sub-selector was removed when the
   // routing basis became a property of the system MODE (routedByIngredients /
-  // routedByCheck). The inspector no longer renders a routing toggle.
+  // routedByCheck). The rail renders no routing toggle.
   it('does not render a per-recipe routing toggle (routing basis is the system mode)', async () => {
-    const target = await inspectorHarness.mount(inspectorProps({ complex: true }));
+    const target = await railHarness.mount(railProps({ complex: true }));
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-routing"]'),
       null,
       'the routing sub-selector is gone'
     );
-    inspectorHarness.remount();
+    railHarness.remount();
+  });
+
+  // --- the validation mini-list --------------------------------------------------
+  it('shows an All clear pill plus the positive check list when the evaluator reports no issues', async () => {
+    const target = await railHarness.mount(
+      railProps({ readiness: { checks: [{ id: 'hasName', satisfied: true }], issues: [] } })
+    );
+    assert.ok(target.querySelector('[data-recipe-validation-clear]'), 'renders the All clear pill');
+    // The positive-state list always renders (issue 643 §G2): a passing check reads green.
+    assert.ok(
+      target.querySelector('[data-recipe-validation-issues]'),
+      'the check list renders even when clear'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-rail-check]').getAttribute('data-satisfied'),
+      'true',
+      'the passing check reads satisfied'
+    );
+    railHarness.remount();
+  });
+
+  it('renders the full check list (passing and failing) and deep-links to the Validation tab', async () => {
+    const selected = [];
+    const target = await railHarness.mount(
+      railProps({
+        readiness: {
+          checks: [
+            { id: 'hasName', satisfied: true },
+            { id: 'hasResultGroup', satisfied: false },
+          ],
+          issues: [{ id: 'noResultGroup', severity: 'critical' }],
+        },
+        onSelectIssue: (requested) => selected.push(requested),
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-validation-clear]'),
+      null,
+      'no All clear pill while an issue stands'
+    );
+    const rows = target.querySelectorAll('[data-recipe-rail-check]');
+    assert.equal(rows.length, 2, 'every check is listed (the positive-state list, §G2)');
+    const failing = target.querySelector('[data-recipe-rail-check="hasResultGroup"]');
+    assert.equal(failing.getAttribute('data-satisfied'), 'false', 'the failing check reads unsatisfied');
+    target.querySelector('[data-recipe-open-validation]').click();
+    assert.deepEqual(selected, ['validation'], 'the review button opens the Validation tab');
+    railHarness.remount();
+  });
+
+  // --- the Validation-tab summary (§G4) ------------------------------------------
+  it('shows the validation summary + count table ONLY on the Validation tab', async () => {
+    const readiness = {
+      checks: [
+        { id: 'hasName', satisfied: true },
+        { id: 'hasResultGroup', satisfied: true },
+      ],
+      issues: [],
+    };
+    const off = await railHarness.mount(railProps({ readiness }));
+    assert.equal(
+      off.querySelector('[data-recipe-validation-summary]'),
+      null,
+      'no summary while another tab is active'
+    );
+    railHarness.remount();
+
+    const on = await railHarness.mount(railProps({ readiness, activeTab: 'validation' }));
+    assert.ok(on.querySelector('[data-recipe-validation-summary]'), 'the summary card renders on the Validation tab');
+    assert.ok(on.querySelector('[data-recipe-validation-counts]'), 'the count table renders');
+    railHarness.remount();
+  });
+
+  it('derives the summary status + Passing/Warnings/Blocking counts from the readiness output', async () => {
+    // All satisfied, no issues → All clear.
+    const clear = await railHarness.mount(
+      railProps({
+        activeTab: 'validation',
+        readiness: {
+          checks: [
+            { id: 'hasName', satisfied: true },
+            { id: 'hasResultGroup', satisfied: true },
+          ],
+          issues: [],
+        },
+      })
+    );
+    assert.equal(
+      clear.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
+      'clear',
+      'no issues reads as clear'
+    );
+    assert.equal(clear.querySelector('[data-recipe-count-passing]').textContent.trim(), '2', 'two satisfied checks pass');
+    assert.equal(clear.querySelector('[data-recipe-count-warnings]').textContent.trim(), '0');
+    assert.equal(clear.querySelector('[data-recipe-count-blocking]').textContent.trim(), '0');
+    railHarness.remount();
+
+    // A warning but no blocker → Enabled with warnings.
+    const warned = await railHarness.mount(
+      railProps({
+        activeTab: 'validation',
+        readiness: {
+          checks: [{ id: 'hasName', satisfied: true }],
+          issues: [{ id: 'unusedTag', severity: 'warning' }],
+        },
+      })
+    );
+    assert.equal(
+      warned.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
+      'warning',
+      'a warning with no blocker reads as warning'
+    );
+    assert.equal(warned.querySelector('[data-recipe-count-warnings]').textContent.trim(), '1');
+    assert.equal(warned.querySelector('[data-recipe-count-blocking]').textContent.trim(), '0');
+    railHarness.remount();
+
+    // A critical issue → Cannot be enabled (blocking wins over warnings).
+    const blocked = await railHarness.mount(
+      railProps({
+        activeTab: 'validation',
+        readiness: {
+          checks: [{ id: 'hasName', satisfied: false }],
+          issues: [
+            { id: 'noResultGroup', severity: 'critical' },
+            { id: 'unusedTag', severity: 'warning' },
+          ],
+        },
+      })
+    );
+    assert.equal(
+      blocked.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
+      'blocked',
+      'a critical issue reads as blocked, even alongside a warning'
+    );
+    assert.equal(blocked.querySelector('[data-recipe-count-passing]').textContent.trim(), '0', 'the unsatisfied check does not pass');
+    assert.equal(blocked.querySelector('[data-recipe-count-blocking]').textContent.trim(), '1');
+    railHarness.remount();
   });
 });
 
@@ -3445,8 +4037,10 @@ describe('RecipeStepsCard (mounted)', () => {
     const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
     triggers[1].click();
     await flushRender();
-    const hoursInput = document.querySelector('[data-recipe-duration-unit="hours"]');
-    assert.ok(hoursInput, 'the duration editor exposes an hours input');
+    const hoursInput = document.querySelector(
+      '[data-recipe-duration-unit="hours"] [data-stepper-input]'
+    );
+    assert.ok(hoursInput, 'the duration editor exposes a typeable hours input');
     hoursInput.value = '4';
     hoursInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(updates.length, 1, 'editing a unit emits exactly one patch');
@@ -3472,7 +4066,9 @@ describe('RecipeStepsCard (mounted)', () => {
     );
     target.querySelector('[data-recipe-duration-trigger]').click();
     await flushRender();
-    const daysInput = document.querySelector('[data-recipe-duration-unit="days"]');
+    const daysInput = document.querySelector(
+      '[data-recipe-duration-unit="days"] [data-stepper-input]'
+    );
     daysInput.value = '0';
     daysInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.equal(updates.at(-1)[0], 'solo', 'the patch targets the edited step');

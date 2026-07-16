@@ -190,7 +190,11 @@ export class ResolutionModeService {
           issues.push(
             buildRecipeActivationIssue('stepIngredientSetCountExact', { step: stepLabel, mode })
           );
-        if (requireComplete && groups.length !== 1)
+        // Exactly ONE success group, plus an OPTIONAL reserved `role: 'failure'` group
+        // (what a failed simple check produces). Its absence is tolerated — a check-less
+        // simple recipe, or one whose failure output is empty, is still valid.
+        const successGroups = groups.filter((group) => group?.role !== 'failure');
+        if (requireComplete && successGroups.length !== 1)
           issues.push(
             buildRecipeActivationIssue('stepResultGroupCountExact', { step: stepLabel, mode })
           );
@@ -469,7 +473,7 @@ export class ResolutionModeService {
           : [];
 
     if (mode === 'simple') {
-      return { groups: allGroups.slice(0, 1), meta: {} };
+      return this._resolveSimpleResultGroups({ checkResult, allGroups });
     }
     if (mode === 'routedByIngredients') {
       return this._routeByIngredientSet(ingredientSet, allGroups, selectedResultGroupId);
@@ -637,6 +641,24 @@ export class ResolutionModeService {
    * `checkResult: null`) resolves to the success group.
    * @returns {{groups: Array, meta: object}}
    */
+  /**
+   * Simple mode resolution. Mirrors alchemy's none/simple path: a simple check FAILURE
+   * (`checkResult.success === false`) produces the reserved `role: 'failure'` group when
+   * present, else NOTHING (a check-less recipe, or one that never authored a failure
+   * output, produces nothing on a fail rather than the success item). No check, or a
+   * passed check (`checkResult` null / `success` true), produces the single SUCCESS group
+   * (the first group not flagged `role: 'failure'`).
+   * @returns {{groups: Array, meta: object}}
+   */
+  _resolveSimpleResultGroups({ checkResult, allGroups }) {
+    if (checkResult?.success === false) {
+      const failureGroup = allGroups.find((group) => group?.role === 'failure');
+      return { groups: failureGroup ? [failureGroup] : [], meta: { disposition: 'fail' } };
+    }
+    const successGroups = allGroups.filter((group) => group?.role !== 'failure');
+    return { groups: successGroups.slice(0, 1), meta: {} };
+  }
+
   _resolveAlchemyResultGroups({ recipe, checkResult, allGroups }) {
     const system = this.getSystem(recipe);
     const checkMode = system?.alchemy?.checkMode || 'none';

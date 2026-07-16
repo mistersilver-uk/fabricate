@@ -54,20 +54,25 @@ describe('RecipeValidationTab (mounted)', () => {
     const target = await harness.mount({
       recipe: { name: '', enabled: true, ingredientSets: [], resultGroups: [] }
     });
+    // Each blocking issue is merged into its owning check row (§E3): the row carries
+    // both the check and the issue id, and reads as a BLOCKS ENABLE (is-block) state.
     assert.ok(target.querySelector('[data-issue="noName"]'), 'noName issue listed');
     assert.ok(target.querySelector('[data-issue="noIngredientSet"]'), 'noIngredientSet issue listed');
     assert.ok(target.querySelector('[data-issue="noResultGroup"]'), 'noResultGroup issue listed');
-    const criticalList = target.querySelector('[data-issue-severity="critical"]');
-    assert.ok(criticalList, 'a critical issue group renders');
+    assert.ok(
+      target.querySelector('[data-issue="noName"].is-block'),
+      'a blocking issue reads as a BLOCKS ENABLE row'
+    );
     harness.remount();
   });
 
-  it('shows the no-issues state for a complete recipe', async () => {
+  it('reads every check as a pass for a complete recipe', async () => {
     const target = await harness.mount({
       recipe: { name: 'Brew', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'g1' }] }
     });
-    assert.equal(target.querySelector('[data-issue]'), null, 'no issues rendered');
-    assert.match(target.textContent, /No issues detected/, 'no-issues message shown');
+    assert.equal(target.querySelector('[data-issue]'), null, 'no issue rows rendered');
+    assert.ok(target.querySelector('[data-check].is-pass'), 'a passing check row renders');
+    assert.equal(target.querySelector('.is-block'), null, 'no blocking rows on a complete recipe');
     harness.remount();
   });
 
@@ -94,9 +99,9 @@ describe('RecipeValidationTab (mounted)', () => {
       recipe: overlapRecipe,
       componentTagOptions: [{ id: 'cmp-iron-ore', tags: ['metal'] }]
     });
-    const warningList = target.querySelector('[data-issue-severity="warning"]');
-    assert.ok(warningList, 'a warning issue group renders');
-    assert.ok(warningList.querySelector('[data-issue="requirementOverlap"]'), 'overlap warning listed under the warning bucket');
+    const overlapIssue = target.querySelector('[data-issue="requirementOverlap"]');
+    assert.ok(overlapIssue, 'overlap warning listed');
+    assert.ok(overlapIssue.classList.contains('is-warn'), 'overlap reads as a WARNING, not a blocker');
     const overlapCheck = target.querySelector('[data-check="noRequirementOverlap"]');
     assert.equal(overlapCheck.dataset.satisfied, 'false', 'overlap check fails');
     harness.remount();
@@ -189,10 +194,9 @@ describe('RecipeValidationTab (mounted)', () => {
       routedOutcomeTierOptions,
       onSelectIssue: (deepLink) => targets.push(deepLink)
     });
-    const warningList = target.querySelector('[data-issue-severity="warning"]');
-    assert.ok(warningList, 'a warning issue group renders');
-    assert.ok(warningList.querySelector('[data-issue="unroutedResultGroup"]'), 'unrouted group warning listed');
-    assert.ok(warningList.querySelector('[data-issue="unproducedOutcomeTier"]'), 'unproduced tier warning listed');
+    assert.ok(target.querySelector('[data-issue="unroutedResultGroup"]'), 'unrouted group warning listed');
+    assert.ok(target.querySelector('[data-issue="unproducedOutcomeTier"]'), 'unproduced tier warning listed');
+    assert.ok(target.querySelector('[data-issue="unroutedResultGroup"]').classList.contains('is-warn'), 'unrouted reads as a WARNING');
     assert.equal(target.querySelector('[data-check="routedResultGroupsRouted"]').dataset.satisfied, 'false');
     assert.equal(target.querySelector('[data-check="routedOutcomeTiersProduced"]').dataset.satisfied, 'false');
 

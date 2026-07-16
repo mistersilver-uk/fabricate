@@ -12,12 +12,20 @@
 
   In `progressive` mode the quantity input is hidden: the progressive award loop
   ignores `quantity` and awards each ordered entry once, so the GM expresses "more
-  of X" by listing X again (and prioritises via drag-reorder) rather than via a
-  count. The component picker and remove control stay.
+  of X" by listing X again (and prioritises via reorder) rather than via a count.
+  The component picker and remove control stay.
+
+  Progressive rows also show the component's DIFFICULTY as a READ-ONLY badge with a
+  deep-link to the component editor — never an inline stepper. `component.difficulty`
+  is consumed by progressive recipes, progressive salvage, progressive gathering AND
+  the system-validation blocker, so editing it here would either write across an
+  aggregate boundary immediately (bypassing both dirty guards) or make "Save recipe"
+  silently persist a *Component* change.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
 
   let {
     item = {},
@@ -26,7 +34,15 @@
     // list (see the parent RecipeResultGroupCard's addItem/reorder handling).
     progressive = false,
     onChange = () => {},
-    onRemove = () => {}
+    onRemove = () => {},
+    // Deep-link to the component editor's Difficulty card. The difficulty badge is
+    // read-only here by design (see the note above).
+    onOpenComponent = () => {},
+    // Optional reorder controls (progressive only): the parent's up/down buttons,
+    // rendered to the RIGHT of the difficulty badge — after the component's DC, before
+    // the remove control — so a stage reads left-to-right as handle · component · DC ·
+    // reorder · remove (issue 643). Absent (a flat row) in every other mode.
+    reorderControls = null
   } = $props();
 
   function text(key, fallback) {
@@ -45,6 +61,12 @@
   // to its name/image so a chosen component reads back clearly.
   const componentPickerOptions = $derived(
     (componentOptions || []).map(option => ({ id: option.id, label: option.name, img: option.img }))
+  );
+
+  // `difficulty` is projected onto the component options; a component that has never
+  // been given one reads as unset rather than as a fabricated 0.
+  const difficulty = $derived(
+    Number.isFinite(Number(selectedComponent?.difficulty)) ? Number(selectedComponent.difficulty) : null
   );
 
   // Spread the existing item so a normalized id (and any unknown fields) survive.
@@ -86,26 +108,55 @@
   </div>
 
   <div class="manager-recipe-option-controls">
+    {#if progressive && selectedComponent}
+      <span class="manager-recipe-difficulty-label" aria-hidden="true">{text('FABRICATE.Admin.Manager.Recipe.DifficultyMicroLabel', 'Difficulty')}</span>
+      <!-- Read-only: `component.difficulty` has four consumers, and the component
+           editor's Difficulty card is the surface with the right save/discard
+           lifecycle. `ui-integration` already requires a read-only badge here. -->
+      <button
+        type="button"
+        class="manager-chip is-info manager-recipe-difficulty-badge"
+        data-recipe-result-difficulty={difficulty === null ? '' : String(difficulty)}
+        aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${selectedComponent.name}`}
+        title={text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')}
+        onclick={() => onOpenComponent(componentId)}
+      >
+        <i class="fas fa-gauge-high" aria-hidden="true"></i>
+        <span>{difficulty === null
+          ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
+          : `${text('FABRICATE.Admin.Manager.Recipe.Difficulty', 'Difficulty')} ${difficulty}`}</span>
+        <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+      </button>
+    {/if}
+
     {#if !progressive}
-      <input
-        type="number"
-        min="1"
-        max="9999"
-        class="manager-recipe-option-quantity"
-        data-recipe-option-quantity
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+      <!-- The same shared Stepper the Ingredients rows use (−/value/+), not a bare
+           number input, so a produced quantity is edited identically to an ingredient
+           quantity. -->
+      <Stepper
         value={quantity}
-        onchange={(e) => setQuantity(e.target.value)}
+        min={1}
+        max={9999}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
+        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
+        inputProps={{ 'data-recipe-option-quantity': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        onChange={(value) => setQuantity(value)}
       />
     {/if}
 
+    {#if reorderControls}
+      {@render reorderControls()}
+    {/if}
+
+    <!-- A subtle × (§C7), never a loud red fa-minus. -->
     <button
       type="button"
-      class="manager-icon-button is-danger manager-recipe-option-remove"
+      class="manager-recipe-result-remove manager-recipe-option-remove"
       data-recipe-remove="result-item"
       aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
       title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
       onclick={() => onRemove()}
-    ><i class="fas fa-minus" aria-hidden="true"></i></button>
+    ><i class="fas fa-times" aria-hidden="true"></i></button>
   </div>
 </div>

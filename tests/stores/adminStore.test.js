@@ -5449,21 +5449,34 @@ describe('createAdminStore', () => {
       assert.deepEqual(get(store.viewState).worldUsers, []);
     });
 
-    it('refreshWorldUsers re-projects the allow-list without a full refresh', async () => {
-      let current = [{ id: 'u1', name: 'Alice' }];
-      const services = createMockServices({ getWorldUsers: () => current });
+    it('refreshAccessRosters re-projects BOTH access rosters without a full refresh', async () => {
+      // The user-only `refreshWorldUsers` is gone: the two rosters move together (the
+      // same user and actor CRUD changes both), so the app wires one helper to both
+      // hook families. A players-only refresh would leave `controlledBy` — which derives
+      // from `actor.ownership` — stale.
+      let users = [{ id: 'u1', name: 'Alice' }];
+      let characters = [{ id: 'a1', name: 'Vex', controlledBy: [] }];
+      const services = createMockServices({
+        getWorldUsers: () => users,
+        getAccessCharacterActors: () => characters,
+      });
       const store = createAdminStore(services);
       await store.refresh();
       assert.deepEqual(get(store.viewState).worldUsers, [{ id: 'u1', name: 'Alice' }]);
+      assert.equal(get(store.viewState).accessCharacters.length, 1);
 
-      // A player is added while the manager is open; the user-CRUD hook calls
-      // refreshWorldUsers, which must surface the change without a full refresh().
-      current = [
+      users = [
         { id: 'u1', name: 'Alice' },
         { id: 'u2', name: 'Bob' },
       ];
-      store.refreshWorldUsers();
-      assert.deepEqual(get(store.viewState).worldUsers, current);
+      characters = [{ id: 'a1', name: 'Vex', controlledBy: [{ id: 'u2', name: 'Bob' }] }];
+      store.refreshAccessRosters();
+
+      assert.deepEqual(get(store.viewState).worldUsers, users);
+      assert.deepEqual(get(store.viewState).accessCharacters[0].controlledBy, [
+        { id: 'u2', name: 'Bob' },
+      ]);
+      assert.equal(store.refreshWorldUsers, undefined, 'the dead users-only helper is gone');
     });
 
     it('viewState.experimentalFeaturesEnabled mirrors the world setting', async () => {
@@ -5557,6 +5570,7 @@ describe('createAdminStore', () => {
           ingredientCount: 3,
           toolCount: 3,
           resultGroupCount: 2,
+          resultItemCount: 0,
           hasAlternatives: false,
           ingredientSetSummaries: [
             {
@@ -5574,6 +5588,7 @@ describe('createAdminStore', () => {
           ingredientCount: 2,
           toolCount: 3,
           resultGroupCount: 1,
+          resultItemCount: 0,
           hasAlternatives: false,
           ingredientSetSummaries: [
             {
@@ -5642,6 +5657,7 @@ describe('createAdminStore', () => {
           ingredientCount: 3,
           toolCount: 2,
           resultGroupCount: 2,
+          resultItemCount: 0,
           hasAlternatives: true,
           ingredientSetSummaries: [
             {

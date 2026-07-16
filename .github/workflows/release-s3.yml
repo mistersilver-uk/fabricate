@@ -1,12 +1,25 @@
-name: "Release Candidate to S3"
+name: "Publish to S3"
 
+# Reusable per-channel publisher. Takes a release TAG, derives its version, checks out that
+# tagged commit, builds, and publishes to the requested channel's S3 targets. Called by beta.yml
+# (channel: beta) and, in later issue #627 chunks, by the early-access/public promotion workflows.
 on:
   workflow_dispatch:
     inputs:
-      rc_tag:
-        description: "RC tag to publish (e.g. v1.0.0-rc.3)"
+      tag:
+        description: "Release tag to publish (e.g. v1.4.0-beta.3 or v1.4.0)"
         required: true
         type: string
+      channel:
+        description: "Channel to publish (beta, early-access, public, or a hotfix line)"
+        required: false
+        type: string
+        default: beta
+      check_heads:
+        description: "Read and report every target's head + the guard verdict; publish nothing"
+        required: false
+        type: boolean
+        default: false
       dry_run:
         description: "Dry-run: build and stage but do not upload"
         required: false
@@ -19,10 +32,20 @@ on:
         default: false
   workflow_call:
     inputs:
-      rc_tag:
-        description: "RC tag to publish (e.g. v1.0.0-rc.3)"
+      tag:
+        description: "Release tag to publish (e.g. v1.4.0-beta.3 or v1.4.0)"
         required: true
         type: string
+      channel:
+        description: "Channel to publish (beta, early-access, public, or a hotfix line)"
+        required: false
+        type: string
+        default: beta
+      check_heads:
+        description: "Read and report every target's head + the guard verdict; publish nothing"
+        required: false
+        type: boolean
+        default: false
       dry_run:
         description: "Dry-run: build and stage but do not upload"
         required: false
@@ -34,11 +57,14 @@ on:
         type: boolean
         default: false
     secrets:
-      # Secrets are NOT inherited by reusable workflows — the caller
-      # (release-candidate.yml) must pass this through explicitly. Without it the
-      # publish refuses to run (tester groups configured + secret unset).
+      # Secrets are NOT inherited by reusable workflows — the caller (beta.yml, and later the
+      # early-access/public promotions) must pass these through explicitly. The publish refuses to
+      # run if a channel declares tester groups but its tester-path secret is unset.
       S3_TESTER_PATH_SECRET:
         description: "Secret directory segment for the closed-beta tester feed path"
+        required: false
+      S3_EARLY_ACCESS_PATH_SECRET:
+        description: "Secret directory segment for the patron early-access tester feed path"
         required: false
 
 # id-token: write lets the workflow request a GitHub OIDC token, which is
@@ -52,6 +78,13 @@ jobs:
   release-s3:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Job-level (NOT workflow-level) so it survives being called as a reusable workflow, and
+    # per-channel so a beta publish and a public publish do not serialise needlessly. cancel-in-
+    # progress is false: a second push must QUEUE behind an in-flight publish, never cancel it
+    # mid-loop and leave a half-written (channel-manifest-but-not-tester) state behind.
+    concurrency:
+      group: release-s3-${{ inputs.channel }}
+      cancel-in-progress: false
     steps:
       # Tag validation runs AFTER checkout (it needs scripts/), not before it. The
       # validator is deliberately zero-dependency, so it runs on the runner's
@@ -63,48 +96,67 @@ jobs:
       - name: Validate release tag
         id: version
         env:
-          RC_TAG: ${{ inputs.rc_tag }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          CHANNEL: ${{ inputs.channel }}
         run: |
-          VERSION=$(node scripts/validate-release-tag.mjs "$RC_TAG" --kind beta)
+          # Derive the required tag kind FROM the channel, never `--kind any`. The head guard in
+          # release-s3.js only refuses BACKWARD moves, so a stable tag on `channel: beta` would pass
+          # both validation and the guard (stable compares newer than beta = "forward") and pollute
+          # the beta head with a stable version. beta accepts a beta/rc prerelease tag (what
+          # BETA_TAG_RE matches); every other channel (early-access, public, a hotfix N.N.x) takes a
+          # stable tag.
+          KIND=$([ "$CHANNEL" = "beta" ] && echo beta || echo stable)
+          VERSION=$(node scripts/validate-release-tag.mjs "$RELEASE_TAG" --kind "$KIND")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing $RC_TAG → version $VERSION"
+          echo "Publishing $RELEASE_TAG → version $VERSION (channel $CHANNEL, kind $KIND)"
 
       - name: Validate tag exists
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          if ! git tag -l "${{ inputs.rc_tag }}" | grep -q .; then
-            echo "::error::Tag '${{ inputs.rc_tag }}' does not exist"
+          if ! git tag -l "$RELEASE_TAG" | grep -q .; then
+            echo "::error::Tag '$RELEASE_TAG' does not exist"
             exit 1
           fi
 
-      - name: Checkout RC tag
-        run: git checkout "${{ inputs.rc_tag }}"
+      - name: Checkout release tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: git checkout "$RELEASE_TAG"
 
-      - uses: actions/setup-node@v6
+      # Shared Node + npm ci + OIDC preamble. npm ci runs AFTER the tag checkout above so it installs
+      # the TAG's dependencies (which is why this workflow keeps its own checkout/tag steps rather
+      # than letting the composite own checkout). OIDC credentials are needed for a real publish AND
+      # for a `--check-heads` read; they are skipped only on a dry-run that is NOT also reading heads
+      # (the script imports no AWS SDK and reaches no bucket when `--dry-run` is set alone).
+      # aws-role/aws-region are forwarded because the composite cannot read vars.* itself.
+      - uses: ./.github/actions/release-setup
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Configure AWS credentials via OIDC
-        # Skipped on dry-run: the script neither imports the AWS SDK nor calls
-        # S3 when --dry-run is set, so a dry-run must not require OIDC/role setup.
-        if: ${{ !inputs.dry_run }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          enable-oidc: ${{ !inputs.dry_run || inputs.check_heads }}
+          aws-role: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Publish to S3
         env:
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
-          # Secret directory segment for the closed-beta tester feed path. GitHub
-          # masks its value in logs; the script also withholds all S3 keys/URLs in
-          # CI and refuses to publish tester groups when this is unset.
+          # Secret directory segments for the private tester feed paths. GitHub masks their values
+          # in logs; the script also withholds all S3 keys/URLs in CI and refuses to publish a
+          # channel's tester groups when that channel's tester-path secret is unset.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+          S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+          CHANNEL: ${{ inputs.channel }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # --source-sha is the tagged commit ACTUALLY being built, taken from the checked-out tree.
+          # It must NOT come from GITHUB_SHA: the "Checkout release tag" step above did
+          # `git checkout "$tag"`, so GITHUB_SHA still names the ref that triggered the run, not the
+          # commit whose bytes this zip carries. The provenance guard keys resume/overwrite on it.
+          SOURCE_SHA="$(git rev-parse HEAD)"
           node scripts/release-s3.js \
-            --version "${{ steps.version.outputs.version }}" \
+            --version "$VERSION" \
+            --channel "$CHANNEL" \
+            --source-sha "$SOURCE_SHA" \
+            ${{ inputs.check_heads == true && '--check-heads' || '' }} \
             ${{ inputs.dry_run == true && '--dry-run' || '' }} \
             ${{ inputs.overwrite == true && '--overwrite' || '' }}

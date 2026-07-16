@@ -25,9 +25,10 @@ export const RELEASE_TAG_KINDS = Object.freeze(['beta', 'stable']);
 
 /**
  * Every numeric identifier is SemVer's `(0|[1-9]\d*)`, NOT `\d+`: leading zeros are refused.
- * `v1.04.0` is not a version, it is a typo — and both `promote-release` and `release-s3` take the
- * tag as a HUMAN-TYPED `workflow_dispatch` input, so a typo that validates clean here goes on to
- * mint a permanent garbage tag (and, in `promote-release`, a public GitHub release).
+ * `v1.04.0` is not a version, it is a typo — and both `release-s3` and `promote-to-public` take a
+ * HUMAN-TYPED `workflow_dispatch` input (a tag and a version respectively), so a typo that
+ * validates clean here goes on to mint a permanent garbage tag (and, in `promote-to-public`, a
+ * public GitHub release).
  *
  * `v1.4.0-beta.3` / `v1.4.0-rc.85`. Named groups; see `parseReleaseTag`.
  */

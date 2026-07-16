@@ -75,7 +75,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const STAGING_DIR = join(ROOT, 'build', 's3');
 
-const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
+export const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
 const CACHE_NO_CACHE = 'no-cache, max-age=0, must-revalidate';
 
 /**
@@ -227,6 +227,7 @@ export function resolveChannelConfig(config, channel) {
  * @property {'channel'|'tester'} kind
  * @property {string} label        - stable id for logging / staging dirs
  * @property {string|null} group   - access-group name (tester targets only)
+ * @property {string} buildProfile - the build variant these bytes came from (issue 345)
  * @property {string} zipKey       - S3 key for the immutable versioned zip
  * @property {string} manifestKey  - S3 key for the "latest" manifest
  * @property {string} manifestUrl  - public URL baked into this target's module.json `manifest`
@@ -259,17 +260,22 @@ export function deriveS3Layout({
   baseUrl,
   testerGroups = [],
   testerSegment = '',
+  buildProfile = 'community',
+  testerBuildProfile,
 }) {
   const base = stripTrailingSlashes(baseUrl);
   const zipName = `${moduleId}-${version}.zip`;
 
   /** @returns {PublishTarget} */
-  const makeTarget = (kind, group, prefix, manifestKey) => {
+  const makeTarget = (kind, group, prefix, manifestKey, profile) => {
     const zipKey = `${prefix}/versions/${version}/${zipName}`;
     return {
       kind,
       group,
       label: group ? `tester-${group}` : `channel-${channel}`,
+      // The build variant these bytes came from. Every target in one publish must share it (issue
+      // 345); a differing tester profile is the tripwire main() fails on before writing anything.
+      buildProfile: profile,
       zipKey,
       manifestKey,
       manifestUrl: `${base}/${manifestKey}`,
@@ -283,7 +289,8 @@ export function deriveS3Layout({
     'channel',
     null,
     channelPrefix,
-    `${channelPrefix}/latest/module.json`
+    `${channelPrefix}/latest/module.json`,
+    buildProfile
   );
 
   // The secret segment sits between the (public) group and the module id so the
@@ -293,7 +300,13 @@ export function deriveS3Layout({
     const prefix = segment
       ? `testers/${group}/${segment}/${moduleId}`
       : `testers/${group}/${moduleId}`;
-    return makeTarget('tester', group, prefix, `${prefix}/module.json`);
+    return makeTarget(
+      'tester',
+      group,
+      prefix,
+      `${prefix}/module.json`,
+      testerBuildProfile ?? buildProfile
+    );
   });
 
   return {
@@ -304,6 +317,49 @@ export function deriveS3Layout({
     testerTargets,
     targets: [channelTarget, ...testerTargets],
   };
+}
+
+/**
+ * The build-provenance stamp attached to every versioned zip (and re-stamped by the backfill). Its
+ * keys are the ones `headObject` returns, and the guard keys its sameness-of-build test on the
+ * whole `(version, sourceSha, buildProfile)` triple — so a patron zip and a community zip of one
+ * tag can never collide on a single key.
+ * @param {string} version The version the zip carries.
+ * @param {string|undefined} sourceSha The source commit — `unknown` when it cannot be identified.
+ * @param {string} buildProfile The build variant (default `community`).
+ * @returns {Record<string, string>} The S3 user-metadata map.
+ */
+export function provenanceMetadata(version, sourceSha, buildProfile) {
+  return {
+    'fabricate-version': version,
+    'fabricate-source-sha': sourceSha || 'unknown',
+    'fabricate-build-profile': buildProfile || 'community',
+  };
+}
+
+/**
+ * The issue-345 tripwire. A single publish MUST produce one build from one source tree, so every one
+ * of its targets shares a build profile; a tester group carrying a different profile would ship, for
+ * example, community bytes to a paying cohort (or paid bytes to a public path). Today this can only
+ * be reached by mis-configuring a channel, and it is meant to fail LOUDLY the day someone tries.
+ *
+ * Called before anything is built or written, so a violation leaves the bucket untouched.
+ * @param {PublishTarget[]} targets The publish targets.
+ * @returns {string} The single build profile they all share.
+ * @throws {Error} When the targets do not all share one build profile.
+ */
+export function assertUniformBuildProfile(targets) {
+  const profiles = [...new Set(targets.map((target) => target.buildProfile ?? 'community'))];
+  if (profiles.length > 1) {
+    throw new Error(
+      `release-s3: publish targets disagree on build profile (${profiles.join(', ')}) — refusing ` +
+        'to publish before anything is written. A single publish MUST produce one build for every ' +
+        'target (see issue 345): shipping a different build to a cohort is a build-profile concern ' +
+        'that must not be expressed as a tester group until the one-build-per-publish invariant is ' +
+        'first lifted.'
+    );
+  }
+  return profiles[0] ?? 'community';
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -330,11 +386,20 @@ function fail(message) {
  * The S3 operations this script performs, as a port. `getObject` reports an HTTP status instead of
  * throwing (the guard has to tell a 404 from a 403); the others behave conventionally.
  *
+ * `headObject` returns the object's `{ etag, size, metadata }` (or `null` when absent) rather than a
+ * bare boolean: the guard reads the versioned zip's provenance metadata from it to tell a resume
+ * (same build) from a same-version content swap (a different build).
+ *
  * @typedef {object} S3Port
- * @property {(key: string) => Promise<boolean>} headObject Does the key exist?
- * @property {(key: string) => Promise<{status: number, body: string|null}>} getObject
- * @property {(put: {key: string, body: unknown, contentType: string, cacheControl: string}) =>
+ * @property {(key: string) => Promise<{etag: string|undefined, size: number|undefined,
+ *   metadata: Record<string, string>}|null>} headObject The object's head, or `null` when absent.
+ * @property {(key: string) => Promise<{status: number, body: string|null, etag?: string}>} getObject
+ * @property {(put: {key: string, body: unknown, contentType: string, cacheControl: string,
+ *   metadata?: Record<string, string>, ifMatch?: string, ifNoneMatch?: string}) =>
  *   Promise<unknown>} putObject
+ * @property {(prefix: string) => Promise<string[]>} listObjects Every key under a prefix.
+ * @property {(copy: {sourceKey: string, destKey: string, metadata: Record<string, string>,
+ *   contentType: string, cacheControl: string}) => Promise<unknown>} copyObject
  */
 
 /**
@@ -367,24 +432,36 @@ export function s3StatusFromError(error) {
  * @returns {Promise<S3Port>} The port.
  */
 async function createDefaultS3Client({ bucket, region }) {
-  const { S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } =
-    await import('@aws-sdk/client-s3');
+  const {
+    S3Client,
+    HeadObjectCommand,
+    GetObjectCommand,
+    PutObjectCommand,
+    ListObjectsV2Command,
+    CopyObjectCommand,
+  } = await import('@aws-sdk/client-s3');
   const s3 = new S3Client(region ? { region } : {});
 
   return {
     headObject: async (key) => {
       try {
-        await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-        return true;
+        const response = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        // S3 lower-cases user-metadata keys and strips the `x-amz-meta-` prefix, so `Metadata` comes
+        // back keyed exactly as the provenance stamp was written (`fabricate-source-sha`, …).
+        return {
+          etag: response.ETag,
+          size: response.ContentLength,
+          metadata: response.Metadata ?? {},
+        };
       } catch (error) {
-        if (s3StatusFromError(error) === 404) return false;
+        if (s3StatusFromError(error) === 404) return null;
         throw error;
       }
     },
     getObject: async (key) => {
       try {
         const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-        return { status: 200, body: await response.Body.transformToString() };
+        return { status: 200, body: await response.Body.transformToString(), etag: response.ETag };
       } catch (error) {
         // A status-carrying error is DATA for the guard (404 ⇒ absent; 403 ⇒ a hard error, which
         // the guard raises itself). Anything else is a genuine fault: rethrow it.
@@ -393,7 +470,7 @@ async function createDefaultS3Client({ bucket, region }) {
         return { status, body: null };
       }
     },
-    putObject: ({ key, body, contentType, cacheControl }) =>
+    putObject: ({ key, body, contentType, cacheControl, metadata, ifMatch, ifNoneMatch }) =>
       s3.send(
         new PutObjectCommand({
           Bucket: bucket,
@@ -401,8 +478,64 @@ async function createDefaultS3Client({ bucket, region }) {
           Body: body,
           ContentType: contentType,
           CacheControl: cacheControl,
+          ...(metadata && { Metadata: metadata }),
+          // The conditional write closes the read-then-write TOCTOU on the manifest head: IfMatch
+          // pins the ETag we read; IfNoneMatch '*' is a create-only write for a brand-new target.
+          ...(ifMatch && { IfMatch: ifMatch }),
+          ...(ifNoneMatch && { IfNoneMatch: ifNoneMatch }),
         })
       ),
+    listObjects: async (prefix) => {
+      const keys = [];
+      let continuationToken;
+      do {
+        const page = await s3.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          })
+        );
+        for (const object of page.Contents ?? []) keys.push(object.Key);
+        continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (continuationToken);
+      return keys;
+    },
+    copyObject: (copy) => s3.send(new CopyObjectCommand(buildCopyObjectParams(bucket, copy))),
+  };
+}
+
+/**
+ * Build the `CopyObjectCommand` input for a provenance backfill.
+ *
+ * `MetadataDirective: 'REPLACE'` discards ALL of the source object's metadata — SYSTEM metadata
+ * included — so `ContentType` and `CacheControl` MUST be re-supplied here, or the copy silently
+ * downgrades every immutable-cached zip clients install from to a default-cached
+ * `binary/octet-stream`. Exported so this contract is pinned without the AWS SDK.
+ *
+ * `CopySource` is percent-encoded PER SEGMENT (slashes preserved): `x-amz-copy-source` is an HTTP
+ * header the SDK serialises VERBATIM, not a path label it URI-encodes for you. A tester feed path
+ * carries a secret segment; if that secret ever held a URL-unsafe char (space, `+`, `%`, `#`), an
+ * unencoded `CopySource` would break the backfill's CopyObject alone while the path-label-encoded
+ * Put/Get/Head kept working. The bucket name is left as-is (it is DNS-safe).
+ * @param {string} bucket The bucket the object lives in.
+ * @param {{sourceKey: string, destKey: string, metadata: Record<string, string>,
+ *   contentType: string, cacheControl: string}} copy The in-place copy inputs.
+ * @returns {object} The `CopyObjectCommand` input.
+ */
+export function buildCopyObjectParams(
+  bucket,
+  { sourceKey, destKey, metadata, contentType, cacheControl }
+) {
+  const encodedSource = sourceKey.split('/').map(encodeURIComponent).join('/');
+  return {
+    Bucket: bucket,
+    CopySource: `${bucket}/${encodedSource}`,
+    Key: destKey,
+    MetadataDirective: 'REPLACE',
+    Metadata: metadata,
+    ContentType: contentType,
+    CacheControl: cacheControl,
   };
 }
 
@@ -461,7 +594,7 @@ async function defaultBuild({ version }) {
  * @returns {{moduleId: string, bucket: string, baseUrl: string, channelConfig: ChannelConfig,
  *   testerSegment: string, layout: ReturnType<typeof deriveS3Layout>}} The resolved plan.
  */
-function resolvePublishPlan({ config, channel, version, env: envMap }) {
+function resolvePublishPlan({ config, channel, version, env: envMap, buildProfile = 'community' }) {
   const moduleId = config?.moduleId;
   if (!moduleId) fail('config is missing "moduleId"');
   if (!channel) fail('config is missing "channel" (and no --channel given)');
@@ -481,6 +614,11 @@ function resolvePublishPlan({ config, channel, version, env: envMap }) {
     );
   }
 
+  // A tester group MAY declare its own build profile in config; when it differs from the channel's,
+  // the layout carries mismatched profiles and the issue-345 tripwire in main() refuses the publish
+  // before anything is written. There is no consumer today — it exists to fail loudly if one appears.
+  const testerBuildProfile = config?.channels?.[channel]?.testerBuildProfile ?? buildProfile;
+
   const layout = deriveS3Layout({
     moduleId,
     channel,
@@ -488,6 +626,8 @@ function resolvePublishPlan({ config, channel, version, env: envMap }) {
     baseUrl: baseUrl || 'https://example.invalid',
     testerGroups: channelConfig.testerGroups,
     testerSegment,
+    buildProfile,
+    testerBuildProfile,
   });
 
   return { moduleId, bucket, baseUrl, channelConfig, testerSegment, layout };
@@ -562,21 +702,38 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
   const options = parseArgs(argvInput.slice(2));
   const { version, dryRun } = options;
 
-  if (!version) fail('--version <ver> is required');
-
   const config = await loadConfig(options.configPath);
   const channel = options.channelOverride || config.channel;
 
   // --check-heads is read-only: no build, no staging, no writes.
   if (options.checkHeads) {
+    if (!version) fail('--version <ver> is required');
     return reportHeads({ config, version, channel, deps, env: envInput, log });
   }
 
+  // --backfill-provenance is a one-shot maintenance mode over EXISTING zips; it enumerates every
+  // version itself, so it needs no --version, builds nothing, and touches no manifest.
+  if (options.backfillProvenance) {
+    return runBackfill({ config, channel, options, deps, env: envInput, log });
+  }
+
+  if (!version) fail('--version <ver> is required');
+
   // Resolve the channel's own targets (its tester groups + secret come from the CHANNEL).
-  const plan = resolvePublishPlan({ config, channel, version, env: envInput });
+  const plan = resolvePublishPlan({
+    config,
+    channel,
+    version,
+    env: envInput,
+    buildProfile: options.buildProfile,
+  });
   // Assigned BEFORE anything can throw with an S3 key in it, so the CLI's catch-all can redact it.
   activeTesterSegment = plan.testerSegment;
   if (!dryRun) requireBucketAndBaseUrl(plan);
+
+  // The issue-345 tripwire runs BEFORE the build and BEFORE any write: a publish whose targets do
+  // not all share one build profile fails here with nothing built and nothing uploaded.
+  const buildProfile = assertUniformBuildProfile(plan.layout.targets);
   printPlan({ plan, channel, version, dryRun, ci, log });
 
   // Build dist/ at the requested version, then validate what came out.
@@ -592,7 +749,18 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
   // order and cannot be re-ordered from here.
   const { safety, put } = dryRun
     ? { safety: null, put: [] }
-    : await publishTargets({ plan, staged, version, options, deps, env: envInput, ci, log });
+    : await publishTargets({
+        plan,
+        staged,
+        version,
+        sourceSha: options.sourceSha,
+        buildProfile,
+        options,
+        deps,
+        env: envInput,
+        ci,
+        log,
+      });
 
   printSummary({ layout: plan.layout, dryRun, segment: plan.testerSegment, ci, log });
   return { layout: plan.layout, staged, safety, put, dryRun };
@@ -601,17 +769,24 @@ export async function main({ argv: argvInput = argv, env: envInput = env, deps =
 /**
  * @param {string[]} args The argv slice.
  * @returns {{version: string|null, channelOverride: string|null, configPath: string,
- *   dryRun: boolean, overwrite: boolean, checkHeads: boolean, allowDowngrade: boolean}} The options.
+ *   sourceSha: string|null, buildProfile: string, dryRun: boolean, overwrite: boolean,
+ *   checkHeads: boolean, allowDowngrade: boolean, backfillProvenance: boolean}} The options.
  */
 function parseArgs(args) {
   return {
     version: getFlag(args, '--version'),
     channelOverride: getFlag(args, '--channel'),
     configPath: getFlag(args, '--config') || join(ROOT, 'release.s3.config.json'),
+    // The source commit stamped into every zip's provenance. It is an EXPLICIT flag, never
+    // GITHUB_SHA: release-s3.yml does `git checkout "$tag"` first, so GITHUB_SHA still names the ref
+    // that triggered the run, not the tagged commit actually being built.
+    sourceSha: getFlag(args, '--source-sha'),
+    buildProfile: getFlag(args, '--build-profile') || 'community',
     dryRun: args.includes('--dry-run'),
     overwrite: args.includes('--overwrite'),
     checkHeads: args.includes('--check-heads'),
     allowDowngrade: args.includes('--allow-downgrade'),
+    backfillProvenance: args.includes('--backfill-provenance'),
   };
 }
 
@@ -708,101 +883,328 @@ async function stageTargets({ plan, built, distDir, deps, ci, log }) {
  * headline test asserts ZERO `PutObject` calls when a head is Foundry-newer, and that assertion is
  * only as good as this ordering.
  *
- * @param {{plan: object, staged: object[], version: string, options: object, deps: ReleaseDeps,
+ * @param {{plan: object, staged: object[], version: string, sourceSha: string|undefined,
+ *   buildProfile: string, options: object, deps: ReleaseDeps,
  *   env: Record<string, string|undefined>, ci: boolean, log: (...args: unknown[]) => void}} opts
  * @returns {Promise<{safety: object, put: string[]}>} The guard's verdict and the keys written.
  */
-async function publishTargets({ plan, staged, version, options, deps, env: envMap, ci, log }) {
+async function publishTargets({
+  plan,
+  staged,
+  version,
+  sourceSha,
+  buildProfile,
+  options,
+  deps,
+  env: envMap,
+  ci,
+  log,
+}) {
   const createClient = deps.createS3Client ?? createDefaultS3Client;
   const s3 = await createClient({ bucket: plan.bucket, region: envMap.AWS_REGION });
 
-  // 1. THE GUARD. Every head, read per TARGET, BEFORE a single object is written.
-  const safety = await guardHeads({
+  // 1. THE GUARD. Every head AND every already-published zip, read per TARGET, BEFORE a single
+  //    object is written. Its verdict decides which zips to skip (an unchanged immutable artefact
+  //    from the same build — the resume path) and refuses a same-version content swap. It REPLACES
+  //    the old zip-exists pre-flight; there is no separate existence check layered around it.
+  const { safety, state } = await guardHeads({
     s3,
     plan,
     staged,
     version,
+    sourceSha,
+    buildProfile,
     allowDowngrade: options.allowDowngrade,
+    overwrite: options.overwrite,
     log,
   });
 
-  // 2. Pre-flight ALL versioned zips before uploading anything (fail-fast, so we never leave a
-  //    half-published release behind).
-  await preflightZips({ s3, staged, plan, overwrite: options.overwrite, ci, log });
+  // 2. Upload — skipping the zips (and any already-identical manifests) the guard resolved, and
+  //    writing each manifest conditionally so a head that moved after we read it is not clobbered.
+  const put = await uploadTargets({
+    s3,
+    staged,
+    state,
+    plan,
+    version,
+    sourceSha,
+    buildProfile,
+    skipZipKeys: new Set(safety.skipZipKeys),
+    skipManifestKeys: new Set(safety.skipManifestKeys),
+    ci,
+    log,
+  });
 
-  // 3. Upload.
-  const put = await uploadTargets({ s3, staged, plan, ci, log });
+  // 3. Read back every manifest and confirm it advertises the published version. A tester manifest
+  //    is a separate PutObject with no transaction around it, so a partial publish must fail here
+  //    rather than report green.
+  await verifyReadBack({ s3, staged, version, log });
   return { safety, put };
 }
 
 /**
- * Read every target's head and refuse the publish if any of them would be moved backwards.
- * @param {{s3: S3Port, plan: object, staged: object[], version: string, allowDowngrade: boolean,
+ * Read every target's head + zip and refuse the publish if any of them would be moved backwards or
+ * would replace an already-distributed version with different bytes.
+ * @param {{s3: S3Port, plan: object, staged: object[], version: string, sourceSha: string|undefined,
+ *   buildProfile: string, allowDowngrade: boolean, overwrite: boolean,
  *   log: (...args: unknown[]) => void}} opts The port, plan, staged targets and verdict inputs.
- * @returns {Promise<object>} The guard's verdict. Throws when it refuses.
+ * @returns {Promise<{safety: object, state: object[]}>} The guard's verdict and the state it read.
+ *   Throws when the guard refuses.
  */
-async function guardHeads({ s3, plan, staged, version, allowDowngrade, log }) {
-  const state = await fetchPublishState(plan.layout.targets, { getObject: s3.getObject });
-  const safety = assertPublishSafety({ version, staged, state, allowDowngrade });
+async function guardHeads({
+  s3,
+  plan,
+  staged,
+  version,
+  sourceSha,
+  buildProfile,
+  allowDowngrade,
+  overwrite,
+  log,
+}) {
+  const state = await fetchPublishState(plan.layout.targets, {
+    getObject: s3.getObject,
+    headObject: s3.headObject,
+  });
+  const safety = assertPublishSafety({
+    version,
+    sourceSha,
+    buildProfile,
+    staged,
+    state,
+    allowDowngrade,
+    overwrite,
+  });
 
   for (const warning of safety.warnings) log(`release-s3: ⚠ ${warning}`);
   for (const decision of safety.decisions) {
     log(`release-s3: head ${decision.label}: ${decision.decision} — ${decision.reason}`);
   }
   if (!safety.ok) fail(safety.error);
-  return safety;
+  return { safety, state };
 }
 
 /**
- * @param {{s3: S3Port, staged: object[], plan: object, overwrite: boolean, ci: boolean,
- *   log: (...args: unknown[]) => void}} opts The port, the staged targets, and the mode.
- * @returns {Promise<void>}
+ * The conditional-write header for one target's manifest: `IfMatch <etag>` when a head was read, or
+ * `IfNoneMatch '*'` (a create-only write) for a brand-new target. Either one makes the manifest PUT
+ * fail rather than overwrite a head that moved after it was read.
+ * @param {object[]} state The heads read by `fetchPublishState`.
+ * @param {string} manifestKey The manifest key.
+ * @returns {{ifMatch?: string, ifNoneMatch?: string}} The condition.
  */
-async function preflightZips({ s3, staged, plan, overwrite, ci, log }) {
-  for (const { target } of staged) {
-    if (!(await s3.headObject(target.zipKey))) continue;
-    if (!overwrite) {
-      fail(
-        ci
-          ? `${target.label} version zip already exists — pass --overwrite to replace it`
-          : `s3://${plan.bucket}/${target.zipKey} already exists — pass --overwrite to replace it`
-      );
-    }
-    log(
-      ci
-        ? `release-s3: will overwrite ${target.label} (--overwrite set)`
-        : `release-s3: will overwrite ${target.zipKey} (--overwrite set)`
-    );
-  }
+function writeConditionFor(state, manifestKey) {
+  const record = state.find((entry) => entry.manifestKey === manifestKey);
+  if (record?.present) return { ifMatch: record.manifest?.etag };
+  return { ifNoneMatch: '*' };
 }
 
 /**
- * @param {{s3: S3Port, staged: object[], plan: object, ci: boolean,
- *   log: (...args: unknown[]) => void}} opts The port, the staged targets, and the mode.
- * @returns {Promise<string[]>} The keys written, in order.
+ * @param {{s3: S3Port, staged: object[], state: object[], plan: object, version: string,
+ *   sourceSha: string|undefined, buildProfile: string, skipZipKeys: Set<string>,
+ *   skipManifestKeys: Set<string>, ci: boolean, log: (...args: unknown[]) => void}} opts The port,
+ *   the staged targets, the state read by the guard, and the skip sets.
+ * @returns {Promise<string[]>} The keys actually written, in order.
  */
-async function uploadTargets({ s3, staged, plan, ci, log }) {
+async function uploadTargets({
+  s3,
+  staged,
+  state,
+  plan,
+  version,
+  sourceSha,
+  buildProfile,
+  skipZipKeys,
+  skipManifestKeys,
+  ci,
+  log,
+}) {
   const put = [];
   for (const { target, body, zipPath } of staged) {
-    const zipBytes = await readFile(zipPath);
-    if (!ci) log(`release-s3: upload zip      -> s3://${plan.bucket}/${target.zipKey}`);
-    await s3.putObject({
-      key: target.zipKey,
-      body: zipBytes,
-      contentType: 'application/zip',
-      cacheControl: CACHE_IMMUTABLE,
-    });
-    if (!ci) log(`release-s3: upload manifest -> s3://${plan.bucket}/${target.manifestKey}`);
-    await s3.putObject({
-      key: target.manifestKey,
-      body: JSON.stringify(body, null, 2),
-      contentType: 'application/json',
-      cacheControl: CACHE_NO_CACHE,
-    });
-    if (ci) log(`release-s3: uploaded ${target.label} (zip + manifest)`);
-    put.push(target.zipKey, target.manifestKey);
+    if (skipZipKeys.has(target.zipKey)) {
+      if (!ci)
+        log(`release-s3: skip zip       -> ${target.zipKey} (already published, same build)`);
+    } else {
+      const zipBytes = await readFile(zipPath);
+      if (!ci) log(`release-s3: upload zip      -> s3://${plan.bucket}/${target.zipKey}`);
+      await s3.putObject({
+        key: target.zipKey,
+        body: zipBytes,
+        contentType: 'application/zip',
+        cacheControl: CACHE_IMMUTABLE,
+        metadata: provenanceMetadata(version, sourceSha, target.buildProfile ?? buildProfile),
+      });
+      put.push(target.zipKey);
+    }
+
+    if (skipManifestKeys.has(target.manifestKey)) {
+      if (!ci) log(`release-s3: skip manifest  -> ${target.manifestKey} (already at ${version})`);
+    } else {
+      if (!ci) log(`release-s3: upload manifest -> s3://${plan.bucket}/${target.manifestKey}`);
+      const condition = writeConditionFor(state, target.manifestKey);
+      await s3.putObject({
+        key: target.manifestKey,
+        body: JSON.stringify(body, null, 2),
+        contentType: 'application/json',
+        cacheControl: CACHE_NO_CACHE,
+        ifMatch: condition.ifMatch,
+        ifNoneMatch: condition.ifNoneMatch,
+      });
+      put.push(target.manifestKey);
+    }
+    if (ci) log(`release-s3: uploaded ${target.label}`);
   }
   return put;
+}
+
+/**
+ * Re-read every manifest a publish just wrote and confirm it advertises the published version.
+ * @param {{s3: S3Port, staged: object[], version: string,
+ *   log: (...args: unknown[]) => void}} opts The port, the staged targets, and the version.
+ * @returns {Promise<void>}
+ * @throws {Error} When any manifest is unreadable or advertises a different version.
+ */
+async function verifyReadBack({ s3, staged, version, log }) {
+  for (const { target } of staged) {
+    const response = await s3.getObject(target.manifestKey);
+    if (response?.status !== 200) {
+      fail(
+        `post-publish read-back of ${target.label} failed: HTTP ${response?.status} for its ` +
+          'manifest. The publish may be partial — do NOT report success.'
+      );
+    }
+    let manifest;
+    try {
+      manifest = JSON.parse(String(response.body));
+    } catch {
+      fail(`post-publish read-back of ${target.label} returned a manifest that is not valid JSON.`);
+    }
+    if (manifest?.version !== version) {
+      fail(
+        `post-publish read-back of ${target.label} advertises ${manifest?.version}, expected ` +
+          `${version}. A publish that established some targets and not others must fail, not report ` +
+          'green.'
+      );
+    }
+  }
+  log(`release-s3: read-back OK — every manifest advertises ${version}`);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Provenance backfill (one-shot maintenance mode)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * The version-independent prefix under which a target's versioned zips live, derived from any one of
+ * its zip keys: everything up to and including `/versions/`.
+ * @param {string} zipKey A versioned zip key (`.../versions/<ver>/<name>.zip`).
+ * @returns {string} The `.../versions/` prefix.
+ */
+function zipVersionsPrefix(zipKey) {
+  return zipKey.slice(0, zipKey.indexOf('/versions/') + '/versions/'.length);
+}
+
+/**
+ * The version segment of a versioned zip key (`.../versions/1.4.0/fabricate-1.4.0.zip` → `1.4.0`).
+ * @param {string} zipKey The zip key.
+ * @returns {string|null} The version, or `null` when the key has no `/versions/<ver>/` segment.
+ */
+function versionFromZipKey(zipKey) {
+  const after = zipKey.split('/versions/', 2)[1];
+  const version = after?.split('/', 1)[0];
+  return version || null;
+}
+
+/**
+ * Resolve the source commit a version was built from, via its release tag. Returns `null` when the
+ * tag is unknown — the backfill then stamps `unknown`, which the guard treats as an unidentified
+ * build (it fails closed rather than matching it).
+ * @param {string} version The version (no leading `v`).
+ * @returns {string|null} The commit sha, or `null` when it cannot be resolved.
+ */
+function defaultResolveSha(version) {
+  try {
+    const sha = execSync(`git rev-list -n 1 v${version}`, { cwd: ROOT }).toString().trim();
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Backfill the build-provenance stamp onto every EXISTING versioned zip of a channel and its tester
+ * targets, so a version already in soak (published by the requirements issue with no provenance)
+ * stops reading as an unidentified build and the "provenance absent ⇒ fail closed" rule does not
+ * fire mid-promotion. One-shot and idempotent: re-running stamps the same metadata.
+ *
+ * It issues `CopyObject` with `MetadataDirective: 'REPLACE'`, which discards ALL of the object's
+ * metadata — SYSTEM metadata included — so it MUST re-supply `ContentType` and `CacheControl`, or it
+ * would silently downgrade every immutable-cached zip clients install from to a default-cached
+ * `binary/octet-stream`. It NEVER touches a manifest (the conditional write depends on their ETags).
+ *
+ * @param {{config: object, channel: string, options: object, deps?: ReleaseDeps,
+ *   env?: Record<string, string|undefined>, log?: (...args: unknown[]) => void}} opts The config,
+ *   channel, parsed options, and injectable collaborators.
+ * @returns {Promise<{channel: string, stamped: Array<{key: string, version: string,
+ *   sourceSha: string, buildProfile: string}>}>} What was stamped.
+ */
+export async function runBackfill({
+  config,
+  channel,
+  options,
+  deps = {},
+  env: envMap,
+  log = () => {},
+}) {
+  const envResolved = deps.env ?? envMap ?? env;
+  // Version is irrelevant to a backfill (it enumerates every version), but resolvePublishPlan needs
+  // one to derive the target PREFIXES. The placeholder is discarded by zipVersionsPrefix.
+  const plan = resolvePublishPlan({
+    config,
+    channel,
+    version: options.version || '0.0.0',
+    env: envResolved,
+    buildProfile: options.buildProfile,
+  });
+  activeTesterSegment = plan.testerSegment;
+  requireBucketAndBaseUrl(plan);
+
+  const createClient = deps.createS3Client ?? createDefaultS3Client;
+  const s3 = await createClient({ bucket: plan.bucket, region: envResolved.AWS_REGION });
+  const resolveSha = deps.resolveSha ?? defaultResolveSha;
+
+  const dryRun = Boolean(options.dryRun);
+  const stamped = [];
+  for (const target of plan.layout.targets) {
+    const keys = await s3.listObjects(zipVersionsPrefix(target.zipKey));
+    for (const key of keys) {
+      if (!key.endsWith('.zip')) continue;
+      const version = versionFromZipKey(key);
+      if (!version) continue;
+      const sourceSha = (await resolveSha(version)) || 'unknown';
+      if (dryRun) {
+        // A dry-run still LISTS the bucket (so it needs read credentials) but writes nothing — the
+        // maintainer previews exactly which zips would be stamped, and with which sha, before the
+        // one-shot mutates production immutable artefacts.
+        log(`release-s3: [dry-run] would stamp ${target.label} v${version} (sha ${sourceSha})`);
+        stamped.push({ key, version, sourceSha, buildProfile: target.buildProfile, dryRun: true });
+        continue;
+      }
+      await s3.copyObject({
+        sourceKey: key,
+        destKey: key,
+        metadata: provenanceMetadata(version, sourceSha, target.buildProfile),
+        contentType: 'application/zip',
+        cacheControl: CACHE_IMMUTABLE,
+      });
+      log(`release-s3: backfilled provenance ${target.label} v${version} (sha ${sourceSha})`);
+      stamped.push({ key, version, sourceSha, buildProfile: target.buildProfile });
+    }
+  }
+  log(
+    `release-s3: backfill ${dryRun ? 'DRY-RUN — would stamp' : 'complete — stamped'} ` +
+      `${stamped.length} versioned zip(s)`
+  );
+  return { channel, stamped };
 }
 
 /**

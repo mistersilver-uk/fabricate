@@ -1,11 +1,16 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Validation tab for the recipe editor: a readiness checklist plus
-  severity-grouped issues. Mirrors EnvironmentValidationTab — the pure
-  `evaluateRecipeReadiness` evaluator returns stable check/issue ids, which this
-  tab maps to localized copy. An issue's "View" deep-links by switching the active
-  tab via `onSelectIssue(target)`. Uses the shared generic `.manager-editor-*`
-  validation classes.
+  Validation tab for the recipe editor (issue 643 §E rebuild). The prototype's
+  grouped, bordered, tagged row stack: checks are grouped (Ingredients / Results /
+  Resolution / Requirements), each group an uppercase icon-led label over a shared
+  1px-bordered container of rows. Each row carries a three-state status — pass /
+  warn / block — derived from the OWNING issue's `severity` + `blocks === 'enable'`,
+  the merged issue text as a `detail` sub-line, and the View deep-link on the right
+  (the separate "Issues" card is retired, §E3).
+
+  Deviation 1 (issue 643): this reuses the ONE `evaluateRecipeReadiness` evaluator
+  the rail's mini-list also reads — it does NOT introduce a second `recipeValidationGroups`
+  evaluator that could disagree. The category map below is display metadata only.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -15,15 +20,8 @@
   let {
     recipe = null,
     componentTagOptions = [],
-    // Routed check-mode authoring inputs: the recipe's routing provider and the
-    // system's success-filtered routed-check outcome tiers {id,name}. Used to flag
-    // unrouted result groups and unproduced success tiers.
     routingProvider = null,
     routedOutcomeTierOptions = [],
-    // Alchemy enable-blocker inputs (issue 549): the alchemy context ({ checkMode })
-    // for an alchemy system (null otherwise) and the cross-recipe signature conflicts
-    // touching this recipe, precomputed via SignatureValidator. Drive the alchemy
-    // result-selection and signature-collision blocker rows.
     alchemy = null,
     signatureConflicts = [],
     onSelectIssue = () => {}
@@ -41,11 +39,6 @@
     alchemy,
     signatureConflicts
   }));
-  const issuesBy = $derived({
-    critical: readiness.issues.filter(issue => issue.severity === 'critical'),
-    warning: readiness.issues.filter(issue => issue.severity === 'warning'),
-    info: readiness.issues.filter(issue => issue.severity === 'info')
-  });
 
   const CHECK_LABELS = {
     hasName: ['CheckName', 'Has a name'],
@@ -72,14 +65,48 @@
     alchemyResultSelection: ['IssueAlchemyResultSelection', 'An alchemy recipe must resolve to exactly one result set before it can be enabled.']
   };
 
+  // Display grouping (metadata only — the evaluator is untouched). A check id not
+  // listed falls into "requirements".
+  const CHECK_CATEGORY = {
+    hasIngredientSet: 'ingredients',
+    noDuplicateMatches: 'ingredients',
+    noRequirementOverlap: 'ingredients',
+    hasResultGroup: 'results',
+    routedResultGroupsRouted: 'results',
+    routedOutcomeTiersProduced: 'results',
+    alchemyResultSelection: 'resolution',
+    hasName: 'requirements',
+    stepsNamed: 'requirements',
+    noSignatureCollision: 'requirements'
+  };
+
+  // The negative issue id(s) that own each check, so an unsatisfied check can borrow
+  // that issue's severity, blocking flag, text and deep-link target.
+  const CHECK_TO_ISSUES = {
+    hasName: ['noName'],
+    hasIngredientSet: ['noIngredientSet'],
+    hasResultGroup: ['noResultGroup'],
+    noDuplicateMatches: ['duplicateAlternative', 'duplicateRequirement'],
+    noRequirementOverlap: ['requirementOverlap'],
+    routedResultGroupsRouted: ['unroutedResultGroup'],
+    routedOutcomeTiersProduced: ['unproducedOutcomeTier'],
+    alchemyResultSelection: ['alchemyResultSelection'],
+    noSignatureCollision: ['signatureCollision']
+  };
+
+  const GROUP_ORDER = [
+    ['ingredients', 'GroupIngredients', 'Ingredients', 'fas fa-flask'],
+    ['results', 'GroupResults', 'Results', 'fas fa-box-open'],
+    ['resolution', 'GroupResolution', 'Resolution', 'fas fa-dice-d20'],
+    ['requirements', 'GroupRequirements', 'Requirements', 'fas fa-clipboard-check']
+  ];
+
   function checkLabel(id) {
     const meta = CHECK_LABELS[id] || [id, id];
     return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
   }
+
   function issueTitle(issue) {
-    // A signature collision carries dynamic, id-free params (the other recipe, the
-    // shared component names); reuse the RecipeActivation localizer (issue 550) so the
-    // tab row reads identically to the enable-failure toast.
     if (issue.id === 'signatureCollision') {
       return localizeActivationIssue(
         { code: issue.code, params: issue.params, message: issue.message },
@@ -90,43 +117,114 @@
     const base = text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
     return issue.stepName ? `${issue.stepName}: ${base}` : base;
   }
+
+  // Build one row per check, borrowing the owning issue when the check fails.
+  const rows = $derived.by(() => {
+    const usedIssueIds = new Set();
+    const checkRows = readiness.checks.map((check) => {
+      const owners = CHECK_TO_ISSUES[check.id] || [];
+      const issue = check.satisfied
+        ? null
+        : readiness.issues.find((entry) => owners.includes(entry.id)) || null;
+      if (issue) usedIssueIds.add(issue);
+      const status = check.satisfied
+        ? 'pass'
+        : issue && (issue.blocks === 'enable' || issue.severity === 'critical')
+          ? 'block'
+          : 'warn';
+      return {
+        id: check.id,
+        category: CHECK_CATEGORY[check.id] || 'requirements',
+        satisfied: check.satisfied,
+        status,
+        title: checkLabel(check.id),
+        detail: issue ? issueTitle(issue) : '',
+        issueId: issue ? issue.id : '',
+        target: issue ? issue.target || '' : ''
+      };
+    });
+    // Any issue not attached to a check row (e.g. `disabledIncomplete`) becomes its
+    // own row, grouped by its deep-link target so nothing is lost when the Issues
+    // card is retired.
+    const targetGroup = { ingredients: 'ingredients', results: 'results', overview: 'requirements' };
+    const orphanRows = readiness.issues
+      .filter((issue) => !usedIssueIds.has(issue))
+      .map((issue) => ({
+        id: '',
+        category: targetGroup[issue.target] || 'requirements',
+        satisfied: false,
+        status: issue.blocks === 'enable' || issue.severity === 'critical' ? 'block' : 'warn',
+        title: issueTitle(issue),
+        detail: '',
+        issueId: issue.id,
+        target: issue.target || ''
+      }));
+    return [...checkRows, ...orphanRows];
+  });
+
+  const groups = $derived(
+    GROUP_ORDER.map(([id, labelKey, labelFallback, icon]) => ({
+      id,
+      icon,
+      label: text(`FABRICATE.Admin.Manager.Recipe.Validation.${labelKey}`, labelFallback),
+      rows: rows.filter((row) => row.category === id)
+    })).filter((group) => group.rows.length > 0)
+  );
+
+  const STATUS_META = {
+    pass: ['fas fa-circle-check', 'StatusPass', 'PASS'],
+    warn: ['fas fa-triangle-exclamation', 'StatusWarn', 'WARNING'],
+    block: ['fas fa-circle-exclamation', 'StatusBlock', 'BLOCKS ENABLE']
+  };
+
+  function statusPill(status) {
+    const meta = STATUS_META[status] || STATUS_META.pass;
+    return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[1]}`, meta[2]);
+  }
+  function statusIcon(status) {
+    return (STATUS_META[status] || STATUS_META.pass)[0];
+  }
 </script>
 
 <section class="manager-recipe-tab manager-recipe-validation" data-recipe-tab="validation" aria-label={text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}>
-  <section class="manager-task-core-card" data-validation-section="readiness">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Validation.Readiness', 'Recipe readiness')}</h3>
-    <ul class="manager-editor-check-list">
-      {#each readiness.checks as check (check.id)}
-        <li class={`manager-editor-check ${check.satisfied ? 'is-satisfied' : 'is-unsatisfied'}`} data-check={check.id} data-satisfied={check.satisfied}>
-          <i class={check.satisfied ? 'fas fa-circle-check' : 'fas fa-circle-xmark'} aria-hidden="true"></i>
-          <span>{checkLabel(check.id)}</span>
-        </li>
-      {/each}
-    </ul>
-  </section>
+  <div class="manager-recipe-tab-intro">
+    <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}</h2>
+    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Validation.Intro', 'A recipe saves even while incomplete, but only enables when every blocking issue is cleared.')}</p>
+  </div>
 
-  <section class="manager-task-core-card" data-validation-section="issues">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Validation.Issues', 'Issues')}</h3>
-    {#if readiness.issues.length === 0}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Validation.NoIssues', 'No issues detected.')}</p>
-    {:else}
-      {#each ['critical', 'warning', 'info'] as severity (severity)}
-        {#if issuesBy[severity].length > 0}
-          <ul class="manager-recipe-issue-list" data-issue-severity={severity}>
-            {#each issuesBy[severity] as issue, index (issue.id + index)}
-              <li class={`manager-editor-issue is-${severity}`} data-issue={issue.id}>
-                <span class={`manager-chip ${severity === 'critical' ? 'is-danger' : severity === 'warning' ? 'is-warning' : 'is-neutral'}`}>{text(`FABRICATE.Admin.Manager.Recipe.Validation.Severity.${severity}`, severity)}</span>
-                <span class="manager-recipe-issue-title">{issueTitle(issue)}</span>
-                {#if issue.target}
-                  <button type="button" class="manager-button manager-recipe-issue-action" data-recipe-issue-view={issue.target} onclick={() => onSelectIssue(issue.target)}>
-                    {text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}
-                  </button>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      {/each}
-    {/if}
-  </section>
+  {#each groups as group (group.id)}
+    <div class="manager-recipe-val-group" data-validation-group={group.id}>
+      <p class="manager-recipe-val-group-label">
+        <i class={group.icon} aria-hidden="true"></i>
+        <span>{group.label}</span>
+      </p>
+      <ul class="manager-recipe-val-rows">
+        {#each group.rows as row, index (`${group.id}-${row.id || row.issueId}-${index}`)}
+          <li
+            class={`manager-recipe-val-row is-${row.status}`}
+            data-check={row.id || undefined}
+            data-satisfied={row.id ? row.satisfied : undefined}
+            data-issue={row.issueId || undefined}
+          >
+            <i class={`manager-recipe-val-status ${statusIcon(row.status)}`} aria-hidden="true"></i>
+            <div class="manager-recipe-val-copy">
+              <span class="manager-recipe-val-title">{row.title}</span>
+              {#if row.detail}
+                <span class="manager-recipe-val-detail manager-muted">{row.detail}</span>
+              {/if}
+            </div>
+            {#if row.target}
+              <button
+                type="button"
+                class="manager-button is-ghost manager-recipe-val-view"
+                data-recipe-issue-view={row.target}
+                onclick={() => onSelectIssue(row.target)}
+              >{text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}</button>
+            {/if}
+            <span class={`manager-chip manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</span>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/each}
 </section>

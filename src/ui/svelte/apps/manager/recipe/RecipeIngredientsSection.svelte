@@ -17,12 +17,18 @@
 
   let {
     ingredientSets = [],
-    complex = true,
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
     showSetName = true,
+    // Whether this system's mode allows more than one ingredient set (i.e. NOT
+    // simple/progressive, which are structurally 1×1, and NOT alchemy, which forces
+    // a single set). Gates the "Add ingredient set" affordance in the single-set
+    // (chromeless) view — the ONLY promotion path to a multi-set recipe now that the
+    // Simple/Complex toggle is gone (issue 643). Complexity itself is EMERGENT from
+    // the set count, never a stored toggle.
+    canAddSet = false,
     onChange = () => {},
     idPrefix = ''
   } = $props();
@@ -48,11 +54,11 @@
 
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
 
-  // Defensive: never let the simple (chromeless, single-set) render hide extra
-  // sets. Trimming to one set is the confirmed store path; if a recipe is somehow
-  // flagged simple while still holding >1 set (e.g. imported data), fall back to
-  // the full list so the first edit can't silently drop set[1..].
-  const effectiveComplex = $derived(complex || sets.length > 1);
+  // Rendering complexity is EMERGENT from structure (issue 643): a recipe renders as
+  // multi-set ONLY when it holds more than one set. A single set (or none yet) renders
+  // CHROMELESS — its requirements sit directly on the tab background with no "Set 1"
+  // bounding box. There is no stored Simple/Complex flag driving this any more.
+  const effectiveComplex = $derived(sets.length > 1);
 
   // Simple mode shows exactly one chromeless set bound to the first set. If none
   // exists yet, synthesize an empty placeholder for editing; the first edit writes
@@ -103,13 +109,12 @@
   }
 </script>
 
-<section class="manager-task-core-card manager-recipe-section" data-recipe-section={`${idPrefix}ingredients`}>
-  <div class="manager-task-card-heading">
-    <div>
-      <h3>{text('FABRICATE.Admin.Manager.Recipe.IngredientsSection', 'Ingredients')}</h3>
-    </div>
-  </div>
+<section class="manager-recipe-ingredients-section" data-recipe-section={`${idPrefix}ingredients`}>
   {#if !effectiveComplex}
+    <!-- A single ingredient set (or none authored yet) renders CHROMELESS: the
+         requirements sit directly on the tab background with no "Set 1" box. The
+         "Add ingredient set" button below is the only way to promote to a multi-set
+         recipe, so it shows only where the mode allows more than one set. -->
     <div class="manager-recipe-ingredient-set-simple">
       <RecipeIngredientSetCard
         set={simpleSet}
@@ -121,15 +126,12 @@
         onChange={(nextSet) => updateSimpleSet(nextSet)}
       />
     </div>
-  {:else if sets.length === 0}
-    <div class="manager-recipe-section-empty">
-      <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.IngredientsEmpty', 'No ingredients yet')}</p>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.IngredientsEmptyHint', 'Add a set of ingredients required to craft this recipe.')}</p>
-      <button type="button" class="manager-button" data-recipe-add="ingredient-set" onclick={() => addSet()}>
+    {#if canAddSet}
+      <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="ingredient-set" onclick={() => addSet()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add set')}</span>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
       </button>
-    </div>
+    {/if}
   {:else}
     <ul class="manager-recipe-ingredient-sets">
       {#each sets as set, index (set?.id || index)}
@@ -154,9 +156,9 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="manager-button" data-recipe-add="ingredient-set" onclick={() => addSet()}>
+    <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="ingredient-set" onclick={() => addSet()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add set')}</span>
+      <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
     </button>
   {/if}
 </section>

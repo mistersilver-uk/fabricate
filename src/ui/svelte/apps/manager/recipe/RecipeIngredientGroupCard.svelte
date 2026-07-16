@@ -7,12 +7,31 @@
   bare row (no box). The requirement emits a shallow-updated copy via
   `onChange(nextGroup)` and is dropped entirely via `onRemove()`.
 
-  Alternatives can now mix match types within one requirement: each
-  alternative's row ends with a component-add popover and a tag-requirement add
-  button, so adding from any row appends an alternative of that type to this
-  requirement (e.g. "Iron OR anything tagged hardwood"). New alternatives are
-  appended id-less; the store normalizes them. Removing the last alternative
-  removes the whole requirement.
+  The add-affordances diverge by shape (issue 643): a BARE single-alternative row
+  keeps ONE compact "or…" popover inline at its right end, while a multi-alternative
+  BOX carries FOUR explicit dashed add-buttons at its foot (Add component / tag /
+  cost / essence). Both drive the same append semantics. The popover offers what
+  Fabricate can actually honour, under TWO headings — because the four choices do
+  not all mean the same thing:
+
+   - "Accept instead" — Component / Tag / Currency: the THREE real ingredient match
+     types (`src/models/match/matchTypes.js`), each appended to THIS requirement as a
+     new OR alternative for the row's own picker to fill in.
+   - "Require as well" — Essence: there is NO essence match type. An essence
+     requirement is a property of the ingredient SET (`IngredientSet.essences`), an
+     AND requirement, not an OR alternative — so it sits under its own heading and
+     bubbles up to the set rather than being mislabelled as an alternative. It is
+     offered only while the set can still take one (`addableEssenceOptions`): once the
+     set requires every essence the system defines, the choice would do nothing, and an
+     entry that no-ops on click is worse than an absent entry.
+
+  The split is an ACCESSIBILITY contract, not decoration: the trigger, dialog and
+  search field therefore carry a NEUTRAL accessible name. Naming the whole control
+  "Accept instead" and then handing a screen-reader user a control that adds an AND
+  requirement would be a lie in exactly the place the visible headings prevent one.
+
+  The `data-recipe-add` token family (`alternative-component` / `alternative-tag` /
+  `alternative-essence` / `alternative-currency`) is PRESERVED on the four choices.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -24,8 +43,16 @@
     componentOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // The essences the owning SET can still be given — the system's essences MINUS the
+    // ones it already requires, computed by the set (which owns `essences`). Non-empty
+    // is what unlocks the popover's per-SET essence choice, which is bubbled up rather
+    // than appended here. Empty means the set already requires every essence the system
+    // has, so the choice would be a no-op and is not offered at all: a menu entry that
+    // does nothing when clicked is worse than an absent one.
+    addableEssenceOptions = [],
     onChange = () => {},
-    onRemove = () => {}
+    onRemove = () => {},
+    onAddEssenceRequirement = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -36,11 +63,73 @@
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
   const hasAlternatives = $derived(options.length >= 2);
 
-  // The footer add cluster (rendered once for an OR group) needs its own picker
-  // option list mirroring the per-row component picker.
-  const componentPickerOptions = $derived(
-    (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
+  // The NEUTRAL accessible name for the trigger, the dialog and its search field. The
+  // menu's two headings carry the meaning; naming the control after only one of them
+  // would tell a screen-reader user "Accept instead" and then hand them the essence
+  // choice, which adds an AND requirement to the set.
+  const orMenuLabel = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.OrMenuLabel', 'Add an alternative or an extra requirement')
   );
+
+  // The two headings. `accept-instead` holds the real OR alternatives; `require-as-well`
+  // holds the one choice that is an AND requirement on the owning SET.
+  const orMenuGroups = $derived([
+    {
+      id: 'accept-instead',
+      label: text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
+    },
+    ...((addableEssenceOptions || []).length > 0
+      ? [
+          {
+            id: 'require-as-well',
+            label: text('FABRICATE.Admin.Manager.Recipe.RequireAsWell', 'Require as well')
+          }
+        ]
+      : [])
+  ]);
+
+  // The four choices, each carrying its own `data-recipe-add` token and its heading.
+  // Currency appears only when the system configures units, and Essence only while the
+  // owning set can still take one — so the menu never offers a choice that the system
+  // cannot honour or that would do nothing.
+  const orMenuOptions = $derived([
+    {
+      id: 'component',
+      group: 'accept-instead',
+      addMarker: 'alternative-component',
+      icon: 'fas fa-cube',
+      label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')
+    },
+    {
+      id: 'tags',
+      group: 'accept-instead',
+      addMarker: 'alternative-tag',
+      icon: 'fas fa-tags',
+      label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')
+    },
+    ...((currencyUnits || []).length > 0
+      ? [
+          {
+            id: 'currency',
+            group: 'accept-instead',
+            addMarker: 'alternative-currency',
+            icon: 'fa-solid fa-coins',
+            label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')
+          }
+        ]
+      : []),
+    ...((addableEssenceOptions || []).length > 0
+      ? [
+          {
+            id: 'essence',
+            group: 'require-as-well',
+            addMarker: 'alternative-essence',
+            icon: 'fas fa-flask-vial',
+            label: text('FABRICATE.Admin.Manager.Recipe.AddSetEssenceRequirement', 'Require an essence on this set')
+          }
+        ]
+      : [])
+  ]);
 
   function updateOption(index, nextOption) {
     onChange({ ...group, options: options.map((option, i) => (i === index ? nextOption : option)) });
@@ -56,39 +145,54 @@
     onChange({ ...group, options: options.filter((_, i) => i !== index) });
   }
 
-  // Adding a component this requirement already lists as an alternative bumps
-  // that alternative's quantity by 1 (capped) rather than creating a duplicate
-  // match, which the Validation tab would otherwise flag.
-  function addComponentAlternative(id) {
-    const existingIndex = options.findIndex(
-      (option) => option?.match?.type === 'component' && option.match.componentId === id
-    );
-    if (existingIndex !== -1) {
-      const existing = options[existingIndex];
-      const nextQuantity = Math.min(9999, (Number(existing.quantity) > 0 ? Number(existing.quantity) : 1) + 1);
+  // A new alternative is born EMPTY (the row's own picker fills it in); a currency
+  // alternative takes the first configured unit so its amount input is usable at once.
+  function appendAlternative(type) {
+    if (type === 'essence') {
+      onAddEssenceRequirement();
+      return;
+    }
+    if (type === 'tags') {
+      onChange({ ...group, options: [...options, { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] });
+      return;
+    }
+    if (type === 'currency') {
+      const firstUnit = (currencyUnits || [])[0]?.id || '';
       onChange({
         ...group,
-        options: options.map((option, i) => (i === existingIndex ? { ...existing, quantity: nextQuantity } : option))
+        options: [...options, { quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }]
       });
       return;
     }
-    onChange({ ...group, options: [...options, { quantity: 1, match: { type: 'component', componentId: id } }] });
-  }
-
-  function addTagAlternative() {
-    onChange({ ...group, options: [...options, { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] });
-  }
-
-  // A currency alternative is born with the first configured unit (or empty when
-  // none) and an amount of 1; the editor refines both inline.
-  function addCurrencyAlternative() {
-    const firstUnit = (currencyUnits || [])[0]?.id || '';
     onChange({
       ...group,
-      options: [...options, { quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }]
+      options: [...options, { quantity: 1, match: { type: 'component', componentId: null } }]
     });
   }
 </script>
+
+{#snippet orMenu()}
+  <SearchablePopover
+    options={orMenuOptions}
+    optionGroups={orMenuGroups}
+    pickerClass="manager-recipe-or-picker"
+    triggerClass="manager-chip manager-recipe-or-trigger"
+    triggerIcon="fas fa-code-branch"
+    triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
+    triggerAriaLabel={orMenuLabel}
+    triggerTitle={text('FABRICATE.Admin.Manager.Recipe.OrTriggerHint', 'Accept another kind of ingredient in place of this one, or require an essence on the whole set.')}
+    dialogAriaLabel={orMenuLabel}
+    searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder', 'Search options...')}
+    searchAriaLabel={orMenuLabel}
+    emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+    showChevron={false}
+    showSearch={false}
+    popoverClass="manager-recipe-or-popover"
+    minWidth={220}
+    maxWidth={340}
+    onChoose={(type) => appendAlternative(type)}
+  />
+{/snippet}
 
 <div
   class="manager-recipe-ingredient-requirement"
@@ -96,64 +200,100 @@
   data-recipe-group
   data-recipe-group-id={group?.id || ''}
 >
-  <div class="manager-recipe-ingredient-requirement-options">
-    {#each options as option, index (index)}
-      {#if index > 0}
-        <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-        </div>
-      {/if}
-      <RecipeIngredientOption
-        {option}
-        {componentOptions}
-        {itemTags}
-        {currencyUnits}
-        canRemove={true}
-        showRowAdds={options.length === 1}
-        onChange={(nextOption) => updateOption(index, nextOption)}
-        onRemove={() => removeOption(index)}
-        onAddComponentAlternative={(id) => addComponentAlternative(id)}
-        onAddTagAlternative={() => addTagAlternative()}
-        onAddCurrencyAlternative={() => addCurrencyAlternative()}
-      />
-    {/each}
-  </div>
-
   {#if hasAlternatives}
+    <!-- ANY ONE OF box (§B2): an accent-bordered container with a header pill + hint;
+         the crafter picks any one of the alternatives inside. -->
+    <div class="manager-recipe-any-one-of-head">
+      <span class="manager-recipe-any-one-of-pill" data-recipe-any-one-of>
+        <i class="fas fa-code-branch" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AnyOneOf', 'Any one of')}</span>
+      </span>
+      <span class="manager-recipe-any-one-of-hint manager-muted">{text('FABRICATE.Admin.Manager.Recipe.AnyOneOfHint', 'crafter picks a component or a tagged item')}</span>
+    </div>
+    <div class="manager-recipe-ingredient-requirement-options">
+      {#each options as option, index (index)}
+        {#if index > 0}
+          <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
+            <span>{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
+          </div>
+        {/if}
+        <RecipeIngredientOption
+          {option}
+          {componentOptions}
+          {itemTags}
+          {currencyUnits}
+          canRemove={true}
+          onChange={(nextOption) => updateOption(index, nextOption)}
+          onRemove={() => removeOption(index)}
+        />
+      {/each}
+    </div>
+    <!-- The multi-alternative box uses FOUR explicit dashed add-buttons (issue 643),
+         modelled on the set-level add row, instead of the compact "or…" popover the
+         bare rows keep. They reuse the same append semantics: component/tag append an
+         OR member to THIS requirement, cost appends a currency member, and essence is
+         an AND requirement that bubbles to the owning SET. Currency shows only when the
+         system configures units, essence only while the set can still take one, and the
+         `data-recipe-add` marker family is preserved on each button. -->
     <div class="manager-recipe-requirement-adds">
-      <SearchablePopover
-        options={componentPickerOptions}
-        pickerClass="manager-recipe-component-picker manager-recipe-add-alternative"
-        triggerClass="manager-button is-subtle manager-recipe-add-alternative-trigger"
-        triggerIcon="fas fa-cube"
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
-        triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
-        triggerAddMarker="alternative-component"
-        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')}
-        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-        showChevron={false}
-        onChoose={(id) => addComponentAlternative(id)}
-      />
       <button
         type="button"
-        class="manager-button is-subtle manager-recipe-add-alternative-trigger"
+        class="manager-button is-dashed"
+        data-recipe-add="alternative-component"
+        onclick={() => appendAlternative('component')}
+      >
+        <i class="fas fa-cube" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}</span>
+      </button>
+      <button
+        type="button"
+        class="manager-button is-dashed"
         data-recipe-add="alternative-tag"
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
-        title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')}
-        onclick={() => addTagAlternative()}
-      ><i class="fas fa-tags" aria-hidden="true"></i></button>
+        onclick={() => appendAlternative('tags')}
+      >
+        <i class="fas fa-tags" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
+      </button>
       {#if (currencyUnits || []).length > 0}
         <button
           type="button"
-          class="manager-button is-subtle manager-recipe-add-alternative-trigger"
+          class="manager-button is-dashed"
           data-recipe-add="alternative-cost"
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')}
-          title={text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')}
-          onclick={() => addCurrencyAlternative()}
-        ><i class="fa-solid fa-coins" aria-hidden="true"></i></button>
+          onclick={() => appendAlternative('currency')}
+        >
+          <i class="fa-solid fa-coins" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}</span>
+        </button>
       {/if}
+      {#if (addableEssenceOptions || []).length > 0}
+        <button
+          type="button"
+          class="manager-button is-dashed"
+          data-recipe-add="alternative-essence"
+          onclick={() => appendAlternative('essence')}
+        >
+          <i class="fas fa-flask-vial" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}</span>
+        </button>
+      {/if}
+    </div>
+  {:else}
+    <!-- Bare requirement (§B1): a single row with the "or…" popover inline at its
+         right end. -->
+    <div class="manager-recipe-ingredient-requirement-options">
+      {#each options as option, index (index)}
+        <RecipeIngredientOption
+          {option}
+          {componentOptions}
+          {itemTags}
+          {currencyUnits}
+          canRemove={true}
+          showRequiredTag={true}
+          orControl={orMenu}
+          onChange={(nextOption) => updateOption(index, nextOption)}
+          onRemove={() => removeOption(index)}
+        />
+      {/each}
     </div>
   {/if}
 </div>

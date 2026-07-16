@@ -1,0 +1,53 @@
+name: "Release setup"
+description: >-
+  Shared release-workflow preamble: Node.js + npm ci, and optional AWS OIDC credentials. Extracted
+  from release-s3.yml / release.yml / beta.yml / backfill-provenance.yml, whose identical preambles
+  were a SonarCloud new-code duplication risk.
+
+# NOTE: the caller must run actions/checkout BEFORE this action. A local composite action
+# (`./.github/actions/...`) is only resolvable once the repository is checked out, so this action
+# cannot own the initial checkout; each caller checks out with its own fetch-depth first.
+#
+# Composite actions have NO `secrets` and NO `vars` context (only inputs/env/github/runner/steps/job).
+# So aws-role and aws-region MUST be passed in explicitly by every caller — a moved-verbatim
+# `${{ vars.AWS_ROLE_TO_ASSUME }}` here would resolve to an EMPTY STRING silently and OIDC would try
+# to assume an empty role. The caller reads vars.* and forwards the value.
+inputs:
+  node-version:
+    description: "Node.js version for actions/setup-node."
+    required: false
+    default: "22"
+  enable-oidc:
+    description: "Assume the AWS role via OIDC ('true'/'false'). Requires aws-role and aws-region."
+    required: false
+    default: "false"
+  aws-role:
+    description: "IAM role ARN to assume. Callers forward vars.AWS_ROLE_TO_ASSUME (a composite cannot read vars.*)."
+    required: false
+    default: ""
+  aws-region:
+    description: "AWS region. Callers forward vars.AWS_REGION (a composite cannot read vars.*)."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Configure AWS credentials via OIDC
+      # SHA-pinned per Sonar S7637. aws-role/aws-region come from the caller (see the note above);
+      # an empty aws-role fails the assume loudly rather than assuming an empty role silently.
+      if: ${{ inputs.enable-oidc == 'true' }}
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        role-to-assume: ${{ inputs.aws-role }}
+        aws-region: ${{ inputs.aws-region }}

@@ -20,14 +20,19 @@
 
   let {
     recipe = null,
-    complex = true,
     isMultiStep = false,
     currencyUnits = [],
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // Whether the system mode allows more than one ingredient set. Forwarded to each
+    // section to gate the "Add ingredient set" promotion affordance (issue 643).
+    canAddSet = false,
     // Hidden in routed check-mode recipes (routing is by check outcome, not set name).
     showSetName = true,
+    // Drives the mode-adaptive heading + intro (§B5): 'ingredientSet' routing reads
+    // as "Ingredient sets", everything else as "Ingredients".
+    routingProvider = null,
     onUpdateIngredientSets = () => {},
     onDeleteStep = () => {}
   } = $props();
@@ -40,12 +45,35 @@
   const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
+  // Per-mode heading + intro OUTSIDE any card (§B5), mirroring the Results tab.
+  const heading = $derived(
+    isMultiStep
+      ? {
+          title: text('FABRICATE.Admin.Manager.Recipe.IngredientsHeadingMultiStep', 'Steps & ingredients'),
+          intro: text('FABRICATE.Admin.Manager.Recipe.IngredientsIntroMultiStep', 'Ordered steps craft in sequence, each with its own ingredients and essences. Durations are set on the Overview tab.')
+        }
+      : routingProvider === 'ingredientSet'
+        ? {
+            title: text('FABRICATE.Admin.Manager.Recipe.IngredientsHeadingSets', 'Ingredient sets'),
+            intro: text('FABRICATE.Admin.Manager.Recipe.IngredientsIntroSets', 'Each set is a full list of components (AND). The crafter satisfies any one set (OR); the set used selects the result on the Results tab.')
+          }
+        : {
+            title: text('FABRICATE.Admin.Manager.Recipe.IngredientsHeadingFlat', 'Ingredients'),
+            intro: text('FABRICATE.Admin.Manager.Recipe.IngredientsIntroFlat', 'Everything the crafter must provide. A set is satisfied when every requirement in it is met (AND).')
+          }
+  );
+
   function stepIngredientSets(step) {
     return Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
   }
 </script>
 
 <section class="manager-recipe-tab manager-recipe-ingredients-tab" data-recipe-tab="ingredients" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients', 'Ingredients')}>
+  <div class="manager-recipe-tab-intro">
+    <h2 class="manager-recipe-tab-title">{heading.title}</h2>
+    <p class="manager-muted">{heading.intro}</p>
+  </div>
+
   {#if isMultiStep}
     {#if steps.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its ingredients.')}</p>
@@ -55,7 +83,7 @@
           <RecipeIngredientsSection
             idPrefix={`step-${step.id}-`}
             ingredientSets={stepIngredientSets(step)}
-            {complex}
+            {canAddSet}
             {componentOptions}
             {essenceOptions}
             {itemTags}
@@ -69,7 +97,7 @@
   {:else}
     <RecipeIngredientsSection
       {ingredientSets}
-      {complex}
+      {canAddSet}
       {componentOptions}
       {essenceOptions}
       {itemTags}

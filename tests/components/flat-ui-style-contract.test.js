@@ -65,6 +65,30 @@ describe('Flat UI style contract', () => {
     );
   });
 
+  // The typographic contract sits ALONGSIDE the flat-style rules in the same spec
+  // section (issue 643). It is asserted here, next to the three prose fragments above,
+  // precisely so a future edit cannot quietly reword one while adding the other.
+  it('enshrines the serif/mono typographic contract in the UI spec', () => {
+    const specSource = readFileSync(specPath, 'utf8');
+
+    assert.ok(
+      specSource.includes('### Typographic contract'),
+      'the UI spec should carry the typographic contract alongside the theme-token and spacing rules'
+    );
+    assert.ok(
+      specSource.includes('`--fab-font-serif`') && specSource.includes('`--fab-font-mono`'),
+      'the contract should name both font tokens'
+    );
+    assert.ok(
+      specSource.includes('self-hosted'),
+      'the fonts must be self-hosted — fabricate.css loads into every world, offline included'
+    );
+    assert.ok(
+      specSource.includes('font-variant-numeric: tabular-nums'),
+      'a mono numeric surface must use tabular figures so a value change cannot shift its neighbour'
+    );
+  });
+
   it('contains no gradients in product UI source files', () => {
     const offenders = productRoots
       .flatMap((rootPath) => collectProductFiles(rootPath))

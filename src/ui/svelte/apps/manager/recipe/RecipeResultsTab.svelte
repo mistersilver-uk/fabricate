@@ -20,9 +20,11 @@
 
   let {
     recipe = null,
-    complex = true,
     // Alchemy Simple two-slot result editor (issue 554); forwarded to each section.
     alchemySimple = false,
+    // Simple resolution mode with the check enabled uses the SAME two-slot editor
+    // (success + reserved failure); single-step only (issue 643).
+    simpleFailureSlot = false,
     isMultiStep = false,
     componentOptions = [],
     // Result routing (routed systems). Provider + the system's outcome tiers feed
@@ -34,6 +36,9 @@
     // Progressive systems award results in order; forwarded to each result section
     // so its rows get drag-reorder handles.
     progressive = false,
+    // Deep-link from a progressive row's read-only difficulty badge to the component
+    // editor's Difficulty card (component.difficulty is a Component property).
+    onOpenComponent = () => {},
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {}
@@ -48,6 +53,17 @@
   const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
+  // Per-mode heading + intro OUTSIDE any card (§C3).
+  const heading = $derived(
+    progressive
+      ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingProgressive', 'Result stages (by difficulty)'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroProgressive', 'One roll is spent down this ordered list, meeting each stage’s difficulty in turn — how far it reaches decides how complete the result is.') }
+      : routingProvider === 'check'
+        ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingCheck', 'Results by outcome'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroCheck', 'Each result set is produced on a matching crafting-check success tier.') }
+        : routingProvider === 'ingredientSet'
+          ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingIngredients', 'Results by ingredient set'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroIngredients', 'The ingredient set the crafter uses selects the result set.') }
+          : { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingSimple', 'Result'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroSimple', 'One ingredient set produces one result set.') }
+  );
+
   function stepResultGroups(step) {
     return Array.isArray(step?.resultGroups) ? step.resultGroups : [];
   }
@@ -58,20 +74,33 @@
 </script>
 
 <section class="manager-recipe-tab manager-recipe-results-tab" data-recipe-tab="results" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Results', 'Results')}>
+  <div class="manager-recipe-tab-intro">
+    <h2 class="manager-recipe-tab-title">{heading.title}</h2>
+    <p class="manager-muted">{heading.intro}</p>
+  </div>
+
+  {#if progressive}
+    <!-- Roll-budget info strip (§C4). -->
+    <div class="manager-recipe-info-strip" data-recipe-info-strip>
+      <i class="fas fa-dice-d20" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo', 'Roll budget flows down the list · each stage consumes its difficulty before the next is produced')}</span>
+    </div>
+  {/if}
+
   {#if isMultiStep}
     {#if steps.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its results.')}</p>
     {:else}
-      <RecipeStepAccordion {steps} {onDeleteStep}>
+      <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
         {#snippet body(step)}
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}
             resultGroups={stepResultGroups(step)}
-            {complex}
             {alchemySimple}
             {componentOptions}
             {routingProvider}
             {progressive}
+            {onOpenComponent}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
             {outcomeTiersDefined}
@@ -85,11 +114,11 @@
   {:else}
     <RecipeResultsSection
       {resultGroups}
-      {complex}
-      {alchemySimple}
+      alchemySimple={alchemySimple || simpleFailureSlot}
       {componentOptions}
       {routingProvider}
       {progressive}
+      {onOpenComponent}
       {ingredientSets}
       {outcomeTierOptions}
       {outcomeTiersDefined}
