@@ -3548,10 +3548,18 @@ export class CraftingEngine {
    * Perform the salvage pipeline for a component.
    *
    * Resolves actor, system, and component from their IDs/UUIDs, then runs
-   * the full pipeline: validate -> ownership check -> tool check ->
-   * salvage check -> failure policy -> consume -> create results -> record run.
+   * the full pipeline: validate -> tool check -> salvage check -> failure policy ->
+   * consume -> create results -> record run.
    *
-   * @param {string} actorUuid - UUID of the actor performing salvage.
+   * THIS METHOD PERFORMS NO OWNERSHIP CHECK. (This block claimed one in the pipeline
+   * for a long time; there has never been one — corrected by issue 675.) It resolves
+   * `actorUuid` through `fromUuid` and mutates that actor's Items directly. The only
+   * ownership gate is at the facade: `Fabricate#salvageComponent` takes an ACTOR ID
+   * and resolves it through `_resolveCraftingSources` -> `_resolveCraftingActor`.
+   * That is why no UI may plumb a uuid through to this parameter.
+   *
+   * @param {string} actorUuid - UUID of the actor performing salvage. NOT ownership
+   *   checked here; see above.
    * @param {string} craftingSystemId - ID of the crafting system.
    * @param {string} componentId - ID of the component to salvage.
    * @param {Object} [options={}] - Optional overrides.
@@ -3561,7 +3569,7 @@ export class CraftingEngine {
    *   and macros stay silent. A dismissed prompt returns
    *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
    *   component consumed, no tool breakage) and discards a run created by this call.
-   *   No current UI surface triggers salvage, so this is API/engine-level only today.
+   *   The player Inventory tab's Salvage panel passes true (issue 675).
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null, cancelled?: boolean}>}
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {

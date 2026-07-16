@@ -14,7 +14,11 @@ import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.j
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
-import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIdsForSystem } from './systems/gatheringRealmDiscovery.js';
+import {
+  revealGatheringRealm,
+  hideGatheringRealm,
+  getDiscoveredRealmIdsForSystem,
+} from './systems/gatheringRealmDiscovery.js';
 import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
 import { isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
@@ -24,8 +28,16 @@ import { secondsPerUnitFromCalendar, daysPerYearFromCalendar } from './systems/f
 import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
-import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
-import { renderDialog, viewScene, localize as bridgeLocalize } from './ui/svelte/util/foundryBridge.js';
+import {
+  EVENT_SCENE_SOCKET,
+  createEventSceneTrigger,
+  routeEventSceneSocketMessage,
+} from './systems/eventSceneCoordinator.js';
+import {
+  renderDialog,
+  viewScene,
+  localize as bridgeLocalize,
+} from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
@@ -40,7 +52,7 @@ import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   createGatheringResultCreator,
   resolveGatheringResultSource,
-  gatheringRunItemRef
+  gatheringRunItemRef,
 } from './gatheringResultCreation.js';
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
@@ -53,23 +65,36 @@ import {
   processWorldTimeCallbacksSafely,
 } from './gatheringBootstrapAdapters.js';
 import { sceneRegionUuidsContainingToken } from './canvas/regionHitTest.js';
-import {
-  createGatheringToolAvailability,
-  matchGatheringTools
-} from './gatheringToolRuntime.js';
+import { createGatheringToolAvailability, matchGatheringTools } from './gatheringToolRuntime.js';
 import { createToolBreakageRuntime } from './toolBreakageRuntime.js';
 import {
   getFabricateAppClass,
   getCraftingSystemManagerAppClass,
   getInteractableBrowserAppClass,
   getInteractableConfigAppClass,
-  getInteractablesManagerAppClass
+  getInteractablesManagerAppClass,
 } from './ui/appFactory.js';
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
-import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
-import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import {
+  findItemsDirectoryActionsContainer,
+  syncGatheringDirectoryButton,
+} from './ui/itemsDirectoryButtons.js';
+import {
+  buildCompendiumImportContextOption,
+  promptSelectCraftingSystem,
+} from './ui/compendiumDirectoryContext.js';
+import {
+  registerFabricateSettings,
+  getSetting,
+  setSetting,
+  SETTING_KEYS,
+  FABRICATE_SETTINGS_NAMESPACE,
+  RECIPE_ITEM_FLAG_STAMP_TARGET,
+  COMPONENT_FLAG_STAMP_TARGET,
+  TOOL_FLAG_STAMP_TARGET,
+  OWNED_ITEM_COMPONENT_STAMP_TARGET,
+} from './config/settings.js';
 import { setFabricateFlag } from './config/flags.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
@@ -77,12 +102,12 @@ import { MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
-import {
-  ActorInventoryCoinSpender,
-  ActorPropertyCoinSpender,
-} from './systems/CoinSpenders.js';
+import { ActorInventoryCoinSpender, ActorPropertyCoinSpender } from './systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
-import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
+import {
+  cleanupStalePreferences,
+  isGatheringActorSelectableByUser,
+} from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
@@ -90,28 +115,28 @@ import {
   handleInteractableSocketMessage,
   applyInteractableBehaviorUpdate,
   resolveInteractableBehaviorByRef,
-  writeInteractableBehaviorNode
+  writeInteractableBehaviorNode,
 } from './canvas/interactableSocketBridge.js';
 import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
 import {
   evaluateInteractableCreate,
   neutralizeInheritedLinkedVisual,
-  buildUnconfiguredSentinelPatch
+  buildUnconfiguredSentinelPatch,
 } from './canvas/regions/interactableCreationGuard.js';
 import {
   isInteractableRegionBehavior,
-  readInteractableBehaviorSystem
+  readInteractableBehaviorSystem,
 } from './canvas/regions/interactableRegionFlags.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
   decideWorldInteractableCleanup,
   executeWorldInteractableCleanup,
-  planHasWork
+  planHasWork,
 } from './canvas/regions/interactableCleanup.js';
 import {
   assignInteractableConfigSheet,
   resolveInteractableConfigTarget,
-  shouldOfferInteractableConfigEntry
+  shouldOfferInteractableConfigEntry,
 } from './canvas/regions/interactableConfigSheet.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
@@ -146,7 +171,7 @@ function isSelectableGatheringActor(actor) {
 const getGatheringSelectableActors = createGatheringSelectableActorsGetter({
   getActors: () => game.actors,
   getCurrentUser: () => game.user,
-  isSelectable: isGatheringActorSelectableByUser
+  isSelectable: isGatheringActorSelectableByUser,
 });
 
 /**
@@ -188,7 +213,7 @@ function isSelectableBarActor({ actor, viewer } = {}) {
 const getBarSelectableActors = createGatheringSelectableActorsGetter({
   getActors: () => game.actors,
   getCurrentUser: () => game.user,
-  isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })
+  isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer }),
 });
 
 function getGatheringRunViewer({ run } = {}) {
@@ -218,13 +243,22 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
     buildItemRef: (actor, item) => gatheringRunItemRef(actor, item),
     resolveReplacementSource: ({ componentId, system }) =>
       resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),
-    evaluateExpression
+    evaluateExpression,
   });
 }
 
 function createGatheringFailureFeedback() {
   return {
-    async apply({ failureOutcome, actor, viewer, system, environment, task, outcome, checkResult } = {}) {
+    async apply({
+      failureOutcome,
+      actor,
+      viewer,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult,
+    } = {}) {
       if (failureOutcome?.mode === 'macro') {
         try {
           return await runGatheringMacro(failureOutcome.macroUuid, {
@@ -235,26 +269,39 @@ function createGatheringFailureFeedback() {
             environment,
             task,
             outcome,
-            checkResult
+            checkResult,
           });
         } catch (err) {
           console.error('Fabricate | Gathering failure-feedback macro failed:', err);
-          const fallback = game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') || 'Gathering produced no results.';
+          const fallback =
+            game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') ||
+            'Gathering produced no results.';
           ui.notifications?.warn?.(fallback);
           return { message: fallback, error: err?.message || 'Macro threw' };
         }
       }
-      const message = failureOutcome?.text || game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') || 'Gathering produced no results.';
+      const message =
+        failureOutcome?.text ||
+        game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') ||
+        'Gathering produced no results.';
       ui.notifications?.warn?.(message);
       return { message };
-    }
+    },
   };
 }
 
 function fabricateEscapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (ch) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[ch]
+  );
 }
 
 function eventScenePromptText(key, fallback, data) {
@@ -271,45 +318,66 @@ function eventScenePromptText(key, fallback, data) {
 async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
   const scene = typeof fromUuid === 'function' ? await fromUuid(sceneUuid) : null;
   if (!scene) {
-    ui.notifications?.warn?.(eventScenePromptText(
-      'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Missing',
-      'The event\'s linked scene could not be found.'
-    ));
+    ui.notifications?.warn?.(
+      eventScenePromptText(
+        'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Missing',
+        "The event's linked scene could not be found."
+      )
+    );
     return;
   }
   const sceneName = scene.name || sceneUuid;
-  const players = Array.from(game.users?.contents || []).filter(user => user?.active && !user?.isGM);
+  const players = Array.from(game.users?.contents || []).filter(
+    (user) => user?.active && !user?.isGM
+  );
   const intro = eventScenePromptText(
     'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Intro',
     `${eventName || 'An event'} dropped. Move players to ${sceneName}?`,
     { event: eventName || 'An event', scene: sceneName }
   );
-  const rows = players.length === 0
-    ? `<p class="notes">${fabricateEscapeHtml(eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.NoPlayers', 'No active players to move.'))}</p>`
-    : players.map(user => `<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="fab-pull-player" value="${fabricateEscapeHtml(user.id)}" checked /> ${fabricateEscapeHtml(user.name)}</label>`).join('');
+  const rows =
+    players.length === 0
+      ? `<p class="notes">${fabricateEscapeHtml(eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.NoPlayers', 'No active players to move.'))}</p>`
+      : players
+          .map(
+            (user) =>
+              `<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="fab-pull-player" value="${fabricateEscapeHtml(user.id)}" checked /> ${fabricateEscapeHtml(user.name)}</label>`
+          )
+          .join('');
   const content = `<div style="display:flex;flex-direction:column;gap:6px;"><p>${fabricateEscapeHtml(intro)}</p>${rows}</div>`;
   renderDialog({
-    title: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Title', 'An event occurred'),
+    title: eventScenePromptText(
+      'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Title',
+      'An event occurred'
+    ),
     content,
     default: 'move',
     buttons: {
       move: {
-        label: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Move', 'Move players'),
+        label: eventScenePromptText(
+          'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Move',
+          'Move players'
+        ),
         callback: (html) => {
           const root = html?.[0] ?? html;
           const userIds = root
-            ? Array.from(root.querySelectorAll('.fab-pull-player:checked')).map(input => input.value)
+            ? Array.from(root.querySelectorAll('.fab-pull-player:checked')).map(
+                (input) => input.value
+              )
             : [];
           void viewScene(sceneUuid);
           if (userIds.length > 0) {
             game.socket?.emit(EVENT_SCENE_SOCKET, { action: 'pullToScene', sceneUuid, userIds });
           }
-        }
+        },
       },
       cancel: {
-        label: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Cancel', 'Cancel')
-      }
-    }
+        label: eventScenePromptText(
+          'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Cancel',
+          'Cancel'
+        ),
+      },
+    },
   });
 }
 
@@ -327,20 +395,23 @@ function localizeGathering(key, data = {}) {
  * @returns {Promise<void[]>} Promise that settles after every guarded processor settles.
  */
 function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)) {
-  return Promise.all(processWorldTimeCallbacksSafely([
-    {
-      label: 'Crafting',
-      callback: () => game.fabricate?.getCraftingRunManager?.()?.processWorldTime?.(worldTime)
-    },
-    {
-      label: 'Salvage',
-      callback: () => game.fabricate?.getCraftingEngine?.()?.processPendingSalvageRuns?.(worldTime)
-    },
-    {
-      label: 'Gathering',
-      callback: () => gatheringEngine?.processWorldTime?.(worldTime)
-    }
-  ]));
+  return Promise.all(
+    processWorldTimeCallbacksSafely([
+      {
+        label: 'Crafting',
+        callback: () => game.fabricate?.getCraftingRunManager?.()?.processWorldTime?.(worldTime),
+      },
+      {
+        label: 'Salvage',
+        callback: () =>
+          game.fabricate?.getCraftingEngine?.()?.processPendingSalvageRuns?.(worldTime),
+      },
+      {
+        label: 'Gathering',
+        callback: () => gatheringEngine?.processWorldTime?.(worldTime),
+      },
+    ])
+  );
 }
 
 /**
@@ -432,11 +503,14 @@ class Fabricate {
     this.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
     this.gatheringRunManager = new GatheringRunManager();
     this.gatheringGateAndCheckEvaluator = new GatheringGateAndCheckEvaluator({
-      evaluateExpression: evaluateGatheringExpression
+      evaluateExpression: evaluateGatheringExpression,
     });
-    this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
+    this.recipeVisibilityService = new RecipeVisibilityService(
+      this.recipeManager,
+      this.craftingSystemManager
+    );
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager, {
-      getPlayerResultOrder: entry => this._readPlayerResultOrder(entry)
+      getPlayerResultOrder: (entry) => this._readPlayerResultOrder(entry),
     });
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
@@ -447,7 +521,10 @@ class Fabricate {
       adapters: new Map([['pf2e', new Pf2eInventoryCoinAdapter()]]),
     });
     this.actorPropertyCoinSpender = new ActorPropertyCoinSpender();
-    this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager);
+    this.compendiumImporter = new CompendiumImporter(
+      this.craftingSystemManager,
+      this.recipeManager
+    );
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,
@@ -456,7 +533,7 @@ class Fabricate {
       this.salvageRunManager,
       this.actorInventoryCoinSpender,
       this.actorPropertyCoinSpender,
-      { getPlayerResultOrder: entry => this._readPlayerResultOrder(entry) }
+      { getPlayerResultOrder: (entry) => this._readPlayerResultOrder(entry) }
     );
 
     // Initialize recipe manager
@@ -466,22 +543,26 @@ class Fabricate {
       systemManager: this.craftingSystemManager,
       runCleanup: {
         removeRunsForSystem: (systemId) => this.gatheringRunManager.removeRunsForSystem(systemId),
-        removeRunsForEnvironment: (environmentId) => this.gatheringRunManager.removeRunsForEnvironment(environmentId),
-        removeRunsForTask: (taskId, options) => this.gatheringRunManager.removeRunsForTask(taskId, options)
-      }
+        removeRunsForEnvironment: (environmentId) =>
+          this.gatheringRunManager.removeRunsForEnvironment(environmentId),
+        removeRunsForTask: (taskId, options) =>
+          this.gatheringRunManager.removeRunsForTask(taskId, options),
+      },
     });
     this.gatheringEnvironmentStore.load();
     // Per-system gathering realms + Fabricate-managed parties + current-realm
     // resolver for location-aware gathering. Parties persist to a world setting;
     // realms live on the crafting system via the realm store's updateSystem
     // seam. The resolver is constructor-injected into the engine (not imported).
-    this.gatheringRealmStore = new GatheringRealmStore({ systemManager: this.craftingSystemManager });
+    this.gatheringRealmStore = new GatheringRealmStore({
+      systemManager: this.craftingSystemManager,
+    });
     this.gatheringPartyStore = new GatheringPartyStore({
       getSetting,
       setSetting,
       randomID: () => foundry.utils.randomID(),
       getUserId: () => game.user?.id || null,
-      now: () => Date.now()
+      now: () => Date.now(),
     });
     this.gatheringPartyStore.load();
     this.gatheringLocationService = new GatheringLocationService({
@@ -497,7 +578,11 @@ class Fabricate {
         const resolve = globalThis.fromUuidSync;
         if (typeof resolve !== 'function' || !travelActorUuid) return [];
         let actor = null;
-        try { actor = resolve(String(travelActorUuid)); } catch (_) { actor = null; }
+        try {
+          actor = resolve(String(travelActorUuid));
+        } catch (_) {
+          actor = null;
+        }
         const tokens = actor?.getActiveTokens?.(false, true) || [];
         const uuids = new Set();
         for (const token of tokens) {
@@ -505,7 +590,10 @@ class Fabricate {
           let matched = false;
           if (memberRegions && typeof memberRegions[Symbol.iterator] === 'function') {
             for (const region of memberRegions) {
-              if (region?.uuid) { uuids.add(String(region.uuid)); matched = true; }
+              if (region?.uuid) {
+                uuids.add(String(region.uuid));
+                matched = true;
+              }
             }
           }
           if (matched) continue;
@@ -513,7 +601,7 @@ class Fabricate {
           for (const uuid of sceneRegionUuidsContainingToken({ scene, token })) uuids.add(uuid);
         }
         return uuids;
-      }
+      },
     });
     this.gatheringRichStateService = new GatheringRichStateService({
       environmentStore: this.gatheringEnvironmentStore,
@@ -531,7 +619,7 @@ class Fabricate {
       // Interactable-scoped node seams (issue 302): resolve a behaviour by ref and
       // route its scoped-node write through the active GM.
       resolveRegionBehavior: (ref) => resolveInteractableBehaviorByRef(ref),
-      writeInteractableBehavior: (ref, patch) => writeInteractableBehaviorNode(ref, patch)
+      writeInteractableBehavior: (ref, patch) => writeInteractableBehaviorNode(ref, patch),
     });
     gatheringEngine = new GatheringEngine({
       environmentStore: this.gatheringEnvironmentStore,
@@ -543,30 +631,35 @@ class Fabricate {
       isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer),
       isGamePaused: isCurrentWorldPaused,
       sceneAccess: createGatheringSceneAccess({
-        getCurrentScene: () => game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null
+        getCurrentScene: () =>
+          game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null,
       }),
       toolAvailability: createGatheringToolAvailability({
         craftingSystemManager: this.craftingSystemManager,
-        evaluator: this.gatheringGateAndCheckEvaluator
+        evaluator: this.gatheringGateAndCheckEvaluator,
       }),
       resultCreator: createGatheringResultCreator(this.craftingSystemManager),
       toolBreakage: createGatheringToolBreakage({
         craftingSystemManager: this.craftingSystemManager,
-        evaluateExpression: evaluateGatheringExpression
+        evaluateExpression: evaluateGatheringExpression,
       }),
       failureFeedback: createGatheringFailureFeedback(),
       // Publishes the documented public `fabricate.gathering.*` integration hooks
       // on terminal completion for other module authors to subscribe to.
       hookPublisher: new GatheringHookPublisher({
         hooks: Hooks,
-        nowWorldTime: () => Number(game.time?.worldTime || 0)
+        nowWorldTime: () => Number(game.time?.worldTime || 0),
       }),
       eventSceneTrigger: createEventSceneTrigger({
         isGM: () => !!game.user?.isGM,
-        emitPrompt: ({ sceneUuid, eventName }) => game.socket?.emit(EVENT_SCENE_SOCKET, {
-          action: 'eventScenePrompt', sceneUuid, eventName, requestedBy: game.user?.id
-        }),
-        showPrompt: showEventScenePrompt
+        emitPrompt: ({ sceneUuid, eventName }) =>
+          game.socket?.emit(EVENT_SCENE_SOCKET, {
+            action: 'eventScenePrompt',
+            sceneUuid,
+            eventName,
+            requestedBy: game.user?.id,
+          }),
+        showPrompt: showEventScenePrompt,
       }),
       getRunViewer: getGatheringRunViewer,
       locationResolver: this.gatheringLocationService,
@@ -580,16 +673,18 @@ class Fabricate {
           sceneId: ref?.sceneId,
           regionId: ref?.regionId,
           behaviorId: ref?.behaviorId,
-          update
-        })
+          update,
+        }),
     });
-    const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
-    const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
+    const validRecipes = new Set(this.recipeManager.getRecipes({}).map((r) => r.id));
+    const validSystems = new Set(this.craftingSystemManager.getSystems().map((s) => s.id));
     const validSalvageComponentsBySystem = new Map(
-      this.craftingSystemManager.getSystems().map(system => [
-        system.id,
-        new Set((system.components || []).map(component => component.id))
-      ])
+      this.craftingSystemManager
+        .getSystems()
+        .map((system) => [
+          system.id,
+          new Set((system.components || []).map((component) => component.id)),
+        ])
     );
     await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
     // Prune legacy phantom crafting runs: a single-step recipe with no time
@@ -604,12 +699,12 @@ class Fabricate {
     // computed: the progressive-order map's `salvage:<componentId>` keys are not
     // system-scoped, so the prune needs one flat id set.
     const validComponentIds = new Set(
-      [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
+      [...validSalvageComponentsBySystem.values()].flatMap((ids) => [...ids])
     );
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
       resolveGatheringActor,
       isSelectableGatheringActor,
-      validComponentIds
+      validComponentIds,
     });
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
@@ -643,7 +738,7 @@ class Fabricate {
       // user-initiated — the GM fixes/deletes the failed documents and RELOADS
       // Foundry, at which point migrations re-run automatically because
       // migrationVersion was not advanced. There is NO same-pass auto-retry.
-      promptRecovery: (context) => this._promptMigrationRecovery(context)
+      promptRecovery: (context) => this._promptMigrationRecovery(context),
     });
     const summary = await runner.run();
 
@@ -653,8 +748,9 @@ class Fabricate {
     // per-document recovery guidance is already emitted to the console by the runner.
     if (summary?.aborted === true) {
       if (game.user?.isGM) {
-        const message = game.i18n?.localize?.('FABRICATE.Migration.Aborted.Notice')
-          || 'Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance.';
+        const message =
+          game.i18n?.localize?.('FABRICATE.Migration.Aborted.Notice') ||
+          'Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance.';
         ui.notifications?.error?.(message);
       }
       return;
@@ -665,8 +761,11 @@ class Fabricate {
     // and only when something was migrated; the pure migration stays free of edge effects.
     const migratedCount = Number(summary?.migratedCatalystCount || 0);
     if (migratedCount > 0 && game.user?.isGM) {
-      const message = game.i18n?.format?.('FABRICATE.Migration.CatalystsToTools.Notice', { count: migratedCount })
-        || `Fabricate migrated ${migratedCount} catalyst(s) to the Tools library. Find them under the Tools tab.`;
+      const message =
+        game.i18n?.format?.('FABRICATE.Migration.CatalystsToTools.Notice', {
+          count: migratedCount,
+        }) ||
+        `Fabricate migrated ${migratedCount} catalyst(s) to the Tools library. Find them under the Tools tab.`;
       ui.notifications?.info?.(message);
     }
 
@@ -674,11 +773,14 @@ class Fabricate {
     // one or more systems, name them so the GM can re-enable Travel & Realms (the
     // subsystem stays disabled by default) and knows realm-scoped records may now
     // appear in more environments. GM-only; only when something was migrated.
-    const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems) ? summary.unifiedRegionSystems : [];
+    const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems)
+      ? summary.unifiedRegionSystems
+      : [];
     if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
       const systemList = unifiedRegionSystems.join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
-        || `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
+      const message =
+        game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList }) ||
+        `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
       ui.notifications?.info?.(message);
     }
 
@@ -691,10 +793,15 @@ class Fabricate {
     // when something was actually dropped or stripped.
     const removedProviders = summary?.removedResultSelectionProviders ?? null;
     const droppedRollTableRecipes = Array.isArray(removedProviders?.droppedRollTableRecipes)
-      ? removedProviders.droppedRollTableRecipes : [];
+      ? removedProviders.droppedRollTableRecipes
+      : [];
     const strippedGatheringTasks = Array.isArray(removedProviders?.strippedGatheringTasks)
-      ? removedProviders.strippedGatheringTasks : [];
-    if ((droppedRollTableRecipes.length > 0 || strippedGatheringTasks.length > 0) && game.user?.isGM) {
+      ? removedProviders.strippedGatheringTasks
+      : [];
+    if (
+      (droppedRollTableRecipes.length > 0 || strippedGatheringTasks.length > 0) &&
+      game.user?.isGM
+    ) {
       // Console recovery log naming the affected recipes/tasks. Routed gathering tasks now
       // resolve via the system gathering check, so the GM must populate
       // `gatheringCraftingCheck.routed.rollFormula` for any stripped task. The localized GM
@@ -715,9 +822,11 @@ class Fabricate {
       : [];
     if (essenceCollisionDisabledRecipes.length > 0 && game.user?.isGM) {
       const recipeList = essenceCollisionDisabledRecipes.join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
-        recipes: recipeList,
-      }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
+      const message =
+        game.i18n?.format?.('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
+          recipes: recipeList,
+        }) ||
+        `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
       ui.notifications?.warn?.(message);
     }
   }
@@ -741,13 +850,13 @@ class Fabricate {
       if (!DialogV2?.wait && !DialogV2?.prompt) return;
 
       const localize = (key, data) =>
-        data ? game.i18n?.format?.(key, data) ?? key : game.i18n?.localize?.(key) ?? key;
+        data ? (game.i18n?.format?.(key, data) ?? key) : (game.i18n?.localize?.(key) ?? key);
       const config = buildMigrationRecoveryPrompt(context, localize);
 
       const buttons = config.buttons.map((button) => ({
         action: button.action,
         label: button.label,
-        default: button.default
+        default: button.default,
       }));
 
       // DialogV2.wait resolves to the chosen action; both choices are
@@ -758,10 +867,12 @@ class Fabricate {
         content: config.content,
         buttons,
         default: config.default,
-        rejectClose: false
+        rejectClose: false,
       });
     } catch (error) {
-      console.warn(`Fabricate | Failed to present migration recovery prompt: ${error?.message ?? error}`);
+      console.warn(
+        `Fabricate | Failed to present migration recovery prompt: ${error?.message ?? error}`
+      );
     }
   }
 
@@ -869,7 +980,10 @@ class Fabricate {
     if (!resolvedActor || !systemId) return null;
     // Realm/travel disabled for this system ⇒ no location surface at all.
     if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    const context = this.gatheringLocationService?.buildCurrentRealmContext({ actor: resolvedActor, systemId });
+    const context = this.gatheringLocationService?.buildCurrentRealmContext({
+      actor: resolvedActor,
+      systemId,
+    });
     if (!context) return null;
     const isGM = game.user?.isGM === true;
     const system = this.craftingSystemManager?.getSystem(systemId);
@@ -936,7 +1050,14 @@ class Fabricate {
    * @param {{ actorId?: string, actor?: object, systemId: string, realmId: string, source?: string, partyId?: string }} options
    * @returns {Promise<boolean>}
    */
-  revealGatheringRealmForActor({ actorId = null, actor = null, systemId = null, realmId = null, source = 'manual', partyId = null } = {}) {
+  revealGatheringRealmForActor({
+    actorId = null,
+    actor = null,
+    systemId = null,
+    realmId = null,
+    source = 'manual',
+    partyId = null,
+  } = {}) {
     this._requireReady();
     this._requireGM();
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
@@ -950,7 +1071,7 @@ class Fabricate {
       source,
       partyId,
       validateRealmInSystem: system,
-      now: () => Date.now()
+      now: () => Date.now(),
     });
   }
 
@@ -959,9 +1080,23 @@ class Fabricate {
    * @param {{ actorId?: string, actor?: object, systemId: string, regionId: string, source?: string, partyId?: string }} options
    * @returns {Promise<boolean>}
    */
-  revealGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null, source = 'manual', partyId = null } = {}) {
+  revealGatheringRegionForActor({
+    actorId = null,
+    actor = null,
+    systemId = null,
+    regionId = null,
+    source = 'manual',
+    partyId = null,
+  } = {}) {
     deprecate('revealGatheringRegionForActor', 'revealGatheringRealmForActor');
-    return this.revealGatheringRealmForActor({ actorId, actor, systemId, realmId: regionId, source, partyId });
+    return this.revealGatheringRealmForActor({
+      actorId,
+      actor,
+      systemId,
+      realmId: regionId,
+      source,
+      partyId,
+    });
   }
 
   /**
@@ -970,13 +1105,19 @@ class Fabricate {
    * @param {{ actorId?: string, actor?: object, systemId: string, realmId: string }} options
    * @returns {Promise<boolean>}
    */
-  hideGatheringRealmForActor({ actorId = null, actor = null, systemId = null, realmId = null } = {}) {
+  hideGatheringRealmForActor({
+    actorId = null,
+    actor = null,
+    systemId = null,
+    realmId = null,
+  } = {}) {
     this._requireReady();
     this._requireGM();
     const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
     if (!resolvedActor || !systemId || !realmId) return Promise.resolve(false);
     // Realm/travel disabled ⇒ no-op (no discovery writes).
-    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
+    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId)))
+      return Promise.resolve(false);
     return hideGatheringRealm(resolvedActor, { systemId, realmId });
   }
 
@@ -985,7 +1126,12 @@ class Fabricate {
    * @param {{ actorId?: string, actor?: object, systemId: string, regionId: string }} options
    * @returns {Promise<boolean>}
    */
-  hideGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null } = {}) {
+  hideGatheringRegionForActor({
+    actorId = null,
+    actor = null,
+    systemId = null,
+    regionId = null,
+  } = {}) {
     deprecate('hideGatheringRegionForActor', 'hideGatheringRealmForActor');
     return this.hideGatheringRealmForActor({ actorId, actor, systemId, realmId: regionId });
   }
@@ -1095,7 +1241,12 @@ class Fabricate {
     // explicit (truthy) actor id still overrides. See _withRememberedActorDefault.
     const withRememberedActor = this._withRememberedActorDefault(options);
 
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'listForActor', withRememberedActor, () => game.user);
+    return callGatheringRuntimeWithCurrentViewer(
+      gatheringEngine,
+      'listForActor',
+      withRememberedActor,
+      () => game.user
+    );
   }
 
   /**
@@ -1117,7 +1268,7 @@ class Fabricate {
       id: actor?.id ?? actor?.uuid ?? null,
       uuid: actor?.uuid ?? null,
       name: actor?.name ?? '',
-      img: actor?.img ?? null
+      img: actor?.img ?? null,
     }));
   }
 
@@ -1311,7 +1462,11 @@ class Fabricate {
    * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
    * @returns {Promise<{success: boolean, message: string, messageData?: object}>}
    */
-  async learnRecipeFromInventory({ actorId = null, recipeId = null, componentSourceActorIds = null } = {}) {
+  async learnRecipeFromInventory({
+    actorId = null,
+    recipeId = null,
+    componentSourceActorIds = null,
+  } = {}) {
     this._requireReady();
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) {
@@ -1347,7 +1502,14 @@ class Fabricate {
    *   mutation (no ingredients, currency, or tools consumed, no run created).
    * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
    */
-  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, componentSourceActorIds = null, interactive = false } = {}) {
+  async craftRecipe({
+    actorId = null,
+    recipeId,
+    ingredientSetId = null,
+    ingredientOptionOverrides = null,
+    componentSourceActorIds = null,
+    interactive = false,
+  } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -1369,6 +1531,46 @@ class Fabricate {
   }
 
   /**
+   * Salvage one owned component for the current selection (issue 675) — the seam
+   * behind the player Inventory tab's Salvage panel, and the first UI caller of
+   * `CraftingEngine.salvage`.
+   *
+   * TAKES AN `actorId`, NEVER AN `actorUuid`. `CraftingEngine.salvage` performs NO
+   * ownership check of its own; `_resolveCraftingActor` — reached here through
+   * `_resolveCraftingSources` — is the ONLY ownership gate on this path, which is
+   * why every player facade (`craftRecipe`, `listInventoryForActor`, the alchemy
+   * pair) takes an id. A uuid would go straight to `fromUuid()` and the engine would
+   * mutate Items directly; a stale, console-supplied, or foreign uuid would reach
+   * the server and THROW rather than return the `{ success: false, message }` a
+   * store expects. Exact `craftRecipe` parity on that gate is the contract.
+   *
+   * Note there is deliberately no public `Fabricate#salvage` delegator to mirror
+   * `craftRecipe`'s `this.craft`: this routes to the engine directly.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id; defaults to the
+   *   persisted last-crafting selection.
+   * @param {string} options.systemId Crafting system id.
+   * @param {string} options.componentId Id of the component to salvage.
+   * @param {boolean} [options.interactive] When true, prompt the player with the
+   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
+   *   so Dice So Nice animates it. Defaults to false so macros and automation stay
+   *   silent. A dismissed prompt returns `{ success: false, cancelled: true, results:
+   *   null }` with zero mutation.
+   * @returns {Promise<{success: boolean, results: Array|null, message: string, salvageRun?: object|null, cancelled?: boolean}>}
+   */
+  async salvageComponent({ actorId = null, systemId, componentId, interactive = false } = {}) {
+    this._requireReady();
+    const { craftingActor } = this._resolveCraftingSources({ rememberedActorId: actorId });
+    if (!craftingActor) {
+      return { success: false, results: null, message: 'No crafting actor selected' };
+    }
+    return await this.craftingEngine.salvage(craftingActor.uuid, systemId, componentId, {
+      interactive,
+    });
+  }
+
+  /**
    * Re-evaluate the craftability of ONE ingredient set with in-session per-group
    * option overrides applied (issue 552). Backs the crafting store's
    * `selectedCraftability` recompute when the player picks a non-default option, so
@@ -1384,7 +1586,13 @@ class Fabricate {
    * @param {string[]|null} [options.componentSourceActorIds]
    * @returns {object|null} Fresh single-set craftability, or null when unresolvable.
    */
-  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, actorId = null, componentSourceActorIds = null } = {}) {
+  evaluateSelectedSet({
+    recipeId = null,
+    setId = null,
+    optionOverrides = null,
+    actorId = null,
+    componentSourceActorIds = null,
+  } = {}) {
     this._requireReady();
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) return null;
@@ -1396,18 +1604,23 @@ class Fabricate {
       rememberedActorId: actorId,
       componentSourceActorIds,
     });
-    const sources = componentSourceActors.length > 0
-      ? componentSourceActors
-      : (craftingActor ? [craftingActor] : []);
+    const sources =
+      componentSourceActors.length > 0
+        ? componentSourceActors
+        : craftingActor
+          ? [craftingActor]
+          : [];
     if (sources.length === 0) return null;
     // Narrow the evaluation to the one selected set (mirrors CraftingListingBuilder's
     // per-set copy): keeps the recipe's data fields + the IngredientSet instance
     // methods while scoping craftability to this set.
     const singleSetRecipe = { ...recipe, ingredientSets: [set] };
-    return this.recipeManager.evaluateCraftability(sources, singleSetRecipe, {
-      craftingActor,
-      optionOverrides,
-    }) ?? null;
+    return (
+      this.recipeManager.evaluateCraftability(sources, singleSetRecipe, {
+        craftingActor,
+        optionOverrides,
+      }) ?? null
+    );
   }
 
   /**
@@ -1450,7 +1663,11 @@ class Fabricate {
    *   source actor ids; defaults to the persisted component-source set.
    * @returns {object} Leak-safe alchemy listing model.
    */
-  listAlchemyForActor({ actorId = null, craftingSystemId = null, componentSourceActorIds = null } = {}) {
+  listAlchemyForActor({
+    actorId = null,
+    craftingSystemId = null,
+    componentSourceActorIds = null,
+  } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -1497,7 +1714,12 @@ class Fabricate {
       componentSourceActorIds,
     });
     if (!craftingActor) {
-      return { success: false, results: null, message: 'No crafting actor selected', disposition: 'error' };
+      return {
+        success: false,
+        results: null,
+        message: 'No crafting actor selected',
+        disposition: 'error',
+      };
     }
     const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
     const system = this.craftingSystemManager?.getSystem?.(craftingSystemId) ?? null;
@@ -1509,7 +1731,12 @@ class Fabricate {
       craftingSystemId
     );
     if (submittedItems.length === 0) {
-      return { success: false, results: null, message: 'FABRICATE.App.Alchemy.NoIngredients', disposition: 'error' };
+      return {
+        success: false,
+        results: null,
+        message: 'FABRICATE.App.Alchemy.NoIngredients',
+        disposition: 'error',
+      };
     }
     return await this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
       craftingSystemId,
@@ -1758,7 +1985,12 @@ class Fabricate {
     // attempt — the player-app "nothing happens" bug. See _withRememberedActorDefault.
     const withRememberedActor = this._withRememberedActorDefault(options);
 
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', withRememberedActor, () => game.user);
+    return callGatheringRuntimeWithCurrentViewer(
+      gatheringEngine,
+      'startAttempt',
+      withRememberedActor,
+      () => game.user
+    );
   }
 
   /**
@@ -1777,7 +2009,12 @@ class Fabricate {
 
     const withRememberedActor = this._withRememberedActorDefault(options);
 
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'getTaskDropBreakdown', withRememberedActor, () => game.user);
+    return callGatheringRuntimeWithCurrentViewer(
+      gatheringEngine,
+      'getTaskDropBreakdown',
+      withRememberedActor,
+      () => game.user
+    );
   }
 
   inspectGatheringEnvironmentState(options = {}) {
@@ -1912,8 +2149,8 @@ class Fabricate {
     // Characters only — exclude NPCs (and other non-character actor types). A
     // character with no rolled pool yet reports max: null (the panel offers Roll).
     return Array.from(game.actors?.contents ?? [])
-      .filter(actor => actor?.type === 'character')
-      .map(actor => {
+      .filter((actor) => actor?.type === 'character')
+      .map((actor) => {
         const stamina = service.getActorStamina(actor, systemId);
         return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };
       });
@@ -1931,7 +2168,11 @@ class Fabricate {
     this._requireGM();
     const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
     if (!actor) return null;
-    return this.gatheringRichStateService?.seedActorStaminaIfNeeded({ actor, systemId: options.systemId, force: true });
+    return this.gatheringRichStateService?.seedActorStaminaIfNeeded({
+      actor,
+      systemId: options.systemId,
+      force: true,
+    });
   }
 
   revealGatheringTask(options = {}) {
@@ -2010,7 +2251,8 @@ class Fabricate {
         getGatheringTask: (environmentId, taskId) =>
           this._resolveJournalGatheringTask(environmentId, taskId),
         getRecipeItemImg: (systemId, recipeItemId) =>
-          this.craftingSystemManager?.getRecipeItemDefinition?.(systemId, recipeItemId)?.img ?? null,
+          this.craftingSystemManager?.getRecipeItemDefinition?.(systemId, recipeItemId)?.img ??
+          null,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
@@ -2130,7 +2372,10 @@ class Fabricate {
     const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
     const resolved = resolveAdvanceSources({ actor, run, fromUuid: globalThis.fromUuidSync });
     if (resolved.blocked) {
-      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
+      return {
+        success: false,
+        message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner'),
+      };
     }
     return this.craft(actor, recipeId, {
       runId,
@@ -2212,17 +2457,18 @@ function registerFabricateConfig() {
   // (`getInteractableConfigAppClass().show(ref)`). Resolved defensively via
   // globalThis — a no-op when the API shape differs, so it never throws into init.
   try {
-    const DocumentSheetConfig = foundry?.applications?.apps?.DocumentSheetConfig
-      ?? globalThis.DocumentSheetConfig;
-    const RegionBehavior = foundry?.documents?.RegionBehavior
-      ?? CONFIG?.RegionBehavior?.documentClass
-      ?? globalThis.RegionBehavior;
+    const DocumentSheetConfig =
+      foundry?.applications?.apps?.DocumentSheetConfig ?? globalThis.DocumentSheetConfig;
+    const RegionBehavior =
+      foundry?.documents?.RegionBehavior ??
+      CONFIG?.RegionBehavior?.documentClass ??
+      globalThis.RegionBehavior;
     const RegionBehaviorConfig = globalThis.foundry?.applications?.sheets?.RegionBehaviorConfig;
     if (typeof RegionBehaviorConfig === 'function') {
       assignInteractableConfigSheet({
         registrar: DocumentSheetConfig,
         RegionBehavior,
-        SheetClass: RegionBehaviorConfig
+        SheetClass: RegionBehaviorConfig,
       });
     }
   } catch (_error) {
@@ -2259,11 +2505,35 @@ function bindFabricateGlobal() {
     hideRealmForActor: (options) => fabricate.hideGatheringRealmForActor(options),
     // DEPRECATED region-named helper aliases — forward to the realm method and
     // warn once. Kept so existing macros/modules keep working.
-    getRegionStore: () => { deprecate('gathering.getRegionStore', 'gathering.getRealmStore'); return fabricate.getGatheringRealmStore(); },
-    setPartyRegionOverride: (options) => { deprecate('gathering.setPartyRegionOverride', 'gathering.setPartyRealmOverride'); return fabricate.setGatheringPartyRealmOverride({ ...options, realmIds: options?.realmIds ?? options?.regionIds }); },
-    clearPartyRegionOverride: (options) => { deprecate('gathering.clearPartyRegionOverride', 'gathering.clearPartyRealmOverride'); return fabricate.clearGatheringPartyRealmOverride(options); },
-    revealRegionForActor: (options) => { deprecate('gathering.revealRegionForActor', 'gathering.revealRealmForActor'); return fabricate.revealGatheringRealmForActor({ ...options, realmId: options?.realmId ?? options?.regionId }); },
-    hideRegionForActor: (options) => { deprecate('gathering.hideRegionForActor', 'gathering.hideRealmForActor'); return fabricate.hideGatheringRealmForActor({ ...options, realmId: options?.realmId ?? options?.regionId }); }
+    getRegionStore: () => {
+      deprecate('gathering.getRegionStore', 'gathering.getRealmStore');
+      return fabricate.getGatheringRealmStore();
+    },
+    setPartyRegionOverride: (options) => {
+      deprecate('gathering.setPartyRegionOverride', 'gathering.setPartyRealmOverride');
+      return fabricate.setGatheringPartyRealmOverride({
+        ...options,
+        realmIds: options?.realmIds ?? options?.regionIds,
+      });
+    },
+    clearPartyRegionOverride: (options) => {
+      deprecate('gathering.clearPartyRegionOverride', 'gathering.clearPartyRealmOverride');
+      return fabricate.clearGatheringPartyRealmOverride(options);
+    },
+    revealRegionForActor: (options) => {
+      deprecate('gathering.revealRegionForActor', 'gathering.revealRealmForActor');
+      return fabricate.revealGatheringRealmForActor({
+        ...options,
+        realmId: options?.realmId ?? options?.regionId,
+      });
+    },
+    hideRegionForActor: (options) => {
+      deprecate('gathering.hideRegionForActor', 'gathering.hideRealmForActor');
+      return fabricate.hideGatheringRealmForActor({
+        ...options,
+        realmId: options?.realmId ?? options?.regionId,
+      });
+    },
   };
 
   // Expose classes for advanced users
@@ -2297,7 +2567,7 @@ function bindFabricateGlobal() {
     CraftingSystemExporter,
     // Public hook names module authors can subscribe to, e.g.
     // `Hooks.on(game.fabricate.api.HOOKS.gathering.ATTEMPT_COMPLETED, handler)`.
-    HOOKS: FABRICATE_HOOKS
+    HOOKS: FABRICATE_HOOKS,
   };
 
   game.fabricate.importFromPack = (packData, options) =>
@@ -2310,7 +2580,7 @@ function bindFabricateGlobal() {
     if (!systemManager || !recipeManager) throw new Error('Fabricate not initialized');
     const system = systemManager.getSystem(systemId);
     if (!system) throw new Error(`System "${systemId}" not found`);
-    const recipes = recipeManager.getRecipes({ craftingSystemId: systemId }).map(r => r.toJSON());
+    const recipes = recipeManager.getRecipes({ craftingSystemId: systemId }).map((r) => r.toJSON());
     const version = game.modules?.get('fabricate')?.version || '0.0.0';
     // Gathering authoring rides along, mirroring adminStore.exportSystem: the FULL
     // global environment array (the exporter filters to this system) plus the whole
@@ -2336,7 +2606,7 @@ function bindFabricateGlobal() {
     const mode = options.copyMode ? 'copy' : 'keep';
     const packData = CraftingSystemExporter.prepareForImport(data, mode);
     return fabricate.compendiumImporter.importFromPackData(packData, {
-      overwriteExisting: options.overwriteExisting || false
+      overwriteExisting: options.overwriteExisting || false,
     });
   };
 
@@ -2384,7 +2654,10 @@ async function runInteractableWorldCleanup() {
   const plan = decideWorldInteractableCleanup(scenes);
   if (!planHasWork(plan)) {
     globalThis.ui?.notifications?.info?.(
-      t('FABRICATE.Canvas.Cleanup.NothingToDo', 'No Fabricate interactables found. Nothing to clean up.')
+      t(
+        'FABRICATE.Canvas.Cleanup.NothingToDo',
+        'No Fabricate interactables found. Nothing to clean up.'
+      )
     );
     return plan.summary;
   }
@@ -2398,11 +2671,11 @@ async function runInteractableWorldCleanup() {
       {
         behaviors: summary.behaviorsRemoved,
         markers: summary.visualsDeleted,
-        scenes: summary.scenesTouched
+        scenes: summary.scenesTouched,
       }
     )}</p>`,
     yes: { label: t('FABRICATE.Canvas.Cleanup.Confirm', 'Remove them') },
-    no: { label: t('FABRICATE.Canvas.Cleanup.Cancel', 'Cancel') }
+    no: { label: t('FABRICATE.Canvas.Cleanup.Cancel', 'Cancel') },
   });
   if (confirmed !== true) return null;
 
@@ -2432,19 +2705,22 @@ Hooks.once('init', async () => {
 // header-button wiring below, which legitimately re-runs on every render.
 // The listener MUTATES `contextOptions` in place and returns nothing.
 Hooks.on('getCompendiumContextOptions', (application, contextOptions) => {
-  contextOptions.push(buildCompendiumImportContextOption({
-    localize: bridgeLocalize,
-    isGM: () => game.user?.isGM,
-    isItemPack: (id) => game.packs.get(id)?.documentName === 'Item',
-    getPackName: (id) => {
-      const pack = game.packs.get(id);
-      return pack?.title ?? pack?.metadata?.label ?? id;
-    },
-    getSystems: () => game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [],
-    promptSelectSystem: promptSelectCraftingSystem,
-    importPack: (systemId, packId) => game.fabricate.getCraftingSystemManager().addItemsFromPack(systemId, packId),
-    notify: ui.notifications
-  }));
+  contextOptions.push(
+    buildCompendiumImportContextOption({
+      localize: bridgeLocalize,
+      isGM: () => game.user?.isGM,
+      isItemPack: (id) => game.packs.get(id)?.documentName === 'Item',
+      getPackName: (id) => {
+        const pack = game.packs.get(id);
+        return pack?.title ?? pack?.metadata?.label ?? id;
+      },
+      getSystems: () => game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [],
+      promptSelectSystem: promptSelectCraftingSystem,
+      importPack: (systemId, packId) =>
+        game.fabricate.getCraftingSystemManager().addItemsFromPack(systemId, packId),
+      notify: ui.notifications,
+    })
+  );
 });
 
 // Hook into Foundry's ready event
@@ -2492,7 +2768,7 @@ Hooks.once('ready', async () => {
         currentUserId: () => game.user?.id,
         isActiveGM: () => game.user === game.users?.activeGM,
         showPrompt: showEventScenePrompt,
-        viewSceneForSelf: (uuid) => viewScene(uuid)
+        viewSceneForSelf: (uuid) => viewScene(uuid),
       });
     } catch (_error) {
       // Defensive: an event-route throw must never block the Interactable payload
@@ -2508,7 +2784,7 @@ Hooks.once('ready', async () => {
       isSenderGM: (id) => game.users?.get(id)?.isGM === true,
       validateAndGrant: (request) => InteractableManager.instance.validateAndGrant(request),
       openGrant: (grant) => InteractableManager.instance.openGrant(grant),
-      notifyDenied: (reason) => InteractableManager.instance.notifyActivationDenied(reason)
+      notifyDenied: (reason) => InteractableManager.instance.notifyActivationDenied(reason),
     });
   });
 
@@ -2565,7 +2841,10 @@ async function runRecipeItemFlagAutoStamp() {
   try {
     // Primary-GM only, so exactly one client performs the write in a multi-GM world.
     if (game.users?.activeGM?.id !== game.user?.id) return;
-    if (Number(getSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION)) >= RECIPE_ITEM_FLAG_STAMP_TARGET) {
+    if (
+      Number(getSetting(SETTING_KEYS.RECIPE_ITEM_FLAG_STAMP_VERSION)) >=
+      RECIPE_ITEM_FLAG_STAMP_TARGET
+    ) {
       return;
     }
     const manager = fabricate?.getCraftingSystemManager?.();
@@ -2592,7 +2871,9 @@ async function runComponentFlagAutoStamp() {
   try {
     // Primary-GM only, so exactly one client performs the write in a multi-GM world.
     if (game.users?.activeGM?.id !== game.user?.id) return;
-    if (Number(getSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION)) >= COMPONENT_FLAG_STAMP_TARGET) {
+    if (
+      Number(getSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION)) >= COMPONENT_FLAG_STAMP_TARGET
+    ) {
       return;
     }
     const manager = fabricate?.getCraftingSystemManager?.();
@@ -2696,9 +2977,9 @@ async function runInteractableMarkerSync() {
       resolveTask: (systemId, taskId) => {
         const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
         const tasks = config?.systems?.[systemId]?.tasks;
-        return (Array.isArray(tasks) ? tasks : []).find(task => task?.id === taskId) ?? null;
+        return (Array.isArray(tasks) ? tasks : []).find((task) => task?.id === taskId) ?? null;
       },
-      applyTileImage: (tile, update) => tile?.update?.(update)
+      applyTileImage: (tile, update) => tile?.update?.(update),
     });
   } catch (_error) {
     // Defensive: marker sync must never throw into a hook body.
@@ -2725,7 +3006,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
     localize: (key, fallback) => {
       const out = game.i18n?.localize?.(key);
       return out && out !== key ? out : fallback;
-    }
+    },
   });
 });
 
@@ -2748,11 +3029,11 @@ function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
         const regionId = region?.id ?? region?._id ?? null;
         const sceneId = region?.parent?.id ?? region?.parent?._id ?? null;
         return regionId && sceneId ? { sceneId, regionId } : null;
-      }
+      },
     });
     if (!target) return;
 
-    const root = element instanceof HTMLElement ? element : element?.[0] ?? null;
+    const root = element instanceof HTMLElement ? element : (element?.[0] ?? null);
     const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
     if (!column?.appendChild) return;
 
@@ -2776,11 +3057,15 @@ function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
 }
 
 Hooks.on('renderTileHUD', (hud, element) => {
-  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromTile' });
+  installInteractableConfigHudEntry(hud, element, {
+    localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromTile',
+  });
 });
 
 Hooks.on('renderTokenHUD', (hud, element) => {
-  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromToken' });
+  installInteractableConfigHudEntry(hud, element, {
+    localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromToken',
+  });
 });
 
 // `fabricate.interactable` Region Behaviour creation edge (issues 334 + 342).
@@ -2870,7 +3155,7 @@ function neutralizeInheritedInteractableLink(document) {
   if (neutralised.changed && typeof document?.updateSource === 'function') {
     document.updateSource({
       'system.linkedVisual.uuid': neutralised.patch.linkedVisual.uuid,
-      'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName
+      'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName,
     });
   }
 }
@@ -2904,30 +3189,35 @@ function addModuleButtonsToItemsDirectory() {
   }
 
   // Add craft button for all users
-  const craftExists = Array.from(actionsContainer.querySelectorAll('button.create-document'))
-    .some(btn =>
-      btn.dataset.fabricateAction === 'craft' ||
-      btn.textContent?.includes('Craft Item')
-    );
+  const craftExists = Array.from(actionsContainer.querySelectorAll('button.create-document')).some(
+    (btn) => btn.dataset.fabricateAction === 'craft' || btn.textContent?.includes('Craft Item')
+  );
   if (!craftExists) {
-    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () => getFabricateAppClass().show('crafting'));
+    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () =>
+      getFabricateAppClass().show('crafting')
+    );
     actionsContainer.insertBefore(craftButton, actionsContainer.firstChild);
   }
 
   syncGatheringDirectoryButton({
     itemsDirectory: itemsDir,
     enabled: hasGatheringEnabledSystems(),
-    createButton: () => createHeaderButton('Gathering', 'fas fa-leaf', 'gathering', () => getFabricateAppClass().show('gathering')),
-    documentRef: document
+    createButton: () =>
+      createHeaderButton('Gathering', 'fas fa-leaf', 'gathering', () =>
+        getFabricateAppClass().show('gathering')
+      ),
+    documentRef: document,
   });
 
   // Add recipe manager button for GMs only
   if (game.user?.isGM) {
-    const managerExists = Array.from(actionsContainer.querySelectorAll('button.create-document'))
-      .some(btn =>
+    const managerExists = Array.from(
+      actionsContainer.querySelectorAll('button.create-document')
+    ).some(
+      (btn) =>
         btn.dataset.fabricateAction === 'manage' ||
         btn.textContent?.includes('Manage Crafting Systems')
-      );
+    );
     if (!managerExists) {
       const managerButton = createHeaderButton(
         'Manage Crafting Systems',
@@ -2942,7 +3232,7 @@ function addModuleButtonsToItemsDirectory() {
 
 function hasGatheringEnabledSystems() {
   const systems = game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [];
-  return Array.from(systems).some(system => system?.features?.gathering === true);
+  return Array.from(systems).some((system) => system?.features?.gathering === true);
 }
 
 /**
@@ -3001,16 +3291,19 @@ Hooks.on('chatMessage', (chatLog, message, chatData) => {
     const recipe = recipes[0];
 
     // Attempt to craft
-    fabricate.craft(actor, recipe).then(result => {
-      if (result.success) {
-        ui.notifications.info(result.message);
-      } else {
-        ui.notifications.error(result.message);
-      }
-    }).catch(err => {
-      ui.notifications.error(err.message);
-      console.error('Fabricate | Crafting error:', err);
-    });
+    fabricate
+      .craft(actor, recipe)
+      .then((result) => {
+        if (result.success) {
+          ui.notifications.info(result.message);
+        } else {
+          ui.notifications.error(result.message);
+        }
+      })
+      .catch((err) => {
+        ui.notifications.error(err.message);
+        console.error('Fabricate | Crafting error:', err);
+      });
 
     return false; // Prevent the message from being sent to chat
   }
@@ -3083,14 +3376,14 @@ globalThis.fabricate = {
 
   importSystemFromFile: async (file, options) => {
     return game.fabricate.importSystemFromFile(file, options);
-  }
+  },
 };
 
 export const __test = {
   createGatheringToolAvailability,
   createGatheringToolBreakage,
   createGatheringResultCreator,
-  matchGatheringTools
+  matchGatheringTools,
 };
 
 export default fabricate;

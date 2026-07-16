@@ -300,7 +300,10 @@ describe('inventoryStore', () => {
   });
 
   it('learn() calls the seam, reloads on success, and clears the busy id', async () => {
-    const listing = { selectedActorId: 'hero', rows: [row('recipeitem:sys:def-1', 'Book', { isRecipeItem: true })] };
+    const listing = {
+      selectedActorId: 'hero',
+      rows: [row('recipeitem:sys:def-1', 'Book', { isRecipeItem: true })],
+    };
     const learnCalls = [];
     const { services, calls } = makeServices({ listing, actorId: 'hero', sourceIds: ['a2'] });
     services.learnRecipeFromInventory = async (opts) => {
@@ -349,5 +352,249 @@ describe('inventoryStore', () => {
     assert.equal(result.success, false);
     assert.deepEqual(notes, ['FABRICATE.Knowledge.LearnBudgetSpent']);
     assert.equal(calls.listInventoryForActor.length, before, 'a failed learn does not reload');
+  });
+
+  // --- Salvage (issue 675) ------------------------------------------------------
+  //
+  // `salvage()` has FOUR outcomes, not two. The one that is easy to miss is a
+  // `success` carrying NULL results: a time-gated run that has STARTED and awarded
+  // nothing. Treating `success` as "done" shows a success ribbon for a run that gave
+  // the player nothing.
+
+  function salvageRow(overrides = {}) {
+    return row('sys:c1', 'Iron', {
+      systemId: 'sys',
+      componentId: 'c1',
+      salvage: {
+        enabled: true,
+        mode: 'simple',
+        checkUsable: false,
+        misconfigured: false,
+        allowPlayerResultReorder: true,
+        results: [],
+        routedOutcomes: [],
+        stages: [],
+        targetActorId: 'a2',
+        ...overrides,
+      },
+    });
+  }
+
+  function salvageServices({ result, listing } = {}) {
+    const notes = [];
+    const calls = [];
+    const { services } = makeServices({
+      listing: listing ?? { selectedActorId: 'hero', rows: [salvageRow()] },
+    });
+    services.notify = (message) => notes.push(message);
+    services.salvageComponent = async (opts) => {
+      calls.push(opts);
+      return typeof result === 'function' ? result(opts) : result;
+    };
+    return { services, notes, calls };
+  }
+
+  describe('inventoryStore - salvage', () => {
+    it('passes an actorId (never a uuid) plus interactive:true through the facade seam', async () => {
+      // The facade's `_resolveCraftingActor` is the ONLY ownership gate on the salvage
+      // path - the engine has none - so a uuid here would bypass it entirely.
+      const { services, calls } = salvageServices({
+        result: { success: true, results: [{}], message: 'Salvaged Iron' },
+      });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+
+      await store.salvage('c1');
+      flushSync();
+
+      assert.equal(calls.length, 1);
+      assert.deepEqual(calls[0], {
+        actorId: 'a2',
+        systemId: 'sys',
+        componentId: 'c1',
+        interactive: true,
+      });
+      assert.equal('actorUuid' in calls[0], false, 'no uuid is accepted from the UI');
+    });
+
+    it('AC7: threads NO result order into the options bag', async () => {
+      // The engine captures the player's order onto the run record at start. Threading
+      // one here would reintroduce the executing-user read the capture exists to prevent.
+      const { services, calls } = salvageServices({ result: { success: true, results: [{}] } });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+      await store.salvage('c1');
+      flushSync();
+
+      assert.deepEqual(Object.keys(calls[0]).sort(), [
+        'actorId',
+        'componentId',
+        'interactive',
+        'systemId',
+      ]);
+    });
+
+    it('AC4: a cancelled prompt returns to the pre-roll state and calls NO notify', async () => {
+      // "No error toast" is the substance of AC3/AC4: the player CHOSE to dismiss the
+      // prompt, so a warning would be a lie about a mutation that never happened.
+      const { services, notes } = salvageServices({
+        result: { success: false, cancelled: true, results: null },
+      });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+
+      const result = await store.salvage('c1');
+      flushSync();
+
+      assert.equal(result.cancelled, true);
+      assert.deepEqual(notes, [], 'a cancel is not an error');
+      assert.equal(store.salvageResult, null, 'no ribbon, no outcome held');
+      assert.equal(store.salvagingKey, null, 'the busy state is released');
+    });
+
+    it('AC9: a time-gated salvage (success with null results) shows a waiting state, no ribbon', async () => {
+      const { services, notes } = salvageServices({
+        result: {
+          success: true,
+          results: null,
+          message: 'Salvage started for Iron (60s remaining)',
+        },
+      });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+
+      await store.salvage('c1');
+      flushSync();
+
+      assert.equal(store.salvageResult.state, 'waiting');
+      assert.equal(store.salvageResult.message, 'Salvage started for Iron (60s remaining)');
+      assert.notEqual(store.salvageResult.state, 'success', 'a started run awarded nothing');
+      assert.deepEqual(notes, [], 'a started run is not a failure');
+    });
+
+    it('a successful salvage holds the outcome and quietly reloads the listing', async () => {
+      const { services, calls: _calls } = salvageServices({
+        result: { success: true, results: [{}], message: 'Salvaged Iron' },
+      });
+      const { services: base, calls: listCalls } = makeServices({
+        listing: { selectedActorId: 'hero', rows: [salvageRow()] },
+      });
+      base.salvageComponent = services.salvageComponent;
+      base.notify = services.notify;
+      const store = createInventoryStore({ services: base });
+      await store.load();
+      flushSync();
+
+      const before = listCalls.listInventoryForActor.length;
+      await store.salvage('c1');
+      flushSync();
+
+      assert.equal(store.salvageResult.state, 'success');
+      assert.equal(
+        listCalls.listInventoryForActor.length,
+        before + 1,
+        'the awarded materials must appear'
+      );
+    });
+
+    it('a failed salvage surfaces its message through notify and holds no ribbon', async () => {
+      const { services, notes } = salvageServices({
+        result: {
+          success: false,
+          results: null,
+          message: 'progressive salvage mode requires a configured salvage check roll formula',
+        },
+      });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+
+      const result = await store.salvage('c1');
+      flushSync();
+
+      assert.equal(result.success, false);
+      assert.deepEqual(notes, [
+        'progressive salvage mode requires a configured salvage check roll formula',
+      ]);
+      assert.equal(store.salvageResult, null, 'no success ribbon on a GM-config failure');
+    });
+
+    it('refuses a double-submit while a salvage is in flight', async () => {
+      let resolveCall;
+      const { services, calls } = salvageServices({
+        result: () => new Promise((resolve) => (resolveCall = resolve)),
+      });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+
+      const first = store.salvage('c1');
+      flushSync();
+      assert.equal(store.salvagingKey, 'c1');
+      await store.salvage('c1');
+      assert.equal(calls.length, 1, 'the second press is refused');
+
+      resolveCall({ success: true, results: [{}] });
+      await first;
+      flushSync();
+      assert.equal(store.salvagingKey, null);
+    });
+
+    // AC10 / decision 11. Salvaging the last copy DROPS the row from the listing, and
+    // `selectedItem` would fall through to `visibleItems[0]` - rendering the success
+    // ribbon against a completely different component. This is the common case (the
+    // smoke fixture seeds a single copy), not an edge.
+    it('AC10: holds the salvaged row selected after its last copy is consumed', async () => {
+      const other = row('sys:c9', 'Aether', { systemId: 'sys', componentId: 'c9' });
+      let listingRows = [salvageRow(), other];
+      const notes = [];
+      const services = {
+        listInventoryForActor: async () => ({ selectedActorId: 'hero', rows: listingRows }),
+        getSelectedCraftingActorId: () => 'hero',
+        getCraftingComponentSourceIds: () => [],
+        notify: (message) => notes.push(message),
+        salvageComponent: async () => {
+          // The engine consumed the only copy: the row leaves the listing.
+          listingRows = [other];
+          return { success: true, results: [{}], message: 'Salvaged Iron' };
+        },
+      };
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+      store.select('sys:c1');
+      flushSync();
+
+      await store.salvage('c1');
+      flushSync();
+
+      assert.equal(store.rows.length, 1, 'the salvaged row has left the listing');
+      assert.equal(store.selectedItem.key, 'sys:c1', 'the ribbon stays on the SALVAGED component');
+      assert.equal(store.salvageResult.state, 'success');
+
+      // Selecting another item releases the hold.
+      store.select('sys:c9');
+      flushSync();
+      assert.equal(store.selectedItem.key, 'sys:c9');
+      assert.equal(store.salvageResult, null, 'the ribbon is dismissed with the selection');
+    });
+
+    it('resetSalvage() releases the held row and the ribbon ("Salvage again")', async () => {
+      const { services } = salvageServices({ result: { success: true, results: [{}] } });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+      store.select('sys:c1');
+      await store.salvage('c1');
+      flushSync();
+
+      store.resetSalvage();
+      flushSync();
+      assert.equal(store.salvageResult, null);
+    });
   });
 });

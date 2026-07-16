@@ -41,11 +41,29 @@ const VALID_SORTS = new Set(['name', 'quantity', 'type']);
  */
 function matchesQuery(row, query) {
   if (query.length === 0) return true;
-  if (String(row?.name ?? '').toLowerCase().includes(query)) return true;
+  if (
+    String(row?.name ?? '')
+      .toLowerCase()
+      .includes(query)
+  )
+    return true;
   const tags = Array.isArray(row?.tags) ? row.tags : [];
-  if (tags.some((tag) => String(tag ?? '').toLowerCase().includes(query))) return true;
+  if (
+    tags.some((tag) =>
+      String(tag ?? '')
+        .toLowerCase()
+        .includes(query)
+    )
+  )
+    return true;
   const essences = Array.isArray(row?.essences) ? row.essences : [];
-  if (essences.some((essence) => String(essence?.name ?? '').toLowerCase().includes(query)))
+  if (
+    essences.some((essence) =>
+      String(essence?.name ?? '')
+        .toLowerCase()
+        .includes(query)
+    )
+  )
     return true;
   return false;
 }
@@ -83,6 +101,17 @@ export function createInventoryStore({ services } = {}) {
   // The recipe id currently being learned from a book (Inventory learn button),
   // so the UI can show a busy state and prevent double-submits.
   let learningRecipeId = $state(null);
+  // The component id currently being salvaged, so the footer can show a busy state
+  // and refuse a double-submit.
+  let salvagingKey = $state(null);
+  // The last salvage outcome, held against the component it belongs to. Cleared by
+  // "Salvage again" or by selecting another item.
+  let salvageResult = $state(null);
+  // Decision 11: hold the SALVAGED row selected while its ribbon is up. Salvaging the
+  // last copy drops the row from the listing, and `selectedItem` would fall through to
+  // `visibleItems[0]` — rendering the success ribbon against the wrong component. This
+  // is the common case (the smoke fixture seeds a single copy), not an edge.
+  let heldItem = $state(null);
 
   /** Resolve the current component-source actor ids, preferring the sibling store. */
   function currentSourceIds() {
@@ -153,9 +182,17 @@ export function createInventoryStore({ services } = {}) {
 
   // Find by key across the full listing; fall back to the first VISIBLE item so
   // the selection respects the active search/filter.
+  //
+  // `heldItem` (decision 11) takes precedence while a salvage ribbon is up: the last
+  // copy of a salvaged component leaves the listing, so `rows.find` misses and the
+  // fallback would swap in an unrelated component under the ribbon. The held snapshot
+  // is the row as it was salvaged; it is released on the next `select` or reset.
   const selectedItem = $derived.by(() => {
+    const live = rows.find((row) => row?.key === selectedKey) ?? null;
+    if (live) return live;
+    if (heldItem && heldItem.key === selectedKey) return heldItem;
     if (rows.length === 0) return null;
-    return rows.find((row) => row?.key === selectedKey) ?? visibleItems[0] ?? null;
+    return visibleItems[0] ?? null;
   });
 
   /**
@@ -250,9 +287,90 @@ export function createInventoryStore({ services } = {}) {
     }
   }
 
-  /** Select an item by key. */
+  /**
+   * Salvage the selected owned component (issue 675) — the first player-facing caller
+   * of `CraftingEngine.salvage`.
+   *
+   * Routes through `services.salvageComponent({ actorId, ... })`. An ACTOR ID, never a
+   * uuid: `_resolveCraftingActor` behind that facade is the only ownership gate the
+   * salvage path has, and a uuid would bypass it and reach the engine (which mutates
+   * Items directly and THROWS on a bad uuid rather than returning a message).
+   *
+   * `salvage()` has FOUR outcomes, not two — a `success` with null results is a
+   * time-gated run that has STARTED and awarded nothing:
+   *
+   *   cancelled            → silently back to pre-roll. NO notify: the player chose to
+   *                          dismiss the prompt; an error toast would be a lie.
+   *   success, no results  → waiting state carrying the engine's message. No ribbon,
+   *                          no "Salvage again" (that would re-enter the time gate).
+   *   success + results    → success ribbon, quiet reload, selection HELD.
+   *   !success             → surface the message (this is also the misconfigured shape).
+   *
+   * No order is threaded into the options bag: the engine captures the player's order
+   * onto the run record at start, from the standing preference. Writing it is the UI's
+   * only job, and the pending write must already be flushed before this is called.
+   *
+   * @param {string} componentId
+   * @returns {Promise<{success: boolean, cancelled?: boolean, message?: string}>}
+   */
+  async function salvage(componentId) {
+    if (!componentId || salvagingKey) return { success: false };
+    const row = rows.find((entry) => entry?.componentId === componentId) ?? null;
+    const systemId = row?.systemId ?? null;
+    if (!systemId) return { success: false };
+
+    salvagingKey = componentId;
+    try {
+      const result = await services?.salvageComponent?.({
+        // Decision 8: the first OWNED actor holding the component.
+        actorId: row?.salvage?.targetActorId ?? null,
+        systemId,
+        componentId,
+        interactive: true,
+      });
+
+      if (result?.cancelled === true) {
+        salvageResult = null;
+        return result;
+      }
+      if (result?.success === true && result?.results == null) {
+        salvageResult = { componentId, state: 'waiting', message: result?.message ?? '' };
+        await load(true);
+        return result;
+      }
+      if (result?.success === true) {
+        // Snapshot the row BEFORE the reload: salvaging the last copy drops it from the
+        // listing, and the ribbon must stay on the component it belongs to.
+        heldItem = row;
+        selectedKey = row?.key ?? selectedKey;
+        salvageResult = { componentId, state: 'success', message: result?.message ?? '' };
+        await load(true);
+        return result;
+      }
+      salvageResult = null;
+      if (result?.message) services?.notify?.(result.message);
+      return result ?? { success: false };
+    } catch (err) {
+      const message = err?.message ?? String(err);
+      salvageResult = null;
+      services?.notify?.(message);
+      return { success: false, message };
+    } finally {
+      salvagingKey = null;
+    }
+  }
+
+  /** Dismiss the salvage outcome and return the panel to its pre-roll state. */
+  function resetSalvage() {
+    salvageResult = null;
+    heldItem = null;
+  }
+
+  /** Select an item by key. Releases any held (salvaged) row and its ribbon. */
   function select(key) {
     selectedKey = key ?? null;
+    heldItem = null;
+    salvageResult = null;
   }
 
   /** Update the search query and jump back to the first page. */
@@ -328,6 +446,12 @@ export function createInventoryStore({ services } = {}) {
     get learningRecipeId() {
       return learningRecipeId;
     },
+    get salvagingKey() {
+      return salvagingKey;
+    },
+    get salvageResult() {
+      return salvageResult;
+    },
     get worldTimeTick() {
       return worldTimeTick;
     },
@@ -349,6 +473,8 @@ export function createInventoryStore({ services } = {}) {
     load,
     learn,
     learnAll,
+    salvage,
+    resetSalvage,
     select,
     setSearch,
     setFilter,
