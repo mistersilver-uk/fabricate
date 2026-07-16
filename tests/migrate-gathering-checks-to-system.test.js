@@ -127,7 +127,10 @@ test('preserves an existing (not-yet-enabled) sibling check config when seeding'
       id: 'sys-1',
       gatheringCraftingCheck: {
         enabled: false,
-        progressive: { allowPlayerReorder: true, rollFormula: '' },
+        progressive: {
+          checkBreakage: { triggers: [{ id: 'trig-1' }] },
+          rollFormula: '',
+        },
         routed: { rollFormula: '1d20', relativeOutcomes: [{ id: 'o', name: 'Find', success: true, dc: 0 }] },
       },
     },
@@ -143,7 +146,11 @@ test('preserves an existing (not-yet-enabled) sibling check config when seeding'
   assert.equal(check.enabled, true);
   assert.equal(check.progressive.rollFormula, '2d6');
   assert.equal(check.progressive.awardMode, 'partial');
-  assert.equal(check.progressive.allowPlayerReorder, true, 'pre-existing progressive field preserved');
+  assert.deepEqual(
+    check.progressive.checkBreakage,
+    { triggers: [{ id: 'trig-1' }] },
+    'pre-existing progressive field preserved'
+  );
   assert.equal(check.routed.relativeOutcomes[0].name, 'Find', 'pre-existing routed sibling preserved');
 });
 

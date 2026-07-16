@@ -2424,11 +2424,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     // The header Save routes to the SALVAGE seam (not crafting) because the salvage
-    // sub-tab is active, and carries the preserved allowPlayerReorder.
+    // sub-tab is active.
     const saved = calls.find((call) => call[0] === 'saveSalvageCheckProgressive');
     assert.ok(saved, 'Save persists the salvage progressive config through the store');
     assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
-    assert.equal(saved[1].allowPlayerReorder, true, 'allowPlayerReorder is preserved');
+    // Issue 651 retired the system-level reorder flag: the draft clone no longer
+    // carries it, so a legacy stored value is not written back on save.
+    assert.equal(
+      saved[1].allowPlayerReorder,
+      undefined,
+      'the retired allowPlayerReorder is not sent'
+    );
     assert.equal(
       calls.find((call) => call[0] === 'saveCraftingCheckProgressive'),
       undefined,
@@ -2546,7 +2552,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saved = calls.find((call) => call[0] === 'saveGatheringCheckProgressive');
     assert.ok(saved, 'Save persists the gathering progressive config through the store');
     assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
-    assert.equal(saved[1].allowPlayerReorder, true, 'allowPlayerReorder is preserved');
+    // Issue 651 retired the system-level reorder flag: the draft clone no longer
+    // carries it, so a legacy stored value is not written back on save.
+    assert.equal(
+      saved[1].allowPlayerReorder,
+      undefined,
+      'the retired allowPlayerReorder is not sent'
+    );
     assert.equal(
       calls.find((call) => call[0] === 'saveSalvageCheckProgressive'),
       undefined,
@@ -2914,7 +2926,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     const emitted = [];
     const value = {
       awardMode: 'equal',
-      allowPlayerReorder: false,
       rollFormula: '2d6',
       checkBreakage: {
         triggers: [
@@ -2987,7 +2998,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       'clicking a segment emits the new outcome'
     );
     assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on a trigger edit');
-    assert.equal(emitted.at(-1).allowPlayerReorder, false);
   });
 
   // Tool-breakage authority UI (issue 419 recombine). Each editor accepts a
@@ -3033,7 +3043,6 @@ describe('CraftingSystemManager mounted behavior', () => {
   };
   const progressiveBreakageValue = {
     awardMode: 'equal',
-    allowPlayerReorder: false,
     rollFormula: '2d6',
     checkBreakage: {
       triggers: [

@@ -251,15 +251,13 @@
 
   // Progressive crafting check draft — same staged pattern, used for progressive
   // resolution mode. Only the roll formula and crit table are edited here; the
-  // award settings (awardMode/allowPlayerReorder) are carried through untouched so
-  // a save never drops them.
+  // award setting (awardMode) is carried through untouched so a save never drops it.
   function cloneProgressiveCheck(progressive) {
     const source = progressive && typeof progressive === 'object' ? progressive : {};
     return {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
-      allowPlayerReorder: source.allowPlayerReorder === true,
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };

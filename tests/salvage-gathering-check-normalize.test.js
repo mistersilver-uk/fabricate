@@ -38,7 +38,6 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
   assert.equal(check.routed.dc, 15);
   assert.deepEqual(check.progressive, {
     awardMode: 'equal',
-    allowPlayerReorder: false,
     rollFormula: '',
     checkBreakage: { triggers: [] },
   });
@@ -74,7 +73,6 @@ test('_normalizeGatheringCraftingCheck defaults to disabled with progressive/rou
   assert.equal(check.enabled, false);
   assert.deepEqual(check.progressive, {
     awardMode: 'equal',
-    allowPlayerReorder: false,
     rollFormula: '',
     checkBreakage: { triggers: [] },
   });

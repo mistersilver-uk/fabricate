@@ -84,7 +84,6 @@ CraftingSystem = {
     routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
-      allowPlayerReorder: boolean,
       rollFormula: string,             // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
@@ -98,7 +97,6 @@ CraftingSystem = {
     enabled: boolean,                  // default false
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
-      allowPlayerReorder: boolean,
       rollFormula: string,
       checkBreakage: CheckBreakage,
     },
@@ -145,7 +143,6 @@ CraftingSystem = {
     routed: RoutedCheck,
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
-      allowPlayerReorder: boolean, // default false
       rollFormula: string,         // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,
     },
