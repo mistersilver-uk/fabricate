@@ -36,8 +36,12 @@ function makeIngredientSet(ingredientGroups) {
   return { id: `set-${Math.random().toString(36).slice(2)}`, name: 'Test Set', ingredientGroups };
 }
 
-function makeRecipe(id, name, ingredientSets) {
-  return { id, name, ingredientSets };
+// Recipes default to ENABLED — the SignatureValidator scans only enabled recipes
+// (issue 649, the complement of the runtime matcher's `if (!recipe.enabled) continue;`),
+// mirroring real stored recipes which always carry the flag. A test exercising the
+// disabled path passes `enabled: false` explicitly.
+function makeRecipe(id, name, ingredientSets, enabled = true) {
+  return { id, name, ingredientSets, enabled };
 }
 
 /**
@@ -688,4 +692,57 @@ test('conflict message includes both recipe names', () => {
   const msg = result.conflicts[0].message;
   assert.ok(msg.includes('Alpha'), `Expected "Alpha" in message, got: ${msg}`);
   assert.ok(msg.includes('Beta'), `Expected "Beta" in message, got: ${msg}`);
+});
+
+// ---------------------------------------------------------------------------
+// Essence match type (issue 649): capacity, expansion overlap, enabled-scoping
+// ---------------------------------------------------------------------------
+
+function makeEssenceComponent(id, essences) {
+  return { id, name: id, tags: [], essences };
+}
+
+test('computeGroupOptions: essence capacity = min(amount, ids.size), not option.quantity', () => {
+  const components = [
+    makeEssenceComponent('c1', { fire: 1 }),
+    makeEssenceComponent('c2', { fire: 1 }),
+  ];
+  const set = makeIngredientSet([
+    makeGroup([{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 3 } }]),
+  ]);
+  const validator = buildValidator({ id: 'sys-1', resolutionMode: 'alchemy' }, [], components);
+  const [group] = validator.computeGroupOptions(set, components);
+  // amount 3 but only 2 components carry fire → capacity is min(3, 2) = 2 (NOT quantity 1).
+  assert.equal(group[0].capacity, 2, 'capacity derives from the essence amount, capped by ids.size');
+  assert.deepEqual([...group[0].ids].sort(), ['c1', 'c2']);
+});
+
+test('essence expansion makes an essence group overlap a component carrying that essence', () => {
+  const components = [makeEssenceComponent('ember', { fire: 1 })];
+  const essenceSet = makeIngredientSet([
+    makeGroup([{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 1 } }]),
+  ]);
+  const componentSet = makeIngredientSet([
+    makeGroup([makeIngredient('component', { componentId: 'ember' })]),
+  ]);
+  const validator = buildValidator(
+    { id: 'sys-1', resolutionMode: 'alchemy' },
+    [makeRecipe('r-1', 'Essence', [essenceSet]), makeRecipe('r-2', 'Component', [componentSet])],
+    components
+  );
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, false, 'an essence group overlaps a component carrying the essence');
+});
+
+test('validateSystem is enabled-scoped: a disabled collider does not count against the gate', () => {
+  const components = [makeComponent('comp-a')];
+  const setA = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const validator = buildValidator(
+    { id: 'sys-1', resolutionMode: 'alchemy' },
+    [makeRecipe('r-1', 'A', [setA], true), makeRecipe('r-2', 'B', [setB], false)],
+    components
+  );
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, true, 'the disabled collider is excluded, so the enabled set is clean');
 });

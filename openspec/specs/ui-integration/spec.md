@@ -903,15 +903,13 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 ### Ingredients tab
 
 A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per requirement, replacing the loose per-row and footer add-buttons.
-It offers exactly what the engine can honour:
+It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Currency, and Essence — each appended to that requirement as a new OR alternative for the row's own picker to fill in.
+Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
-- **Accept instead** — Component, Tag and Currency: the three real ingredient match types.
-Each is appended to that requirement as a new, empty OR alternative for the row's own picker to fill in.
-- **Require as well** — Essence: there is **no** essence match type.
-An essence requirement is a property of the ingredient **set** (`IngredientSet.essences`) — an AND requirement, not an OR alternative — so it is offered under its own heading and applies to the set, rather than being mislabelled as an alternative.
-
-Currency and Essence appear only when the system configures currency units or essences, so the menu never offers a choice the system cannot honour.
+Currency and Essence appear only when the system configures currency units or enables essences, so the menu never offers a choice the system cannot honour.
+An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
 The per-option `tagMatch` (any / all) control is retained on every tag alternative.
+The set-level **"Add essence requirement"** control is retained and now appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
 
 Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
 
@@ -949,7 +947,7 @@ Ingredient set editor supports:
   - Add/remove groups
   - Add/remove OR options within a group
   - Item placeholder options that match one or more configured system tags
-- Essences per set (when enabled)
+- Essence options authored as OR alternatives within a group (when the system enables essences); the set-level add appends a single-option essence group
 
 Required tools are **not** authored here.
 *Catalyst* is a retired concept — Tools replaced it, and the recipe's tools are authored on the editor's **Tools** tab at recipe and step scope.

@@ -6031,13 +6031,18 @@ describe('createAdminStore', () => {
       assert.equal(unlinkedEssence.associatedItemName, null);
     });
 
-    it('viewState.selectedSystem.componentTagOptions is an { id, tags } projection separate from managedItemOptions', async () => {
+    it('viewState.selectedSystem.componentTagOptions is an { id, tags, essences } projection separate from managedItemOptions', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.components = [
-          makeItem({ id: 'comp-1', name: 'Iron Ore', tags: [' metal ', 'ore', ''] }),
+          makeItem({
+            id: 'comp-1',
+            name: 'Iron Ore',
+            tags: [' metal ', 'ore', ''],
+            essences: { ' ess-fire ': 2, 'ess-zero': 0 },
+          }),
           makeItem({ id: 'comp-2', name: 'Herb', tags: ['plant'] }),
           makeItem({ id: 'comp-3', name: 'Untagged' }),
         ];
@@ -6047,12 +6052,13 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
 
-      // Built as { id, tags } from managed items, with tags trim-normalized to
-      // line up with how the tags-match handler stores match tags.
+      // Built as { id, tags, essences } from managed items, with tags trim-normalized
+      // to line up with how the tags-match handler stores match tags, and essences
+      // trimmed + numeric-positive so an essence option expands correctly (issue 649).
       assert.deepEqual(vs.selectedSystem.componentTagOptions, [
-        { id: 'comp-1', tags: ['metal', 'ore'] },
-        { id: 'comp-2', tags: ['plant'] },
-        { id: 'comp-3', tags: [] },
+        { id: 'comp-1', tags: ['metal', 'ore'], essences: { 'ess-fire': 2 } },
+        { id: 'comp-2', tags: ['plant'], essences: {} },
+        { id: 'comp-3', tags: [], essences: {} },
       ]);
 
       // The managedItemOptions contract shape is unchanged (no tags leak in).

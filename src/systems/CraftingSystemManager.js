@@ -3798,21 +3798,20 @@ export class CraftingSystemManager {
     let updatedRecipeCount = 0;
     for (const recipe of recipes) {
       const updated = recipe.toJSON();
-      updated.ingredientSets = (updated.ingredientSets || [])
-        .map((set) => {
-          const essences = { ...set.essences };
-          delete essences[essenceId];
-          return { ...set, essences };
-        })
-        .filter(
-          (set) =>
-            (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
-            Object.keys(set.essences || {}).length > 0
-        );
+      updated.ingredientSets = this._stripEssenceFromSets(updated.ingredientSets, essenceId);
+      updated.steps = (updated.steps || []).map((step) => ({
+        ...step,
+        ingredientSets: this._stripEssenceFromSets(step.ingredientSets, essenceId),
+      }));
 
       const hasResults =
-        (updated.resultGroups?.length || 0) > 0 || (updated.results?.length || 0) > 0;
-      if (updated.ingredientSets.length === 0 || !hasResults) {
+        (updated.resultGroups?.length || 0) > 0 ||
+        (updated.results?.length || 0) > 0 ||
+        (updated.steps || []).some((step) => (step.resultGroups?.length || 0) > 0);
+      const hasIngredientSets =
+        (updated.ingredientSets?.length || 0) > 0 ||
+        (updated.steps || []).some((step) => (step.ingredientSets?.length || 0) > 0);
+      if (!hasIngredientSets || !hasResults) {
         updated.enabled = false;
       }
 
@@ -3861,14 +3860,61 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Whether a recipe references the given essence in any ingredient set.
+   * Strip an essence from an ingredient-set array: remove the legacy per-set map key
+   * AND any first-class essence OPTION (`match.type === 'essence'`) for that essence
+   * from each group (dropping a group left with no options), then drop a set left with
+   * no ingredient groups / ingredients / essences.
+   * @param {object[]} sets
+   * @param {string} essenceId
+   * @returns {object[]}
+   * @private
+   */
+  _stripEssenceFromSets(sets, essenceId) {
+    return (sets || [])
+      .map((set) => {
+        const essences = { ...set.essences };
+        delete essences[essenceId];
+        const ingredientGroups = (set.ingredientGroups || [])
+          .map((group) => ({
+            ...group,
+            options: (group.options || []).filter(
+              (option) =>
+                !(option?.match?.type === 'essence' && option.match.essenceId === essenceId)
+            ),
+          }))
+          .filter((group) => (group.options?.length || 0) > 0);
+        return { ...set, essences, ingredientGroups };
+      })
+      .filter(
+        (set) =>
+          (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
+          Object.keys(set.essences || {}).length > 0
+      );
+  }
+
+  /**
+   * Whether a recipe references the given essence in any ingredient set — via EITHER
+   * the legacy per-set `essences` map (back-compat read) OR a first-class essence
+   * ingredient OPTION (`match.type === 'essence'`) inside an ingredient group. Walks
+   * both recipe-level and step-level ingredient sets.
    * @param {object} recipe
    * @param {string} essenceId
    * @returns {boolean}
    */
   _recipeReferencesEssence(recipe, essenceId) {
     const data = typeof recipe.toJSON === 'function' ? recipe.toJSON() : recipe;
-    return (data.ingredientSets || []).some((set) => set.essences && essenceId in set.essences);
+    const sets = [
+      ...(data.ingredientSets || []),
+      ...(data.steps || []).flatMap((step) => step.ingredientSets || []),
+    ];
+    return sets.some((set) => {
+      if (set.essences && essenceId in set.essences) return true;
+      return (set.ingredientGroups || []).some((group) =>
+        (group.options || []).some(
+          (option) => option?.match?.type === 'essence' && option.match.essenceId === essenceId
+        )
+      );
+    });
   }
 
   /**

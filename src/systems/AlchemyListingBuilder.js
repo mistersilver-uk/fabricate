@@ -417,8 +417,32 @@ export class AlchemyListingBuilder {
     if (!Array.isArray(sets) || sets.length !== 1) return null;
     const set = sets[0];
     const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
-    if (groups.length > 0) return null;
-    const resolved = this._resolveEssenceList(set?.essences, system);
+
+    // Legacy shape (back-compat read): no ingredient groups + a per-set essences map.
+    if (groups.length === 0) {
+      const resolved = this._resolveEssenceList(set?.essences, system);
+      return resolved.length > 0 ? resolved : null;
+    }
+
+    // First-class shape (issue 649): an essence-only set is one whose EVERY group is a
+    // SINGLE-OPTION essence group (exactly what the 1.17.0 migration produces). A mixed
+    // set, or a group with an OR of essences, cannot be verified client-side, so it
+    // fails safe to null (the store then offers no auto-fill).
+    const essenceMap = {};
+    for (const group of groups) {
+      const options = Array.isArray(group?.options) ? group.options : [];
+      if (options.length !== 1 || options[0]?.match?.type !== 'essence') return null;
+      const match = options[0].match;
+      const id = String(match.essenceId || '').trim();
+      const amount = Number(match.amount) || 0;
+      if (id && amount > 0) essenceMap[id] = Math.max(essenceMap[id] || 0, amount);
+    }
+    // Fold any legacy per-set map entries (transitional).
+    for (const [id, qty] of Object.entries(set?.essences || {})) {
+      const amount = Number(qty) || 0;
+      if (amount > 0) essenceMap[id] = Math.max(essenceMap[id] || 0, amount);
+    }
+    const resolved = this._resolveEssenceList(essenceMap, system);
     return resolved.length > 0 ? resolved : null;
   }
 
@@ -458,6 +482,10 @@ export class AlchemyListingBuilder {
   _optionLabel(option) {
     const tags = option?.match?.tags;
     if (Array.isArray(tags) && tags.length > 0) return tags.join(', ');
+    if (option?.match?.type === 'essence') {
+      const id = String(option.match.essenceId || '').trim();
+      if (id) return id;
+    }
     return this.localize('FABRICATE.Labels.UnknownComponent');
   }
 

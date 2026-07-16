@@ -8255,7 +8255,8 @@
   font-family: var(--fab-font-mono);
 }
 
-.fabricate-manager .manager-recipe-option-currency {
+.fabricate-manager .manager-recipe-option-currency,
+.fabricate-manager .manager-recipe-option-essence {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -8263,7 +8264,8 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-currency-amount {
+.fabricate-manager .manager-recipe-currency-amount,
+.fabricate-manager .manager-recipe-essence-amount {
   flex: 0 0 auto;
   width: 3.75rem;
   height: 36px;
@@ -8274,9 +8276,17 @@
   color: var(--fab-mv2-text);
 }
 
-.fabricate-manager .manager-recipe-currency-unit {
+.fabricate-manager .manager-recipe-currency-unit,
+.fabricate-manager .manager-recipe-essence-picker-wrap {
   display: inline-flex;
   min-width: 0;
+}
+
+/* The essence "met by any components carrying this essence" sub-line sits below the
+   row, mirroring the tag detail's small top gap. */
+.fabricate-manager .manager-recipe-option-essence-detail {
+  flex-basis: 100%;
+  margin-top: var(--fab-space-1);
 }
 
 /* §B1: subtle × remove — never a loud red trash/minus button. */

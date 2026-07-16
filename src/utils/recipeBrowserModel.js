@@ -372,7 +372,7 @@ export function buildRecipeRequirementRows(recipe, rosters = {}) {
         if (options.length === 0) continue;
         const groupId = `${setId}:${group?.id || groupIndex}`;
         const members = options.map((option, optionIndex) => ({
-          ...describeRequirementOption(option, components),
+          ...describeRequirementOption(option, components, essences),
           id: `${groupId}:${option?.id || optionIndex}`,
         }));
 
@@ -401,10 +401,22 @@ export function buildRecipeRequirementRows(recipe, rosters = {}) {
   return requirements;
 }
 
-function describeRequirementOption(option, components) {
+function describeRequirementOption(option, components, essences) {
   const match = option?.match || {};
   const quantity = Number(option?.quantity) > 0 ? Number(option.quantity) : 1;
 
+  if (match.type === 'essence') {
+    const essence = findById(essences, match.essenceId);
+    return {
+      kind: 'essence',
+      essenceId: match.essenceId || '',
+      name: essence?.name || '',
+      amount: Number(match.amount) || 0,
+      icon: essence?.icon || 'fas fa-flask-vial',
+      img: '',
+      quantity,
+    };
+  }
   if (match.type === 'tags') {
     return {
       kind: 'tags',

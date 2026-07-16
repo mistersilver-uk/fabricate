@@ -34,6 +34,9 @@
     componentOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // The system's essences ({ id, name, icon }), for an essence OR alternative's
+    // picker. Empty when the system has no essences (the essence arm never appears).
+    essenceOptions = [],
     // Render the "REQUIRED" tag — set by the parent for a bare (single-alternative)
     // requirement; box alternatives (inside "ANY ONE OF") never carry it.
     showRequiredTag = false,
@@ -51,7 +54,9 @@
   }
 
   const matchType = $derived(
-    option?.match?.type === 'tags' || option?.match?.type === 'currency'
+    option?.match?.type === 'tags' ||
+    option?.match?.type === 'currency' ||
+    option?.match?.type === 'essence'
       ? option.match.type
       : 'component'
   );
@@ -84,6 +89,23 @@
       id: unit.id,
       label: currencyUnitLabel(currencyUnits, unit.id),
       icon: currencyUnitIcon(currencyUnits, unit.id)
+    }))
+  );
+
+  const essenceId = $derived(option?.match?.type === 'essence' ? option.match.essenceId || '' : '');
+  const essenceAmount = $derived(
+    option?.match?.type === 'essence' && Number(option.match.amount) > 0
+      ? Number(option.match.amount)
+      : 1
+  );
+  const selectedEssence = $derived(
+    essenceId ? (essenceOptions || []).find((essence) => essence.id === essenceId) || null : null
+  );
+  const essencePickerOptions = $derived(
+    (essenceOptions || []).map((essence) => ({
+      id: essence.id,
+      label: essence.name,
+      icon: essence.icon || 'fas fa-flask-vial'
     }))
   );
 
@@ -150,11 +172,42 @@
     });
   }
 
+  function chooseEssence(id) {
+    emit({ match: { type: 'essence', essenceId: String(id || ''), amount: essenceAmount } });
+  }
+
+  // Essence amounts share the four-digit cap with quantities and are stored on the
+  // match (not the option quantity), which stays the default 1.
+  function setEssenceAmount(value) {
+    const next = Number(value);
+    emit({
+      match: {
+        type: 'essence',
+        essenceId,
+        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1
+      }
+    });
+  }
+
   // Lead-chip tone + icon per match type (the small type-tinted square that opens
-  // the row, matching the prototype).
-  const leadTone = $derived(matchType === 'tags' ? 'tag' : matchType === 'currency' ? 'currency' : 'component');
+  // the row, matching the prototype). Essence reuses the existing `is-essence` tone.
+  const leadTone = $derived(
+    matchType === 'tags'
+      ? 'tag'
+      : matchType === 'currency'
+        ? 'currency'
+        : matchType === 'essence'
+          ? 'essence'
+          : 'component'
+  );
   const leadIcon = $derived(
-    matchType === 'tags' ? 'fas fa-tag' : matchType === 'currency' ? 'fa-solid fa-coins' : 'fas fa-cubes'
+    matchType === 'tags'
+      ? 'fas fa-tag'
+      : matchType === 'currency'
+        ? 'fa-solid fa-coins'
+        : matchType === 'essence'
+          ? 'fas fa-flask-vial'
+          : 'fas fa-cubes'
   );
 
   const removeLabel = $derived(
@@ -195,6 +248,39 @@
     {:else if matchType === 'tags'}
       <span class="manager-recipe-option-tag-name" data-recipe-tag-summary>{tagSummary}</span>
       <span class="manager-recipe-req-tag is-tag" data-recipe-req-tag="tag">{text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}</span>
+    {:else if matchType === 'essence'}
+      <div class="manager-recipe-option-essence" data-recipe-option-essence>
+        <input
+          type="number"
+          min="1"
+          max="9999"
+          class="manager-recipe-essence-amount"
+          data-recipe-essence-amount
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+          value={essenceAmount}
+          onchange={(e) => setEssenceAmount(e.target.value)}
+        />
+        <span class="manager-recipe-essence-picker-wrap" data-recipe-essence-picker>
+          <SearchablePopover
+            options={essencePickerOptions}
+            value={essenceId}
+            pickerClass="manager-recipe-essence-picker"
+            triggerClass="manager-button is-subtle manager-recipe-essence-trigger"
+            triggerIcon={selectedEssence?.icon || 'fas fa-flask-vial'}
+            triggerLabel={selectedEssence
+              ? selectedEssence.name
+              : text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
+            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
+            triggerTitle={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
+            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
+            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
+            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
+            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined')}
+            onChoose={(id) => chooseEssence(id)}
+          />
+        </span>
+        <span class="manager-recipe-req-tag is-essence" data-recipe-req-tag="essence">{text('FABRICATE.Admin.Manager.Recipe.EssenceTypeLabel', 'Essence')}</span>
+      </div>
     {:else}
       <div class="manager-recipe-option-currency" data-recipe-option-currency>
         <input
@@ -235,7 +321,7 @@
       <span class="manager-recipe-req-tag is-required" data-recipe-req-tag="required">{text('FABRICATE.Admin.Manager.Recipe.RequiredTag', 'Required')}</span>
     {/if}
 
-    {#if matchType !== 'currency'}
+    {#if matchType !== 'currency' && matchType !== 'essence'}
       <Stepper
         value={quantity}
         min={1}
@@ -323,6 +409,14 @@
           <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
         {/if}
       </div>
+    </div>
+  {/if}
+
+  {#if matchType === 'essence'}
+    <!-- The essence sub-line: met by any components carrying this essence (parallel to
+         the currency cost hint). A full-width muted line under the row. -->
+    <div class="manager-recipe-option-essence-detail">
+      <span class="manager-recipe-essence-subline manager-muted" data-recipe-essence-subline>{text('FABRICATE.Admin.Manager.Recipe.EssenceMetBy', 'met by any components carrying this essence')}</span>
     </div>
   {/if}
 </div>

@@ -90,8 +90,14 @@ export class SignatureValidator {
       (group.options || [])
         .map((option) => {
           const ids = this.expandIngredientToComponentIds(option, systemComponents);
-          const quantity = Math.max(1, Number(option?.quantity) || 1);
-          return { ids, capacity: Math.min(quantity, ids.size) };
+          // An essence option carries its count on `match.amount` (quantity stays 1),
+          // so its capacity derives from the amount, not the option quantity — else
+          // `amount: 3` would cap capacity at 1 and fail-OPEN overlap detection.
+          const count =
+            option?.match?.type === 'essence'
+              ? Math.max(1, Number(option?.match?.amount) || 1)
+              : Math.max(1, Number(option?.quantity) || 1);
+          return { ids, capacity: Math.min(count, ids.size) };
         })
         .filter((option) => option.ids.size > 0)
     );
@@ -264,7 +270,19 @@ export class SignatureValidator {
   }
 
   /**
-   * Validate all recipes in a crafting system for ingredient signature conflicts.
+   * Validate all ENABLED recipes in a crafting system for ingredient signature
+   * conflicts.
+   *
+   * The scan is scoped to enabled recipes — the exact complement of the runtime
+   * matcher's `if (!recipe.enabled) continue;` skip in
+   * `CraftingEngine._matchAlchemySignature` — so the scanned set equals the
+   * matchable set. Because every gate consumer (`collectAlchemySignatureBlockers`
+   * → `blocksSystem`, `_assertNoAlchemySignatureCollisions`, `disableSignatureConflicts`,
+   * the adminStore validator, and the 1.17.0 migration reconciliation) funnels
+   * through this method, the invariant they all enforce is "the set of ENABLED
+   * recipes is collision-free" — the only invariant the runtime needs. Disabling all
+   * participants of a conflict genuinely clears it; re-enabling a disabled collider
+   * is re-caught at that mutation by the same save-block.
    *
    * @param {string} systemId
    * @returns {{ valid: boolean, conflicts: object[] }}
@@ -273,7 +291,9 @@ export class SignatureValidator {
     const system = this._csm.getSystem(systemId);
     if (!system) return { valid: true, conflicts: [] };
 
-    const recipes = this._csm.getRecipesForSystem(systemId) || [];
+    const recipes = (this._csm.getRecipesForSystem(systemId) || []).filter(
+      (recipe) => recipe?.enabled
+    );
     const components = this._csm.getComponentsForSystem(systemId) || [];
     const conflicts = [];
 

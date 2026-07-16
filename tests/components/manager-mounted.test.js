@@ -148,7 +148,6 @@ function compileManagerRoot() {
     'RecipeIngredientSetCard',
     'RecipeIngredientGroupCard',
     'RecipeIngredientOption',
-    'RecipeEssenceRequirements',
     'RecipeResultsSection',
     'RecipeResultGroupCard',
     'RecipeRoutingAssignment',

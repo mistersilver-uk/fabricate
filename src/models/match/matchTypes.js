@@ -243,6 +243,80 @@ const currencyHandler = {
   },
 };
 
+/** @type {MatchHandler} */
+const essenceHandler = {
+  type: 'essence',
+
+  // An essence match is terminal for inventory matching: it matches no single
+  // inventory item (satisfaction is amount-accumulative across items carrying the
+  // essence, resolved by the consumption planner, not per-item), so `matchesItem`
+  // returns false and `_matchesIngredient` dispatches to it rather than falling
+  // through.
+  isTerminalInventoryMatch: true,
+
+  normalize(data = {}) {
+    const raw = data.match && typeof data.match === 'object' ? data.match : null;
+    // An essence alternative ("3 fire essence") mirrors the legacy per-set essence
+    // requirement: an essence id string plus a non-negative amount. It is met at
+    // craft time by consuming items whose accumulated essence reaches `amount`
+    // (see IngredientSet._buildPlanForEssenceOption).
+    return {
+      type: 'essence',
+      essenceId: String(raw?.essenceId || '').trim(),
+      amount: Math.max(0, Number(raw?.amount) || 0),
+    };
+  },
+
+  isComplete: (match) =>
+    match?.type === 'essence' && !!trimmed(match.essenceId) && Number(match.amount) > 0,
+
+  validate(match, { requireComplete = true } = {}) {
+    if (requireComplete && !essenceHandler.isComplete(match)) {
+      return ['Essence ingredient match requires an essence and a positive amount'];
+    }
+    return [];
+  },
+
+  signature(match) {
+    const essenceId = trimmed(match?.essenceId);
+    const amount = Number(match?.amount) || 0;
+    if (!essenceId || amount <= 0) return null;
+    return `essence:${essenceId}:${amount}`;
+  },
+
+  // An essence alternative is satisfied by EVERY managed component carrying the
+  // essence, so it expands to all such components' ids — load-bearing for readiness
+  // overlap detection and the alchemy SignatureValidator.
+  expandToComponentIds(match, systemComponents) {
+    const essenceId = trimmed(match?.essenceId);
+    if (!essenceId) return new Set();
+    return new Set(
+      (systemComponents || []).filter((c) => Number(c?.essences?.[essenceId]) > 0).map((c) => c.id)
+    );
+  },
+
+  // An essence alternative matches no single inventory item — satisfaction is
+  // amount-accumulative across items carrying the essence and routes through the
+  // consumption planner, not per-item matching here.
+  matchesItem: () => false,
+
+  getComponentId: () => null,
+
+  describe(match) {
+    // An essence alternative carries its amount on the match (`amount`/`essenceId`),
+    // not the option quantity, so the description reads as an essence amount phrase
+    // rather than an "Nx" item count.
+    const essenceId = trimmed(match?.essenceId);
+    const amount = Number(match?.amount) || 0;
+    return `${amount}x ${essenceId} essence`.trim();
+  },
+
+  // An essence option is satisfied by inventory items, never by currency.
+  affords: () => false,
+
+  getCurrencySpend: () => null,
+};
+
 /**
  * Fallback handler for a null match or an unrecognized `match.type`. Every method
  * is a safe no-op so call sites can dispatch without guarding the type.
@@ -270,12 +344,13 @@ const unknownHandler = {
  * Type → handler registry. `systemItem` is a legacy alias for `component`
  * resolved by {@link getMatchHandler}, not a distinct entry.
  *
- * @type {{ component: MatchHandler, tags: MatchHandler, currency: MatchHandler }}
+ * @type {{ component: MatchHandler, tags: MatchHandler, currency: MatchHandler, essence: MatchHandler }}
  */
 export const HANDLERS = {
   component: componentHandler,
   tags: tagsHandler,
   currency: currencyHandler,
+  essence: essenceHandler,
 };
 
 /**
@@ -328,6 +403,13 @@ export function normalizeMatch(data = {}) {
     }
     if (raw.type === 'currency') {
       return currencyHandler.normalize(data);
+    }
+    // The essence branch MUST precede the component fallback below: `normalizeMatch`
+    // falls through everything that is not tags/currency/essence to the component
+    // normalizer, so a misplaced essence branch would normalize to
+    // `{ type: 'component', componentId: null }` and silently drop essenceId/amount.
+    if (raw.type === 'essence') {
+      return essenceHandler.normalize(data);
     }
     // Accept both 'component' (primary) and 'systemItem' (legacy fallback).
     return componentHandler.normalize(data);

@@ -149,7 +149,13 @@ describe('RecipeManager.disableSignatureConflicts', () => {
     assert.equal(manager.recipes.get('r-b').enabled, true);
   });
 
-  it('skips recipes already disabled', async () => {
+  it('leaves a recipe enabled when its only collision partner is already disabled', async () => {
+    // Issue 649: `SignatureValidator.validateSystem` is now enabled-scoped, so the scan
+    // is the exact complement of the runtime matcher's `if (!recipe.enabled) continue;`.
+    // A disabled recipe no longer counts against the gate, so the still-enabled recipe
+    // (whose sole collision partner is disabled) is collision-free among the enabled set
+    // and STAYS enabled — the domain-correct outcome (no runtime ambiguity), and
+    // `disableSignatureConflicts` reports nothing.
     const manager = makeManager();
     manager.save = async () => {};
     manager.recipes.set('r-a', new Recipe(completeRecipe('r-a', 'A', 'comp-a', { enabled: false })));
@@ -157,10 +163,7 @@ describe('RecipeManager.disableSignatureConflicts', () => {
 
     const disabled = await manager.disableSignatureConflicts('sys-1');
 
-    assert.deepEqual(
-      disabled.map((d) => d.name),
-      ['B'],
-      'only the still-enabled conflicting recipe is reported'
-    );
+    assert.deepEqual(disabled, [], 'nothing to disable — the enabled residual is collision-free');
+    assert.equal(manager.recipes.get('r-b').enabled, true, 'the enabled recipe stays enabled');
   });
 });

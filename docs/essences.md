@@ -62,12 +62,21 @@ In the **Items** tab of the GM admin, each component can have essences assigned 
 
 ## Using Essences in Recipes
 
-Ingredient sets can require specific essence quantities.
-When a player crafts, the essences from their chosen ingredients are totalled and compared against the requirement.
+An essence amount is a first-class ingredient option, matched the same way as a component or a tag.
+When a player crafts, the essences from their chosen ingredients are totalled and compared against the amount the option asks for.
 
-For example, an ingredient set requiring "3 Fire essence and 2 Arcane essence" could be satisfied by:
+For example, an option requiring "3 Fire essence" is satisfied by any combination of held items whose Fire essence totals at least 3:
 
-- 1x Dragon Scale (3 Fire + 1 Arcane) + 1x Arcane Dust (2 Arcane) = 3 Fire + 3 Arcane (meets requirement)
+- 1x Dragon Scale (3 Fire) meets it outright.
+- 3x Ember Shard (1 Fire each) also meets it.
+
+Because an essence is an option like any other, it can sit inside a group as one of several **Accept instead** alternatives on the recipe editor's Ingredients tab, or stand alone in its own group as a hard requirement.
+A group holding only a single essence option is a required essence: the crafter must supply that essence amount in addition to the recipe's other groups.
+
+{: .note }
+> Earlier versions attached essence requirements to the whole ingredient set through a separate essence map.
+That per-set map is superseded by first-class essence options.
+Fabricate migrates existing recipes automatically, rewriting each former requirement into a required single-option essence group so the original behaviour is preserved.
 
 ## Effect Transfer via Essences
 

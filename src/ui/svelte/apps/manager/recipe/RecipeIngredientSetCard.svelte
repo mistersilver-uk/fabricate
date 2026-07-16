@@ -15,7 +15,6 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeIngredientGroupCard from './RecipeIngredientGroupCard.svelte';
-  import RecipeEssenceRequirements from './RecipeEssenceRequirements.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
 
   let {
@@ -51,24 +50,26 @@
   const displayName = $derived(set?.name?.trim() ? set.name : defaultName);
 
   const groups = $derived(Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []);
-  const essences = $derived(set?.essences && typeof set.essences === 'object' ? set.essences : {});
 
   const componentPickerOptions = $derived(
     (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
   );
 
-  // The set-level "Add essence requirement" picker offers essences the set does not
-  // already require (an essence is an AND requirement on the SET, so once every one
-  // is required the choice would be a no-op and is dropped).
+  // The set-level "Add essence requirement" picker offers EVERY system essence: an
+  // essence is now a first-class ingredient match type (issue 649), so the set-add
+  // appends a single-option essence GROUP (an AND-required requirement, preserving the
+  // old per-set semantics) and an essence may legitimately repeat across groups.
   const essencePickerOptions = $derived(
     (essenceOptions || [])
-      .filter((essence) => !(essence.id in essences))
       .map((essence) => ({ id: essence.id, label: essence.name, icon: essence.icon || 'fas fa-flask-vial' }))
   );
 
-  function addNamedEssence(id) {
-    if (!id || id in essences) return;
-    updateEssences({ ...essences, [id]: 1 });
+  function addEssenceGroup(id) {
+    if (!id) return;
+    onChange({
+      ...set,
+      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'essence', essenceId: id, amount: 1 } }] }]
+    });
   }
 
   function setName(name) {
@@ -129,29 +130,6 @@
     });
   }
 
-  function updateEssences(nextEssences) {
-    onChange({ ...set, essences: nextEssences });
-  }
-
-  // The requirement's "or…" popover offers Essence under its OWN heading, because an
-  // essence requirement is NOT an OR alternative: there is no essence match type, and
-  // `IngredientSet.essences` is an AND requirement on the whole SET. Choosing it seeds
-  // the first essence the set does not already require, at amount 1; the per-set
-  // essence editor below refines it.
-  //
-  // The SET owns `essences`, so the set is the only thing that can say whether another
-  // essence can still be added. It hands the requirement cards exactly the addable ones
-  // — once this is empty the popover drops the choice entirely, rather than offering an
-  // entry whose handler would silently return.
-  const addableEssenceOptions = $derived(
-    (essenceOptions || []).filter((essence) => !(essence.id in essences))
-  );
-
-  function addEssenceRequirement() {
-    const next = addableEssenceOptions[0];
-    if (!next) return;
-    updateEssences({ ...essences, [next.id]: 1 });
-  }
 </script>
 
 <div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`} data-recipe-set data-recipe-set-id={set?.id || ''}>
@@ -205,21 +183,12 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
-          {addableEssenceOptions}
+          {essenceOptions}
           onChange={(nextGroup) => updateGroup(index, nextGroup)}
           onRemove={() => removeGroup(index)}
-          onAddEssenceRequirement={addEssenceRequirement}
         />
       {/each}
     </div>
-  {/if}
-
-  {#if (essenceOptions || []).length > 0}
-    <RecipeEssenceRequirements
-      {essences}
-      {essenceOptions}
-      onChange={updateEssences}
-    />
   {/if}
 
   <div class="manager-recipe-ingredient-set-add">
@@ -248,8 +217,10 @@
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
     </button>
     {#if (essenceOptions || []).length > 0}
-      <!-- §B6: the missing set-level essence add. An essence is an AND requirement on
-           the SET; the picker offers only essences not already required. -->
+      <!-- §B6: the set-level essence add. Essence is now a first-class match type
+           (issue 649), so this appends a single-option essence GROUP (AND-required,
+           preserving the old per-set semantics). The picker offers every system
+           essence; an essence may repeat across groups. -->
       <SearchablePopover
         options={essencePickerOptions}
         pickerClass="manager-recipe-essence-picker"
@@ -261,9 +232,9 @@
         dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}
         searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
         searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
-        emptyHint={text('FABRICATE.Admin.Manager.Recipe.AllEssencesAdded', 'All essences added')}
+        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined')}
         showChevron={false}
-        onChoose={(id) => addNamedEssence(id)}
+        onChoose={(id) => addEssenceGroup(id)}
       />
     {/if}
     {#if (currencyUnits || []).length > 0}
