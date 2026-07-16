@@ -71,19 +71,22 @@ describe('RecipeEditView identity-only single column', () => {
     assert.equal(overviewSource.includes('manager-task-core-card'), false, 'no reused task core card wrapper');
     assert.ok(overviewSource.includes('manager-recipe-micro-label'), 'uppercase micro-labels over fields');
     assert.ok(overviewSource.includes('manager-task-image-picker'), 'keeps the shared image picker (capability)');
-    assert.ok(overviewSource.includes('manager-status-toggle'), 'reuses the status toggle');
+    assert.ok(overviewSource.includes('ToggleCard'), 'reuses the shared ToggleCard for the status toggles (issue 658 retrofit)');
     // Category authored on Overview (prototype §5.1), not the rail.
     assert.ok(overviewSource.includes('data-recipe-category-select'), 'category select lives on Overview');
-    // Two side-by-side status cards (Enabled + Locked).
-    assert.ok(overviewSource.includes('manager-recipe-status-card'), 'status cards for enabled + locked');
-    assert.ok(overviewSource.includes('data-recipe-section="enabled-status"'), 'enabled status card');
-    assert.ok(overviewSource.includes('data-recipe-section="locked-status"'), 'locked status card');
+    // Two side-by-side status cards (Enabled + Locked) now render through the shared
+    // ToggleCard extracted in issue 651; the issue-658 retrofit is a byte-faithful DOM
+    // no-op, so the section/field markers move from inlined attributes onto props.
+    assert.ok(overviewSource.includes('variant="is-enabled"'), 'enabled status card via ToggleCard');
+    assert.ok(overviewSource.includes('variant="is-locked"'), 'locked status card via ToggleCard');
+    assert.ok(overviewSource.includes('section="enabled-status"'), 'enabled status card section marker');
+    assert.ok(overviewSource.includes('section="locked-status"'), 'locked status card section marker');
     // Always-visible inline duration steppers replace the popover on the tab.
     assert.ok(overviewSource.includes('RecipeDurationSteppers'), 'inline duration steppers on the Duration card');
     assert.ok(overviewSource.includes('data-recipe-field="name"'), 'name field bound');
     assert.ok(overviewSource.includes('data-recipe-field="description"'), 'description field bound');
-    assert.ok(overviewSource.includes('data-recipe-field="enabled"'), 'enabled toggle bound');
-    assert.ok(overviewSource.includes('data-recipe-field="locked"'), 'locked toggle bound');
+    assert.ok(overviewSource.includes('field="enabled"'), 'enabled toggle bound');
+    assert.ok(overviewSource.includes('field="locked"'), 'locked toggle bound');
     assert.ok(overviewSource.includes('data-recipe-field="img"'), 'image picker bound');
   });
 
