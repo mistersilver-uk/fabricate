@@ -768,6 +768,24 @@ export class ResolutionModeService {
     return true;
   }
 
+  /**
+   * The difficulty (progressive cost) of a result's component — the PUBLIC seam over the
+   * private lookup the progressive award path feeds `resolveProgressiveAward`'s `costFor`.
+   *
+   * `CraftingListingBuilder` computes the player-facing "reached at ≥N" thresholds and
+   * MUST spend the same numbers the engine does. Routing it through this delegator makes
+   * that parity structural: a second hand-rolled `components.find(...).difficulty` lookup
+   * would agree with the threshold helper's oracle test (same helper, same injected
+   * `costFor`) while silently diverging from production.
+   *
+   * @param {object} system
+   * @param {string} componentId
+   * @returns {number|null}
+   */
+  getDifficulty(system, componentId) {
+    return this._getDifficulty(system, componentId);
+  }
+
   _getDifficulty(system, componentId) {
     if (!componentId) return null;
     const managedItems = system?.components || [];

@@ -19,6 +19,7 @@
  * browse status so no ingredient/result/check detail leaks.
  */
 
+import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
 
 /**
@@ -307,6 +308,10 @@ export class CraftingListingBuilder {
       check: this._buildCheck(system, mode, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
       result: this._buildResult({ recipe, system, mode, defaultSet }),
+      // The ordered stage list (progressive only; [] otherwise) — the F1 fix.
+      progressiveStages: this._buildProgressiveStages({ recipe, system, mode }),
+      // GM policy: may this player reorder the stages? Default true (issue 651).
+      allowPlayerResultReorder: recipe.allowPlayerResultReorder !== false,
     };
   }
 
@@ -345,6 +350,13 @@ export class CraftingListingBuilder {
             defaultSet: recipe.ingredientSets?.[0] ?? null,
           })
         : { items: [], timeLabel: null, xp: null },
+      // Redacted exactly as `result`/`outcomeTiers` above. A teaser is shown to a player
+      // in DISCOVERY status — the surface whose entire purpose is NOT showing them what
+      // the recipe makes — so a missing guard here leaks the full stage list, names,
+      // images and difficulties included. Redaction is builder-side, so no component test
+      // can cover this.
+      progressiveStages: showResults ? this._buildProgressiveStages({ recipe, system, mode }) : [],
+      allowPlayerResultReorder: recipe.allowPlayerResultReorder !== false,
     };
   }
 
@@ -583,6 +595,73 @@ export class CraftingListingBuilder {
   _firstStep(recipe) {
     const steps = this.resolutionModeService?.getExecutionSteps?.(recipe);
     return Array.isArray(steps) && steps.length > 0 ? steps[0] : null;
+  }
+
+  /**
+   * The ORDERED stage list a progressive recipe shows the player, built from the AUTHORED
+   * result group — deliberately bypassing the award loop.
+   *
+   * This is the F1 fix. Browsing has no roll, so this builder passes `checkResult: null`;
+   * `_resolveProgressiveResultGroups` then derives `initialRemaining: Number(null || 0)`
+   * → 0, every stage costs at least 1, and `awarded` is ALWAYS `[]`. A progressive recipe
+   * therefore showed the player an empty output list — a pre-existing bug, and a
+   * precondition for this feature: a stage list cannot be added to a surface with no data.
+   * Routing this through the award loop with a fake budget would be the wrong fix; the
+   * player is being shown what the recipe CAN produce, not what one roll did produce.
+   *
+   * Group selection mirrors `_resolveProgressiveResultGroups`'s `allGroups[0]` exactly
+   * (step groups win over recipe groups), so the list the player orders is the list the
+   * award will spend.
+   *
+   * @private
+   */
+  _buildProgressiveStages({ recipe, system, mode }) {
+    if (mode !== 'progressive') return [];
+    const step = this._firstStep(recipe);
+    const allGroups =
+      Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
+        ? step.resultGroups
+        : Array.isArray(recipe?.resultGroups)
+          ? recipe.resultGroups
+          : [];
+    const group = allGroups[0];
+    const results = Array.isArray(group?.results) ? group.results : [];
+    if (results.length === 0) return [];
+
+    const components = Array.isArray(system?.components) ? system.components : [];
+    const byId = new Map(components.map((component) => [component.id, component]));
+    // The ENGINE'S difficulty lookup, not a local re-implementation — see
+    // `ResolutionModeService.getDifficulty`. Parity here is what keeps the displayed
+    // thresholds honest.
+    const costFor = (result) =>
+      this.resolutionModeService?.getDifficulty?.(
+        system,
+        result?.componentId || result?.systemItemId
+      ) ?? NaN;
+
+    const thresholds = progressiveStageThresholds({
+      results,
+      costFor,
+      awardMode: system?.craftingCheck?.progressive?.awardMode || 'equal',
+    });
+
+    return results.map((result, index) => {
+      const componentId = result?.componentId || result?.systemItemId;
+      const component = componentId ? byId.get(componentId) : null;
+      const difficulty = costFor(result);
+      return {
+        id: stringOrNull(result?.id),
+        componentId: stringOrNull(componentId),
+        name: stringOrEmpty(component?.name) || this.localize(UNKNOWN_COMPONENT_KEY),
+        img: stringOrNull(component?.img),
+        // Null (not 0) when the component has no authored difficulty, so the row can say
+        // "no difficulty" rather than claim a free stage.
+        difficulty: Number.isFinite(difficulty) ? difficulty : null,
+        // Null when this stage is unreachable at any budget (an invalid cost the award
+        // loop skips): the row omits the badge rather than showing a wrong number.
+        threshold: thresholds[index] ?? null,
+      };
+    });
   }
 
   /**

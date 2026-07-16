@@ -97,6 +97,12 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
   // imports of its own, so this single entry suffices.
   'src/utils/recipeCategories.js',
+  // Same rule, issue 651: the builder now derives each progressive stage's cumulative
+  // "reached at >=N" threshold through this helper. Both of these are deliberately
+  // import-free leaves, so one entry each suffices.
+  'src/utils/progressiveStageThresholds.js',
+  // The player's stored stage order is reconciled against the authored list here.
+  'src/utils/progressiveResultOrder.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 
