@@ -606,6 +606,16 @@ export class CraftingListingBuilder {
   }
 
   /**
+   * The award mode progressive thresholds are derived from (`null` outside progressive).
+   * Single source for both projections and the value the store recomputes against.
+   * @private
+   */
+  _progressiveAwardMode(system, mode) {
+    if (mode !== 'progressive') return null;
+    return system?.craftingCheck?.progressive?.awardMode || 'equal';
+  }
+
+  /**
    * The ORDERED stage list a progressive recipe shows the player, built from the AUTHORED
    * result group — deliberately bypassing the award loop.
    *
@@ -621,18 +631,13 @@ export class CraftingListingBuilder {
    * (step groups win over recipe groups), so the list the player orders is the list the
    * award will spend.
    *
+   * The thresholds baked here are POSITIONAL, so they are only valid for the authored
+   * order. When the player reorders, `orderedProgressiveStages` recomputes them through
+   * the same helper — carrying these values across a move is the defect that shipped in
+   * review and was caught by `fabricate_reviewer`.
+   *
    * @private
    */
-  /**
-   * The award mode progressive thresholds are derived from (`null` outside progressive).
-   * Single source for both projections and the value the store recomputes against.
-   * @private
-   */
-  _progressiveAwardMode(system, mode) {
-    if (mode !== 'progressive') return null;
-    return system?.craftingCheck?.progressive?.awardMode || 'equal';
-  }
-
   _buildProgressiveStages({ recipe, system, mode }) {
     if (mode !== 'progressive') return [];
     const step = this._firstStep(recipe);

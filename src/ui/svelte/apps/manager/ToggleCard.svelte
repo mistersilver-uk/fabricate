@@ -56,7 +56,10 @@
   <span class="manager-recipe-status-icon" aria-hidden="true"><i class={icon}></i></span>
   <div class="manager-recipe-status-copy">
     <p class="manager-recipe-status-title">{title}</p>
-    <p class="manager-recipe-status-sub manager-muted" {...(subAttr ? { [subAttr]: true } : {})}>
+    <!-- `''` not `true`: a bare attribute renders `=""`, which is the byte the Overview
+         cards emit today. Every consumer form is insensitive, but the issue 658 retrofit
+         is a no-op DOM diff only if this matches exactly. -->
+    <p class="manager-recipe-status-sub manager-muted" {...(subAttr ? { [subAttr]: '' } : {})}>
       {sub}
     </p>
   </div>
