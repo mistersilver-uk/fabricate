@@ -5465,15 +5465,22 @@ async function main() {
           await screenshot(page, 'manager-system-edit-blocked');
 
           // (c) Progressive difficulty UI — this system is in progressive crafting
-          // mode, so its components browser shows the difficulty column (a value
-          // for component 0, "None" for component 1) and the component editor's
-          // right inspector exposes the staged Progressive difficulty card.
+          // mode, so its components browser badges each row's difficulty (a value for
+          // component 0, "None" for component 1) and the component editor's body
+          // exposes the staged Progressive difficulty control.
+          //
+          // Issue 676: difficulty was its own table COLUMN
+          // (`.manager-component-difficulty-cell`) until the browser was rebuilt as a
+          // LIST; it is now a row badge. The editor's difficulty control moved out of
+          // the deleted right-rail inspector into the single scrolling column but KEEPS
+          // its `data-component-edit-section="difficulty"` hook — this hard-wait is
+          // precisely why that hook was preserved rather than renamed.
           // Guarded independently so a hiccup here does not fail the overview step.
           try {
             const blockedNames = craftingSetup.blockedComponentNames || [];
             await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
             await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-            await page.locator('.fabricate-manager .manager-component-difficulty-cell').first()
+            await page.locator('.fabricate-manager [data-component-difficulty]').first()
               .waitFor({ state: 'visible', timeout: 5_000 });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'manager-components-progressive');

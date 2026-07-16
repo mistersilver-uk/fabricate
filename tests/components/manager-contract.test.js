@@ -20,6 +20,7 @@ const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/Recipes
 const recipeBrowserInspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+const componentRowPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/components/ComponentRow.svelte');
 const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
@@ -41,6 +42,7 @@ const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
 const recipeBrowserInspectorSource = readFileSync(recipeBrowserInspectorPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
+const componentRowSource = readFileSync(componentRowPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
@@ -307,13 +309,24 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
     }
-    for (const snippet of [
-      'class="manager-component-drop-zone"',
-      'class={componentTableClass}',
-      'manager-component-row',
-      'class="manager-component-identity"'
-    ]) {
+    // `class={componentTableClass}` is GONE (issue 676): the rebuilt browser is a LIST
+    // of rows, not a `role="table"` grid, so the table scaffolding and the class that
+    // toggled its column template are dropped rather than left orphaned on a non-table
+    // structure. `.manager-component-drop-zone` still lives here; the row's own classes
+    // moved into the extracted ComponentRow and are pinned there — both are probed by
+    // managerLayoutGuards and the smoke harness.
+    for (const snippet of ['class="manager-component-drop-zone"', 'ComponentRow']) {
       assert.ok(componentsBrowserSource.includes(snippet), `ComponentsBrowserView should include ${snippet}`);
+    }
+    for (const snippet of ['manager-component-row', 'class="manager-component-identity"']) {
+      assert.ok(componentRowSource.includes(snippet), `ComponentRow should include ${snippet}`);
+    }
+    // The dropped table scaffolding must not creep back in either file.
+    for (const snippet of ['role="table"', 'role="row"', 'role="columnheader"', 'role="cell"']) {
+      assert.ok(
+        !componentsBrowserSource.includes(snippet) && !componentRowSource.includes(snippet),
+        `the component browser must not reintroduce ${snippet}`
+      );
     }
     for (const snippet of [
       'manager-system-edit-form',

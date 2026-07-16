@@ -20,6 +20,7 @@
     normalizeRecipeCategory
   } from '../../../../utils/recipeCategories.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
+  import { createComponentBrowserState } from '../../../../utils/componentBrowserModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -113,6 +114,10 @@
   // the browser remounts against this intact object. Fresh open still starts at defaults
   // (this is seeded once, on first mount).
   let recipeBrowserState = $state(createRecipeBrowserState());
+  // Same lift, same reason, for the component library (issue 676): its filter/sort/
+  // group/page state used to live inside ComponentsBrowserView, so every editor
+  // round-trip reset it.
+  let componentBrowserState = $state(createComponentBrowserState());
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
@@ -5217,6 +5222,8 @@
         selectedSystemName={selectedSystem?.name || ''}
         {selectedSystemId}
         selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        categoryVocabulary={selectedSystem?.componentCategories || []}
+        bind:browserState={componentBrowserState}
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
         onSearchChange={(term) => store.setItemSearch?.(term)}
         onSelectComponent={(id) => selectComponent(id)}

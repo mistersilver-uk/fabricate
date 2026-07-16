@@ -1313,32 +1313,44 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.equal(css.includes('.fabricate-manager .manager-gathering-task-row .manager-environment-reorder-stack'), false, 'task rows should not render environment reorder controls');
 });
 
-test('manager components browser defines drop target and compact responsive table geometry', () => {
-  const tableBlock = blockFor('.fabricate-manager .manager-components-table');
+test('manager components browser defines drop target and compact responsive list geometry', () => {
+  // Issue 676: the component library is a LIST, not a column grid. The
+  // `.manager-components-table` block and its six `--fab-mv2-component-grid`
+  // permutations are gone with the table scaffolding, and rows flex + wrap instead —
+  // which is what makes the narrow (stacked) surface the smoke harness photographs
+  // reflow rather than crush fixed tracks.
+  const listBlock = blockFor('.fabricate-manager .manager-components-list');
+  const rowBlock = blockFor('.fabricate-manager .manager-component-row');
+  const rowMetaBlock = blockFor('.fabricate-manager .manager-component-row-meta');
+  const chipBlock = blockFor('.fabricate-manager .manager-component-chip');
   const toolbarBlock = Array.from(css.matchAll(/\.fabricate-manager \.manager-toolbar\s*\{[\s\S]*?\}/g))
     .map(match => match[0])
     .join('\n');
   const toolbarPrimaryBlock = blockFor('.fabricate-manager .manager-toolbar-primary');
-  const toolbarPillsBlock = blockFor('.fabricate-manager .manager-toolbar-pills');
   const dropBlock = blockFor('.fabricate-manager .manager-component-drop-zone');
-  const tagSearchBlock = blockFor('.fabricate-manager .manager-tag-search');
-  const tagSuggestionsBlock = blockFor('.fabricate-manager .manager-tag-suggestions');
-  const selectedTagPillBlock = blockFor('.fabricate-manager .manager-selected-tag-pill');
   const identityBlock = blockFor('.fabricate-manager .manager-component-identity');
   const componentCopyBlock = blockFor('.fabricate-manager .manager-component-identity .manager-system-copy');
-  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
 
   assert.ok(
     css.includes('.fabricate-manager[data-manager-view="components"] .manager-main'),
-    'components route should reserve rows for header, drop target, toolbar, and table'
+    'components route should reserve rows for header, drop target, toolbar, and list'
+  );
+  assert.equal(
+    css.includes('--fab-mv2-component-grid'),
+    false,
+    'the dropped table column template must not survive the rebuild'
+  );
+  assert.ok(listBlock.includes('display: flex;'), 'the component list stacks its rows');
+  assert.ok(rowBlock.includes('display: flex;'), 'a component row is a flex row, not a column grid');
+  assert.ok(rowBlock.includes('flex-wrap: wrap;'), 'a component row wraps rather than compressing');
+  assert.ok(rowMetaBlock.includes('flex-wrap: wrap;'), 'the badge run wraps inside the row');
+  assert.ok(
+    chipBlock.includes('background: var(--fab-bg-3);') && !chipBlock.includes('gradient'),
+    'the item chip is a FLAT fill on the surface ramp, never a gradient'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-component-grid: minmax(0, 1.42fr)'),
-    'components table should define shrinkable compact columns for normal Foundry manager widths'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-components-table.has-no-tags.has-no-essences.has-progressive-difficulty'),
-    'components table should have a no-tags/no-essences progressive grid variant'
+    chipBlock.includes('width: var(--fab-cs-chip-sm);'),
+    'the item chip uses the Component Studio dimension alias'
   );
   assert.ok(dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'), 'component drop zone should reserve icon and copy space');
   assert.ok(dropBlock.includes('margin: var(--fab-space-3);'), 'component drop zone should keep balanced vertical spacing around the toolbar');
@@ -1347,14 +1359,6 @@ test('manager components browser defines drop target and compact responsive tabl
   assert.ok(toolbarBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'manager toolbar grid should keep rows bounded to the main content width');
   assert.ok(toolbarPrimaryBlock.includes('display: flex;'), 'manager primary toolbar row should lay out controls as a flex row');
   assert.ok(toolbarPrimaryBlock.includes('flex-wrap: wrap;'), 'manager primary toolbar row should wrap controls without involving selected pills');
-  assert.ok(toolbarPillsBlock.includes('display: flex;'), 'manager pill row should be its own flex row');
-  assert.ok(toolbarPillsBlock.includes('flex-wrap: wrap;'), 'manager pill row should wrap selected tags independently');
-  assert.ok(toolbarPillsBlock.includes('width: 100%;'), 'manager pill row should occupy a full toolbar row');
-  assert.ok(tagSearchBlock.includes('position: relative;'), 'component tag search should anchor its suggestion list to the control');
-  assert.ok(tagSearchBlock.includes('max-width: 320px;'), 'component tag search should keep bounded toolbar geometry');
-  assert.ok(tagSuggestionsBlock.includes('position: absolute;'), 'component tag suggestions should overlay below the search field without shifting the toolbar');
-  assert.ok(tagSuggestionsBlock.includes('max-height: 148px;'), 'component tag suggestions should be scroll bounded');
-  assert.ok(selectedTagPillBlock.includes('padding-right: var(--fab-space-1);'), 'selected tag pills should reserve compact space for the remove button');
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
       || css.includes('.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity'),
@@ -1364,14 +1368,8 @@ test('manager components browser defines drop target and compact responsive tabl
     componentCopyBlock.includes('max-height: 52px;') && componentCopyBlock.includes('overflow: hidden;'),
     'component identity copy should clamp inside the row instead of overflowing below the thumbnail'
   );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-component-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'medium manager layout should stack component rows before columns become cramped'
-  );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-action-group.manager-labeled-cell') && mediumQuery.includes('display: flex;'),
-    'stacked component action groups should keep buttons in a compact action cluster'
-  );
+  // No medium-query stacking rule is needed any more: the row wraps natively, so the
+  // narrow surface reflows without a breakpoint re-templating its columns.
 });
 
 test('manager essence browser defines compact responsive table geometry', () => {

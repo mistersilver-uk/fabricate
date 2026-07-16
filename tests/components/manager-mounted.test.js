@@ -57,6 +57,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentDifficultyInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+  // The library's row, extracted out of the browser (issue 676). It lives under
+  // `components/` — NOT `component/`, which the screenshot map globs for the EDITOR.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -273,6 +276,10 @@ function compileManagerRoot() {
     // The component category vocabulary (issue 676) — the SIBLING of the above, not a
     // reuse of it. Imported by ComponentEditView and the component browser.
     'src/utils/componentCategories.js',
+    // The component library's pure list model — filter/group/sort/paginate (issue 676),
+    // the sibling of recipeBrowserModel below. Imported by ComponentsBrowserView AND by
+    // the root (which lifts the browser state).
+    'src/utils/componentBrowserModel.js',
     // The recipe library's pure list model (filter / group / sort / paginate + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
@@ -561,6 +568,10 @@ function createStore(calls = [], options = {}) {
         img: 'icons/commodities/metal/ore-chunk-grey.webp',
         description: 'Unrefined metal.',
         tags: ['ore', 'metal'],
+        // Component category (issue 676) — the browser's grouping/filter axis. This one
+        // is deliberately a CUSTOM category that exists only in this system, so the
+        // system-switch facet-reset test has something real to hide.
+        category: 'Reagent',
         essences: [{ id: 'earth', name: 'Earth', icon: 'fas fa-mountain', quantity: 2 }],
         registeredItemUuidDisplay: 'Compendium.fabricate.items.iron-ore',
         hasRegisteredItemUuid: true,
@@ -4882,97 +4893,61 @@ describe('CraftingSystemManager mounted behavior', () => {
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
+    // Issue 676: components group and filter by CATEGORY, not by tag. Tags are a
+    // many-valued field that was being asked to do a single-valued job; they are now
+    // edited only in the component editor and render nowhere in the browser.
     assert.equal(
       target.querySelector('[aria-label="Filter components by tag"]'),
       null,
-      'component tag filtering should use searchable pills, not the legacy dropdown'
+      'the legacy tag dropdown is gone'
+    );
+    assert.equal(
+      target.querySelector('[aria-label="Search component tags"]'),
+      null,
+      'the tag search facet is gone — category is the grouping axis now'
+    );
+    assert.equal(
+      target.querySelector('[data-component-tag-search]'),
+      null,
+      'no tag search control'
+    );
+    assert.equal(
+      target.querySelector('.manager-component-row .manager-chip-row .manager-chip:not(.manager-essence-compact-chip)'),
+      null,
+      'rows render no tag chips'
     );
 
-    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
-    assert.ok(tagSearch, 'component tag search should render when component tags are available');
-    tagSearch.value = 'con';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    const containerSuggestion = Array.from(target.querySelectorAll('.manager-tag-suggestion')).find(
-      (button) => button.textContent.includes('container')
-    );
-    assert.ok(containerSuggestion, 'tag search should show matching tags underneath');
-    containerSuggestion.click();
+    const categoryFilter = target.querySelector('[data-component-category-filter]');
+    assert.ok(categoryFilter, 'the browser filters by category');
+    categoryFilter.value = 'Reagent';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
-    assert.ok(target.textContent.includes('Glass Vial'));
-    const containerPill = target.querySelector('[data-component-tag-pill="container"]');
-    assert.ok(containerPill, 'selected tag should render as a removable pill');
-    const componentToolbar = target.querySelector('.manager-toolbar');
-    const primaryToolbarRow = target.querySelector('.manager-toolbar-primary');
-    const tagSearchControl = target.querySelector('[data-component-tag-search]');
-    const selectedTagRow = target.querySelector('.manager-toolbar-pills');
+    assert.ok(target.textContent.includes('Iron Ore'), 'the category filter narrows the list');
+
+    // `general` is suppressed as a BADGE (no redundant "General" chip on every row) but
+    // stays a selectable FILTER option, pinned last as the catch-all — the Recipe
+    // Studio's badge-vs-filter asymmetry.
     assert.ok(
-      primaryToolbarRow.contains(tagSearchControl),
-      'tag search control should stay in the primary toolbar row'
+      target.querySelector('[data-component-id="c1"] [data-component-category="Reagent"]'),
+      'a custom category renders as a row badge'
     );
+    categoryFilter.value = 'general';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
+    assert.ok(target.textContent.includes('Glass Vial'), 'the uncategorized component falls into general');
     assert.equal(
-      selectedTagRow?.parentElement,
-      componentToolbar,
-      'selected tag pills should render in a toolbar sibling row'
-    );
-    assert.equal(
-      tagSearchControl.contains(containerPill),
-      false,
-      'selected tag pills should not live inside the tag search control'
-    );
-
-    containerPill.querySelector('button').click();
-    await tick();
-    flushSync();
-    assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
-
-    tagSearch.value = 'ore';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
-      .find((button) => button.textContent.includes('ore'))
-      .click();
-    await tick();
-    flushSync();
-    tagSearch.value = 'metal';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
-      .find((button) => button.textContent.includes('metal'))
-      .click();
-    await tick();
-    flushSync();
-    assert.equal(
-      target.querySelectorAll('.manager-component-row').length,
-      1,
-      'multiple selected tags should require all tags'
-    );
-    assert.ok(target.textContent.includes('Iron Ore'));
-
-    target
-      .querySelector('[data-component-tag-pill="ore"]')
-      .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    await tick();
-    flushSync();
-    assert.equal(
-      target.querySelector('[data-component-tag-pill="ore"]'),
+      target.querySelector('[data-component-id="c2"] [data-component-category]'),
       null,
-      'right-clicking a tag pill should remove it'
+      'the general bucket renders no redundant badge'
     );
 
     target.querySelector('[data-clear-filters="components"]').click();
     await tick();
     flushSync();
-    assert.equal(
-      target.querySelector('[data-component-tag-pill="metal"]'),
-      null,
-      'clear filters should remove selected tag pills'
-    );
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
@@ -5077,22 +5052,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Progressive difficulty'));
     assert.ok(target.textContent.includes('Missing'));
 
-    // A set difficulty renders as a plain, borderless value (not a chip); an
-    // unset one shows a centered "None".
-    const c1DifficultyCell = target.querySelector('[data-component-id="c1"] .manager-component-difficulty-cell');
-    assert.ok(c1DifficultyCell, 'difficulty cell renders for a progressive system');
-    assert.ok(
-      c1DifficultyCell.querySelector('.manager-component-difficulty-value'),
-      'a set difficulty renders as a plain value element'
-    );
-    assert.equal(
-      c1DifficultyCell.querySelector('.manager-chip'),
-      null,
-      'the difficulty value is not boxed in a chip'
-    );
-    assert.match(c1DifficultyCell.textContent, /2/, 'the set difficulty value is shown');
-    const c2DifficultyCell = target.querySelector('[data-component-id="c2"] .manager-component-difficulty-cell');
-    assert.match(c2DifficultyCell.textContent, /None/, 'an unset difficulty shows "None"');
+    // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
+    // COLUMN — it rides in the row's badge run. The read-only parity it gives the GM
+    // (issue 651) is preserved rather than dropped with the table scaffolding.
+    const c1Difficulty = target.querySelector('[data-component-id="c1"] [data-component-difficulty]');
+    assert.ok(c1Difficulty, 'a difficulty badge renders for a progressive system');
+    assert.match(c1Difficulty.textContent, /2/, 'the set difficulty value is shown');
+    const c2Difficulty = target.querySelector('[data-component-id="c2"] [data-component-difficulty]');
+    assert.match(c2Difficulty.textContent, /None/, 'an unset difficulty shows "None"');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
@@ -11083,24 +11050,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
-    tagSearch.value = 'ore';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
-      .find((button) => button.textContent.includes('ore'))
-      .click();
+    // Issue 676: the facet is CATEGORY now, not tag. `Reagent` exists only in this
+    // system's vocabulary, so carrying it across a system switch would hide every row
+    // of the new system behind a filter naming something it has never heard of.
+    const categoryFilter = target.querySelector('[data-component-category-filter]');
+    categoryFilter.value = 'Reagent';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
+    assert.ok(target.textContent.includes('Iron Ore'));
 
     store.selectSystem('smithing');
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('[aria-label="Filter components by tag"]'), null);
-    assert.equal(target.querySelector('[aria-label="Search component tags"]'), null);
+    assert.equal(
+      target.querySelector('[data-component-category-filter]').value,
+      'all',
+      'a stale category facet is cleared when the selected system changes'
+    );
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
     assert.ok(target.textContent.includes('Coal'));
     assert.equal(target.textContent.includes('No components match these filters'), false);

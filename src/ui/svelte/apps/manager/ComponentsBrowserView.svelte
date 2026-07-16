@@ -3,6 +3,21 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
+  import ComponentRow from './components/ComponentRow.svelte';
+  import {
+    COMPONENT_SORT_KEYS,
+    componentCategoryOptions,
+    createComponentBrowserState,
+    filterComponents,
+    groupComponentsByCategory,
+    paginateComponents,
+    sortComponents
+  } from '../../../../utils/componentBrowserModel.js';
+  import {
+    GENERAL_COMPONENT_CATEGORY,
+    getComponentCategoryLabel
+  } from '../../../../utils/componentCategories.js';
 
   let {
     itemCards = [],
@@ -12,84 +27,98 @@
     selectedSystemName = '',
     selectedSystemId = '',
     selectedSystemResolutionMode = 'simple',
+    categoryVocabulary = [],
     dropEnabled = false,
     onSearchChange = () => {},
     onSelectComponent = () => {},
     onDropComponent = () => {},
     onEditComponent = () => {},
     onDeleteComponent = () => {},
-    onCopySourceUuid = () => {}
+    onCopySourceUuid = () => {},
+    // The filter / sort / group / paginate view-state (issue 676). The manager root
+    // LIFTS this up and binds it here so it survives the editor round-trip: opening a
+    // component unmounts this browser, and remounting it with the controls reset to
+    // defaults threw away the page, filters, sort and grouping the GM left — which is
+    // exactly what this view did before, because it kept all of it locally. Mirrors
+    // RecipesBrowserView. When unbound (the isolated mounted tests) the local fallback
+    // below keeps every control reactive in-component.
+    browserState = $bindable(null)
   } = $props();
 
-  let selectedTagFilters = $state([]);
-  let tagSearchTerm = $state('');
-  let essenceFilter = $state('all');
-  let lastSystemId = $state('');
-  let pageIndex = $state(0);
-  let pageSize = $state(10);
+  // svelte-ignore state_referenced_locally
+  let ownBrowserState = $state(createComponentBrowserState());
+  // The active view-state: the root's lifted object when bound, else the local
+  // fallback. Both are `$state` proxies, so nested writes (`ui.categoryFilter = …`)
+  // are reactive AND, when bound, propagate back to the root.
+  const ui = $derived(browserState ?? ownBrowserState);
 
+  let lastSystemId = $state('');
+
+  // Switching system resets the filters — they name a vocabulary the new system does
+  // not share. The page/sort/group PREFERENCES are deliberately kept.
   $effect(() => {
     if (selectedSystemId === lastSystemId) return;
-    selectedTagFilters = [];
-    tagSearchTerm = '';
-    essenceFilter = 'all';
+    ui.categoryFilter = 'all';
+    ui.essenceFilter = 'all';
+    ui.pageIndex = 0;
+    ui.collapsedCategories = new Set();
     lastSystemId = selectedSystemId;
   });
 
-  const showComponentTags = $derived((itemCards || []).some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
   const showComponentEssences = $derived((itemCards || []).some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
-  const componentTagOptions = $derived(uniqueSorted((itemCards || []).flatMap(item => Array.isArray(item.tags) ? item.tags : [])));
   const componentEssenceOptions = $derived(uniqueSorted((itemCards || []).flatMap(item => Array.isArray(item.essences) ? item.essences.map(essence => essence.name || essence.id) : [])));
-  const normalizedTagSearchTerm = $derived((tagSearchTerm || '').trim().toLowerCase());
-  const tagSearchSuggestions = $derived(normalizedTagSearchTerm
-    ? componentTagOptions.filter(tag =>
-        !selectedTagFilters.includes(tag)
-        && tag.toLowerCase().includes(normalizedTagSearchTerm)
-      )
-    : []);
-  const filteredComponents = $derived((itemCards || []).filter(item => {
-    const itemTags = Array.isArray(item.tags) ? item.tags : [];
-    const matchesTag = selectedTagFilters.length === 0
-      || selectedTagFilters.every(tag => itemTags.includes(tag));
-    const matchesEssence = essenceFilter === 'all'
-      || (Array.isArray(item.essences) && item.essences.some(essence => (essence.name || essence.id) === essenceFilter));
-    return matchesTag && matchesEssence;
+  const categoryOptions = $derived(componentCategoryOptions(itemCards || [], categoryVocabulary));
+
+  const filteredComponents = $derived(filterComponents(itemCards || [], {
+    category: ui.categoryFilter,
+    essence: ui.essenceFilter
   }));
-  const showProgressiveDifficulty = $derived(
-    selectedSystemResolutionMode === 'progressive'
-    && filteredComponents.some(item => Object.prototype.hasOwnProperty.call(item, 'difficulty'))
-  );
+  const sortedComponents = $derived(sortComponents(filteredComponents, {
+    key: ui.sortKey,
+    direction: ui.sortDirection
+  }));
+  const page = $derived(paginateComponents(sortedComponents, {
+    pageIndex: ui.pageIndex,
+    pageSize: ui.pageSize
+  }));
+  const groups = $derived(ui.groupByCategory ? groupComponentsByCategory(page.components) : []);
+
   const filtersActive = $derived(
     (itemSearchTerm || '').trim().length > 0
-    || selectedTagFilters.length > 0
-    || (tagSearchTerm || '').trim().length > 0
-    || essenceFilter !== 'all'
+    || ui.categoryFilter !== 'all'
+    || ui.essenceFilter !== 'all'
   );
-  const componentTableClass = $derived([
-    'manager-components-table',
-    showComponentTags ? '' : 'has-no-tags',
-    showComponentEssences ? '' : 'has-no-essences',
-    showProgressiveDifficulty ? 'has-progressive-difficulty' : ''
-  ].filter(Boolean).join(' '));
-  const paginatedComponents = $derived(filteredComponents.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
 
-  $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredComponents.length) {
-      pageIndex = 0;
-    }
-  });
+  const sortOptions = $derived(COMPONENT_SORT_KEYS.map(key => ({
+    key,
+    label: sortLabel(key)
+  })));
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  function stackedLabel(key, fallback) {
-    return `${text(key, fallback)}:`;
+  function sortLabel(key) {
+    const labels = {
+      name: text('FABRICATE.Admin.Manager.Component.SortName', 'Name'),
+      category: text('FABRICATE.Admin.Manager.Component.SortCategory', 'Category'),
+      essences: text('FABRICATE.Admin.Manager.Component.SortEssences', 'Essences'),
+      salvage: text('FABRICATE.Admin.Manager.Component.SortSalvage', 'Salvage')
+    };
+    return labels[key] || key;
   }
 
-  function componentImage(item) {
-    return item?.img || 'icons/svg/item-bag.svg';
+  function categoryLabel(category) {
+    return getComponentCategoryLabel(category, localize);
+  }
+
+  // Suppressed for `general`: no redundant "General" chip on every uncategorized row.
+  // `general` remains a selectable FILTER option, pinned last as the catch-all — the
+  // same badge-vs-filter asymmetry the Recipe Studio settled on.
+  function categoryBadgeFor(item) {
+    const category = item?.category || GENERAL_COMPONENT_CATEGORY;
+    return category === GENERAL_COMPONENT_CATEGORY ? '' : categoryLabel(category);
   }
 
   function uniqueSorted(values) {
@@ -127,93 +156,91 @@
     };
   }
 
-  function usageEvidenceItems(item) {
-    if (!item?.usageCounts || typeof item.usageCounts !== 'object') return [];
-    const labels = {
-      ingredient: text('FABRICATE.Admin.Manager.Component.UsageIngredient', 'Ingredient usage'),
-      result: text('FABRICATE.Admin.Manager.Component.UsageResult', 'Result usage'),
-      tool: text('FABRICATE.Admin.Manager.Component.UsageTool', 'Tool usage'),
-      gathering: text('FABRICATE.Admin.Manager.Component.UsageGathering', 'Gathering usage'),
-      salvage: text('FABRICATE.Admin.Manager.Component.UsageSalvage', 'Salvage usage')
-    };
-    return Object.entries(item.usageCounts)
-      .filter(([, count]) => Number.isFinite(Number(count)))
-      .map(([key, count]) => ({
-        id: `usage-${key}`,
-        label: labels[key] || key,
-        value: Number(count)
-      }));
-  }
-
-  function salvageSummaryLabel(summary) {
-    const parts = [
-      text('FABRICATE.Admin.Manager.Component.SalvageQuantity', '{count} required')
-        .replace('{count}', summary.quantityRequired ?? 1)
-    ];
-    if (summary.toolCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTools', '{count} tools').replace('{count}', summary.toolCount));
-    if (summary.resultGroupCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result groups').replace('{count}', summary.resultGroupCount));
-    if (summary.outcomeCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageOutcomes', '{count} outcomes').replace('{count}', summary.outcomeCount));
-    if (summary.hasTimeRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTime', 'time'));
-    if (summary.hasCurrencyRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageCost', 'cost'));
-    return parts.join(', ');
-  }
-
-  function componentEvidenceItems(item) {
-    const evidence = [];
-    if (!item) return evidence;
-    if (Object.prototype.hasOwnProperty.call(item, 'difficulty')) {
-      evidence.push({
-        id: 'difficulty',
-        label: text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty'),
-        value: item.difficulty
-      });
-    }
-    if (item.salvageSummary) {
-      evidence.push({
-        id: 'salvage',
-        label: text('FABRICATE.Admin.Manager.Component.Salvage', 'Salvage'),
-        value: salvageSummaryLabel(item.salvageSummary)
-      });
-    }
-    for (const fact of usageEvidenceItems(item)) {
-      evidence.push(fact);
-    }
-    return evidence;
-  }
-
   function isSelectedComponent(item) {
     return !!selectedComponentId && item.id === selectedComponentId;
   }
 
-  function addTagFilter(tag) {
-    const normalized = String(tag || '').trim();
-    if (!normalized || selectedTagFilters.includes(normalized)) return;
-    selectedTagFilters = [...selectedTagFilters, normalized];
-    tagSearchTerm = '';
-    pageIndex = 0;
-  }
-
-  function removeTagFilter(tag) {
-    selectedTagFilters = selectedTagFilters.filter(selected => selected !== tag);
-    pageIndex = 0;
-  }
-
-  function removeTagFilterFromContext(event, tag) {
-    event.preventDefault();
-    removeTagFilter(tag);
+  function setCategoryFilter(value) {
+    ui.categoryFilter = value;
+    ui.pageIndex = 0;
   }
 
   function setEssenceFilter(value) {
-    essenceFilter = value;
-    pageIndex = 0;
+    ui.essenceFilter = value;
+    ui.pageIndex = 0;
+  }
+
+  function setSortKey(value) {
+    ui.sortKey = value;
+    ui.pageIndex = 0;
+  }
+
+  function toggleSortDirection() {
+    ui.sortDirection = ui.sortDirection === 'asc' ? 'desc' : 'asc';
+  }
+
+  function toggleGroupByCategory() {
+    ui.groupByCategory = !ui.groupByCategory;
+  }
+
+  // Collapse is opt-IN: a category absent from the set is expanded. A new Set is
+  // assigned rather than mutated so the bound state propagates back to the root.
+  function toggleCategoryCollapsed(category) {
+    const next = new Set(ui.collapsedCategories);
+    if (next.has(category)) next.delete(category);
+    else next.add(category);
+    ui.collapsedCategories = next;
+  }
+
+  function isCategoryCollapsed(category) {
+    return ui.collapsedCategories.has(category);
+  }
+
+  function groupCountText(count) {
+    return text('FABRICATE.Admin.Manager.Component.GroupCount', '{count} components').replace('{count}', count);
   }
 
   function clearFilters() {
-    selectedTagFilters = [];
-    tagSearchTerm = '';
-    essenceFilter = 'all';
-    pageIndex = 0;
+    ui.categoryFilter = 'all';
+    ui.essenceFilter = 'all';
+    ui.pageIndex = 0;
     onSearchChange('');
+  }
+
+  // Progressive-difficulty parity with the component editor (issue 651): shown ONLY for
+  // a progressive system, and only where a value is authored. It reads "None" when the
+  // system is progressive but the component has no difficulty, so a GM can see the gap.
+  const showProgressiveDifficulty = $derived(selectedSystemResolutionMode === 'progressive');
+
+  function difficultyBadgeFor(item) {
+    if (!showProgressiveDifficulty) return '';
+    const difficulty = Number(item?.difficulty);
+    const label = text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty');
+    return Number.isFinite(difficulty) && difficulty >= 1
+      ? `${label} ${difficulty}`
+      : `${label} ${text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}`;
+  }
+
+  function rowProps(item) {
+    const origin = componentSourceOrigin(item);
+    return {
+      component: item,
+      selected: isSelectedComponent(item),
+      categoryBadge: categoryBadgeFor(item),
+      difficultyBadge: difficultyBadgeFor(item),
+      originLabel: origin.label,
+      originClass: origin.className,
+      editLabel: text('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}').replace('{name}', item.name),
+      editTitle: text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component'),
+      deleteLabel: text('FABRICATE.Admin.Manager.Component.DeleteNamed', 'Delete {name}').replace('{name}', item.name),
+      deleteTitle: text('FABRICATE.Admin.Manager.Component.Delete', 'Delete component'),
+      copyLabel: text('FABRICATE.Admin.Manager.Component.CopySourceNamed', 'Copy source UUID for {name}').replace('{name}', item.name),
+      noDescriptionText: text('FABRICATE.Admin.Manager.NoDescription', 'No description'),
+      onSelect: onSelectComponent,
+      onEdit: onEditComponent,
+      onDelete: onDeleteComponent,
+      onCopySourceUuid
+    };
   }
 </script>
 
@@ -222,7 +249,7 @@
     <div class="manager-heading">
       <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
       <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Component.Library', 'Component directory')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Component.LibraryHint', 'Browse item-backed components and open the existing component editor for changes.')}</p>
+      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Component.LibraryHint', 'Crafting metadata on borrowed Foundry items — category, tags, essence contributions and salvage.')}</p>
     </div>
   </section>
 
@@ -250,37 +277,26 @@
           aria-label={text('FABRICATE.Admin.Manager.Component.SearchLabel', 'Search components')}
         />
       </label>
-      {#if showComponentTags && componentTagOptions.length > 0}
-        <div class="manager-tag-search" data-component-tag-search>
-          <label class="manager-filter manager-tag-search-label">
-            <span>{text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}</span>
-            <input
-              type="search"
-              value={tagSearchTerm}
-              oninput={(event) => tagSearchTerm = event.currentTarget.value}
-              placeholder={text('FABRICATE.Admin.Manager.Component.TagSearchPlaceholder', 'Search tags...')}
-              aria-label={text('FABRICATE.Admin.Manager.Component.TagSearchLabel', 'Search component tags')}
-              aria-controls="manager-component-tag-suggestions"
-            />
-          </label>
-          {#if normalizedTagSearchTerm.length > 0}
-            <div id="manager-component-tag-suggestions" class="manager-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.Manager.Component.TagSuggestions', 'Matching component tags')}>
-              {#each tagSearchSuggestions as tag (tag)}
-                <button type="button" role="option" aria-selected="false" class="manager-tag-suggestion" onclick={() => addTagFilter(tag)}>
-                  <i class="fas fa-tag" aria-hidden="true"></i>
-                  <span>{tag}</span>
-                </button>
-              {:else}
-                <span class="manager-tag-no-matches">{text('FABRICATE.Admin.Manager.Component.TagNoMatches', 'No matching tags')}</span>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
+
+      <label class="manager-filter">
+        <span>{text('FABRICATE.Admin.Manager.Component.CategoryFilter', 'Category')}</span>
+        <select
+          value={ui.categoryFilter}
+          data-component-category-filter
+          onchange={(event) => setCategoryFilter(event.currentTarget.value)}
+          aria-label={text('FABRICATE.Admin.Manager.Component.CategoryFilterLabel', 'Filter components by category')}
+        >
+          <option value="all">{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option>
+          {#each categoryOptions as category (category)}
+            <option value={category}>{categoryLabel(category)}</option>
+          {/each}
+        </select>
+      </label>
+
       {#if showComponentEssences && componentEssenceOptions.length > 0}
         <label class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</span>
-          <select value={essenceFilter} onchange={(event) => setEssenceFilter(event.currentTarget.value)} aria-label={text('FABRICATE.Admin.Manager.Component.EssenceFilterLabel', 'Filter components by essence')}>
+          <select value={ui.essenceFilter} onchange={(event) => setEssenceFilter(event.currentTarget.value)} aria-label={text('FABRICATE.Admin.Manager.Component.EssenceFilterLabel', 'Filter components by essence')}>
             <option value="all">{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option>
             {#each componentEssenceOptions as essence (essence)}
               <option value={essence}>{essence}</option>
@@ -288,6 +304,46 @@
           </select>
         </label>
       {/if}
+
+      <label class="manager-filter">
+        <span>{text('FABRICATE.Admin.Manager.Component.SortBy', 'Sort by')}</span>
+        <select
+          value={ui.sortKey}
+          data-component-sort
+          onchange={(event) => setSortKey(event.currentTarget.value)}
+          aria-label={text('FABRICATE.Admin.Manager.Component.SortLabel', 'Sort components')}
+        >
+          {#each sortOptions as option (option.key)}
+            <option value={option.key}>{option.label}</option>
+          {/each}
+        </select>
+      </label>
+
+      <button
+        type="button"
+        class="manager-button manager-component-sort-direction"
+        data-component-sort-direction={ui.sortDirection}
+        aria-pressed={ui.sortDirection === 'desc'}
+        onclick={toggleSortDirection}
+        title={text('FABRICATE.Admin.Manager.Component.SortDirection', 'Toggle sort direction')}
+      >
+        <i class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-a-z' : 'fas fa-arrow-down-z-a'} aria-hidden="true"></i>
+        <span>{ui.sortDirection === 'asc'
+          ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
+          : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span>
+      </button>
+
+      <button
+        type="button"
+        class="manager-button manager-component-group-toggle"
+        data-component-group-by-category
+        aria-pressed={ui.groupByCategory}
+        onclick={toggleGroupByCategory}
+      >
+        <i class={ui.groupByCategory ? 'fas fa-folder-open' : 'fas fa-folder'} aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Component.GroupByCategory', 'Group by category')}</span>
+      </button>
+
       <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredComponents.length).replace('{total}', totalComponentsCount)}</span>
       {#if filtersActive}
         <button type="button" class="manager-button manager-clear-filters" data-clear-filters="components" onclick={clearFilters}>
@@ -296,21 +352,9 @@
         </button>
       {/if}
     </div>
-    {#if selectedTagFilters.length > 0}
-      <div class="manager-toolbar-pills manager-selected-tag-row" role="list" aria-label={text('FABRICATE.Admin.Manager.Component.SelectedTags', 'Selected component tags')}>
-        {#each selectedTagFilters as tag (tag)}
-          <span class="manager-chip manager-selected-tag-pill" role="listitem" data-component-tag-pill={tag} oncontextmenu={(event) => removeTagFilterFromContext(event, tag)}>
-            <span>{tag}</span>
-            <button type="button" aria-label={text('FABRICATE.Admin.Manager.Component.RemoveTagNamed', 'Remove tag {name}').replace('{name}', tag)} title={text('FABRICATE.Admin.Manager.Component.RemoveTag', 'Remove tag')} onclick={() => removeTagFilter(tag)}>
-              <i class="fas fa-times" aria-hidden="true"></i>
-            </button>
-          </span>
-        {/each}
-      </div>
-    {/if}
   </section>
 
-  <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components table')}>
+  <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}>
     {#if (itemCards || []).length === 0}
       <div class="manager-empty">
         <div>
@@ -329,94 +373,44 @@
         </div>
       </div>
     {:else}
-      <div class={componentTableClass} role="table" aria-label={text('FABRICATE.Admin.Manager.Component.TableShort', 'Components')}>
-        <div class="manager-table-head manager-component-table-head" role="row">
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Component.Column.Component', 'Component')}</span>
-          {#if showComponentTags}
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}</span>
-          {/if}
-          {#if showComponentEssences}
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</span>
-          {/if}
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Component.Origin', 'Origin')}</span>
-          {#if showProgressiveDifficulty}
-            <span role="columnheader" class="manager-component-difficulty-head">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}</span>
-          {/if}
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
-        </div>
-        {#each paginatedComponents as item (item.id)}
-          <div class={`manager-component-row ${isSelectedComponent(item) ? 'is-selected' : ''}`} role="row" aria-selected={isSelectedComponent(item)} data-component-id={item.id}>
-            <button type="button" class="manager-component-identity" onclick={() => onSelectComponent(item.id)} role="cell">
-              <img class="manager-component-thumb" src={componentImage(item)} alt="" />
-              <span class="manager-system-copy">
-                <span class="manager-system-name" title={item.name}>{item.name}</span>
-                {#if item.description}
-                  <span class="manager-system-description" title={item.description}>{item.description}</span>
-                {:else}
-                  <span class="manager-system-description">{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span>
-                {/if}
-              </span>
-            </button>
-            {#if showComponentTags}
-              <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}>
-                <span class="manager-chip-row">
-                  {#each item.tags || [] as tag (tag)}
-                    <span class="manager-chip">{tag}</span>
+      <!-- A LIST of rows, not a grid: the table/row/columnheader/cell ARIA scaffolding
+           is dropped rather than left orphaned on a non-table structure. -->
+      <div class="manager-components-list">
+        {#if ui.groupByCategory}
+          {#each groups as group (group.category)}
+            <section class="manager-component-group" data-component-group={group.category}>
+              <CollapsibleGroupHeader
+                name={categoryLabel(group.category)}
+                countText={groupCountText(group.components.length)}
+                expanded={!isCategoryCollapsed(group.category)}
+                controls={`manager-component-group-${group.category}`}
+                onToggle={() => toggleCategoryCollapsed(group.category)}
+              />
+              {#if !isCategoryCollapsed(group.category)}
+                <div class="manager-component-group-body" id={`manager-component-group-${group.category}`}>
+                  {#each group.components as item (item.id)}
+                    <ComponentRow {...rowProps(item)} />
                   {:else}
-                    <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}</span>
+                    <p class="manager-muted manager-component-group-empty">{text('FABRICATE.Admin.Manager.Component.EmptyCategory', 'No components in this category.')}</p>
                   {/each}
-                </span>
-              </span>
-            {/if}
-            {#if showComponentEssences}
-              <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}>
-                <span class="manager-chip-row">
-                  {#each item.essences || [] as essence (essence.id)}
-                    <span class="manager-chip manager-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
-                      <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
-                    </span>
-                  {:else}
-                    <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoEssences', 'No essences')}</span>
-                  {/each}
-                </span>
-              </span>
-            {/if}
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.Origin', 'Origin')}>
-              <span class={`manager-chip ${componentSourceOrigin(item).className}`}>{componentSourceOrigin(item).label}</span>
-            </span>
-            {#if showProgressiveDifficulty}
-              <span role="cell" class="manager-labeled-cell manager-component-difficulty-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty')}>
-                {#if Number.isFinite(Number(item.difficulty)) && Number(item.difficulty) >= 1}
-                  <span class="manager-component-difficulty-value">{item.difficulty}</span>
-                {:else}
-                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}</span>
-                {/if}
-              </span>
-            {/if}
-            <span role="cell" class="manager-action-group manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
-              {#if item.hasRegisteredItemUuid}
-                <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Component.CopySourceNamed', 'Copy source UUID for {name}').replace('{name}', item.name)} title={item.registeredItemUuidDisplay} onclick={() => onCopySourceUuid(item.registeredItemUuidDisplay)}>
-                  <i class="fas fa-copy" aria-hidden="true"></i>
-                </button>
+                </div>
               {/if}
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}').replace('{name}', item.name)} title={text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component')} onclick={() => onEditComponent(item.id)}>
-                <i class="fas fa-edit" aria-hidden="true"></i>
-              </button>
-              <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Component.DeleteNamed', 'Delete {name}').replace('{name}', item.name)} title={text('FABRICATE.Admin.Manager.Component.Delete', 'Delete component')} onclick={() => onDeleteComponent(item.id)}>
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </button>
-            </span>
-          </div>
-        {/each}
+            </section>
+          {/each}
+        {:else}
+          {#each page.components as item (item.id)}
+            <ComponentRow {...rowProps(item)} />
+          {/each}
+        {/if}
       </div>
     {/if}
   </section>
 
   <Pagination
     totalCount={filteredComponents.length}
-    {pageSize}
-    {pageIndex}
-    onPageChange={(next) => pageIndex = next}
-    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+    pageSize={ui.pageSize}
+    pageIndex={page.pageIndex}
+    onPageChange={(next) => ui.pageIndex = next}
+    onPageSizeChange={(next) => { ui.pageSize = next; ui.pageIndex = 0; }}
   />
 </main>
