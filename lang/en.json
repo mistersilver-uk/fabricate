@@ -2081,7 +2081,7 @@
           "TableShort": "Components",
           "EmptyTitle": "No components yet",
           "EmptyHint": "Drop Foundry items into this page to add components to the selected system.",
-          "EmptySearchTitle": "No components match these filters",
+          "EmptySearchTitle": "No components match your filters.",
           "EmptySearchHint": "Clear search and filters to show all components in this system.",
           "Column": {
             "Component": "Component"
@@ -2200,7 +2200,8 @@
             "Unlink": "Unlink Source Item",
             "MissingLabel": "Source item unresolved",
             "NoneLabel": "No source",
-            "NoSourceHint": "Drop or replace a Foundry item to link this component to a source."
+            "NoSourceHint": "Drop or replace a Foundry item to link this component to a source.",
+            "ReleaseToSwap": "Release to swap the linked item"
           },
           "TagsEdit": {
             "Title": "Tags",
@@ -2222,7 +2223,17 @@
             "Title": "Category",
             "Hint": "Group this component in the component directory. Component categories are separate from recipe categories.",
             "Label": "Component category"
-          }
+          },
+          "GroupCountOne": "1 component",
+          "CountRange": "{start}–{end} of {total}",
+          "ChipCategory": "Category: {value}",
+          "ChipEssence": "Essence: {value}",
+          "ChipSearch": "Search: {value}",
+          "ClearChip": "Clear {filter} filter",
+          "LinkedBadge": "Linked",
+          "UnlinkedBadge": "Not linked",
+          "UnlinkAction": "Unlink component",
+          "EssenceContributions": "Essence contributions"
         },
         "TagsCategories": {
           "Kicker": "System vocabulary",

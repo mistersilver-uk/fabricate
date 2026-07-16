@@ -1707,8 +1707,12 @@
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+/* Drop zone, toolbar, the LIST (which takes the slack), then the pager. The fourth
+   `auto` track used to be the view's own duplicate page header (issue 676); with that
+   deleted, leaving the template at `auto auto auto minmax(0, 1fr)` handed the growing
+   track to the PAGER and left the list to size to its content. */
 .fabricate-manager[data-manager-view="components"] .manager-main {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .fabricate-manager[data-manager-view="essences"] .manager-main {
@@ -3214,11 +3218,16 @@
   min-width: 0;
 }
 
+/* A real `<ul role="list">` of `<li>` cards (issue 676), so the list markers and the
+   UA's default indent are reset here exactly as the recipe group list does. */
 .fabricate-manager .manager-component-group-body {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .fabricate-manager .manager-component-group-empty {
@@ -3792,12 +3801,27 @@
   gap: var(--fab-space-2);
 }
 
+/* The Component Studio's toolbar (issue 676) is the SAME bar: ruling 1 makes the recipe
+   treatment win wherever the two disagree, so the component browser joins every rule
+   below rather than re-deriving a second, drifting filter bar. Its selects carried NO
+   font-size rule at all and were rendering at Foundry's 14px `.application` base — a
+   live bleed, because the Component Studio's own bleed patch covers `.manager-search
+   input` and `.manager-toolbar .manager-button`, but not `select`. */
 .fabricate-manager .manager-recipe-toolbar .manager-search input,
-.fabricate-manager .manager-recipe-toolbar select {
+.fabricate-manager .manager-recipe-toolbar select,
+.fabricate-manager .manager-component-toolbar .manager-search input,
+.fabricate-manager .manager-component-toolbar select {
   font-size: var(--fab-recipe-control-font);
 }
 
-.fabricate-manager .manager-recipe-filter-row {
+/* The search field takes the selects' 9px radius rather than the shared 6px, so the bar
+   does not mix two corner radii across adjacent controls. */
+.fabricate-manager .manager-component-toolbar .manager-search input {
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-recipe-filter-row,
+.fabricate-manager .manager-component-filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-2);
@@ -3806,11 +3830,13 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-filter-row.is-secondary {
+.fabricate-manager .manager-recipe-filter-row.is-secondary,
+.fabricate-manager .manager-component-filter-row.is-secondary {
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-recipe-filter-row.is-chips {
+.fabricate-manager .manager-recipe-filter-row.is-chips,
+.fabricate-manager .manager-component-filter-row.is-chips {
   gap: var(--fab-space-1);
 }
 
@@ -3819,7 +3845,8 @@
    `color-scheme: dark` — rather than Foundry core's default light select chrome, which
    they rendered with before (issue 643). The two-class-plus-element selector (0,2,1)
    outranks Foundry core's aggressive `select` rules. */
-.fabricate-manager .manager-recipe-toolbar select {
+.fabricate-manager .manager-recipe-toolbar select,
+.fabricate-manager .manager-component-toolbar select {
   height: 34px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
@@ -3832,7 +3859,9 @@
 /* The bare category select. It carries no visible label — the `aria-label` is its
    accessible name — because a filter bar whose controls each announce themselves in
    sentence case reads as a form, not a bar. */
-.fabricate-manager .manager-recipe-category-filter {
+.fabricate-manager .manager-recipe-category-filter,
+.fabricate-manager .manager-component-category-filter,
+.fabricate-manager .manager-component-essence-filter {
   flex: 0 0 auto;
   min-width: 0;
   max-width: 180px;
@@ -3840,7 +3869,8 @@
 }
 
 /* A row-two field: its uppercase micro-label, then its control. */
-.fabricate-manager .manager-recipe-filter-field {
+.fabricate-manager .manager-recipe-filter-field,
+.fabricate-manager .manager-component-filter-field {
   display: flex;
   gap: var(--fab-space-2);
   align-items: center;
@@ -3853,7 +3883,8 @@
   breaks onto two lines: as flowing sentence-case text in a wrapping flex row it was
   free to fold, and in the flagship frame it did.
 */
-.fabricate-manager .manager-recipe-filter-label {
+.fabricate-manager .manager-recipe-filter-label,
+.fabricate-manager .manager-component-filter-label {
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
   font-size: 0.55rem;
@@ -3864,7 +3895,8 @@
 }
 
 /* Separates the grouping control from the ordering controls. */
-.fabricate-manager .manager-recipe-filter-divider {
+.fabricate-manager .manager-recipe-filter-divider,
+.fabricate-manager .manager-component-filter-divider {
   flex: 0 0 auto;
   width: 1px;
   height: 20px;
@@ -3873,19 +3905,26 @@
 
 /* The grouping switch is a FILTER control, not a row's On/Off status cell, so it opts
    out of the shared 78px status-cell cap. It carries no label of its own — the micro-
-   label beside it is its accessible name (`aria-labelledby`) — so it is track-only. */
-.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle] {
+   label beside it is its accessible name (`aria-labelledby`) — so it is track-only.
+
+   The component browser's grouping switch is the same control (issue 676). It shipped
+   as a `.manager-button` under a class with NO CSS anywhere, so its `aria-pressed`
+   state had no visual expression at all. */
+.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle],
+.fabricate-manager .manager-component-filter-row .manager-status-toggle[data-component-group-by-category] {
   width: auto;
   min-width: 0;
   max-width: none;
   padding: 0;
 }
 
-.fabricate-manager .manager-recipe-filter-chip {
+.fabricate-manager .manager-recipe-filter-chip,
+.fabricate-manager .manager-component-filter-chip {
   gap: var(--fab-space-chip);
 }
 
-.fabricate-manager .manager-recipe-chip-clear {
+.fabricate-manager .manager-recipe-chip-clear,
+.fabricate-manager .manager-component-chip-clear {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -3905,8 +3944,12 @@
 
 /* The count is quiet right-aligned METADATA, not a control. As a bordered mono chip it
    read as something to press, and it reported "6 of 6" — a number that never told the GM
-   which page they were on. It now reports the page window, "1–5 of 12". */
-.fabricate-manager .manager-recipe-count {
+   which page they were on. It now reports the page window, "1–5 of 12".
+
+   The component library shipped the very chip this rule replaced, reporting "6 of 6";
+   ruling 1 brings it here (issue 676). */
+.fabricate-manager .manager-recipe-count,
+.fabricate-manager .manager-component-count {
   margin-left: auto;
   color: var(--fab-text-subtle);
   font-size: 0.68rem;
@@ -3918,8 +3961,12 @@
    radius) — bold and boxy next to the compact 0.72rem segmented toggles and the
    SORT BY micro-label, so it read as oversized. Chain `.manager-button` (0,3,0)
    to beat the base rule declared later in the sheet, then bring it down to the
-   toolbar's compact scale and match the sort select's 9px radius / 34px height. */
-.fabricate-manager .manager-button.manager-recipe-sort-direction {
+   toolbar's compact scale and match the sort select's 9px radius / 34px height.
+
+   The component browser's direction toggle was in exactly that pre-fix state — its own
+   class carried no CSS at all — so it joins the rule (issue 676). */
+.fabricate-manager .manager-button.manager-recipe-sort-direction,
+.fabricate-manager .manager-button.manager-component-sort-direction {
   gap: var(--fab-space-chip);
   height: 34px;
   min-height: 34px;
@@ -3943,7 +3990,8 @@
    across the whole manager for 20px, and nesting a second grid inside `.manager-main` to
    get it is exactly what overflows the recipe row at 1280px.
    --------------------------------------------------------------------------- */
-.fabricate-manager .manager-recipe-browser-inspector {
+.fabricate-manager .manager-recipe-browser-inspector,
+.fabricate-manager .manager-component-browser-inspector {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -3951,7 +3999,8 @@
 }
 
 /* A section label, not a card title: it sits ON the panel, titling what follows. */
-.fabricate-manager .manager-recipe-browser-inspector-label {
+.fabricate-manager .manager-recipe-browser-inspector-label,
+.fabricate-manager .manager-component-browser-inspector-label {
   margin: var(--fab-space-2) 0 0;
   color: var(--fab-text-subtle);
   font-size: 0.58rem;
@@ -3960,7 +4009,8 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-label:first-child {
+.fabricate-manager .manager-recipe-browser-inspector-label:first-child,
+.fabricate-manager .manager-component-browser-inspector-label:first-child {
   margin-top: 0;
 }
 
@@ -3982,14 +4032,16 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-hero {
+.fabricate-manager .manager-recipe-browser-inspector-hero,
+.fabricate-manager .manager-component-browser-inspector-hero {
   display: flex;
   gap: var(--fab-space-3);
   align-items: flex-start;
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-browser-inspector-identity {
+.fabricate-manager .manager-recipe-browser-inspector-identity,
+.fabricate-manager .manager-component-browser-inspector-identity {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
@@ -3998,7 +4050,8 @@
 
 /* The flavour text, WHOLE. It used to be cut at 160 characters in the one panel with the
    room to show it. */
-.fabricate-manager .manager-recipe-browser-inspector-flavour {
+.fabricate-manager .manager-recipe-browser-inspector-flavour,
+.fabricate-manager .manager-component-browser-inspector-flavour {
   margin: 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.72rem;
@@ -4014,7 +4067,8 @@
   too, but toned with danger-red text and a subtly danger-tinted border — a real action,
   not a plain text link, and never louder than Edit.
 */
-.fabricate-manager .manager-recipe-browser-inspector-actions {
+.fabricate-manager .manager-recipe-browser-inspector-actions,
+.fabricate-manager .manager-component-browser-inspector-actions {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -4031,7 +4085,9 @@
 
 /* Dark secondary: the panel surface, a subtle border, normal text. The font-size
    and weight match the Edit button so all three action buttons read at one size. */
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate,
+.fabricate-manager .manager-button.manager-component-browser-inspector-copy,
+.fabricate-manager .manager-button.manager-component-browser-inspector-unlink {
   width: 100%;
   min-height: 36px;
   justify-content: center;
@@ -4042,7 +4098,8 @@
 }
 
 /* Accent primary: the loudest control on the panel. */
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit,
+.fabricate-manager .manager-button.manager-component-browser-inspector-edit {
   width: 100%;
   min-height: 38px;
   justify-content: center;
@@ -4054,14 +4111,17 @@
 }
 
 .fabricate-manager .manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit:focus-visible {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit:focus-visible,
+.fabricate-manager .manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
+.fabricate-manager .manager-button.manager-component-browser-inspector-edit:focus-visible {
   border-color: var(--fab-accent);
   background: var(--fab-accent-strong);
 }
 
 /* Dark danger button: the same surface as Duplicate, but danger-red text and a subtly
    danger-tinted border so it reads as destructive without shouting louder than Edit. */
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete,
+.fabricate-manager .manager-button.manager-component-browser-inspector-delete {
   width: 100%;
   min-height: 36px;
   justify-content: center;
@@ -4073,20 +4133,24 @@
 }
 
 .fabricate-manager .manager-button.manager-recipe-browser-inspector-delete:not(:disabled):hover,
-.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete:focus-visible {
+.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete:focus-visible,
+.fabricate-manager .manager-button.manager-component-browser-inspector-delete:not(:disabled):hover,
+.fabricate-manager .manager-button.manager-component-browser-inspector-delete:focus-visible {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-recipe-stat-grid {
+.fabricate-manager .manager-recipe-stat-grid,
+.fabricate-manager .manager-component-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fab-space-2);
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-stat {
+.fabricate-manager .manager-recipe-stat,
+.fabricate-manager .manager-component-stat {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
@@ -4099,7 +4163,8 @@
 
 /* The stat VALUE is a name-scale number: serif, per the typographic contract, with
    tabular figures so a 9 -> 10 change cannot reflow the tile. */
-.fabricate-manager .manager-recipe-stat-value {
+.fabricate-manager .manager-recipe-stat-value,
+.fabricate-manager .manager-component-stat-value {
   overflow: hidden;
   color: var(--fab-mv2-text);
   font-family: var(--fab-font-serif);
@@ -4125,20 +4190,23 @@
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-recipe-stat-label {
+.fabricate-manager .manager-recipe-stat-label,
+.fabricate-manager .manager-component-stat-label {
   color: var(--fab-text-subtle);
   font-size: 0.62rem;
   font-weight: 600;
 }
 
-.fabricate-manager .manager-recipe-flow-list {
+.fabricate-manager .manager-recipe-flow-list,
+.fabricate-manager .manager-component-flow-list {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-chip);
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-flow-row {
+.fabricate-manager .manager-recipe-flow-row,
+.fabricate-manager .manager-component-flow-row {
   display: flex;
   gap: var(--fab-space-2);
   align-items: center;
@@ -4200,7 +4268,8 @@
   background: var(--fab-bg-2);
 }
 
-.fabricate-manager .manager-recipe-flow-icon {
+.fabricate-manager .manager-recipe-flow-icon,
+.fabricate-manager .manager-component-flow-icon {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -4214,14 +4283,16 @@
   font-size: 0.66rem;
 }
 
-.fabricate-manager .manager-recipe-flow-icon img {
+.fabricate-manager .manager-recipe-flow-icon img,
+.fabricate-manager .manager-component-flow-icon img {
   width: 100%;
   height: 100%;
   border: 0;
   object-fit: cover;
 }
 
-.fabricate-manager .manager-recipe-flow-name {
+.fabricate-manager .manager-recipe-flow-name,
+.fabricate-manager .manager-component-flow-name {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -4408,7 +4479,8 @@
 }
 
 /* Quantities are numerics: mono, tabular. */
-.fabricate-manager .manager-recipe-flow-qty {
+.fabricate-manager .manager-recipe-flow-qty,
+.fabricate-manager .manager-component-flow-qty {
   flex: 0 0 auto;
   color: var(--fab-text-secondary);
   font-family: var(--fab-font-mono);
@@ -4477,13 +4549,24 @@
 
 /* A flex row: identity grows, the badge run and the actions sit at the end. It WRAPS
    rather than compressing, so the narrow (stacked) container query the smoke harness
-   photographs reflows the meta under the identity instead of crushing it. */
+   photographs reflows the meta under the identity instead of crushing it.
+
+   The geometry matches the recipe row, not the 76px/radius-8 group it left (issue 676):
+   a denser 11px/12px, radius-9, ~62px card, so a page of components shows more of the
+   library and less of the gaps between it. */
 .fabricate-manager .manager-component-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-2);
   align-items: center;
+  width: 100%;
   min-width: 0;
+  min-height: 62px;
+  padding: 11px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-component-row .manager-component-identity {
@@ -4499,20 +4582,10 @@
   min-width: 0;
 }
 
-/* The item chip is a FLAT fill on the existing surface ramp — decorative gradients are
-   forbidden on product UI surfaces. */
-.fabricate-manager .manager-component-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: var(--fab-cs-chip-sm);
-  height: var(--fab-cs-chip-sm);
-  border: 1px solid var(--fab-border);
-  border-radius: var(--fab-cs-radius-row);
-  background: var(--fab-bg-3);
-  overflow: hidden;
-}
+/* The row's item chip is the shared `Medallion` (issue 676) — the same component the
+   recipe row leads with, flat by contract and carrying its own glyph fallback. The
+   hand-rolled `.manager-component-chip` + `.manager-component-thumb` pair it replaced
+   duplicated that for one caller and fell back to a private item-bag SVG path. */
 
 .fabricate-manager .manager-environment-table-head,
 .fabricate-manager .manager-environment-row {
@@ -4749,9 +4822,9 @@
   min-width: 0;
 }
 
-/* The shared row-card geometry. The recipe row LEFT this group (issue 643): it is a
-   denser card at 11px/12px and radius 9, declared with the rest of the library. */
-.fabricate-manager .manager-component-row,
+/* The shared row-card geometry. The recipe row LEFT this group (issue 643), and the
+   component row followed it (issue 676): both are the denser 11px/12px, radius-9,
+   ~62px card, declared with their own library. */
 .fabricate-manager .manager-environment-row,
 .fabricate-manager .manager-gathering-task-row,
 .fabricate-manager .manager-essence-row {
@@ -4792,7 +4865,13 @@
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
 }
 
-.fabricate-manager .manager-recipe-row.is-selected {
+/* The component row joins the recipe row's opt-out (issue 676): it now leads with the
+   same 40px Medallion, so the inset bar bit into it in exactly the way the recipe row
+   documents. The environment / gathering-task / essence rows keep the bar — they are
+   untouched by this change and re-skinning them here would re-type three surfaces it
+   never visited. */
+.fabricate-manager .manager-recipe-row.is-selected,
+.fabricate-manager .manager-component-row.is-selected {
   box-shadow: none;
 }
 
@@ -5052,9 +5131,16 @@
 .fabricate-manager .manager-availability-pill.is-weather { --fab-chip-color: var(--fab-warning); }
 .fabricate-manager .manager-availability-pill.is-timeOfDay { --fab-chip-color: var(--fab-purple); }
 
+/* A component TAG (issue 676). The pill vehicle is Gathering's, and the component
+   editor's tag pills inherited its unmapped default — the AMBER `--fab-warning` fill
+   below — which reads as a warning on a plain authored tag. Tags are purple, so they
+   get the mapping the other three facets already have. */
+.fabricate-manager .manager-availability-pill.is-tag { --fab-chip-color: var(--fab-purple); }
+
 .fabricate-manager .manager-availability-pill.is-realm,
 .fabricate-manager .manager-availability-pill.is-weather,
 .fabricate-manager .manager-availability-pill.is-timeOfDay,
+.fabricate-manager .manager-availability-pill.is-tag,
 .fabricate-manager .manager-availability-pill.is-biome {
   background: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 16%, var(--fab-mv2-surface-2));
   border-color: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 50%, transparent);
@@ -5082,8 +5168,6 @@
 
 .fabricate-manager .manager-recipe-thumb,
 .fabricate-manager .manager-recipe-preview,
-.fabricate-manager .manager-component-thumb,
-.fabricate-manager .manager-component-preview,
 .fabricate-manager .manager-gathering-task-thumb,
 .fabricate-manager .manager-environment-thumb,
 .fabricate-manager .manager-environment-preview {
@@ -5096,12 +5180,8 @@
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-component-thumb {
-  align-self: center;
-}
 
-.fabricate-manager .manager-recipe-preview,
-.fabricate-manager .manager-component-preview {
+.fabricate-manager .manager-recipe-preview {
   width: 56px;
   height: 56px;
   border: 1px solid var(--fab-mv2-border);
@@ -12144,7 +12224,8 @@
   Clear-filters button — which the prototype has no equivalent of, and which is kept —
   is the way out of it.
 */
-.fabricate-manager .manager-recipe-empty-filtered {
+.fabricate-manager .manager-recipe-empty-filtered,
+.fabricate-manager .manager-component-empty-filtered {
   align-content: center;
   min-height: 0;
   padding: 40px;
@@ -12153,13 +12234,15 @@
   background: transparent;
 }
 
-.fabricate-manager .manager-recipe-empty-filtered > div {
+.fabricate-manager .manager-recipe-empty-filtered > div,
+.fabricate-manager .manager-component-empty-filtered > div {
   display: grid;
   gap: var(--fab-space-3);
   justify-items: center;
 }
 
-.fabricate-manager .manager-recipe-empty-filtered p {
+.fabricate-manager .manager-recipe-empty-filtered p,
+.fabricate-manager .manager-component-empty-filtered p {
   margin: 0;
   font-size: 0.8rem;
 }
@@ -12628,6 +12711,23 @@
   gap: var(--fab-space-2);
 }
 
+/* The WHOLE strip is the drop target (issue 676, brief §C6). Only the small inner zone
+   used to react, so a GM aiming at the strip's heading — most of its area — got no
+   feedback and had to hunt for the box. `dragDrop` is attached at strip level and this
+   is its `activeClass`. */
+.fabricate-manager .manager-component-identity-strip.is-drop-active {
+  border: 1.5px dashed var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+/* The inner zone stops competing for the cue once the strip carries it: one dashed
+   accent boundary, not two nested ones. */
+.fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target,
+.fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-linked {
+  border-color: transparent;
+  background: transparent;
+}
+
 .fabricate-manager .manager-component-identity-fields {
   display: grid;
   gap: var(--fab-space-2);
@@ -12744,26 +12844,60 @@
   min-height: calc(40px + (2 * var(--fab-space-3)) + 2px);
 }
 
+/* A fixed FOUR-up grid (brief §C5). `auto-fill, minmax(260px, 1fr)` gave 2–3 columns at
+   the manager's width, so the same system rendered a different grid depending on the
+   window. */
 .fabricate-manager .manager-component-essence-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--fab-space-2);
   min-width: 0;
 }
 
+/* TWO rows — identity (chip + label) above, the stepper below — not a single 5-column
+   run rendering −, qty, +, icon, name, which put the stepper BEFORE the thing it
+   counts. The card is TINTED by whether the component contributes this essence at all:
+   an inactive card recedes to the soft surface, so a GM scanning the grid sees which
+   essences are set without reading every number. */
 .fabricate-manager .manager-component-essence-card {
   display: grid;
-  grid-template-columns: auto auto auto auto minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--fab-space-2);
+  align-content: start;
+  min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-04);
+  border: 1px solid color-mix(in srgb, var(--fab-mv2-accent) 32%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fab-mv2-accent) 8%, var(--fab-mv2-surface-2));
+}
+
+/* No essence contributed: this card is a control the GM has not used. It recedes rather
+   than disappearing — the stepper is still how they'd add one. */
+.fabricate-manager .manager-component-essence-card.is-inactive {
+  border-color: var(--fab-mv2-border);
+  background: var(--fab-surface-soft);
+  opacity: 0.6;
+}
+
+.fabricate-manager .manager-component-essence-identity {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-component-essence-stepper {
+  display: flex;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
 }
 
 .fabricate-manager .manager-component-essence-quantity {
-  width: 56px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   height: 28px;
   padding: 0 var(--fab-space-chip);
   border: 1px solid var(--fab-mv2-border);
@@ -12775,21 +12909,22 @@
 
 .fabricate-manager .manager-component-essence-icon {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 6px;
   background: var(--fab-overlay-light-06);
   color: var(--fab-mv2-accent);
-  font-size: 0.86rem;
+  font-size: 0.7rem;
 }
 
 .fabricate-manager .manager-component-essence-name {
   min-width: 0;
   overflow: hidden;
   color: var(--fab-mv2-text);
-  font-size: 0.86rem;
+  font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
