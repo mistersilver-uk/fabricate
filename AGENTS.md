@@ -241,7 +241,28 @@ Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - A Foundry `game.settings.register` **`scope: 'client'`** setting persists in that browser/device's `localStorage`, so it is **per device, not per user account** — the same user opening the world on a second machine sees the client default, and it never follows the account.
 `scope: 'user'` is the cross-device per-user account scope, and `scope: 'world'` is shared for the world.
-Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `PROGRESSIVE_RESULT_ORDER`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user" — a preference that must follow the account needs `scope: 'user'`.
+Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user" — a preference that must follow the account needs `scope: 'user'`.
+- **`scope: 'user'` is a replicated async DOCUMENT write, not localStorage** (`PROGRESSIVE_RESULT_ORDER` is the only one Fabricate registers; issue 651 flipped it from `client`).
+`ClientSettings#set` forks on scope: `client` is a synchronous `storage.setItem`, `user` is an `await`ed document create/update that **can reject** and **throws before `game.ready`**.
+So the fire-and-forget `setSetting(...)` idiom used for client-scoped settings (e.g. `toggleFavouriteRecipe`) is **unsafe** on a user-scoped one — `await` it and define the failure path, or the UI reports a write that never happened.
+Every write broadcasts `createSetting`/`updateSetting` to every client (the FIRST write is `createSetting`, not `updateSetting`), so a per-gesture write must be debounced.
+It is per-user **within a world**, not per-account globally — the same player in a second world gets the default.
+- **Setting scope changes ORPHAN data; they never migrate it.** Foundry has no scope-migration facility (`ClientSettings#get` dispatches on scope at read time), so a pre-existing `localStorage` value is simply never read again — never deleted, never an error.
+When claiming "there is no data to migrate", prove it by showing **no writer has ever existed**, not that nothing reads it: "nothing reads it" does not imply absence.
+- **`BaseSetting.canUserCreate` is a UI helper, NOT authorization** — it requires `SETTINGS_MODIFY` (default ASSISTANT), which players lack, and reads like a blocker for user-scoped player writes.
+Real authz is `#canModify`, which passes any user writing their **own** user-scoped setting. `config: false` is orthogonal: only WORLD scope is GM-gated in the settings UI.
+- **A synced `updateWorldTime` handler runs on EVERY client**, so any per-user state read inside one reads the **executing** user, not the owner — and with no primary-GM gate or ownership filter, whichever client wins the race executes.
+Capture owner-scoped state onto the record at start instead of reading it at resume; that makes the invariant structural rather than documented.
+Issue 651's salvage `resultOrder` is the worked example (`SalvageRunManager.createRun` already stamps `userId`, so the capture is auditable); `SalvageRunManager.processWorldTime`'s unguarded actor loop is the open defect (#656).
+Contrast `GatheringEngine`, which gates timed completions on `isPrimaryGM()` explicitly.
+- **`MigrationRunner` has no GM gate** (#657): `initialize()` calls `_runMigrations()` unconditionally and the runner contains zero `isGM`/`game.user` references.
+Safety is emergent and racy — `run()` early-returns once `MIGRATION_VERSION` is bumped, but a player connecting before or concurrently with the GM reaches a world-scoped write that `#canModify` denies and throws.
+Every new migration re-opens that window for one session per world upgrade.
+- **The adminStore view-state projections are a FAMILY of hand-built allowlists** — the `selectedSystem` projection and the recipe-list projection (both in `src/ui/svelte/stores/adminStore.js`), plus `salvageComponentOptions` in `CraftingSystemManagerRoot.svelte` — and a new field is invisible to the UI unless added to each one it must reach.
+For a **default-true** field the failure is worse than absent, it is **inverted**: the editor seeds from `undefined`, reads its default-true, renders ON for an entity the GM authored OFF, and saves that wrong value back.
+Pin such a projection with a `false` fixture — a `true` fixture round-trips green through a dropped field.
+- **The mounted/store test harnesses have TWO separate module-copy mechanisms**, and adding one import to a module already in the graph can break either: `CRAFTING_APP_RAW_MODULES`/`compiledModules` in `tests/helpers/svelte-component-harness.js` (mounted components) and `compiler.copyPlain(...)` in `tests/helpers/compile-svelte-module.js` (runes `.svelte.js` store suites).
+A missing entry HANGS the suite (`# cancelled N`), never fails it — one import added to `CraftingListingBuilder` cancelled 36 tests across 8 files.
 - Foundry custom module/system sockets carry a **server-attested sender user id** as the **2nd callback argument** (`game.socket.on('module.fabricate', (payload, senderId) => …)`).
 The server sets it from the authenticated session in `dist/server/sockets.mjs handleCustomSocket` (`this.user.id`), so it is non-forgeable; a payload `userId` field is client-supplied and spoofable.
 Authenticate socket senders via the 2nd arg (e.g. gate privileged edges on `game.users.get(senderId)?.isGM`), never via the payload — `socketlib` merely wraps this same mechanism and adds no stronger guarantee (so it is not needed for sender auth).

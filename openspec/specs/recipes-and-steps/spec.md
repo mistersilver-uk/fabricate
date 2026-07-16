@@ -328,6 +328,15 @@ On success, produce the single result group.
   The engine-evaluated progressive salvage check rolls the configured formula to produce the
   numeric `value`; with no authored formula the salvage fails loudly (zero mutation).
   Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
+  The order the awards are spent down is governed by `Component.salvage.allowPlayerResultReorder`
+  (default `true`) — see `resolution-modes` §Player Reorder for the full contract.
+  The order is read from the run record's captured `resultOrder`, never from settings, and a
+  salvage with no run record uses the authored order with no settings fallback.
+  The permission is gated at read time, so a GM toggling it off mid-run takes effect on that run.
+  This is honoured at runtime today (via the API/macro path), but **no player salvage authoring
+  surface exists**: `CraftingEngine.salvage` has no UI callers, so the captured order is only ever
+  non-null once a player-facing salvage app exists.
+  The GM toggle is therefore authored policy, exported and honoured, rather than a dead control.
 
 ### Failure Consumption Policy
 
@@ -354,9 +363,15 @@ Actor.flags.fabricate.salvageRuns = {
 SalvageRun = {
   id: string,
   actorUuid: string,
-  userId: string,
+  userId: string,           // the user who STARTED the run
   craftingSystemId: string,
   componentId: string,
+
+  // The player's progressive result order, CAPTURED at run start (a list of result ids,
+  // or null when there was none). The award path reads the order from here and never
+  // from settings, so a world-time resume awards down the starting user's order however
+  // wins the resume race. See resolution-modes §Player Reorder.
+  resultOrder?: string[] | null,
 
   status: "inProgress" | "waitingTime" | "succeeded" | "failed" | "cancelled",
 

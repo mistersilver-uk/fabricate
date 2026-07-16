@@ -684,6 +684,9 @@ Represent one curated item entry available to recipes and salvage operations.
 
   salvage?: {
     enabled: boolean,              // default false
+    // GM-authored Result Order Permission for progressive salvage (issue 651). An absent
+    // key reads true, and the default is stated on BOTH _normalizeSalvage return paths.
+    allowPlayerResultReorder: boolean, // default true
     ingredientQuantity: number,    // default 1
     toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
@@ -733,6 +736,9 @@ Recipe = {
   description: string,
   craftingSystemId: string,
   enabled: boolean,
+  // GM-authored Result Order Permission: may a player reorder this recipe's progressive
+  // result stages? An absent key reads true, so no migration seeds it.
+  allowPlayerResultReorder: boolean, // default true
   category: string,
 
   // Multi-step mode
