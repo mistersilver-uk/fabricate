@@ -3644,6 +3644,20 @@ async function main() {
           }
         });
 
+        // Iron Sword gets authored salvage results with `enabled` ABSENT (issue 676).
+        // This is the state decision 6 guarantees EVERY existing world will show — the
+        // per-component gate defaults false and no migration seeds it — so without this
+        // fixture no frame captures the collapsed/OFF salvage body at all: the rest of
+        // the fixture authors `enabled: true` throughout.
+        await csm.updateItem(systemId, componentMap['Iron Sword'], {
+          salvage: {
+            ingredientQuantity: 1,
+            resultGroups: [
+              { id: 'sword-scrap', name: 'Sword Scrap', results: [{ id: 'sword-scrap-result', componentId: componentMap['Iron Ore'], quantity: 2 }] }
+            ]
+          }
+        });
+
         // Create 3 recipes
         const rm = game.fabricate.getRecipeManager();
 
@@ -5087,6 +5101,30 @@ async function main() {
         process.stdout.write('  D0: component edit salvage screenshotted\n');
 
         // Return to the components browser for the remaining navigation.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // The OFF salvage body (issue 676, AC4). Iron Sword has authored result groups
+        // with `enabled` absent — the accurate state decision 6 guarantees every
+        // existing world will show, and the one no other frame captures. Ruling A is
+        // what this photographs: the mode/DC/routing/reorder chrome is collapsed, but
+        // the result-group editor (and its add-group control, the only one in the
+        // codebase) is still there.
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Sword") button:has(i.fa-edit)')
+          .first().click();
+        await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        const offSalvageSection = page
+          .locator('.fabricate-manager [data-component-edit-section="salvage"]')
+          .first();
+        await offSalvageSection.waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-salvage-disabled-notice]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await offSalvageSection.scrollIntoViewIfNeeded();
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-component-edit-salvage-off');
+        process.stdout.write('  D0: component edit salvage (off) screenshotted\n');
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 

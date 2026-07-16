@@ -105,7 +105,9 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-component-edit-salvage',
     label: 'Manager component editor — salvage authoring (enable toggle, result groups, routing, DC presets)',
-    smokeLabels: ['manager-component-edit-salvage'],
+    // `-off` photographs the collapsed/OFF salvage body: the state decision 6
+    // guarantees every existing world shows, and the one Ruling A governs.
+    smokeLabels: ['manager-component-edit-salvage', 'manager-component-edit-salvage-off'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/component\/salvageDcPresets\.js$/,
