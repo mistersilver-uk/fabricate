@@ -207,10 +207,17 @@ export class IngredientSet {
    * option over an available item — the default items-first rule is unchanged). A
    * group with no override keeps the byte-for-byte default resolution.
    *
+   * An `resolveItemEssences` probe supplies each item's essence map so an ESSENCE
+   * group option can draw down essence-carrying items (see
+   * {@link _buildPlanForEssenceOption}). It defaults to a flag-only resolver, which
+   * keeps the no-probe `canBeCraftedWith`/display path byte-for-byte; component-aware
+   * callers bind a resolver that also reads component-defined essences.
+   *
    * @param {Item[]} availableItems
    * @param {Function|null} [matcher]
    * @param {{ affordCurrency?: (match: object) => boolean,
-   *   optionOverrides?: Record<string, {optionIndex: number, heldItemId?: string|null}> }} [options]
+   *   optionOverrides?: Record<string, {optionIndex: number, heldItemId?: string|null}>,
+   *   resolveItemEssences?: (item: object) => Record<string, number> }} [options]
    * @returns {{ success: boolean, selectedIngredients: Ingredient[],
    *   plan: Array<{item: Item, quantity: number, ingredient: Ingredient}>,
    *   currencySpends: Array<{unit: string, amount: number, ingredient: Ingredient}>,

@@ -111,10 +111,13 @@ IngredientGroup.fromJSON({
 new Ingredient({
   quantity,       // number (default 1)
   match: {
-    type,         // "component" | "tags"
+    type,         // "component" | "tags" | "currency" | "essence"
     componentId,  // string (for component type)
     tags,         // string[] (for tags type)
-    tagMatch      // "any" | "all" (for tags type)
+    tagMatch,     // "any" | "all" (for tags type)
+    unit,         // string (currency unit abbreviation, for currency type)
+    essenceId,    // string (for essence type)
+    amount        // number (currency cost or essence amount, for currency/essence types)
   },
   extractEffects, // boolean (default false)
   effectFilter    // string | null (regex for filtering effects)
