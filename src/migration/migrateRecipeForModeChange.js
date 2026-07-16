@@ -18,7 +18,7 @@
  * system-validation aggregator (`src/systems/systemValidation.js`) and gate
  * visibility, not deletion.
  *
- * Migratability matrix (per the `004-resolution-modes` normative 5×5). RI =
+ * Migratability matrix (per the `resolution-modes/spec.md` normative 5×5). RI =
  * `routedByIngredients`, RC = `routedByCheck`:
  *
  *   | From \ To  | simple              | RI                       | RC                       | progressive         | alchemy                              |

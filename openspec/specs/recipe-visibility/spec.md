@@ -1,9 +1,9 @@
-# Specification 006: Recipe Visibility
+# Recipe Visibility
 
 ## Purpose
 
 Define recipe visibility, knowledge gating, recipe-item matching, and learning behaviour.
-UI rendering requirements live in `003-ui-integration.md`.
+UI rendering requirements live in `ui-integration/spec.md`.
 
 ## Scope
 
@@ -17,7 +17,7 @@ This spec governs:
 
 ## Data Model References
 
-From `002-data-models.md`:
+From `data-models/spec.md`:
 
 - `CraftingSystem.visibilityMode` (canonical flat strategy: `global` | `restricted` | `item` | `knowledge`)
 - `CraftingSystem.recipeVisibility` (legacy strategy, superseded by `visibilityMode`; read as a derivation fallback: `listMode`, `knowledge.mode`, `knowledge.learn.dragDropEnabled`)
