@@ -3813,6 +3813,11 @@ export class CraftingEngine {
 
     const salvageRecipeView = this._buildSalvageRecipeView(component, system);
     const resultItems = [];
+    // Track the awarding component id alongside each created item without
+    // reshaping `resultItems` (it is returned as `results` below). Each `result`
+    // carries its component id as `result.componentId` (legacy `result.systemItemId`),
+    // the same accessor used by `_createSingleResult` and progressive award.
+    const createdRecords = [];
     for (const group of resultGroups) {
       for (const result of group.results || []) {
         const created = await this._createSingleResult(
@@ -3823,7 +3828,13 @@ export class CraftingEngine {
           salvageRecipeView,
           checkResult
         );
-        if (created) resultItems.push(created);
+        if (created) {
+          resultItems.push(created);
+          createdRecords.push({
+            item: created,
+            componentId: result.componentId || result.systemItemId || null,
+          });
+        }
       }
     }
 
@@ -3834,9 +3845,9 @@ export class CraftingEngine {
           quantity,
         })),
         usedTools,
-        createdResults: resultItems.map((item) => ({
+        createdResults: createdRecords.map(({ item, componentId }) => ({
           itemUuid: item.uuid,
-          componentId: null,
+          componentId,
           quantity: Number(item.system?.quantity || 1),
         })),
         checkResult: {

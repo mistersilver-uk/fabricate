@@ -2244,7 +2244,20 @@ function bindFabricateGlobal() {
     if (!system) throw new Error(`System "${systemId}" not found`);
     const recipes = recipeManager.getRecipes({ craftingSystemId: systemId }).map(r => r.toJSON());
     const version = game.modules?.get('fabricate')?.version || '0.0.0';
-    return CraftingSystemExporter.buildExportPayload(system, recipes, version);
+    // Gathering authoring rides along, mirroring adminStore.exportSystem: the FULL
+    // global environment array (the exporter filters to this system) plus the whole
+    // gatheringConfig setting (the exporter slices this system's block + shared
+    // vocabularies). Passing three args here dropped both, making the public-API
+    // export lossy versus the import path (issue #642).
+    const gatheringEnvironments = fabricate.gatheringEnvironmentStore?.list?.() ?? [];
+    const gatheringConfig = getSetting(SETTING_KEYS.GATHERING_CONFIG) || {};
+    return CraftingSystemExporter.buildExportPayload(
+      system,
+      recipes,
+      version,
+      gatheringEnvironments,
+      gatheringConfig
+    );
   };
 
   game.fabricate.importSystemFromFile = async (file, options = {}) => {
