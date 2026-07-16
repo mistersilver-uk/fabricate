@@ -196,7 +196,7 @@ test('1.15.0 upcasts an OLD-named component AND 1.16.0 renames it, in one sequen
   });
   const result = await runner.run();
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.16.0');
+  assert.equal(store.get('migrationVersion'), '1.17.0');
   const sys = store.get('craftingSystems')[0];
   // 1.16.0 renamed the component fields.
   assert.equal(sys.components[0].registeredItemUuid, 'Item.old-live');

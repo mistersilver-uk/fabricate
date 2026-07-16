@@ -36,14 +36,17 @@ function collidingSystem() {
     id: `grp-${Math.random().toString(36).slice(2)}`,
     options: [{ match: { type: 'component', componentId: 'comp-ember' }, quantity: 1 }],
   });
+  // Enabled — the SignatureValidator scans only enabled recipes (issue 649).
   const recipeA = {
     id: 'r-heal',
     name: 'Healing Potion',
+    enabled: true,
     ingredientSets: [{ id: 'aZrvhxMlMBWxYFam', ingredientGroups: [group()] }],
   };
   const recipeB = {
     id: 'r-mana',
     name: 'Mana Potion',
+    enabled: true,
     ingredientSets: [{ id: 'ZskumdJApJlvdmvw', ingredientGroups: [group()] }],
   };
   const system = { id: 'sys-alch', resolutionMode: 'alchemy' };
@@ -149,11 +152,13 @@ test('an UNNAMED shared component is dropped from the collision label — no id 
     {
       id: 'r-a',
       name: 'Alpha',
+      enabled: true,
       ingredientSets: [{ id: 'setAAAAAAAAAAAAAA', ingredientGroups: [group()] }],
     },
     {
       id: 'r-b',
       name: 'Beta',
+      enabled: true,
       ingredientSets: [{ id: 'setBBBBBBBBBBBBBB', ingredientGroups: [group()] }],
     },
   ];

@@ -357,3 +357,70 @@ test('deletion in a non-alchemy system does not run the signature reconcile', as
 
   assert.deepEqual(recipeManager.disableCalls, [], 'reconcile is skipped outside alchemy mode');
 });
+
+// --- First-class essence OPTION deletion (issue 649) ------------------------
+
+// A recipe manager whose recipe carries the essence via a first-class ingredient
+// OPTION (`match: { type: 'essence', ... }`) inside a group, NOT the legacy per-set
+// essences map — deleteEssence must strip the option and _recipeReferencesEssence
+// must detect it via the option shape.
+function makeEssenceOptionRecipeManager() {
+  const updateCalls = [];
+  const recipes = [
+    makeRecipe({
+      id: 'recipe-fire-opt',
+      name: 'Fire Option Brew',
+      craftingSystemId: 'sys',
+      enabled: true,
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g-comp', options: [{ match: { type: 'component', componentId: 'iron' } }] },
+            { id: 'g-ess', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
+          ],
+        },
+      ],
+      resultGroups: [{ id: 'rg1', results: [{ componentId: 'bar' }] }],
+    }),
+  ];
+  return {
+    getRecipes(filters = {}) {
+      if (filters.craftingSystemId) {
+        return recipes.filter((recipe) => recipe.craftingSystemId === filters.craftingSystemId);
+      }
+      return recipes;
+    },
+    async updateRecipe(recipeId, updates, options = {}) {
+      updateCalls.push({ recipeId, updates, options });
+    },
+    conflictDisableResult: [],
+    disableCalls: [],
+    async disableSignatureConflicts(systemId) {
+      this.disableCalls.push(systemId);
+      return this.conflictDisableResult;
+    },
+    updateCalls,
+  };
+}
+
+test('deleteEssence detects and strips a first-class essence OPTION (not just the legacy map)', async () => {
+  notifications.length = 0;
+  const recipeManager = makeEssenceOptionRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteEssence('sys', 'fire');
+
+  assert.deepEqual(
+    recipeManager.updateCalls.map((call) => call.recipeId),
+    ['recipe-fire-opt'],
+    'the recipe is detected via its essence OPTION shape'
+  );
+  const update = recipeManager.updateCalls[0];
+  const groups = update.updates.ingredientSets[0].ingredientGroups;
+  // The essence group (its only option was the deleted essence) is dropped; the
+  // component group survives.
+  assert.equal(groups.length, 1, 'the emptied essence group is removed');
+  assert.equal(groups[0].id, 'g-comp', 'the component group is retained');
+  assert.equal(update.updates.enabled, true, 'the recipe still has ingredients/results, so it stays enabled');
+});

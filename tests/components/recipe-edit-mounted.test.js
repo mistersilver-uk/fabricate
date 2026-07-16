@@ -62,7 +62,6 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeEssenceRequirements.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
@@ -175,8 +174,9 @@ const CURRENCY_UNITS = Object.freeze([
 
 // A fully populated single-set recipe: a component requirement with two
 // component alternatives (linked by "— or —"), a separate tag requirement, plus
-// a per-set essence requirement. Requirements have no name field; a requirement
-// is identified by its component image + name (or its tag chips).
+// a single-option essence requirement GROUP (issue 649 — essence is a first-class
+// ingredient match type). Requirements have no name field; a requirement is
+// identified by its component image + name (or its tag chips).
 const POPULATED_SET = Object.freeze({
   id: 'set-1',
   name: 'Primary',
@@ -194,8 +194,13 @@ const POPULATED_SET = Object.freeze({
         Object.freeze({ quantity: 1, match: { type: 'tags', tags: ['liquid'], tagMatch: 'any' } }),
       ],
     }),
+    Object.freeze({
+      id: 'grp-3',
+      options: [
+        Object.freeze({ quantity: 1, match: { type: 'essence', essenceId: 'ess-life', amount: 3 } }),
+      ],
+    }),
   ],
-  essences: { 'ess-life': 3 },
 });
 
 const STEPS = Object.freeze([
@@ -1980,15 +1985,27 @@ describe('RecipeEditView (mounted)', () => {
       'no AND divider is rendered between AND’d requirements'
     );
 
-    // The per-set essence row renders.
+    // The essence requirement renders as a first-class essence OPTION row (issue 649),
+    // with its amount input (no quantity stepper) and the essence sub-line.
+    const essenceReq = set.querySelector('[data-recipe-group-id="grp-3"]');
+    assert.ok(essenceReq, 'the essence requirement renders as an ingredient group');
     assert.ok(
-      set.querySelector('[data-recipe-essence-id="ess-life"]'),
-      'the per-set essence row renders'
+      essenceReq.querySelector('[data-recipe-req-tag="essence"]'),
+      'the essence option carries the Essence tag'
     );
     assert.equal(
-      set.querySelector('[data-recipe-essence-id="ess-life"] [data-recipe-essence-quantity]').value,
+      essenceReq.querySelector('[data-recipe-essence-amount]').value,
       '3',
-      'essence quantity shown'
+      'essence amount shown on the option'
+    );
+    assert.equal(
+      essenceReq.querySelector('[data-recipe-option-quantity]'),
+      null,
+      'an essence option shows no quantity stepper'
+    );
+    assert.ok(
+      essenceReq.querySelector('[data-recipe-essence-subline]'),
+      'the essence option shows the met-by sub-line'
     );
     editHarness.remount();
   });
@@ -2367,12 +2384,12 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('splits the "or..." menu into Accept instead (OR) and Require as well (AND on the set)', async () => {
-    // The four choices do NOT all mean the same thing. Component / Tag / Currency are
-    // real OR alternatives appended to THIS requirement; Essence is an AND requirement
-    // that bubbles to the owning ingredient SET (there is no essence match type). One
-    // flat list named "Accept instead" would tell a screen-reader user that the essence
-    // choice replaces the ingredient — the exact mislabelling the split exists to stop.
+  it('renders the "or..." menu as a single flat "Accept instead" list (essence is a real OR alternative)', async () => {
+    // Essence is now a first-class ingredient match type (issue 649), so Component /
+    // Tag / Currency / Essence are ALL real OR alternatives appended to THIS
+    // requirement. The old two-heading Accept-instead / Require-as-well split is gone:
+    // the menu is one flat ungrouped list (optionGroups: []), so no lone role="group"
+    // heading renders.
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       {
@@ -2386,31 +2403,23 @@ describe('RecipeEditView (mounted)', () => {
     );
     await openOrMenu(target, 'grp-1');
 
-    const groups = [...document.querySelectorAll('[data-popover-group]')];
-    assert.deepEqual(
-      groups.map((group) => group.getAttribute('aria-label')),
-      ['Accept instead', 'Require as well'],
-      'two ARIA groups, in that order'
+    assert.equal(
+      document.querySelector('[data-popover-group]'),
+      null,
+      'no ARIA option-group headings — the menu is a single flat list'
     );
-    for (const group of groups) {
-      assert.equal(group.getAttribute('role'), 'group');
-    }
-
-    const accept = groups[0];
-    const require_ = groups[1];
+    const listbox = document.querySelector('.manager-recipe-or-popover [role="listbox"]');
     assert.deepEqual(
-      [...accept.querySelectorAll('[data-recipe-add]')].map((option) =>
+      [...listbox.querySelectorAll('[data-recipe-add]')].map((option) =>
         option.getAttribute('data-recipe-add')
       ),
-      ['alternative-component', 'alternative-tag', 'alternative-currency'],
-      'the three real match types are the OR alternatives'
-    );
-    assert.deepEqual(
-      [...require_.querySelectorAll('[data-recipe-add]')].map((option) =>
-        option.getAttribute('data-recipe-add')
-      ),
-      ['alternative-essence'],
-      'essence is an AND requirement on the SET, never an OR alternative'
+      [
+        'alternative-component',
+        'alternative-tag',
+        'alternative-currency',
+        'alternative-essence',
+      ],
+      'all four kinds are flat OR alternatives, in order'
     );
     editHarness.remount();
   });
@@ -2426,10 +2435,10 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    const NEUTRAL = 'Add an alternative or an extra requirement';
+    const NEUTRAL = 'Accept instead';
 
     const trigger = target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-or-trigger');
-    assert.equal(trigger.getAttribute('aria-label'), NEUTRAL, 'the trigger does not claim to be Accept instead');
+    assert.equal(trigger.getAttribute('aria-label'), NEUTRAL, 'the trigger is named for the flat Accept instead list');
 
     await openOrMenu(target, 'grp-1');
     const dialog = document.querySelector('.manager-travel-popover[role="dialog"]');
@@ -2446,19 +2455,19 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('drops the Require as well heading entirely when the system has no essences', async () => {
+  it('offers no essence alternative in the flat "or..." menu when the system has no essences', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
     await openOrMenu(target, 'grp-1');
 
-    assert.deepEqual(
-      [...document.querySelectorAll('[data-popover-group]')].map((group) =>
-        group.getAttribute('aria-label')
-      ),
-      ['Accept instead'],
-      'an empty heading is not rendered'
+    // No option-group headings (flat list) and no essence choice at all.
+    assert.equal(document.querySelector('[data-popover-group]'), null, 'the menu is a flat list');
+    assert.equal(
+      document.querySelector('[data-recipe-add="alternative-essence"]'),
+      null,
+      'no essence alternative without system essences'
     );
     editHarness.remount();
   });
@@ -2484,11 +2493,10 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('adds an ESSENCE requirement to the SET, not an OR alternative to the requirement', async () => {
-    // There is NO essence ingredient match type: `IngredientSet.essences` is an AND
-    // requirement on the whole set. The menu offers it under its own heading and the
-    // choice bubbles to the set — mislabelling it as an "alternative" would promise OR
-    // semantics the engine does not implement.
+  it('appends an ESSENCE OR alternative to the requirement (issue 649)', async () => {
+    // Essence is now a first-class ingredient match type, so choosing Essence from the
+    // flat "Accept instead" menu appends a real OR alternative to THIS requirement (seeded
+    // from the first system essence at amount 1) — it does NOT bubble to a per-set map.
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       {
@@ -2502,69 +2510,43 @@ describe('RecipeEditView (mounted)', () => {
     await pickOrOption(target, 'grp-1', 'alternative-essence');
     assert.equal(patches.length, 1, 'choosing Essence patches the recipe');
     const set = patches[0].ingredientSets[0];
-    assert.deepEqual(set.essences, { 'ess-life': 1 }, 'the first unrequired essence is seeded at 1');
+    assert.equal(set.essences, undefined, 'no per-set essences map is written');
     assert.equal(
       set.ingredientGroups[0].options.length,
-      1,
-      'the requirement gains NO new alternative'
-    );
-    editHarness.remount();
-  });
-
-  it('drops the essence choice once the SET already requires every system essence', async () => {
-    // The handler seeds "the first essence the set does not already require" — so with
-    // every essence required it returned silently while the menu still offered the entry
-    // and clicking it did nothing. A dead choice is a bug, not a no-op: the set OWNS
-    // `essences`, so it is the set that decides whether another can still be added.
-    const { target, patches } = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
-      {
-        props: {
-          componentOptions: COMPONENT_OPTIONS,
-          itemTags: ITEM_TAGS,
-          essenceOptions: ESSENCE_OPTIONS,
-        },
-        set: { essences: { 'ess-life': 2, 'ess-water': 1 } },
-      }
-    );
-    await openOrMenu(target, 'grp-1');
-
-    assert.equal(
-      document.querySelector('[data-recipe-add="alternative-essence"]'),
-      null,
-      'the exhausted essence choice is not offered'
+      2,
+      'the requirement gains a new essence alternative'
     );
     assert.deepEqual(
-      [...document.querySelectorAll('[data-popover-group]')].map((group) =>
-        group.getAttribute('aria-label')
-      ),
-      ['Accept instead'],
-      'and its now-empty heading goes with it'
+      set.ingredientGroups[0].options[1].match,
+      { type: 'essence', essenceId: 'ess-life', amount: 1 },
+      'the essence alternative is seeded from the first system essence at amount 1'
     );
-    // The real OR alternatives are untouched — only the dead choice is gone.
-    assert.ok(document.querySelector('[data-recipe-add="alternative-component"]'));
-    assert.ok(document.querySelector('[data-recipe-add="alternative-tag"]'));
-    assert.equal(patches.length, 0, 'opening the menu authors nothing');
     editHarness.remount();
   });
 
-  it('still offers the essence choice while the set requires only SOME of the essences', async () => {
-    const { target } = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+  it('keeps offering the essence alternative even when the group already requires an essence (OR may repeat)', async () => {
+    // The essence choice is gated only on the system HAVING essences, not on
+    // system-minus-already-required: an OR essence may legitimately repeat across groups
+    // (issue 649), so the choice never disappears while the system has essences.
+    const { target, patches } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'essence', essenceId: 'ess-life', amount: 2 } },
+      ],
       {
         props: {
           componentOptions: COMPONENT_OPTIONS,
           itemTags: ITEM_TAGS,
           essenceOptions: ESSENCE_OPTIONS,
         },
-        set: { essences: { 'ess-life': 2 } },
       }
     );
-    await openOrMenu(target, 'grp-1');
+    // A 2-option group renders the box footer of dashed add-buttons.
     assert.ok(
-      document.querySelector('[data-recipe-add="alternative-essence"]'),
-      'one essence is still addable, so the choice stays'
+      target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]'),
+      'the essence alternative stays available even with an essence already present'
     );
+    assert.equal(patches.length, 0, 'rendering authors nothing');
     editHarness.remount();
   });
 
@@ -2855,9 +2837,11 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('adds a per-set essence via the essence popover, writing the essences map', async () => {
+  it('adds a set-level essence requirement as a single-option essence GROUP (issue 649)', async () => {
+    // The retained set-level "Add essence requirement" control now appends a
+    // single-option essence GROUP (an AND-required requirement preserving the old
+    // per-set semantics), NOT a per-set essences map entry.
     const { target, patches } = await mountIngredientGroups([], {
-      set: { essences: {} },
       props: { essenceOptions: ESSENCE_OPTIONS },
     });
     await pickPopoverOption(
@@ -2866,21 +2850,26 @@ describe('RecipeEditView (mounted)', () => {
       /Life/
     );
     assert.equal(patches.length, 1, 'choosing an essence patches the recipe');
+    const set = patches[0].ingredientSets[0];
+    assert.equal(set.essences, undefined, 'no per-set essences map is written');
+    assert.equal(set.ingredientGroups.length, 1, 'a single essence group is appended');
+    assert.ok(set.ingredientGroups[0].id, 'the appended essence group carries an eager id');
+    assert.equal(set.ingredientGroups[0].options.length, 1, 'the group has one essence option');
     assert.deepEqual(
-      patches[0].ingredientSets[0].essences,
-      { 'ess-life': 1 },
-      'the essences map records the chosen essence at quantity 1'
+      set.ingredientGroups[0].options[0].match,
+      { type: 'essence', essenceId: 'ess-life', amount: 1 },
+      'the chosen essence is seeded at amount 1'
     );
     editHarness.remount();
   });
 
-  it('omits the per-set essence editor when the system has no essences', async () => {
+  it('omits the set-level "Add essence requirement" control when the system has no essences', async () => {
     const { target } = await mountIngredientGroups([], { props: { essenceOptions: [] } });
     assert.ok(target.querySelector('[data-recipe-set-id="set-1"]'), 'the set still renders');
     assert.equal(
-      target.querySelector('[data-recipe-section-essences]'),
+      target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]'),
       null,
-      'no essence editor without essences'
+      'no set-level essence add without essences'
     );
     editHarness.remount();
   });
