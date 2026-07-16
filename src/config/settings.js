@@ -189,10 +189,11 @@ const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
     name: 'Progressive Result Order Preferences',
     // `user` scope (issue 651), NOT `client`: a player's chosen stage order is a standing
-    // preference that must follow their account across devices, not sit in one browser's
-    // localStorage. Note this is per-user WITHIN A WORLD — the same player in a second
-    // world gets a fresh order — and that `set` is now an async, replicated document
-    // write that can reject, not a synchronous localStorage write.
+    // preference that must reach them on any device they open this world from, rather
+    // than sit in one browser's localStorage. This is per user PER WORLD (the same player
+    // in a second world gets a fresh order) — never describe it as following the account,
+    // which is wrong for `user` scope. Note also that `set` is now an async, replicated
+    // document write that can reject, not a synchronous localStorage write.
     //
     // The flip needed no data migration, and the reason is NOT "nothing reads it" —
     // that would not imply absence. The real reason: NO WRITER HAS EVER EXISTED. The

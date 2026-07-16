@@ -1642,10 +1642,12 @@ class Fabricate {
    * The player's stored progressive result orders, keyed `recipe:<id>` / `salvage:<id>`
    * (`PROGRESSIVE_RESULT_ORDER`).
    *
-   * USER-scoped, NOT client-scoped: this preference is per-user and follows the account
-   * across devices, but it is per-user PER WORLD — the same player in another world gets
-   * a fresh map. (The `getFavouriteRecipeIds` neighbour above IS client-scoped; do not
-   * read its JSDoc as describing this one.)
+   * USER-scoped, NOT client-scoped: this preference is per user PER WORLD. It reaches
+   * that user on any device they open THIS world from, and the same player in another
+   * world gets a fresh map. It does NOT follow the account globally — that phrasing is
+   * wrong for `scope: 'user'` and is banned in `AGENTS.md` for exactly this reason.
+   * (The `getFavouriteRecipeIds` neighbour above IS client-scoped, i.e. per device; do
+   * not read its JSDoc as describing this one.)
    *
    * @returns {Record<string, string[]>}
    */

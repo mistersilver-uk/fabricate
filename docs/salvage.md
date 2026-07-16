@@ -46,6 +46,17 @@ When the salvage resolution mode is Routed or Progressive, you must configure a 
 This is separate from the recipe crafting check.
 A system can have both.
 
+## Player Result Re-ordering
+
+A component set up for progressive salvage carries an **Allow player result re-ordering** setting on its salvage setup, and it is on by default.
+It decides whether a player's own preferred stage order is used when that component is salvaged, or whether your authored order always is.
+
+There is no player-facing salvage screen today, so players have no way to choose a salvage order in the interface.
+The setting is in place for when that screen ships.
+A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
+
+See [Progressive Mode]({% link recipes/progressive.md %}#player-result-re-ordering) for how the same setting behaves on recipes, where players do have a screen.
+
 ---
 
 ## See Also
