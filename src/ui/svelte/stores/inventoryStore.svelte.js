@@ -528,8 +528,16 @@ export function createInventoryStore({ services } = {}) {
         return result;
       }
       if (result?.success === true) {
-        // Snapshot the row BEFORE the reload: salvaging the last copy drops it from the
-        // listing, and the ribbon must stay on the component it belongs to.
+        // Keep the salvaged component selected so its ribbon stays put even when the
+        // last copy is consumed and the row leaves the listing.
+        //
+        // Hold it selected BEFORE the reload, not only after. `load(true)` awaits, and
+        // the reactive flush it schedules runs at that await boundary — BEFORE the code
+        // after the await. Without a held row in place, that flush momentarily resolves
+        // the selection to a DIFFERENT component (the listing's first visible row), whose
+        // changed key bounces the inspector off the Salvage tab (issue 675 defect 2). The
+        // pre-roll snapshot pins the same key across the whole reload; its stale count is
+        // corrected immediately below.
         heldItem = row;
         selectedKey = row?.key ?? selectedKey;
         salvageResult = {
@@ -562,6 +570,14 @@ export function createInventoryStore({ services } = {}) {
           outcomeId: result?.salvageRun?.checkResult?.data?.outcomeId ?? null,
         };
         await load(true);
+        // Reconcile the held snapshot with post-salvage reality (issue 675 defect).
+        // The live listing now reflects the consumed stock: when the last copy was
+        // broken down the row is GONE (remaining 0); otherwise the fresh live row still
+        // exists and `selectedItem` prefers it. Carry the TRUE remaining onto the held
+        // row so a depleted component reads "None remaining" and withholds "Salvage
+        // again" — never the stale pre-roll count that would offer an impossible re-roll.
+        const liveRow = rows.find((entry) => entry?.componentId === componentId) ?? null;
+        heldItem = { ...row, totalQuantity: liveRow ? Number(liveRow.totalQuantity ?? 0) : 0 };
         return result;
       }
       salvageResult = null;

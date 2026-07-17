@@ -1166,16 +1166,44 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.doesNotMatch(target.textContent, /d20/, 'it never invents a formula');
   });
 
-  it('a committed salvage swaps the footer for the ribbon plus a Salvage again reset', async () => {
+  it('a committed salvage with stock remaining swaps the footer for the ribbon plus a Salvage again reset', async () => {
+    // makeItem() carries totalQuantity 7, so stock remains: "Salvage again" is offered.
     const { services, calls, store } = salvageServices(salvageItem());
     store.salvageResult = { componentId: 'c1', state: 'success', message: '', awarded: [] };
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'));
     assert.equal(target.querySelector('[data-inventory-salvage-action]'), null, 'one-shot: no reroll');
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-depleted]'),
+      null,
+      'stock remains, so no depleted note'
+    );
     target.querySelector('[data-inventory-salvage-again]').click();
     await settle();
     assert.deepEqual(calls.reset, [true]);
+  });
+
+  // Defect 3 (issue 675): salvaging the LAST copy leaves nothing to break down. The
+  // ribbon still shows what was recovered, but "Salvage again" must be withheld and
+  // the header must read honestly rather than a stale count.
+  it('a committed salvage of the LAST copy shows the ribbon but withholds "Salvage again" and reads depleted', async () => {
+    const { services, store } = salvageServices(salvageItem({}, { totalQuantity: 0 }));
+    store.salvageResult = { componentId: 'c1', state: 'success', message: '', awarded: [] };
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'), 'the result ribbon still shows');
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-again]'),
+      null,
+      'nothing left to salvage — no way back to rolling'
+    );
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-depleted]'),
+      'a depleted note takes the ribbon slot instead'
+    );
+    const total = target.querySelector('.inventory-detail-total');
+    assert.match(total.textContent, /TotalDepleted/, 'header reads "None remaining", not a stale count');
   });
 
   // AC9.

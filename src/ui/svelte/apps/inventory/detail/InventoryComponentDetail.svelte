@@ -122,17 +122,46 @@
   const salvage = $derived(item?.salvage?.enabled === true ? item.salvage : null);
   const salvageable = $derived(salvage !== null);
 
+  // Remaining owned quantity. Zero means the stack is depleted — the honest state
+  // after salvaging the last copy, where the row has left the live listing and the
+  // store holds a post-salvage snapshot carrying 0 (issue 675 defect). A depleted
+  // component still keeps its ribbon (the player must see what they recovered) but
+  // must never offer a way back to rolling an impossible salvage.
+  const remaining = $derived(Number(item?.totalQuantity ?? 0));
+  const depleted = $derived(remaining <= 0);
+  // "N total" while stock remains; "None remaining" once depleted — a count of 0
+  // would read as a stack that is somehow both present and empty.
+  const totalLabel = $derived(
+    depleted
+      ? localize('FABRICATE.App.Inventory.Detail.TotalDepleted')
+      : localize('FABRICATE.App.Inventory.Detail.Total', { count: remaining })
+  );
+
   const TABS = [
     { id: 'info', icon: 'fas fa-circle-info', key: 'FABRICATE.App.Inventory.Detail.TabInfo' },
     { id: 'salvage', icon: 'fas fa-recycle', key: 'FABRICATE.App.Inventory.Detail.TabSalvage' }
   ];
   let activeTab = $state('info');
-  // Reset to Info whenever the selected item changes: a Salvage tab left active would
-  // otherwise carry over onto a component whose panel is a different shape — or which
-  // is not salvageable at all, leaving no tab bar and an orphaned panel.
+  // Reset to Info only when the selected item's KEY actually changes — i.e. the
+  // player picked a DIFFERENT component (whose Salvage panel is a different shape, or
+  // which is not salvageable at all, leaving no tab bar and an orphaned panel).
+  //
+  // A salvage roll calls `load(true)`, which hands us a NEW item object with the SAME
+  // key; keying the reset on the object reference (issue 675 defect) dropped the
+  // player off Salvage onto Info the instant their roll resolved, while the success
+  // ribbon sat on the Salvage tab they'd just been kicked out of. Tracking the
+  // previous key keeps Salvage active across that same-key reload.
+  //
+  // Seeded to a sentinel rather than `item?.key` (which would only capture the initial
+  // value and warn): the first effect run then "resets" to Info, which is a no-op
+  // because `activeTab` already starts on Info.
+  let prevItemKey;
   $effect(() => {
-    void item?.key;
-    activeTab = 'info';
+    const key = item?.key ?? null;
+    if (key !== prevItemKey) {
+      prevItemKey = key;
+      activeTab = 'info';
+    }
   });
 
   function onTabKeydown(event, index) {
@@ -151,9 +180,7 @@
   img={item.img ?? ''}
   icon={isEssence ? icon : ''}
   name={item.name}
-  total={localize('FABRICATE.App.Inventory.Detail.Total', {
-    count: Number(item.totalQuantity ?? 0)
-  })}
+  total={totalLabel}
   chips={headerChips}
 >
   {#if salvageable}
@@ -196,6 +223,7 @@
       <InventorySalvagePanel
         {salvage}
         busy={salvaging}
+        {depleted}
         result={salvageResult}
         {onSalvage}
         onReset={onResetSalvage}

@@ -585,12 +585,55 @@ describe('inventoryStore', () => {
       assert.equal(store.rows.length, 1, 'the salvaged row has left the listing');
       assert.equal(store.selectedItem.key, 'sys:c1', 'the ribbon stays on the SALVAGED component');
       assert.equal(store.salvageResult.state, 'success');
+      // Defect 3 (issue 675): the held snapshot carries the TRUE post-salvage remaining
+      // (0 — the last copy was consumed), never the stale pre-roll count of 1.
+      assert.equal(
+        store.selectedItem.totalQuantity,
+        0,
+        'the held row reads the honest depleted remaining, not the pre-roll 1'
+      );
 
       // Selecting another item releases the hold.
       store.select('sys:c9');
       flushSync();
       assert.equal(store.selectedItem.key, 'sys:c9');
       assert.equal(store.salvageResult, null, 'the ribbon is dismissed with the selection');
+    });
+
+    // Defect 3 (issue 675): when copies REMAIN after the salvage, the live row is still
+    // in the listing (with a decremented count) and `selectedItem` prefers it — the
+    // header shows the real remaining, and "Salvage again" stays available upstream.
+    it('reads the decremented live count when copies remain after salvage', async () => {
+      const rowWithStock = (totalQuantity) => ({ ...salvageRow(), totalQuantity });
+      let listingRows = [rowWithStock(3)];
+      const services = {
+        listInventoryForActor: async () => ({ selectedActorId: 'hero', rows: listingRows }),
+        getSelectedCraftingActorId: () => 'hero',
+        getCraftingComponentSourceIds: () => [],
+        notify: () => {},
+        salvageComponent: async () => {
+          // One copy consumed; two remain, so the row stays in the listing.
+          listingRows = [rowWithStock(2)];
+          return { success: true, results: [{}], message: 'Salvaged Iron' };
+        },
+      };
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+      store.select('sys:c1');
+      flushSync();
+
+      await store.salvage('c1');
+      flushSync();
+
+      assert.equal(store.rows.length, 1, 'the row is still in the listing');
+      assert.equal(store.selectedItem.key, 'sys:c1');
+      assert.equal(
+        store.selectedItem.totalQuantity,
+        2,
+        'the live decremented count is shown, never the stale 3'
+      );
+      assert.equal(store.salvageResult.state, 'success');
     });
 
     it('resetSalvage() releases the held row and the ribbon ("Salvage again")', async () => {

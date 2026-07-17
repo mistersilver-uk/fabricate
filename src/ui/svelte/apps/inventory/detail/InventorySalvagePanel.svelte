@@ -33,6 +33,7 @@
   let {
     salvage = null,
     busy = false,
+    depleted = false,
     result = null,
     onSalvage = null,
     onReset = null,
@@ -49,6 +50,11 @@
   const misconfigured = $derived(salvage?.misconfigured === true);
   // The ribbon is up: the attempt resolved and awarded. "Salvage again" resets.
   const committed = $derived(result?.state === 'success');
+  // Salvaging the last copy leaves nothing to break down again. The ribbon still
+  // shows what was recovered, but the way back to rolling must be withheld — and the
+  // pre-roll footer's action disabled — because there is no stock left to salvage
+  // (issue 675 defect). `depleted` is the store's post-salvage remaining, threaded in.
+  const canSalvageAgain = $derived(!depleted);
   // A time-gated run has STARTED and awarded nothing. No ribbon, and no "Salvage
   // again" — that would only re-enter the time gate.
   const waiting = $derived(result?.state === 'waiting');
@@ -181,14 +187,22 @@
     <p class="salvage-ribbon" data-inventory-salvage-ribbon role="status">
       <i class="fas fa-circle-check" aria-hidden="true"></i>
       <span class="salvage-ribbon-text">{localize('FABRICATE.App.Inventory.Salvage.Ribbon')}</span>
-      <button
-        type="button"
-        class="salvage-again"
-        data-inventory-salvage-again
-        onclick={() => onReset?.()}
-      >
-        {localize('FABRICATE.App.Inventory.Salvage.Again')}
-      </button>
+      {#if canSalvageAgain}
+        <button
+          type="button"
+          class="salvage-again"
+          data-inventory-salvage-again
+          onclick={() => onReset?.()}
+        >
+          {localize('FABRICATE.App.Inventory.Salvage.Again')}
+        </button>
+      {:else}
+        <!-- Nothing left to break down: state it plainly instead of inviting an
+             impossible re-roll. -->
+        <span class="salvage-depleted-note" data-inventory-salvage-depleted>
+          {localize('FABRICATE.App.Inventory.Salvage.Depleted')}
+        </span>
+      {/if}
     </p>
   {:else}
     <!-- A ruled row, not a full-width slab: the note explains the gesture's cost on the
@@ -201,7 +215,7 @@
         type="button"
         class="salvage-action"
         data-inventory-salvage-action
-        disabled={busy || misconfigured || waiting}
+        disabled={busy || misconfigured || waiting || depleted}
         aria-busy={busy}
         onclick={() => onSalvage?.()}
       >
@@ -377,6 +391,16 @@
 
   .salvage-again:hover {
     filter: brightness(1.1);
+  }
+
+  /* The depleted stand-in for "Salvage again": same slot, same weight, but a quiet
+     statement rather than an actionable link — nothing remains to salvage. */
+  .salvage-depleted-note {
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 600;
+    font-style: italic;
+    opacity: 0.85;
   }
 
   .salvage-ribbon {
