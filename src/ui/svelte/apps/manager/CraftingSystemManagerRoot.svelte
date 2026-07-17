@@ -5381,6 +5381,7 @@
         recipeCategories={$viewState.recipeCategories || []}
         recipeSearchTerm={$viewState.recipeSearchTerm || ''}
         selectedRecipeId={selectedRecipe?.id || ''}
+        {selectedSystemId}
         {showRecipeCategories}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
         bind:browserState={recipeBrowserState}

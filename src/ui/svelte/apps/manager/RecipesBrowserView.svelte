@@ -38,6 +38,7 @@
     recipeCategories = [],
     recipeSearchTerm = '',
     selectedRecipeId = '',
+    selectedSystemId = '',
     showRecipeCategories = false,
     resolutionMode = 'simple',
     onSearchChange = () => {},
@@ -60,6 +61,22 @@
   // fallback. Both are `$state` proxies, so nested writes (`ui.statusFilter = …`)
   // are reactive AND, when bound, propagate back to the root so the state persists.
   const ui = $derived(browserState ?? ownBrowserState);
+
+  let lastSystemId = $state('');
+
+  // Switching system resets the CATEGORY filter and the group/page position — a
+  // recipe category names a vocabulary the new system does not share, so carrying it
+  // over filters the new library down to nothing. Mirrors ComponentsBrowserView. The
+  // status/lock filters are NOT reset: enabled and locked mean the same thing in every
+  // system, so they are preferences like sort/page-size, not a stale vocabulary. The
+  // search term is cleared by the store on selectSystem (it is shared state).
+  $effect(() => {
+    if (selectedSystemId === lastSystemId) return;
+    ui.categoryFilter = 'all';
+    ui.pageIndex = 0;
+    ui.collapsedCategories = new Set();
+    lastSystemId = selectedSystemId;
+  });
 
   // The blocked-enable flash. Enabling is GATED (an incomplete recipe is refused),
   // and this view CLAIMS the refusal message by handing the store an `onBlocked`

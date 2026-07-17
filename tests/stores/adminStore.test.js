@@ -532,6 +532,64 @@ describe('createAdminStore', () => {
       assert.equal(vs.hasSystem, true);
       assert.equal(vs.selectedSystem?.id, 'sys1');
     });
+
+    // A search term names a vocabulary that belongs to ONE system: "iron" is a real
+    // component in the system the GM typed it into and means nothing in the next one.
+    // Carrying it across a system change silently filters the new system's browser
+    // down to (usually) nothing, and the GM sees an empty library, not a filter.
+    //
+    // The clear lives HERE and not in the views because every consumer reads the same
+    // store: `itemSearch` reaches the component browser via
+    // `getItems(systemId, search)` → `itemCards`, and `recipeSearch`/`graphSearch`
+    // reach the recipe browser and the graph the same way. Clearing at the selection
+    // covers all of them at once and survives a system change triggered from anywhere.
+    it('selectSystem clears every system-scoped search filter', async () => {
+      const services = createMockServices();
+      services._getSystemsMutable().push(makeSystem({ id: 'sys2', name: 'System Two' }));
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      await store.setItemSearch('iron');
+      await store.setRecipeSearch('potion');
+      await store.setGraphSearch('ingot');
+
+      await store.selectSystem('sys2');
+
+      const vs = get(store.viewState);
+      assert.equal(vs.itemSearchTerm, '', 'the component search must not follow the GM');
+      assert.equal(vs.recipeSearchTerm, '', 'the recipe search must not follow the GM');
+      assert.equal(vs.graphSearchTerm, '', 'the graph search must not follow the GM');
+    });
+
+    it('createSystem clears every system-scoped search filter', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      await store.setItemSearch('iron');
+      await store.setRecipeSearch('potion');
+      await store.setGraphSearch('ingot');
+
+      await store.createSystem();
+
+      const vs = get(store.viewState);
+      assert.equal(vs.itemSearchTerm, '', 'a brand-new system starts unfiltered');
+      assert.equal(vs.recipeSearchTerm, '', 'a brand-new system starts unfiltered');
+      assert.equal(vs.graphSearchTerm, '', 'a brand-new system starts unfiltered');
+    });
+
+    // Re-selecting the SAME system is a refresh, not a change of vocabulary — the
+    // search the GM is actively typing must survive it.
+    it('re-selecting the current system keeps the search filters', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.setItemSearch('iron');
+
+      await store.selectSystem('sys1');
+
+      assert.equal(get(store.viewState).itemSearchTerm, 'iron');
+    });
   });
 
   // -------------------------------------------------------------------------

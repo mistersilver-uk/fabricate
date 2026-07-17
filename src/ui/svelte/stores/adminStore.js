@@ -4990,6 +4990,22 @@ export function createAdminStore(services) {
 
   // --- System selection ---
 
+  // Every search term is scoped to ONE system's vocabulary: "iron" names a real
+  // component in the system it was typed into and nothing in the next one. Carrying a
+  // term across a system change filters the new system's browser down to nothing and
+  // reads as an empty library rather than an active filter.
+  //
+  // This clears at the STORE, not in each view, because all three terms are read back
+  // out of these stores by every consumer at once (`itemSearch` → `getItems(systemId,
+  // search)` → `itemCards` → the component browser; `recipeSearch` → the recipe
+  // browser; `graphSearch` → the graph). Clearing here covers each of them and holds
+  // for a system change triggered from anywhere.
+  function _clearSystemScopedSearches() {
+    recipeSearch.set('');
+    itemSearch.set('');
+    graphSearch.set('');
+  }
+
   async function selectSystem(systemId) {
     if (systemId === get(selectedSystemId)) {
       await refresh();
@@ -4998,6 +5014,7 @@ export function createAdminStore(services) {
     if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     selectedSystemId.set(systemId);
+    _clearSystemScopedSearches();
     selectedEnvironmentId.set('');
     selectedEnvironmentSystemId.set(systemId || '');
     _setEnvironmentDraftState(null, { persistedDraft: null });
@@ -5015,6 +5032,7 @@ export function createAdminStore(services) {
       'Configure categories, item tags, essences, and crafting behaviour for this system.';
     const system = await systemManager.createSystem({ name, description });
     selectedSystemId.set(system.id);
+    _clearSystemScopedSearches();
     activeTab.set('systems');
     await services.setSetting('lastManagedCraftingSystem', system.id);
     await refresh();
