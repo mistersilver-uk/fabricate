@@ -3,9 +3,9 @@
   One result item inside a result group — the component this recipe produces plus
   a quantity. Result items have no name/tags/currency (unlike ingredient
   alternatives), so this mirrors only the `component` branch of
-  RecipeIngredientOption: an image-only SearchablePopover trigger to pick/swap the
-  component, the resolved component name beside it, a capped quantity input, and a
-  remove control. Items have no id of their own, so the parent keys them by index
+  RecipeIngredientOption: one SearchablePopover trigger carrying the component's image
+  AND name (sized to the name — issue 676) to pick/swap it, a capped quantity stepper,
+  and a remove control. Items have no id of their own, so the parent keys them by index
   and owns the option list; this row emits the whole updated item via
   `onChange(nextItem)` (spreading the existing item so a normalized id and any
   unknown fields survive the first edit).
@@ -85,12 +85,14 @@
 <div class="manager-recipe-ingredient-option-row" data-recipe-option data-recipe-result-item>
   <div class="manager-recipe-option-target">
     <div class="manager-recipe-option-component">
-      <!-- PROGRESSIVE puts the image AND the name INSIDE the trigger, matching the
-           progressive salvage yield picker (issue 676): the whole thing is one hit
-           target that says what it is and opens the picker. The non-progressive row
-           keeps the image-only trigger with the name beside it — the salvage side's
-           simple/routed row is shaped that way too, and only the STAGE rows were
-           migrated. -->
+      <!-- The image AND the name live INSIDE one trigger, in EVERY mode (issue 676) —
+           the same shape the ingredient rows and the salvage yield picker now use. The
+           progressive row was migrated first and the flat row kept an image-only trigger
+           with the name as loose text beside it; that split meant the same picker had two
+           anatomies depending on a mode the picker itself has nothing to do with. The
+           trigger sizes to the name's length, so it never grows into the trailing cluster.
+           `manager-recipe-stage-trigger` remains as the STAGE-row marker only — the
+           trigger anatomy no longer depends on it. -->
       <SearchablePopover
         options={componentPickerOptions}
         value={componentId}
@@ -98,10 +100,8 @@
         triggerClass={`manager-button manager-recipe-component-trigger${progressive ? ' manager-recipe-stage-trigger' : ''}`}
         triggerImg={selectedComponent?.img || ''}
         triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-        triggerLabel={progressive
-          ? (selectedComponent?.name || text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component'))
-          : (selectedComponent ? '' : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component'))}
-        valueClass={progressive ? 'manager-recipe-stage-trigger-name' : ''}
+        triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        valueClass={progressive ? 'manager-recipe-stage-trigger-name' : 'manager-recipe-component-name'}
         triggerTitle={selectedComponent?.name || ''}
         triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
         dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
@@ -110,9 +110,6 @@
         emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
         onChoose={(id) => chooseComponent(id)}
       />
-      {#if selectedComponent && !progressive}
-        <span class="manager-recipe-component-name">{selectedComponent.name}</span>
-      {/if}
     </div>
   </div>
 

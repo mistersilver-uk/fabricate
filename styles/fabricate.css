@@ -7978,47 +7978,78 @@
   min-width: 0;
 }
 
-/* The picker fills its (bounded) field, so the trigger's hit area is the whole 360px
-   basis rather than shrink-wrapping the name. The recipe stage row shares this: without
-   it the recipe trigger measured 283px against salvage's 360px in the same field. */
+/* THE NAME-LENGTH CAP LIVES HERE, once, for every component picker in the studio.
+   The wrapper hugs the trigger, which sizes itself to the component's name (see below).
+
+   The cap is on the WRAPPER rather than only on the trigger because a flex field sizes
+   itself from its content's MAX-CONTENT — the *untruncated* name. Capping only the
+   trigger left the field 490px wide around a 360px trigger: 130px of dead space that the
+   row reserved and nothing drew in. Capping here bounds what the field can ask for, so
+   the field, the wrapper and the trigger all agree on one number.
+
+   360px stops a pathological component name reproducing the original defect (an unbounded
+   picker took ~85% of a stage row and crushed the DC/Edit/reorder/× cluster into the
+   scraps). The cap is deliberately PERCENTAGE-FREE: a percentage max-width (`min(100%,
+   360px)`) is treated as indefinite while the ancestor computes its intrinsic size, so
+   the field ignored it and went back to sizing on the untruncated name — measured, the
+   360px trigger still sat in a 490px field. A plain length is honoured.
+
+   Nothing here needs a `100%` to stay inside a narrow field: these are flex items with
+   the default `flex-shrink: 1`, and `min-width: 0` lets them shrink below their own
+   min-content, so they still fit at the narrow container-query widths. */
 .fabricate-manager .manager-salvage-component-picker,
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-component,
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-component-picker {
+.fabricate-manager .manager-recipe-option-component,
+.fabricate-manager .manager-recipe-component-picker {
   min-width: 0;
-  width: 100%;
+  max-width: 360px;
 }
 
-/* Foundry's core `button` rule fixes a height and a font; a trigger that only sets a
+/* THE ONE COMPONENT-PICKER TRIGGER, for every component picker in the studio: the recipe
+   ingredient rows, the recipe result rows (flat and progressive stage) and both salvage
+   yield rows. They are the same control doing the same job, so they are one rule with a
+   widened selector list rather than four rules that drift.
+
+   Foundry's core `button` rule fixes a height and a font; a trigger that only sets a
    min-height gets cropped by it (the EnvironmentCard pattern). Reset to auto and let the
    portrait set the row's height.
 
-   The RECIPE progressive stage trigger shares this (issue 676): it carries the image AND
-   the name too, where the recipe row previously used an image-only trigger with the name
-   as loose text beside it. */
+   THE WIDTH FOLLOWS THE NAME (issue 676). `width: max-content` shrink-wraps the
+   image+name, so a picker is as wide as the thing it names and no wider — the same way
+   the essence and currency pickers beside it already size themselves. It was
+   `width: 100%` of a fixed 360px basis, which made every picker the same width whatever
+   it held: a two-word component sat in a half-empty 360px button, and the row's controls
+   were spaced around a number that no content justified. Past the wrapper's cap the name
+   ellipsizes and the `title` tooltip carries the rest.
+
+   EXPLICIT font-size, not inherited. The salvage trigger computed 13.12px only because a
+   `.manager-field` ancestor happened to set 0.82rem; the recipe rows have no such
+   ancestor, so the identical trigger inherited Foundry's 14px `.application` base
+   instead — the bleed signature the font gates exist to catch, and a 0.88px drift
+   between rows that are meant to be the same surface. Stating it here makes them equal
+   by rule rather than by luck of the ancestry. */
 .fabricate-manager .manager-button.manager-salvage-component-trigger,
-.fabricate-manager .manager-button.manager-recipe-component-trigger.manager-recipe-stage-trigger {
+.fabricate-manager .manager-button.manager-recipe-component-trigger {
   justify-content: flex-start;
-  width: 100%;
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
   height: auto;
   min-height: 34px;
   padding: var(--fab-space-1);
-
-  /* EXPLICIT, not inherited. The salvage trigger computed 13.12px only because a
-     `.manager-field` ancestor happened to set 0.82rem; the recipe stage row has no such
-     ancestor, so the identical trigger inherited Foundry's 14px `.application` base
-     instead — the bleed signature the font gates exist to catch, and a 0.88px drift
-     between two rows that are meant to be the same surface. Stating it here makes the
-     two equal by rule rather than by luck of the ancestry. */
   font-size: 0.82rem;
 }
 
 .fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait,
-.fabricate-manager .manager-recipe-stage-trigger .manager-travel-portrait {
+.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {
   width: 24px;
   height: 24px;
 }
 
+/* The name INSIDE the trigger. It grows with the (max-content) trigger and ellipsizes
+   once the trigger hits its cap, so a long name degrades to a truncation rather than to
+   a row-wide button. */
 .fabricate-manager .manager-salvage-component-name,
+.fabricate-manager .manager-recipe-component-name,
 .fabricate-manager .manager-recipe-stage-trigger-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -8061,16 +8092,20 @@
   background: var(--fab-mv2-bg);
 }
 
-/* THE PICKER IS BOUNDED ON A STAGE ROW, NOT GREEDY. The shared field is `flex: 1 1 auto`,
-   which is right on the simple/routed row (a picker, a stepper and an ×) but wrong here: a
-   stage row carries four more controls, so a greedy trigger took ~85% of the row and
-   crushed DC/Edit/reorder/× into the last scraps. Bounded, the row reads as a set of parts.
-   `flex: 0 1 360px` is a BASIS, not a width: it still SHRINKS (with `min-width: 0` on the
-   field keeping the name ellipsizing), so the row survives the narrow container-query
-   widths — it just never grows past a size that comfortably holds a long component name. */
+/* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is
+   `flex: 1 1 auto`, which is right on the simple/routed row (a picker, a stepper and an ×)
+   but wrong here: a stage row carries four more controls, so a greedy field took ~85% of
+   the row and crushed DC/Edit/reorder/× into the last scraps.
+
+   `flex: 0 1 auto` hands the sizing to the trigger, which is `max-content` capped at 360px
+   (see the shared trigger rule above). This replaces a fixed `flex: 0 1 360px` BASIS: the
+   basis fixed the defect's symptom but still made every stage row's picker exactly 360px
+   whatever it named. Content-sizing is the same bound applied precisely — a short name
+   gets a short button, and only a name that actually needs 360px gets 360px. It still
+   shrinks below that at the narrow container-query widths. */
 .fabricate-manager .manager-salvage-stage-row .manager-salvage-component-field,
 .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-target {
-  flex: 0 1 360px;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -8711,31 +8746,12 @@
   box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
 }
 
-/* The component alternative's trigger is the image-only picker target, sized to
-   its thumbnail; the resolved component name renders as static text beside it.
-   The `.manager-button.…` selector raises specificity above the base
-   `.manager-button` padding (declared later in this file) so the horizontal
-   padding actually tightens to match the vertical breathing room. */
-.fabricate-manager .manager-button.manager-recipe-component-trigger {
-  justify-content: flex-start;
-  width: auto;
-  height: auto;
-  min-height: 34px;
-  padding: var(--fab-space-1);
-}
+/* (`.manager-button.manager-recipe-component-trigger` and `.manager-recipe-component-name`
+   were declared here, sizing an image-only trigger and the loose name beside it. The name
+   now renders INSIDE the trigger and both classes join the shared component-picker rules
+   the salvage yield picker owns — see `.manager-salvage-component-trigger` above.) */
 
-/* The selected component's name, rendered beside the image-only picker trigger
-   (not inside the clickable button). */
-.fabricate-manager .manager-recipe-component-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The option's match editor lays the image trigger and the static name on one
-   row so the name reads beside the thumbnail. */
+/* The option's match editor wraps the picker. */
 .fabricate-manager .manager-recipe-option-component {
   display: flex;
   align-items: center;
@@ -8794,11 +8810,6 @@
 /* The READ-ONLY difficulty badge on a progressive result row. It deep-links to the
    component editor rather than editing in place: component.difficulty has four
    consumers, so an inline stepper would write across an aggregate boundary. */
-
-.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {
-  width: 24px;
-  height: 24px;
-}
 
 .fabricate-manager .manager-recipe-option-tags {
   display: flex;

@@ -47,6 +47,26 @@ const FIXTURE = `
           <button class="manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
+        <!-- The FLAT (non-progressive) ingredient/result row's component picker (issue
+             676). It now carries the name INSIDE the trigger and joins the SAME shared
+             rule as the salvage yield trigger and the progressive stage trigger, so it
+             is pinned to their number — 0.82rem — not to whatever it used to inherit.
+             It previously had no font-size of its own at all and bled to Foundry's 14px
+             app base; the flat-picker vs bleed-baseline assertions below prove it no
+             longer does. -->
+        <div class="manager-recipe-ingredient-option-row">
+          <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fas fa-cubes"></i></span>
+          <div class="manager-recipe-option-target">
+            <div class="manager-recipe-option-component">
+              <span class="manager-travel-picker manager-recipe-component-picker">
+                <button class="manager-button manager-recipe-component-trigger" data-m="flat-picker">
+                  <img class="manager-travel-portrait" alt="">
+                  <span class="manager-travel-picker-value manager-recipe-component-name" data-m="flat-picker-name">Venom Gland</span>
+                </button>
+              </span>
+            </div>
+          </div>
+        </div>
         <!-- The progressive stage row (issue 676). It is the SAME surface as the
              progressive SALVAGE stage row and shares its rules by joining their selector
              lists, so these roles are pinned to the numbers component-studio-font-size.js
@@ -119,6 +139,12 @@ const EXPECTED = {
   'nav-count': 10, // 0.625rem
   'dashed-add': 11.2, // 0.7rem
   muted: 10.24, // 0.64rem — recipe-view-scoped
+  // ── The FLAT component picker (issue 676). Same shared rule as the stage/salvage
+  // triggers below, so it reads at the same 0.82rem — a flat row and a stage row name a
+  // component identically. If these ever diverge from `stage-picker`, the sharing broke.
+  'option-lead': 13.12, // 0.82rem — the type-tinted lead chip's glyph
+  'flat-picker': 13.12, // 0.82rem — shared .manager-recipe-component-trigger rule
+  'flat-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
   // ── The progressive stage row (issue 676). Every number below is the one the salvage
   // stage row already commits in component-studio-font-size.test.js: the two rows are
   // the same surface and SHARE their CSS rules, so a divergence here means the sharing
@@ -169,6 +195,16 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
     // the nav label must NOT sit at that base — it is now design-pinned, not bleeding.
     assert.equal(measured['bleed-baseline'], 14, 'bare <input> inherits the Foundry 14px app base');
     assert.notEqual(measured['nav-label'], 14, 'nav label must not bleed to the Foundry base');
+
+    // The flat and stage component pickers SHARE one rule (issue 676), so they must read
+    // identically. Asserting the relationship (not just two equal constants) is what
+    // catches the sharing being broken by a new rule that only one of them matches.
+    assert.equal(
+      measured['flat-picker'],
+      measured['stage-picker'],
+      'the flat and progressive component pickers share a rule, so they share a size'
+    );
+    assert.notEqual(measured['flat-picker'], 14, 'the flat component picker must not bleed to the Foundry base');
   } finally {
     await browser.close();
   }

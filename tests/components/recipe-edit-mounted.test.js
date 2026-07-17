@@ -2414,19 +2414,20 @@ describe('RecipeEditView (mounted)', () => {
       trigger.querySelector('.manager-travel-portrait img'),
       'the trigger shows the component image'
     );
-    // The name must NOT be inside the clickable trigger button.
-    assert.equal(
-      /Mountain Herb/.test(trigger.textContent),
-      false,
-      'the component name is not inside the trigger button'
-    );
-    // The name renders as separate static text beside the trigger.
-    const name = row.querySelector('.manager-recipe-component-name');
-    assert.ok(name, 'the component name renders as static text beside the trigger');
+    // §676: the name is INSIDE the clickable trigger — the whole image+name is one hit
+    // target that both says what the component is and opens the picker. It used to be
+    // loose text beside an image-only button, which made the obvious target inert.
+    const name = trigger.querySelector('.manager-recipe-component-name');
+    assert.ok(name, 'the component name renders inside the trigger button');
     assert.equal(
       name.textContent.trim(),
       'Mountain Herb',
-      'the static name resolves the component name'
+      'the trigger name resolves the component name'
+    );
+    assert.equal(
+      row.querySelector('.manager-recipe-option-component > .manager-recipe-component-name'),
+      null,
+      'no loose name is rendered beside the trigger'
     );
     // The image trigger carries the component name as a tooltip.
     assert.equal(

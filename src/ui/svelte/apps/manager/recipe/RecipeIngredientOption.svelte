@@ -7,11 +7,10 @@
     [lead chip] [picker / summary] … [REQUIRED tag] [count stepper] | [or…] [× remove]
 
   The lead chip is a small type-tinted square (component → cubes, tag → tag, currency
-  → coins, essence → flask). A component alternative additionally shows the component's
-  image as the clickable picker medallion (swap the component) with its name beside it;
-  a tag alternative shows a summary "any #tag" name + a TAG pill, with the any/all
-  control and chip list as an editing detail below; currency and essence alternatives
-  show only their unit/essence picker.
+  → coins, essence → flask). A component alternative shows one picker trigger carrying
+  the image AND the name (issue 676); a tag alternative shows a summary "any #tag" name
+  + a TAG pill, with the any/all control and chip list as an editing detail below;
+  currency and essence alternatives show only their unit/essence picker.
 
   EVERY row type edits its count with the same shared `Stepper` in the same end-of-row
   slot (issue 676) — see the note at the stepper itself for why the marker attribute is
@@ -225,6 +224,12 @@
 
   <div class="manager-recipe-option-target">
     {#if matchType === 'component'}
+      <!-- The NAME lives INSIDE the trigger (issue 676), sized to the name's length — the
+           shape the progressive stage rows and the salvage yield picker already use, now
+           shared by every component picker in the studio. It was an image-only button with
+           the name as loose text beside it: the name is the only thing that identifies the
+           component to a GM who has not memorised the art, yet clicking it did nothing, so
+           the obvious target was inert and the real one was a 24px thumbnail. -->
       <div class="manager-recipe-option-component">
         <SearchablePopover
           options={componentPickerOptions}
@@ -233,7 +238,8 @@
           triggerClass="manager-button manager-recipe-component-trigger"
           triggerImg={selectedComponent?.img || ''}
           triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-          triggerLabel={selectedComponent ? '' : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+          triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+          valueClass="manager-recipe-component-name"
           triggerTitle={selectedComponent?.name || ''}
           triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
           dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
@@ -242,9 +248,6 @@
           emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
           onChoose={(id) => chooseComponent(id)}
         />
-        {#if selectedComponent}
-          <span class="manager-recipe-component-name">{selectedComponent.name}</span>
-        {/if}
       </div>
     {:else if matchType === 'tags'}
       <span class="manager-recipe-option-tag-name" data-recipe-tag-summary>{tagSummary}</span>
