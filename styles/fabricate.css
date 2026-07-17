@@ -7595,6 +7595,144 @@
   background: var(--fab-accent-soft);
 }
 
+/* ── The Validation tab's aggregate header (issue 676) ────────────────────────────
+   Rehomed from the deleted RecipeContextRail, which showed it only while this tab was
+   open. It lives in the GLOBAL sheet, not a scoped Svelte <style>, for two reasons: the
+   rest of the recipe studio's chrome already does (`.manager-recipe-tab`,
+   `.manager-recipe-val-*`, `.manager-recipe-section-empty`), and a component-scoped
+   block is INVISIBLE to `recipe-studio-font-size.test.js`, which renders raw markup
+   against this file — which is exactly why the rail's summary was never gated and could
+   drift unmeasured. The `manager-recipe-rail-*` class names are kept verbatim so nothing
+   already reading this surface has to learn a new name.
+
+   The rail's VALUES are carried over unchanged; only the LAYOUT changes, because the
+   surface did: the rail stacked medallion-over-copy-over-counts in a 300px column, and a
+   tab panel is ~1060px. Here the summary and the counts sit side by side, and the
+   summary's own medallion+copy runs as a row rather than a centred stack — a centred
+   52px medallion with centred copy under it, stretched across a full-width tab, reads as
+   a hero banner rather than a status line. */
+.fabricate-manager .manager-recipe-validation-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-recipe-rail-summary {
+  display: flex;
+  flex: 1 1 320px;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 12px;
+}
+
+.fabricate-manager .manager-recipe-rail-summary-medallion {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 13px;
+  font-size: 1.35rem;
+}
+
+.fabricate-manager .manager-recipe-rail-summary-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-rail-summary.is-clear .manager-recipe-rail-summary-medallion {
+  color: var(--fab-success);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-recipe-rail-summary.is-warning .manager-recipe-rail-summary-medallion {
+  color: var(--fab-warning);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-recipe-rail-summary.is-blocked .manager-recipe-rail-summary-medallion {
+  color: var(--fab-danger);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-recipe-rail-summary.is-clear {
+  border-color: var(--fab-success-border);
+}
+
+.fabricate-manager .manager-recipe-rail-summary.is-warning {
+  border-color: var(--fab-warning-border);
+}
+
+.fabricate-manager .manager-recipe-rail-summary.is-blocked {
+  border-color: var(--fab-danger-border);
+}
+
+.fabricate-manager .manager-recipe-rail-summary-title {
+  font-family: var(--fab-font-serif);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Nested under the summary deliberately: this element also carries `.manager-muted`,
+   which `[data-manager-view="recipe-edit"] .manager-muted` scopes to 0.64rem at (0,3,0).
+   The rail out-specified that for free via Svelte's scoping hash; in the global sheet a
+   (0,2,0) rule silently LOSES and the sub-line renders 10.24px instead of the rail's
+   committed 11.52px. `recipe-studio-font-size.test.js` catches exactly this. */
+.fabricate-manager .manager-recipe-rail-summary .manager-recipe-rail-summary-sub {
+  font-size: 0.72rem;
+}
+
+/* The Passing / Warnings / Blocking count table (three mono counts). */
+.fabricate-manager .manager-recipe-rail-counts {
+  display: flex;
+  flex: 0 1 260px;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-recipe-rail-count {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+
+.fabricate-manager .manager-recipe-rail-count-label {
+  flex: 1 1 auto;
+}
+
+.fabricate-manager .manager-recipe-rail-count-value {
+  flex: 0 0 auto;
+  font-family: var(--fab-font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-recipe-rail-count.is-passing > i {
+  color: var(--fab-success);
+}
+
+.fabricate-manager .manager-recipe-rail-count.is-warning > i {
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-recipe-rail-count.is-blocking > i {
+  color: var(--fab-danger);
+}
+
 /* ── Rebuilt Validation tab (issue 643 §E): grouped, bordered, tagged row stack ─ */
 .fabricate-manager .manager-recipe-validation {
   display: flex;

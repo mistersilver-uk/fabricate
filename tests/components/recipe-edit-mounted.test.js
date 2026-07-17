@@ -4006,6 +4006,135 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     );
     editHarness.remount();
   });
+
+  // --- the Validation tab's aggregate summary (issue 676) -------------------------
+  // Rehomed from the deleted rail, which only ever showed it while this tab was open.
+  // The rail took `readiness` as a PROP, so its tests could inject any state; the tab
+  // derives readiness from the recipe itself, so these drive real recipes through the
+  // real evaluator — the path the GM is on.
+  async function openValidation(recipe) {
+    const target = await editHarness.mount(identityProps({ recipe }));
+    await openTab(target, 'validation');
+    return target;
+  }
+
+  function summaryStatus(target) {
+    return target
+      .querySelector('[data-recipe-validation-summary]')
+      .getAttribute('data-recipe-validation-summary');
+  }
+
+  function counts(target) {
+    const n = (sel) => Number(target.querySelector(sel).textContent.trim());
+    return {
+      passing: n('[data-recipe-count-passing]'),
+      warnings: n('[data-recipe-count-warnings]'),
+      blocking: n('[data-recipe-count-blocking]'),
+    };
+  }
+
+  const COMPLETE_RECIPE = {
+    ...RECIPE,
+    ingredientSets: [
+      { id: 'set-1', name: 'Set 1', ingredientGroups: [{ id: 'g1', options: [{ id: 'o1', match: { type: 'component', componentId: 'cmp-herb' }, quantity: 1 }] }] },
+    ],
+    resultGroups: [{ id: 'grp-1', name: '', results: [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }] }],
+  };
+
+  it('renders the aggregate summary + count table as a header on the Validation tab', async () => {
+    const target = await openValidation(COMPLETE_RECIPE);
+    assert.ok(
+      target.querySelector('[data-recipe-section="validation-summary"]'),
+      'the summary section renders'
+    );
+    assert.ok(target.querySelector('[data-recipe-validation-summary]'), 'the summary card renders');
+    assert.ok(target.querySelector('[data-recipe-validation-counts]'), 'the count table renders');
+    // It is a HEADER over the grouped checks, not a replacement for them.
+    const summary = target.querySelector('[data-recipe-section="validation-summary"]');
+    const firstGroup = target.querySelector('[data-validation-group]');
+    assert.ok(firstGroup, 'the grouped checks still render below it');
+    assert.ok(
+      summary.compareDocumentPosition(firstGroup) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the checks follow the summary'
+    );
+    editHarness.remount();
+  });
+
+  it('shows the aggregate ONLY on the Validation tab', async () => {
+    const target = await editHarness.mount(identityProps({ recipe: COMPLETE_RECIPE }));
+    assert.equal(
+      target.querySelector('[data-recipe-validation-summary]'),
+      null,
+      'no summary while another tab is active'
+    );
+    await openTab(target, 'validation');
+    assert.ok(target.querySelector('[data-recipe-validation-summary]'), 'it appears on the Validation tab');
+    editHarness.remount();
+  });
+
+  it('reads clear, with every satisfied check counted, when the recipe is complete', async () => {
+    const target = await openValidation(COMPLETE_RECIPE);
+    assert.equal(summaryStatus(target), 'clear', 'no issues reads as clear');
+    const c = counts(target);
+    assert.ok(c.passing > 0, 'the satisfied structural checks are counted');
+    assert.equal(c.warnings, 0);
+    assert.equal(c.blocking, 0);
+    editHarness.remount();
+  });
+
+  it('reads blocked when a critical issue is present', async () => {
+    // No name and no result group: both are critical, enable-blocking issues.
+    const target = await openValidation({ ...COMPLETE_RECIPE, name: '', resultGroups: [] });
+    assert.equal(summaryStatus(target), 'blocked', 'a critical issue reads as blocked');
+    assert.ok(counts(target).blocking > 0, 'the blockers are counted');
+    editHarness.remount();
+  });
+
+  // THE INVARIANT the rail's "same evaluator, can never disagree" comment protected, now
+  // enforced structurally: the tab derives `readiness` ONCE and builds both the aggregate
+  // and the rows from that one object. Pinning the counts against the ROWS (rather than
+  // against hardcoded numbers) is what actually proves it — a second evaluator, or a
+  // stale copy, breaks this and cannot break a number literal.
+  it('never disagrees with the check rows it heads', async () => {
+    for (const recipe of [
+      COMPLETE_RECIPE,
+      { ...COMPLETE_RECIPE, name: '', resultGroups: [] },
+      { ...COMPLETE_RECIPE, resultGroups: [] },
+    ]) {
+      const target = await openValidation(recipe);
+      const c = counts(target);
+      const rows = [...target.querySelectorAll('.manager-recipe-val-row')];
+      assert.equal(
+        c.passing,
+        rows.filter((r) => r.classList.contains('is-pass')).length,
+        'Passing equals the number of passing rows'
+      );
+      assert.equal(
+        c.blocking,
+        rows.filter((r) => r.classList.contains('is-block')).length,
+        'Blocking equals the number of blocking rows'
+      );
+      assert.equal(
+        c.warnings,
+        rows.filter((r) => r.classList.contains('is-warn')).length,
+        'Warnings equals the number of warning rows'
+      );
+      // And the headline status is the one the rows imply.
+      const expected = c.blocking > 0 ? 'blocked' : c.warnings > 0 ? 'warning' : 'clear';
+      assert.equal(summaryStatus(target), expected, 'the status matches the rows below it');
+      editHarness.remount();
+    }
+  });
+
+  // The mini-list is NOT coming back: the grouped rows below ARE the list, and the rail
+  // rendering both was the duplication.
+  it('does not reintroduce the rail check mini-list', async () => {
+    const target = await openValidation(COMPLETE_RECIPE);
+    assert.equal(target.querySelector('[data-recipe-rail-check]'), null, 'no rail check list');
+    assert.equal(target.querySelector('[data-recipe-validation-issues]'), null, 'no rail issue list');
+    assert.equal(target.querySelector('[data-recipe-validation-clear]'), null, 'no rail All-clear pill');
+    editHarness.remount();
+  });
 });
 
 describe('RecipeStepsCard (mounted)', () => {

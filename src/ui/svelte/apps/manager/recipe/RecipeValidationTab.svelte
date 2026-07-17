@@ -171,6 +171,47 @@
     })).filter((group) => group.rows.length > 0)
   );
 
+  // --- The aggregate summary (issue 676) -----------------------------------------
+  // Rehomed from the deleted RecipeContextRail, which showed it only while this very tab
+  // was open. The grouped rows below say what each check does; nothing said the
+  // at-a-glance STATE, so this is a header over them, not a duplicate of them.
+  //
+  // It reads the SAME `readiness` object the rows are built from — literally the one
+  // `$derived` above, not a second call — so "the aggregate can never disagree with the
+  // list" is structural rather than a convention someone has to remember. Blocking =
+  // critical issues (they block enabling); passing = the satisfied structural checks.
+  const criticalIssues = $derived(
+    (readiness?.issues || []).filter((issue) => issue.severity === 'critical')
+  );
+  const warningIssues = $derived(
+    (readiness?.issues || []).filter((issue) => issue.severity === 'warning')
+  );
+  const passingCount = $derived((readiness?.checks || []).filter((check) => check.satisfied).length);
+  const warningCount = $derived(warningIssues.length);
+  const blockingCount = $derived(criticalIssues.length);
+  const summaryStatus = $derived(
+    blockingCount > 0 ? 'blocked' : warningCount > 0 ? 'warning' : 'clear'
+  );
+  const summaryMeta = $derived(
+    summaryStatus === 'blocked'
+      ? {
+          icon: 'fas fa-circle-xmark',
+          title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlocked', 'Cannot be enabled'),
+          sub: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlockedSub', 'Clear every blocking issue before this recipe can be enabled.')
+        }
+      : summaryStatus === 'warning'
+        ? {
+            icon: 'fas fa-triangle-exclamation',
+            title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarnings', 'Enabled with warnings'),
+            sub: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarningsSub', 'Saves and enables — review the warnings when you can.')
+          }
+        : {
+            icon: 'fas fa-circle-check',
+            title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClear', 'All clear'),
+            sub: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClearSub', 'Every structural check passes. Ready to enable.')
+          }
+  );
+
   const STATUS_META = {
     pass: ['fas fa-circle-check', 'StatusPass', 'PASS'],
     warn: ['fas fa-triangle-exclamation', 'StatusWarn', 'WARNING'],
@@ -191,6 +232,40 @@
     <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}</h2>
     <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Validation.Intro', 'A recipe saves even while incomplete, but only enables when every blocking issue is cleared.')}</p>
   </div>
+
+  <!-- The aggregate header (issue 676): a status medallion + the Passing/Warnings/
+       Blocking counts, off the SAME readiness the grouped rows below are built from.
+       The rail's markup, classes and data hooks are kept verbatim so nothing that
+       already reads this surface has to learn a new name. Laid out as a ROW here — the
+       rail stacked it in a 300px column; a tab is ~1060px wide. -->
+  <section class="manager-recipe-validation-summary-row" data-recipe-section="validation-summary">
+    <div class={`manager-recipe-rail-summary is-${summaryStatus}`} data-recipe-validation-summary={summaryStatus}>
+      <span class="manager-recipe-rail-summary-medallion" aria-hidden="true">
+        <i class={summaryMeta.icon}></i>
+      </span>
+      <span class="manager-recipe-rail-summary-copy">
+        <span class="manager-recipe-rail-summary-title">{summaryMeta.title}</span>
+        <span class="manager-recipe-rail-summary-sub manager-muted">{summaryMeta.sub}</span>
+      </span>
+    </div>
+    <ul class="manager-recipe-rail-counts" data-recipe-validation-counts>
+      <li class="manager-recipe-rail-count is-passing">
+        <i class="fas fa-circle-check" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-count-passing>{passingCount}</span>
+      </li>
+      <li class="manager-recipe-rail-count is-warning">
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-count-warnings>{warningCount}</span>
+      </li>
+      <li class="manager-recipe-rail-count is-blocking">
+        <i class="fas fa-circle-xmark" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-count-blocking>{blockingCount}</span>
+      </li>
+    </ul>
+  </section>
 
   {#each groups as group (group.id)}
     <div class="manager-recipe-val-group" data-validation-group={group.id}>

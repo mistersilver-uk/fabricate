@@ -75,6 +75,27 @@ const FIXTURE = `
             </div>
           </div>
         </div>
+        <!-- The Validation tab's aggregate header (issue 676), rehomed from the deleted
+             context rail. Pinned to the rail's OWN committed values — the design source —
+             not read off the rehomed markup: a gate authored from the implementation
+             enshrines the implementation. Only the rail's LAYOUT changed here (a 300px
+             column became a ~1060px tab), never its type. -->
+        <section class="manager-recipe-validation-summary-row">
+          <div class="manager-recipe-rail-summary is-blocked">
+            <span class="manager-recipe-rail-summary-medallion" data-m="summary-medallion"><i class="fas fa-circle-xmark"></i></span>
+            <span class="manager-recipe-rail-summary-copy">
+              <span class="manager-recipe-rail-summary-title" data-m="summary-title">Cannot be enabled</span>
+              <span class="manager-recipe-rail-summary-sub manager-muted" data-m="summary-sub">Clear every blocking issue first.</span>
+            </span>
+          </div>
+          <ul class="manager-recipe-rail-counts">
+            <li class="manager-recipe-rail-count is-passing">
+              <i class="fas fa-circle-check"></i>
+              <span class="manager-recipe-rail-count-label" data-m="count-label">Passing</span>
+              <span class="manager-recipe-rail-count-value" data-m="count-value">7</span>
+            </li>
+          </ul>
+        </section>
         <input type="text" data-m="bleed-baseline" value="bare">
       </div>
     </section>
@@ -109,6 +130,14 @@ const EXPECTED = {
   'stage-dc': 13, // 0.8125rem mono 700 — shared read-only DC
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc, as on salvage
   'stage-move': 10.88, // 0.68rem — the reorder chevron glyph
+  // ── The Validation tab's aggregate header (issue 676). Every value is the one the
+  // deleted RecipeContextRail committed for the same roles; the rehome changed the
+  // layout, not the type scale.
+  'summary-medallion': 21.6, // 1.35rem — the 52px status medallion's glyph
+  'summary-title': 16, // 1rem serif 600
+  'summary-sub': 11.52, // 0.72rem
+  'count-label': 12.48, // 0.78rem — the count row
+  'count-value': 12.48, // 0.78rem mono 700 — inherits the count row's size
   'bleed-baseline': 14, // Foundry app base (bare control)
 };
 
