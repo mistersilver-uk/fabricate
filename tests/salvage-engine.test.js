@@ -1494,6 +1494,17 @@ test('salvage run createdResults record the awarding componentId, in award order
     ['scrap-iron', 'scrap-wood'],
     'createdResults must carry the awarding componentId in award order — not null'
   );
+  // Durable capture (issue 675): each record captures the created item's name/img at
+  // award time (mirroring crafting), so the Journal can label a salvage run's output
+  // even if the item is later deleted — no display-time resolution required.
+  assert.deepEqual(
+    createdResults.map((r) => r.name),
+    ['Iron Scrap', 'Wood Scrap'],
+    'createdResults must capture the awarded item name at award time'
+  );
+  createdResults.forEach((r) =>
+    assert.ok(Object.hasOwn(r, 'img'), 'each createdResults record captures an img field')
+  );
 });
 
 test('salvage() creates a waitingTime run when salvage has a time requirement', async () => {

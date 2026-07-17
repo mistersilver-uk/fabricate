@@ -4019,6 +4019,11 @@ export class CraftingEngine {
           itemUuid: item.uuid,
           componentId,
           quantity: Number(item.system?.quantity || 1),
+          // Capture name/img at award time (mirroring the crafting award record) so a
+          // salvage record is self-describing in the Journal even if the item is later
+          // deleted. Older records without these fall back to the componentId resolver.
+          name: item.name ?? null,
+          img: item.img ?? null,
         })),
         checkResult: {
           success: true,
