@@ -8628,7 +8628,9 @@
   white-space: nowrap;
 }
 
-/* The REQUIRED / TAG / ESSENCE type pill. */
+/* The REQUIRED / TAG type pill. (`.is-essence` was declared below for an ESSENCE pill on
+   the essence row; the row's flask lead chip already says that, so the pill is gone —
+   issue 676.) */
 .fabricate-manager .manager-recipe-req-tag {
   display: inline-flex;
   flex: 0 0 auto;
@@ -8646,11 +8648,6 @@
 .fabricate-manager .manager-recipe-req-tag.is-tag {
   color: var(--fab-purple);
   border-color: var(--fab-purple-soft);
-}
-
-.fabricate-manager .manager-recipe-req-tag.is-essence {
-  color: var(--fab-info);
-  border-color: var(--fab-info-soft);
 }
 
 .fabricate-manager .manager-recipe-option-controls {
@@ -8884,6 +8881,11 @@
   font-family: var(--fab-font-mono);
 }
 
+/* A currency/essence match editor is now just its picker: the amount moved out to the
+   shared end-of-row Stepper (issue 676), so `.manager-recipe-currency-amount` /
+   `.manager-recipe-essence-amount` (which sized the bare 3.75rem number inputs that
+   opened these rows) and `.manager-recipe-option-essence-detail` (the removed
+   "met by any components carrying this essence" sub-line) are gone with them. */
 .fabricate-manager .manager-recipe-option-currency,
 .fabricate-manager .manager-recipe-option-essence {
   display: flex;
@@ -8893,29 +8895,10 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-currency-amount,
-.fabricate-manager .manager-recipe-essence-amount {
-  flex: 0 0 auto;
-  width: 3.75rem;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-mv2-bg);
-  color: var(--fab-mv2-text);
-}
-
 .fabricate-manager .manager-recipe-currency-unit,
 .fabricate-manager .manager-recipe-essence-picker-wrap {
   display: inline-flex;
   min-width: 0;
-}
-
-/* The essence "met by any components carrying this essence" sub-line sits below the
-   row, mirroring the tag detail's small top gap. */
-.fabricate-manager .manager-recipe-option-essence-detail {
-  flex-basis: 100%;
-  margin-top: var(--fab-space-1);
 }
 
 /* §B1: subtle × remove — never a loud red trash/minus button. */
@@ -8980,13 +8963,6 @@
 .fabricate-manager .manager-recipe-essence-name {
   overflow: hidden;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-recipe-essence-subline {
-  overflow: hidden;
-  font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

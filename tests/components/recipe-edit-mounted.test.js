@@ -2139,26 +2139,40 @@ describe('RecipeEditView (mounted)', () => {
     );
 
     // The essence requirement renders as a first-class essence OPTION row (issue 649),
-    // with its amount input (no quantity stepper) and the essence sub-line.
+    // its amount edited by the SAME end-of-row Stepper every other row type uses (676).
     const essenceReq = set.querySelector('[data-recipe-group-id="grp-3"]');
     assert.ok(essenceReq, 'the essence requirement renders as an ingredient group');
+    const essenceAmount = essenceReq.querySelector('[data-recipe-essence-amount]');
+    assert.equal(essenceAmount.value, '3', 'essence amount shown on the option');
+    // The amount is a Stepper, in the trailing control cluster — not the bare number
+    // input that used to open the row (issue 676).
     assert.ok(
-      essenceReq.querySelector('[data-recipe-req-tag="essence"]'),
-      'the essence option carries the Essence tag'
+      essenceAmount.closest('.fab-stepper'),
+      'the essence amount is the shared Stepper, not a bare input'
     );
-    assert.equal(
-      essenceReq.querySelector('[data-recipe-essence-amount]').value,
-      '3',
-      'essence amount shown on the option'
+    assert.ok(
+      essenceAmount.closest('.manager-recipe-option-controls'),
+      'the essence stepper sits in the row’s trailing control cluster'
     );
+    // Still no `data-recipe-option-quantity`: an essence row's count lives on the MATCH
+    // (`match.amount`), not on `option.quantity`, so the marker stays per-kind even
+    // though the control is now shared.
     assert.equal(
       essenceReq.querySelector('[data-recipe-option-quantity]'),
       null,
-      'an essence option shows no quantity stepper'
+      'an essence option edits match.amount, not option.quantity'
     );
-    assert.ok(
+    // §676: the ESSENCE pill and the "met by any components carrying this essence"
+    // sub-line are gone — the flask lead chip already says what the row is.
+    assert.equal(
+      essenceReq.querySelector('[data-recipe-req-tag="essence"]'),
+      null,
+      'the redundant ESSENCE pill is gone'
+    );
+    assert.equal(
       essenceReq.querySelector('[data-recipe-essence-subline]'),
-      'the essence option shows the met-by sub-line'
+      null,
+      'the over-explaining met-by sub-line is gone'
     );
     editHarness.remount();
   });
@@ -2891,20 +2905,34 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }],
       { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS } }
     );
-    // The currency option renders an amount input + a unit picker (no quantity input).
+    // The currency option's editor is now just its unit picker; the amount moved out to
+    // the shared end-of-row Stepper (issue 676).
     const currency = target.querySelector('[data-recipe-option-currency]');
     assert.ok(currency, 'the currency option renders its editor');
     assert.equal(
+      currency.querySelector('[data-recipe-currency-amount]'),
+      null,
+      'the bare amount input no longer opens the currency row'
+    );
+    // Still no `data-recipe-option-quantity`: a currency row's count lives on the MATCH
+    // (`match.amount`), not on `option.quantity`.
+    assert.equal(
       target.querySelector('[data-recipe-option] [data-recipe-option-quantity]'),
       null,
-      'currency rows have no separate quantity input'
+      'currency rows edit match.amount, not option.quantity'
     );
+
+    const amount = target.querySelector(
+      '.manager-recipe-option-controls [data-recipe-currency-amount]'
+    );
+    assert.ok(amount, 'the currency amount is a Stepper in the trailing control cluster');
+    assert.ok(amount.closest('.fab-stepper'), 'the currency amount is the shared Stepper');
 
     // Controlled component: each edit derives from the unchanged prop, so the
     // amount edit keeps the chosen unit and the unit edit keeps the prop amount.
-    const amount = currency.querySelector('[data-recipe-currency-amount]');
+    // The Stepper commits on `input` (it stays typeable mid-keystroke), not `change`.
     amount.value = '250';
-    amount.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    amount.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.deepEqual(
       patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match,
       { type: 'currency', unit: 'gp', amount: 250 },

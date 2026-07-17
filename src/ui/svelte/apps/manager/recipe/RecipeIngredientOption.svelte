@@ -4,18 +4,19 @@
   so the parent keys them by index and owns the option list; this component renders
   the requirement ROW to the prototype anatomy (issue 643 §B1):
 
-    [lead chip] [icon medallion / name] … [REQUIRED tag] [qty stepper] | [or…] [× remove]
+    [lead chip] [picker / summary] … [REQUIRED tag] [count stepper] | [or…] [× remove]
 
   The lead chip is a small type-tinted square (component → cubes, tag → tag, currency
-  → coins). A component alternative additionally shows the component's image as the
-  clickable picker medallion (swap the component) with its name beside it; a tag
-  alternative shows a summary "any #tag" name + a TAG pill, with the any/all control
-  and chip list as an editing detail below; a currency alternative shows an amount +
-  unit picker.
+  → coins, essence → flask). A component alternative additionally shows the component's
+  image as the clickable picker medallion (swap the component) with its name beside it;
+  a tag alternative shows a summary "any #tag" name + a TAG pill, with the any/all
+  control and chip list as an editing detail below; currency and essence alternatives
+  show only their unit/essence picker.
 
-  The quantity is the shared `Stepper` (horizontal) rather than a raw number input
-  (§B1); the remove control is a subtle `×` (`fa-xmark`), never a loud `fa-minus`
-  (§B1). The requirement-level "or…" popover is passed in as the `orControl` snippet
+  EVERY row type edits its count with the same shared `Stepper` in the same end-of-row
+  slot (issue 676) — see the note at the stepper itself for why the marker attribute is
+  still per-kind. The remove control is a subtle `×` (`fa-xmark`), never a loud
+  `fa-minus` (§B1). The requirement-level "or…" popover is passed in as the `orControl` snippet
   by the parent for a BARE (single-alternative) requirement, so it sits INLINE at the
   row's right end; a multi-alternative box renders it at the box bottom instead.
 -->
@@ -250,16 +251,6 @@
       <span class="manager-recipe-req-tag is-tag" data-recipe-req-tag="tag">{text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}</span>
     {:else if matchType === 'essence'}
       <div class="manager-recipe-option-essence" data-recipe-option-essence>
-        <input
-          type="number"
-          min="1"
-          max="9999"
-          class="manager-recipe-essence-amount"
-          data-recipe-essence-amount
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-          value={essenceAmount}
-          onchange={(e) => setEssenceAmount(e.target.value)}
-        />
         <span class="manager-recipe-essence-picker-wrap" data-recipe-essence-picker>
           <SearchablePopover
             options={essencePickerOptions}
@@ -279,20 +270,9 @@
             onChoose={(id) => chooseEssence(id)}
           />
         </span>
-        <span class="manager-recipe-req-tag is-essence" data-recipe-req-tag="essence">{text('FABRICATE.Admin.Manager.Recipe.EssenceTypeLabel', 'Essence')}</span>
       </div>
     {:else}
       <div class="manager-recipe-option-currency" data-recipe-option-currency>
-        <input
-          type="number"
-          min="1"
-          max="9999"
-          class="manager-recipe-currency-amount"
-          data-recipe-currency-amount
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-          value={currencyAmount}
-          onchange={(e) => setCurrencyAmount(e.target.value)}
-        />
         <span class="manager-recipe-currency-unit" data-recipe-currency-unit>
           <SearchablePopover
             options={currencyPickerOptions}
@@ -321,7 +301,42 @@
       <span class="manager-recipe-req-tag is-required" data-recipe-req-tag="required">{text('FABRICATE.Admin.Manager.Recipe.RequiredTag', 'Required')}</span>
     {/if}
 
-    {#if matchType !== 'currency' && matchType !== 'essence'}
+    <!-- EVERY row type edits its count through the SAME Stepper in the SAME end-of-row
+         position (issue 676). Essence and currency used to put a bare `<input type=number>`
+         at the row's START, so the one thing all four row types have in common — "how many"
+         — was two different controls in two different places depending on the row's kind.
+         The count is the same question, so it is the same control.
+
+         The MODEL differs even though the control does not: a component/tag row counts with
+         `option.quantity`, while essence and currency carry their count on the MATCH
+         (`match.amount`) with `option.quantity` pinned at 1. So the marker attribute stays
+         per-kind (`data-recipe-essence-amount` / `data-recipe-currency-amount` /
+         `data-recipe-option-quantity`) — a shared marker would claim these write the same
+         field, and `data-recipe-option-quantity` specifically means "this row's
+         option.quantity", which is not what an essence stepper edits. -->
+    {#if matchType === 'essence'}
+      <Stepper
+        value={essenceAmount}
+        min={1}
+        max={9999}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
+        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
+        inputProps={{ 'data-recipe-essence-amount': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        onChange={(value) => setEssenceAmount(value)}
+      />
+    {:else if matchType === 'currency'}
+      <Stepper
+        value={currencyAmount}
+        min={1}
+        max={9999}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
+        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
+        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
+        inputProps={{ 'data-recipe-currency-amount': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        onChange={(value) => setCurrencyAmount(value)}
+      />
+    {:else}
       <Stepper
         value={quantity}
         min={1}
@@ -412,11 +427,10 @@
     </div>
   {/if}
 
-  {#if matchType === 'essence'}
-    <!-- The essence sub-line: met by any components carrying this essence (parallel to
-         the currency cost hint). A full-width muted line under the row. -->
-    <div class="manager-recipe-option-essence-detail">
-      <span class="manager-recipe-essence-subline manager-muted" data-recipe-essence-subline>{text('FABRICATE.Admin.Manager.Recipe.EssenceMetBy', 'met by any components carrying this essence')}</span>
-    </div>
-  {/if}
+  <!-- (An essence row carried a full-width "met by any components carrying this essence"
+       sub-line here, and an ESSENCE pill after its picker. Both are gone (issue 676): the
+       row already opens with the flask lead chip and its picker names an essence, so the
+       pill restated the chip and the sub-line explained the feature to a GM who had just
+       chosen it deliberately from an essence-only menu. Explanation belongs in the tab's
+       intro copy, not repeated under every row.) -->
 </div>
