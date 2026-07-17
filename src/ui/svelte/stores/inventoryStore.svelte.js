@@ -568,6 +568,11 @@ export function createInventoryStore({ services } = {}) {
             .map((entry) => entry?.componentId)
             .filter(Boolean),
           outcomeId: result?.salvageRun?.checkResult?.data?.outcomeId ?? null,
+          // The rolled total, so the summary can print "with a roll of N". Read from the
+          // engine's top-level `value` (present even runless), NOT from `salvageRun`. A
+          // no-check "Guaranteed" salvage rolled nothing and returns null — kept null so
+          // the summary omits the roll phrase entirely rather than printing "of 0".
+          rollValue: Number.isFinite(result?.value) ? result.value : null,
         };
         await load(true);
         // Reconcile the held snapshot with post-salvage reality (issue 675 defect).

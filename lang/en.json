@@ -452,7 +452,8 @@
           "Again": "Salvage again",
           "Depleted": "That was the last one — nothing left to salvage.",
           "OutcomeSuccess": "Salvaged",
-          "OutcomeWaiting": "In progress"
+          "OutcomeWaiting": "In progress",
+          "SummaryWithRoll": "with a roll of"
         },
         "Detail": {
           "SelectHint": "Select an item to see its sources and where it's used.",

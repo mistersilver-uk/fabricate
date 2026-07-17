@@ -566,6 +566,50 @@ test('salvage() consumes component item on success', async () => {
   assert.equal(compItem.deleteCalled, true, 'Component should be deleted on success (qty == ingredientQuantity)');
 });
 
+// Issue 675: the player summary reports "with a roll of N", so the engine must thread
+// the rolled total onto the TOP-LEVEL result — not only onto `salvageRun`, which is
+// null on the runless path. A rolled check surfaces the number; a no-check salvage
+// surfaces null so the UI omits the roll phrase entirely.
+test('salvage() threads the rolled total onto the top-level result (issue 675)', async () => {
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [{ id: 'rg-1', name: 'Scraps', results: [] }], meta: {} })
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+  engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: 23, data: {} });
+
+  const compItem = makeItem('comp-item', 'Test Component', 1);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({ name: 'Test Component', ingredientQuantity: 1, resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
+  const system = makeSystem({ components: [component] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true);
+  assert.equal(result.value, 23, 'the rolled total is threaded top-level, even without a run manager');
+});
+
+test('salvage() reports a null roll value for a no-check salvage (issue 675)', async () => {
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [{ id: 'rg-1', name: 'Scraps', results: [] }], meta: {} })
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+  engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  const compItem = makeItem('comp-item', 'Test Component', 1);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({ name: 'Test Component', ingredientQuantity: 1, resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }] });
+  const system = makeSystem({ components: [component] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true);
+  assert.equal(result.value, null, 'no roll happened — value is null so the UI prints no roll phrase');
+});
+
 test('salvage() reduces component quantity when partially consumed', async () => {
   const fakeResolutionService = {
     validateSalvage: () => ({ valid: true, errors: [] }),

@@ -28,6 +28,13 @@
   const state = $derived(result?.state ?? null);
   const message = $derived(String(result?.message ?? '').trim());
   const awarded = $derived(Array.isArray(result?.awarded) ? result.awarded : []);
+  // The rolled total, present only when a roll actually happened. A no-check
+  // "Guaranteed" salvage has none (null), so the roll phrase is omitted rather than
+  // printing "with a roll of 0/null". The connective is prose (it inherits the muted
+  // message treatment); only the NUMBER is set mono, honouring the box's rule that
+  // mono is for roll totals and DC values.
+  const rollValue = $derived(Number.isFinite(result?.rollValue) ? result.rollValue : null);
+  const hasRoll = $derived(rollValue !== null);
 </script>
 
 {#if state}
@@ -51,7 +58,10 @@
       </span>
     </p>
     {#if message}
-      <p class="salvage-summary-message" data-inventory-salvage-message>{message}</p>
+      <p class="salvage-summary-message" data-inventory-salvage-message>
+        {message}{#if hasRoll} {localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}
+          <span class="salvage-summary-roll" data-inventory-salvage-roll>{rollValue}</span>{/if}
+      </p>
     {/if}
     {#if awarded.length > 0}
       <ul class="salvage-summary-awarded" data-inventory-salvage-awarded>
@@ -113,6 +123,16 @@
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);
+  }
+
+  /* The rolled total reads as DATA, so it takes the box's mono numeric treatment (the
+     same one RollResultBox gives a roll total) while the connective around it stays
+     prose. Inline with the message so it reads as one sentence. */
+  .salvage-summary-roll {
+    font-family: var(--fab-font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--fab-text);
   }
 
   .salvage-summary-awarded {

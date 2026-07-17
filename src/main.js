@@ -1395,7 +1395,7 @@ class Fabricate {
    *   so Dice So Nice animates it. Defaults to false so macros and automation stay
    *   silent. A dismissed prompt returns `{ success: false, cancelled: true, results:
    *   null }` with zero mutation.
-   * @returns {Promise<{success: boolean, results: Array|null, message: string, salvageRun?: object|null, cancelled?: boolean}>}
+   * @returns {Promise<{success: boolean, results: Array|null, message: string, value?: number|null, salvageRun?: object|null, cancelled?: boolean}>}
    */
   async salvageComponent({ actorId = null, systemId, componentId, interactive = false } = {}) {
     this._requireReady();

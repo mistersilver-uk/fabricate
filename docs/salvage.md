@@ -146,6 +146,7 @@ Nothing is consumed, no tool breaks, and no message is shown.
 The tab returns to how it looked before the roll.
 
 Once the roll resolves, a read-only summary appears, the body marks what was recovered and what the roll fell short of, and a ribbon confirms the materials were added.
+When the salvage involved a roll, the summary reports its total alongside what was recovered; a guaranteed, no-check salvage shows none, because nothing was rolled.
 **Salvage again** clears the summary and returns the tab to its pre-roll state.
 The ribbon stays with the component that was salvaged, even when the last copy was consumed and its card has left the grid.
 When that last copy is gone, the header reads **None remaining** and **Salvage again** is withheld, because there is nothing left to break down.

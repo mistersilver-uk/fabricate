@@ -4052,6 +4052,10 @@ export class CraftingEngine {
       success: true,
       results: resultItems,
       message: `Successfully salvaged ${component.name || componentId}`,
+      // The rolled total, threaded top-level so the player summary can read it even on
+      // the RUNLESS path (no salvage run manager) where `salvageRun` is null. `null` for
+      // a no-check simple salvage (nothing was rolled); a finite number otherwise.
+      value: checkResult.value ?? null,
       salvageRun,
     };
   }

@@ -1166,6 +1166,52 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.doesNotMatch(target.textContent, /d20/, 'it never invents a formula');
   });
 
+  // Issue 675: the success summary must report the ROLL VALUE ("with a roll of N") when
+  // a roll actually happened, and must NOT when it did not (a no-check "Guaranteed"
+  // salvage rolled nothing — printing "of 0/null" would be a lie). The connective
+  // localizes to its key in the test i18n; only the number is asserted verbatim.
+  it('the summary prints the roll total when a roll happened, and omits it for a no-check salvage', async () => {
+    const { services, store } = salvageServices(salvageItem({ checkUsable: true, dc: 12 }));
+    store.salvageResult = {
+      componentId: 'c1',
+      state: 'success',
+      message: 'Successfully salvaged Mordant Gland',
+      awarded: [{ name: 'Iron Shard', img: null }],
+      rollValue: 23,
+    };
+    let target = await openSalvage(services);
+    const roll = target.querySelector('[data-inventory-salvage-roll]');
+    assert.ok(roll, 'the rolled total is shown when a roll happened');
+    assert.equal(roll.textContent.trim(), '23', 'the exact rolled total');
+    assert.match(
+      target.querySelector('[data-inventory-salvage-message]').textContent,
+      /SummaryWithRoll/,
+      'the connective phrases the number as the roll'
+    );
+
+    // A no-check salvage carries a null rollValue: no roll phrase at all.
+    harness.remount();
+    const guaranteed = salvageServices(salvageItem({ checkUsable: false }));
+    guaranteed.store.salvageResult = {
+      componentId: 'c1',
+      state: 'success',
+      message: 'Successfully salvaged Mordant Gland',
+      awarded: [{ name: 'Iron Shard', img: null }],
+      rollValue: null,
+    };
+    target = await openSalvage(guaranteed.services);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-roll]'),
+      null,
+      'a no-check salvage rolled nothing — no roll phrase'
+    );
+    assert.doesNotMatch(
+      target.querySelector('[data-inventory-salvage-message]').textContent,
+      /SummaryWithRoll|roll of/i,
+      'and never "with a roll of 0/null"'
+    );
+  });
+
   it('a committed salvage with stock remaining swaps the footer for the ribbon plus a Salvage again reset', async () => {
     // makeItem() carries totalQuantity 7, so stock remains: "Salvage again" is offered.
     const { services, calls, store } = salvageServices(salvageItem());

@@ -483,7 +483,9 @@ describe('inventoryStore', () => {
 
     it('a successful salvage holds the outcome and quietly reloads the listing', async () => {
       const { services, calls: _calls } = salvageServices({
-        result: { success: true, results: [{}], message: 'Salvaged Iron' },
+        // Issue 675: the engine threads the rolled total top-level as `value`; the store
+        // must carry it onto `salvageResult.rollValue` for the summary's roll phrase.
+        result: { success: true, results: [{}], message: 'Salvaged Iron', value: 23 },
       });
       const { services: base, calls: listCalls } = makeServices({
         listing: { selectedActorId: 'hero', rows: [salvageRow()] },
@@ -499,11 +501,29 @@ describe('inventoryStore', () => {
       flushSync();
 
       assert.equal(store.salvageResult.state, 'success');
+      assert.equal(store.salvageResult.rollValue, 23, 'the rolled total is held for the summary');
       assert.equal(
         listCalls.listInventoryForActor.length,
         before + 1,
         'the awarded materials must appear'
       );
+    });
+
+    it('a no-check salvage holds a null rollValue so the summary omits the roll phrase', async () => {
+      // The engine returns `value: null` for a no-check "Guaranteed" salvage — nothing
+      // was rolled. The store must keep it null, never coerce it to 0.
+      const { services } = salvageServices({
+        result: { success: true, results: [{}], message: 'Salvaged Iron', value: null },
+      });
+      const store = createInventoryStore({ services });
+      await store.load();
+      flushSync();
+
+      await store.salvage('c1');
+      flushSync();
+
+      assert.equal(store.salvageResult.state, 'success');
+      assert.equal(store.salvageResult.rollValue, null, 'no roll happened — no roll phrase');
     });
 
     it('a failed salvage surfaces its message through notify and holds no ribbon', async () => {
