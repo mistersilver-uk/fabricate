@@ -721,8 +721,11 @@
       >
         <div class="manager-task-card-heading">
           <div>
-            <h3>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'This component’s Progressive DC')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyHint', 'Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its own component.')}</p>
+            <!-- The card title uses its OWN key. `Component.ProgressiveDifficulty` is a SHORT
+                 label shared with the browser badge (`${label} ${difficulty}` -> "Progressive
+                 difficulty 2") and the evidence row, so it must not carry this sentence. -->
+            <h3>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyCardTitle', 'This component’s Progressive DC')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyHint', 'Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its component.')}</p>
           </div>
           <div class="manager-component-inline-stepper">
             <span class="manager-component-micro-label">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyMicro', 'DC')}</span>

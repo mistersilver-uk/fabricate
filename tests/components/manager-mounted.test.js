@@ -5394,6 +5394,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
   }
 
+  it('titles the difficulty card without stealing the browser badge label', async () => {
+    // The card title and the browser badge are DIFFERENT strings that both describe
+    // `component.difficulty`. The badge composes `${label} ${difficulty}`, so pointing
+    // the card's <h3> at the shared `Component.ProgressiveDifficulty` key would render
+    // "This component's Progressive DC 2" in the list. They must stay separate keys.
+    await openComponentEditor([], { alchemyResolutionMode: 'progressive' });
+    const card = target.querySelector('[data-component-edit-section="difficulty"]');
+    assert.equal(card.querySelector('h3').textContent.trim(), 'This component’s Progressive DC');
+    assert.ok(
+      card
+        .querySelector('p')
+        .textContent.includes('shown read-only wherever this component appears as a progressive result')
+    );
+  });
+
   it('hides the component difficulty control when no progressive surface consumes it', async () => {
     await openComponentEditor([], {
       alchemyResolutionMode: 'routedByCheck',

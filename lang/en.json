@@ -2091,9 +2091,10 @@
           "NoTags": "No tags",
           "NoEssences": "No essences",
           "ProgressiveDifficulty": "Progressive difficulty",
+          "ProgressiveDifficultyCardTitle": "This component’s Progressive DC",
           "DifficultyNone": "None",
           "ProgressiveDifficultyLabel": "Difficulty value",
-          "ProgressiveDifficultyHint": "Cost spent against the crafting roll in progressive mode. Whole number, 1 or greater; leave blank to clear. Saved with the editor.",
+          "ProgressiveDifficultyHint": "Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its component.",
           "NoDifficulty": "No difficulty",
           "Salvage": "Salvage",
           "SalvageReorder": {
