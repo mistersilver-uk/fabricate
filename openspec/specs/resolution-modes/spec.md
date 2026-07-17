@@ -187,6 +187,9 @@ This governs **every** progressive award surface, crafting and salvage alike —
 The normalization is enforced at award time on both paths (`ResolutionModeService._resolveProgressive` for recipes, `CraftingEngine._resolveSalvageResultGroups` for salvage), never by a migration: `quantity` remains a stored, normalizer-clamped field and is simply inert in this mode.
 The salvage scope is stated explicitly because it was read as recipe-only once and the salvage path shipped honouring the authored count.
 - Each result references a `Component` with `difficulty >= 1`.
+This `difficulty` IS the component's **progressive DC** — the field the GM component editor labels verbatim "This component's Progressive DC" — and it is stable, per-component authored data.
+It is distinct from the progressive **check**, which has **no DC** of its own: the check produces the numeric budget (`value`), and each stage spends that budget against its component's progressive DC.
+Player-facing progressive surfaces therefore show both per stage — the component's progressive DC (`DC N`) and the cumulative budget that reaches the stage (`Reach ≥N`).
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
 - **All result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group.

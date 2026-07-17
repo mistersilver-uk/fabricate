@@ -1364,19 +1364,31 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   });
 
-  it('prints ONE number per stacked row: the cumulative threshold, not both', async () => {
+  it('prints BOTH numbers per stacked row: the component DC and the cumulative reach', async () => {
+    // Issue 675 ruling: progressive CHECKS have no DC, but COMPONENTS do. `stage.difficulty`
+    // IS the component's progressive DC (`component.difficulty`, GM-labelled "This component's
+    // Progressive DC"), distinct from `stage.threshold` (the cumulative budget to reach the
+    // stage). An earlier round dropped the DC from the stacked row on the false belief that
+    // progressive "has no DC"; that was the check DC, not the component's. Both show now.
     const { services } = shapeServices();
     const target = await openSalvage(services);
 
-    assert.equal(
-      target.querySelector('[data-progressive-stage-difficulty]'),
-      null,
-      'the per-stage difficulty is the running sum the threshold already reports — printing both said it twice, and the pair measured wider than the whole identity column',
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-progressive-stage-difficulty]')].map((n) => n.textContent.trim()),
+      ['DC 4', 'DC 3'],
+      'the component\'s own progressive DC is shown per stage, labelled as a DC',
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-progressive-stage-difficulty]')].map((n) =>
+        n.getAttribute('data-progressive-stage-difficulty'),
+      ),
+      ['4', '3'],
+      'and the raw DC stays on the marker attribute for smoke selectors',
     );
     assert.deepEqual(
       [...target.querySelectorAll('[data-progressive-stage-threshold]')].map((n) => n.textContent.trim()),
       ['Reach ≥4', 'Reach ≥7'],
-      'and the survivor is the number that answers "what must I roll to reach this?"',
+      'alongside the cumulative reach, which answers "what must I roll to reach this?"',
     );
   });
 

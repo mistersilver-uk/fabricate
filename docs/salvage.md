@@ -121,14 +121,16 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Simple, with no salvage check roll formula | **You will recover**, then the materials, each tagged **Guaranteed**. No roll is made. |
 | Simple, with a salvage check roll formula | **On a success**, the materials, the DC to beat, and a note that a failed roll can cost the component. |
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
-| Progressive | The result stages in order, each with the check value that reaches it, shown as **Reach ≥N**. |
+| Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 A component's DC override shifts the DC shown for a simple check, and it shifts the thresholds shown for relative outcome tiers.
 Fixed tiers own absolute segments of the roll range and have no DC, so they are shown exactly as you authored them and no DC appears.
-Progressive salvage has no DC either.
+Progressive salvage is different again.
+The progressive salvage check itself has no DC, because its roll is a budget spent down the stage list rather than a pass-or-fail against a target.
+Each component still carries its own progressive DC, and that DC is shown on its stage beside the reach value.
 See [Relative and fixed tiers]({% link crafting-checks.md %}#relative-and-fixed-tiers).
 
 ### Making the Attempt

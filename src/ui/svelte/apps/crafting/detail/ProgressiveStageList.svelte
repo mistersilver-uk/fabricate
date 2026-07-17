@@ -157,20 +157,30 @@
 -->
 {#snippet numbers(stage)}
   <!--
-    ONE number when stacked, TWO inline.
+    TWO numbers on BOTH surfaces (issue 675 ruling): the component's progressive DC, then
+    the cumulative threshold.
 
-    They are not independent facts: `progressiveStageThresholds` DERIVES the threshold
-    as the running sum of the difficulties before it, so a list that prints both prints
-    the same information twice, and the threshold is the one that answers the player's
-    actual question ("what do I need to roll to reach this?"). Inline, on the crafting
-    tab's wide panel, the pair is affordable and the difficulty is a useful cross-check.
-    Stacked, in a 300px column, it is not: the two together measure wider than the whole
-    identity column, and the redundant one is what pushes the useful one out of the box.
-    The prototype prints the threshold alone for exactly this reason.
+    They are DIFFERENT numbers, not the same fact printed twice:
+
+      - `stage.difficulty` IS the component's own **progressive DC** — `component.difficulty`,
+        the field the GM editor labels verbatim "This component's Progressive DC". It is
+        stable authored data on the component.
+      - `stage.threshold` is the CUMULATIVE budget to REACH this stage — the running sum of
+        the DCs before it plus this one — which answers "what do I need to roll to get here?".
+
+    An earlier round showed only the threshold on the stacked (salvage) row, in the belief
+    that "DC" was a concept progressive lacked. That conflated the progressive CHECK (which
+    genuinely has no DC — its roll is a budget, not a pass/fail against a target) with the
+    COMPONENT, which does carry a progressive DC. The maintainer's ruling: progressive checks
+    have no DC, but components do — so both surfaces show the component DC alongside the reach.
   -->
-  {#if !stacked && stage.difficulty !== null && stage.difficulty !== undefined}
+  {#if stage.difficulty !== null && stage.difficulty !== undefined}
     <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
-      <i class="fas fa-gauge-high" aria-hidden="true"></i>{stage.difficulty}
+      <i class="fas fa-gauge-high" aria-hidden="true"></i>{format(
+        'FABRICATE.App.Crafting.Detail.StageDifficultyDc',
+        'DC {difficulty}',
+        { difficulty: stage.difficulty }
+      )}
     </span>
   {/if}
   <!-- Omitted (not zeroed) when the threshold is undefined: a stage the award loop
@@ -178,11 +188,12 @@
   {#if stage.threshold !== null && stage.threshold !== undefined}
     <span class="crafting-stage-threshold" data-progressive-stage-threshold={String(stage.threshold)}>
       {#if stacked}
-        <!-- The SHORT form of the same phrase, not a new term. The prototype labels this
-             "DC n", but "DC" is a defined concept here that progressive genuinely does
-             NOT have: `InventoryListingBuilder._salvageDc` returns null for progressive,
-             and a component's `dcOverride` does not shift these thresholds. Borrowing
-             the prototype's loose wording would contradict the projection and the docs. -->
+        <!-- The SHORT form of the same phrase — stacked, this reads "DC N · Reach ≥N" (the
+             DC chip above, then this). This is the COMPONENT's progressive DC (`component.difficulty`,
+             GM-labelled "This component's Progressive DC"), NOT the progressive check DC: the
+             check has no DC (`InventoryListingBuilder._salvageDc` returns null for progressive,
+             and `dcOverride` is a check-DC knob progressive never reads). Those check-DC facts
+             do not argue against showing the component's own DC, which is stable authored data. -->
         {format('FABRICATE.App.Crafting.Detail.StageThresholdShort', 'Reach ≥{threshold}', { threshold: stage.threshold })}
       {:else}
         {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', { threshold: stage.threshold })}
