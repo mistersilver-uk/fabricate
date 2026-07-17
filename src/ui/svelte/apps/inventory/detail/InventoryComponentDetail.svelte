@@ -142,24 +142,44 @@
     { id: 'salvage', icon: 'fas fa-recycle', key: 'FABRICATE.App.Inventory.Detail.TabSalvage' }
   ];
   let activeTab = $state('info');
-  // Reset to Info only when the selected item's KEY actually changes — i.e. the
-  // player picked a DIFFERENT component (whose Salvage panel is a different shape, or
-  // which is not salvageable at all, leaving no tab bar and an orphaned panel).
+  // Tab routing is driven by two events, resolved in ONE effect so their ordering is
+  // explicit rather than a race between two:
   //
-  // A salvage roll calls `load(true)`, which hands us a NEW item object with the SAME
-  // key; keying the reset on the object reference (issue 675 defect) dropped the
-  // player off Salvage onto Info the instant their roll resolved, while the success
-  // ribbon sat on the Salvage tab they'd just been kicked out of. Tracking the
-  // previous key keeps Salvage active across that same-key reload.
+  //  1. A newly-arrived salvage RESULT opens Salvage. This is the robust fix for the
+  //     post-salvage bounce (issue 675 defect): rather than trying to PREVENT a reset
+  //     (which assumed the component instance never remounts — an assumption that did
+  //     not hold in the real Foundry flow, where the roll dialog can trigger a
+  //     remount), we ACTIVELY open Salvage whenever a result appears. This survives a
+  //     remount — on a fresh mount with a result already present it opens Salvage — AND
+  //     a same-instance reload. It is gated on the result being NEW (a changed
+  //     reference) so a player who manually clicks Info while the ribbon is up is not
+  //     yanked back: a manual tab change does not touch `salvageResult`, so the effect
+  //     never re-fires for it.
   //
-  // Seeded to a sentinel rather than `item?.key` (which would only capture the initial
-  // value and warn): the first effect run then "resets" to Info, which is a no-op
-  // because `activeTab` already starts on Info.
+  //  2. Otherwise, a changed item KEY resets to Info — the player picked a DIFFERENT
+  //     component (whose Salvage panel is a different shape, or which is not salvageable
+  //     at all). Selecting a new component also CLEARS `salvageResult` in the store, so
+  //     branch 1 never mistakes the old ribbon for a new arrival on that switch.
+  //
+  // The result branch WINS when both fire in one pass: a resolved salvage hands us a new
+  // item object (its key-change branch would otherwise reset to Info) but must land on
+  // Salvage. Both `prev*` are seeded to `undefined` sentinels, so the first run treats a
+  // pre-existing result as an arrival (the remount case) and an absent one as a plain
+  // key-change reset to Info (a no-op, since `activeTab` already starts on Info).
   let prevItemKey;
+  let prevSalvageResult;
   $effect(() => {
     const key = item?.key ?? null;
-    if (key !== prevItemKey) {
-      prevItemKey = key;
+    const result = salvageResult;
+    const keyChanged = key !== prevItemKey;
+    const resultArrived = result != null && result !== prevSalvageResult;
+    prevItemKey = key;
+    prevSalvageResult = result;
+    if (resultArrived && salvageable) {
+      activeTab = 'salvage';
+      return;
+    }
+    if (keyChanged) {
       activeTab = 'info';
     }
   });

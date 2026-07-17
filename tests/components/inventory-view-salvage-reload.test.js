@@ -212,4 +212,43 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     assert.match(total.textContent, /TotalDepleted/, 'the depleted total key, not a count');
     assert.doesNotMatch(total.textContent, /Total:/, 'never the stale counted "N total"');
   });
+
+  // Issue 675 (re-report): the previous fix tried to PREVENT the tab reset, which
+  // assumed the inspector instance never remounts. In the real Foundry flow the roll
+  // dialog can remount it, and the bounce returned. The robust fix actively OPENS
+  // Salvage when a held result is present on a fresh mount — this test tears the tree
+  // down and remounts against the SAME store to prove it survives that remount.
+  it('reopens Salvage on a REMOUNT while a result is held (survives a dialog-driven remount)', async () => {
+    const services = makeServices();
+    services.inventory = createInventoryStore({ services });
+    let target = await harness.mount({ services });
+    await settle();
+
+    services.inventory.select('sys:c1');
+    await settle();
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+
+    target.querySelector('[data-inventory-salvage-action]').click();
+    await settle();
+    await settle();
+    assert.ok(services.inventory.salvageResult, 'the store holds a result after the roll');
+
+    // Fresh component tree, same store: the remount the maintainer observed.
+    harness.remount();
+    target = await harness.mount({ services });
+    await settle();
+
+    const salvageTab = target.querySelector('[data-inventory-detail-tab="salvage"]');
+    assert.ok(salvageTab, 'the held salvageable component still shows its Salvage tab');
+    assert.equal(
+      salvageTab.getAttribute('aria-selected'),
+      'true',
+      'a fresh mount with a held result opens Salvage, not Info'
+    );
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-ribbon]'),
+      'and the success ribbon is on that reopened tab'
+    );
+  });
 });
