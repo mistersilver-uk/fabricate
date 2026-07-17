@@ -118,6 +118,10 @@ export class RunJournalBuilder {
    * @param {Function} [deps.getResultItem] `(itemUuid) => { name, img }|null` — resolves
    *   an awarded/created result item by its recorded uuid, so the journal can label a
    *   run's produced items even for records that predate name/img capture.
+   * @param {Function} [deps.getComponent] `(systemId, componentId) => { name, img }|null` —
+   *   resolves a system component to its authored name/image. Powers a salvage run's
+   *   title (from the source `componentId`) and the name/img fallback for a salvage
+   *   created-result whose record captured neither (records that predate name/img capture).
    * @param {Function} [deps.getViewer] `() => viewer` (current Foundry user) for redaction.
    * @param {Function} [deps.localize] `(key, data?) => string`.
    * @param {Function} [deps.nowWorldTime] `() => number` current world time.
@@ -134,6 +138,7 @@ export class RunJournalBuilder {
     getGatheringTask = null,
     getRecipeItemImg = null,
     getResultItem = null,
+    getComponent = null,
     getViewer = null,
     localize = (key) => key,
     nowWorldTime = () => 0,
@@ -149,6 +154,7 @@ export class RunJournalBuilder {
     this._getGatheringTask = typeof getGatheringTask === 'function' ? getGatheringTask : () => null;
     this._getRecipeItemImg = typeof getRecipeItemImg === 'function' ? getRecipeItemImg : () => null;
     this._getResultItem = typeof getResultItem === 'function' ? getResultItem : () => null;
+    this._getComponent = typeof getComponent === 'function' ? getComponent : () => null;
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this._nowWorldTime = typeof nowWorldTime === 'function' ? nowWorldTime : () => 0;
@@ -341,7 +347,7 @@ export class RunJournalBuilder {
       taskId: null,
       flavor: '',
       failureReason,
-      ...this._craftingResults(runSteps, redacted),
+      ...this._craftingResults(runSteps, redacted, stringOrNull(run.craftingSystemId)),
       // A redacted run hides its recipe identity, so it cannot offer a manual
       // "Trigger Next Step" advance — only a discovered crafting run can.
       manualAdvance: !redacted,
@@ -472,12 +478,20 @@ export class RunJournalBuilder {
    * @private
    */
   /**
-   * Map a persisted created-result to the UI shape, resolving name/img by uuid when
-   * the record does not carry them (records that predate name/img capture).
+   * Map a persisted created-result to the UI shape, resolving name/img when the
+   * record does not carry them. Two ordered fallbacks cover records that predate
+   * name/img capture: first the actual item by its recorded uuid, then (for a
+   * salvage result, which always carries a `componentId`) the source component's
+   * authored name/img via `getComponent`. Both fallbacks are no-ops when the
+   * resolver is absent/returns null, and never override a captured name/img.
+   * @param {object} result The persisted created-result record.
+   * @param {string|null} [systemId] The run's crafting system id, needed to resolve
+   *   a `componentId` to its component (threaded from the run/model).
    * @private
    */
-  _mapResult(result) {
+  _mapResult(result, systemId = null) {
     const itemUuid = stringOrNull(result?.itemUuid);
+    const componentId = stringOrNull(result?.componentId);
     let name = stringOrNull(result?.name);
     let img = stringOrNull(result?.img);
     if ((!name || !img) && itemUuid) {
@@ -485,8 +499,13 @@ export class RunJournalBuilder {
       name ||= stringOrNull(doc?.name);
       img ||= stringOrNull(doc?.img);
     }
+    if ((!name || !img) && componentId && systemId) {
+      const component = this._getComponent(systemId, componentId);
+      name ||= stringOrNull(component?.name);
+      img ||= stringOrNull(component?.img);
+    }
     return {
-      componentId: stringOrNull(result?.componentId),
+      componentId,
       itemUuid,
       quantity: numberOrNull(result?.quantity) ?? 1,
       name,
@@ -494,10 +513,10 @@ export class RunJournalBuilder {
     };
   }
 
-  _craftingResults(runSteps, redacted) {
+  _craftingResults(runSteps, redacted, systemId = null) {
     if (redacted) return { createdResults: [], createdResultCount: 0 };
     const createdResults = normalizeList(runSteps).flatMap((step) =>
-      normalizeList(step?.createdResults).map((result) => this._mapResult(result))
+      normalizeList(step?.createdResults).map((result) => this._mapResult(result, systemId))
     );
     return { createdResults, createdResultCount: createdResults.length };
   }
@@ -581,10 +600,12 @@ export class RunJournalBuilder {
         ? numberOrNull(run.completedAtWorldTime)
         : numberOrNull(run.finishedAt);
 
-    // Gathering runs persist only a `taskId`; resolve it to the task's authored
-    // name/image (mirroring how crafting resolves recipe name/img). Guard blind
-    // runs — a null/`'blind'` taskId is not resolvable — and fall back to the raw
-    // id + default image when the task cannot be resolved.
+    // Gathering runs persist only a `taskId`; salvage runs persist only the source
+    // `componentId`. Resolve each to the authored name/image (mirroring how crafting
+    // resolves recipe name/img), and fall back to the raw id + default image when it
+    // cannot be resolved. A salvage title is the bare source-component name — the bag
+    // icon and run context already convey "salvage", matching crafting's bare recipe
+    // name and gathering's bare task name.
     let title = stringOrEmpty(run.label) || stringOrEmpty(run.taskId);
     let img = DEFAULT_RUN_IMAGE;
     if (runType === 'gathering') {
@@ -597,6 +618,13 @@ export class RunJournalBuilder {
         title = stringOrEmpty(task.name) || title;
         img = stringOrNull(task.img) || DEFAULT_RUN_IMAGE;
       }
+    } else if (runType === 'salvage') {
+      const componentId = stringOrNull(run.componentId);
+      const component = componentId
+        ? this._getComponent(stringOrNull(run.craftingSystemId), componentId)
+        : null;
+      title = stringOrEmpty(component?.name) || stringOrEmpty(componentId) || title;
+      img = stringOrNull(component?.img) || DEFAULT_RUN_IMAGE;
     }
 
     return {
@@ -629,7 +657,7 @@ export class RunJournalBuilder {
       taskId: stringOrNull(run.taskId),
       flavor: '',
       failureReason: stringOrNull(run.failureReason),
-      ...this._passthroughResults(run.createdResults),
+      ...this._passthroughResults(run.createdResults, stringOrNull(run.craftingSystemId)),
       manualAdvance: false,
     };
   }
@@ -640,8 +668,10 @@ export class RunJournalBuilder {
    * quantity) rather than a bare count.
    * @private
    */
-  _passthroughResults(createdResults) {
-    const results = normalizeList(createdResults).map((result) => this._mapResult(result));
+  _passthroughResults(createdResults, systemId = null) {
+    const results = normalizeList(createdResults).map((result) =>
+      this._mapResult(result, systemId)
+    );
     return { createdResults: results, createdResultCount: results.length };
   }
 

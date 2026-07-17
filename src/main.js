@@ -2052,6 +2052,8 @@ class Fabricate {
         getRecipeItemImg: (systemId, recipeItemId) =>
           this.craftingSystemManager?.getRecipeItemDefinition?.(systemId, recipeItemId)?.img ?? null,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
+        getComponent: (systemId, componentId) =>
+          this._resolveJournalComponent(systemId, componentId),
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
@@ -2111,6 +2113,21 @@ class Fabricate {
       doc = null;
     }
     return doc ? { name: doc.name ?? null, img: doc.img ?? null } : null;
+  }
+
+  /**
+   * Resolve a system component to `{ name, img }` for the Journal. Powers a salvage
+   * run's title (from the source `componentId`) and the name/img fallback for a
+   * salvage created-result that captured neither. Returns null when the system or
+   * component cannot be resolved (the Journal then falls back to the raw id + default
+   * image, or — for a result — the uuid resolution / bare componentId).
+   * @private
+   */
+  _resolveJournalComponent(systemId, componentId) {
+    if (!systemId || !componentId) return null;
+    const system = this.craftingSystemManager?.getSystem(systemId);
+    const component = (system?.components || []).find((entry) => entry?.id === componentId);
+    return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 
   /**
