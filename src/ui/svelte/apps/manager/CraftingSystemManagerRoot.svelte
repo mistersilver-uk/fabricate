@@ -525,23 +525,26 @@
   const salvageCheckTiers = $derived(selectedSystem?.salvageCraftingCheck?.simple?.tiers || []);
   const salvageCheckDcMode = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static');
   const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
-  // System components offered to the salvage result picker ({id, name, img}).
-  // `difficulty` is projected so the progressive salvage result rows can render their
-  // read-only difficulty badge (issue 651). This map is an ALLOWLIST — an omitted field
-  // reaches the editor as undefined and the badge silently reads "No difficulty" for
-  // every row, which looks like unauthored data rather than a dropped projection.
-  const salvageComponentOptions = $derived(
-    itemCards.map((item) => ({
-      id: item.id,
-      name: item.name,
-      img: item.img,
-      // Component category (issue 676) — projected here for the same reason
-      // `difficulty` is: an omitted field reaches the editor as undefined and reads
-      // as unauthored data rather than a dropped projection.
-      category: item.category || 'general',
-      ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
-    }))
-  );
+  // System components offered to the salvage yield picker.
+  //
+  // READ FROM `managedItemOptions`, NEVER FROM `itemCards` (issue 676). `itemCards` is
+  // the component BROWSER's list and is SEARCH-FILTERED:
+  //   itemCards ← _buildItemCards(…, itemSearchTerm, …) ← getItems(systemId, search)
+  // where `itemSearchTerm` is `get(itemSearch)`, the browser's search store. Projecting
+  // the picker from it leaked that search into the editor: typing "iron" in the browser
+  // and then opening any component silently narrowed the yield picker to components
+  // matching "iron" — a filter applied by a control that is not on screen, with no
+  // feedback. `selectedSystem.managedItemOptions` is `_buildManagedItemOptions` over the
+  // UNFILTERED managed items, and is already what the recipe editor's component pickers
+  // read; salvage was the one surface that diverged.
+  //
+  // It is REUSED rather than re-projected here on purpose. The old hand-rolled map was an
+  // ALLOWLIST whose every field had to be remembered — an omitted `difficulty` reaches the
+  // editor as `undefined` and the progressive row's badge silently reads "No difficulty"
+  // for every row, which looks like unauthored data rather than a dropped projection.
+  // `_buildManagedItemOptions` already carries `id`/`name`/`img`/`description`/`category`/
+  // `difficulty`, so there is one projection to keep correct instead of two.
+  const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
   // Reseed the routed + simple check drafts and baselines when the selected system
   // changes (not on every refresh of the same system, so a save never clobbers an

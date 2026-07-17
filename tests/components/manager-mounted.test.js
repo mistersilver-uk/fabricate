@@ -437,6 +437,12 @@ function createStore(calls = [], options = {}) {
     recipeCategories: true,
     salvage: true,
   };
+  // Mirrors `adminStore._buildManagedItemOptions`, which is the source of the real
+  // `selectedSystem.managedItemOptions`. `category` (always) and `difficulty` (when
+  // authored) are part of that projection and are carried here deliberately: the salvage
+  // yield picker reads options from this list (issue 676), and its read-only difficulty
+  // badge reads "No difficulty" for a component whose `difficulty` was dropped in
+  // projection. A fixture omitting them would let that regression pass green.
   const alchemyManagedItemOptions = options.emptyComponents
     ? []
     : [
@@ -445,6 +451,8 @@ function createStore(calls = [], options = {}) {
           name: 'Iron Ore',
           img: 'icons/commodities/metal/ore-chunk-grey.webp',
           description: 'Unrefined metal.',
+          category: 'Reagent',
+          difficulty: 2,
           originItemUuid: 'Compendium.fabricate.items.iron-ore',
         },
         {
@@ -452,12 +460,15 @@ function createStore(calls = [], options = {}) {
           name: 'Glass Vial',
           img: 'icons/containers/kitchenware/vase-clay-blue.webp',
           description: '',
+          category: 'general',
+          difficulty: 5,
         },
         {
           id: 'c3',
           name: 'Nightshade With An Exceptionally Long Localized Component Name',
           img: 'icons/consumables/plants/nightshade.jpg',
           description: 'A dusky flowering herb used in careful doses.',
+          category: 'general',
           originItemUuid: 'Compendium.fabricate.items.nightshade-with-a-long-source-reference',
         },
         {
@@ -465,6 +476,8 @@ function createStore(calls = [], options = {}) {
           name: 'Coal',
           img: 'icons/commodities/materials/bowl-powder-black.webp',
           description: 'Fuel for a steady forge.',
+          category: 'general',
+          difficulty: 3,
         },
       ];
   const systemDetails = {
@@ -954,7 +967,7 @@ function createStore(calls = [], options = {}) {
       { name: 'potions', count: 1 },
     ],
     recipeSearchTerm: '',
-    itemSearchTerm: '',
+    itemSearchTerm: options.itemSearchTerm || '',
     experimentalFeaturesEnabled: options.experimentalFeaturesEnabled === true,
     itemCards: selectedSystem ? componentCardsFor(selectedSystem.id) : [],
     essenceCards: selectedSystem
@@ -1150,10 +1163,29 @@ function createStore(calls = [], options = {}) {
 
   function componentCardsFor(id) {
     if (options.emptyComponents) return [];
-    return (componentItems[id] || []).map((item) =>
+    const cards = (componentItems[id] || []).map((item) =>
       options.missingComponentSource && item.id === 'c1'
         ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
         : item
+    );
+    // `itemCards` is the SEARCH-FILTERED list. In production `_buildItemCards` calls
+    // `CraftingSystemManager.getItems(systemId, itemSearchTerm)`, which returns the whole
+    // managed list for an empty search and a name/description/uuid/tag-matched subset
+    // otherwise — while `selectedSystem.managedItemOptions` is built from the UNFILTERED
+    // managed items. That asymmetry is real and load-bearing (issue 676: it leaked the
+    // browser's search into the salvage yield picker), so the fixture reproduces it
+    // rather than pretending `itemCards` is always everything.
+    const search = String(options.itemSearchTerm || '')
+      .trim()
+      .toLowerCase();
+    if (!search) return cards;
+    return cards.filter(
+      (item) =>
+        String(item.name || '')
+          .toLowerCase()
+          .includes(search) ||
+        (Array.isArray(item.tags) &&
+          item.tags.some((tag) => String(tag || '').toLowerCase().includes(search)))
     );
   }
 
@@ -5677,6 +5709,73 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-salvage-dc-override]'),
       null,
       'progressive mode has no DC override'
+    );
+  });
+
+  it('the salvage yield picker is NOT filtered by the component browser search', async () => {
+    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`, and
+    // `itemCards` is the SEARCH-FILTERED list —
+    //   itemCards ← _buildItemCards(…, itemSearchTerm, …) ← getItems(systemId, search)
+    // with `itemSearchTerm: get(itemSearch)`, the component BROWSER's search store. So
+    // typing "iron" in the browser and then opening any component silently narrowed the
+    // salvage yield picker to components matching "iron". The GM was authoring yields
+    // from a list filtered by a search box that is not even on screen.
+    //
+    // The recipe editor never had this: it already reads `selectedSystem.managedItemOptions`,
+    // built from the UNFILTERED managed items. The fix makes salvage read the same list.
+    //
+    // No screenshot could have caught this — the smoke harness never types in the search
+    // box before opening an editor.
+    const calls = [];
+    await openComponentSalvageEditor(calls, {
+      // Matches ONLY "Iron Ore" (c1) — the component being edited — and excludes Glass
+      // Vial, Nightshade and Coal from `itemCards`.
+      itemSearchTerm: 'iron',
+      salvageResolutionMode: 'progressive',
+      componentSalvage: {
+        enabled: true,
+        resultGroups: [{ id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] }],
+      },
+    });
+
+    const root = target.querySelector('.fabricate-manager');
+    target.querySelector('.manager-salvage-component-trigger').click();
+    await tick();
+    flushSync();
+
+    const optionLabels = Array.from(root.querySelectorAll('.manager-travel-option')).map((button) =>
+      button.textContent.trim()
+    );
+    assert.ok(
+      optionLabels.some((label) => label.includes('Glass Vial')),
+      `the picker must offer every component, not just search matches (saw: ${optionLabels.join(' | ')})`
+    );
+    assert.ok(optionLabels.some((label) => label.includes('Coal')));
+    assert.ok(optionLabels.some((label) => label.includes('Nightshade')));
+  });
+
+  it('a yield row reads its DC from the picker source — difficulty survives the projection', async () => {
+    // The options list is an ALLOWLIST projection. `difficulty` reaching the editor as
+    // `undefined` is indistinguishable from a component that was never given one, so a
+    // dropped field renders "DC —" on every row instead of failing. This drives the badge
+    // through the ROOT (not by handing ComponentEditView props directly), which is the
+    // only way the projection itself is under test.
+    const calls = [];
+    await openComponentSalvageEditor(calls, {
+      itemSearchTerm: 'iron',
+      salvageResolutionMode: 'progressive',
+      componentSalvage: {
+        enabled: true,
+        resultGroups: [{ id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] }],
+      },
+    });
+
+    // c4 (Coal) has difficulty 3 and is EXCLUDED by the "iron" search — so this also
+    // proves the badge resolves through the unfiltered list rather than reading "DC —".
+    assert.equal(
+      target.querySelector('[data-salvage-result-difficulty]').getAttribute('data-salvage-result-difficulty'),
+      '3',
+      'the yield row reads the referenced component difficulty from the picker source'
     );
   });
 
