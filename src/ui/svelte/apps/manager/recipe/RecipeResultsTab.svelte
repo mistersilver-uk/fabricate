@@ -61,9 +61,16 @@
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
   // Per-mode heading + intro OUTSIDE any card (§C3).
+  //
+  // The progressive heading is "Results", matching the progressive SALVAGE editor
+  // (issue 676). The two are the same surface and must not drift: salvage says
+  // "Results" over its ordered stage list, and "Result stages (by difficulty)" plus a
+  // paragraph of mechanics restated, above a list whose own info strip already explains
+  // the roll budget, was the recipe side saying it three times. The strip below is the
+  // one place that explanation belongs.
   const heading = $derived(
     progressive
-      ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingProgressive', 'Result stages (by difficulty)'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroProgressive', 'One roll is spent down this ordered list, meeting each stage’s difficulty in turn — how far it reaches decides how complete the result is.') }
+      ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingProgressive', 'Results'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroProgressive', 'What this recipe produces, awarded in order down the list.') }
       : routingProvider === 'check'
         ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingCheck', 'Results by outcome'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroCheck', 'Each result set is produced on a matching crafting-check success tier.') }
         : routingProvider === 'ingredientSet'
@@ -87,11 +94,33 @@
   </div>
 
   {#if progressive}
-    <!-- Roll-budget info strip (§C4). -->
+    <!-- The strip and the reorder policy sit ABOVE the list, not after it (issue 676,
+         matching the progressive salvage editor): both describe what the ORDER MEANS,
+         and the order is the thing being authored below. The reorder card used to render
+         at the very BOTTOM — the GM read the policy governing the list only after they
+         had finished writing it. Salvage fixed that first; this is the recipe side
+         following its already-migrated sibling.
+
+         The strip's copy is NOT folded into the card's sub-line: the strip states an
+         INVARIANT (the award mechanic is true of every progressive recipe regardless of
+         this toggle) while the card states a CONDITIONAL. When the toggle is off the
+         budget explanation must still be true, so a merged sub-line would caveat itself. -->
     <div class="manager-recipe-info-strip" data-recipe-info-strip>
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo', 'Roll budget flows down the list · each stage consumes its difficulty before the next is produced')}</span>
     </div>
+
+    <ToggleCard
+      variant="is-info"
+      icon="fas fa-arrow-down-a-z"
+      section="allow-player-result-reorder"
+      field="allowPlayerResultReorder"
+      title={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderTitle', 'Allow player result re-ordering')}
+      sub={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderSub', 'Players may set their own stage order for this recipe, which is remembered and used every time they craft it.')}
+      toggleLabel={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderToggle', 'Allow player result re-ordering')}
+      on={allowPlayerResultReorder}
+      onToggle={(next) => onToggleAllowPlayerResultReorder(next)}
+    />
   {/if}
 
   {#if isMultiStep}
@@ -135,28 +164,4 @@
     />
   {/if}
 
-  {#if progressive}
-    <!-- Reorder-permission card (§C4, issue 651), placed at the END of the progressive
-         block — AFTER the result sets, never directly beneath the info strip. The two
-         info-toned surfaces would otherwise stack as one undifferentiated block. This
-         adjacency also reads correctly on its own terms: strip = "here is how this list
-         is spent" (preamble) → list = the thing → card = "here is who may reorder it"
-         (policy about the thing you have now seen).
-
-         The strip's copy is NOT folded into this card's sub-line: the strip states an
-         INVARIANT (the award mechanic is true of every progressive recipe regardless of
-         this toggle) while the card states a CONDITIONAL. When the toggle is off the
-         budget explanation must still be true, so a merged sub-line would caveat itself. -->
-    <ToggleCard
-      variant="is-info"
-      icon="fas fa-arrow-down-a-z"
-      section="allow-player-result-reorder"
-      field="allowPlayerResultReorder"
-      title={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderTitle', 'Allow player result re-ordering')}
-      sub={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderSub', 'Players may set their own stage order for this recipe, which is remembered and used every time they craft it.')}
-      toggleLabel={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderToggle', 'Allow player result re-ordering')}
-      on={allowPlayerResultReorder}
-      onToggle={(next) => onToggleAllowPlayerResultReorder(next)}
-    />
-  {/if}
 </section>

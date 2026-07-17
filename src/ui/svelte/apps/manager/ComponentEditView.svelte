@@ -1073,8 +1073,13 @@
                     data-salvage-result-difficulty={salvageResultDifficulty(result.componentId) === null
                       ? ''
                       : String(salvageResultDifficulty(result.componentId))}
-                  >{salvageResultDifficulty(result.componentId) === null
-                      ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset', 'DC —')
+                  ><!-- The fallback must MATCH the lang value, or the two disagree and the
+                       fallback silently describes a string nobody ever sees: `lang/en.json`
+                       resolves `DifficultyUnset` to "No difficulty", so the literal "DC —"
+                       here only ever rendered in a test with no i18n loaded. The recipe
+                       stage row (issue 676) reads the same, which is the point. -->
+                  {salvageResultDifficulty(result.componentId) === null
+                      ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset', 'No difficulty')
                       : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${salvageResultDifficulty(result.componentId)}`}</span
                   >
 

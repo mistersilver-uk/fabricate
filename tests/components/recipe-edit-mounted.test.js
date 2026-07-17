@@ -1509,7 +1509,10 @@ describe('RecipeEditView (mounted)', () => {
     );
   }
 
-  it('progressive: result rows render a drag handle with grip + order pip', async () => {
+  // Issue 676: grip and order are SIBLINGS, matching the progressive salvage stage row.
+  // The order used to be stacked INSIDE the grip handle, which read as a decorated grip
+  // rather than as the stage number the award loop spends down.
+  it('progressive: result rows render a grip and a separate order badge', async () => {
     const { target } = await mountProgressiveResults([
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
@@ -1517,13 +1520,21 @@ describe('RecipeEditView (mounted)', () => {
     const rows = target.querySelectorAll('[data-recipe-result-row]');
     assert.equal(rows.length, 2, 'both result rows render reorderable wrappers');
     rows.forEach((row, index) => {
-      const handle = row.querySelector('.manager-environment-comp-handle');
-      assert.ok(handle, `row ${index} renders the shared handle`);
+      const grip = row.querySelector('.manager-recipe-stage-grip');
+      assert.ok(grip, `row ${index} renders the grip`);
       assert.equal(row.getAttribute('draggable'), 'true', `row ${index} card is the drag source`);
-      assert.ok(handle.querySelector('.fa-grip-vertical'), `row ${index} renders the grip icon`);
-      assert.ok(
-        handle.querySelector('.manager-environment-comp-order').textContent.includes(String(index + 1)),
-        `row ${index} renders its 1-based order pip`
+      assert.ok(grip.querySelector('.fa-grip-vertical'), `row ${index} renders the grip icon`);
+      const ordinal = row.querySelector('.manager-recipe-stage-ordinal');
+      assert.ok(ordinal, `row ${index} renders a separate order badge`);
+      assert.equal(
+        ordinal.getAttribute('data-recipe-result-ordinal'),
+        String(index + 1),
+        `row ${index} renders its 1-based order`
+      );
+      assert.equal(
+        grip.querySelector('.manager-recipe-stage-ordinal'),
+        null,
+        `row ${index} does not nest the order inside the grip`
       );
     });
     editHarness.remount();
@@ -1567,7 +1578,7 @@ describe('RecipeEditView (mounted)', () => {
       'no reorderable wrapper outside progressive mode'
     );
     assert.equal(
-      target.querySelector('[data-recipe-section="results"] .manager-environment-comp-handle'),
+      target.querySelector('[data-recipe-section="results"] .manager-recipe-stage-grip'),
       null,
       'no drag handle on result rows outside progressive mode'
     );
@@ -1744,9 +1755,12 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('progressive: the card is placed AFTER the result sets, not under the info strip', async () => {
-    // D10: two info-toned surfaces must not stack. The reading order is
-    // strip ("how this list is spent") → list → card ("who may reorder it").
+  it('progressive: the reorder card is placed ABOVE the result sets, under the info strip', async () => {
+    // Issue 676: matching the progressive SALVAGE editor, which fixed this first. Both
+    // the strip and the card describe what the ORDER MEANS, and the order is the thing
+    // authored below — at the bottom the GM read the policy governing the list only
+    // after they had finished writing it. Reading order: strip ("how this list is
+    // spent") → card ("who may reorder it") → list.
     const { target } = await mountProgressiveResults([
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
     ]);
@@ -1755,12 +1769,12 @@ describe('RecipeEditView (mounted)', () => {
     const card = reorderCard(target);
     assert.ok(strip && results && card);
     assert.ok(
-      strip.compareDocumentPosition(results) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
-      'the result sets follow the info strip'
+      strip.compareDocumentPosition(card) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the reorder card follows the info strip'
     );
     assert.ok(
-      results.compareDocumentPosition(card) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
-      'the card follows the result sets — it is not adjacent to the strip'
+      card.compareDocumentPosition(results) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the result sets follow the card — the policy is stated before the list it governs'
     );
     editHarness.remount();
   });
@@ -1811,7 +1825,10 @@ describe('RecipeEditView (mounted)', () => {
   // would either write cross-aggregate immediately (bypassing both dirty guards) or make
   // "Save recipe" silently persist a *Component* change — so it is a READ-ONLY badge
   // with a deep-link to the component editor's Difficulty card.
-  it('progressive: renders a READ-ONLY difficulty badge that deep-links to the component editor', async () => {
+  // Issue 676: `DC n` as a read-only FACT, plus a SEPARATE "Edit ↗" link — the shape the
+  // progressive salvage stage row already had. It was a "DIFFICULTY" micro-label over one
+  // combined `Difficulty 12 ↗` chip, which made the fact look like the control.
+  it('progressive: renders a READ-ONLY DC and a separate Edit link to the component editor', async () => {
     const opened = [];
     const { target } = await mountProgressiveResults(
       [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
@@ -1824,13 +1841,25 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    const badge = target.querySelector('[data-recipe-result-difficulty]');
-    assert.ok(badge, 'the difficulty badge renders');
-    assert.equal(badge.getAttribute('data-recipe-result-difficulty'), '12', 'it shows the value');
-    assert.match(badge.textContent, /Difficulty 12/, 'and reads it out');
-    // It is a deep-link, NOT an editor: no input of any kind inside the badge.
-    assert.equal(badge.querySelector('input'), null, 'the badge carries no editable control');
-    badge.click();
+    const dc = target.querySelector('[data-recipe-result-difficulty]');
+    assert.ok(dc, 'the DC renders');
+    assert.equal(dc.getAttribute('data-recipe-result-difficulty'), '12', 'it shows the value');
+    assert.match(dc.textContent, /DC 12/, 'and reads it out as a DC, like the salvage stage row');
+    // The DC is a read-only FACT: not a control at all, and carrying no editor.
+    assert.equal(dc.tagName, 'SPAN', 'the DC is not a button');
+    assert.equal(dc.querySelector('input'), null, 'the DC carries no editable control');
+    // The micro-label is gone: the DC says what it is.
+    assert.equal(
+      target.querySelector('.manager-recipe-difficulty-label'),
+      null,
+      'no DIFFICULTY micro-label — the salvage row has none'
+    );
+    // Editing is a SEPARATE link, and it is the only route to the value.
+    const edit = target.querySelector('[data-recipe-result-edit]');
+    assert.ok(edit, 'a separate Edit link renders beside the DC');
+    assert.equal(edit.getAttribute('data-recipe-result-edit'), 'cmp-herb');
+    assert.match(edit.textContent, /Edit/, 'it reads as Edit');
+    edit.click();
     assert.deepEqual(opened, ['cmp-herb'], 'it routes to the component that owns the difficulty');
     editHarness.remount();
   });
@@ -1844,9 +1873,9 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    const badge = target.querySelector('[data-recipe-result-difficulty]');
-    assert.equal(badge.getAttribute('data-recipe-result-difficulty'), '', 'no fabricated value');
-    assert.match(badge.textContent, /No difficulty/, 'it says so rather than showing a 0');
+    const dc = target.querySelector('[data-recipe-result-difficulty]');
+    assert.equal(dc.getAttribute('data-recipe-result-difficulty'), '', 'no fabricated value');
+    assert.match(dc.textContent, /No difficulty/, 'it says so rather than showing a 0');
     editHarness.remount();
   });
 

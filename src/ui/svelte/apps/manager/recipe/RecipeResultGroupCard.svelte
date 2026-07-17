@@ -284,14 +284,20 @@
             ondragover={(event) => event.preventDefault()}
             ondrop={(event) => { event.preventDefault(); handleResultDrop(index); }}
           >
+            <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
+                 (issue 676). The order was stacked UNDER the grip inside one handle,
+                 which read as a decorated grip rather than as the stage number that the
+                 award loop actually spends down. -->
             <span
-              class="manager-environment-comp-handle"
+              class="manager-recipe-stage-grip"
               aria-hidden="true"
               title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
-            >
-              <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-              <span class="manager-environment-comp-order">{index + 1}</span>
-            </span>
+            ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span>
+            <span
+              class="manager-recipe-stage-ordinal"
+              data-recipe-result-ordinal={String(index + 1)}
+              aria-hidden="true"
+            >{index + 1}</span>
             <RecipeResultItemRow
               {item}
               {componentOptions}
@@ -302,11 +308,15 @@
             >
               {#snippet reorderControls()}
                 <!-- Reorder lives to the RIGHT of the component's DC (issue 643): after
-                     the difficulty badge, before the remove control. -->
-                <span class="manager-recipe-result-move" data-recipe-result-move>
+                     the DC + Edit pair, before the remove control. Drag is an
+                     ENHANCEMENT; these chevrons are the accessible reorder path and are
+                     what a keyboard user gets. Disabled at the ends. They share the
+                     salvage stage row's rocker geometry (issue 676) — see the shared
+                     rule in styles/fabricate.css. -->
+                <span class="manager-recipe-stage-reorder" data-recipe-result-move>
                   <button
                     type="button"
-                    class="manager-icon-button"
+                    class="manager-recipe-stage-move"
                     data-recipe-result-move-up
                     aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')} — ${componentNameFor(item)}`}
                     title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
@@ -315,7 +325,7 @@
                   ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
                   <button
                     type="button"
-                    class="manager-icon-button"
+                    class="manager-recipe-stage-move"
                     data-recipe-result-move-down
                     aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')} — ${componentNameFor(item)}`}
                     title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}

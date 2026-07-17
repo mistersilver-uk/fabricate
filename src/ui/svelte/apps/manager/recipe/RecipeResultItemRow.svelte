@@ -85,14 +85,23 @@
 <div class="manager-recipe-ingredient-option-row" data-recipe-option data-recipe-result-item>
   <div class="manager-recipe-option-target">
     <div class="manager-recipe-option-component">
+      <!-- PROGRESSIVE puts the image AND the name INSIDE the trigger, matching the
+           progressive salvage yield picker (issue 676): the whole thing is one hit
+           target that says what it is and opens the picker. The non-progressive row
+           keeps the image-only trigger with the name beside it — the salvage side's
+           simple/routed row is shaped that way too, and only the STAGE rows were
+           migrated. -->
       <SearchablePopover
         options={componentPickerOptions}
         value={componentId}
         pickerClass="manager-recipe-component-picker"
-        triggerClass="manager-button manager-recipe-component-trigger"
+        triggerClass={`manager-button manager-recipe-component-trigger${progressive ? ' manager-recipe-stage-trigger' : ''}`}
         triggerImg={selectedComponent?.img || ''}
         triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-        triggerLabel={selectedComponent ? '' : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        triggerLabel={progressive
+          ? (selectedComponent?.name || text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component'))
+          : (selectedComponent ? '' : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component'))}
+        valueClass={progressive ? 'manager-recipe-stage-trigger-name' : ''}
         triggerTitle={selectedComponent?.name || ''}
         triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
         dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
@@ -101,32 +110,42 @@
         emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
         onChoose={(id) => chooseComponent(id)}
       />
-      {#if selectedComponent}
+      {#if selectedComponent && !progressive}
         <span class="manager-recipe-component-name">{selectedComponent.name}</span>
       {/if}
     </div>
   </div>
 
   <div class="manager-recipe-option-controls">
-    {#if progressive && selectedComponent}
-      <span class="manager-recipe-difficulty-label" aria-hidden="true">{text('FABRICATE.Admin.Manager.Recipe.DifficultyMicroLabel', 'Difficulty')}</span>
-      <!-- Read-only: `component.difficulty` has four consumers, and the component
-           editor's Difficulty card is the surface with the right save/discard
-           lifecycle. `ui-integration` already requires a read-only badge here. -->
-      <button
-        type="button"
-        class="manager-chip is-info manager-recipe-difficulty-badge"
+    {#if progressive}
+      <!-- READ-ONLY `DC n`, then a SEPARATE "Edit ↗" — the salvage stage row's shape
+           (issue 676). It was a "DIFFICULTY" micro-label plus one combined
+           `Difficulty 4 ↗` chip, which made a read-only FACT look like the control that
+           changes it. `component.difficulty` has four consumers and the component
+           editor's Difficulty card owns its save/discard lifecycle, so the fact is
+           read-only here and the link is the only route to changing it. The DC always
+           renders (it anchors the trailing cluster); the Edit link needs a chosen
+           component. -->
+      <span
+        class="manager-recipe-stage-dc"
         data-recipe-result-difficulty={difficulty === null ? '' : String(difficulty)}
-        aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${selectedComponent.name}`}
-        title={text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')}
-        onclick={() => onOpenComponent(componentId)}
-      >
-        <i class="fas fa-gauge-high" aria-hidden="true"></i>
-        <span>{difficulty === null
+      >{difficulty === null
           ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
-          : `${text('FABRICATE.Admin.Manager.Recipe.Difficulty', 'Difficulty')} ${difficulty}`}</span>
-        <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </button>
+          : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span>
+
+      {#if selectedComponent}
+        <button
+          type="button"
+          class="manager-recipe-stage-edit"
+          data-recipe-result-edit={componentId}
+          aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${selectedComponent.name}`}
+          title={text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')}
+          onclick={() => onOpenComponent(componentId)}
+        >
+          <span>{text('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}</span>
+          <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+        </button>
+      {/if}
     {/if}
 
     {#if !progressive}

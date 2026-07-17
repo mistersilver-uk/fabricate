@@ -47,6 +47,34 @@ const FIXTURE = `
           <button class="manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
+        <!-- The progressive stage row (issue 676). It is the SAME surface as the
+             progressive SALVAGE stage row and shares its rules by joining their selector
+             lists, so these roles are pinned to the numbers component-studio-font-size.js
+             already commits for the salvage row — the design source — NOT read off this
+             markup. If the two ever disagree, the sharing has broken. -->
+        <div class="manager-recipe-result-row is-reorderable">
+          <span class="manager-recipe-stage-grip" data-m="stage-grip"><i class="fas fa-grip-vertical"></i></span>
+          <span class="manager-recipe-stage-ordinal" data-m="stage-ordinal">1</span>
+          <div class="manager-recipe-ingredient-option-row">
+            <div class="manager-recipe-option-target">
+              <div class="manager-recipe-option-component">
+                <span class="manager-recipe-component-picker">
+                  <button class="manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
+                    <img class="manager-travel-portrait" alt="">
+                    <span class="manager-recipe-stage-trigger-name" data-m="stage-picker-name">Mountain Herb</span>
+                  </button>
+                </span>
+              </div>
+            </div>
+            <div class="manager-recipe-option-controls">
+              <span class="manager-recipe-stage-dc" data-m="stage-dc">DC 12</span>
+              <button class="manager-recipe-stage-edit" data-m="stage-edit"><span>Edit</span><i class="fas fa-arrow-up-right-from-square"></i></button>
+              <span class="manager-recipe-stage-reorder">
+                <button class="manager-recipe-stage-move" data-m="stage-move"><i class="fas fa-chevron-up"></i></button>
+              </span>
+            </div>
+          </div>
+        </div>
         <input type="text" data-m="bleed-baseline" value="bare">
       </div>
     </section>
@@ -70,6 +98,17 @@ const EXPECTED = {
   'nav-count': 10, // 0.625rem
   'dashed-add': 11.2, // 0.7rem
   muted: 10.24, // 0.64rem — recipe-view-scoped
+  // ── The progressive stage row (issue 676). Every number below is the one the salvage
+  // stage row already commits in component-studio-font-size.test.js: the two rows are
+  // the same surface and SHARE their CSS rules, so a divergence here means the sharing
+  // broke, not that this row wants its own scale.
+  'stage-grip': 11.2, // 0.7rem — shared .manager-salvage-stage-grip rule
+  'stage-ordinal': 10.88, // 0.68rem mono — shared with salvage's order badge
+  'stage-picker': 13.12, // 0.82rem — the picker trigger, as salvage's measures
+  'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
+  'stage-dc': 13, // 0.8125rem mono 700 — shared read-only DC
+  'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc, as on salvage
+  'stage-move': 10.88, // 0.68rem — the reorder chevron glyph
   'bleed-baseline': 14, // Foundry app base (bare control)
 };
 

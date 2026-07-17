@@ -375,11 +375,15 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const badge = target.querySelector('[data-salvage-result-difficulty]');
     assert.equal(badge.getAttribute('data-salvage-result-difficulty'), '');
-    // Issue 676 made this a compact mono DC chip, so the unset state reads "DC —"
-    // rather than "No difficulty". The POINT of the test is unchanged and is asserted
-    // explicitly below: an unset difficulty must never render as a DC of 0, which is a
-    // real, meaningful, and completely wrong value.
-    assert.match(badge.textContent, /DC\s+—/);
+    // This asserted /DC\s+—/ — the component's FALLBACK literal, which nothing ever
+    // rendered: `lang/en.json` resolves `SalvageEditor.DifficultyUnset` to "No
+    // difficulty", so production always said that and only a test with no i18n loaded
+    // ever saw "DC —". The test's own NAME recorded the real intent all along. Issue 676
+    // aligned the fallback to the lang value, and the recipe stage row now reads the
+    // same. The POINT of the test is unchanged and is asserted explicitly below: an
+    // unset difficulty must never render as a DC of 0, which is a real, meaningful, and
+    // completely wrong value.
+    assert.match(badge.textContent, /No difficulty/);
     assert.doesNotMatch(badge.textContent, /\b0\b/, 'an unset difficulty is never DC 0');
     harness.remount();
   });
