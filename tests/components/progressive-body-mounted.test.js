@@ -331,7 +331,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
 
   // ── Issue 675: the salvage extensions are OPT-IN ─────────────────────────
   //
-  // Progressive salvage reuses this component, which needed a per-stage quantity and a
+  // Progressive salvage reuses this component, which needed a stacked row shape and a
   // state chip. Both had to be additive and default-off, or a salvage feature would
   // have re-skinned the Crafting tab as a side effect. The crafting path (this one)
   // passes neither, so it must render exactly as it did — these assertions are the pin
@@ -339,17 +339,10 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
 
   it('675: the crafting rendering is unchanged when the new props are omitted', async () => {
     const target = await mountBody();
-    // Even though the fixture stages carry no `quantity`, the guard is `showQuantity`
-    // itself: a caller that never opts in gets no quantity slot at all.
-    assert.equal(
-      target.querySelector('[data-progressive-stage-quantity]'),
-      null,
-      'no quantity is rendered for crafting'
-    );
     assert.equal(
       target.querySelector('[data-progressive-stage-state]'),
       null,
-      'and no state chip'
+      'no state chip'
     );
     // The rest of the row is untouched: ordinal, difficulty, threshold, move buttons.
     const first = rows(target)[0];
@@ -359,14 +352,42 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     assert.ok(first.querySelector('[data-progressive-stage-move]'));
   });
 
-  it('675: a stage carrying a quantity still renders none unless showQuantity is passed', async () => {
+  it('675: a stage carrying a quantity renders NONE — progressive is quantity-less', async () => {
+    // There is no opt-in left to pass: `showQuantity` was deleted, not defaulted off.
+    // Awarding spends the budget against an entry ONCE and grants a single item, so any
+    // `×N` on this list is a number the engine does not honour — on this surface and on
+    // salvage's, which shares this component.
     const target = await mountBody({
       stages: [{ ...STAGES[0], quantity: 3 }, STAGES[1], STAGES[2]],
     });
     assert.equal(
       target.querySelector('[data-progressive-stage-quantity]'),
       null,
-      'the DATA is not the switch — the opt-in prop is'
+      'the stored count is inert in this mode and nothing renders it'
+    );
+    assert.equal(
+      rows(target)[0].textContent.includes('×'),
+      false,
+      'and no ×N reaches the row by any other route'
+    );
+  });
+
+  it('675: the reorder chevrons END the row', async () => {
+    // One arrow position across both surfaces (crafting here, salvage via the same
+    // component), matching the GM's component salvage editor. A divergence prop was
+    // deliberately not added.
+    const target = await mountBody();
+    const row = rows(target)[0];
+    const parts = [
+      ...row.querySelectorAll('[data-progressive-stage-move], [data-progressive-stage-ordinal]'),
+    ];
+    assert.equal(parts.length, 2);
+    assert.ok(parts[0].hasAttribute('data-progressive-stage-ordinal'), 'the ordinal leads');
+    assert.ok(parts[1].hasAttribute('data-progressive-stage-move'), 'the chevrons trail');
+    assert.equal(
+      row.lastElementChild.hasAttribute('data-progressive-stage-move'),
+      true,
+      'and they are the last thing on the row'
     );
   });
 });

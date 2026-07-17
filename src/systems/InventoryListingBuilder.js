@@ -843,6 +843,12 @@ export class InventoryListingBuilder {
    * Baked in AUTHORED order. Thresholds are POSITIONAL, so they are only valid while the
    * list is in that order — the store recomputes them through this same helper after
    * applying the player's order.
+   *
+   * NO `quantity` is projected, unlike `_salvageResultItems`. That is the mode's rule,
+   * not an omission: a progressive stage is awarded ONCE for its difficulty and grants a
+   * single item (`CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1`), so
+   * repetition — the same component listed twice — is how a GM asks for more. Projecting
+   * the stored, inert count let the row print "×2" beside a one-item award (issue 675).
    * @private
    */
   _salvageStages({ system, salvage, componentById }) {
@@ -864,13 +870,11 @@ export class InventoryListingBuilder {
       const componentId = result?.componentId || result?.systemItemId;
       const produced = componentId ? componentById.get(componentId) : null;
       const difficulty = costFor(result);
-      const quantity = Number(result?.quantity);
       return {
         id: stringOrNull(result?.id),
         componentId: stringOrNull(componentId),
         name: stringOrEmpty(produced?.name) || stringOrEmpty(componentId),
         img: stringOrNull(produced?.img),
-        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
         // Null (not 0) when the component has no authored difficulty, so the row can say
         // "no difficulty" rather than claim a free stage.
         difficulty: Number.isFinite(difficulty) ? difficulty : null,

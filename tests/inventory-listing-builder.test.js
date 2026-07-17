@@ -1270,6 +1270,60 @@ describe('InventoryListingBuilder - salvage view-model', () => {
     );
   });
 
+  it('675: a progressive stage carries NO quantity, whatever the GM authored', () => {
+    // Progressive results are quantity-less: the award loop charges an entry's
+    // difficulty once and grants ONE item (`CraftingEngine._resolveSalvageResultGroups`
+    // forces `quantity: 1`), so a projected count could only ever be a number the
+    // engine ignores - and the row printed it: "Balehound Teeth x2", one awarded.
+    // Repetition, not a count, is how the GM asks for two.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'progressive',
+        check: { progressive: { rollFormula: '1d20 + 4', awardMode: 'equal' } },
+        salvage: {
+          resultGroups: [
+            {
+              id: 'g1',
+              results: [
+                { id: 'r1', componentId: 'c3', quantity: 2 },
+                { id: 'r2', componentId: 'c3', quantity: 9 },
+              ],
+            },
+          ],
+        },
+      })
+    );
+    assert.deepEqual(
+      salvage.stages.map((s) => s.quantity),
+      [undefined, undefined],
+      'the stored count is inert in this mode and is not projected at all'
+    );
+    // The same component listed twice is TWO stages - the one-to-one mapping is what
+    // makes repetition expressive, so it must not collapse.
+    assert.deepEqual(
+      salvage.stages.map((s) => [s.id, s.name]),
+      [
+        ['r1', 'Slag'],
+        ['r2', 'Slag'],
+      ]
+    );
+  });
+
+  it('675: simple-mode results DO carry quantity - the rule is progressive-only', () => {
+    // The counter-case, so the deletion above cannot creep into the simple/routed
+    // projection: those modes award the authored count and always have.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        salvage: { resultGroups: [{ id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 3 }] }] },
+      })
+    );
+    assert.deepEqual(
+      salvage.results.map((r) => r.quantity),
+      [3]
+    );
+  });
+
   it('progressive with no authored salvage formula is misconfigured and shows no stages', () => {
     const salvage = salvageOf(
       salvageSystem({

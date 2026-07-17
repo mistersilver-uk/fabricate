@@ -1236,12 +1236,16 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'Iron Shard moved to position 2 of 2',
       'the announcement REACHES the live region across all five wrapper hops (AC6)'
     );
-    // The opt-in extensions the salvage body passes.
-    assert.equal(
-      target.querySelector('[data-progressive-stage-quantity]').dataset.progressiveStageQuantity,
-      '2'
-    );
+    // The opt-in extension the salvage body passes.
     assert.ok(target.querySelector('[data-progressive-stage-state]'), 'renders a state chip');
+    // And the one it must NOT: the fixture's authored `quantity: 2` renders nowhere.
+    // Progressive awarding grants each entry ONE item, so the row said "×2" and the
+    // player was handed one (issue 675).
+    assert.equal(
+      target.querySelector('[data-progressive-stage-quantity]'),
+      null,
+      'no quantity is rendered — progressive results are quantity-less'
+    );
     // No exclude affordance exists: the reconciliation contract guarantees a result is
     // never dropped, and there is nowhere to persist an exclusion.
     assert.equal(target.querySelector('input[type="checkbox"]'), null, 'no exclude checkbox');
@@ -1320,13 +1324,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'the name lives INSIDE that column, not as a row-level flex child',
     );
     assert.equal(
-      identity.querySelector('[data-progressive-stage-quantity]').textContent.trim(),
-      '×2',
-      'and ×N shares the name\'s wrapping text flow rather than costing the row a fixed slot',
+      identity.textContent.includes('×'),
+      false,
+      'and nothing prints a count beside it: an awarded stage grants exactly one item',
     );
   });
 
-  it('leads the row with the reorder controls, before the ordinal', async () => {
+  it('ends the row with the reorder controls, after the state chip', async () => {
     const { services } = shapeServices();
     const target = await openSalvage(services);
 
@@ -1334,17 +1338,29 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const parts = [...row.querySelectorAll('[data-progressive-stage-move], [data-progressive-stage-ordinal]')];
     assert.equal(parts.length, 2);
     assert.ok(
-      parts[0].hasAttribute('data-progressive-stage-move'),
-      'the chevrons come FIRST — they were on the trailing edge, where they overflowed the panel',
+      parts[0].hasAttribute('data-progressive-stage-ordinal'),
+      'the ordinal leads, as the row identity',
     );
-    assert.ok(parts[1].hasAttribute('data-progressive-stage-ordinal'));
+    assert.ok(
+      parts[1].hasAttribute('data-progressive-stage-move'),
+      'the chevrons come LAST — the same edge they sit on in the GM salvage editor and on the crafting tab',
+    );
+    assert.equal(
+      row.lastElementChild.hasAttribute('data-progressive-stage-move'),
+      true,
+      'far right: after the state chip, not merely after the identity column',
+    );
 
     const handle = row.querySelector('.crafting-stage-handle');
-    assert.ok(handle.contains(parts[0]), 'the grip and the chevrons are one cluster');
+    assert.equal(
+      handle.contains(parts[1]),
+      false,
+      'the chevrons are no longer inside the grip cluster',
+    );
     assert.equal(
       handle.getAttribute('aria-hidden'),
-      null,
-      'and the cluster is NOT aria-hidden — it now holds the only keyboard reorder control',
+      'true',
+      'so the cluster is decorative again — the keyboard reorder control lives outside it',
     );
   });
 

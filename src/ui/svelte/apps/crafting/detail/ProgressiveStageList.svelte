@@ -37,27 +37,40 @@
 
   SHARED WITH PLAYER SALVAGE (issue 675). Progressive salvage spends its roll down an
   ordered list under exactly these rules, so it reuses this component rather than
-  growing a twin. Three OPTIONAL, DEFAULT-OFF extensions exist for it:
+  growing a twin. Two OPTIONAL, DEFAULT-OFF extensions exist for it:
 
-    `showQuantity`  render each stage's `×N`.
     `stateChip`     a snippet, rendered per stage, for a per-row state (salvage's
                     Recovered / Roll fell short / Not reached / Awaiting roll).
-    `stacked`       the player Inventory's row shape (the prototype's): the reorder
-                    controls LEAD the row, and the stage's identity is a flexible
-                    COLUMN — name + `×N`, then its numbers beneath — so the name wraps
-                    instead of being crushed.
+    `stacked`       the player Inventory's row shape: the stage's identity is a
+                    flexible COLUMN — the name, then its numbers beneath — so the name
+                    wraps instead of being crushed.
 
-  All three default to today's rendering, so the Crafting tab — which passes none — is
-  byte-unchanged. A required prop or an always-on chip would have re-skinned crafting
-  as a side effect of a salvage feature.
+  Both default to today's rendering, so the Crafting tab — which passes neither — is
+  unchanged. A required prop or an always-on chip would have re-skinned crafting as a
+  side effect of a salvage feature.
+
+  NO STAGE RENDERS A QUANTITY, on either surface. A `showQuantity` opt-in existed for
+  one round and the salvage caller passed it, printing a count the engine does not
+  honour: the player read "Balehound Teeth ×2" and was awarded one. Progressive results
+  are a QUANTITY-LESS ordered list — the award loop charges one entry's difficulty and
+  grants that entry ONCE, so "more of X" is expressed by listing X again, and any
+  authored quantity is normalized to 1 at award time on both paths
+  (`ResolutionModeService._resolveProgressive`, `CraftingEngine._resolveSalvageResultGroups`;
+  `openspec/specs/resolution-modes/spec.md`, Progressive Mode). The opt-in was DELETED
+  rather than defaulted off: it had exactly one caller, that caller must not use it, and
+  a prop nothing sets is an invitation to opt back into the lie.
+
+  THE REORDER CHEVRONS END THE ROW, on both surfaces — one position everywhere, no
+  divergence prop. That matches the GM's component salvage editor, whose progressive
+  rows run handle, index, picker, DC, Edit, chevrons, ×.
 
   WHY `stacked` EXISTS AT ALL. The inline row lays every part on one line and lets only
   the name flex, so it is the name that pays for every other part. In the player
   inspector — a 300px COLUMN, not the crafting tab's wide panel — grip + ordinal + art
-  + `×N` + difficulty + "Reached at ≥N" + a state chip + two chevrons leave the name a
-  MEASURED ZERO pixels: it does not truncate to a word, it disappears, and the chevrons
-  overflow the panel. Adding a chip to a row that was already full is what did it, so
-  the fix belongs with the extension that caused it, not in the crafting tab.
+  + difficulty + "Reached at ≥N" + a state chip + two chevrons leave the name a MEASURED
+  ZERO pixels: it does not truncate to a word, it disappears. Adding a chip to a row that
+  was already full is what did it, so the fix belongs with the extension that caused it,
+  not in the crafting tab.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -70,8 +83,7 @@
     // Commit any debounced order write now. A drag has already settled by the time it
     // drops, so there is nothing left to coalesce.
     onReorderSettled = () => {},
-    // Issue 675, all opt-in: omitted, this renders exactly as it did for crafting.
-    showQuantity = false,
+    // Issue 675, both opt-in: omitted, this renders exactly as it did for crafting.
     stateChip = null,
     stacked = false,
     // WHY the rows are fixed. `canReorder: false` has MORE THAN ONE CAUSE and only the
@@ -143,12 +155,6 @@
   The row's parts as snippets, so the reorderable and fixed branches SHARE them rather
   than carrying two copies that drift (and count twice against the duplication gate).
 -->
-{#snippet quantity(stage)}
-  {#if showQuantity && stage.quantity !== null && stage.quantity !== undefined}
-    <span class="crafting-stage-quantity" data-progressive-stage-quantity={String(stage.quantity)}>×{stage.quantity}</span>
-  {/if}
-{/snippet}
-
 {#snippet numbers(stage)}
   <!--
     ONE number when stacked, TWO inline.
@@ -190,14 +196,13 @@
     <!-- The prototype's shape: ONE flexible column. The name wraps inside it and the
          numbers sit beneath, so nothing on the row competes with the name for width. -->
     <span class="crafting-stage-identity">
-      <span class="crafting-stage-name">{stage.name}{@render quantity(stage)}</span>
+      <span class="crafting-stage-name">{stage.name}</span>
       <span class="crafting-stage-meta is-stacked">{@render numbers(stage)}</span>
     </span>
     {#if stateChip}{@render stateChip(stage)}{/if}
   {:else}
     <span class="crafting-stage-name">{stage.name}</span>
     <span class="crafting-stage-meta">
-      {@render quantity(stage)}
       {@render numbers(stage)}
       {#if stateChip}{@render stateChip(stage)}{/if}
     </span>
@@ -243,26 +248,20 @@
         ondrop={(event) => { event.preventDefault(); handleDrop(index); }}
       >
         <!--
-          `aria-hidden` moves DOWN a level when stacked, and that is load-bearing: the
-          chevrons live inside this cluster there, and an aria-hidden ancestor would take
-          the list's only keyboard-reachable reorder control away from assistive tech.
-          Unstacked, the attribute stays exactly where it was — the crafting tab's DOM is
-          unchanged.
+          Wholly decorative on BOTH surfaces, so `aria-hidden` sits on the cluster
+          itself: the chevrons — the list's only keyboard-reachable reorder control —
+          end the row rather than living in here, and the ordinal restates the position
+          the live region already announces.
         -->
         <span
           class="crafting-stage-handle"
           class:is-stacked={stacked}
-          aria-hidden={stacked ? undefined : 'true'}
+          aria-hidden="true"
           title={text('FABRICATE.App.Crafting.Detail.DragStage', 'Drag to reorder')}
         >
           <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-          <!-- Stacked, the reorder controls LEAD the row (the prototype's shape): the
-               grip and the chevrons are one affordance, so they sit together, and the
-               ordinal reads after them as the row's identity rather than its handle. -->
-          {#if stacked}{@render moveButtons(stage, index)}{/if}
           <span
             class="crafting-stage-ordinal"
-            aria-hidden={stacked ? 'true' : undefined}
             data-progressive-stage-ordinal={String(index + 1)}
           >{index + 1}</span>
         </span>
@@ -273,8 +272,11 @@
                first drag row in the repo to contain an image — the GM's row has none. -->
           <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" draggable="false" />
         {/if}
+        <!-- The chevrons END the row on both surfaces (stacked, that is after the state
+             chip): one arrow position everywhere, matching the GM's component salvage
+             editor rather than diverging per caller. -->
         {@render identity(stage)}
-        {#if !stacked}{@render moveButtons(stage, index)}{/if}
+        {@render moveButtons(stage, index)}
       </div>
     {:else}
       <!-- D13: no drag handlers attached at all, and no grip glyph. The ordinal and the
@@ -392,12 +394,6 @@
     line-height: 1.25;
   }
 
-  /* `×N` reads as part of the name, so it sits in the same wrapping text flow — not in
-     a rigid box that would re-introduce a fixed cost on the row. */
-  .crafting-stage-row.is-stacked .crafting-stage-quantity {
-    margin-left: 5px;
-  }
-
   /* Wraps rather than overflowing: every child here is `nowrap`, so an inline-flex that
      cannot wrap paints its numbers straight out of the identity column and under the
      state chip. Nothing clips it — an overflow this quiet is exactly the class of bug
@@ -433,7 +429,9 @@
     border-radius: 6px;
   }
 
-  /* Stacked, the chevrons are a VERTICAL pair leading the row. Each keeps a 22px touch
+  /* Stacked, the chevrons are a VERTICAL pair ENDING the row — the same stack the GM's
+     component salvage editor uses, and the shape that costs a 300px column the least
+     width at the edge it sits on. Each keeps a 22px touch
      target rather than the prototype's ~17px: HTML5 drag never fires on touch, so these
      buttons are the only touch path to reordering and cannot shrink below usable. */
   .crafting-stage-move.is-stacked {
@@ -465,14 +463,6 @@
   .crafting-stage-threshold {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
-  }
-
-  /* Opt-in (issue 675): only rendered when a caller passes `showQuantity`. */
-  .crafting-stage-quantity {
-    white-space: nowrap;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: var(--fab-text-secondary);
   }
 
   .crafting-stage-move {

@@ -5,10 +5,15 @@
   the order decides what the player actually recovers.
 
   It wraps the shared `ProgressiveStageList` (the crafting tab's), passing its two
-  opt-in extensions: per-stage quantity and a `stateChip` snippet. Reuse rather than a
-  twin is what keeps salvage's a11y triad — drag, keyboard, live region — identical to
-  crafting's, and what keeps `canReorder: false` DETACHING the handlers instead of
-  leaving inert rows a player can grab to no effect.
+  opt-in extensions: the `stacked` row shape and a `stateChip` snippet. Reuse rather
+  than a twin is what keeps salvage's a11y triad — drag, keyboard, live region —
+  identical to crafting's, and what keeps `canReorder: false` DETACHING the handlers
+  instead of leaving inert rows a player can grab to no effect.
+
+  It passes NO quantity, because there is no quantity to pass: progressive results are a
+  quantity-less ordered list, each awarded entry grants exactly one item, and a row
+  reading "×2" beside a single awarded item is a lie the player has no way to see
+  through. The extension that rendered it is gone from the shared list entirely.
 
   Reorder is the whole of the shipped feature: drag + keyboard, no exclude affordance.
   Exclusion would contradict the canonical reconciliation contract, which guarantees a
@@ -167,7 +172,6 @@
       {announcement}
       {onReorder}
       {onReorderSettled}
-      showQuantity
       stacked
       {stateChip}
       {fixedNoteKey}
