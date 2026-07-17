@@ -145,6 +145,9 @@
   }
 
   .salvage-summary-award {
+    /* Cap to the column so a long name ellipsizes instead of widening the pill past the
+       300px inspector. */
+    max-width: 100%;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -155,6 +158,18 @@
     color: var(--fab-text);
     font-size: 11px;
     font-weight: 600;
+  }
+
+  /* Every pill is one line tall regardless of name length: the 14px thumb never varies,
+     so the ONLY thing that changed a pill's height was a long name WRAPPING to a second
+     line (measured: 30px vs 20px). Pin the name to a single ellipsized line so all pills
+     share the thumb-driven 20px height. `min-width:0` lets the flex item shrink far
+     enough for the ellipsis to engage. */
+  .salvage-summary-award > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
 </style>
