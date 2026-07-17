@@ -145,15 +145,17 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   for (const recipeComponent of [
     'RecipeEditorTabs',
-    // The editor's mode banner + context rail (issue 643). The rail REPLACED
-    // RecipeItemInspector and lives under `recipe/` so the screenshot map's
-    // RECIPE_EDIT_MATCHES glob republishes the editor frames when it changes.
+    // The editor's mode banner (issue 643). The former RecipeContextRail is DELETED
+    // (issue 676): its content became the Access / Books & Scrolls tabs below plus the
+    // Overview step-mode control. These live under `recipe/` so the screenshot map's
+    // RECIPE_EDIT_MATCHES glob republishes the editor frames when they change.
     'RecipeModeBanner',
-    'RecipeContextRail',
     'RecipeOverviewTab',
     'RecipeIngredientsTab',
     'RecipeResultsTab',
     'RecipeToolsTab',
+    'RecipeAccessTab',
+    'RecipeBooksScrollsTab',
     'RecipeValidationTab',
     'RecipeStepAccordion',
     'RecipeDurationEditor',
@@ -4413,11 +4415,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'recipe-edit renders the identity card in the central main'
     );
     // The mock system carries no recipeVisibility.knowledge.mode, so the editor
-    // defaults to 'itemOrLearned' and the recipe-item card is shown in the global
-    // inspector aside (not a view-internal column).
+    // defaults to 'itemOrLearned' and the Books & Scrolls TAB is offered. Issue 676
+    // deleted the inspector rail that used to host this: recipe-edit is now a
+    // two-column route, so there is no `.manager-inspector` aside at all here.
+    assert.equal(
+      target.querySelector('.manager-inspector'),
+      null,
+      'recipe-edit renders no inspector aside — the rail is deleted and its column released'
+    );
+    const booksTab = target.querySelector('.manager-main [data-recipe-tab-button="books-scrolls"]');
+    assert.ok(booksTab, 'the Books & Scrolls tab is offered for the default knowledge mode');
+    booksTab.click();
+    await tick();
+    flushSync();
     assert.ok(
-      target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'),
-      'recipe-item card shows in the global inspector for the default knowledge mode'
+      target.querySelector('.manager-main [data-recipe-section="recipe-item"]'),
+      'the Books & Scrolls tab hosts the linked-book list'
     );
     // The recipe-edit header now follows the task/environment convention: Back to
     // recipes + Delete recipe + Save (no Cancel).
@@ -4598,16 +4611,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       'recipe-edit still renders the identity card in the central main'
     );
     // Learning a recipe requires it to link a recipe item (the book the player
-    // learns from), and this inspector is the only place that link is authored,
-    // so the recipe-item card must show for 'learned' too — otherwise a
-    // learned-only system has no way to make any recipe learnable.
+    // learns from), and this surface is the only place that link can be REMOVED,
+    // so the Books & Scrolls tab must show for 'learned' too — otherwise a
+    // learned-only system has no way to see or manage what teaches a recipe.
+    const booksTab = target.querySelector('.manager-main [data-recipe-tab-button="books-scrolls"]');
+    assert.ok(booksTab, 'the Books & Scrolls tab is offered for the learned knowledge mode');
+    booksTab.click();
+    await tick();
+    flushSync();
     assert.ok(
-      target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'),
-      'recipe-item card shows for the learned knowledge mode'
-    );
-    assert.ok(
-      target.querySelector('.manager-inspector'),
-      'the inspector aside is present for the learned knowledge mode'
+      target.querySelector('.manager-main [data-recipe-section="recipe-item"]'),
+      'the Books & Scrolls tab hosts the linked-book list for the learned knowledge mode'
     );
     assert.ok(
       !target.textContent.includes('Edit identity for this recipe.'),
@@ -4670,7 +4684,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     // It must carry an id up front: step-scoped edits route by step id, and an
     // id-less step (undefined == null) misroutes to the recipe scope — looking
     // like the per-step ingredient/result/tool/cost adds do nothing.
-    target.querySelector('.manager-inspector [data-recipe-step-mode-option="multi"]').click();
+    // Step mode lives on the Overview tab since issue 676 (it was in the deleted rail),
+    // beside the steps card it governs.
+    target.querySelector('.manager-main [data-recipe-step-mode-option="multi"]').click();
     await tick();
     flushSync();
 

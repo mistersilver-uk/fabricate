@@ -76,6 +76,9 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
+  // The two mode-conditional tabs (issue 676), rehomed from the deleted context rail.
+  'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
@@ -93,17 +96,6 @@ const editHarness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 });
 
-// The recipe editor's context rail (issue 643 §4b) — it REPLACED RecipeItemInspector.
-const railHarness = createMountedComponentHarness({
-  repoRoot,
-  tmpPrefix: 'fabricate-recipe-context-rail-',
-  rawModules: RAW_MODULES,
-  compiledModules: [
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
-  ],
-  componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
-});
 
 const stepsHarness = createMountedComponentHarness({
   repoRoot,
@@ -141,17 +133,31 @@ function identityProps(overrides = {}) {
 
 // The rail's default effect is the `knowledge` row of the craftingVisibility matrix
 // (showBooksScrolls), which is also the manager's default visibility mode.
-function railProps(overrides = {}) {
+// Props for the Access / Books & Scrolls / Step-mode surfaces, which issue 676 rehomed
+// out of the deleted RecipeContextRail into real tabs. These drive the whole editor
+// (RecipeEditView), NOT the tab components directly: a tab prop that is not ALSO
+// declared and forwarded by the wrapper silently drops to its default and the control
+// never renders, which is invisible to a test that feeds the tab straight.
+function contextProps(overrides = {}) {
   return {
     recipe: RECIPE,
     visibilityEffect: { showAccess: false, showBooksScrolls: true },
     accessPlayers: [],
     accessCharacters: [],
     recipeItemDefinitions: [],
-    readiness: { checks: [], issues: [] },
     onOpenItem: () => {},
     ...overrides,
   };
+}
+
+// Click through to a tab. The gated tabs only exist under the matching visibility mode,
+// so a missing button is a real failure rather than a selector typo.
+async function openTab(target, tabId) {
+  const button = target.querySelector(`[data-recipe-tab-button="${tabId}"]`);
+  assert.ok(button, `the ${tabId} tab button renders`);
+  button.click();
+  await flushRender();
+  return button;
 }
 
 const TOOLS_LIBRARY = Object.freeze([
@@ -331,15 +337,20 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.teardown();
   });
 
-  it('renders the five editor tabs with Overview active by default', async () => {
-    const target = await editHarness.mount(identityProps());
+  // The strip is MODE-CONDITIONAL since issue 676: Access and Books & Scrolls appear
+  // only under the visibility mode that gives them meaning, so the tab list is asserted
+  // per mode rather than as one fixed five.
+  it('renders the always-present editor tabs with Overview active by default', async () => {
+    const target = await editHarness.mount(
+      identityProps({ visibilityEffect: { showAccess: false, showBooksScrolls: false } })
+    );
     const tabs = [...target.querySelectorAll('[data-recipe-tab-button]')].map(
       (btn) => btn.dataset.recipeTabButton
     );
     assert.deepEqual(
       tabs,
       ['overview', 'ingredients', 'results', 'tools', 'validation'],
-      'five tabs render in order'
+      'a globally-visible system renders only the five unconditional tabs, in order'
     );
     assert.equal(
       target.querySelector('[role="tabpanel"]').getAttribute('id'),
@@ -347,6 +358,28 @@ describe('RecipeEditView (mounted)', () => {
       'overview panel is shown first'
     );
     assert.ok(target.querySelector('[data-recipe-tab="overview"]'), 'overview tab content renders');
+    editHarness.remount();
+  });
+
+  it('inserts the gated Access / Books & Scrolls tabs before Validation, per visibility mode', async () => {
+    const knowledge = await editHarness.mount(
+      identityProps({ visibilityEffect: { showAccess: false, showBooksScrolls: true } })
+    );
+    assert.deepEqual(
+      [...knowledge.querySelectorAll('[data-recipe-tab-button]')].map((b) => b.dataset.recipeTabButton),
+      ['overview', 'ingredients', 'results', 'tools', 'books-scrolls', 'validation'],
+      'an item/knowledge system teaches through books, so Books & Scrolls joins the strip'
+    );
+    editHarness.remount();
+
+    const restricted = await editHarness.mount(
+      identityProps({ visibilityEffect: { showAccess: true, showBooksScrolls: false } })
+    );
+    assert.deepEqual(
+      [...restricted.querySelectorAll('[data-recipe-tab-button]')].map((b) => b.dataset.recipeTabButton),
+      ['overview', 'ingredients', 'results', 'tools', 'access', 'validation'],
+      'a restricted system grants per recipe, so Access joins the strip'
+    );
     editHarness.remount();
   });
 
@@ -3468,9 +3501,14 @@ describe('RecipeEditView (mounted)', () => {
   });
 });
 
-describe('RecipeContextRail (mounted)', () => {
+// The two mode-conditional tabs (issue 676), rehomed from the deleted RecipeContextRail.
+// Driven THROUGH RecipeEditView, not by mounting the tabs directly: the wrapper must
+// declare AND forward each prop, and a tab prop it drops silently falls back to its
+// default with the control simply absent — which a test that feeds the tab straight
+// cannot see.
+describe('RecipeEditView — surfaces rehomed from the deleted context rail (mounted)', () => {
   before(async () => {
-    await railHarness.setup();
+    await editHarness.setup();
     // The harness installs game.i18n but not fromUuid; provide a default stub.
     globalThis.foundry = {};
     globalThis.fromUuid = async () => null;
@@ -3479,55 +3517,59 @@ describe('RecipeContextRail (mounted)', () => {
   after(() => {
     delete globalThis.fromUuid;
     delete globalThis.foundry;
-    railHarness.teardown();
+    editHarness.teardown();
   });
 
   beforeEach(() => {
     globalThis.fromUuid = async () => null;
   });
 
-  it('renders the "Appears in" card with no drop zone and no "link another" affordance', async () => {
-    const target = await railHarness.mount(railProps());
+  it('renders the "Appears in" tab with no drop zone and no "link another" affordance', async () => {
+    const target = await editHarness.mount(contextProps());
+    await openTab(target, 'books-scrolls');
     assert.ok(
       target.querySelector('[data-recipe-section="recipe-item"]'),
-      'the books & scrolls card renders under the knowledge/item effect'
+      'the books & scrolls tab renders under the knowledge/item effect'
     );
-    // §2c: adding a recipe to a book is authored on Books & Scrolls. The recipe-side
-    // drop zone was a SECOND authoring path for the same many-to-many and is removed.
+    // Adding a recipe to a book is authored on Books & Scrolls. The recipe-side drop
+    // zone was a SECOND authoring path for the same many-to-many and is removed.
     assert.equal(
       target.querySelector('[data-recipe-item-dropzone]'),
       null,
       'no drop zone: adding a recipe to a book happens on Books & Scrolls'
     );
     assert.ok(target.querySelector('[data-recipe-item-empty]'), 'shows the empty summary copy');
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('deep-links to Books & Scrolls', async () => {
     const opened = [];
-    const target = await railHarness.mount(
-      railProps({ onOpenBooksScrolls: () => opened.push(true) })
+    const target = await editHarness.mount(
+      contextProps({ onOpenBooksScrolls: () => opened.push(true) })
     );
+    await openTab(target, 'books-scrolls');
     target.querySelector('[data-recipe-open-books]').click();
     assert.deepEqual(opened, [true], 'the Open Books & Scrolls button routes to the owning screen');
-    railHarness.remount();
+    editHarness.remount();
   });
 
-  it('omits the books card entirely under the global visibility mode', async () => {
-    const target = await railHarness.mount(
-      railProps({ visibilityEffect: { showAccess: false, showBooksScrolls: false } })
+  // The GATE is the tab BUTTON, not just the panel: a tab that opens an empty panel is
+  // worse than no tab, so the strip and RecipeEditView's TAB_IDS read the same effect.
+  it('omits both gated tabs entirely under the global visibility mode', async () => {
+    const target = await editHarness.mount(
+      contextProps({ visibilityEffect: { showAccess: false, showBooksScrolls: false } })
     );
     assert.equal(
-      target.querySelector('[data-recipe-section="recipe-item"]'),
+      target.querySelector('[data-recipe-tab-button="books-scrolls"]'),
       null,
-      'a globally-visible system uses no books'
+      'a globally-visible system uses no books, so the tab button is absent'
     );
     assert.equal(
-      target.querySelector('[data-recipe-section="access"]'),
+      target.querySelector('[data-recipe-tab-button="access"]'),
       null,
-      'a globally-visible system grants no per-recipe access'
+      'a globally-visible system grants no per-recipe access, so the tab button is absent'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('enumerates every linked book (many-to-many) and unlinks one via onRemoveRecipeItem', async () => {
@@ -3537,13 +3579,14 @@ describe('RecipeContextRail (mounted)', () => {
       { id: 'ri-a', name: 'Alpha Tome', img: 'icons/a.webp', originItemUuid: 'Item.a' },
       { id: 'ri-b', name: 'Beta Scroll', img: 'icons/b.webp', originItemUuid: 'Item.b' },
     ];
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      contextProps({
         recipe: { ...RECIPE, recipeItemId: 'ri-a', recipeItemIds: ['ri-a', 'ri-b'] },
         recipeItemDefinitions: DEFS,
         onRemoveRecipeItem: (id) => removed.push(id),
       })
     );
+    await openTab(target, 'books-scrolls');
     await new Promise((r) => setTimeout(r, 10));
     const rows = target.querySelectorAll('[data-recipe-item-link]');
     assert.equal(rows.length, 2, 'both linked books are listed');
@@ -3553,14 +3596,14 @@ describe('RecipeContextRail (mounted)', () => {
     // The per-row unlink removes only that book.
     target.querySelector('[data-recipe-item-link="ri-b"] .manager-icon-button.is-danger').click();
     assert.deepEqual(removed, ['ri-b'], 'unlink calls onRemoveRecipeItem with the book id');
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('resolves each linked book image/name from its source document', async () => {
     const DOCS = { 'Item.blue': { name: 'Blue Potion', img: 'icons/blue-potion.webp' } };
     globalThis.fromUuid = async (uuid) => DOCS[uuid] || null;
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      contextProps({
         recipe: { ...RECIPE, recipeItemId: 'ri-blue', recipeItemIds: ['ri-blue'] },
         recipeItemDefinitions: [
           {
@@ -3572,27 +3615,28 @@ describe('RecipeContextRail (mounted)', () => {
         ],
       })
     );
+    await openTab(target, 'books-scrolls');
     await new Promise((r) => setTimeout(r, 10));
     assert.ok(
       target
-        .querySelector('[data-recipe-item-linked] img.manager-environment-scene-thumb')
+        .querySelector('[data-recipe-item-linked] img.manager-recipe-book-thumb')
         .getAttribute('src')
         .includes('blue-potion'),
       'shows the resolved source image'
     );
     assert.ok(
       target
-        .querySelector('[data-recipe-item-linked] .manager-environment-scene-name')
+        .querySelector('[data-recipe-item-linked] .manager-recipe-book-name')
         .textContent.includes('Blue Potion'),
       'shows the resolved source name'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('renders the missing state when fromUuid resolves to null', async () => {
     globalThis.fromUuid = async () => null;
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      contextProps({
         recipe: { ...RECIPE, recipeItemId: 'ri1', recipeItemIds: ['ri1'] },
         recipeItemDefinitions: [
           {
@@ -3604,6 +3648,7 @@ describe('RecipeContextRail (mounted)', () => {
         ],
       })
     );
+    await openTab(target, 'books-scrolls');
     await new Promise((r) => setTimeout(r, 10));
     assert.ok(
       target.querySelector('[data-recipe-item-missing]'),
@@ -3613,15 +3658,15 @@ describe('RecipeContextRail (mounted)', () => {
       target.querySelector('[data-recipe-item-linked]'),
       'the link is retained in the missing state'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
-  // --- the RESTRICTED branch (issue 643 §4b) ----------------------------------
+  // --- the RESTRICTED branch ----------------------------------------------------
   const RESTRICTED = { showAccess: true, showBooksScrolls: false };
 
-  it('lists players and characters with access under the restricted mode, and no books card', async () => {
-    const target = await railHarness.mount(
-      railProps({
+  it('lists players and characters with access under the restricted mode, and no books tab', async () => {
+    const target = await editHarness.mount(
+      contextProps({
         visibilityEffect: RESTRICTED,
         accessPlayers: [{ id: 'u1', name: 'Ada', avatar: 'icons/ada.webp' }],
         accessCharacters: [
@@ -3635,22 +3680,18 @@ describe('RecipeContextRail (mounted)', () => {
         ],
       })
     );
-    const accessCard = target.querySelector('[data-recipe-section="access"]');
-    assert.ok(accessCard, 'access card renders');
-    // `.manager-inspector-title-row` is a `44px | 1fr` grid built for a medallion +
-    // copy pair. A lone heading in it lands in the 44px column and wraps one word per
-    // line ("WHO / CAN / CRAFT / THIS"), so this card must use a bare card title.
-    assert.equal(
-      accessCard.querySelector('.manager-inspector-title-row'),
-      null,
-      'the access heading must not sit in the medallion title grid, which would wrap it to one word per line'
-    );
+    await openTab(target, 'access');
+    assert.ok(target.querySelector('[data-recipe-section="access"]'), 'access panel renders');
+    // The tab leads with the shared tab intro (an h2 + muted sub), like every other
+    // recipe tab — not the rail's uppercase micro-label, which was rail chrome.
     assert.ok(
-      accessCard.querySelector(':scope > h3.manager-recipe-rail-label'),
-      'the access heading is a bare uppercase micro-label, like every rail section (issue 643 §G1)'
+      target.querySelector(
+        '[data-recipe-tab="access"] > .manager-recipe-tab-intro > h2.manager-recipe-tab-title'
+      ),
+      'the access tab is headed by the shared tab title, like Results/Tools/Validation'
     );
     assert.equal(
-      target.querySelector('[data-recipe-section="recipe-item"]'),
+      target.querySelector('[data-recipe-tab-button="books-scrolls"]'),
       null,
       'restricted systems use no books'
     );
@@ -3666,15 +3707,15 @@ describe('RecipeContextRail (mounted)', () => {
       'Played by Ada',
       'a single controller reads "Played by <name>"'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('says "Shared with all players" rather than naming one player when ownership.default is OWNER', async () => {
     // THE bug this field exists to prevent: `getUserLevel` falls through to
     // ownership.default, so an "All Players = Owner" actor is controlled by EVERY
     // player. Naming one of them would tell the GM the opposite of the truth.
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      contextProps({
         visibilityEffect: RESTRICTED,
         accessCharacters: [
           {
@@ -3690,34 +3731,36 @@ describe('RecipeContextRail (mounted)', () => {
         ],
       })
     );
+    await openTab(target, 'access');
     assert.equal(
       target.querySelector('[data-recipe-access-subline]').textContent.trim(),
       'Shared with all players',
       'the whole-table grant is stated as such, never as "Played by <one name>"'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('renders no sub-line at all when nobody controls the granted character', async () => {
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      contextProps({
         visibilityEffect: RESTRICTED,
         accessCharacters: [
           { id: 'a1', name: 'Orphan NPC', img: '', controlledBy: [], sharedWithAllPlayers: false },
         ],
       })
     );
+    await openTab(target, 'access');
     assert.equal(
       target.querySelector('[data-recipe-access-subline]'),
       null,
       'an empty control set invents no attribution'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('collapses three or more controllers to "+N" and keeps the full list in the title', async () => {
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      contextProps({
         visibilityEffect: RESTRICTED,
         accessCharacters: [
           {
@@ -3734,6 +3777,7 @@ describe('RecipeContextRail (mounted)', () => {
         ],
       })
     );
+    await openTab(target, 'access');
     const subline = target.querySelector('[data-recipe-access-subline]');
     assert.equal(subline.textContent.trim(), 'Played by Ada +2', 'collapses to +N');
     assert.equal(
@@ -3741,18 +3785,19 @@ describe('RecipeContextRail (mounted)', () => {
       'Ada, Brin, Cade',
       'the "+N" collapse never hides a name — the full list is in the title'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('shows an empty-grant message and still deep-links to Manage access', async () => {
     const opened = [];
-    const target = await railHarness.mount(
-      railProps({ visibilityEffect: RESTRICTED, onOpenAccess: () => opened.push(true) })
+    const target = await editHarness.mount(
+      contextProps({ visibilityEffect: RESTRICTED, onOpenAccess: () => opened.push(true) })
     );
+    await openTab(target, 'access');
     assert.ok(target.querySelector('[data-recipe-access-empty]'), 'states that nothing is granted');
     target.querySelector('[data-recipe-open-access]').click();
-    assert.deepEqual(opened, [true], 'Manage access routes to the Access tab');
-    railHarness.remount();
+    assert.deepEqual(opened, [true], 'Manage access routes to the Access screen');
+    editHarness.remount();
   });
 
   // --- category (moved to Overview, threaded through RecipeEditView) ------------
@@ -3803,33 +3848,38 @@ describe('RecipeContextRail (mounted)', () => {
     editHarness.remount();
   });
 
-  // --- step mode / recipe mode (now SegmentedControls) ---------------------------
+  // --- step mode (issue 676: rehomed from the deleted rail onto Overview) ---------
+  // It lives beside the surface it governs — the steps themselves are authored on this
+  // tab (RecipeStepsCard), and this control decides whether that card exists at all.
+  // These drive RecipeEditView, so they also prove the wrapper declares AND forwards
+  // `multiStepEnabled` / `onEnterMultiStep` / `onRevertToSingleStep`; a prop the wrapper
+  // drops falls back to its default and the control silently never renders.
   it('hides the step-mode control when multi-step is not enabled and the recipe is single-step', async () => {
-    const target = await railHarness.mount(
-      railProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: false })
+    const target = await editHarness.mount(
+      identityProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: false })
     );
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       null,
       'step-mode card is hidden'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('shows the step-mode control for a single-step recipe when multi-step is enabled', async () => {
-    const target = await railHarness.mount(
-      railProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: true })
+    const target = await editHarness.mount(
+      identityProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: true })
     );
     assert.ok(
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       'step-mode card renders when enabled'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('still shows the step-mode control for a multi-step recipe even when the feature is off (to allow revert)', async () => {
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      identityProps({
         recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
         multiStepEnabled: false,
       })
@@ -3838,14 +3888,14 @@ describe('RecipeContextRail (mounted)', () => {
       target.querySelector('[data-recipe-section="recipe-step-mode"]'),
       'step-mode card stays visible so multi-step can be reverted'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('shows single-step selected and fires onEnterMultiStep when switching to multi', async () => {
     const entered = [];
     const reverted = [];
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      identityProps({
         recipe: { ...RECIPE, steps: [] },
         multiStepEnabled: true,
         onEnterMultiStep: () => entered.push(true),
@@ -3863,14 +3913,14 @@ describe('RecipeContextRail (mounted)', () => {
     await flushRender();
     assert.deepEqual(entered, [true], 'choosing multi fires onEnterMultiStep');
     assert.equal(reverted.length, 0, 'revert not called when entering multi');
-    railHarness.remount();
+    editHarness.remount();
   });
 
   it('shows multi-step selected and fires onRevertToSingleStep when switching to single', async () => {
     const entered = [];
     const reverted = [];
-    const target = await railHarness.mount(
-      railProps({
+    const target = await editHarness.mount(
+      identityProps({
         recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
         onEnterMultiStep: () => entered.push(true),
         onRevertToSingleStep: () => reverted.push(true),
@@ -3883,14 +3933,14 @@ describe('RecipeContextRail (mounted)', () => {
     await flushRender();
     assert.deepEqual(reverted, [true], 'choosing single fires onRevertToSingleStep');
     assert.equal(entered.length, 0, 'enter not called when reverting');
-    railHarness.remount();
+    editHarness.remount();
   });
 
   // The Simple/Complex toggle was removed (issue 643): recipe complexity is emergent
   // from the ingredient-set count, authored via the Ingredients tab's "Add ingredient
-  // set" affordance, so the rail renders no recipe-mode control in any configuration.
+  // set" affordance, so the editor renders no recipe-mode control in any configuration.
   it('renders NO recipe-mode control (complexity is emergent from structure)', async () => {
-    const single = await railHarness.mount(railProps({ recipe: { ...RECIPE, steps: [] } }));
+    const single = await editHarness.mount(identityProps({ recipe: { ...RECIPE, steps: [] } }));
     assert.equal(
       single.querySelector('[data-recipe-section="recipe-mode"]'),
       null,
@@ -3901,167 +3951,31 @@ describe('RecipeContextRail (mounted)', () => {
       null,
       'no Simple/Complex segmented control'
     );
-    railHarness.remount();
+    editHarness.remount();
 
     // Even a multi-set / multi-step recipe gets no toggle — there is nothing to toggle.
-    const multi = await railHarness.mount(
-      railProps({ recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] } })
+    const multi = await editHarness.mount(
+      identityProps({ recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] } })
     );
     assert.equal(
       multi.querySelector('[data-recipe-section="recipe-mode"]'),
       null,
       'no recipe-mode section for a multi-step recipe either'
     );
-    railHarness.remount();
+    editHarness.remount();
   });
 
   // The per-recipe Check/Ingredient routing sub-selector was removed when the
   // routing basis became a property of the system MODE (routedByIngredients /
-  // routedByCheck). The rail renders no routing toggle.
+  // routedByCheck). The editor renders no routing toggle.
   it('does not render a per-recipe routing toggle (routing basis is the system mode)', async () => {
-    const target = await railHarness.mount(railProps({ complex: true }));
+    const target = await editHarness.mount(identityProps());
     assert.equal(
       target.querySelector('[data-recipe-section="recipe-routing"]'),
       null,
       'the routing sub-selector is gone'
     );
-    railHarness.remount();
-  });
-
-  // --- the validation mini-list --------------------------------------------------
-  it('shows an All clear pill plus the positive check list when the evaluator reports no issues', async () => {
-    const target = await railHarness.mount(
-      railProps({ readiness: { checks: [{ id: 'hasName', satisfied: true }], issues: [] } })
-    );
-    assert.ok(target.querySelector('[data-recipe-validation-clear]'), 'renders the All clear pill');
-    // The positive-state list always renders (issue 643 §G2): a passing check reads green.
-    assert.ok(
-      target.querySelector('[data-recipe-validation-issues]'),
-      'the check list renders even when clear'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-rail-check]').getAttribute('data-satisfied'),
-      'true',
-      'the passing check reads satisfied'
-    );
-    railHarness.remount();
-  });
-
-  it('renders the full check list (passing and failing) and deep-links to the Validation tab', async () => {
-    const selected = [];
-    const target = await railHarness.mount(
-      railProps({
-        readiness: {
-          checks: [
-            { id: 'hasName', satisfied: true },
-            { id: 'hasResultGroup', satisfied: false },
-          ],
-          issues: [{ id: 'noResultGroup', severity: 'critical' }],
-        },
-        onSelectIssue: (requested) => selected.push(requested),
-      })
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-validation-clear]'),
-      null,
-      'no All clear pill while an issue stands'
-    );
-    const rows = target.querySelectorAll('[data-recipe-rail-check]');
-    assert.equal(rows.length, 2, 'every check is listed (the positive-state list, §G2)');
-    const failing = target.querySelector('[data-recipe-rail-check="hasResultGroup"]');
-    assert.equal(failing.getAttribute('data-satisfied'), 'false', 'the failing check reads unsatisfied');
-    target.querySelector('[data-recipe-open-validation]').click();
-    assert.deepEqual(selected, ['validation'], 'the review button opens the Validation tab');
-    railHarness.remount();
-  });
-
-  // --- the Validation-tab summary (§G4) ------------------------------------------
-  it('shows the validation summary + count table ONLY on the Validation tab', async () => {
-    const readiness = {
-      checks: [
-        { id: 'hasName', satisfied: true },
-        { id: 'hasResultGroup', satisfied: true },
-      ],
-      issues: [],
-    };
-    const off = await railHarness.mount(railProps({ readiness }));
-    assert.equal(
-      off.querySelector('[data-recipe-validation-summary]'),
-      null,
-      'no summary while another tab is active'
-    );
-    railHarness.remount();
-
-    const on = await railHarness.mount(railProps({ readiness, activeTab: 'validation' }));
-    assert.ok(on.querySelector('[data-recipe-validation-summary]'), 'the summary card renders on the Validation tab');
-    assert.ok(on.querySelector('[data-recipe-validation-counts]'), 'the count table renders');
-    railHarness.remount();
-  });
-
-  it('derives the summary status + Passing/Warnings/Blocking counts from the readiness output', async () => {
-    // All satisfied, no issues → All clear.
-    const clear = await railHarness.mount(
-      railProps({
-        activeTab: 'validation',
-        readiness: {
-          checks: [
-            { id: 'hasName', satisfied: true },
-            { id: 'hasResultGroup', satisfied: true },
-          ],
-          issues: [],
-        },
-      })
-    );
-    assert.equal(
-      clear.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
-      'clear',
-      'no issues reads as clear'
-    );
-    assert.equal(clear.querySelector('[data-recipe-count-passing]').textContent.trim(), '2', 'two satisfied checks pass');
-    assert.equal(clear.querySelector('[data-recipe-count-warnings]').textContent.trim(), '0');
-    assert.equal(clear.querySelector('[data-recipe-count-blocking]').textContent.trim(), '0');
-    railHarness.remount();
-
-    // A warning but no blocker → Enabled with warnings.
-    const warned = await railHarness.mount(
-      railProps({
-        activeTab: 'validation',
-        readiness: {
-          checks: [{ id: 'hasName', satisfied: true }],
-          issues: [{ id: 'unusedTag', severity: 'warning' }],
-        },
-      })
-    );
-    assert.equal(
-      warned.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
-      'warning',
-      'a warning with no blocker reads as warning'
-    );
-    assert.equal(warned.querySelector('[data-recipe-count-warnings]').textContent.trim(), '1');
-    assert.equal(warned.querySelector('[data-recipe-count-blocking]').textContent.trim(), '0');
-    railHarness.remount();
-
-    // A critical issue → Cannot be enabled (blocking wins over warnings).
-    const blocked = await railHarness.mount(
-      railProps({
-        activeTab: 'validation',
-        readiness: {
-          checks: [{ id: 'hasName', satisfied: false }],
-          issues: [
-            { id: 'noResultGroup', severity: 'critical' },
-            { id: 'unusedTag', severity: 'warning' },
-          ],
-        },
-      })
-    );
-    assert.equal(
-      blocked.querySelector('[data-recipe-validation-summary]').getAttribute('data-recipe-validation-summary'),
-      'blocked',
-      'a critical issue reads as blocked, even alongside a warning'
-    );
-    assert.equal(blocked.querySelector('[data-recipe-count-passing]').textContent.trim(), '0', 'the unsatisfied check does not pass');
-    assert.equal(blocked.querySelector('[data-recipe-count-blocking]').textContent.trim(), '1');
-    railHarness.remount();
+    editHarness.remount();
   });
 });
 

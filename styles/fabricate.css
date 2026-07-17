@@ -3712,8 +3712,13 @@
   font-weight: 600;
 }
 
+/* The Overview cards. `manager-recipe-step-mode-card` joined this list in issue 676
+   when Step mode was rehomed out of the deleted context rail: it sits directly above
+   the card it governs (steps or duration), so it SHARES their rule rather than
+   hand-rolling a near-copy that would drift the moment either is retuned. */
 .fabricate-manager .manager-recipe-duration-card,
-.fabricate-manager .manager-recipe-steps-card {
+.fabricate-manager .manager-recipe-steps-card,
+.fabricate-manager .manager-recipe-step-mode-card {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
@@ -3721,6 +3726,23 @@
   border: 1px solid var(--fab-border);
   border-radius: 12px;
   background: var(--fab-surface-soft);
+}
+
+/* Step mode's copy block and its control sit side by side, like the duration card's
+   copy + pill — but the control is a real segmented control, so it keeps its intrinsic
+   width instead of stretching. */
+.fabricate-manager .manager-recipe-step-mode-card {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fabricate-manager .manager-recipe-step-mode-card > div {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-step-mode-card p {
+  margin: 2px 0 0;
 }
 
 .fabricate-manager .manager-recipe-duration-card-head,
@@ -6088,8 +6110,13 @@
 
 /* The two-column editor routes. `component-edit` joined this list in issue 676:
    decision 4 deleted its right-rail inspectors, but the column they occupied was
-   never released, so the editor rendered against a ~300px dead strip. `recipe-edit`
-   is deliberately ABSENT — it fills the third column with `RecipeContextRail`.
+   never released, so the editor rendered against a ~300px dead strip.
+
+   `recipe-edit` joined it later in the same issue, for exactly the same reason: its
+   `RecipeContextRail` is deleted and its content became real tabs (Access, Books &
+   Scrolls) plus an Overview control (Step mode). The 300px this frees goes to the tab
+   panel, which is the whole point — the tabs were being authored in ~2/3 of the window
+   while a read-only summary held the rest.
 
    This list and the `<aside class="manager-inspector">` render condition in
    `CraftingSystemManagerRoot.svelte` are ONE decision expressed twice: release the
@@ -6098,6 +6125,7 @@
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
 .fabricate-manager[data-manager-view="checks"] .manager-body,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body,
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body {
@@ -6107,6 +6135,7 @@
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {

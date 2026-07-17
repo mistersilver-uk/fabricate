@@ -203,12 +203,13 @@ describe('UI PR screenshot evidence', () => {
       'manager-recipe-edit-access-rail',
     ];
 
-    // The top-level editor view, the context rail, and any recipe sub-component all
-    // republish all ten frames. The rail lives under `recipe/` (issue 643) so the
-    // glob covers it; the BROWSER inspector deliberately lives under `recipes/`.
+    // The top-level editor view and any recipe sub-component all republish all ten
+    // frames. Every editor tab lives under `recipe/` so the glob covers it; the BROWSER
+    // inspector deliberately lives under `recipes/`.
     for (const file of [
       'src/ui/svelte/apps/manager/RecipeEditView.svelte',
-      'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);

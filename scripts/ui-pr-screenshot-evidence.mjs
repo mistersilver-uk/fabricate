@@ -16,11 +16,11 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
-// The recipe editor's five screenshot frames (overview/ingredients/validation/
-// multi-step/tools) share the same trigger files, so any recipe editor / context-rail
-// / sub-component change republishes all five. The rail (RecipeContextRail) lives
-// under `recipe/` and is covered by the glob below; the BROWSER inspector deliberately
-// does not (see the manager-recipes recipe).
+// The recipe editor's frames (overview/ingredients/validation/multi-step/tools/access/
+// results) share the same trigger files, so any recipe editor / tab / sub-component
+// change republishes all of them. Every editor tab lives under `recipe/` and is covered
+// by the glob below; the BROWSER inspector deliberately does not (see the
+// manager-recipes recipe).
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
@@ -287,12 +287,14 @@ export const VIEW_RECIPES = Object.freeze([
     matches: RECIPE_EDIT_MATCHES,
   },
   {
-    // The context rail is MODE-CONDITIONAL (issue 643 §4b). Every other recipe frame
-    // is captured against a system whose visibility mode drives the Books & Scrolls
-    // branch, so without this frame the restricted (access) branch would ship with no
-    // screenshot evidence at all.
+    // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
+    // rail). Every other recipe frame is captured against a system whose visibility mode
+    // drives the Books & Scrolls branch, so without this frame the restricted (access)
+    // branch would ship with no screenshot evidence at all. The frame ID keeps its
+    // `-access-rail` suffix: it is a stable identifier the published S3 keys and the
+    // smoke labels share, and renaming it would orphan existing evidence for no gain.
     id: 'manager-recipe-edit-access-rail',
-    label: 'Manager recipe editor — restricted-visibility context rail (players and characters with access)',
+    label: 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)',
     smokeLabels: ['manager-recipe-edit-access-rail'],
     matches: RECIPE_EDIT_MATCHES,
   },

@@ -1630,6 +1630,7 @@
           "SingleStep": "Single step",
           "MultiStep": "Multi-step",
           "StepMode": "Step mode",
+          "StepModeHint": "A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.",
           "SingleStepHint": "The recipe is crafted in a single step.",
           "MultiStepHint": "Author an ordered list of named steps in the editor.",
           "Routing": "Result routing",
@@ -1879,6 +1880,8 @@
             "Ingredients": "Ingredients",
             "Results": "Results",
             "Tools": "Tools",
+            "Access": "Access",
+            "BooksScrolls": "Books & Scrolls",
             "Validation": "Validation"
           },
           "PerStepTools": "Tools per step",
@@ -1966,28 +1969,23 @@
             "Settings": "System settings",
             "SettingsHint": "Resolution mode is set for the whole crafting system, not per recipe."
           },
-          "Rail": {
-            "AccessTitle": "Who can craft this",
+          "AccessTab": {
+            "Title": "Who can craft this",
+            "Intro": "This system grants recipes per player and character. Grants are authored on the Access screen.",
             "PlayersWithAccess": "Players with access",
             "CharactersWithAccess": "Characters with access",
             "PlayedBy": "Played by",
             "SharedWithAllPlayers": "Shared with all players",
+            "EmptyTitle": "No access granted",
             "NoAccessGrants": "No player or character has been granted this recipe yet.",
-            "ManageAccess": "Manage access",
-            "AppearsIn": "Appears in",
+            "ManageAccess": "Manage access"
+          },
+          "BooksScrollsTab": {
+            "Title": "Appears in",
+            "Intro": "The books and scrolls that teach this recipe. A recipe is added to a book from the book’s own editor.",
+            "EmptyTitle": "Not in any book or scroll",
             "AppearsInEmpty": "No book or scroll teaches this recipe yet.",
-            "OpenBooksScrolls": "Open Books & Scrolls",
-            "AllClear": "All clear",
-            "ReviewValidation": "Review validation",
-            "SummaryAllClear": "All clear",
-            "SummaryAllClearSub": "Every structural check passes. Ready to enable.",
-            "SummaryWarnings": "Enabled with warnings",
-            "SummaryWarningsSub": "Saves and enables — review the warnings when you can.",
-            "SummaryBlocked": "Cannot be enabled",
-            "SummaryBlockedSub": "Clear every blocking issue before this recipe can be enabled.",
-            "CountPassing": "Passing",
-            "CountWarnings": "Warnings",
-            "CountBlocking": "Blocking"
+            "OpenBooksScrolls": "Open Books & Scrolls"
           },
           "OpenItem": "Open item",
           "UnlinkItem": "Unlink recipe item",

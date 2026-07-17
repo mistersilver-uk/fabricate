@@ -1,8 +1,16 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Recipe editor shell. A tab strip (Overview / Ingredients / Results / Validation)
-  mirroring the gathering environment editor, with the card contents moved into the
-  relevant tab.
+  Recipe editor shell. A tab strip (Overview / Ingredients / Results / Tools /
+  Access* / Books & Scrolls* / Validation) mirroring the gathering environment
+  editor, with the card contents moved into the relevant tab. The two starred tabs
+  are mode-conditional (issue 676) — see RecipeEditorTabs for the gate.
+
+  The editor has NO right rail (issue 676): `RecipeContextRail` is deleted and
+  `recipe-edit` is in the two-column override list in `styles/fabricate.css`, so the
+  tab panel takes the 300px back. Nothing was lost — the rail's Access rows and
+  "Appears in" list became the two conditional tabs, its Step-mode control moved to
+  Overview (next to the steps it governs), and its validation summary + mini check
+  list were duplicates of the Validation tab, which reads the same evaluator.
 
   The shell is fully CONTROLLED: the root holds the in-flight recipe draft and passes
   it down as `recipe`. Identity inputs (name/description/img) read straight from
@@ -21,6 +29,8 @@
   import RecipeIngredientsTab from './recipe/RecipeIngredientsTab.svelte';
   import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
   import RecipeToolsTab from './recipe/RecipeToolsTab.svelte';
+  import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
+  import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
   import { evaluateRecipeReadiness, blocksEnable } from './recipe/recipeReadiness.js';
 
@@ -77,14 +87,23 @@
     // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every
     // tab and routes to Crafting Settings, which is the only place it can change.
     resolutionMode = 'simple',
-    // Requested-tab handshake (a nonce, so the same tab can be re-requested): the
-    // context rail deep-links into a tab of the editor it sits beside.
-    requestedTab = '',
-    requestedTabNonce = 0,
-    // Report the active tab up so the sibling context rail can react to it (the rail
-    // shows a validation summary only while the Validation tab is open — §G4). The
-    // tab state lives here; the rail is a sibling in the shell, so it is lifted out.
-    onActiveTabChange = () => {},
+    // The system's craftingEffect matrix row ({ showAccess, showBooksScrolls, ... }),
+    // gating the Access and Books & Scrolls tabs (issue 676). NOT named `effect`.
+    visibilityEffect = { showAccess: false, showBooksScrolls: true },
+    // Access tab inputs. RESOLVED rows (never ids) — the store resolves them, because a
+    // granted id resolves over EVERY world actor, not the player-character roster.
+    accessPlayers = [],
+    accessCharacters = [],
+    // Books & Scrolls tab inputs (the recipe-item definition library + the unlink).
+    recipeItemDefinitions = [],
+    onRemoveRecipeItem = () => {},
+    onOpenItem = () => {},
+    onOpenAccess = () => {},
+    onOpenBooksScrolls = () => {},
+    // Step mode, rehomed to the Overview tab from the deleted context rail (issue 676).
+    multiStepEnabled = false,
+    onEnterMultiStep = () => {},
+    onRevertToSingleStep = () => {},
     onOpenCraftingSettings = () => {},
     onUpdateRecipe = () => {},
     onToggleEnabled = () => {},
@@ -260,21 +279,6 @@
     lastRecipeId = nextRecipeId;
   });
 
-  // Mirror the active tab out to the shell (which threads it to the context rail).
-  $effect(() => {
-    onActiveTabChange(activeTab);
-  });
-
-  // Honour an external tab request (the context rail's validation deep-link). Keyed
-  // on the NONCE so requesting the tab the user has since navigated away from still
-  // works, and so a stale `requestedTab` never fights manual tab clicks.
-  let lastRequestedTabNonce = $state(0);
-  $effect(() => {
-    if (requestedTabNonce === lastRequestedTabNonce) return;
-    lastRequestedTabNonce = requestedTabNonce;
-    if (TAB_IDS.includes(requestedTab)) activeTab = requestedTab;
-  });
-
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -289,7 +293,24 @@
     if (value) onUpdateRecipe({ img: value });
   }
 
-  const TAB_IDS = ['overview', 'ingredients', 'results', 'tools', 'validation'];
+  // Derived from the SAME `visibilityEffect` the tab strip builds its buttons from, so
+  // a deep-link can never select a tab that does not exist in this system's mode.
+  const TAB_IDS = $derived([
+    'overview',
+    'ingredients',
+    'results',
+    'tools',
+    ...(visibilityEffect?.showAccess ? ['access'] : []),
+    ...(visibilityEffect?.showBooksScrolls ? ['books-scrolls'] : []),
+    'validation'
+  ]);
+
+  // A mode change can retire the tab the GM is standing on (turning a restricted system
+  // global retires Access). Fall back to Overview rather than rendering a panel-less
+  // tabpanel whose `aria-labelledby` points at a button that no longer exists.
+  $effect(() => {
+    if (!TAB_IDS.includes(activeTab)) activeTab = 'overview';
+  });
 
   // Deep-link from a validation issue: switch to the tab that hosts the gap.
   function selectIssue(targetTab) {
@@ -304,7 +325,7 @@
     <div class="manager-recipe-edit-view" data-recipe-editor>
       <!-- Header → tabs → banner → content (§4.2): the banner sits BELOW the tab strip
            so the tabs stay attached to the header above them. -->
-      <RecipeEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
+      <RecipeEditorTabs {activeTab} {badges} {visibilityEffect} onSelect={(tab) => { activeTab = tab; }} />
 
       <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
 
@@ -336,6 +357,9 @@
             {minSuccessTierOptions}
             {locked}
             {onToggleLocked}
+            {multiStepEnabled}
+            {onEnterMultiStep}
+            {onRevertToSingleStep}
             {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}
@@ -384,6 +408,16 @@
             onAddStepTool={addStepTool}
             onRemoveStepTool={removeStepTool}
             onDeleteStep={deleteStepFrom('tools')}
+          />
+        {:else if activeTab === 'access'}
+          <RecipeAccessTab {accessPlayers} {accessCharacters} {onOpenAccess} />
+        {:else if activeTab === 'books-scrolls'}
+          <RecipeBooksScrollsTab
+            {recipe}
+            {recipeItemDefinitions}
+            {onRemoveRecipeItem}
+            {onOpenItem}
+            {onOpenBooksScrolls}
           />
         {:else if activeTab === 'validation'}
           <RecipeValidationTab

@@ -4915,14 +4915,34 @@ async function main() {
           process.stderr.write(`Crafting group surface capture failed: ${err.message}\n`);
         }
 
-        // Recipes → open the editor so the identity card (central column) and the
-        // knowledge-gated recipe-item inspector (right context panel) are captured (#387).
+        // Recipes → open the editor so the Overview tab's identity card is captured
+        // (#387). Issue 676 deleted the right context rail: recipe-edit is a TWO-column
+        // route now, and the knowledge-gated recipe-item list moved to its own Books &
+        // Scrolls tab (captured in its own step below). This step therefore waits only
+        // on the always-present Overview identity card — waiting on the recipe-item
+        // section here would hang, and this wait is UNGUARDED, so it would abort the
+        // rest of Phase D0 rather than record one failed step.
         await openManagerRecipeEditor(page, 'Brew Healing Potion');
         await page.locator('.fabricate-manager [data-recipe-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager [data-recipe-section="recipe-item"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'recipe edit normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-normal');
+
+        // Books & Scrolls tab: the knowledge-gated list of books teaching this recipe,
+        // plus its per-row unlink — the ONLY surface carrying either. Guarded so a
+        // hiccup records a failed step instead of aborting Phase D0.
+        try {
+          await page.locator('.fabricate-manager [data-recipe-tab-button="books-scrolls"]').first().click();
+          await page.locator('.fabricate-manager [data-recipe-tab="books-scrolls"] [data-recipe-section="recipe-item"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertManagerLayoutStable(page, 'recipe edit books & scrolls');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-recipe-edit-books-scrolls');
+          results.steps.push({ step: 'recipe-edit-books-scrolls', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipe-edit-books-scrolls', passed: false, error: err.message });
+          process.stderr.write(`Recipe books & scrolls capture failed: ${err.message}\n`);
+        }
 
         // Recipe Tools tab → this recipe references a deliberately-unlabelled tool,
         // so the row must show the backing component's name (the fallback fix),
@@ -5050,18 +5070,22 @@ async function main() {
           }
         }
 
-        // Warded Rite (restricted system) → the recipe editor's context rail renders
-        // its ACCESS branch: players with access, characters with access, and each
-        // character's "played by" subline. This is the ONLY capture of the restricted
-        // branch — every other recipe capture runs against Arcane Forge, whose
-        // visibility mode drives the Books & Scrolls branch instead. Guarded so a
+        // Warded Rite (restricted system) → the recipe editor's ACCESS tab: players with
+        // access, characters with access, and each character's "played by" subline. This
+        // is the ONLY capture of the restricted branch — every other recipe capture runs
+        // against Arcane Forge, whose visibility mode drives the Books & Scrolls branch
+        // instead. Issue 676 moved this out of the deleted context rail into a real tab,
+        // so the tab must be CLICKED first; the tab button only exists under the
+        // restricted mode, which is itself part of what this asserts. Guarded so a
         // hiccup records a failed step instead of aborting the rest of Phase D0, and
         // the system selection is restored either way.
         try {
           await returnToSystemLibrary(page);
           await selectSmokeSystemInManager(page, craftingSetup.restrictedSystemId);
           await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);
-          await page.locator('.fabricate-manager [data-recipe-section="access"]').first()
+          await page.locator('.fabricate-manager [data-recipe-tab-button="access"]').first()
+            .click({ timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-recipe-tab="access"] [data-recipe-section="access"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await page.locator('.fabricate-manager [data-recipe-access-characters]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });

@@ -192,23 +192,34 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     );
   });
 
-  it('never suppresses the inspector aside on recipe-edit (the context rail is always present)', () => {
-    // recipe-edit is absent from the two-column override list, so a hidden inspector
-    // rendered a 300px dead column. The always-present context rail fixes that
-    // (issue 643 §8), and the aside guard no longer names recipe-edit at all.
+  it('suppresses the inspector aside on recipe-edit, matching the released grid column', () => {
+    // Issue 676 deleted the context rail: recipe-edit is a TWO-column route now, and the
+    // 300px the rail held goes to the tab panel. Suppressing the aside here and adding
+    // recipe-edit to the two-column override list in styles/fabricate.css are ONE
+    // decision expressed twice — suppress without releasing and a 300px empty box still
+    // holds the strip open; release without suppressing and the (empty) aside wraps to
+    // an implicit grid row BELOW the editor. This pins both halves together.
     assert.equal(
       rootSource.includes('recipeInspectorVisible'),
       false,
-      'the conditional-hide gate is gone'
+      'no conditional-hide gate: the aside is unconditionally absent on this route'
     );
     const asideGuard = rootSource.slice(
       rootSource.indexOf("{#if currentView !== 'environment-edit' && currentView !== 'checks'"),
       rootSource.indexOf('<aside class="manager-inspector"')
     );
-    assert.equal(
+    assert.ok(
       asideGuard.includes("currentView !== 'recipe-edit'"),
-      false,
-      'the aside is never suppressed on recipe-edit'
+      'the aside is suppressed on recipe-edit'
+    );
+    const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    assert.ok(
+      css.includes('.fabricate-manager[data-manager-view="recipe-edit"] .manager-body'),
+      'and the grid column is released, or the suppressed aside leaves a dead 300px strip'
+    );
+    assert.ok(
+      css.includes('.fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed'),
+      'the collapsed-rail variant is released too'
     );
   });
 
