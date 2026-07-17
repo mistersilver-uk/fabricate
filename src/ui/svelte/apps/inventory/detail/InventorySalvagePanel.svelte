@@ -237,6 +237,15 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
+    /* Genuine breathing room beneath the footer/ribbon at the end of a long, scrolled
+       result list. The scroll container (`.inventory-detail`) is a flex column with
+       `overflow-y:auto`, and Chromium DROPS a flex-overflow container's own
+       padding-bottom at the scroll end (measured: ~0px gap, not the 16px the padding
+       implies) — so the roomy look of a short list collapses to a cramped footer once
+       the list scrolls. Padding on THIS block is inside a normal flow box and is
+       honoured, restoring ~24px below the last control (measured). Scoped here, not on
+       the shared `.inventory-detail`, which also serves the Info and book panels. */
+    padding-bottom: var(--fab-space-6);
   }
 
   .salvage-banner {
