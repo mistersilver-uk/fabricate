@@ -151,6 +151,33 @@ describe('KnownRecipesColumn (mounted)', () => {
     assert.ok(target.querySelector('[data-alchemy-zero-known]'), 'onboarding empty state shown');
     assert.equal(target.querySelector('[data-alchemy-known-no-matches]'), null);
   });
+
+  it('renders an essence ingredient option as its resolved NAME x AMOUNT, not the raw id', async () => {
+    // The builder now projects essence-type ingredient options with the essence
+    // name + required amount (issue 675). The card's sig summary must surface those,
+    // e.g. "Toxic ×2 · Water ×1" — never the raw essence uuid.
+    const bladeVenom = {
+      id: 'blade-venom',
+      name: 'Blade Venom',
+      img: null,
+      result: null,
+      signatureSummary: [
+        {
+          setId: 'bv-set',
+          essences: [],
+          groups: [
+            { options: [{ componentId: null, essenceId: 'toxic-id', name: 'Toxic', icon: 'fas fa-skull', quantity: 2 }] },
+            { options: [{ componentId: null, essenceId: 'water-id', name: 'Water', icon: 'fas fa-droplet', quantity: 1 }] }
+          ]
+        }
+      ]
+    };
+    const target = await harness.mount({ recipes: [bladeVenom], knownCount: 1 });
+    const sig = target.querySelector('[data-alchemy-recipe="blade-venom"] .alchemy-recipe-sig');
+    assert.ok(sig, 'the signature summary renders');
+    assert.equal(sig.textContent.trim(), 'Toxic ×2 · Water ×1', 'resolved essence name + amount, not raw ids');
+    assert.ok(!sig.textContent.includes('toxic-id'), 'the raw essence id must not appear in the card');
+  });
 });
 
 // ---------------------------------------------------------------------------

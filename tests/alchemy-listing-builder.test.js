@@ -225,6 +225,108 @@ test('a rich signature (alternatives + essence) is projected but NOT reducible t
   assert.equal(projected.signatureSummary[0].essences.length, 1, 'the essence requirement is shown');
 });
 
+test('an essence-type ingredient option projects the essence NAME + AMOUNT + icon, never the raw id', () => {
+  // The real "Blade Venom" shape (issue 675): ONE ingredient set with TWO groups,
+  // each a single ESSENCE option (componentId null). Historically the card showed
+  // the raw essence id at ×option.quantity; the projection must resolve the
+  // essence's name/icon and surface match.amount as the display quantity.
+  const bladeVenom = {
+    id: 'blade-venom',
+    name: 'Blade Venom',
+    img: null,
+    description: '',
+    enabled: true,
+    craftingSystemId: 'sys-a',
+    ingredientSets: [
+      {
+        id: 'bv-set',
+        ingredientGroups: [
+          {
+            id: 'bv-g1',
+            options: [
+              { match: { type: 'essence', essenceId: 'toxic-id', amount: 2 }, componentId: null, quantity: 1 },
+            ],
+          },
+          {
+            id: 'bv-g2',
+            options: [
+              { match: { type: 'essence', essenceId: 'water-id', amount: 1 }, componentId: null, quantity: 1 },
+            ],
+          },
+        ],
+        essences: {},
+        resultGroupId: 'bv-rg',
+      },
+    ],
+    resultGroups: [{ id: 'bv-rg', name: 'Blade Venom result', results: [{ componentId: 'quicksilver', quantity: 1 }] }],
+  };
+  const system = makeSystem('sys-a', 'Herbalism', [bladeVenom], COMPONENTS);
+  system.essenceDefinitions = [
+    { id: 'toxic-id', name: 'Toxic', icon: 'fas fa-skull' },
+    { id: 'water-id', name: 'Water', icon: 'fas fa-droplet' },
+  ];
+  const actor = makeActor('pc', { learned: { 'blade-venom': {} } });
+  const listing = build([{ system, recipes: [bladeVenom] }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  });
+  const projected = listing.recipes[0];
+  const groups = projected.signatureSummary[0].groups;
+  assert.equal(groups.length, 2, 'both essence groups are projected');
+
+  const toxic = groups[0].options[0];
+  assert.equal(toxic.name, 'Toxic', 'the essence NAME renders, not the raw id');
+  assert.notEqual(toxic.name, 'toxic-id', 'the raw essence id must never be the display name');
+  assert.equal(toxic.quantity, 2, 'the display quantity is the required essence amount');
+  assert.equal(toxic.icon, 'fas fa-skull', 'the essence icon is carried for display');
+  assert.equal(toxic.componentId, null);
+  assert.equal(toxic.essenceId, 'toxic-id', 'the essence id is carried in its own field, as set-level essences do');
+
+  const water = groups[1].options[0];
+  assert.equal(water.name, 'Water');
+  assert.notEqual(water.name, 'water-id');
+  assert.equal(water.quantity, 1);
+  assert.equal(water.icon, 'fas fa-droplet');
+});
+
+test('an essence option with a missing definition falls back to the raw id as the name', () => {
+  const recipe = {
+    id: 'orphan',
+    name: 'Orphan Brew',
+    enabled: true,
+    craftingSystemId: 'sys-a',
+    ingredientSets: [
+      {
+        id: 'o-set',
+        ingredientGroups: [
+          {
+            id: 'o-g',
+            options: [
+              { match: { type: 'essence', essenceId: 'ghost-id', amount: 3 }, componentId: null, quantity: 1 },
+            ],
+          },
+        ],
+        essences: {},
+        resultGroupId: 'o-rg',
+      },
+    ],
+    resultGroups: [{ id: 'o-rg', name: 'r', results: [{ componentId: 'quicksilver', quantity: 1 }] }],
+  };
+  const system = makeSystem('sys-a', 'Herbalism', [recipe], COMPONENTS);
+  system.essenceDefinitions = [];
+  const actor = makeActor('pc', { learned: { orphan: {} } });
+  const listing = build([{ system, recipes: [recipe] }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  });
+  const option = listing.recipes[0].signatureSummary[0].groups[0].options[0];
+  assert.equal(option.name, 'ghost-id', 'with no definition, the raw id is the only available label');
+  assert.equal(option.quantity, 3, 'the amount is still the required essence amount');
+  assert.equal(option.icon, null);
+});
+
 test('GM bypass: every enabled recipe is known, undiscovered count is zero', () => {
   const { system, recipes } = singleSystemSetup();
   const gmActor = makeActor('gm', {});
