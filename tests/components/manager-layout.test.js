@@ -2034,10 +2034,13 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   // `:not(.fab-stepper-input)` (issue 676): the shared `Stepper` brings its own
   // borderless chrome from a component-scoped <style>, which this rule out-specifies —
   // so a Stepper inside any `.manager-field` was being stretched to 100%/36px and
-  // re-bordered. `.manager-component-inline-control` joins it because it renders
-  // OUTSIDE a `.manager-field` and would otherwise inherit Foundry's native control.
+  // re-bordered. `:not([type='radio'])` excludes the custom resolution radios for the
+  // same reason — the text-field treatment tied their own rule on specificity and, later
+  // in the file, squared the dot and stretched it to fill the flex line.
+  // `.manager-component-inline-control` joins it because it renders OUTSIDE a
+  // `.manager-field` and would otherwise inherit Foundry's native control.
   const fieldInputBlock = blockFor(
-    '.fabricate-manager .manager-field input:not(.fab-stepper-input),\n'
+    ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),\n"
       + '.fabricate-manager .manager-field select,\n'
       + '.fabricate-manager .manager-component-inline-control'
   );
