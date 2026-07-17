@@ -7864,12 +7864,40 @@
 .fabricate-manager .manager-salvage-stage-row {
   display: flex;
   align-items: center;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-mv2-bg);
+}
+
+/* THE PICKER IS BOUNDED ON A STAGE ROW, NOT GREEDY. The shared field is `flex: 1 1 auto`,
+   which is right on the simple/routed row (a picker, a stepper and an ×) but wrong here: a
+   stage row carries four more controls, so a greedy trigger took ~85% of the row and
+   crushed DC/Edit/reorder/× into the last scraps. Bounded, the row reads as a set of parts.
+   `flex: 0 1 360px` is a BASIS, not a width: it still SHRINKS (with `min-width: 0` on the
+   field keeping the name ellipsizing), so the row survives the narrow container-query
+   widths — it just never grows past a size that comfortably holds a long component name. */
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-component-field {
+  flex: 0 1 360px;
+}
+
+/* Right-align the trailing cluster now the picker no longer grows into it, so the row keeps
+   the familiar `target … controls` shape of the Recipe Studio's sibling row rather than
+   packing everything left against a dead right margin. The DC always renders (the Edit link
+   does NOT — it needs a chosen component), so it is the only safe anchor for the `auto`. */
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-result-difficulty {
+  margin-left: auto;
+}
+
+/* Extra separation between the trailing controls, on top of the row's 12px gap: these are
+   four unrelated affordances (a read-only fact, a deep link, a reorder rocker and a
+   delete), and packed at 8px they read as one undifferentiated clump. */
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-reorder,
+.fabricate-manager .manager-salvage-stage-row > .manager-icon-button {
+  margin-left: var(--fab-space-1);
 }
 
 /* The row being dragged. `--fab-accent-border` + a lifted surface, so the GM can see
@@ -7905,15 +7933,17 @@
    Sized as a REAL stacked control, not a hairline: reorder is the authoring act in
    progressive mode (the list order decides what a player is awarded), so the chevrons
    are the primary affordance for it and the drag is the enhancement. They were 20x12 at
-   a 0.44rem glyph, which is smaller than the row's own icons and an unhittable target. */
+   a 0.44rem glyph, which is smaller than the row's own icons and an unhittable target;
+   24x16 was still cramped. 30px wide matches the Recipe Studio's stacked rocker, and the
+   room comes free now the picker beside them is bounded. */
 .fabricate-manager .manager-salvage-stage-move {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 16px;
+  width: 30px;
+  height: 18px;
   min-height: 0;
   margin: 0;
   padding: 0;
@@ -7921,7 +7951,7 @@
   border-radius: 4px;
   color: var(--fab-mv2-text-muted);
   background: var(--fab-surface-soft);
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -7940,23 +7970,25 @@
 /* The "Edit ↗" deep link to the yield component's own editor. It is the ONLY way to
    change the DC shown beside it (the DC belongs to the yield component, whose own editor
    owns its save lifecycle), so it has to read as a legible link rather than a 0.56rem
-   speck — it was smaller than the caption text next to it. */
+   speck — it was smaller than the caption text next to it. Sized UP again: at 0.72rem in a
+   24px box it was still the smallest hit target on a row whose other controls are 30-34px.
+   It now matches the DC's 0.8125rem, so the fact and the way to change it read as a pair. */
 .fabricate-manager .manager-salvage-stage-edit {
   display: inline-flex;
   align-items: center;
-  gap: var(--fab-space-2xs);
+  gap: var(--fab-space-chip);
   flex: 0 0 auto;
   width: auto;
   height: auto;
-  min-height: 24px;
+  min-height: 30px;
   margin: 0;
-  padding: var(--fab-space-2xs) var(--fab-space-chip);
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 6px;
   color: var(--fab-mv2-accent);
   background: var(--fab-surface-soft);
   font-family: inherit;
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   line-height: normal;
   white-space: nowrap;
@@ -7964,7 +7996,7 @@
 }
 
 .fabricate-manager .manager-salvage-stage-edit i {
-  font-size: 0.62rem;
+  font-size: 0.72rem;
 }
 
 .fabricate-manager .manager-salvage-stage-edit:hover:not(:disabled) {

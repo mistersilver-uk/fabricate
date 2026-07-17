@@ -265,10 +265,12 @@ const EXPECTED = {
   'stage-picker': 13.12, // 0.82rem — inherits the field size, as the select did
   'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
   'stage-dc': 13, // 0.8125rem mono 700 — prototype read-only DC chip 13px mono. Exact.
-  // 0.72rem. It is the ONLY route to the DC rendered beside it, so it is sized as a real
-  // link rather than the 0.56rem speck it shipped as — smaller than its own caption.
-  'stage-edit': 11.52,
-  'stage-move': 9.6, // 0.6rem — the reorder chevron glyph; reorder IS the authoring act
+  // It is the ONLY route to the DC rendered beside it, so it is sized as a real link
+  // rather than the 0.56rem speck it shipped as — smaller than its own caption. Raised
+  // again from 0.72rem: it now MATCHES `stage-dc`, so the read-only fact and the control
+  // that changes it read as one pair rather than a number with a speck beside it.
+  'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc
+  'stage-move': 10.88, // 0.68rem — the reorder chevron glyph; reorder IS the authoring act
   'tag-toggle': 11.2, // 0.7rem — prototype tag toggle pill 11px sans. Near-exact.
   // The cascade context. A bare control inherits Foundry's 14px app base; any role
   // above landing on 14 means its rule stopped applying and Foundry bled through.
