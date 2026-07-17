@@ -148,6 +148,12 @@ The tab returns to how it looked before the roll.
 Once the roll resolves, a read-only summary appears, the body marks what was recovered and what the roll fell short of, and a ribbon confirms the materials were added.
 **Salvage again** clears the summary and returns the tab to its pre-roll state.
 The ribbon stays with the component that was salvaged, even when the last copy was consumed and its card has left the grid.
+When that last copy is gone, the header reads **None remaining** and **Salvage again** is withheld, because there is nothing left to break down.
+
+When the system's chat-output feature is on, salvage also posts a result card to chat, in the same format crafting uses.
+It is the same card as a crafting result, reading as its salvage counterpart: it names the source that was broken down, the materials recovered, and any tools that broke, and it posts on both a success and a rolled failure.
+A cancelled prompt, a salvage that is not yet configured, and a run that has only started against a time requirement post nothing, because none of them has changed anything to report.
+This is the same **Chat output** feature that governs crafting cards, set on the **Features** card of the System tab in the Crafting Admin panel.
 
 When the component carries a time requirement, the press starts a run rather than finishing the salvage.
 The tab then shows the run's waiting message instead of a ribbon, and the materials arrive as world time advances.
