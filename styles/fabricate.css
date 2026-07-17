@@ -7807,6 +7807,47 @@
   min-width: 0;
 }
 
+/* ── The yield picker (issue 676) ────────────────────────────────────────────────
+   Both salvage result rows pick their component through a portaled SearchablePopover
+   whose trigger carries the image AND the name, replacing a native <select> that could
+   never show the art. The field is the flex child; the popover itself is portaled to
+   `.fabricate-manager` and is positioned inline, so it takes no layout here. */
+.fabricate-manager .manager-salvage-component-field {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-component-picker {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Foundry's core `button` rule fixes a height and a font; a trigger that only sets a
+   min-height gets cropped by it (the EnvironmentCard pattern). Reset to auto and let the
+   portrait set the row's height. */
+.fabricate-manager .manager-button.manager-salvage-component-trigger {
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  min-height: 34px;
+  padding: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait {
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-manager .manager-salvage-component-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
 /* ── Progressive salvage stages (issue 676) ───────────────────────────────────────
    Progressive renders an ordered list of SINGLE results — no group boxes. The roll is
    spent DOWN this list, so the row's POSITION is data: it gets a grip, an order badge
@@ -7849,10 +7890,9 @@
   cursor: grabbing;
 }
 
-.fabricate-manager .manager-salvage-stage-component {
-  flex: 1 1 auto;
-  min-width: 0;
-}
+/* (`.manager-salvage-stage-component` sized the stage row's native <select>. The row now
+   picks its component through `.manager-salvage-component-field`, which both salvage rows
+   share — see the yield-picker block above.) */
 
 .fabricate-manager .manager-salvage-stage-reorder {
   display: flex;
@@ -9937,9 +9977,27 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-task-card-heading > div {
+/* The heading's COPY block. `> div` is the vehicle because every heading's copy is a bare
+   <div> wrapping the h3 + hint — but a heading's right-hand CONTROL WRAPPER is a div too,
+   and this rule out-specifies its own `flex: 0 0 auto` (0-2-1 beats 0-2-0). The wrapper
+   was therefore GROWN to half the row, and because it lays its contents out as an
+   inline-flex, they left-aligned inside the grown box: the salvage ENABLED cluster and the
+   DC stepper both rendered stranded at ~3/4 width with dead space to their right
+   (measured: a 345px box whose content started at the box's left edge). The Category
+   select escaped this only by being a <select> rather than a <div>.
+   `.manager-task-card-heading-control` is the opt-out marker; carry it on any wrapper that
+   should sit at its own width against the right edge. */
+.fabricate-manager .manager-task-card-heading > div:not(.manager-task-card-heading-control) {
   flex: 1 1 220px;
   min-width: 0;
+}
+
+/* Right-pinned at its own width. `margin-left: auto` is belt-and-braces with the heading's
+   `justify-content: space-between` — it keeps the control at the right edge even in a
+   heading whose copy block does not grow. */
+.fabricate-manager .manager-task-card-heading > .manager-task-card-heading-control {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .fabricate-manager .manager-task-card-heading .manager-link-button {
@@ -12900,7 +12958,14 @@
   flex-wrap: wrap;
 }
 
-.fabricate-manager .manager-component-inline-panel > .manager-task-card-heading > div {
+/* Same shape, same exclusion as the base rule: the DC card's stepper wrapper is a direct
+   child div of this heading, and this rule (0-3-1) out-specified its `flex: 0 0 auto` even
+   harder. Excluding the control marker lets the title/hint take the free space so the card
+   reads full width with the control at the right edge. */
+.fabricate-manager
+  .manager-component-inline-panel
+  > .manager-task-card-heading
+  > div:not(.manager-task-card-heading-control) {
   flex: 1 1 200px;
   min-width: 0;
 }

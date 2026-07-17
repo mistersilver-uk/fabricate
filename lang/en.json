@@ -2122,6 +2122,8 @@
             "RemoveGroup": "Remove result group",
             "ResultComponent": "Result component",
             "SelectComponent": "Select a component",
+            "ComponentSearchPlaceholder": "Search components...",
+            "NoComponentsDefined": "No components defined",
             "EditResult": "Edit {name}",
             "Difficulty": "Difficulty",
             "DifficultyUnset": "No difficulty",

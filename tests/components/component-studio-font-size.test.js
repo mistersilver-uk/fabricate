@@ -159,7 +159,7 @@ const FIXTURE = `
           <section class="manager-component-panel" data-salvage-section>
             <div class="manager-task-card-heading">
               <div><h3>Salvage</h3></div>
-              <div class="manager-component-heading-controls">
+              <div class="manager-component-heading-controls manager-task-card-heading-control">
                 <span class="manager-chip is-info manager-salvage-mode-pill" data-m="salvage-mode-pill"><span>Progressive · ordered</span></span>
                 <span class="manager-component-heading-divider"></span>
                 <span class="manager-component-micro-label" data-m="micro-label">Enabled</span>
@@ -171,7 +171,15 @@ const FIXTURE = `
               <ul class="manager-salvage-stage-list">
                 <li class="manager-salvage-stage-row">
                   <span class="manager-salvage-result-ordinal" data-m="stage-ordinal">1</span>
-                  <select class="manager-input manager-salvage-stage-component" data-m="stage-select"><option>Brass Casing</option></select>
+                  <span class="manager-salvage-component-field">
+                    <span class="manager-travel-picker manager-salvage-component-picker">
+                      <button type="button" class="manager-button manager-salvage-component-trigger" data-m="stage-picker">
+                        <span class="manager-travel-portrait"><img src="" alt=""></span>
+                        <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
+                        <i class="fas fa-chevron-down"></i>
+                      </button>
+                    </span>
+                  </span>
                   <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
                   <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
                   <span class="manager-salvage-stage-reorder">
@@ -250,7 +258,12 @@ const EXPECTED = {
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
   'info-banner': 10.56, // 0.66rem — prototype roll-budget banner 10.5px sans
   'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
-  'stage-select': 13.12, // 0.82rem — inherits the field size
+  // The yield picker replaced the stage row's native <select> (issue 676). It measures the
+  // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
+  // native control for a popover trigger re-typed nothing. That is the point of checking:
+  // a <button> is exactly the element Foundry's core `button` rule would otherwise size.
+  'stage-picker': 13.12, // 0.82rem — inherits the field size, as the select did
+  'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
   'stage-dc': 13, // 0.8125rem mono 700 — prototype read-only DC chip 13px mono. Exact.
   // 0.72rem. It is the ONLY route to the DC rendered beside it, so it is sized as a real
   // link rather than the 0.56rem speck it shipped as — smaller than its own caption.

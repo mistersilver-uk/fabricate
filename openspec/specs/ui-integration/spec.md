@@ -1049,6 +1049,12 @@ The strip's copy is NOT folded into the card's sub-line, because the strip state
 - The progressive **salvage** result list shows **ordinals** and a **read-only difficulty badge** per row.
 These are required alongside the salvage toggle card and not severable from it: progressive salvage spends the roll down the list, so without them the card would govern an order the GM cannot see, and a card reading "players may reorder the stages" above a list of bare selects asserts a model the surface contradicts.
 The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
+- A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
+The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
+- A salvage result row picks its component through a **searchable popover whose trigger carries the component's image and its name**, not a native `<select>`.
+The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
+The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
+The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
 
 ## Crafting App (Player)
 

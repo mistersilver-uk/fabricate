@@ -384,33 +384,69 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  it('progressive salvage KEEPS its quantity stepper, because the award loop honours it', async () => {
-    // READ THIS BEFORE DELETING THE PROGRESSIVE QUANTITY CONTROL.
+  it('progressive salvage has NO quantity stepper — the engine forces quantity 1', async () => {
+    // This test was the exact REVERSE until issue 676, and the reversal is the record of
+    // a real fix rather than a change of mind. It used to say: do not delete this control,
+    // because salvage — unlike recipes — genuinely honoured the authored quantity, so
+    // hiding it would conceal a live field a GM could no longer see or edit. It ended
+    // "if salvage should become quantity-less, the ENGINE must change first".
     //
-    // The recipe editor hides quantity on progressive result rows, and its comment says
-    // why: "the progressive award loop ignores `quantity` and awards each ordered entry
-    // once". That is TRUE FOR RECIPES AND FALSE FOR SALVAGE, and the difference is not
-    // in the loop — it is one layer above it:
-    //
-    //   * `ResolutionModeService._resolveProgressive` (recipes) FORCES the quantity:
-    //       results: awarded.map((result) => ({ ...result, quantity: 1 }))
-    //   * `CraftingEngine._resolveSalvageResultGroups` (salvage) does NOT:
-    //       return [{ ...group, results: awarded }];
-    //
-    // `resolveProgressiveAward` never mentions `quantity` because it returns the authored
-    // result objects BY IDENTITY — so salvage hands them straight to `_createSingleResult`,
-    // which does `itemData.system.quantity = result.quantity`. Progressive salvage
-    // therefore awards the authored quantity: set 2, get 2.
-    //
-    // So hiding this control would not be "matching the recipe" — it would hide a live,
-    // working, authored field, leaving existing worlds silently awarding a quantity their
-    // GM could no longer see or edit. If salvage should become quantity-less, the ENGINE
-    // must change first; this test fails on purpose when it does.
+    // The engine changed first. `CraftingEngine._resolveSalvageResultGroups` now forces
+    // `quantity: 1` on every awarded progressive entry, exactly as
+    // `ResolutionModeService._resolveProgressive` always has for recipes — because
+    // progressive is an ordered list of INDIVIDUAL results whose award loop charges one
+    // difficulty and awards one entry. `tests/salvage-engine.test.js` pins both halves
+    // (the resolver AND the item actually created), so this control is now genuinely dead
+    // UI in progressive mode rather than a window onto working behaviour.
     const target = await harness.mount(props());
+    assert.equal(
+      target.querySelector('[data-salvage-result-quantity]'),
+      null,
+      'a progressive yield is one item; repetition is authored by listing the component twice'
+    );
+    harness.remount();
+  });
+
+  it('simple salvage KEEPS its quantity stepper — the count is real there', async () => {
+    // The other half of the ruling, and the reason the change above is a mode-scoped
+    // deletion rather than a global one: simple/routed award the whole authored group, so
+    // `quantity` is honoured end-to-end and must stay editable.
+    const target = await harness.mount(props({ salvageResolutionMode: 'simple' }));
     assert.ok(
       target.querySelector('[data-salvage-result-quantity]'),
-      'progressive salvage rows expose the quantity the award path actually honours'
+      'simple salvage rows expose the quantity the award path honours'
     );
+    harness.remount();
+  });
+
+  it('a yield row picks its component through the searchable popover, showing image AND name', async () => {
+    // The native <select> could show a component's name but never its art, so the GM
+    // picked yields from a text list on a surface where every other component is shown
+    // with its image. The trigger wraps BOTH facts as one target.
+    const target = await harness.mount(props());
+    const field = target.querySelector('[data-salvage-result-component]');
+    assert.ok(field, 'the row still exposes its component field');
+    assert.equal(field.querySelector('select'), null, 'the native select is gone');
+    const trigger = field.querySelector('button.manager-salvage-component-trigger');
+    assert.ok(trigger, 'the field is a popover trigger');
+    assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
+    assert.ok(trigger.querySelector('img'), 'the trigger carries the component image');
+    assert.match(trigger.textContent, /Scrap Metal/, 'the trigger carries the component name');
+    harness.remount();
+  });
+
+  it('a yield component with no art falls back to a glyph, never a broken <img>', async () => {
+    // A raw <img src=""> renders a broken-image box. SearchablePopover only emits the
+    // <img> when `triggerImg` is truthy, so the fallback has to be an ICON — the option
+    // list is built with `icon` set for exactly the art-less components.
+    const target = await harness.mount(
+      props({
+        componentOptions: COMPONENT_OPTIONS.map((option) => ({ ...option, img: '' }))
+      })
+    );
+    const trigger = target.querySelector('button.manager-salvage-component-trigger');
+    assert.equal(trigger.querySelector('img'), null, 'no <img> is emitted without a src');
+    assert.ok(trigger.querySelector('i.fa-cube'), 'the art-less component reads as a glyph');
     harness.remount();
   });
 

@@ -3,6 +3,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import SearchablePopover from './SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   import {
     GENERAL_COMPONENT_CATEGORY,
@@ -619,6 +620,23 @@
     return componentOptions.find(option => option.id === componentId)?.name || '';
   }
 
+  function salvageComponentOption(componentId) {
+    return componentId ? componentOptions.find(option => option.id === componentId) || null : null;
+  }
+
+  // The yield picker's option list (issue 676). `img` is projected onto every component
+  // option by the manager root, and `icon` is the fallback for a component whose linked
+  // item has no art: SearchablePopover renders a raw <img> ONLY when `img` is truthy, so
+  // an art-less component reads as a cube glyph rather than a broken-image box.
+  const salvageComponentPickerOptions = $derived(
+    (componentOptions || []).map(option => ({
+      id: option.id,
+      label: option.name,
+      img: option.img || '',
+      icon: option.img ? '' : 'fas fa-cube'
+    }))
+  );
+
   function toggleTag(tag, checked) {
     const next = tagDraft.map(entry => entry.tag === tag ? { ...entry, checked: checked === true } : entry);
     tagDraft = next;
@@ -727,7 +745,11 @@
             <h3>{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyCardTitle', 'This component’s Progressive DC')}</h3>
             <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyHint', 'Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its component.')}</p>
           </div>
-          <div class="manager-component-inline-stepper">
+          <!-- `manager-task-card-heading-control` opts this wrapper OUT of the heading's
+               `> div { flex: 1 1 200px }` copy-block rule, which out-specifies the
+               wrapper's own `flex: 0 0 auto` and otherwise grows it to half the row —
+               stranding the stepper mid-card with dead space to its right. -->
+          <div class="manager-component-inline-stepper manager-task-card-heading-control">
             <span class="manager-component-micro-label">{text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyMicro', 'DC')}</span>
             <Stepper
               value={difficultyInputValue === '' ? 0 : difficultyInputValue}
@@ -859,6 +881,45 @@
         </section>
       {/if}
 
+    <!-- The yield picker, shared by BOTH salvage result rows (issue 676). A `{#snippet}`
+         rather than a new `.svelte` file for two reasons: the two call sites differ only
+         in which group they write to, and a new component would have to be registered in
+         every mount harness that renders this tree (a missing entry HANGS the suite
+         rather than failing it). SearchablePopover is already in all of them.
+
+         WHY NOT A `<select>`: the native control could show the component's NAME but never
+         its IMAGE, so the GM picked yields from a text list while every other component
+         surface in the studio shows the art. The trigger wraps the image AND the name —
+         one target, both facts — and the popover is portaled to `.fabricate-manager`, so
+         it escapes the panel's `overflow: hidden` (a naive absolute popover clips).
+
+         There is deliberately no "clear" entry, matching RecipeResultItemRow: the select's
+         old blank `<option>` only ever produced a result that names no component, and the
+         row's × removes it properly. -->
+    {#snippet salvageComponentPicker(groupId, result)}
+      {@const selected = salvageComponentOption(result.componentId)}
+      <span class="manager-salvage-component-field" data-salvage-result-component>
+        <SearchablePopover
+          options={salvageComponentPickerOptions}
+          value={result.componentId}
+          disabled={saving}
+          pickerClass="manager-salvage-component-picker"
+          triggerClass="manager-button manager-salvage-component-trigger"
+          triggerImg={selected?.img || ''}
+          triggerIcon={selected?.img ? '' : 'fas fa-cube'}
+          triggerLabel={selected?.name || text('FABRICATE.Admin.Manager.Component.SalvageEditor.SelectComponent', 'Select a component')}
+          valueClass="manager-salvage-component-name"
+          triggerTitle={selected?.name || ''}
+          triggerAriaLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent', 'Result component')}
+          dialogAriaLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent', 'Result component')}
+          searchPlaceholder={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder', 'Search components...')}
+          searchAriaLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder', 'Search components...')}
+          emptyHint={text('FABRICATE.Admin.Manager.Component.SalvageEditor.NoComponentsDefined', 'No components defined')}
+          onChoose={(id) => updateSalvageResult(groupId, result.id, { componentId: id })}
+        />
+      </span>
+    {/snippet}
+
     {#if showSalvage}
       <section class="manager-component-panel" data-component-edit-section="salvage" data-salvage-section>
         <!-- THE HEADING IS THE CONTROL ROW (issue 676): mode pill · divider · ENABLED ·
@@ -876,7 +937,13 @@
                AC4/AC9/AC10 suites drive, and those pin the salvage ENABLEMENT rulings
                (the dirty-baseline, the zero-group deadlock, the removal clamp) rather
                than the vehicle. Renaming them would have silently unpinned all of it. -->
-          <div class="manager-component-heading-controls" data-recipe-section="salvage-enabled">
+          <!-- `manager-task-card-heading-control`: see the DC card's note. Without it the
+               heading's `> div` copy-block rule grows this cluster to half the row and the
+               pill/ENABLED/toggle left-align inside the grown box. -->
+          <div
+            class="manager-component-heading-controls manager-task-card-heading-control"
+            data-recipe-section="salvage-enabled"
+          >
             {#if salvageModeLabel}
               <!-- Read-only: the mode is a SYSTEM setting, authored on Crafting Settings.
                    It names the mode that decides this panel's shape, which the GM
@@ -986,31 +1053,17 @@
                     data-salvage-result-ordinal={String(stageIndex + 1)}
                     aria-hidden="true">{stageIndex + 1}</span
                   >
-                  <select
-                    class="manager-input manager-salvage-stage-component"
-                    value={result.componentId}
-                    aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent', 'Result component')}
-                    data-salvage-result-component
-                    onchange={(event) => updateSalvageResult(salvageStageGroup.id, result.id, { componentId: event.currentTarget.value })}
-                    disabled={saving}
-                  >
-                    <option value="">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.SelectComponent', 'Select a component')}</option>
-                    {#each componentOptions as option (option.id)}
-                      <option value={option.id}>{option.name}</option>
-                    {/each}
-                  </select>
+                  {@render salvageComponentPicker(salvageStageGroup.id, result)}
 
-                  <Stepper
-                    value={result.quantity}
-                    min={1}
-                    ariaLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultQuantity', 'Quantity for {name}').replace('{name}', salvageComponentName(result.componentId))}
-                    decrementLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.DecrementResult', 'Decrease quantity')}
-                    incrementLabel={text('FABRICATE.Admin.Manager.Component.SalvageEditor.IncrementResult', 'Increase quantity')}
-                    max={9999}
-                    disabled={saving}
-                    inputProps={{ 'data-salvage-result-quantity': '', class: 'fab-stepper-input manager-component-stepper-quantity' }}
-                    onChange={(next) => updateSalvageResult(salvageStageGroup.id, result.id, { quantity: clampSalvageQuantity(next) })}
-                  />
+                  <!-- NO QUANTITY HERE (issue 676). Progressive is an ordered list of
+                       INDIVIDUAL results: the award loop charges this entry's difficulty
+                       once and awards it once, so "two of X" is authored by listing X
+                       twice, never by a count. The ENGINE enforces it —
+                       `CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1` on
+                       every awarded progressive entry, exactly as
+                       `ResolutionModeService._resolveProgressive` always has for recipes.
+                       The control was removed only AFTER that, so this hides nothing a
+                       world can still be awarded. -->
 
                   <!-- READ-ONLY: `difficulty` belongs to the RESULT component, whose own
                        editor owns its save lifecycle; this surface is editing a
@@ -1133,19 +1186,10 @@
                     <ul class="manager-salvage-result-list">
                       {#each group.results as result (result.id)}
                         <li class="manager-salvage-result-row" data-salvage-result={result.id}>
-                          <select
-                            class="manager-input"
-                            value={result.componentId}
-                            aria-label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent', 'Result component')}
-                            data-salvage-result-component
-                            onchange={(event) => updateSalvageResult(group.id, result.id, { componentId: event.currentTarget.value })}
-                            disabled={saving}
-                          >
-                            <option value="">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.SelectComponent', 'Select a component')}</option>
-                            {#each componentOptions as option (option.id)}
-                              <option value={option.id}>{option.name}</option>
-                            {/each}
-                          </select>
+                          {@render salvageComponentPicker(group.id, result)}
+                          <!-- The quantity STAYS in simple/routed: these modes award the
+                               whole group as authored, so a count is a real, honoured
+                               field here. Only progressive drops it. -->
                           <Stepper
                             value={result.quantity}
                             min={1}
