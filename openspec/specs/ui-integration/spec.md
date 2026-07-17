@@ -617,7 +617,12 @@ The synthetic row mirrors the exact shape `InventoryListingBuilder._buildRecipeI
 Because the GM preview has no actor, the **"Effective rules"** list's "Needs: &lt;name&gt;" rows (one per requirement, only when Limited learning is on; the character-prerequisite row's sub is the `@path op value` preview) each carry a GM-only **"Satisfied?"** toggle (`manager-status-toggle`, defaulting to satisfied so the preview opens unlocked).
 Flipping a requirement's toggle drives that requirement's synthetic `met` state, which flows to the embedded `InventoryDetail` live — its requirement chip flips met/unmet and its Learn buttons enable/disable — letting the GM preview exactly what a player in any qualification state would see.
 The toggle is an authoring experiment control only; it is never persisted.
-In the player app, the **book detail** (`InventoryDetail`) renders the "Needs: &lt;name&gt;" chip row full-width below the header from the row's `requirements` array (surfaced by `InventoryListingBuilder`), reflecting the acting actor's met/unmet state per requirement (success ramp + check glyph when met, danger ramp + lock glyph when unmet); a blocked recipe's Learn button is disabled (the enumeration is not repeated per recipe).
+In the player app, the **book detail** renders the "Needs: &lt;name&gt;" chip row full-width below the header from the row's `requirements` array (surfaced by `InventoryListingBuilder`), reflecting the acting actor's met/unmet state per requirement (success ramp + check glyph when met, danger ramp + lock glyph when unmet); a blocked recipe's Learn button is disabled (the enumeration is not repeated per recipe).
+
+`InventoryDetail` is a thin **router** over three states (empty | book | component) and remains the entry point the preview renders; the book branch routes to `InventoryBookDetail`.
+The no-drift guarantee is unchanged by that split — the preview still renders the real player component rather than a re-implementation.
+The component branch owns the salvage surface, and the preview never **renders** it, because a book is never salvageable.
+(Note this is a rendering property, not a module-graph one: the router imports both branches statically.)
 
 ### Access Surface
 
@@ -1111,6 +1116,24 @@ Each
   bridge refreshes calendar-aware durations and re-fetches the listing quietly when
   the GM advances the clock.
 
+### Salvage Execution
+
+The engine seam behind the player salvage surface (§Player Salvage Surface).
+Stated as its own section, a sibling of §Craft Execution, because the outcome semantics are the engine's, not the presentation's.
+
+- Salvage runs through the `salvageComponent` facade seam, which takes an **`actorId`** and never an actor uuid.
+The engine's `salvage` performs **no ownership check of its own** — it resolves the uuid and mutates that actor's Items directly — so the facade's actor resolution is the only ownership gate on this path.
+A uuid accepted from a UI would bypass it, and a stale or foreign one reaches the server and **throws** rather than returning a message.
+- The seam **returns** rather than throwing for every ordinary failure (actor / system / component not found, feature disabled, salvage disabled, validation failure), so a failed salvage surfaces its message.
+- **`cancelled` is distinct from `success: false`.**
+A dismissed roll prompt returns `{ success: false, cancelled: true, results: null }` with **guaranteed zero mutation** — no component consumed, no tool breakage — and discards a run created by that call.
+It is a user's choice, not a failure, and MUST NOT be reported as an error.
+- There is a **third** outcome: a component with a time requirement returns `success` with **null results**.
+The run has STARTED and awarded nothing.
+Treating `success` as "done" would show a success state for a run that gave the player nothing.
+- A misconfigured required check (routed or progressive with no authored roll formula) returns `{ success: false, misconfigured: true }` with zero mutation and a GM-config message.
+- The UI passes `interactive: true`; the default `false` keeps macros and automation silent.
+
 ### Deferred (this iteration)
 
 - The learn affordance renders (the control plus its consume-on-learn warning), but
@@ -1120,10 +1143,19 @@ Each
 
 ### Top-Level Tabs
 
-- **Alchemy tab**: shown when >= 1 crafting system has `resolutionMode === "alchemy"`
+The player app is a single shared window with a full-height left navigation rail.
+It carries five tabs, in this order:
+
 - **Crafting tab**: shown when >= 1 crafting system has a non-alchemy resolution mode
-- If only one tab type exists, show that tab without a tab bar
-- If both exist, show tab bar; default to last-used or Crafting
+- **Alchemy tab**: conditional — shown when >= 1 crafting system has `resolutionMode === "alchemy"`
+- **Gathering tab**
+- **Journal tab**
+- **Inventory tab**
+
+Alchemy is the only conditional entry; the others are always present.
+
+- The one-tab rule governs the **Crafting / Alchemy pair only**, not the rail as a whole: if only one of those two tab types exists, show that one without a tab bar for the pair.
+- If both exist, show the tab bar and default to last-used or Crafting.
 
 ### Crafting Tab
 
@@ -1157,6 +1189,10 @@ Each
 
 ##### Progressive Stage List
 
+This section governs **every ordered-stage surface**, not crafting alone: the progressive recipe body and the progressive **salvage** body in the Inventory tab's salvage panel (§Player Salvage Surface) render the same component under the same invariants.
+Where a requirement says "recipe", read it as "the progressive subject" — a recipe or a salvageable component.
+The salvage deltas are stated at the end of this section; everything else applies identically to both.
+
 - A progressive recipe's detail body renders an **ordered stage list**, replacing the generic input/output table: a progressive output is not a flat set, because one roll is spent down the list and the order decides what the player receives.
 - The stage list is built from the **authored** result group and deliberately bypasses the award loop.
 Browsing has no roll, so routing it through the award loop yields a zero budget, awards nothing, and renders an empty output list.
@@ -1178,6 +1214,37 @@ A notification alone is insufficient: the writes are optimistic, so the row has 
 No live region is rendered in this state, because nothing can change.
 Identical rows minus working affordances are not acceptable: a player must not be able to grab a row and have nothing happen.
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
+
+**Optional per-caller extensions.**
+The extension set is exactly four, all **opt-in and default-off**: an optional per-stage **quantity**, an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, and an optional **stacked row layout**.
+A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
+This exists so a second consumer can add rendering without re-skinning the first.
+The fixed-state note is overridable because `canReorder: false` has **two** causes the component cannot distinguish: the GM pinned the order (the permission is off), or the player's order has already been **spent** by a resolved roll.
+Defaulting to the GM reason keeps the crafting rendering unchanged, since there it is the only cause; a caller with a second cause MUST supply the note, or the surface asserts something untrue about the roll that just happened.
+The GM reason takes precedence where both apply — it stays true whether or not a roll has since been spent.
+The set is enumerated deliberately: a future extension is added to this list, so "not listed" means "not supported", not "not yet noticed".
+
+The **stacked row layout** exists because the default inline row lays every part on one line and lets only the name flex, so the name absorbs every other part's width.
+In a narrow column (the player inspector's 300px) that measures a **zero-width name** and overflows the trailing controls out of the panel — the row does not degrade gracefully, it fails.
+Stacked, the reorder controls **lead** the row and the stage's identity is a flexible **column** (name and quantity in one wrapping text flow, its number beneath), so the name wraps instead of being crushed.
+A stacked row MUST print the **cumulative threshold only**, never the threshold and the per-stage difficulty together: the threshold is derived as the running sum of the difficulties before it, so the pair states the same information twice, and it is the redundant number that pushes the useful one out of the column.
+Both numbers remain correct to show inline, where the width exists and the difficulty serves as a cross-check.
+The threshold MUST NOT be labelled a **DC** on any surface: `DC` is a distinct authored concept that progressive resolution does not have (the projection resolves progressive's DC to null, and a component's `dcOverride` does not shift these thresholds), so the label would name a value the player cannot find and the GM cannot author.
+
+**Progressive salvage deltas.**
+
+- The award mode is **salvage's own** (`system.salvageCraftingCheck.progressive.awardMode`), authored independently of the recipe's.
+Deriving salvage thresholds from the crafting award mode violates the agreement requirement above invisibly, because both blocks normally exist and are normally authored.
+- The permission is `Component.salvage.allowPlayerResultReorder` (default true; only an explicit `false` pins the authored order), not the recipe's.
+- The player's order is stored under the `salvage:<componentId>` key (see `resolution-modes` §Which user's order is read).
+- A pending debounced write MUST be **flushed before a salvage run starts**, and a **rejected** write MUST abort the run: an unflushed write is captured stale onto the run record, and a rejected one leaves the player looking at an order that was reverted.
+- Salvage renders **no exclude affordance**: reorder is the whole of the feature.
+- The panel MUST state the mode and the flow **rule** as two separate statements: naming the mode ("progressive, ordered") does not tell a player that the roll **stops** at the first result it cannot reach, and stopping is the entire reason the order is worth arranging.
+Neither is a duplicate of the other, and collapsing them loses the mechanic rather than a repetition.
+- Where reordering is permitted, the surface MUST offer a **reset** to the GM's authored order.
+An order the player can rearrange is one they can get lost in, and the authored order is the only one they cannot reconstruct from what is on screen.
+Reset persists **no preference** (an empty order), never the currently-authored ids: an empty order follows a later GM re-author, whereas pinning today's ids would silently outlive the GM changing them.
+It is offered only when the rendered order actually **differs** from the authored one — a stored order can name the authored sequence exactly, so a reset offered on the mere presence of stored state does nothing when pressed.
 
 ##### Browse Status
 
@@ -1379,6 +1446,69 @@ A fizzle brew runs no check and shows no roll animation.
 - Success/failure notifications with actionable reasons.
 - Refresh list/detail state after completion.
 - The same learning flow must be invocable from the item sheet header learn control when drag-and-drop learning is disabled.
+
+### Inventory Tab
+
+The player's owned crafting materials: what they carry, where it came from, and what it is for.
+It shares the selected character and the component-source actors with the Crafting tab, so both agree on what the player owns.
+
+- **Layout.**
+Two responsive columns — filters + item grid on the left, an item inspector on the right — reflowing to **stacked** below the container breakpoint.
+The window is resizable, so a fixed column count is not the contract: the grid is responsive and its column count is an expression of the available width.
+- **Filter chips.**
+A chip row in this fixed order: **All · Components · Essences · Tools · Books & Scrolls**.
+Each chip carries an icon and a live count computed over the search-filtered set, so a chip's badge reflects what selecting it would show.
+- **Sort.**
+Name / Quantity / **Type**.
+- **Card contract.**
+Each item card is a **square thumbnail** carrying every at-a-glance signal, with the item name beneath.
+Every overlay sits **inside** the thumbnail's bounds and above it — not hanging off the card frame:
+  - a **quantity pip**;
+  - **corner badges**: a **recycle** badge when the item is salvageable, and a **wrench** badge when it is a registered tool.
+    These two flags are **orthogonal** — a component can be both, and a broken salvageable tool is a common case — so they MUST NOT share one slot.
+  - **essence pips**: one chip per essence the component carries, rendering the essence's **own authored icon**.
+    Essences are GM-authored per system with their own icon; a fixed icon set, or a hue keyed on an essence's name, silently mis-renders any essence the GM named differently.
+    The chip exists so the glyph reads against arbitrary artwork.
+- **Broken treatment.**
+`broken` is a **read-only** verdict, and no engine path un-breaks a tool.
+It has **two** sources, and reading only the second reports almost every broken tool a player can actually see as intact:
+
+  - the persisted **`flags.fabricate.toolBroken`** past fact — the authoritative presence-gate disqualifier, written by the `flagBroken` on-break action for **every** breakage mode and requiring no roll to know.
+    This is the source that matters most: `flagBroken` is the only on-break mode that leaves a broken item in the player's inventory at all (`destroy` and `replaceWith` remove it), and a chance- or formula-broken tool carries this flag with **no usage counter** whatsoever.
+  - a **projection** of usage exhaustion, which only `limitedUses` supports (the other modes decide at attempt time by a roll).
+    It MUST NOT be applied under the `checkDriven` tool-breakage authority: usage still accrues there, but the active check decides breakage and per-tool modes are ignored, so projecting exhaustion would report a perfectly usable tool broken permanently.
+
+A broken item dims its artwork, takes a danger wash and a danger card border, and its **"Broken" pip REPLACES the quantity pip** — they are one slot, not two.
+There is **no repair affordance** anywhere; the treatment states why the tool is unusable and offers no action.
+Brokenness is about **usability, not salvageability**, and MUST NOT gate the salvage surface.
+
+- **Inspector Info order.**
+Broken banner → description → essences → **Sources** (hidden for books) → Used by → Produced by.
+
+#### Player Salvage Surface
+
+The player's route to salvage.
+
+- Salvage lives **inline in the inspector**; it is never a modal.
+- An **`Info | Salvage`** control appears when the item is salvageable — **including when it is broken**, since brokenness does not gate salvageability.
+When the item is not salvageable, **no tab bar renders at all**: a hidden tab reads as "this isn't salvageable", which is wrong and unfixable by the player.
+- The body dispatches on the pair **`(mode, checkUsable)`** against **`system.salvageCraftingCheck`** — salvage's own check block, NOT `system.craftingCheck`, which is the recipe block.
+Both normally exist and are normally authored, so reading the wrong one renders plausibly while showing the player a formula and a DC the engine will never use.
+- A check is **usable** iff its mode's roll formula is authored; that is the only gate the engine applies.
+"No check" and "pass/fail" are therefore **one `simple` mode at two usability states**, not two modes.
+- A routed or progressive salvage with **no authored formula** renders a GM-config state, not its authored tiers or stages: the engine aborts such an attempt with zero mutation, so showing the contract would put it under an action that always fails.
+- **`dcOverride` shifts the simple DC and routed RELATIVE thresholds only.**
+A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
+A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
+- The action is **one-shot for every mode**: it rolls AND commits in a single gesture.
+The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
+The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
+- The roll summary is **read-only** and renders only **after** resolution.
+It never renders a hardcoded formula: the formula is system-authored, and the prompt has already displayed the resolved one.
+- A **cancelled** prompt returns to the pre-roll state with zero mutation and **no notification**.
+- A **time-gated** salvage (`success` with null results) shows a **waiting** state carrying the engine's message, **not** a success state.
+- The success ribbon stays **pinned to the salvaged row** until dismissed or another item is selected — **including when its last copy was consumed and the row leaves the listing**.
+Otherwise the selection falls through to another item and the ribbon renders against the wrong component; with single-copy components this is the common case.
 
 ### Run Guardrails
 

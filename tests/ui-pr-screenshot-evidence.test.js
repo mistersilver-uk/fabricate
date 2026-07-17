@@ -168,6 +168,32 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[0].smokeLabels, ['player-inventory']);
   });
 
+  // Issue 675. The `player-salvage` glob is NARROW on purpose: `apps/inventory/**`
+  // would return two ids for the two ordinary inventory files above and break that
+  // exact-equality assertion — and it would force a salvage frame onto every future
+  // unrelated inventory touch.
+  it('maps only the salvage tree to the player-salvage recipe, and to BOTH recipes', () => {
+    for (const file of [
+      'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
+      'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
+    ]) {
+      const ids = mapChangedFilesToViews([file]).map(view => view.id).sort();
+      // A salvage change IS an inventory change, so both frames are expected.
+      assert.deepEqual(ids, ['player-inventory', 'player-salvage'], file);
+    }
+
+    const view = VIEW_RECIPES.find(recipe => recipe.id === 'player-salvage');
+    // Two frames, neither substituting for the other: the progressive stage list and
+    // the no-check body. The smoke-label guard below pins both to real captures.
+    assert.deepEqual(view.smokeLabels, ['player-salvage', 'player-salvage-no-check']);
+
+    // An ordinary inventory file must NOT pull in the salvage frame.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/ui/svelte/apps/inventory/InventoryGrid.svelte']).map(v => v.id),
+      ['player-inventory'],
+    );
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',

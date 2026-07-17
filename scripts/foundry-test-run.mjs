@@ -1500,6 +1500,10 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // per row, and equal difficulties would make a carried/stale threshold invisible.
       // The long name is deliberate — it is the stacked frame's ellipsis subject.
       { name: 'Smoke Clay', img: 'icons/commodities/stone/clay-grey.webp' },
+      // Issue 675: the progressive-salvage subject. Breaking it down spends ONE roll
+      // down the same three stages the progressive craft awards, so its reorderable
+      // stage list is the player salvage surface's headline frame.
+      { name: 'Smoke Cracked Amphora', img: 'icons/containers/kitchenware/vase-clay-painted-blue-gold.webp' },
       { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' },
       { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/paver-tile-blue.webp' },
       { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' }
@@ -1802,7 +1806,18 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     const progressiveSystemId = progressiveSystem.id;
     const progressiveMap = await registerComponents(
       progressiveSystemId,
-      ['Smoke Clay', 'Smoke Brick', 'Smoke Kiln-Fired Ceramic Roofing Tile', 'Smoke Glazed Amphora'],
+      [
+        'Smoke Clay',
+        'Smoke Brick',
+        'Smoke Kiln-Fired Ceramic Roofing Tile',
+        'Smoke Glazed Amphora',
+        // Issue 675: the ONLY progressive-salvage fixture in the repo. Before it there
+        // was none anywhere — `Smoke Relic` is a SIMPLE-mode salvage with no check
+        // formula (so it renders the no-check body) and `Iron Ore` is seeded for the
+        // component EDITOR, not player inventory — so the player salvage surface's
+        // headline feature, the reorderable stage list, had no capturable frame.
+        'Smoke Cracked Amphora'
+      ],
       1
     );
     // `registerComponents` applies ONE difficulty to every name, so re-stamp the three
@@ -1830,6 +1845,46 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         // 1d20 + 20 budget (21-40) far exceeds the Smoke Brick difficulty (1) so a
         // single advance awards it (progressive is budget-vs-difficulty, not tiered).
         progressive: { rollFormula: '1d20 + 20', awardMode: 'equal' }
+      },
+      // Issue 675 — SALVAGE'S OWN mode and check block, authored independently of the
+      // recipe's above. This is exactly the pair a projection that read `craftingCheck`
+      // instead of `salvageCraftingCheck` would confuse: the award modes differ
+      // (`partial` vs `equal`), so a wrong read renders visibly wrong thresholds.
+      salvageResolutionMode: 'progressive',
+      salvageCraftingCheck: {
+        enabled: true,
+        progressive: { rollFormula: '1d20 + 6', awardMode: 'partial' }
+      }
+    });
+    // Progressive salvage on Smoke Cracked Amphora: one roll spent down the SAME three
+    // stages (difficulties 1 / 4 / 9), authored in ascending order so a player reorder
+    // visibly changes the "Reached at >=N" badges.
+    await csm.updateItem(progressiveSystemId, progressiveMap['Smoke Cracked Amphora'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        // Left at its default TRUE so the player CAN reorder: this fixture exists to
+        // capture the reorder affordances, which `false` would (correctly) remove.
+        allowPlayerResultReorder: true,
+        resultGroups: [
+          {
+            id: 'smoke-amphora-salvage',
+            name: 'Amphora Fragments',
+            results: [
+              { id: 'smoke-salvage-brick', componentId: progressiveMap['Smoke Brick'], quantity: 1 },
+              {
+                id: 'smoke-salvage-tile',
+                componentId: progressiveMap['Smoke Kiln-Fired Ceramic Roofing Tile'],
+                quantity: 1
+              },
+              {
+                id: 'smoke-salvage-amphora',
+                componentId: progressiveMap['Smoke Glazed Amphora'],
+                quantity: 1
+              }
+            ]
+          }
+        ]
       }
     });
     const progressiveRecipe = await rm.createRecipe({
@@ -1876,13 +1931,22 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ...invCopies('Smoke Plank', 5),                 // simple(1) + breakage(1) + limitedUses(2) crafts; negative consumes none
       ...invCopies('Smoke Mallet', 1),                // breakageChance tool
       ...invCopies('Smoke Chisel', 1),                // limitedUses tool (broken by crafting maxUses times)
-      ...invCopies('Smoke Relic', 1),                 // salvageable component
+      // TWO copies (issue 675), not one. The always-run `exec-salvage-run` step calls
+      // engine.salvage() on this and CONSUMES a copy, and it runs in a different
+      // Playwright phase from the player-app capture — so ordering the capture ahead of
+      // it is not viable. With one copy the Inventory tab has no salvageable row left to
+      // photograph. That step asserts only `result.success`, `results != null` and
+      // `shardAfter > shardBefore`, and nothing repo-wide counts Smoke Relic, so a second
+      // copy is inert. The player-salvage capture below does NOT commit a salvage; if it
+      // ever does, this must become 3.
+      ...invCopies('Smoke Relic', 2),                 // salvageable component
       ...invCopies('Smoke Copper Coil', 1),           // multi-option recipe alternative A (#552)
       ...invCopies('Smoke Bronze Coil', 1),           // multi-option recipe alternative B (#552)
       ...invCopies('Smoke Ingot A', 1),               // routedByIngredients set A
       ...invCopies('Smoke Ingot B', 1),               // routedByIngredients set B (asserted NOT produced)
       ...invCopies('Smoke Bar', 1),                   // routedByCheck stock
-      ...invCopies('Smoke Clay', 1)                   // progressive stock
+      ...invCopies('Smoke Clay', 1),                  // progressive stock
+      ...invCopies('Smoke Cracked Amphora', 1)        // progressive-salvage subject (#675)
     ]);
 
     // ── 7. Always-run guaranteed-success gather (Arcane Forge, scene-less) ──
@@ -6200,6 +6264,66 @@ async function main() {
         }
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-inventory');
+
+        // Dedicated player SALVAGE evidence (issue 675) — the first player-facing
+        // salvage surface. Select the progressive-salvage fixture (Smoke Cracked
+        // Amphora) and open its Salvage tab, so the frame shows the reorderable stage
+        // list: the headline feature, and the only visual proof of it.
+        //
+        // THIS STEP FAILS LOUDLY, BY DESIGN. It has no `if (… .count() > 0)` guard and
+        // no try/catch, unlike the inventory capture above. The evidence gate only
+        // regex-scrapes `screenshot(page, '<label>')` LITERALS out of this file and
+        // never checks that the capture ran — so a guarded step would silently no-op,
+        // publish no PNG, and still pass every gate. A hard `waitFor` is what makes the
+        // absence of the panel a red run instead of a missing frame. That is the
+        // behaviour in BOTH CI and local dev: there is no environment in which this
+        // step is skipped or downgraded to a warning. If it times out, the fixture or
+        // the surface is broken and the run should say so.
+        const salvageSearch = appShell.locator('[data-inventory-filters] input').first();
+        await salvageSearch.waitFor({ state: 'visible', timeout: 10_000 });
+        await salvageSearch.fill('Smoke Cracked Amphora');
+        await page.waitForTimeout(200);
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        const salvageTab = appShell.locator('[data-inventory-detail-tab="salvage"]').first();
+        await salvageTab.waitFor({ state: 'visible', timeout: 10_000 });
+        await salvageTab.click();
+        await appShell.locator('[data-inventory-salvage-panel="progressive"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-progressive-stage-reorderable]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-salvage');
+
+        // The SECOND salvage frame: the no-check body — Smoke Relic's real shape, and
+        // the shape most real worlds have (a simple-mode salvage with no authored check
+        // formula recovers its materials outright, with every result tagged
+        // "Guaranteed"). The progressive frame above cannot show it, and this is the
+        // body a wrong (mode, checkUsable) dispatch would silently replace with a
+        // pass/fail contract under a footer that never prompts.
+        //
+        // This capture does NOT commit a salvage, so the two seeded Smoke Relic copies
+        // remain sufficient (the exec-salvage-run step consumes exactly one). Fails
+        // loudly, for the same reason as the frame above.
+        await salvageSearch.fill('Smoke Relic');
+        await page.waitForTimeout(200);
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        const relicSalvageTab = appShell.locator('[data-inventory-detail-tab="salvage"]').first();
+        await relicSalvageTab.waitFor({ state: 'visible', timeout: 10_000 });
+        await relicSalvageTab.click();
+        await appShell.locator('[data-inventory-salvage-body="no-check"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-salvage-no-check');
+
+        // Clear the search so the tab is left in its browsable state for any later
+        // inventory work (and so a re-entry does not inherit this filter).
+        await salvageSearch.fill('');
+        await page.waitForTimeout(150);
+
         // Restore the Gathering tab (the tab active before this inventory capture):
         // the downstream steps operate on the Gathering view (selecting the
         // 'Azure Grove' environment, etc.), so re-activate it and wait for its

@@ -134,6 +134,7 @@ function makeBuilder({
   getGatheringTask = null,
   getResultItem = null,
   getRecipeItemImg = null,
+  getComponent = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -160,6 +161,7 @@ function makeBuilder({
     getGatheringTask,
     getResultItem,
     getRecipeItemImg,
+    getComponent,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -590,6 +592,138 @@ test('salvage runs pass through with crafting-named time fields, runType salvage
   assert.equal(run.derivedStatus, 'succeeded');
   assert.equal(run.createdResultCount, 1);
   assert.equal(run.createdResults[0].itemUuid, 'Item.scrap');
+});
+
+// A realistic salvage run carries neither a `label` nor a `taskId` — only the source
+// `componentId` + `craftingSystemId`. getComponent resolves the source component to
+// its authored name/img for the run title + image (bug 1).
+const SALVAGE_COMPONENT = { name: 'Balehound Teeth', img: 'icons/teeth.webp' };
+const getSalvageComponent = (systemId, componentId) =>
+  systemId === 'sys-1' && componentId === 'bhBalehoundTeth1' ? SALVAGE_COMPONENT : null;
+
+test('salvage run resolves its title + image from the source componentId', () => {
+  const salvageRun = {
+    id: 'salvage-title',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhBalehoundTeth1',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    createdResults: [],
+  };
+  const run = makeBuilder({
+    salvageHistory: [salvageRun],
+    getComponent: getSalvageComponent,
+    worldTime: 300,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
+
+  assert.equal(run.names.title, 'Balehound Teeth', 'title is the bare source-component name');
+  assert.equal(run.img, 'icons/teeth.webp', 'image is the source component img');
+});
+
+test('salvage run title falls back to the raw componentId when it cannot be resolved', () => {
+  const salvageRun = {
+    id: 'salvage-unresolved',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhBalehoundTeth1',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    createdResults: [],
+  };
+  // No getComponent resolver: the builder falls back to the raw id + default image,
+  // mirroring how a gathering run falls back to its raw taskId.
+  const run = makeBuilder({ salvageHistory: [salvageRun], worldTime: 300 }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).history[0];
+
+  assert.equal(run.names.title, 'bhBalehoundTeth1', 'falls back to the raw componentId');
+  assert.equal(run.img, 'icons/svg/item-bag.svg', 'falls back to the default bag image');
+});
+
+test('salvage created result with only a componentId resolves name/img via getComponent', () => {
+  // Records persisted before name/img capture carry only { itemUuid, componentId,
+  // quantity }. This is the maintainer's already-persisted history — the componentId
+  // resolver must repair it without any captured name/img and without a resolvable uuid.
+  const salvageRun = {
+    id: 'salvage-persisted',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhSourceHide01',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    createdResults: [{ itemUuid: 'Item.gone', componentId: 'bhEarCartilage01', quantity: 2 }],
+  };
+  const getComponent = (systemId, componentId) =>
+    systemId === 'sys-1' && componentId === 'bhEarCartilage01'
+      ? { name: 'Ear Cartilage', img: 'icons/cartilage.webp' }
+      : null;
+  const run = makeBuilder({ salvageHistory: [salvageRun], getComponent, worldTime: 300 })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+
+  assert.equal(run.createdResults[0].name, 'Ear Cartilage', 'name resolved via componentId');
+  assert.equal(run.createdResults[0].img, 'icons/cartilage.webp', 'img resolved via componentId');
+  assert.equal(run.createdResults[0].quantity, 2);
+});
+
+test('a captured salvage result name/img is NOT overridden by the componentId resolver', () => {
+  const salvageRun = {
+    id: 'salvage-captured',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhSourceHide01',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    // A new (post-fix) record captures name/img at award time.
+    createdResults: [
+      {
+        itemUuid: 'Item.teeth',
+        componentId: 'bhEarCartilage01',
+        quantity: 1,
+        name: 'Captured Name',
+        img: 'icons/captured.webp',
+      },
+    ],
+  };
+  const getComponent = () => ({ name: 'Resolver Name', img: 'icons/resolver.webp' });
+  const run = makeBuilder({ salvageHistory: [salvageRun], getComponent, worldTime: 300 })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+
+  assert.equal(run.createdResults[0].name, 'Captured Name', 'captured name wins');
+  assert.equal(run.createdResults[0].img, 'icons/captured.webp', 'captured img wins');
+});
+
+test('a crafting run model is unaffected by the componentId result fallback', () => {
+  // Crafting created-results carry name/img (and no componentId), so the new
+  // componentId fallback is a no-op — the model is unchanged.
+  const run = terminalCraftingRun({
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'succeeded',
+        createdResults: [
+          { itemUuid: 'Item.plank', quantity: 2, name: 'Plank', img: 'icons/plank.webp' },
+        ],
+      },
+    ],
+  });
+  // A getComponent that would fire if consulted — it must not be, since name/img exist.
+  const getComponent = () => ({ name: 'WRONG', img: 'icons/wrong.webp' });
+  const model = makeBuilder({ history: [run], getComponent }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).history[0];
+
+  assert.equal(model.runType, 'crafting');
+  assert.equal(model.names.title, 'Iron Sword');
+  assert.equal(model.createdResults[0].name, 'Plank');
+  assert.equal(model.createdResults[0].img, 'icons/plank.webp');
+  assert.equal(model.createdResults[0].componentId, null);
 });
 
 test('aggregates createdResults across multiple result-bearing steps', () => {

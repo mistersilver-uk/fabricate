@@ -187,6 +187,9 @@ This governs **every** progressive award surface, crafting and salvage alike —
 The normalization is enforced at award time on both paths (`ResolutionModeService._resolveProgressive` for recipes, `CraftingEngine._resolveSalvageResultGroups` for salvage), never by a migration: `quantity` remains a stored, normalizer-clamped field and is simply inert in this mode.
 The salvage scope is stated explicitly because it was read as recipe-only once and the salvage path shipped honouring the authored count.
 - Each result references a `Component` with `difficulty >= 1`.
+This `difficulty` IS the component's **progressive DC** — the field the GM component editor labels verbatim "This component's Progressive DC" — and it is stable, per-component authored data.
+It is distinct from the progressive **check**, which has **no DC** of its own: the check produces the numeric budget (`value`), and each stage spends that budget against its component's progressive DC.
+Player-facing progressive surfaces therefore show both per stage — the component's progressive DC (`DC N`) and the cumulative budget that reaches the stage (`Reach ≥N`).
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
 - **All result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group.
@@ -216,6 +219,8 @@ Two distinct concepts govern it and MUST NOT be collapsed: the GM-authored **Res
 - The retired system-level `craftingCheck.progressive.allowPlayerReorder` is gone from all three progressive check blocks (crafting, salvage, gathering).
 - Gathering has no reorder feature: it exposes no ordered result-stage surface, so the retired flag was removed without replacement.
 - When the permission is `false` the authored order is authoritative and any stored player order is ignored.
+- `Component.salvage.allowPlayerResultReorder` has its **first UI consumer**: the player Inventory tab's salvage panel (`ui-integration` §Player Salvage Surface).
+It was previously modelled, normalized, GM-authorable, captured onto every salvage run, and read at award time — with no surface that let a player exercise it, so the permission a GM set had no observable effect.
 
 #### Player Result Order (per-user runtime state)
 
@@ -255,6 +260,9 @@ Capturing the order at start makes the executing user irrelevant, which makes th
 - A salvage with **no run record uses the authored order**, and there is deliberately **no settings fallback**; adding one would reintroduce the executing-user read the capture exists to prevent.
 - Salvage gates on the permission at **read time, not capture time**, so a GM toggling the permission off mid-run takes effect on that run's award.
 The captured order is retained but ignored.
+- The player-facing salvage surface writes only the **standing preference** under `salvage:<componentId>` and relies on the existing run-record capture; it MUST NOT thread an order into the salvage call.
+The "no settings fallback" rule above is unaffected by that surface existing and MUST NOT be relaxed.
+- A pending debounced order write MUST be **flushed before a salvage run starts**: the capture happens once, at start, so a run begun inside the debounce window captures the **stale** order.
 
 ### Validation
 

@@ -1,10 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  InventoryFilters is the left-column header: a search box, a row of filter pills
-  (All / Components / Essences / Tools / Rare, each with a live count), and a sort
-  dropdown. Prop-driven so it stays presentational; callbacks route back to the
-  inventory store. The search + pill markup mirrors the Crafting browser so the
-  two tabs feel identical.
+  InventoryFilters is the left-column header: a search box, a row of filter chips
+  (All / Components / Essences / Tools / Books & Scrolls — this fixed order, each
+  with an icon and a live count), and a sort select (Name / Quantity / Type).
+  Prop-driven so it stays presentational; callbacks route back to the inventory
+  store. The search + chip markup mirrors the Crafting browser so the two tabs
+  feel identical.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -22,7 +23,7 @@
   const PILLS = [
     { id: 'all', labelKey: 'FABRICATE.App.Inventory.Filters.All', icon: 'fa-layer-group' },
     { id: 'components', labelKey: 'FABRICATE.App.Inventory.Filters.Components', icon: 'fa-cube' },
-    { id: 'essences', labelKey: 'FABRICATE.App.Inventory.Filters.Essences', icon: 'fa-mortar-pestle' },
+    { id: 'essences', labelKey: 'FABRICATE.App.Inventory.Filters.Essences', icon: 'fa-droplet' },
     { id: 'tools', labelKey: 'FABRICATE.App.Inventory.Filters.Tools', icon: 'fa-screwdriver-wrench' },
     { id: 'recipeItems', labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems', icon: 'fa-book' }
   ];
@@ -90,12 +91,14 @@
   }
 
   .inventory-search {
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
+    min-height: 40px;
+    padding: 0 12px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-muted);
   }
@@ -130,6 +133,12 @@
 
   .inventory-pill {
     box-sizing: border-box;
+    /* Foundry's global `.app button` height/centering reset (EnvironmentCard pattern):
+       a chip that sets only min-height gets cropped. */
+    appearance: none;
+    -webkit-appearance: none;
+    height: auto;
+    margin: 0;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -139,8 +148,10 @@
     border-radius: 999px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-muted);
-    font-size: 12px;
-    font-weight: 600;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
     cursor: pointer;
   }
 
@@ -158,19 +169,19 @@
     border-color: var(--fab-accent-border);
     background: var(--fab-accent-soft);
     color: var(--fab-accent);
+    font-weight: 600;
   }
 
   .inventory-pill i {
     font-size: 11px;
   }
 
+  /* NOT mono. The brief scopes mono to quantities, roll totals and DC values; a chip's
+     population count is part of the chip's own label, and the chip is pinned to the sans
+     face. So it inherits the chip's family, weight AND colour (which is what makes the
+     active state track automatically) and only drops back in emphasis. */
   .inventory-pill-count {
-    font-variant-numeric: tabular-nums;
-    color: var(--fab-text-muted);
-  }
-
-  .inventory-pill.is-active .inventory-pill-count {
-    color: var(--fab-accent);
+    opacity: 0.7;
   }
 
   .inventory-sort {
@@ -193,8 +204,9 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface);
-    color: var(--fab-text);
-    font-size: 12px;
+    color: var(--fab-text-secondary);
+    font-size: 11px;
+    font-weight: 500;
   }
 
   .inventory-sort select:focus-visible {

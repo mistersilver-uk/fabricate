@@ -21,7 +21,17 @@
  * @returns {object} The reactive inventory store.
  */
 
+import {
+  applyPlayerResultOrder,
+  progressiveOrderKey,
+} from '../../../utils/progressiveResultOrder.js';
+import { progressiveStageThresholds } from '../../../utils/progressiveStageThresholds.js';
+
 const DEFAULT_PAGE_SIZE = 25;
+
+// Reorder writes are replicated `scope: 'user'` document writes, so they are coalesced
+// rather than issued per gesture. Mirrors the crafting store's window.
+const ORDER_COMMIT_DEBOUNCE_MS = 400;
 
 // The filter pills. Kept as a local constant so the store never imports the
 // builder's module graph.
@@ -83,6 +93,24 @@ export function createInventoryStore({ services } = {}) {
   // The recipe id currently being learned from a book (Inventory learn button),
   // so the UI can show a busy state and prevent double-submits.
   let learningRecipeId = $state(null);
+  // The component id currently being salvaged, so the footer can show a busy state
+  // and refuse a double-submit.
+  let salvagingKey = $state(null);
+  // The last salvage outcome, held against the component it belongs to. Cleared by
+  // "Salvage again" or by selecting another item.
+  let salvageResult = $state(null);
+  // Decision 11: hold the SALVAGED row selected while its ribbon is up. Salvaging the
+  // last copy drops the row from the listing, and `selectedItem` would fall through to
+  // `visibleItems[0]` — rendering the success ribbon against the wrong component. This
+  // is the common case (the smoke fixture seeds a single copy), not an edge.
+  let heldItem = $state(null);
+  // The player's standing progressive stage orders, keyed `salvage:<componentId>`,
+  // seeded from settings on load. `persistedOrders` is the last known-GOOD snapshot —
+  // the revert target when an optimistic write is rejected.
+  let progressiveOrders = $state({});
+  let persistedOrders = {};
+  let orderCommitTimer = null;
+  let salvageOrderAnnouncement = $state('');
 
   /** Resolve the current component-source actor ids, preferring the sibling store. */
   function currentSourceIds() {
@@ -108,8 +136,7 @@ export function createInventoryStore({ services } = {}) {
       return true;
     });
     // Explicit comparator (never a bare `.sort()`).
-    const byName = (left, right) =>
-      String(left?.name ?? '').localeCompare(String(right?.name ?? ''));
+    const byName = (left, right) => String(left?.name ?? '').localeCompare(String(right?.name ?? ''));
     if (sort === 'quantity') {
       return [...filtered].sort(
         (left, right) =>
@@ -153,10 +180,190 @@ export function createInventoryStore({ services } = {}) {
 
   // Find by key across the full listing; fall back to the first VISIBLE item so
   // the selection respects the active search/filter.
+  //
+  // `heldItem` (decision 11) takes precedence while a salvage ribbon is up: the last
+  // copy of a salvaged component leaves the listing, so `rows.find` misses and the
+  // fallback would swap in an unrelated component under the ribbon. The held snapshot
+  // is the row as it was salvaged; it is released on the next `select` or reset.
   const selectedItem = $derived.by(() => {
+    const live = rows.find((row) => row?.key === selectedKey) ?? null;
+    if (live) return live;
+    if (heldItem && heldItem.key === selectedKey) return heldItem;
     if (rows.length === 0) return null;
-    return rows.find((row) => row?.key === selectedKey) ?? visibleItems[0] ?? null;
+    return visibleItems[0] ?? null;
   });
+
+  /**
+   * The selected component's progressive salvage stages in the PLAYER'S order, with
+   * thresholds RECOMPUTED for that order (issue 675).
+   *
+   * The recompute is not an optimization, it is a correctness requirement. A threshold
+   * is cumulative — a property of a stage's POSITION in the list the roll is spent
+   * down, not of the stage — and `applyPlayerResultOrder` returns elements
+   * ===-identical to its inputs (deliberately; downstream depends on it). So a moved
+   * stage would otherwise carry its authored-position threshold with it, and the top
+   * row would claim a HIGHER bar than the row beneath it.
+   *
+   * It recomputes through the SAME helper the builder used, fed SALVAGE's own award
+   * mode, which is the only thing that keeps the badge and the award in step.
+   */
+  const orderedSalvageStages = $derived.by(() => {
+    const salvage = selectedItem?.salvage ?? null;
+    const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
+    if (stages.length === 0) return stages;
+    if (salvage.allowPlayerResultReorder === false) return stages;
+    const key = progressiveOrderKey({ scope: 'salvage', id: selectedItem?.componentId });
+    if (!key) return stages;
+
+    const ordered = applyPlayerResultOrder(stages, progressiveOrders[key] ?? null);
+    // Identity means nothing moved, so the builder's authored thresholds already stand.
+    if (ordered === stages) return stages;
+
+    // `difficulty` is already null for an absent/invalid cost, so `?? NaN` reproduces
+    // the award loop's skip: no budget reaches the stage, and its threshold stays null.
+    const thresholds = progressiveStageThresholds({
+      results: ordered,
+      costFor: (stage) => stage?.difficulty ?? NaN,
+      awardMode: salvage.awardMode || 'equal',
+    });
+    return ordered.map((stage, index) => ({ ...stage, threshold: thresholds[index] }));
+  });
+
+  /**
+   * Persist the pending order for `key`, reverting and announcing on failure.
+   *
+   * Mirrors `craftingStore.commitProgressiveOrder`'s STRUCTURE but NOT its error
+   * contract. That one swallows the rejection outright, so `await flushProgressiveOrder()`
+   * resolves successfully even when the write FAILED and the order was silently
+   * reverted. Safe for crafting, which never gates an engine call on the flush —
+   * unusable here, where a rejected write must ABORT the salvage.
+   *
+   * SIGNALS BY RETURN STATUS, NEVER BY REthrow. That is a constraint, not a taste:
+   * `SvelteFabricateApp._flushPendingOrderWrite` calls this at window teardown as
+   * `void`, inside a `try/catch` that catches only SYNCHRONOUS throws — so a rejecting
+   * flush would become an unhandled promise rejection on a path with no user to see
+   * it, land in the smoke run's `consoleErrors[]`, and flip its `passed` to false.
+   *
+   * The revert + the live-region announcement stay internal: the write is optimistic,
+   * so by the time a rejection returns, the row has ALREADY moved and the announcement
+   * has ALREADY been made. A toast is not sufficient — a keyboard user reordering by
+   * chevron never looks at one.
+   *
+   * @returns {Promise<{ok: boolean}>}
+   */
+  async function commitProgressiveOrder(key) {
+    const attempted = progressiveOrders[key] ?? [];
+    try {
+      await services?.setProgressiveResultOrder?.(key, attempted);
+      persistedOrders[key] = [...attempted];
+      return { ok: true };
+    } catch {
+      const restored = persistedOrders[key] ?? null;
+      progressiveOrders = { ...progressiveOrders };
+      if (restored) {
+        progressiveOrders[key] = [...restored];
+      } else {
+        delete progressiveOrders[key];
+      }
+      salvageOrderAnnouncement = services?.progressiveOrderRevertMessage?.() ?? '';
+      return { ok: false };
+    }
+  }
+
+  /**
+   * Move a stage of the selected progressive salvage, optimistically and debounced.
+   *
+   * @param {number} index the stage's current position
+   * @param {number} target the position to move it to
+   * @param {string} [announcement] pre-formatted live-region text (the component owns
+   *   the i18n, and reads the moved stage's name BEFORE the move)
+   */
+  function reorderSalvageStage(index, target, announcement = '') {
+    const componentId = selectedItem?.componentId;
+    const key = progressiveOrderKey({ scope: 'salvage', id: componentId });
+    if (!key || selectedItem?.salvage?.allowPlayerResultReorder === false) return;
+
+    const current = orderedSalvageStages;
+    if (target < 0 || target >= current.length || index < 0 || index >= current.length) return;
+
+    const next = [...current];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved);
+    // Store ids, not indices: they survive a GM editing the component's salvage.
+    progressiveOrders = { ...progressiveOrders, [key]: next.map((stage) => stage.id) };
+    salvageOrderAnnouncement = announcement;
+
+    if (orderCommitTimer) clearTimeout(orderCommitTimer);
+    orderCommitTimer = setTimeout(() => {
+      orderCommitTimer = null;
+      void commitProgressiveOrder(key);
+    }, ORDER_COMMIT_DEBOUNCE_MS);
+  }
+
+  /**
+   * Whether the player's order actually DIFFERS from the GM's authored one.
+   *
+   * Derived from the RENDERED order rather than from `progressiveOrders[key]` merely
+   * being present: a stored order can name the authored sequence exactly (drag a row
+   * away and back, or a GM re-authoring the list into the order the player had already
+   * chosen), and offering to reset an order that is already the GM's is a control that
+   * does nothing when pressed.
+   */
+  const salvageOrderIsCustom = $derived.by(() => {
+    const stages = Array.isArray(selectedItem?.salvage?.stages) ? selectedItem.salvage.stages : [];
+    if (stages.length === 0) return false;
+    const ordered = orderedSalvageStages;
+    return ordered.length === stages.length && ordered.some((stage, i) => stage.id !== stages[i].id);
+  });
+
+  /**
+   * Drop the player's order for the selected salvage, restoring the GM's authored one.
+   *
+   * Persists `[]`, NOT the authored id list — they are different claims. `[]` means
+   * "this player expresses no preference", so a later GM re-author is followed. Writing
+   * today's authored ids would PIN the current sequence and silently outlive the GM
+   * changing it, which is the opposite of what "reset" promises.
+   *
+   * Optimistic and debounced like every other order write, so a rejected write reverts
+   * and announces through the same path.
+   *
+   * @param {string} [announcement] pre-formatted live-region text (the component owns
+   *   the i18n)
+   */
+  function resetSalvageOrder(announcement = '') {
+    const key = progressiveOrderKey({ scope: 'salvage', id: selectedItem?.componentId });
+    if (!key || selectedItem?.salvage?.allowPlayerResultReorder === false) return;
+
+    progressiveOrders = { ...progressiveOrders, [key]: [] };
+    salvageOrderAnnouncement = announcement;
+
+    if (orderCommitTimer) clearTimeout(orderCommitTimer);
+    orderCommitTimer = setTimeout(() => {
+      orderCommitTimer = null;
+      void commitProgressiveOrder(key);
+    }, ORDER_COMMIT_DEBOUNCE_MS);
+  }
+
+  /**
+   * Flush a pending debounced order write immediately, reporting whether it landed.
+   *
+   * Called on drop, before a salvage run starts, and on window teardown via
+   * `SvelteFabricateApp._flushPendingOrderWrite` — without the last, a player who
+   * reorders and immediately closes or refreshes inside the debounce window loses the
+   * order silently. A no-op when nothing is pending, so a double call from both
+   * `close()` and `_onClose()` writes once.
+   *
+   * NEVER REJECTS: see `commitProgressiveOrder`.
+   *
+   * @returns {Promise<{ok: boolean}>}
+   */
+  function flushSalvageOrder() {
+    if (!orderCommitTimer) return Promise.resolve({ ok: true });
+    clearTimeout(orderCommitTimer);
+    orderCommitTimer = null;
+    const key = progressiveOrderKey({ scope: 'salvage', id: selectedItem?.componentId });
+    return key ? commitProgressiveOrder(key) : Promise.resolve({ ok: true });
+  }
 
   /**
    * Fetch the inventory listing for the current actor + component sources.
@@ -173,6 +380,11 @@ export function createInventoryStore({ services } = {}) {
         componentSourceActorIds: currentSourceIds(),
       });
       listing = result ?? null;
+      // Seed the player's stored stage orders. The persisted snapshot is the revert
+      // target for a rejected write.
+      const orders = services?.getProgressiveResultOrder?.() ?? {};
+      progressiveOrders = orders && typeof orders === 'object' ? { ...orders } : {};
+      persistedOrders = { ...progressiveOrders };
       loadedOnce = true;
     } catch (err) {
       error = err?.message ?? String(err);
@@ -250,9 +462,153 @@ export function createInventoryStore({ services } = {}) {
     }
   }
 
-  /** Select an item by key. */
+  /**
+   * Salvage the selected owned component (issue 675) — the first player-facing caller
+   * of `CraftingEngine.salvage`.
+   *
+   * Routes through `services.salvageComponent({ actorId, ... })`. An ACTOR ID, never a
+   * uuid: `_resolveCraftingActor` behind that facade is the only ownership gate the
+   * salvage path has, and a uuid would bypass it and reach the engine (which mutates
+   * Items directly and THROWS on a bad uuid rather than returning a message).
+   *
+   * `salvage()` has FOUR outcomes, not two — a `success` with null results is a
+   * time-gated run that has STARTED and awarded nothing:
+   *
+   *   cancelled            → silently back to pre-roll. NO notify: the player chose to
+   *                          dismiss the prompt; an error toast would be a lie.
+   *   success, no results  → waiting state carrying the engine's message. No ribbon,
+   *                          no "Salvage again" (that would re-enter the time gate).
+   *   success + results    → success ribbon, quiet reload, selection HELD.
+   *   !success             → surface the message (this is also the misconfigured shape).
+   *
+   * NO ORDER IS THREADED INTO THE OPTIONS BAG. The engine captures the player's order
+   * onto the run record at start, reading the standing preference exactly once, there.
+   * Threading one here would reintroduce the executing-user read that capture exists to
+   * prevent. Writing the standing preference is the UI's whole job — which is why this
+   * FLUSHES the pending debounced write first: without that, a player who reorders and
+   * immediately presses Salvage starts a run inside the debounce window and the engine
+   * captures the STALE order.
+   *
+   * A REJECTED FLUSH ABORTS THE SALVAGE (decision 9). The store has already reverted
+   * the row and announced the revert, so proceeding would consume the component against
+   * an order the player can see was undone. Nothing is consumed; they retry deliberately.
+   *
+   * @param {string} componentId
+   * @returns {Promise<{success: boolean, cancelled?: boolean, message?: string}>}
+   */
+  async function salvage(componentId) {
+    if (!componentId || salvagingKey) return { success: false };
+    const row = rows.find((entry) => entry?.componentId === componentId) ?? null;
+    const systemId = row?.systemId ?? null;
+    if (!systemId) return { success: false };
+
+    salvagingKey = componentId;
+    try {
+      const flush = await flushSalvageOrder();
+      if (flush?.ok === false) {
+        // The revert and its live-region announcement already happened inside the
+        // flush. Consume nothing.
+        return { success: false, message: salvageOrderAnnouncement };
+      }
+      const result = await services?.salvageComponent?.({
+        // Decision 8: the first OWNED actor holding the component.
+        actorId: row?.salvage?.targetActorId ?? null,
+        systemId,
+        componentId,
+        interactive: true,
+      });
+
+      if (result?.cancelled === true) {
+        salvageResult = null;
+        return result;
+      }
+      if (result?.success === true && result?.results == null) {
+        salvageResult = { componentId, state: 'waiting', message: result?.message ?? '' };
+        await load(true);
+        return result;
+      }
+      if (result?.success === true) {
+        // Keep the salvaged component selected so its ribbon stays put even when the
+        // last copy is consumed and the row leaves the listing.
+        //
+        // Hold it selected BEFORE the reload, not only after. `load(true)` awaits, and
+        // the reactive flush it schedules runs at that await boundary — BEFORE the code
+        // after the await. Without a held row in place, that flush momentarily resolves
+        // the selection to a DIFFERENT component (the listing's first visible row), whose
+        // changed key bounces the inspector off the Salvage tab (issue 675 defect 2). The
+        // pre-roll snapshot pins the same key across the whole reload; its stale count is
+        // corrected immediately below.
+        heldItem = row;
+        selectedKey = row?.key ?? selectedKey;
+        salvageResult = {
+          componentId,
+          state: 'success',
+          message: result?.message ?? '',
+          // The created result documents, projected for the read-only summary. Never a
+          // formula: that is system-authored and the prompt already showed it.
+          awarded: (Array.isArray(result.results) ? result.results : []).map((entry) => ({
+            name: String(entry?.name ?? ''),
+            img: typeof entry?.img === 'string' ? entry.img : null,
+          })),
+          // What the run RECORDED, so the body can reconcile itself with the roll rather
+          // than keep asserting a pre-roll state under a success ribbon.
+          //
+          // `createdResults` is the engine's own record of what it awarded, keyed by
+          // componentId — the only honest source for a per-stage "Recovered" chip
+          // (the created Items are matched by name otherwise, which is fragile).
+          // `data.outcomeId` is the routed tier the roll actually matched.
+          //
+          // Both are null/empty when the salvage ran WITHOUT a run manager (the runless
+          // invariant), in which case the bodies fall back to a neutral resolved state
+          // rather than inventing one.
+          awardedComponentIds: (Array.isArray(result?.salvageRun?.createdResults)
+            ? result.salvageRun.createdResults
+            : []
+          )
+            .map((entry) => entry?.componentId)
+            .filter(Boolean),
+          outcomeId: result?.salvageRun?.checkResult?.data?.outcomeId ?? null,
+          // The rolled total, so the summary can print "with a roll of N". Read from the
+          // engine's top-level `value` (present even runless), NOT from `salvageRun`. A
+          // no-check "Guaranteed" salvage rolled nothing and returns null — kept null so
+          // the summary omits the roll phrase entirely rather than printing "of 0".
+          rollValue: Number.isFinite(result?.value) ? result.value : null,
+        };
+        await load(true);
+        // Reconcile the held snapshot with post-salvage reality (issue 675 defect).
+        // The live listing now reflects the consumed stock: when the last copy was
+        // broken down the row is GONE (remaining 0); otherwise the fresh live row still
+        // exists and `selectedItem` prefers it. Carry the TRUE remaining onto the held
+        // row so a depleted component reads "None remaining" and withholds "Salvage
+        // again" — never the stale pre-roll count that would offer an impossible re-roll.
+        const liveRow = rows.find((entry) => entry?.componentId === componentId) ?? null;
+        heldItem = { ...row, totalQuantity: liveRow ? Number(liveRow.totalQuantity ?? 0) : 0 };
+        return result;
+      }
+      salvageResult = null;
+      if (result?.message) services?.notify?.(result.message);
+      return result ?? { success: false };
+    } catch (err) {
+      const message = err?.message ?? String(err);
+      salvageResult = null;
+      services?.notify?.(message);
+      return { success: false, message };
+    } finally {
+      salvagingKey = null;
+    }
+  }
+
+  /** Dismiss the salvage outcome and return the panel to its pre-roll state. */
+  function resetSalvage() {
+    salvageResult = null;
+    heldItem = null;
+  }
+
+  /** Select an item by key. Releases any held (salvaged) row and its ribbon. */
   function select(key) {
     selectedKey = key ?? null;
+    heldItem = null;
+    salvageResult = null;
   }
 
   /** Update the search query and jump back to the first page. */
@@ -328,6 +684,21 @@ export function createInventoryStore({ services } = {}) {
     get learningRecipeId() {
       return learningRecipeId;
     },
+    get salvagingKey() {
+      return salvagingKey;
+    },
+    get salvageResult() {
+      return salvageResult;
+    },
+    get orderedSalvageStages() {
+      return orderedSalvageStages;
+    },
+    get salvageOrderAnnouncement() {
+      return salvageOrderAnnouncement;
+    },
+    get salvageOrderIsCustom() {
+      return salvageOrderIsCustom;
+    },
     get worldTimeTick() {
       return worldTimeTick;
     },
@@ -349,6 +720,11 @@ export function createInventoryStore({ services } = {}) {
     load,
     learn,
     learnAll,
+    salvage,
+    resetSalvage,
+    reorderSalvageStage,
+    resetSalvageOrder,
+    flushSalvageOrder,
     select,
     setSearch,
     setFilter,

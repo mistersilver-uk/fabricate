@@ -245,6 +245,11 @@ See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
 Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).
 - A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
+- **The player-path ownership gate lives in the `main.js` FACADE, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.
+`_resolveCraftingActor` / `_resolveCraftingSources` (`src/main.js`) are the whole gate, which is exactly why every player-facing facade (`craftRecipe`, `salvageComponent`, `listInventoryForActor`, the alchemy pair) takes an **`actorId`** and resolves it, and **never accepts an actor uuid**.
+A uuid-taking facade is a privilege hole, not a style choice: the uuid flows straight to `fromUuid` past the only gate that exists, and a stale, foreign, or console-supplied one reaches the server and surfaces as a **thrown exception**, not the `{ success: false, message }` every store is written to expect — so the failure is both a permission bypass and an unhandled shape.
+Keep new player entry points on `actorId`, and treat "the engine will check it" as false.
+Engine methods are the GM/API surface and are owner-scoped by their caller.
 - A Foundry `game.settings.register` **`scope: 'client'`** setting persists in that browser/device's `localStorage`, so it is **per device, not per user account** — the same user opening the world on a second machine sees the client default, and it never follows the account.
 `scope: 'user'` is the cross-device per-user scope **within one world** (NOT a per-account-globally scope — see the next bullet), and `scope: 'world'` is shared for the world.
 Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user".
@@ -254,6 +259,9 @@ A preference that must follow the user across devices needs `scope: 'user'` — 
 So the fire-and-forget `setSetting(...)` idiom used for client-scoped settings (e.g. `toggleFavouriteRecipe`) is **unsafe** on a user-scoped one — `await` it and define the failure path, or the UI reports a write that never happened.
 Every write broadcasts `createSetting`/`updateSetting` to every client (the FIRST write is `createSetting`, not `updateSetting`), so a per-gesture write must be debounced.
 It is per-user **within a world**, not per-account globally — the same player in a second world gets the default.
+Despite being async and replicated, the write is **locally coherent**: the awaited create/update populates the same local collection `ClientSettings#get` reads, so a `get` issued after the `await` returns the new value without waiting on any broadcast.
+That is what makes **flush-before-read an honest ordering guarantee** rather than a hopeful one — `await` the pending write, then start the operation that captures it (issue 675's salvage panel flushes its debounced order write before `salvage()` captures it onto the run record).
+It also means the failure mode to design for is **rejection, not staleness**.
 - **Setting scope changes ORPHAN data; they never migrate it.** Foundry has no scope-migration facility (`ClientSettings#get` dispatches on scope at read time), so a pre-existing `localStorage` value is simply never read again — never deleted, never an error.
 When claiming "there is no data to migrate", prove it by showing **no writer has ever existed**, not that nothing reads it: "nothing reads it" does not imply absence.
 - **`BaseSetting.canUserCreate` is a UI helper, NOT authorization** — it requires `SETTINGS_MODIFY` (default ASSISTANT), which players lack, and reads like a blocker for user-scoped player writes.
@@ -270,10 +278,20 @@ For a **default-true** field the failure is worse than absent, it is **inverted*
 Pin such a projection with a `false` fixture — a `true` fixture round-trips green through a dropped field.
 - **The mounted/store test harnesses have TWO separate module-copy mechanisms**, and adding one import to a module already in the graph can break either: `CRAFTING_APP_RAW_MODULES`/`compiledModules` in `tests/helpers/svelte-component-harness.js` (mounted components) and `compiler.copyPlain(...)` in `tests/helpers/compile-svelte-module.js` (runes `.svelte.js` store suites).
 A missing entry HANGS the suite (`# cancelled N`), never fails it — one import added to `CraftingListingBuilder` cancelled 36 tests across 8 files.
+**Membership is an explicit allowlist, so READ it — never infer it from a module's kind or its name.** That incident does **not** generalize to "builders are in the harness graph": its sibling `InventoryListingBuilder` is copied by **no** harness (its only importer is `src/main.js`), so the hazard does not apply to it at all — issue 675's delta inherited the opposite belief from this note and planned around a constraint that did not bind.
+Grep the allowlists for the module before reasoning about whether an import is safe to add.
+The mirror trap is **over-filling**: a speculative entry for a module the graph never reaches is silently **inert** and passes green, so an allowlist accretes cargo-cult entries that read as load-bearing and no gate distinguishes from real ones — confirm a new entry is needed (drop it; the suite should hang) rather than adding it defensively.
+What matters is the **transitive import graph, not the rendered tree**: the harness imports the compiled `.svelte.js`, whose **static** imports resolve at module time, so an `{#if}` branch that never renders a child does not keep it out of the graph.
 - Foundry custom module/system sockets carry a **server-attested sender user id** as the **2nd callback argument** (`game.socket.on('module.fabricate', (payload, senderId) => …)`).
 The server sets it from the authenticated session in `dist/server/sockets.mjs handleCustomSocket` (`this.user.id`), so it is non-forgeable; a payload `userId` field is client-supplied and spoofable.
 Authenticate socket senders via the 2nd arg (e.g. gate privileged edges on `game.users.get(senderId)?.isGM`), never via the payload — `socketlib` merely wraps this same mechanism and adds no stronger guarantee (so it is not needed for sender auth).
 The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `main.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.
+- **Foundry's `Localization#localize()` is a dotted-path WALK (`foundry.utils.getProperty`) over the nested `lang/` tree — not a flat-key lookup — and returns the key VERBATIM on any non-string result.** `lang/en.json` is a nested object, so every key segment is a real node.
+The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate's `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageList.svelte`) quietly renders its **hardcoded English fallback**.
+**Nothing fails.** The UI reads correctly in English, screenshots look right, and mounted tests pass — so the whole class is invisible until a translator ships a locale where the fallback is wrong-language.
+Every child key of the shadowing string is affected at once.
+`tests/ui-lang-keys-resolve.test.js` (PR #674) gates only the **reference direction** (a key the code reads must exist); it does **not** detect a shadowed namespace, and **orphaned keys stay invisible to it entirely**.
+So when adding a key, check no ancestor path is itself a string, and prefer a distinct leaf (`…Salvage.Label`) over reusing a container path as a value.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers

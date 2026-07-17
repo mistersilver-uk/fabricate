@@ -7112,8 +7112,17 @@
    Stepper placed inside any `.manager-field` was silently stretched to 100% width and
    36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
    rows dodge this only by not living in a `.manager-field`. Excluding the stepper here
-   fixes it for EVERY surface rather than per-caller. */
-.fabricate-manager .manager-field input:not(.fab-stepper-input),
+   fixes it for EVERY surface rather than per-caller.
+
+   `:not([type='radio'])` — the SAME collision, found via the crafting-settings resolution
+   cards. The resolution radios live in a `<fieldset class="manager-field">`, so this text-
+   field treatment (width: 100%, a 6px-radius rectangle, a 36px height) matched them at the
+   SAME specificity as their own `.manager-resolution-option input[type='radio']` rule and,
+   being later in the file, won the tie: the radio stretched to fill the flex line (~643px in
+   a 669px card), starving the option body to 0px so every description wrapped one word per
+   line, and squared off the dot. A radio is a custom-drawn control, never a text field, so
+   exclude it here — the same fix-once-for-every-surface move as the stepper. */
+.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea,
 .fabricate-manager .manager-component-inline-control {
@@ -7125,7 +7134,7 @@
   background: var(--fab-mv2-bg);
 }
 
-.fabricate-manager .manager-field input:not(.fab-stepper-input),
+.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-component-inline-control {
   height: 36px;

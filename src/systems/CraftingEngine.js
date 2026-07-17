@@ -29,6 +29,7 @@ import {
   checkCurrencySpends,
   spendCurrencySpends,
 } from './currencyAffordance.js';
+import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 /**
@@ -3266,29 +3267,7 @@ export class CraftingEngine {
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
-    // Tools render by their AUTHORED name (the referenced component), not the
-    // matched item's name: a single owned item can satisfy more than one tool
-    // slot (source/name collision), which would otherwise print the same item
-    // name twice. Fall back to the matched item's name when the component can't
-    // be resolved. De-dupe by component id so a tool is never listed twice.
-    const componentById = new Map(
-      (system.components || []).map((component) => [component?.id, component])
-    );
-    const toolEntries = [];
-    const seenToolKeys = new Set();
-    for (const pair of tools || []) {
-      // Skip virtual-present canvas tools (no owned item) — no chip to render.
-      if (!pair?.item) continue;
-      const componentId = pair.tool?.componentId || pair.tool?.systemItemId || null;
-      const component = componentId ? componentById.get(componentId) : null;
-      const key = componentId || pair.item?.uuid || pair.item?.name || null;
-      if (key && seenToolKeys.has(key)) continue;
-      if (key) seenToolKeys.add(key);
-      toolEntries.push({
-        name: component?.name || pair.item?.name || '',
-        img: component?.img || pair.item?.img || '',
-      });
-    }
+    const toolEntries = this._resolveToolChatEntries(tools, system);
 
     // Resolve to a plain, Foundry-free model, then render via the shared pure
     // builder (mirrors the gathering card: resolve names/images here, format there).
@@ -3321,6 +3300,141 @@ export class CraftingEngine {
       });
     } catch (error) {
       console.error('Fabricate | Failed to post crafting chat message:', error);
+    }
+  }
+
+  /**
+   * Resolve `[{ tool, item }]` tool matches to plain `{ name, img }` chat entries.
+   *
+   * Tools render by their AUTHORED name (the referenced component), not the matched
+   * item's name: a single owned item can satisfy more than one tool slot
+   * (source/name collision), which would otherwise print the same item name twice.
+   * Falls back to the matched item's name when the component can't be resolved.
+   * De-dupes by component id so a tool is never listed twice. Shared by the crafting
+   * and salvage chat cards.
+   * @private
+   */
+  _resolveToolChatEntries(tools, system) {
+    const componentById = new Map(
+      (system?.components || []).map((component) => [component?.id, component])
+    );
+    const entries = [];
+    const seen = new Set();
+    for (const pair of tools || []) {
+      // Skip virtual-present canvas tools (no owned item) — no chip to render.
+      if (!pair?.item) continue;
+      const componentId = pair.tool?.componentId || pair.tool?.systemItemId || null;
+      const component = componentId ? componentById.get(componentId) : null;
+      const key = componentId || pair.item?.uuid || pair.item?.name || null;
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      entries.push({
+        name: component?.name || pair.item?.name || '',
+        img: component?.img || pair.item?.img || '',
+      });
+    }
+    return entries;
+  }
+
+  /**
+   * Resolve the `_applyToolBreakage` evidence records that BROKE this salvage to
+   * plain `{ name, img }` chat entries, resolving each authored tool component by
+   * its `componentId` and de-duping. Non-broken evidence (spared/virtual/immune) is
+   * skipped so the salvage card's tools section names only what was actually lost.
+   * @private
+   */
+  _resolveBrokenToolChatEntries(usedTools, system) {
+    const componentById = new Map(
+      (system?.components || []).map((component) => [component?.id, component])
+    );
+    const entries = [];
+    const seen = new Set();
+    for (const record of usedTools || []) {
+      if (record?.broken !== true) continue;
+      const componentId = record.componentId || null;
+      const component = componentId ? componentById.get(componentId) : null;
+      const key = componentId || record.itemUuid || null;
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      entries.push({
+        name: component?.name || '',
+        img: component?.img || '',
+      });
+    }
+    return entries;
+  }
+
+  /**
+   * Post a salvage result chat card, the salvage analogue of
+   * {@link _postCraftChatMessage} (issue 675). Gated on the SAME
+   * `system.features.chatOutput` toggle crafting reads, and posted only for a
+   * resolved success or a rolled failure — never for a cancelled prompt, a
+   * misconfigured/validation abort, or a time-gated run that has started but
+   * awarded nothing (those mutate nothing to report). Renders through the shared
+   * pure `buildSalvageChatContent` builder, so the card matches the crafting card
+   * visually. Errors from `ChatMessage.create` are caught so a chat failure never
+   * propagates out of `salvage()` or blocks the award.
+   *
+   * @param {object}  params
+   * @param {boolean} params.success       - Whether the salvage succeeded.
+   * @param {object}  params.actor         - The salvaging actor.
+   * @param {object}  params.system        - The crafting system (already resolved).
+   * @param {object}  params.component     - The salvaged source component.
+   * @param {number}  params.consumedQuantity - How many of the source were broken down.
+   * @param {Array}   [params.results]     - Created result Item documents (success only).
+   * @param {Array}   [params.usedTools]   - `_applyToolBreakage` evidence records.
+   * @param {string}  [params.failureReason] - Human-readable reason (failure only).
+   * @private
+   */
+  async _postSalvageChatMessage({
+    success,
+    actor,
+    system,
+    component,
+    consumedQuantity,
+    results,
+    usedTools,
+    failureReason,
+  }) {
+    if (!system || system.features?.chatOutput !== true) return;
+
+    const localize = (key) => game.i18n?.localize?.(key) ?? key;
+    const consumed =
+      Number(consumedQuantity) > 0
+        ? [
+            {
+              name: component?.name || '',
+              img: component?.img || '',
+              quantity: Number(consumedQuantity),
+            },
+          ]
+        : [];
+
+    const content = buildSalvageChatContent(
+      {
+        status: success ? 'succeeded' : 'failed',
+        actorName: actor?.name || '',
+        componentName: component?.name || '',
+        results: (results || []).map((item) => ({
+          name: item?.name || '',
+          img: item?.img || '',
+          quantity: Number(item?.system?.quantity || 1),
+        })),
+        consumed,
+        tools: this._resolveBrokenToolChatEntries(usedTools, system),
+        failureReason: failureReason || '',
+      },
+      localize
+    );
+
+    try {
+      await ChatMessage.create({
+        user: game.user?.id,
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content,
+      });
+    } catch (error) {
+      console.error('Fabricate | Failed to post salvage chat message:', error);
     }
   }
 
@@ -3548,10 +3662,18 @@ export class CraftingEngine {
    * Perform the salvage pipeline for a component.
    *
    * Resolves actor, system, and component from their IDs/UUIDs, then runs
-   * the full pipeline: validate -> ownership check -> tool check ->
-   * salvage check -> failure policy -> consume -> create results -> record run.
+   * the full pipeline: validate -> tool check -> salvage check -> failure policy ->
+   * consume -> create results -> record run.
    *
-   * @param {string} actorUuid - UUID of the actor performing salvage.
+   * THIS METHOD PERFORMS NO OWNERSHIP CHECK. (This block claimed one in the pipeline
+   * for a long time; there has never been one — corrected by issue 675.) It resolves
+   * `actorUuid` through `fromUuid` and mutates that actor's Items directly. The only
+   * ownership gate is at the facade: `Fabricate#salvageComponent` takes an ACTOR ID
+   * and resolves it through `_resolveCraftingSources` -> `_resolveCraftingActor`.
+   * That is why no UI may plumb a uuid through to this parameter.
+   *
+   * @param {string} actorUuid - UUID of the actor performing salvage. NOT ownership
+   *   checked here; see above.
    * @param {string} craftingSystemId - ID of the crafting system.
    * @param {string} componentId - ID of the component to salvage.
    * @param {Object} [options={}] - Optional overrides.
@@ -3561,7 +3683,7 @@ export class CraftingEngine {
    *   and macros stay silent. A dismissed prompt returns
    *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
    *   component consumed, no tool breakage) and discards a run created by this call.
-   *   No current UI surface triggers salvage, so this is API/engine-level only today.
+   *   The player Inventory tab's Salvage panel passes true (issue 675).
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null, cancelled?: boolean}>}
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
@@ -3812,6 +3934,24 @@ export class CraftingEngine {
         });
       }
 
+      // Salvage chat parity (issue 675): crafting posts on failure too. Report the
+      // source forfeited on failure (per the consumption policy) and any tools that
+      // broke — merged into one "Consumed on Failure" section by the shared card.
+      const forfeitedQuantity = consumedOnFail.reduce(
+        (sum, { quantity }) => sum + (Number(quantity) || 0),
+        0
+      );
+      await this._postSalvageChatMessage({
+        success: false,
+        actor,
+        system,
+        component,
+        consumedQuantity: forfeitedQuantity,
+        results: [],
+        usedTools,
+        failureReason: checkResult.message || 'Salvage check failed',
+      });
+
       return {
         success: false,
         results: null,
@@ -3879,6 +4019,11 @@ export class CraftingEngine {
           itemUuid: item.uuid,
           componentId,
           quantity: Number(item.system?.quantity || 1),
+          // Capture name/img at award time (mirroring the crafting award record) so a
+          // salvage record is self-describing in the Journal even if the item is later
+          // deleted. Older records without these fall back to the componentId resolver.
+          name: item.name ?? null,
+          img: item.img ?? null,
         })),
         checkResult: {
           success: true,
@@ -3890,10 +4035,32 @@ export class CraftingEngine {
       });
     }
 
+    // Salvage chat parity (issue 675): the same card crafting posts, reading as a
+    // salvage analogue — the source broken down, the materials recovered, and any
+    // tools that broke. Gated on the same `chatOutput` toggle inside the poster.
+    const consumedQuantity = consumedItems.reduce(
+      (sum, { quantity }) => sum + (Number(quantity) || 0),
+      0
+    );
+    await this._postSalvageChatMessage({
+      success: true,
+      actor,
+      system,
+      component,
+      consumedQuantity,
+      results: resultItems,
+      usedTools,
+      failureReason: '',
+    });
+
     return {
       success: true,
       results: resultItems,
       message: `Successfully salvaged ${component.name || componentId}`,
+      // The rolled total, threaded top-level so the player summary can read it even on
+      // the RUNLESS path (no salvage run manager) where `salvageRun` is null. `null` for
+      // a no-check simple salvage (nothing was rolled); a finite number otherwise.
+      value: checkResult.value ?? null,
       salvageRun,
     };
   }

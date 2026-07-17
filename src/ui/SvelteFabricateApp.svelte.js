@@ -207,6 +207,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       learnRecipeFromInventory: (opts = {}) =>
         game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      // Salvage one owned component (issue 675) — the Inventory tab's Salvage panel,
+      // and the first UI caller of the engine's salvage pipeline. Takes
+      // `{ actorId, systemId, componentId, interactive }`: an ACTOR ID, never a uuid,
+      // so the facade's `_resolveCraftingSources` gate — the only ownership check on
+      // this path — is not bypassed.
+      salvageComponent: (opts = {}) => game?.fabricate?.salvageComponent?.(opts) ?? null,
       // Fresh per-set craftability for an in-session ingredient-option override
       // (issue 552). Synchronous so the store's `selectedCraftability` $derived can
       // read it without an async round-trip; returns null when the facade is absent.
@@ -432,12 +438,24 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * window must not discard it. Safe to call from both `close()` and `_onClose()`: the
    * store's flush is a no-op when no write is pending, so a double call writes once.
    *
+   * Flushes BOTH progressive-order writers: the crafting store (issue 651) and the
+   * inventory store's salvage stage order (issue 675). This is the only teardown net
+   * either has.
+   *
    * Deliberately NOT awaited and never throws — a rejected write is the store's business
    * (it reverts and announces), and a teardown must not be blocked or broken by it.
+   *
+   * The `try/catch` below catches only SYNCHRONOUS throws, and `void` discards the
+   * promise, so a store flush that REJECTED would surface as an unhandled promise
+   * rejection here — a console error on a path with no user to see it. Both stores
+   * therefore report failure by return status rather than rejecting; the `.catch()`
+   * below is a second line of defence so this seam is safe regardless.
    */
   _flushPendingOrderWrite() {
     try {
-      void this._services?.crafting?.flushProgressiveOrder?.();
+      const noop = () => {};
+      void this._services?.crafting?.flushProgressiveOrder?.()?.catch?.(noop);
+      void this._services?.inventory?.flushSalvageOrder?.()?.catch?.(noop);
     } catch {
       // A failed order write must never break the window close.
     }

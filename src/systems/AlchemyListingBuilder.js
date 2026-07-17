@@ -448,7 +448,7 @@ export class AlchemyListingBuilder {
 
   _projectSet(set, recipe, system, components) {
     const groups = (Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []).map((group) =>
-      this._projectGroup(group, components)
+      this._projectGroup(group, components, system)
     );
     const essences = this._projectEssences(set, system);
     return {
@@ -459,12 +459,21 @@ export class AlchemyListingBuilder {
     };
   }
 
-  _projectGroup(group, components) {
+  _projectGroup(group, components, system = null) {
     const options = (Array.isArray(group?.options) ? group.options : []).map((option) => {
       const componentId = this._optionComponentId(option);
       const component = componentId
         ? components.find((candidate) => candidate.id === componentId)
         : null;
+      // An essence-type ingredient option (componentId is null) resolves to the
+      // essence's NAME + ICON from the system's essence definitions, and its
+      // display quantity is the required essence AMOUNT (`match.amount`), NOT the
+      // per-option quantity — the raw essence id is never player-facing. The
+      // component path is unchanged (name from the component, quantity from the
+      // option).
+      if (!component && option?.match?.type === 'essence') {
+        return this._projectEssenceOption(option, system);
+      }
       return {
         componentId: stringOrNull(componentId),
         name: component ? stringOrEmpty(component.name) : this._optionLabel(option),
@@ -473,6 +482,27 @@ export class AlchemyListingBuilder {
       };
     });
     return { options };
+  }
+
+  /**
+   * Project an essence-type ingredient option into the same display shape a
+   * component option uses, resolving the essence's NAME + ICON against the
+   * system's `essenceDefinitions` (falling back to the raw id only when no
+   * definition exists) and surfacing the required essence AMOUNT as `quantity`.
+   */
+  _projectEssenceOption(option, system) {
+    const match = option?.match ?? {};
+    const essenceId = String(match.essenceId || '').trim();
+    const defs = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const def = defs.find((candidate) => candidate.id === essenceId) ?? null;
+    return {
+      componentId: null,
+      essenceId: stringOrNull(essenceId),
+      name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
+      img: null,
+      icon: stringOrNull(def?.icon),
+      quantity: Math.max(1, Number(match.amount) || 1),
+    };
   }
 
   _optionComponentId(option) {
