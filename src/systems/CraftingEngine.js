@@ -4037,7 +4037,17 @@ export class CraftingEngine {
         zeroRemainingOnPartial: false,
       });
 
-      return [{ ...group, results: awarded }];
+      // Progressive results are a quantity-less ordered list: the loop above charges a
+      // result's difficulty ONCE and awards that entry ONCE, so the GM expresses "more of
+      // X" by listing X again rather than via a count. Force `quantity: 1` so the grant
+      // path (`_createResultItems` reads `result.quantity`) produces one item per awarded
+      // entry — this MIRRORS `ResolutionModeService._resolveProgressive`, which has always
+      // done the same for recipes. Salvage did not, so it handed the authored objects
+      // through by identity and a world that authored `quantity: 2` was awarded 2 for one
+      // entry's difficulty (issue 676). `quantity` remains in the stored model and the
+      // normalizer still clamps it; forcing it here leaves the stored value inert, so no
+      // migration is required.
+      return [{ ...group, results: awarded.map((result) => ({ ...result, quantity: 1 })) }];
     }
 
     return allGroups;

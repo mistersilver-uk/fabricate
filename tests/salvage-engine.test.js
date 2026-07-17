@@ -999,6 +999,57 @@ test('_resolveSalvageResultGroups progressive exceed mode awards only when value
   assert.equal(awarded[0].results[0].componentId, 'item-a');
 });
 
+test('_resolveSalvageResultGroups progressive forces quantity 1 — an ordered list has no counts', () => {
+  // READ THIS BEFORE "RESTORING" THE AUTHORED QUANTITY (issue 676).
+  //
+  // Progressive is an ORDERED LIST OF INDIVIDUAL RESULTS. Repetition is expressed by
+  // listing the same component twice — never by a count — because the award loop spends
+  // the roll budget PER ENTRY: it charges the component's difficulty once and awards the
+  // entry once. A `quantity: 2` was therefore two items for the price of one entry's
+  // difficulty, which is not a rule the mode has.
+  //
+  // Recipes already forced this (`ResolutionModeService._resolveProgressive`:
+  // `awarded.map((result) => ({ ...result, quantity: 1 }))`). Salvage did not, so it
+  // returned the authored objects by identity and `_createResultItems` wrote
+  // `itemData.system.quantity = result.quantity` — set 2, get 2. This test pins the
+  // two paths to the SAME rule.
+  //
+  // `quantity` stays in the stored model (the normalizer still clamps it) and is inert
+  // here, so no migration is needed: an authored 2 simply stops being honoured.
+  const engine = makeEngine();
+  const resultGroup = {
+    id: 'rg-1',
+    name: 'Loot',
+    results: [
+      { id: 'r-1', componentId: 'item-a', quantity: 2 }, // difficulty 2
+      { id: 'r-2', componentId: 'item-a', quantity: 7 }  // the SAME component, listed twice
+    ]
+  };
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [resultGroup] }
+  };
+  const system = makeSystem({
+    salvageResolutionMode: 'progressive',
+    salvageCraftingCheck: {
+      enabled: true, macroUuid: null, outcomes: [], progressive: { awardMode: 'equal' },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false }
+    },
+    components: [component, { id: 'item-a', name: 'Item A', difficulty: 2 }]
+  });
+
+  const awarded = engine._resolveSalvageResultGroups(component, system, { outcome: null, value: 4 });
+  assert.equal(awarded[0].results.length, 2, 'a budget of 4 buys both entries at difficulty 2');
+  assert.deepEqual(
+    awarded[0].results.map((result) => result.quantity),
+    [1, 1],
+    'every awarded progressive entry is exactly one item, whatever the world authored'
+  );
+  // The rest of the authored result must survive the rewrite — only `quantity` changes.
+  assert.equal(awarded[0].results[0].id, 'r-1');
+  assert.equal(awarded[0].results[0].componentId, 'item-a');
+});
+
 test('_resolveSalvageResultGroups progressive partial mode awards a final partial result on remainder', () => {
   // partial: full results while `remaining >= cost`, then ONE final result on any
   // leftover `remaining > 0`. value 4, costs 3 then 5 → item-a fully (remaining 1),
@@ -1114,7 +1165,16 @@ test('salvage() progressive mode creates items matching awarded results', async 
 
   assert.equal(result.success, true);
   assert.equal(actor.createdItems.length, 1, 'Only item-a should be created (cost 2 <= value 3)');
-  assert.equal(actor.createdItems[0].system.quantity, 2, 'Item A created with quantity 2');
+  // ONE item, though the group authors `quantity: 2` — the BEHAVIOUR CHANGE of issue 676,
+  // asserted end-to-end through `_createResultItems`. Progressive is an ordered list of
+  // individual results; a count was never a rule of the mode, and honouring one gave two
+  // items for one entry's difficulty. Recipes have always forced this; salvage now does
+  // too. See `_resolveSalvageResultGroups progressive forces quantity 1` for the why.
+  assert.equal(
+    actor.createdItems[0].system.quantity,
+    1,
+    'the authored quantity 2 is inert: a progressive entry awards exactly one item'
+  );
 });
 
 // ---------------------------------------------------------------------------

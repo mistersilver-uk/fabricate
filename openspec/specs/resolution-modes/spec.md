@@ -181,8 +181,11 @@ A `routedByCheck` recipe is otherwise structurally valid regardless of the check
 
 - Exactly one ingredient set and one result group.
 - The result order is meaningful.
-- Result entries carry no quantity: awarding spends the budget against each entry once, so the same `Component` may appear multiple times and repetition is how a recipe asks for more of a result.
+- Result entries carry no quantity: awarding spends the budget against each entry once, so the same `Component` may appear multiple times and repetition is how a recipe or a salvage config asks for more of a result.
 Each awarded entry grants a single item (any legacy authored quantity is normalized to 1).
+This governs **every** progressive award surface, crafting and salvage alike — the rule follows from the award loop, which charges one entry's `difficulty` and awards that one entry, so honouring a count would grant N items for the price of one.
+The normalization is enforced at award time on both paths (`ResolutionModeService._resolveProgressive` for recipes, `CraftingEngine._resolveSalvageResultGroups` for salvage), never by a migration: `quantity` remains a stored, normalizer-clamped field and is simply inert in this mode.
+The salvage scope is stated explicitly because it was read as recipe-only once and the salvage path shipped honouring the authored count.
 - Each result references a `Component` with `difficulty >= 1`.
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
