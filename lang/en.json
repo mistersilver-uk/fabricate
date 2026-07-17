@@ -450,12 +450,14 @@
           "FooterNoteRoll": "One roll, one shot — rolling breaks the item down immediately. No reroll.",
           "Ribbon": "Salvaged — materials added to your pack",
           "Again": "Salvage again",
+          "Depleted": "That was the last one — nothing left to salvage.",
           "OutcomeSuccess": "Salvaged",
           "OutcomeWaiting": "In progress"
         },
         "Detail": {
           "SelectHint": "Select an item to see its sources and where it's used.",
           "Total": "{count} total",
+          "TotalDepleted": "None remaining",
           "TabsLabel": "Item details",
           "TabInfo": "Info",
           "TabSalvage": "Salvage",
@@ -1086,7 +1088,14 @@
       "GatherEvents": "Events Encountered",
       "GatherToolsBroken": "Tools Broken",
       "GatherStamina": "Stamina Spent",
-      "GatherNodes": "Nodes Remaining"
+      "GatherNodes": "Nodes Remaining",
+      "SalvageSuccess": "Salvage Successful",
+      "SalvageFailure": "Salvage Failed",
+      "SalvageActor": "Salvager",
+      "SalvageSource": "Source",
+      "SalvageRecovered": "Recovered",
+      "SalvageConsumed": "Broken Down",
+      "SalvageTools": "Tools Broken"
     },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",

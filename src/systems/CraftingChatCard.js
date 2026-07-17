@@ -9,15 +9,26 @@
  * result cards render as one consistent, Fabricate-namespaced card. All
  * image/name resolution happens in the caller (CraftingEngine); this module
  * only formats.
+ *
+ * The rendering core is factored into {@link buildResultCard}, a generic result
+ * card parameterised by a label-key map. Salvage reuses it verbatim (via
+ * {@link module:src/systems/SalvageChatCard}) so a salvage card is the SAME card
+ * — same markup, same `fabricate-craft-chat` styles — reading only as a salvage
+ * analogue rather than a second, unrelated format (issue 675). Sharing the core
+ * this way also keeps the two callers from duplicating the renderer.
  */
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
-const CHAT_KEYS = Object.freeze({
+/**
+ * The crafting label-key map for {@link buildResultCard}: the subject is the
+ * recipe, and the state titles read "Crafting Successful/Failed".
+ */
+export const CRAFTING_CHAT_KEYS = Object.freeze({
   success: 'FABRICATE.Chat.CraftSuccess',
   failure: 'FABRICATE.Chat.CraftFailure',
   actor: 'FABRICATE.Chat.Actor',
-  recipe: 'FABRICATE.Chat.Recipe',
+  subject: 'FABRICATE.Chat.Recipe',
   results: 'FABRICATE.Chat.Results',
   consumed: 'FABRICATE.Chat.Consumed',
   tools: 'FABRICATE.Chat.Tools',
@@ -65,61 +76,63 @@ function renderSection({ heading, entries, modifier }) {
 }
 
 /**
- * Build the HTML content for a crafting result chat card.
+ * Build the HTML content for a result chat card (crafting or salvage), keyed by a
+ * label-key map so the SAME markup and `fabricate-craft-chat` styles back both.
  *
- * On success the card lists the created results, consumed ingredients, and tools
- * used as separate sections. On failure it shows the failure reason as a notice
- * and merges any consumed ingredients + tools into a single "Consumed on Failure"
+ * On success the card lists the created/recovered results, the consumed source,
+ * and tools as separate sections. On failure it shows the failure reason as a
+ * notice and merges any consumed + tools into a single "Consumed on Failure"
  * section (mirroring the prior plain-text card's failure branch).
  *
  * @param {object} model
  * @param {'succeeded'|'failed'} model.status
  * @param {string}  model.actorName
- * @param {string}  [model.recipeName]
+ * @param {string}  [model.subjectName] - The recipe (crafting) or source component (salvage).
  * @param {Array<{name:string,img:string,quantity:number}>} [model.results]
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed]
  * @param {Array<{name:string,img:string}>}                 [model.tools]
  * @param {string}  [model.failureReason]
+ * @param {object}  keys - The label-key map (e.g. {@link CRAFTING_CHAT_KEYS}).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
  * @returns {string} HTML string suitable for ChatMessage content.
  */
-export function buildCraftingChatContent(model = {}, localize = (key) => key) {
+export function buildResultCard(model = {}, keys, localize = (key) => key) {
   const loc = (key) => localize(key) ?? key;
   const succeeded = model.status === 'succeeded';
   const stateModifier = succeeded ? 'success' : 'failure';
-  const title = loc(succeeded ? CHAT_KEYS.success : CHAT_KEYS.failure);
+  const title = loc(succeeded ? keys.success : keys.failure);
 
-  const subtitleParts = [`${esc(loc(CHAT_KEYS.actor))}: ${esc(model.actorName)}`];
-  if (model.recipeName) {
-    subtitleParts.push(`${esc(loc(CHAT_KEYS.recipe))}: ${esc(model.recipeName)}`);
+  const subtitleParts = [`${esc(loc(keys.actor))}: ${esc(model.actorName)}`];
+  if (model.subjectName) {
+    subtitleParts.push(`${esc(loc(keys.subject))}: ${esc(model.subjectName)}`);
   }
 
   const notice =
     !succeeded && model.failureReason
-      ? `<div class="fabricate-craft-chat__notice">${esc(loc(CHAT_KEYS.failureReason))}: ${esc(model.failureReason)}</div>`
+      ? `<div class="fabricate-craft-chat__notice">${esc(loc(keys.failureReason))}: ${esc(model.failureReason)}</div>`
       : '';
 
   let sections;
   if (succeeded) {
     sections = [
       renderSection({
-        heading: loc(CHAT_KEYS.results),
+        heading: loc(keys.results),
         entries: model.results,
         modifier: 'results',
       }),
       renderSection({
-        heading: loc(CHAT_KEYS.consumed),
+        heading: loc(keys.consumed),
         entries: model.consumed,
         modifier: 'consumed',
       }),
-      renderSection({ heading: loc(CHAT_KEYS.tools), entries: model.tools, modifier: 'tools' }),
+      renderSection({ heading: loc(keys.tools), entries: model.tools, modifier: 'tools' }),
     ].filter(Boolean);
   } else {
-    // Failure: consumed ingredients + tools were forfeited together — one section.
+    // Failure: consumed source + tools were forfeited together — one section.
     const forfeited = [...(model.consumed || []), ...(model.tools || [])];
     sections = [
       renderSection({
-        heading: loc(CHAT_KEYS.consumedOnFailure),
+        heading: loc(keys.consumedOnFailure),
         entries: forfeited,
         modifier: 'consumed',
       }),
@@ -138,4 +151,30 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
   ]
     .filter(Boolean)
     .join('');
+}
+
+/**
+ * Build the HTML content for a crafting result chat card.
+ *
+ * A thin wrapper over {@link buildResultCard} that maps the crafting model
+ * (`recipeName` → subject) onto the shared renderer with {@link CRAFTING_CHAT_KEYS}.
+ *
+ * @param {object} model - See {@link buildResultCard}; the subject is `recipeName`.
+ * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
+ * @returns {string} HTML string suitable for ChatMessage content.
+ */
+export function buildCraftingChatContent(model = {}, localize = (key) => key) {
+  return buildResultCard(
+    {
+      status: model.status,
+      actorName: model.actorName,
+      subjectName: model.recipeName,
+      results: model.results,
+      consumed: model.consumed,
+      tools: model.tools,
+      failureReason: model.failureReason,
+    },
+    CRAFTING_CHAT_KEYS,
+    localize
+  );
 }
