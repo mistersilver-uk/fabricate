@@ -98,6 +98,7 @@ A DC you set that does not match any tier is kept exactly as you typed it.
 It shows under **Custom** with its own value, and it is never rounded to the nearest tier.
 
 When the system's salvage DC is set by a macro rather than a fixed number, the **System default** option says so instead of showing a DC, because there is no single number to show.
+
 ## Salvaging From the Inventory Tab
 
 Players salvage from the **Inventory** tab of the Fabricate window.
