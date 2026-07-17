@@ -175,8 +175,12 @@
     have no DC, but components do — so both surfaces show the component DC alongside the reach.
   -->
   {#if stage.difficulty !== null && stage.difficulty !== undefined}
+    <!-- The DC glyph differs by surface (issue 675): salvage (stacked) uses the medal, the
+         maintainer's chosen mark for a component's progressive DC in the player app; crafting
+         (inline) keeps the gauge. Keyed off the existing `stacked` layout flag, so no new
+         prop exists solely to hold this cosmetic difference. -->
     <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
-      <i class="fas fa-gauge-high" aria-hidden="true"></i>{format(
+      <i class="fas {stacked ? 'fa-medal' : 'fa-gauge-high'}" aria-hidden="true"></i>{format(
         'FABRICATE.App.Crafting.Detail.StageDifficultyDc',
         'DC {difficulty}',
         { difficulty: stage.difficulty }
