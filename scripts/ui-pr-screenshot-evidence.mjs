@@ -16,11 +16,11 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
-// The recipe editor's five screenshot frames (overview/ingredients/validation/
-// multi-step/tools) share the same trigger files, so any recipe editor / context-rail
-// / sub-component change republishes all five. The rail (RecipeContextRail) lives
-// under `recipe/` and is covered by the glob below; the BROWSER inspector deliberately
-// does not (see the manager-recipes recipe).
+// The recipe editor's frames (overview/ingredients/validation/multi-step/tools/access/
+// results) share the same trigger files, so any recipe editor / tab / sub-component
+// change republishes all of them. Every editor tab lives under `recipe/` and is covered
+// by the glob below; the BROWSER inspector deliberately does not (see the
+// manager-recipes recipe).
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
@@ -61,38 +61,57 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/config\/currency(?:Presets|Providers)\.js$/,
     ],
   },
+  // The Component Studio (issue 676). Two dirs, deliberately distinct: `components/`
+  // is the BROWSER's, `component/` is the EDITOR's — mirroring the Recipe Studio's
+  // `recipes/` vs `recipe/` split.
   {
     id: 'manager-components',
     label: 'Manager components browser',
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+      /^src\/utils\/componentBrowserModel\.js$/,
+    ],
   },
   {
     id: 'manager-components-progressive',
-    label: 'Manager components browser — progressive difficulty column (value + None)',
+    label: 'Manager components browser — progressive difficulty badge (value + None)',
     smokeLabels: ['manager-components-progressive'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+    ],
   },
   {
     id: 'manager-component-edit',
-    label: 'Manager component editor (identity card + linked-source inspector)',
+    label: 'Manager component editor (single column: identity strip + category, no rail)',
     smokeLabels: ['manager-component-edit-normal'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentSourceInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/.+\.svelte$/,
     ],
   },
   {
     id: 'manager-component-edit-difficulty',
-    label: 'Manager component editor — staged progressive difficulty card',
+    label: 'Manager component editor — staged progressive difficulty control',
     smokeLabels: ['manager-component-edit-difficulty'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentDifficultyInspector\.svelte$/],
+    // The difficulty control rehomed from the deleted ComponentDifficultyInspector
+    // into ComponentEditView's body. This entry used to name ONLY that inspector — so
+    // after its deletion it would have matched nothing forever, silently, all green.
+    // That is the exact drift `every matches entry resolves to a real path` now pins.
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   },
   {
     id: 'manager-component-edit-salvage',
-    label: 'Manager component editor — salvage authoring (result groups, routing, DC override)',
-    smokeLabels: ['manager-component-edit-salvage'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    label: 'Manager component editor — salvage authoring (enable toggle, result groups, routing, DC presets)',
+    // `-off` photographs the collapsed/OFF salvage body: the state decision 6
+    // guarantees every existing world shows, and the one Ruling A governs.
+    smokeLabels: ['manager-component-edit-salvage', 'manager-component-edit-salvage-off'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/salvageDcPresets\.js$/,
+    ],
   },
   {
     id: 'manager-checks-gathering',
@@ -268,12 +287,14 @@ export const VIEW_RECIPES = Object.freeze([
     matches: RECIPE_EDIT_MATCHES,
   },
   {
-    // The context rail is MODE-CONDITIONAL (issue 643 §4b). Every other recipe frame
-    // is captured against a system whose visibility mode drives the Books & Scrolls
-    // branch, so without this frame the restricted (access) branch would ship with no
-    // screenshot evidence at all.
+    // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
+    // rail). Every other recipe frame is captured against a system whose visibility mode
+    // drives the Books & Scrolls branch, so without this frame the restricted (access)
+    // branch would ship with no screenshot evidence at all. The frame ID keeps its
+    // `-access-rail` suffix: it is a stable identifier the published S3 keys and the
+    // smoke labels share, and renaming it would orphan existing evidence for no gain.
     id: 'manager-recipe-edit-access-rail',
-    label: 'Manager recipe editor — restricted-visibility context rail (players and characters with access)',
+    label: 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)',
     smokeLabels: ['manager-recipe-edit-access-rail'],
     matches: RECIPE_EDIT_MATCHES,
   },

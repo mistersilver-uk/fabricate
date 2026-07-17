@@ -20,6 +20,10 @@ import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
   TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST,
 } from '../models/Tool.js';
+import {
+  normalizeComponentCategory,
+  normalizeCustomComponentCategories,
+} from '../utils/componentCategories.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
@@ -241,6 +245,13 @@ export class CraftingSystemManager {
         system.resolutionMode
       ),
       teaserConfig: this._normalizeTeaserConfig(system.teaserConfig),
+
+      // Canonical, system-owned COMPONENT category vocabulary (issue 676). A sibling
+      // of the recipe `categories` vocabulary below, and deliberately NOT an alias of
+      // it: canonical spec forbids merging, aliasing, or cross-populating the two, so
+      // a component category is never offered as a recipe category and vice versa.
+      // The reserved `general` bucket is implied, never persisted in the array.
+      componentCategories: normalizeCustomComponentCategories(system.componentCategories),
 
       // Transitional aliases for existing UI code paths
       categories: normalizeCustomRecipeCategories(system.categories),
@@ -1486,6 +1497,11 @@ export class CraftingSystemManager {
       registeredItemUuid,
       aliasItemUuids,
       tier: item.tier || null,
+      // Single-valued grouping axis (issue 676). Defaults to the reserved `general`
+      // bucket — there is no "uncategorized" state — which is how every EXISTING
+      // component acquires a category with no migration. Distinct from `tags`, which
+      // is many-valued and does a different job.
+      category: normalizeComponentCategory(item.category),
       tags: Array.isArray(item.tags) ? item.tags : [],
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
       difficulty:
@@ -1528,8 +1544,26 @@ export class CraftingSystemManager {
       return Number.isFinite(n) ? Math.trunc(n) : null;
     })();
 
+    // HOISTED DELIBERATELY (issue 676). `enabled` is the first key of the literal
+    // below and `resultGroups` used to be computed ~10 lines later, so clamping
+    // `enabled` in place against the groups would read an uninitialized local.
+    const resultGroups = Array.isArray(salvage.resultGroups)
+      ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
+      : [];
+
     return {
-      enabled: salvage.enabled === true,
+      // Requirement 5 (`data-models` → Component) is ENFORCED HERE, not by any UI
+      // control (issue 676, decision 8a). The normalizer is the single chokepoint
+      // EVERY writer passes — GM save, import (`CraftingSystemExporter` has no
+      // salvage handling at all, so `{enabled: true, resultGroups: []}` would
+      // otherwise land verbatim), copy-mode, and migration — so the clamp is what
+      // actually makes the forbidden state unreachable. A control that merely
+      // refuses to ENABLE a zero-group component cannot stop one BECOMING
+      // zero-group while enabled.
+      //
+      // The clamp only ever turns `enabled` OFF, never on: it therefore cannot
+      // contradict the "no migration seeds this field" rule and seeds nothing.
+      enabled: salvage.enabled === true && resultGroups.length > 0,
       // GM-authored policy: may a player reorder this salvage's progressive result
       // stages? Default TRUE (issue 651) — an absent key reads as `true`, which is why
       // the 1.17.0 migration does not seed it.
@@ -1539,9 +1573,7 @@ export class CraftingSystemManager {
       // Preserve migrated salvage tool references so they are not orphaned on the
       // next system save. Coerced to trimmed, non-empty, deduped id strings.
       toolIds: this._normalizeToolIds(salvage.toolIds),
-      resultGroups: Array.isArray(salvage.resultGroups)
-        ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
-        : [],
+      resultGroups,
       ...(salvage.outcomeRouting &&
         typeof salvage.outcomeRouting === 'object' && {
           outcomeRouting: { ...salvage.outcomeRouting },

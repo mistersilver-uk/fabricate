@@ -42,6 +42,10 @@ import {
   normalizeRecipeCategory,
 } from '../../../utils/recipeCategories.js';
 import {
+  isGeneralComponentCategory,
+  normalizeCustomComponentCategories,
+} from '../../../utils/componentCategories.js';
+import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets,
 } from '../../../config/gatheringCharacterModifierPresets.js';
@@ -503,6 +507,12 @@ function _buildManagedItemOptions(managedItems = []) {
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
     description: _plainTextDescription(item.description),
+    // Component category (issue 676). This is the PER-COMPONENT field, and is a
+    // different projection from the system-level `componentCategories` vocabulary
+    // in the `selectedSystem` viewState projection — both are required, for
+    // different things. Normalization guarantees the key, so it is projected
+    // unconditionally rather than through a hasOwnProperty guard.
+    category: item.category || 'general',
     ...(item.originItemUuid ? { originItemUuid: item.originItemUuid } : {}),
     ...(item.registeredItemUuid ? { registeredItemUuid: item.registeredItemUuid } : {}),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty')
@@ -1731,13 +1741,49 @@ function _sourceOriginForUuid(uuid, sourceMissing = false) {
   };
 }
 
-async function _sourceMissingForUuid(uuid) {
-  if (!uuid || typeof globalThis.fromUuid !== 'function') return false;
+/**
+ * Resolve a component's linked source document ONCE, returning both the document and
+ * the `missing` verdict derived from the same lookup.
+ *
+ * The `missing` contract is preserved EXACTLY as `_sourceMissingForUuid` defined it,
+ * and the two clauses are load-bearing in opposite directions:
+ *  - no uuid, or no `fromUuid` (every non-Foundry test env): `missing: false`. Deriving
+ *    it as `Boolean(uuid) && !doc` instead would report EVERY component's source as
+ *    unresolved the moment `fromUuid` is absent.
+ *  - a throw: `missing: true`.
+ *
+ * Returning the doc as well is what lets the component card follow the LINKED ITEM for
+ * description (issue 676) without resolving the same uuid twice per component — which,
+ * for a compendium-linked library, is real async I/O per row.
+ *
+ * @param {string} uuid
+ * @returns {Promise<{doc: object|null, missing: boolean}>}
+ */
+async function _resolveSourceDocumentState(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return { doc: null, missing: false };
   try {
-    return !(await globalThis.fromUuid(uuid));
+    const doc = await globalThis.fromUuid(uuid);
+    return { doc: doc || null, missing: !doc };
   } catch (_) {
-    return true;
+    return { doc: null, missing: true };
   }
+}
+
+/**
+ * The linked document's description, in a SYSTEM-AGNOSTIC way.
+ *
+ * dnd5e keeps it at `system.description.value` as HTML; others use a bare
+ * `description`. Both are handed to `_plainTextDescription`, which recurses objects
+ * (`_descriptionTextCandidate`) and strips markup — so the `{value, chat}` shape and a
+ * plain string both resolve. `doc.system` is NEVER passed whole: the recursion would
+ * happily flatten every unrelated field on the sheet into the "description".
+ *
+ * @param {object|null} doc
+ * @returns {string}
+ */
+function _documentDescriptionCandidate(doc) {
+  if (!doc) return '';
+  return _plainTextDescription(doc.system?.description ?? doc.description ?? '');
 }
 
 // ---------------------------------------------------------------------------
@@ -1916,9 +1962,21 @@ async function _buildItemCards(
   const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
   return Promise.all(
     items.map(async (item) => {
-      const description = _plainTextDescription(item.description);
       const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
-      const sourceMissing = await _sourceMissingForUuid(registeredItemUuidDisplay);
+      // Resolve the LINKED DOCUMENT, not just its existence (issue 676). The editor's
+      // identity strip promises "name, image & description follow the linked item and
+      // can't be edited here" — and for description that promise was FALSE: this read
+      // `item.description` off the stored component record, which holds whatever was
+      // captured at registration. For a compendium-linked component that is routinely
+      // empty, so the strip rendered a bare "—" while the item's sheet showed prose.
+      //
+      // The stored value remains the FALLBACK, so an unresolvable source (and every
+      // environment without `fromUuid`) renders exactly what it rendered before.
+      // A genuinely description-less item still yields '' -> the strip's own "—".
+      const { doc: sourceDoc, missing: sourceMissing } =
+        await _resolveSourceDocumentState(registeredItemUuidDisplay);
+      const description =
+        _documentDescriptionCandidate(sourceDoc) || _plainTextDescription(item.description);
       const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
       return {
         ...item,
@@ -2163,6 +2221,12 @@ function _buildSelectedSystemViewData(
     },
 
     categories: selectedSystem.categories || [],
+    // The system-level COMPONENT category vocabulary (issue 676). This hand-built
+    // projection is an allowlist: without this line the Tags & Categories screen's
+    // component-categories section is permanently EMPTY, however correctly the
+    // normalizer and the write path behave. Distinct from `_buildManagedItemOptions`,
+    // which projects the per-component `category` field.
+    componentCategories: selectedSystem.componentCategories || [],
     itemTags: selectedSystem.itemTags || selectedSystem.tags || [],
     essenceDefinitions,
     managedItemOptions,
@@ -4926,6 +4990,22 @@ export function createAdminStore(services) {
 
   // --- System selection ---
 
+  // Every search term is scoped to ONE system's vocabulary: "iron" names a real
+  // component in the system it was typed into and nothing in the next one. Carrying a
+  // term across a system change filters the new system's browser down to nothing and
+  // reads as an empty library rather than an active filter.
+  //
+  // This clears at the STORE, not in each view, because all three terms are read back
+  // out of these stores by every consumer at once (`itemSearch` → `getItems(systemId,
+  // search)` → `itemCards` → the component browser; `recipeSearch` → the recipe
+  // browser; `graphSearch` → the graph). Clearing here covers each of them and holds
+  // for a system change triggered from anywhere.
+  function _clearSystemScopedSearches() {
+    recipeSearch.set('');
+    itemSearch.set('');
+    graphSearch.set('');
+  }
+
   async function selectSystem(systemId) {
     if (systemId === get(selectedSystemId)) {
       await refresh();
@@ -4934,6 +5014,7 @@ export function createAdminStore(services) {
     if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     selectedSystemId.set(systemId);
+    _clearSystemScopedSearches();
     selectedEnvironmentId.set('');
     selectedEnvironmentSystemId.set(systemId || '');
     _setEnvironmentDraftState(null, { persistedDraft: null });
@@ -4951,6 +5032,7 @@ export function createAdminStore(services) {
       'Configure categories, item tags, essences, and crafting behaviour for this system.';
     const system = await systemManager.createSystem({ name, description });
     selectedSystemId.set(system.id);
+    _clearSystemScopedSearches();
     activeTab.set('systems');
     await services.setSetting('lastManagedCraftingSystem', system.id);
     await refresh();
@@ -5837,6 +5919,44 @@ export function createAdminStore(services) {
       (system.categories || []).filter((c) => c !== category)
     );
     await systemManager.updateSystem(sysId, { categories });
+    await refresh();
+  }
+
+  // --- Component category management (issue 676) ---
+  //
+  // Mirrors addCategory/removeCategory above, writing the SIBLING vocabulary
+  // `componentCategories` top-level via updateSystem. Deliberately does not touch
+  // `categories`: the two vocabularies are independent and must never cross-populate.
+  // Note updateSystem's whole-array replace semantics make removal persist without
+  // any `-=` deletion (unlike setFlag's deep merge).
+
+  async function addComponentCategory(value) {
+    if (!value || !value.trim()) return;
+    if (isGeneralComponentCategory(value)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const componentCategories = normalizeCustomComponentCategories([
+      ...(system.componentCategories || []),
+      value.trim(),
+    ]);
+    await systemManager.updateSystem(sysId, { componentCategories });
+    await refresh();
+  }
+
+  async function removeComponentCategory(category) {
+    if (isGeneralComponentCategory(category)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const componentCategories = normalizeCustomComponentCategories(
+      (system.componentCategories || []).filter((c) => c !== category)
+    );
+    await systemManager.updateSystem(sysId, { componentCategories });
     await refresh();
   }
 
@@ -7967,6 +8087,8 @@ export function createAdminStore(services) {
     toggleRequirement,
     addCategory,
     removeCategory,
+    addComponentCategory,
+    removeComponentCategory,
     addTag,
     removeTag,
     addEssence,

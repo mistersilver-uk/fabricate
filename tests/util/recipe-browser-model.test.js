@@ -120,6 +120,42 @@ describe('recipeBrowserModel — grouping', () => {
     assert.deepEqual(groups.map((group) => group.category), ['alchemy', 'smithing']);
     assert.deepEqual(names(groups[0].recipes), ['Acid', 'Brew']);
     assert.deepEqual(names(groups[1].recipes), ['Zinc']);
+    assert.deepEqual(groups.map((group) => group.total), [2, 1], 'total degrades to the bucket length');
+  });
+
+  // buildRecipeBrowserModel groups the PAGE, so a bucket's own length is only what is on
+  // screen. The header pairs it with the category's FILTERED total — issue 676.
+  it('carries the category total from the filtered rows, not the page slice', () => {
+    const many = Array.from({ length: 12 }, (_, index) =>
+      makeRecipe({ id: `r${index}`, name: `Draught ${String(index).padStart(2, '0')}`, category: 'alchemy' })
+    );
+    const model = buildRecipeBrowserModel(many, { groupByCategory: true, pageSize: 10 });
+
+    assert.equal(model.groups.length, 1);
+    assert.equal(model.groups[0].recipes.length, 10, 'page 1 renders ten');
+    assert.equal(model.groups[0].total, 12, 'the filtered alchemy bucket holds twelve');
+  });
+
+  it('counts the total over the FILTERED rows, so an active filter is respected', () => {
+    const model = buildRecipeBrowserModel(
+      [
+        makeRecipe({ id: 'r1', name: 'Acid', category: 'alchemy', enabled: true }),
+        makeRecipe({ id: 'r2', name: 'Brew', category: 'alchemy', enabled: false }),
+        makeRecipe({ id: 'r3', name: 'Cure', category: 'alchemy', enabled: false })
+      ],
+      { groupByCategory: true, status: 'off', pageSize: 1 }
+    );
+
+    assert.equal(model.groups[0].recipes.length, 1, 'page 1 of the two disabled rows');
+    assert.equal(model.groups[0].total, 2, 'the total counts the FILTERED rows, not all three');
+  });
+
+  it('an ungrouped model reports the page as its own total', () => {
+    const model = buildRecipeBrowserModel(
+      [makeRecipe({ id: 'r1', name: 'Acid' }), makeRecipe({ id: 'r2', name: 'Brew' })],
+      { groupByCategory: false }
+    );
+    assert.equal(model.groups[0].total, 2);
   });
 });
 

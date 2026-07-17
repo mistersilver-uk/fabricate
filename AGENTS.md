@@ -183,6 +183,12 @@ Note this is independent of the Svelte `<style>` blocks in `src/ui/svelte/`, whi
 - No literal colours in product code. `tests/components/theme-colour-contract.test.js` (under `npm test`) forbids colour literals — `#hex`, `rgb()/rgba()`, `hsl()/hsla()`, bare `white`/`black` — anywhere under `src/ui/` or `styles/` outside the approved `:root`/theme blocks, **including JS fallback constants** (a `'#888888'` default in a `.js` util fails the gate).
 Use a theme token (`var(--fab-…)`); when a util can't resolve a colour, return `''` and let CSS supply a themed default.
 A region/document's *own* runtime colour is fine inline via `style=` (it isn't a source literal).
+- **A UI control's constraint is never an invariant — the invariant belongs at the normalizer.**
+A disabled or absent control only refuses to *enter* a forbidden state through one surface.
+It cannot stop a record *becoming* forbidden by a removal path, and it is not on the path of the writers that have no UI at all — import (`CraftingSystemExporter.prepareForImport`), copy-mode, and migration.
+Enforce the rule where every writer passes instead: `_normalizeSystem` / `_normalizeComponent` / `_normalizeSalvage` in `src/systems/CraftingSystemManager.js` are that single chokepoint.
+Issue 676 is the worked example, and the claim "constraining the control makes the forbidden state unreachable by construction" was false in **both** directions: the sanctioned flow's exact reverse (enable at one result group, delete that group, save) persisted the forbidden state anyway, and then disabled the control that would have undone it.
+Keep the control constraint as UX, and **test the requirement** (normalizer input → output), never the control's `disabled` attribute — a control-shaped test reads green through every gap the control cannot close.
 - Localized strings belong in `lang/`; UI code should use the Foundry bridge/localization helpers instead of hard-coded copy.
 - Manager confirmation prompts (discard unsaved, destructive actions) MUST go through `services.confirmDialog` → `foundry.applications.api.DialogV2.confirm`.
 Never use `globalThis.confirm()`, not even as a fallback.
@@ -385,6 +391,59 @@ It is unrelated to the registered-entry match ref and stays `sourceUuid`.
 
 The learned-recipe provenance record (`Actor.flags.fabricate.learnedRecipes[recipeId].sourceItemUuid`, written by `RecipeVisibilityService`) is a fourth, actor-flag family that is also NOT in the settings-payload rename scope.
 Classify every occurrence by the owning object before renaming.
+
+### Prototype-driven redesign and design-system migration
+
+Fabricate's UI is being redesigned surface-by-surface from standalone HTML prototypes.
+Issues 675 (player Inventory) and 676 (GM Component Studio) each passed a three-round plan gate, a two-round implementation review, and a docs loop — and the maintainer still found user-visible drift within minutes of opening them, plus two surfaces that were specified and never built.
+Every reviewer had checked the change against *rules* (tokens, geometry, type scale, a11y); none had put the new surface beside the shipped one it was supposed to match, and none had checked whether the CSS did anything.
+These notes are what that cost.
+
+- **The already-migrated side wins — identify it, do not assume it.**
+When a redesign lands one surface at a time, every prototype-vs-shipped disagreement has a side that is already the new design system.
+That side wins.
+The shipped sibling won for issue 676 (the Recipe Studio was itself built from a prototype and had already been corrected in use), and the **prototype** won for issue 675 (the Inventory leads the new player design; Crafting/Gathering/Journal are the old one and follow later).
+Neither "the mock is the source of truth" nor "match the neighbour" is safe as a blanket rule — applied blindly, the first re-introduces fixed defects and the second drags a leading surface backwards.
+
+- **"Where the brief is silent, X wins" does not fire where the brief speaks.**
+Issue 676's plan carried exactly that clause and drifted anyway: the brief spoke, the implementer followed it faithfully, and the result still diverged from its sibling — because the sibling had already fixed the thing the brief described.
+A sibling rule must read "the sibling wins wherever it has an opinion", and the check must be a control-by-control diff, not a tie-breaker invoked when someone happens to notice a gap.
+
+- **A shipped sibling's CSS comments are the record of what the prototype got wrong.**
+Read them before building from a mock.
+`.manager-recipe-row.is-selected { box-shadow: none; }` in `styles/fabricate.css` exists to opt the recipe row out of a shared rule, and says why: a ring plus a bar states the selection twice.
+Issue 676 was added to that shared rule's selector list, never got the opt-out, and shipped the bar.
+The same file documents deleting a duplicate page header, replacing a bordered count chip that "read as something to press", and cutting three row icons to one — all three of which issue 676 rebuilt.
+
+- **Implementing a brief's token NAMES is not implementing its design.**
+A brief describes a delta from the prototype's baseline, so the same declaration means different things against a different baseline.
+Issue 675's card selection shipped `--accent-border` + `--surface-soft` exactly as written, onto a resting card that was already `--surface-soft` — the rule compiled to a no-op and selection became invisible.
+Verify the change **renders**; a style that declares correctly and changes nothing passes every review we have.
+
+- **Duplicated scoped styles drift silently, and per-file review cannot see it.**
+Svelte scoping lets two components hand-roll the same class names with different values while each reads as perfectly self-consistent.
+Issue 675's `InventoryBookDetail.svelte` and `InventoryComponentDetail.svelte` did this across eleven classes, so the inspector rendered two design systems depending on what the player clicked.
+Extract the shared shell; matching the values by hand only resets the clock.
+
+- **A "verbatim" extraction during a redesign carries the OLD design forward.**
+Splitting a component is a structural refactor, and "I moved it unchanged" is the correct claim for the code and the wrong outcome for the pixels when everything around it is being restyled.
+
+- **A gate authored from the implementation enshrines the implementation.**
+`tests/components/component-studio-font-size.test.js` was written by measuring the shipped markup, so its fixture hardcoded the drifted controls and its own comments recorded the drift as expected values.
+It then defended the drift.
+Author a visual gate from the design source, and treat a gate whose fixture mirrors the component as measuring nothing.
+
+- **Hand-rolled markup where a primitive exists is a drift generator.**
+Both issues did this: `Medallion`, `StatusPill`, `DropZone`, `RollResultBox`, `CraftButton` and `CraftingThumb` all exist and were re-implemented locally, each copy landing on its own values.
+When reviewing a new surface, list the primitives its sibling uses and ask why each one is absent — "it's a valid manager surface" is not the bar, "it is the same surface" is.
+
+- **Borrowing vocabulary from the wrong neighbour is invisible to rule-based review.**
+Issue 676's editor was built from the Gathering vocabulary (`manager-task-core-card`, the environment scene widgets, `manager-availability-pill`) rather than the Recipe Studio's, so its tag pills inherited a **warning** ramp and rendered amber.
+Every token was a real `--fab-*` token and every gate passed.
+
+- **A mock's fixtures hide the states real data produces.**
+No item in issue 675's prototype was both a tool and salvageable, so its salvageable and tool badges could share one corner slot; in Fabricate those flags are independent and the broken salvageable tool is the headline case.
+The prototype is not authority on states it never had to survive — long names, missing art, both-flags-true, zero-length collections.
 
 ## Markdown & Prose Conventions
 

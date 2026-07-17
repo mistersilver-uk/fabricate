@@ -32,7 +32,20 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/componentEditor.js',
+    // The component category vocabulary (issue 676), imported by ComponentEditView.
+    // A deliberately import-free leaf, so this single entry suffices — but omit it
+    // and the mounted suite HANGS (# cancelled) rather than failing.
+    'src/utils/componentCategories.js',
+    // The salvage DC control's pure option model (issue 676). Import-free leaf.
+    'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
+    // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
+    // check' for the persisted 'routed' token. Import-free leaf.
+    'src/ui/svelte/apps/manager/resolutionModeOptions.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // The identity strip's drop target + its portaled overflow menu (issue 676).
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
   ],
   // ToggleCard is rendered by the salvage block; a component the tree renders but the
   // harness does not list HANGS the suite (# cancelled) rather than failing it. The
@@ -40,6 +53,12 @@ const harness = createMountedComponentHarness({
   // from the temp tree but only compiles what `compiledModules` names.
   compiledModules: [
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // The salvage result quantity + the progressive DC are the shared Stepper (issue
+    // 676). Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and
+    // the suite HANGS (# cancelled) rather than failing.
+    'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
@@ -176,13 +195,36 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  it('renders the card ON when salvage is null (the cloneSalvage default)', async () => {
-    // `cloneSalvage(null)` spreads `{}` → the field is absent. Without the default the
-    // switch renders off against a default-on spec.
-    const target = await harness.mount(props({ component: { salvage: null } }));
-    assert.ok(card(target), 'the card renders for a component with no salvage config');
+  it('renders the card ON when allowPlayerResultReorder is absent (the cloneSalvage default)', async () => {
+    // `cloneSalvage` spreads the source → an absent field stays absent. Without the
+    // default the switch renders off against a default-on spec.
+    //
+    // UPDATED for issue 676: this used to mount `salvage: null`, but `null` now
+    // normalizes to salvage DISABLED (decision 6), and the reorder card is part of the
+    // chrome Ruling A collapses when salvage is off — so the card no longer exists on
+    // that fixture and `card(target).classList` threw on undefined. The fixture now
+    // carries an ENABLED salvage with the reorder key absent, which is what this test
+    // was always actually about.
+    const target = await harness.mount(
+      props({ component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS } } })
+    );
+    assert.ok(card(target), 'the card renders for an enabled salvage config');
     assert.ok(card(target).classList.contains('is-on'), 'absent reads default-true');
     assert.equal(toggle(target).getAttribute('aria-pressed'), 'true');
+    harness.remount();
+  });
+
+  it('Ruling A: salvage: null collapses the reorder chrome but keeps the group editor', async () => {
+    // `salvage: null` normalizes to disabled (decision 6), so the reorder card — which
+    // only has meaning once salvage RUNS — collapses. The result-group editor must NOT,
+    // because it owns `data-add-salvage-group`, the ONLY add-group control in the
+    // codebase. Hide that and enabling salvage becomes impossible forever.
+    const target = await harness.mount(props({ component: { salvage: null } }));
+    assert.equal(card(target), null, 'the reorder chrome collapses when salvage is off');
+    assert.ok(
+      target.querySelector('[data-add-salvage-group]'),
+      'the add-group control stays reachable while salvage is off'
+    );
     harness.remount();
   });
 
@@ -333,7 +375,82 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const badge = target.querySelector('[data-salvage-result-difficulty]');
     assert.equal(badge.getAttribute('data-salvage-result-difficulty'), '');
+    // This asserted /DC\s+—/ — the component's FALLBACK literal, which nothing ever
+    // rendered: `lang/en.json` resolves `SalvageEditor.DifficultyUnset` to "No
+    // difficulty", so production always said that and only a test with no i18n loaded
+    // ever saw "DC —". The test's own NAME recorded the real intent all along. Issue 676
+    // aligned the fallback to the lang value, and the recipe stage row now reads the
+    // same. The POINT of the test is unchanged and is asserted explicitly below: an
+    // unset difficulty must never render as a DC of 0, which is a real, meaningful, and
+    // completely wrong value.
     assert.match(badge.textContent, /No difficulty/);
+    assert.doesNotMatch(badge.textContent, /\b0\b/, 'an unset difficulty is never DC 0');
+    harness.remount();
+  });
+
+  it('progressive salvage has NO quantity stepper — the engine forces quantity 1', async () => {
+    // This test was the exact REVERSE until issue 676, and the reversal is the record of
+    // a real fix rather than a change of mind. It used to say: do not delete this control,
+    // because salvage — unlike recipes — genuinely honoured the authored quantity, so
+    // hiding it would conceal a live field a GM could no longer see or edit. It ended
+    // "if salvage should become quantity-less, the ENGINE must change first".
+    //
+    // The engine changed first. `CraftingEngine._resolveSalvageResultGroups` now forces
+    // `quantity: 1` on every awarded progressive entry, exactly as
+    // `ResolutionModeService._resolveProgressive` always has for recipes — because
+    // progressive is an ordered list of INDIVIDUAL results whose award loop charges one
+    // difficulty and awards one entry. `tests/salvage-engine.test.js` pins both halves
+    // (the resolver AND the item actually created), so this control is now genuinely dead
+    // UI in progressive mode rather than a window onto working behaviour.
+    const target = await harness.mount(props());
+    assert.equal(
+      target.querySelector('[data-salvage-result-quantity]'),
+      null,
+      'a progressive yield is one item; repetition is authored by listing the component twice'
+    );
+    harness.remount();
+  });
+
+  it('simple salvage KEEPS its quantity stepper — the count is real there', async () => {
+    // The other half of the ruling, and the reason the change above is a mode-scoped
+    // deletion rather than a global one: simple/routed award the whole authored group, so
+    // `quantity` is honoured end-to-end and must stay editable.
+    const target = await harness.mount(props({ salvageResolutionMode: 'simple' }));
+    assert.ok(
+      target.querySelector('[data-salvage-result-quantity]'),
+      'simple salvage rows expose the quantity the award path honours'
+    );
+    harness.remount();
+  });
+
+  it('a yield row picks its component through the searchable popover, showing image AND name', async () => {
+    // The native <select> could show a component's name but never its art, so the GM
+    // picked yields from a text list on a surface where every other component is shown
+    // with its image. The trigger wraps BOTH facts as one target.
+    const target = await harness.mount(props());
+    const field = target.querySelector('[data-salvage-result-component]');
+    assert.ok(field, 'the row still exposes its component field');
+    assert.equal(field.querySelector('select'), null, 'the native select is gone');
+    const trigger = field.querySelector('button.manager-salvage-component-trigger');
+    assert.ok(trigger, 'the field is a popover trigger');
+    assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
+    assert.ok(trigger.querySelector('img'), 'the trigger carries the component image');
+    assert.match(trigger.textContent, /Scrap Metal/, 'the trigger carries the component name');
+    harness.remount();
+  });
+
+  it('a yield component with no art falls back to a glyph, never a broken <img>', async () => {
+    // A raw <img src=""> renders a broken-image box. SearchablePopover only emits the
+    // <img> when `triggerImg` is truthy, so the fallback has to be an ICON — the option
+    // list is built with `icon` set for exactly the art-less components.
+    const target = await harness.mount(
+      props({
+        componentOptions: COMPONENT_OPTIONS.map((option) => ({ ...option, img: '' }))
+      })
+    );
+    const trigger = target.querySelector('button.manager-salvage-component-trigger');
+    assert.equal(trigger.querySelector('img'), null, 'no <img> is emitted without a src');
+    assert.ok(trigger.querySelector('i.fa-cube'), 'the art-less component reads as a glyph');
     harness.remount();
   });
 

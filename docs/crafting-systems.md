@@ -34,13 +34,40 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 
 ### Tags And Categories
 
-Custom recipe categories organize recipe browsing and authoring, and item tags allow component labeling plus tag-based ingredient matching.
+The **Tags & Categories** screen holds three separate vocabularies for the selected system: recipe categories, component categories, and item tags.
+
+#### Recipe categories
+
+Custom recipe categories organize recipe browsing and authoring.
 The reserved **General** recipe category is always present and is not stored in the custom category list.
 
 In the player recipe browser, each recipe that belongs to a custom category shows that category as a small label on its row.
 Recipes in the reserved **General** category show no label, so the default bucket does not tag every row.
 A **Category** filter, placed above the crafting-system filter, lets players narrow the list to a single category.
 The filter offers only the categories that appear in the player's visible recipes, sorted alphabetically with **General** pinned last, and its default **All categories** option shows the full list.
+
+#### Component categories
+
+Component categories group your components in the component browser.
+They are managed in the **Component categories** section of the same screen, and they are a **separate vocabulary from recipe categories**.
+The two never mix.
+A component category such as **Reagent** is never offered as a recipe category, and a recipe category is never offered as a component category.
+Keeping them apart is deliberate, so that adding a way to group your components does not add clutter to the recipe browser your players use.
+
+Add a category by typing a name and clicking **Add component category**.
+The reserved **General** category is always available and is not stored in your custom list, so you cannot add or remove it.
+Every component belongs to exactly one category, and a component you have never categorised is in **General**.
+There is no uncategorised state.
+
+Removing a custom category does not change the components already assigned to it.
+Fabricate tells you how many components may still carry the value, and those components keep showing it until you update them.
+
+#### Item tags
+
+Item tags allow component labeling plus tag-based ingredient matching.
+Tags are many-valued, so a component can carry as many as you like.
+Tags are edited in the component editor only.
+They are not shown on component browser rows and they do not filter the browser, because grouping is what categories are for.
 
 ### Feature Toggles
 
@@ -388,12 +415,45 @@ If the folder contains no Item documents, a notification says so and nothing is 
 > Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row.
 If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
 
+### Browsing Components
+
+The **Items** tab lists the system's components as a single grouped list.
+Each row shows the component's name and a short description line.
+
+The toolbar above the list gives you:
+
+- a **Category** filter, defaulting to **All categories**
+- an essence filter, defaulting to **All essences**
+- a **Group by category** switch, on by default
+- a **Sort by** control offering **Name**, **Category**, **Essences**, and **Salvage**, with a button to flip between ascending and descending
+
+While **Group by category** is on, the list is split into a heading per category with a count of the components in it, and you can collapse a group you are not working on.
+The reserved **General** category is always shown last, because it is the catch-all rather than a category you chose.
+Long lists are paged, and the count above the list tells you which components you are looking at, such as **1–25 of 60**.
+
+Your filters, sort, grouping, and page survive opening a component and coming back, so working through a long list does not reset your place each time.
+
 ### Editing Components
 
 Open a component in the **Items** tab to edit it.
-The editor lets you change a component's tags, essences, and salvage setup, and replace its linked source item from the right-hand inspector.
-When the system's recipe resolution mode is Progressive, the inspector also shows a **Progressive difficulty** card for setting the value spent against the crafting roll.
+The editor is a single scrolling page rather than a form with a side panel.
+**Back** sits next to **Save** at the top, so leaving and saving are in the same place.
+If you leave with unsaved changes, Fabricate asks you to confirm first.
+
+The page starts with an **Identity** strip carrying the component's icon, name, and description.
+When a component is backed by a Foundry item, its name, image, and description follow that item and cannot be typed here.
+The identity strip is also where you manage that link:
+
+- drop a Foundry item onto the source area to replace the linked item
+- click the source item's name to open its sheet
+- use the **Source actions** menu for **Copy source UUID** and **Unlink Source Item**
+
+Replacing or unlinking a source takes effect immediately and is not held until you press **Save**, unlike the rest of the page.
+
+Below the identity strip you set the component's **Category**, its tags, its essences, and its salvage setup.
+When the system's recipe resolution mode is Progressive, a **Progressive difficulty** card appears for setting the value spent against the crafting roll.
 See [Setting Component Difficulty]({% link recipes/progressive.md %}#setting-component-difficulty).
+For the salvage panel, see [Component Salvage]({% link salvage.md %}#component-salvage).
 
 ---
 

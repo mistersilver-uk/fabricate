@@ -13,6 +13,11 @@ import { getDragEventData } from '../util/foundryBridge.js';
  * @param {Function}    options.onDrop                       Callback invoked with extracted drag data.
  * @param {string}      [options.activeClass='drop-active']  CSS class toggled during dragover.
  * @param {boolean}     [options.disabled=false]             When true, no listeners are attached.
+ * @param {Function}    [options.onActiveChange]             Called with `true`/`false` as the
+ *   dragover state toggles. The class alone is enough for a purely CSS hover state; a zone
+ *   that must also swap its ICON or COPY (the component editor's identity strip, issue 676)
+ *   needs the state in the component, and re-listening for dragover beside this action would
+ *   be a second, drifting copy of the same enter/leave bookkeeping.
  * @returns {{ update(newOptions: object): void, destroy(): void }}
  */
 export function dragDrop(node, options) {
@@ -20,10 +25,20 @@ export function dragDrop(node, options) {
   let dropCallback = options?.onDrop;
   let activeClass = options?.activeClass ?? 'drop-active';
   let disabled = options?.disabled ?? false;
+  let activeChangeCallback = options?.onActiveChange;
+
+  // `add`/`remove`, not `classList.toggle(cls, force)`: the DOM surface this action
+  // touches is deliberately narrow, and widening it broke every caller that hands it a
+  // minimal element stub.
+  function setActive(active) {
+    if (active) node.classList.add(activeClass);
+    else node.classList.remove(activeClass);
+    if (typeof activeChangeCallback === 'function') activeChangeCallback(active);
+  }
 
   function handleDragOver(event) {
     event.preventDefault();
-    node.classList.add(activeClass);
+    setActive(true);
   }
 
   function handleDragLeave(event) {
@@ -31,12 +46,12 @@ export function dragDrop(node, options) {
     // relatedTarget is the element the pointer is entering; if it is still
     // inside node we haven't truly left the drop zone.
     if (node.contains(event.relatedTarget)) return;
-    node.classList.remove(activeClass);
+    setActive(false);
   }
 
   function handleDrop(event) {
     event.preventDefault();
-    node.classList.remove(activeClass);
+    setActive(false);
     const data = getDragEventData(event);
     if (data !== null && data !== undefined && typeof dropCallback === 'function') {
       dropCallback(data);
@@ -53,7 +68,7 @@ export function dragDrop(node, options) {
     node.removeEventListener('dragover', handleDragOver);
     node.removeEventListener('dragleave', handleDragLeave);
     node.removeEventListener('drop', handleDrop);
-    node.classList.remove(activeClass);
+    setActive(false);
   }
 
   if (!disabled) {
@@ -65,8 +80,9 @@ export function dragDrop(node, options) {
       const newDisabled = newOptions.disabled ?? false;
       const newActiveClass = newOptions.activeClass ?? 'drop-active';
 
-      // Swap callback reference — no listener re-attachment needed.
+      // Swap callback references — no listener re-attachment needed.
       dropCallback = newOptions.onDrop;
+      activeChangeCallback = newOptions.onActiveChange;
 
       // Handle disabled toggle.
       if (newDisabled !== disabled) {

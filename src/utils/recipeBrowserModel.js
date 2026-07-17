@@ -1,6 +1,12 @@
 /**
- * Pure list model for the GM recipe library (issue 643): filter → group → sort →
- * paginate, plus the per-row derivations the rich row renders.
+ * Pure list model for the GM recipe library (issue 643): filter → sort → paginate →
+ * group, plus the per-row derivations the rich row renders.
+ *
+ * That order is deliberate and is what `buildRecipeBrowserModel` composes: the PAGE is
+ * grouped, so the pager stays the unit of truth for how many rows are on screen. (This
+ * header claimed `filter → group → sort → paginate` until issue 676 — the opposite of
+ * what ships.) The group header therefore reports both its rendered count and the
+ * category's filtered total; `countByCategory` supplies the latter.
  *
  * It lives under `src/utils/` rather than `src/ui/` deliberately: `src/ui/**` is
  * not covered by the ESLint/Prettier globs today, so a module there can be
@@ -12,6 +18,8 @@
  * already applies `recipeSearchTerm` before projecting, so re-applying it would
  * double-filter. The search term still contributes an active-filter chip.
  */
+
+import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
 
 /** @typedef {'name' | 'attention' | 'dc' | 'ingredients' | 'results'} RecipeSortKey */
 /** @typedef {'asc' | 'desc'} SortDirection */
@@ -79,7 +87,15 @@ function numeric(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function categoryOf(recipe) {
+/**
+ * The category bucket a row belongs to; an unauthored category falls back to the
+ * reserved `general` catch-all. Exported so a caller can build the same category totals
+ * this module groups by, rather than re-deriving the fallback and drifting.
+ *
+ * @param {object} recipe
+ * @returns {string}
+ */
+export function recipeCategoryOf(recipe) {
   const raw = typeof recipe?.category === 'string' ? recipe.category.trim() : '';
   return raw || GENERAL_CATEGORY;
 }
@@ -104,7 +120,7 @@ export function filterRecipes(recipes, filters = {}) {
     if (status === 'off' && enabled) return false;
     if (lock === 'locked' && !locked) return false;
     if (lock === 'unlocked' && locked) return false;
-    if (category !== 'all' && categoryOf(recipe) !== category) return false;
+    if (category !== 'all' && recipeCategoryOf(recipe) !== category) return false;
     return true;
   });
 }
@@ -162,20 +178,32 @@ export function sortRecipes(recipes, options = {}) {
  * each bucket. Buckets are name-ordered so the group list is stable across
  * re-sorts of the rows themselves.
  *
- * @param {object[]} recipes
- * @returns {{category: string, recipes: object[]}[]}
+ * The rows passed in are the PAGE, so each bucket also carries `total`: how many rows
+ * the category holds across the whole FILTERED list. Without it the header reads
+ * "Alchemy · 25 recipes" above page 1 of a 282-strong Alchemy bucket, which says the
+ * bucket holds 25. Pass the map `countByCategory(filteredRows, recipeCategoryOf)` built
+ * from the same filters; omit it and `total` degrades to the bucket's own length.
+ *
+ * @param {object[]} recipes the page's rows.
+ * @param {Map<string, number>} [categoryTotals] from `countByCategory`, over the
+ *   FILTERED rows.
+ * @returns {{category: string, recipes: object[], total: number}[]}
  */
-export function groupRecipesByCategory(recipes) {
+export function groupRecipesByCategory(recipes, categoryTotals) {
   const buckets = new Map();
 
   for (const recipe of Array.isArray(recipes) ? recipes : []) {
-    const category = categoryOf(recipe);
+    const category = recipeCategoryOf(recipe);
     if (!buckets.has(category)) buckets.set(category, []);
     buckets.get(category).push(recipe);
   }
 
   return [...buckets]
-    .map(([category, rows]) => ({ category, recipes: rows }))
+    .map(([category, rows]) => ({
+      category,
+      recipes: rows,
+      total: categoryTotalOf(categoryTotals, category, rows.length),
+    }))
     .sort((a, b) => a.category.localeCompare(b.category));
 }
 
@@ -599,7 +627,9 @@ export function buildRecipeRoutingModel(recipe) {
 /**
  * Run the whole pipeline in one call: filter → sort → paginate (→ group the page).
  * Grouping is applied to the PAGE, not the full list, so the pager stays the unit
- * of truth for how many rows are on screen.
+ * of truth for how many rows are on screen. Each group therefore carries `total` —
+ * the category's size across the whole FILTERED list — so its header can say both
+ * ("3 of 12 recipes") instead of only the number that happens to be on screen.
  *
  * @param {object[]} recipes
  * @param {{
@@ -608,7 +638,9 @@ export function buildRecipeRoutingModel(recipe) {
  *   pageIndex?: number, pageSize?: number, groupByCategory?: boolean
  * }} [options]
  * @returns {{
- *   filtered: object[], page: object[], groups: {category: string, recipes: object[]}[],
+ *   filtered: object[],
+ *   page: object[],
+ *   groups: {category: string, recipes: object[], total: number}[],
  *   pageIndex: number, pageCount: number, totalCount: number,
  *   rangeStart: number, rangeEnd: number,
  *   chips: {id: string, value: string}[]
@@ -621,8 +653,8 @@ export function buildRecipeBrowserModel(recipes, options = {}) {
   });
   const paged = paginateRecipes(filtered, options);
   const groups = options.groupByCategory
-    ? groupRecipesByCategory(paged.recipes)
-    : [{ category: '', recipes: paged.recipes }];
+    ? groupRecipesByCategory(paged.recipes, countByCategory(filtered, recipeCategoryOf))
+    : [{ category: '', recipes: paged.recipes, total: paged.recipes.length }];
 
   return {
     filtered,

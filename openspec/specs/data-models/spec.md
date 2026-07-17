@@ -49,6 +49,7 @@ CraftingSystem = {
   },
 
   categories: string[], // custom recipe categories only; reserved "general" is implicit
+  componentCategories?: string[], // default []; custom COMPONENT categories only; reserved "general" is implicit; independent of `categories`
   itemTags: string[],
 
   // Present only when features.essences is true.
@@ -280,7 +281,14 @@ The reserved `general` category must not be persisted in that array.
 Legacy persisted `features.recipeCategories`, `features.categories`, and `enableCategories` values are compatibility inputs only; normalization must emit enabled category aliases.
 5. Item tags are always enabled.
 Legacy persisted `features.itemTags` and `enableTags` values are compatibility inputs only; normalization must emit enabled item-tag aliases.
-6. `categories` and `itemTags` should be normalized to unique, trimmed strings.
+6. `categories`, `componentCategories`, and `itemTags` should be normalized to unique, trimmed strings.
+6a.
+Every crafting system has a reserved effective component category named `general` (`General` in UI copy).
+It is always enabled, cannot be removed, and must not be persisted in `CraftingSystem.componentCategories`.
+6b.
+`CraftingSystem.componentCategories` stores only additional user-defined component categories.
+It is a sibling of, and independent from, `CraftingSystem.categories` (recipe categories): the two vocabularies must not be merged, aliased, or cross-populated.
+A component category is never offered as a recipe category and vice versa.
 7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, or `"alchemy"`.
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
@@ -678,6 +686,7 @@ Represent one curated item entry available to recipes and salvage operations.
     img: string,
     description?: string,
     originItemUuid: string | null,
+    category: string, // default "general"; single-valued grouping axis drawn from CraftingSystem.componentCategories
     tags: string[],
   essences: { [essenceId: string]: number },
   difficulty?: number, // only used in progressive mode
@@ -720,6 +729,17 @@ When the salvage check defines no outcome tiers, routing is impossible and the c
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
+13. `Component.category` defaults to `general`.
+Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
+A custom token is free text surfaced verbatim; only `general` is localized.
+14. `Component.salvage.enabled` is GM-authorable and defaults to `false`.
+It gates salvage at runtime.
+A component whose salvage config is invalidated by a system resolution-mode change is auto-disabled and must be re-enablable from the GM component editor.
+No migration seeds this field; an existing component with authored salvage results but no explicit `enabled` value reads as disabled.
+15. Requirement 5 is enforced by normalization, in both directions.
+Component normalization must clamp `salvage.enabled` to `false` whenever the normalized `salvage.resultGroups` is empty.
+The clamp applies to every writer that passes through normalization — GM edits, import, copy-mode, and migration — and only ever turns `enabled` off, never on.
+Enforcement must not rest on a UI control's disabled state: a GM surface that merely refuses to *enable* a zero-group component does not prevent a component from *becoming* zero-group while enabled.
 
 ## Recipe
 

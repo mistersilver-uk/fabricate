@@ -24,6 +24,7 @@
   import ToggleCard from '../ToggleCard.svelte';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
+  import SegmentedControl from '../SegmentedControl.svelte';
 
   let {
     recipe = null,
@@ -58,6 +59,15 @@
     // unfinished.
     locked = false,
     onToggleLocked = () => {},
+    // Step mode, rehomed here from the deleted context rail (issue 676). Overview is
+    // where it belongs: the steps THEMSELVES are authored on this tab (RecipeStepsCard),
+    // and this control decides whether that card exists at all. `multiStepEnabled` is
+    // the SYSTEM feature (`features.multiStepRecipes`); the control also renders for a
+    // recipe that is ALREADY multi-step under a system whose feature was since turned
+    // off, which is the only way back to single-step.
+    multiStepEnabled = false,
+    onEnterMultiStep = () => {},
+    onRevertToSingleStep = () => {},
     onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
@@ -68,6 +78,30 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  const STEP_MODE_OPTIONS = [
+    {
+      value: 'single',
+      icon: 'fas fa-square',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.SingleStep',
+      fallback: 'Single step'
+    },
+    {
+      value: 'multi',
+      icon: 'fas fa-list-ol',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.MultiStep',
+      fallback: 'Multi-step'
+    }
+  ];
+
+  // Reverting to single-step DISCARDS the per-step authoring, so the handler confirms
+  // before staging it — never call these unless the mode actually changes.
+  function selectStepMode(next) {
+    const multi = next === 'multi';
+    if (multi === isMultiStep) return;
+    if (multi) onEnterMultiStep();
+    else onRevertToSingleStep();
   }
 
   // Resolve the generic item-bag (an unset recipe icon) to the alchemical blueprint
@@ -218,6 +252,29 @@
       onToggle={onToggleLocked}
     />
   </div>
+
+  {#if multiStepEnabled || isMultiStep}
+    <!-- Step mode (issue 676): rehomed from the deleted context rail, which was the ONLY
+         surface carrying it — `onEnterMultiStep`/`onRevertToSingleStep` had no other
+         consumer in `src/`, so deleting the rail without this would have made multi-step
+         recipes unreachable for every system with the feature on. It sits directly above
+         the surface it governs: the card below is either the steps list or the recipe's
+         single Duration. -->
+    <section class="manager-recipe-step-mode-card" data-recipe-section="recipe-step-mode">
+      <div>
+        <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.StepModeHint', 'A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.')}</p>
+      </div>
+      <SegmentedControl
+        options={STEP_MODE_OPTIONS}
+        value={isMultiStep ? 'multi' : 'single'}
+        groupName="manager-recipe-step-mode"
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
+        optionDataAttr="data-recipe-step-mode-option"
+        onChange={selectStepMode}
+      />
+    </section>
+  {/if}
 
   {#if isMultiStep}
     <RecipeStepsCard

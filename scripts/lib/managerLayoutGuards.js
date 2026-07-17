@@ -110,10 +110,23 @@ export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
   'manager-recipe-edit-results-progressive': ['.manager-recipe-edit-main'],
   'manager-recipe-edit-results-alchemy': ['.manager-recipe-edit-main'],
 
-  // Components browser (harness clicks a `.manager-component-row`).
-  'components normal': ['.manager-component-row'],
-  'components stacked': ['.manager-component-row'],
-  'component edit normal': ['.manager-component-edit-view'],
+  // Components browser (harness clicks a `.manager-component-row`). The Component
+  // Studio rebuild (issue 676) made this a LIST of rows rather than a `role="table"`
+  // grid; `.manager-component-row` and `.manager-component-identity` survive that on
+  // purpose, and `.manager-components-list` pins the list container that replaced the
+  // table. The row moved into `components/ComponentRow.svelte`, so these selectors are
+  // what catch it being renamed out from under the harness.
+  'components normal': [
+    '.manager-components-list',
+    '.manager-component-row',
+    '.manager-component-identity',
+  ],
+  'components stacked': ['.manager-components-list', '.manager-component-row'],
+  // The component editor is a single scrolling column with NO right rail (decision 4).
+  // `.manager-component-edit-view` is the form the header's Save submits BY ID, and
+  // the identity strip is where the rehomed source actions live — losing either is a
+  // silent break the unit suite cannot see.
+  'component edit normal': ['.manager-component-edit-view', '.manager-component-identity-strip'],
 
   // Essences browser + editor.
   'essences normal': ['.manager-essence-row'],

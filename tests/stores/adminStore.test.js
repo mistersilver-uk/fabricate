@@ -532,6 +532,64 @@ describe('createAdminStore', () => {
       assert.equal(vs.hasSystem, true);
       assert.equal(vs.selectedSystem?.id, 'sys1');
     });
+
+    // A search term names a vocabulary that belongs to ONE system: "iron" is a real
+    // component in the system the GM typed it into and means nothing in the next one.
+    // Carrying it across a system change silently filters the new system's browser
+    // down to (usually) nothing, and the GM sees an empty library, not a filter.
+    //
+    // The clear lives HERE and not in the views because every consumer reads the same
+    // store: `itemSearch` reaches the component browser via
+    // `getItems(systemId, search)` → `itemCards`, and `recipeSearch`/`graphSearch`
+    // reach the recipe browser and the graph the same way. Clearing at the selection
+    // covers all of them at once and survives a system change triggered from anywhere.
+    it('selectSystem clears every system-scoped search filter', async () => {
+      const services = createMockServices();
+      services._getSystemsMutable().push(makeSystem({ id: 'sys2', name: 'System Two' }));
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      await store.setItemSearch('iron');
+      await store.setRecipeSearch('potion');
+      await store.setGraphSearch('ingot');
+
+      await store.selectSystem('sys2');
+
+      const vs = get(store.viewState);
+      assert.equal(vs.itemSearchTerm, '', 'the component search must not follow the GM');
+      assert.equal(vs.recipeSearchTerm, '', 'the recipe search must not follow the GM');
+      assert.equal(vs.graphSearchTerm, '', 'the graph search must not follow the GM');
+    });
+
+    it('createSystem clears every system-scoped search filter', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      await store.setItemSearch('iron');
+      await store.setRecipeSearch('potion');
+      await store.setGraphSearch('ingot');
+
+      await store.createSystem();
+
+      const vs = get(store.viewState);
+      assert.equal(vs.itemSearchTerm, '', 'a brand-new system starts unfiltered');
+      assert.equal(vs.recipeSearchTerm, '', 'a brand-new system starts unfiltered');
+      assert.equal(vs.graphSearchTerm, '', 'a brand-new system starts unfiltered');
+    });
+
+    // Re-selecting the SAME system is a refresh, not a change of vocabulary — the
+    // search the GM is actively typing must survive it.
+    it('re-selecting the current system keeps the search filters', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.setItemSearch('iron');
+
+      await store.selectSystem('sys1');
+
+      assert.equal(get(store.viewState).itemSearchTerm, 'iron');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -941,6 +999,75 @@ describe('createAdminStore', () => {
       assert.ok(savedCategories !== null);
       assert.ok(!savedCategories.includes('Potions'));
       assert.ok(savedCategories.includes('Weapons'));
+    });
+
+    // ── The COMPONENT category vocabulary (issue 676) ──────────────────────────
+    // A sibling of the recipe handlers above, mirroring their coverage. The write path
+    // had none, and the root calls these optional-chained (`store.addComponentCategory?.()`)
+    // — so deleting the store export no-ops silently and ships green.
+
+    function trackComponentCategoryWrites(seed = null) {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      if (seed) {
+        const sys = origManager.getSystem('sys1');
+        if (sys) sys.componentCategories = seed;
+      }
+      const saved = { componentCategories: null, categories: null, updateCalled: false };
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          saved.updateCalled = true;
+          if (updates.componentCategories) saved.componentCategories = updates.componentCategories;
+          if (updates.categories) saved.categories = updates.categories;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      return { services, saved };
+    }
+
+    it('addComponentCategory appends to componentCategories and deduplicates', async () => {
+      const { services, saved } = trackComponentCategoryWrites();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addComponentCategory('Reagent');
+      await store.addComponentCategory('Reagent'); // duplicate
+      assert.ok(saved.componentCategories !== null, 'the write reaches updateSystem');
+      assert.equal(saved.componentCategories.filter((c) => c === 'Reagent').length, 1);
+      // Written TOP-LEVEL and alone — never folded into the recipe vocabulary.
+      assert.equal(saved.categories, null, 'the recipe categories are never touched');
+    });
+
+    it('removeComponentCategory filters out the category', async () => {
+      const { services, saved } = trackComponentCategoryWrites(['Reagent', 'Metal']);
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.removeComponentCategory('Reagent');
+      assert.ok(saved.componentCategories !== null);
+      assert.ok(!saved.componentCategories.includes('Reagent'));
+      assert.ok(saved.componentCategories.includes('Metal'));
+    });
+
+    it('addComponentCategory does nothing with an empty string', async () => {
+      const { services, saved } = trackComponentCategoryWrites();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addComponentCategory('');
+      await store.addComponentCategory('   ');
+      assert.ok(!saved.updateCalled, 'updateSystem should not be called for a blank category');
+    });
+
+    it('the reserved general bucket can be neither added nor removed', async () => {
+      // `general` is implied, never persisted in the array. The guard is what stops a
+      // GM authoring a duplicate "General" entry, or deleting the catch-all.
+      const { services, saved } = trackComponentCategoryWrites(['Reagent']);
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      for (const reserved of ['general', 'General', ' GENERAL ']) {
+        await store.addComponentCategory(reserved);
+        await store.removeComponentCategory(reserved);
+      }
+      assert.ok(!saved.updateCalled, 'the reserved bucket never reaches updateSystem');
     });
 
     it('addCategory does nothing with empty string', async () => {
@@ -5967,6 +6094,39 @@ describe('createAdminStore', () => {
       assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
     });
 
+    it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {
+      // AC6 clause 3. This hand-built projection is an ALLOWLIST, and its failure mode
+      // is silent: without the line, the Tags & Categories screen's component-categories
+      // section is permanently EMPTY however correctly the normalizer and the write path
+      // behave. A NON-EMPTY fixture is the point — an `|| []` fallback or a stubbed-out
+      // line reads green against an empty one.
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.categories = ['Potions'];
+        sys.componentCategories = ['Reagent', 'Metal'];
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+
+      assert.deepEqual(vs.selectedSystem.componentCategories, ['Reagent', 'Metal']);
+      // The two vocabularies are SIBLINGS and must never cross-populate: reuse would
+      // have leaked component categories into the Recipe Studio's filter and vice versa.
+      assert.deepEqual(vs.selectedSystem.categories, ['Potions']);
+      assert.ok(!vs.selectedSystem.categories.includes('Reagent'));
+      assert.ok(!vs.selectedSystem.componentCategories.includes('Potions'));
+    });
+
+    it('viewState.selectedSystem.componentCategories defaults to an empty array', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      assert.deepEqual(get(store.viewState).selectedSystem.componentCategories, []);
+    });
+
     it('viewState.selectedSystem exposes managed item images and resolved essence source item metadata', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -6012,14 +6172,25 @@ describe('createAdminStore', () => {
       const vs = get(store.viewState);
       const [linkedEssence, unlinkedEssence] = vs.selectedSystem.essenceDefinitions;
 
+      // `category` (issue 676) is projected here unconditionally — this is the
+      // PER-COMPONENT field projection, distinct from the system-level
+      // `componentCategories` vocabulary projection. deepEqual (not deepInclude) is
+      // the point: it fails if the field is ever dropped from the allowlist.
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
         {
           id: 'comp-1',
           name: 'Blazing Herb',
           img: 'blazing-herb.png',
           description: 'Bright ember leaf.',
+          category: 'general',
         },
-        { id: 'comp-2', name: 'Moon Salt', img: 'icons/svg/item-bag.svg', description: '' },
+        {
+          id: 'comp-2',
+          name: 'Moon Salt',
+          img: 'icons/svg/item-bag.svg',
+          description: '',
+          category: 'general',
+        },
       ]);
       assert.deepEqual(linkedEssence.associatedItem, {
         id: 'comp-1',
@@ -6061,11 +6232,13 @@ describe('createAdminStore', () => {
         { id: 'comp-3', tags: [], essences: {} },
       ]);
 
-      // The managedItemOptions contract shape is unchanged (no tags leak in).
+      // The managedItemOptions contract shape is unchanged (no tags leak in). It does
+      // carry the per-component `category` (issue 676) — tags and category are
+      // different axes and neither substitutes for the other.
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
-        { id: 'comp-1', name: 'Iron Ore', img: 'item.png', description: '' },
-        { id: 'comp-2', name: 'Herb', img: 'item.png', description: '' },
-        { id: 'comp-3', name: 'Untagged', img: 'item.png', description: '' },
+        { id: 'comp-1', name: 'Iron Ore', img: 'item.png', description: '', category: 'general' },
+        { id: 'comp-2', name: 'Herb', img: 'item.png', description: '', category: 'general' },
+        { id: 'comp-3', name: 'Untagged', img: 'item.png', description: '', category: 'general' },
       ]);
     });
 

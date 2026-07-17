@@ -253,6 +253,7 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 #### Feature Controls
 
 - Category list editor for custom categories only; reserved `General` is always present and not removable
+- The Tags & Categories screen manages recipe categories and component categories as two separate sections, reflecting the two independent vocabularies.
 - Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
@@ -437,12 +438,12 @@ Folder
 - Remove managed items.
 - Edit managed item tags (if enabled).
 - Edit managed item essences (if enabled).
-- Edit managed item difficulty: the component editor's right-hand inspector exposes an editable
-  progressive-difficulty input.
+- Edit managed item difficulty: the component editor's body exposes an editable
+  progressive-difficulty stepper, titled "This component's Progressive DC".
 It is shown only when the system's crafting resolution mode is `progressive` (parity with the
-  read-only components-browser column).
-It accepts an integer of 1 or greater, or blank to clear the value.
-The input is staged into the component editor's draft and persisted with the rest of the edit on Save (not written on change), contributing to the editor's dirty state and unsaved-changes guard.
+  read-only badge on the components-browser row).
+It accepts an integer of 1 or greater; zero clears the value.
+The stepper is staged into the component editor's draft and persisted with the rest of the edit on Save (not written on change), contributing to the editor's dirty state and unsaved-changes guard.
 - Replace associated source item by drag/drop.
 
 Component import warnings:
@@ -536,6 +537,13 @@ The **count** is quiet right-aligned metadata — not a chip — and reports the
 Category group headers are `aria-expanded` / `aria-controls` buttons and default to **expanded**, the status and lock filters default to **all**, and the pager's default page size exceeds a typical system's recipe count.
 These defaults are load-bearing: a default that hid rows would leave the GM staring at an empty library.
 A group header is a tight left cluster — chevron, folder, name, count — not a full-width bar with the count flung to the far edge, which reads as a table header.
+
+Both GM libraries group the **page**, not the filtered list, so a group header reports **two** numbers whenever they differ: what the group renders, and the category's total across the **filtered** rows (`25 of 282 recipes`).
+Either number alone is a false statement — a count of the page says a 282-strong category holds 25, and a count of the filtered list puts `12 recipes` above the three rows page 2 renders.
+A group shown **whole** reports one number (`25 recipes`), never `25 of 25`.
+The total counts the filtered rows, so an active search / status / lock / category / essence filter is always respected; a total over the raw roster would be a third wrong number.
+Both singulars are localized — `1 recipe` and `1 of 282 recipes`, never `1 recipes`.
+The Component Studio's library follows the identical rule.
 
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).
@@ -931,6 +939,30 @@ If multistep is disabled:
 
 - Show implicit single-step editors at the recipe level
 
+## Component Studio
+
+The GM component surfaces: the component browser and the component editor.
+
+### Requirements
+
+1. The GM component browser groups and filters by `Component.category`.
+Tags are edited only in the component editor and must not be rendered as row chips; rows show a single-line description, mirroring the Recipe Studio.
+2. The GM component editor is a single scrolling column with no right rail.
+Back sits beside Save in the header.
+Source actions (replace by drop, unlink, open item sheet, copy UUID) are reachable from the identity strip; the component's progressive difficulty is authored in the body.
+3. Source actions commit immediately and are never staged into the editor draft.
+Replacing or unlinking a component's source item restamps durable component identity and saves; carrying source fields through the draft's update path would skip that restamping.
+4. The component salvage panel derives its presentation from `salvageResolutionMode` plus salvage-check enablement, gated by `features.salvage` and `component.salvage.enabled`.
+The persisted `routed` token is displayed as "Routed by check".
+5. The result-group editor remains reachable when salvage is disabled.
+Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
+The per-component enable control is disabled, with a visible explanation, until at least one result group exists; since the add-group control lives in the result-group editor, collapsing that editor would make enabling unreachable.
+The disabled-state copy distinguishes "no result groups authored yet" from "authored but disabled".
+6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
+A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
+A "Manage presets" link routes to the system's Checks screen.
+7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
+
 ## Step Editor
 
 Per step controls:
@@ -1017,6 +1049,12 @@ The strip's copy is NOT folded into the card's sub-line, because the strip state
 - The progressive **salvage** result list shows **ordinals** and a **read-only difficulty badge** per row.
 These are required alongside the salvage toggle card and not severable from it: progressive salvage spends the roll down the list, so without them the card would govern an order the GM cannot see, and a card reading "players may reorder the stages" above a list of bare selects asserts a model the surface contradicts.
 The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
+- A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
+The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
+- A salvage result row picks its component through a **searchable popover whose trigger carries the component's image and its name**, not a native `<select>`.
+The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
+The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
+The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
 
 ## Crafting App (Player)
 

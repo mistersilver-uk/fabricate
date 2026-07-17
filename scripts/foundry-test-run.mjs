@@ -924,6 +924,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-environment-row',
       '.manager-environment-identity',
       '.manager-environment-editor-shell',
+      '.manager-components-list',
       '.manager-component-row',
       '.manager-component-identity',
       '.manager-essence-row',
@@ -938,6 +939,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-essence-edit-view',
       '.manager-recipe-edit-main',
       '.manager-component-edit-view',
+      '.manager-component-identity-strip',
       '.environment-draft-editor',
       '.manager-environment-edit-view',
       '.manager-gathering-task-edit-view',
@@ -3214,16 +3216,34 @@ async function main() {
         // Use 'loot' for all items — safest common type across D&D 5e versions
         const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
 
-        // Create world-level items (all as loot — type doesn't matter for crafting)
+        // Create world-level items (all as loot — type doesn't matter for crafting).
+        //
+        // Each carries a DESCRIPTION (issue 676). These items had none, so every frame
+        // of the component editor photographed its identity strip rendering "—" — the
+        // correct output for a description-less item, and therefore a frame that proved
+        // nothing about the surface whose whole premise is "name, image & description
+        // follow the linked item". The strip reads the LIVE document, so this is also
+        // what exercises that resolution rather than the registration-time snapshot.
+        // `system.description.value` is the dnd5e shape and is HTML, which is exactly
+        // what the plain-text extraction has to cope with.
+        const describe = (html) => ({ description: { value: `<p>${html}</p>` } });
         const itemData = [
-          { name: 'Iron Ore', type: itemType, img: 'icons/commodities/metal/ingot-worn-iron.webp' },
-          { name: 'Mystic Herb', type: itemType, img: 'icons/consumables/plants/leaf-herb-green.webp' },
-          { name: 'Dragon Scale', type: itemType, img: 'icons/commodities/leather/scales-blue-white.webp' },
-          { name: 'Empty Vial', type: itemType, img: 'icons/consumables/potions/vial-cork-empty.webp' },
-          { name: 'Iron Sword', type: itemType, img: 'icons/weapons/swords/sword-guard-brass-worn.webp' },
-          { name: 'Herbalist Sickle', type: itemType, img: 'icons/tools/hand/sickle-worn-steel-grey.webp' },
-          { name: 'Healing Potion', type: itemType, img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
-          { name: 'Dragon Scale Armor', type: itemType, img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp' }
+          { name: 'Iron Ore', type: itemType, img: 'icons/commodities/metal/ingot-worn-iron.webp',
+            system: describe('Unrefined metal, dug from a hillside and still carrying the grit of the seam it came from. Smelt it before you trust it to hold an edge.') },
+          { name: 'Mystic Herb', type: itemType, img: 'icons/consumables/plants/leaf-herb-green.webp',
+            system: describe('A pungent leaf that keeps its colour long after cutting.') },
+          { name: 'Dragon Scale', type: itemType, img: 'icons/commodities/leather/scales-blue-white.webp',
+            system: describe('Shed plate, still faintly warm to the touch.') },
+          { name: 'Empty Vial', type: itemType, img: 'icons/consumables/potions/vial-cork-empty.webp',
+            system: describe('Cheap, corked glass. Holds a single dose.') },
+          { name: 'Iron Sword', type: itemType, img: 'icons/weapons/swords/sword-guard-brass-worn.webp',
+            system: describe('A serviceable blade with a worn brass guard.') },
+          { name: 'Herbalist Sickle', type: itemType, img: 'icons/tools/hand/sickle-worn-steel-grey.webp',
+            system: describe('A short curved blade for taking cuttings without crushing them.') },
+          { name: 'Healing Potion', type: itemType, img: 'icons/consumables/potions/potion-tube-corked-red.webp',
+            system: describe('Tastes of iron and cloves.') },
+          { name: 'Dragon Scale Armor', type: itemType, img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp',
+            system: describe('Overlapping plate, light for its bulk.') }
         ];
 
         const items = await Item.createDocuments(itemData);
@@ -3639,6 +3659,20 @@ async function main() {
               { id: 'intact', name: 'Intact Parts', results: [{ id: 'intact-result', componentId: componentMap['Iron Sword'], quantity: 1 }] }
             ],
             outcomeRouting: { 'Clean Salvage': 'intact', 'Partial Salvage': 'scrap' }
+          }
+        });
+
+        // Iron Sword gets authored salvage results with `enabled` ABSENT (issue 676).
+        // This is the state decision 6 guarantees EVERY existing world will show — the
+        // per-component gate defaults false and no migration seeds it — so without this
+        // fixture no frame captures the collapsed/OFF salvage body at all: the rest of
+        // the fixture authors `enabled: true` throughout.
+        await csm.updateItem(systemId, componentMap['Iron Sword'], {
+          salvage: {
+            ingredientQuantity: 1,
+            resultGroups: [
+              { id: 'sword-scrap', name: 'Sword Scrap', results: [{ id: 'sword-scrap-result', componentId: componentMap['Iron Ore'], quantity: 2 }] }
+            ]
           }
         });
 
@@ -4881,14 +4915,34 @@ async function main() {
           process.stderr.write(`Crafting group surface capture failed: ${err.message}\n`);
         }
 
-        // Recipes → open the editor so the identity card (central column) and the
-        // knowledge-gated recipe-item inspector (right context panel) are captured (#387).
+        // Recipes → open the editor so the Overview tab's identity card is captured
+        // (#387). Issue 676 deleted the right context rail: recipe-edit is a TWO-column
+        // route now, and the knowledge-gated recipe-item list moved to its own Books &
+        // Scrolls tab (captured in its own step below). This step therefore waits only
+        // on the always-present Overview identity card — waiting on the recipe-item
+        // section here would hang, and this wait is UNGUARDED, so it would abort the
+        // rest of Phase D0 rather than record one failed step.
         await openManagerRecipeEditor(page, 'Brew Healing Potion');
         await page.locator('.fabricate-manager [data-recipe-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager [data-recipe-section="recipe-item"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'recipe edit normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-normal');
+
+        // Books & Scrolls tab: the knowledge-gated list of books teaching this recipe,
+        // plus its per-row unlink — the ONLY surface carrying either. Guarded so a
+        // hiccup records a failed step instead of aborting Phase D0.
+        try {
+          await page.locator('.fabricate-manager [data-recipe-tab-button="books-scrolls"]').first().click();
+          await page.locator('.fabricate-manager [data-recipe-tab="books-scrolls"] [data-recipe-section="recipe-item"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await assertManagerLayoutStable(page, 'recipe edit books & scrolls');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-recipe-edit-books-scrolls');
+          results.steps.push({ step: 'recipe-edit-books-scrolls', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipe-edit-books-scrolls', passed: false, error: err.message });
+          process.stderr.write(`Recipe books & scrolls capture failed: ${err.message}\n`);
+        }
 
         // Recipe Tools tab → this recipe references a deliberately-unlabelled tool,
         // so the row must show the backing component's name (the fallback fix),
@@ -5016,18 +5070,22 @@ async function main() {
           }
         }
 
-        // Warded Rite (restricted system) → the recipe editor's context rail renders
-        // its ACCESS branch: players with access, characters with access, and each
-        // character's "played by" subline. This is the ONLY capture of the restricted
-        // branch — every other recipe capture runs against Arcane Forge, whose
-        // visibility mode drives the Books & Scrolls branch instead. Guarded so a
+        // Warded Rite (restricted system) → the recipe editor's ACCESS tab: players with
+        // access, characters with access, and each character's "played by" subline. This
+        // is the ONLY capture of the restricted branch — every other recipe capture runs
+        // against Arcane Forge, whose visibility mode drives the Books & Scrolls branch
+        // instead. Issue 676 moved this out of the deleted context rail into a real tab,
+        // so the tab must be CLICKED first; the tab button only exists under the
+        // restricted mode, which is itself part of what this asserts. Guarded so a
         // hiccup records a failed step instead of aborting the rest of Phase D0, and
         // the system selection is restored either way.
         try {
           await returnToSystemLibrary(page);
           await selectSmokeSystemInManager(page, craftingSetup.restrictedSystemId);
           await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);
-          await page.locator('.fabricate-manager [data-recipe-section="access"]').first()
+          await page.locator('.fabricate-manager [data-recipe-tab-button="access"]').first()
+            .click({ timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-recipe-tab="access"] [data-recipe-section="access"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await page.locator('.fabricate-manager [data-recipe-access-characters]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
@@ -5061,7 +5119,7 @@ async function main() {
 
         // Components → open the editor so the identity card (central column) and the
         // linked-source inspector (right context panel) are captured (#398).
-        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-edit)').first().click();
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-pen)').first().click();
         await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-component-edit-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-component-edit-section="source"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5085,6 +5143,30 @@ async function main() {
         process.stdout.write('  D0: component edit salvage screenshotted\n');
 
         // Return to the components browser for the remaining navigation.
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // The OFF salvage body (issue 676, AC4). Iron Sword has authored result groups
+        // with `enabled` absent — the accurate state decision 6 guarantees every
+        // existing world will show, and the one no other frame captures. Ruling A is
+        // what this photographs: the mode/DC/routing/reorder chrome is collapsed, but
+        // the result-group editor (and its add-group control, the only one in the
+        // codebase) is still there.
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Sword") button:has(i.fa-pen)')
+          .first().click();
+        await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        const offSalvageSection = page
+          .locator('.fabricate-manager [data-component-edit-section="salvage"]')
+          .first();
+        await offSalvageSection.waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-salvage-disabled-notice]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await offSalvageSection.scrollIntoViewIfNeeded();
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-component-edit-salvage-off');
+        process.stdout.write('  D0: component edit salvage (off) screenshotted\n');
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
@@ -5465,15 +5547,22 @@ async function main() {
           await screenshot(page, 'manager-system-edit-blocked');
 
           // (c) Progressive difficulty UI — this system is in progressive crafting
-          // mode, so its components browser shows the difficulty column (a value
-          // for component 0, "None" for component 1) and the component editor's
-          // right inspector exposes the staged Progressive difficulty card.
+          // mode, so its components browser badges each row's difficulty (a value for
+          // component 0, "None" for component 1) and the component editor's body
+          // exposes the staged Progressive difficulty control.
+          //
+          // Issue 676: difficulty was its own table COLUMN
+          // (`.manager-component-difficulty-cell`) until the browser was rebuilt as a
+          // LIST; it is now a row badge. The editor's difficulty control moved out of
+          // the deleted right-rail inspector into the single scrolling column but KEEPS
+          // its `data-component-edit-section="difficulty"` hook — this hard-wait is
+          // precisely why that hook was preserved rather than renamed.
           // Guarded independently so a hiccup here does not fail the overview step.
           try {
             const blockedNames = craftingSetup.blockedComponentNames || [];
             await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
             await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-            await page.locator('.fabricate-manager .manager-component-difficulty-cell').first()
+            await page.locator('.fabricate-manager [data-component-difficulty]').first()
               .waitFor({ state: 'visible', timeout: 5_000 });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'manager-components-progressive');
@@ -5482,7 +5571,7 @@ async function main() {
             // the Unsaved chip, and the editor Save flow are captured together. Save
             // afterwards so the dirty draft does not trip the discard guard on exit.
             if (blockedNames[1]) {
-              await page.locator(`.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) button:has(i.fa-edit)`)
+              await page.locator(`.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) button:has(i.fa-pen)`)
                 .first().click();
               await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
                 .waitFor({ state: 'visible', timeout: 5_000 });
