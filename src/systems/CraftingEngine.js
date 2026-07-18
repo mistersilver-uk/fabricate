@@ -620,6 +620,7 @@ export class CraftingEngine {
           tools: usedToolPairs,
           createdResults: [],
           failureReason: checkResult.message || 'Crafting check failed',
+          rollValue: checkResult?.value ?? null,
         });
         return {
           success: false,
@@ -692,6 +693,7 @@ export class CraftingEngine {
           tools: usedToolPairsOnValidationFail,
           createdResults: [],
           failureReason: message,
+          rollValue: checkResult?.value ?? null,
         });
         return {
           success: false,
@@ -743,6 +745,7 @@ export class CraftingEngine {
             tools: [],
             createdResults: [],
             failureReason: message,
+            rollValue: checkResult?.value ?? null,
           });
           return {
             success: false,
@@ -853,6 +856,7 @@ export class CraftingEngine {
         consumedIngredients: consumedItems,
         tools: toolValidation.tools,
         createdResults: resultItems,
+        rollValue: checkResult?.value ?? null,
       });
 
       return {
@@ -1193,6 +1197,7 @@ export class CraftingEngine {
         tools: usedToolPairs,
         createdResults: [],
         failureReason: message,
+        rollValue: checkResult?.value ?? null,
       });
       return { resolved: true, result: { success: false, results: null, message } };
     };
@@ -1291,6 +1296,7 @@ export class CraftingEngine {
         tools: toolItems,
         createdResults: [],
         failureReason: message,
+        rollValue: checkResult?.value ?? null,
       });
       return {
         resolved: true,
@@ -1344,6 +1350,7 @@ export class CraftingEngine {
       consumedIngredients: consumedItems,
       tools: toolItems,
       createdResults: resultItems,
+      rollValue: checkResult?.value ?? null,
     });
 
     const stepLabel = step.name || `step ${stepIndex + 1}`;
@@ -1468,6 +1475,7 @@ export class CraftingEngine {
       tools: appliedTools,
       createdResults: resultItems,
       failureReason: checkResult.message || 'Crafting check failed',
+      rollValue: checkResult?.value ?? null,
     });
 
     return {
@@ -3264,6 +3272,8 @@ export class CraftingEngine {
    * @param {Array}   params.tools               - Array of { tool, item } entries.
    * @param {Array}   params.createdResults      - Array of created Item documents (success only).
    * @param {string}  [params.failureReason]     - Human-readable failure reason (failure only).
+   * @param {number|null} [params.rollValue]      - The crafting check total (`checkResult.value`),
+   *   or null when no check ran; the card renders it only when finite.
    * @private
    */
   async _postCraftChatMessage({
@@ -3274,6 +3284,7 @@ export class CraftingEngine {
     tools,
     createdResults,
     failureReason,
+    rollValue = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
@@ -3301,6 +3312,7 @@ export class CraftingEngine {
           quantity: Number(quantity || 1),
         })),
         tools: toolEntries,
+        rollValue: Number.isFinite(rollValue) ? rollValue : null,
         failureReason: failureReason || '',
       },
       localize
@@ -3398,6 +3410,8 @@ export class CraftingEngine {
    * @param {Array}   [params.results]     - Created result Item documents (success only).
    * @param {Array}   [params.usedTools]   - `_applyToolBreakage` evidence records.
    * @param {string}  [params.failureReason] - Human-readable reason (failure only).
+   * @param {number|null} [params.rollValue]  - The salvage check total (`checkResult.value`),
+   *   or null when no check ran; the card renders it only when finite.
    * @private
    */
   async _postSalvageChatMessage({
@@ -3409,6 +3423,7 @@ export class CraftingEngine {
     results,
     usedTools,
     failureReason,
+    rollValue = null,
   }) {
     if (!system || system.features?.chatOutput !== true) return;
 
@@ -3436,6 +3451,7 @@ export class CraftingEngine {
         })),
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
+        rollValue: Number.isFinite(rollValue) ? rollValue : null,
         failureReason: failureReason || '',
       },
       localize
@@ -3970,6 +3986,7 @@ export class CraftingEngine {
         results: [],
         usedTools,
         failureReason: checkResult.message || 'Salvage check failed',
+        rollValue: checkResult?.value ?? null,
       });
 
       return {
@@ -4071,6 +4088,7 @@ export class CraftingEngine {
       results: resultItems,
       usedTools,
       failureReason: '',
+      rollValue: checkResult?.value ?? null,
     });
 
     return {

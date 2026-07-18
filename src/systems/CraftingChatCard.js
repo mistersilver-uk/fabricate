@@ -32,6 +32,7 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   results: 'FABRICATE.Chat.Results',
   consumed: 'FABRICATE.Chat.Consumed',
   tools: 'FABRICATE.Chat.Tools',
+  roll: 'FABRICATE.Chat.Roll',
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
 });
@@ -56,6 +57,23 @@ function renderItem({ name, img, quantity }) {
     `<img class="fabricate-craft-chat__icon" src="${esc(img || ITEM_FALLBACK_IMG)}" alt="" />`,
     `<span class="fabricate-craft-chat__label">${label}</span>`,
     '</li>',
+  ].join('');
+}
+
+/**
+ * Render the rolled check total as a header row, or '' when no check ran (a
+ * non-finite value). A guaranteed no-check craft/salvage rolls nothing, so — like
+ * the salvage summary's "with a roll of" phrase — the row is omitted rather than
+ * printing "0"/"null". The number is set apart from its label so it reads as the
+ * roll result, not more subtitle metadata.
+ */
+function renderRollTotal(value, label) {
+  if (!Number.isFinite(value)) return '';
+  return [
+    '<div class="fabricate-craft-chat__roll">',
+    `<span class="fabricate-craft-chat__roll-label">${esc(label)}</span>`,
+    `<span class="fabricate-craft-chat__roll-value">${esc(value)}</span>`,
+    '</div>',
   ].join('');
 }
 
@@ -91,6 +109,8 @@ function renderSection({ heading, entries, modifier }) {
  * @param {Array<{name:string,img:string,quantity:number}>} [model.results]
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed]
  * @param {Array<{name:string,img:string}>}                 [model.tools]
+ * @param {number}  [model.rollValue] - The rolled check total; rendered only when
+ *   finite (a no-check "Guaranteed" craft/salvage omits it).
  * @param {string}  [model.failureReason]
  * @param {object}  keys - The label-key map (e.g. {@link CRAFTING_CHAT_KEYS}).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
@@ -106,6 +126,8 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
   if (model.subjectName) {
     subtitleParts.push(`${esc(loc(keys.subject))}: ${esc(model.subjectName)}`);
   }
+
+  const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
 
   const notice =
     !succeeded && model.failureReason
@@ -145,6 +167,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     `<div class="fabricate-craft-chat__title">${esc(title)}</div>`,
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
+    rollTotal,
     notice,
     ...sections,
     '</div>',
@@ -172,6 +195,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       results: model.results,
       consumed: model.consumed,
       tools: model.tools,
+      rollValue: model.rollValue,
       failureReason: model.failureReason,
     },
     CRAFTING_CHAT_KEYS,

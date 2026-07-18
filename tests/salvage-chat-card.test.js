@@ -95,6 +95,24 @@ test('uses the item-bag fallback image when a recovered entry has no img', () =>
   assert.ok(content.includes('src="icons/svg/item-bag.svg"'), 'fallback image used');
 });
 
+test('renders the roll total row when a finite check value is present', () => {
+  const content = buildSalvageChatContent(successModel({ rollValue: 15 }));
+  assert.ok(content.includes('fabricate-craft-chat__roll'), 'shared roll row element');
+  assert.ok(content.includes('FABRICATE.Chat.Roll'), 'roll label key');
+  assert.ok(content.includes('fabricate-craft-chat__roll-value">15<'), 'roll value rendered');
+});
+
+test('omits the roll row for a guaranteed no-check salvage (null / absent value)', () => {
+  assert.ok(
+    !buildSalvageChatContent(successModel({ rollValue: null })).includes('fabricate-craft-chat__roll'),
+    'no roll row when value is null'
+  );
+  assert.ok(
+    !buildSalvageChatContent(successModel()).includes('fabricate-craft-chat__roll'),
+    'no roll row when the field is absent'
+  );
+});
+
 test('escapes HTML in user-authored names', () => {
   const content = buildSalvageChatContent(
     successModel({ results: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }] })
