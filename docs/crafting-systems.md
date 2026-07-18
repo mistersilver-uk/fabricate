@@ -82,7 +82,7 @@ Most optional features are off by default and must be explicitly enabled by a GM
 | Essences            | Off     | Enable the essences system for abstract ingredient properties                                                                                             |
 | Property macros     | Off     | Allow result items to have their properties set by a macro                                                                                                |
 | Effect transfer     | Off     | Transfer active effects from essence source items to crafted results                                                                                      |
-| Multi-step recipes  | Off     | Allow recipes with multiple sequential steps                                                                                                              |
+| Multi-step recipes  | Off     | Allow recipes with multiple sequential steps. Turning it off keeps any multi-step recipes you have authored but hides them from players until you turn it back on |
 | Gathering           | Off     | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -214,6 +214,7 @@ Issues are grouped by what they affect:
 - **System blockers** are problems that make the whole system unusable.
   They have no deep-link of their own because the Overview is where you resolve them.
 - **Recipes** lists per-recipe problems, such as a recipe with no name or a result set that is not assigned to any check outcome.
+  A multi-step recipe in a system with the Multi-Step Recipes feature turned off is listed here too, warning you that it is hidden from players until you re-enable the feature or revert it to a single step.
 - **Gathering environments**, **Gathering tasks**, and **Gathering events** list problems with your gathering setup.
 - **Component salvage** lists components whose salvage setup is invalid for the current salvage mode.
 
