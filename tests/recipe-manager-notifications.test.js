@@ -176,11 +176,62 @@ describe('RecipeManager notification controls', () => {
       })
     ]);
 
-    assert.deepEqual(result, { imported: 1, skipped: 1, total: 2 });
+    assert.equal(result.imported, 1);
+    assert.equal(result.skipped, 1);
+    assert.equal(result.total, 2);
+    // The counts notification (spec item 4) stays distinct and unchanged.
     assert.deepEqual(
       notifications.filter(entry => entry.level === 'info').map(entry => entry.message),
       ['Imported 1 recipes (1 skipped)']
     );
     assert.equal(manager.getRecipe('new-recipe')?.name, 'New Import');
+
+    // The return value additively carries per-recipe conflict reasons (spec item 3).
+    assert.deepEqual(result.conflicts, [
+      { recipeId: 'existing-recipe', recipeName: 'Existing Import', reason: 'duplicate-id' }
+    ]);
+
+    // One aggregated conflict report (spec item 3) names the skipped recipe + reason,
+    // distinct from the counts notification. Duplicate-id skips are no longer silent.
+    const warnings = notifications.filter(entry => entry.level === 'warn').map(entry => entry.message);
+    assert.equal(warnings.length, 1, 'exactly one aggregated conflict report');
+    assert.match(warnings[0], /could not be imported/);
+    assert.match(warnings[0], /"Existing Import" \(duplicate id\)/);
+  });
+
+  it('importRecipes aggregates invalid-recipe conflicts into the report instead of console.warn', async () => {
+    const manager = makeManager();
+
+    const result = await manager.importRecipes([
+      // An invalid recipe: no ingredient sets / results, so activation validation fails.
+      { id: 'broken-recipe', name: 'Broken', craftingSystemId: 'sys-1', ingredientSets: [], resultGroups: [] }
+    ]);
+
+    assert.equal(result.imported, 0);
+    assert.equal(result.skipped, 1);
+    assert.equal(result.conflicts.length, 1);
+    assert.equal(result.conflicts[0].recipeId, 'broken-recipe');
+    assert.equal(result.conflicts[0].reason, 'invalid');
+    assert.ok(Array.isArray(result.conflicts[0].errors), 'invalid conflict carries the validation errors');
+
+    const warnings = notifications.filter(entry => entry.level === 'warn').map(entry => entry.message);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /"Broken" \(invalid\)/);
+  });
+
+  it('importRecipes emits no conflict report when every recipe imports cleanly', async () => {
+    const manager = makeManager();
+
+    const result = await manager.importRecipes([
+      makeRecipeData({ id: 'clean-recipe', name: 'Clean Import' })
+    ]);
+
+    assert.equal(result.imported, 1);
+    assert.deepEqual(result.conflicts, []);
+    assert.equal(
+      notifications.filter(entry => entry.level === 'warn').length,
+      0,
+      'no aggregated conflict report when there are no conflicts'
+    );
   });
 });

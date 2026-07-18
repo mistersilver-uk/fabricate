@@ -63,7 +63,7 @@ A non-GM import attempt MUST leave no partial system and no rejected writes.
 ### Reference handling
 
 Import MUST classify every cross-reference as internal or external.
-Internal references are resolvable within the payload: environment-to-task and environment-to-event identifier linkages, drop-row `componentId`, tool `componentId`, recipe `recipeItemId`, and essence `sourceComponentId`.
+Internal references are resolvable within the payload: environment-to-task and environment-to-event identifier linkages; drop-row `componentId`; tool `componentId` and `onBreak.replacementComponentId` across both the system tools and the gathering-library tool slice; recipe ingredient-option, result, and catalyst component references including the recursive `alternatives[]` refs and the flat `ingredients`/`results` aliases at both top level and per step; component salvage result references and legacy salvage catalysts; recipe `recipeItemId`; essence `sourceComponentId`; and `recipeItemDefinitions[].recipeIds` recipe-book membership.
 A broken internal reference is a data-integrity warning that MUST be kept verbatim and reported.
 This classification is unchanged by copy-mode component-id and recipe-id regeneration: after the copy transform (see Copy-mode identifier rebinding) no internal component reference and no recipe-book membership reference points at a pre-regeneration id, so a faithful copy import surfaces zero broken component references and zero broken `RECIPE_ITEM` references.
 External references point at world documents that may be absent: component `originItemUuid`, environment `sceneUuid`, realm `sceneMappings[].sceneUuid` and `sceneMappings[].sceneRegionUuid`, drop-row `itemUuid`, and macro UUIDs.
