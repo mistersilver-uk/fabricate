@@ -74,7 +74,7 @@ When switching `recipeVisibility.listMode` or `knowledge.mode`:
 When deleting a `RecipeItemDefinition` from a crafting system:
 
 - Require explicit GM confirmation.
-- Clear `recipeItemId` from every recipe in that system that references the deleted definition.
+- Remove the deleted definition's membership entries (its `recipeIds[]`), per the many-to-many recipe↔book membership model in `data-models/spec.md`; the retired `recipe.recipeItemId` reverse ref no longer participates.
 - Warn in the recipe editor.
 - Learned recipe flags remain stored.
 - Access behaviour changes immediately according to `recipe-visibility/spec.md`.
@@ -141,19 +141,26 @@ For systems in `alchemy` mode:
 ### Migration Registry
 
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
-- Each migration receives a `{ recipes, systems }` data payload and returns the transformed payload.
+- Each migration receives a five-key `{ recipes, systems, gatheringConfig, environments, gatheringParties }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, and `GATHERING_PARTIES` settings) and returns the transformed payload **or a subset of its keys**.
+- A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
+This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
 - Migration metadata SHOULD include a `downgradeTo` (Fabricate module version string) used for GM recovery guidance when migration aborts.
 
 ### Startup Migration Flow
 
-On module initialization:
+**Precondition — primary-GM gate.** The startup migration pass runs only on the client where `game.users.activeGM.id === game.user.id`.
+All other clients — including assistant GMs, who also hold `SETTINGS_MODIFY` — skip the pass entirely, because an `isGM` gate would let the full GM and every assistant GM transform-and-write the world-scoped settings concurrently (last-writer-wins), whereas `activeGM` fires on exactly one client.
+Two consequences follow: non-primary clients never migrate and rely on read-time legacy fallbacks until the primary GM loads, and a world session with no GM connected migrates nothing.
+This precondition is distinct from the primary-GM `autoStampToolSources` ready-body pass described later in this document (that pass is not a `MigrationRunner` entry).
+
+On module initialization (on the primary-GM client):
 
 1. Read `fabricate.migrationVersion` (defaults to `"0.0.0"` if unset).
 2. Filter the migration registry for entries where `migration.version > migrationVersion` using numeric semver comparison.
 3. Sort pending migrations by ascending semver order.
 4. If no pending migrations exist, exit early (no data reads or writes).
-5. Read current `fabricate.recipes` and `fabricate.craftingSystems` settings.
+5. Read all five current settings: `fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, and `fabricate.gatheringParties`.
 6. Snapshot the original data (JSON serialization) as rollback baseline.
 7. Execute each pending migration sequentially, passing the accumulated data payload.
 8. Before each migration, capture a per-migration checkpoint of the last known-good transformed payload.
@@ -164,8 +171,8 @@ On module initialization:
     - Emit GM-facing recovery guidance in console (see "Migration Abort Recovery Guidance").
     - Present a GM decision prompt, defaulting to `Keep existing data`.
 11. If the pass completes successfully, compare final data against the original snapshot.
-12. Persist `fabricate.recipes` only if recipes changed.
-13. Persist `fabricate.craftingSystems` only if systems changed.
+12. Persist each of the five settings only if its serialized value changed against the snapshot (`fabricate.recipes`, `fabricate.craftingSystems`, `fabricate.gatheringConfig`, `fabricate.gatheringEnvironments`, `fabricate.gatheringParties`).
+13. Each of the five write-on-change comparisons is independent, so an unchanged setting is never rewritten.
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
 
@@ -202,7 +209,7 @@ The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, document
 
 ### Write-on-Change Persistence
 
-- Data is persisted only when the JSON-serialized output differs from the pre-migration snapshot.
+- Each of the five migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
 - This avoids unnecessary setting writes that would trigger Foundry change hooks and potential re-renders.
 - On successful migration passes, `migrationVersion` is updated to the highest successfully executed migration version even when data is unchanged.
 - On aborted migration passes, `migrationVersion` is unchanged.
@@ -357,16 +364,24 @@ Seeding would churn stored JSON for zero observable change, so the omission is a
 ### Recipe Item Library Migration (Pre-Release)
 
 The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUuid` values with system-owned recipe item definitions.
+Recipe↔book membership was subsequently **inverted** by the `1.13.0` migration (`src/migration/migrateInvertRecipeItemLink.js`): membership now lives on `RecipeItemDefinition.recipeIds[]` (a recipe may belong to many books), and the recipe-level reverse ref `recipe.recipeItemId` is retired (see `data-models/spec.md` and `recipe-visibility/spec.md`).
+The sections below describe the shipped behaviour, not the retired `recipeItemId`-as-canonical-output model.
 
 1. Group recipes by `craftingSystemId`.
 2. For each distinct legacy `linkedRecipeItemUuid` inside one crafting system:
    - create one generated `RecipeItemDefinition`,
    - set `originItemUuid` to the legacy UUID,
    - derive `name`/`img` from the resolved source item when available, otherwise use deterministic fallback metadata.
-3. Rewrite each recipe to `recipeItemId` referencing the generated definition for that UUID.
-4. If a legacy UUID is unresolved, keep it as stale `originItemUuid` on the generated definition and emit a migration warning rather than dropping the reference.
+3. Record membership by pushing the recipe id onto the generated definition's `recipeIds[]`.
+The `1.13.0` inversion drops the book-only `recipe.recipeItemId` reverse ref unconditionally.
+4. If a legacy UUID is unresolved, the migration derives deterministic fallback metadata for the generated definition and keeps the stale `originItemUuid`; the `1.13.0` inversion does not emit a migration warning for this case.
 5. When multiple recipes in one system share the same legacy UUID, they must reuse the same generated `RecipeItemDefinition`.
-6. Remove `linkedRecipeItemUuid` from canonical migrated recipe output.
+6. `linkedRecipeItemUuid` is dropped **only** when it was itself the alias that resolved to a book; it is **preserved** when it links a standalone alchemy formula item (never unconditionally removed).
+
+The surviving init-time reconciler `_migrateLegacyRecipeItems` (`src/systems/CraftingSystemManager.js`) reconciles legacy recipe-item links on read.
+It matches on the trigger "no valid `recipeItemId` and a non-empty `linkedRecipeItemUuid`", generating or reusing a definition, silently deriving fallback metadata for an unresolved UUID (no migration warning), and — transitionally — still writing the retired reverse ref `recipe.recipeItemId = definition.id`.
+Treat that reverse-ref write as a transitional shim, not canonical output.
+A post-`1.13.0` **preserved alchemy-formula** `linkedRecipeItemUuid` still satisfies the reconciler's trigger; the current, intended behaviour is that the reconciler may re-process such preserved formula links (they are not exempt from the trigger).
 
 ### Catalyst → Tool Migration (`0.6.0`)
 
@@ -458,7 +473,7 @@ The `1.7.0` migration (`src/migration/migrateBreakToolsOnFail.js`) is pure, idem
 - Unit tests for write-on-change: verify no setting writes occur when data is unchanged.
 - Unit tests for pending migration selection: only migrations newer than `migrationVersion` are selected, ordered by ascending semver.
 - Unit tests for pre-release mode migration (`mapped -> routedByIngredients`, `tiered -> routedByCheck`; no per-recipe provider seeded) and the one-time `routed -> routedByIngredients`/`routedByCheck` split (majority-provider system mode, ties → `routedByIngredients`, minority reconciliation).
-- Unit tests for pre-release recipe-item migration (`linkedRecipeItemUuid` -> `recipeItemDefinitions` + `recipeItemId`).
+- Unit tests for pre-release recipe-item migration and the `1.13.0` inversion (`linkedRecipeItemUuid` -> `recipeItemDefinitions`, membership on `RecipeItemDefinition.recipeIds[]`, retired `recipe.recipeItemId`, preserved standalone alchemy-formula links).
 - Unit tests for unmigratable recipe deletion with cascade cleanup and JSON logging output.
 - Unit tests for provider-switch stale-config cleanup.
 - Unit tests for the `1.6.0` legacy-provider removal migration: recipe-level, per-step, and alchemy recipe-level `macroOutcome | rollTableOutcome → check` rewrite; `rollTableUuid` drop; gathering-task `resultSelection` stripping; the surfaced-then-stripped recovery-warning payload; and the chained `1.4.0 → 1.6.0` catch-up path.
