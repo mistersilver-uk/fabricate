@@ -127,6 +127,22 @@ export class ResolutionModeService {
   }
 
   /**
+   * Human-readable label for a component in a salvage validation message: the
+   * author-given name when present, otherwise a name-free phrase — never the
+   * internal component id (issue 611). A salvage component is validated on its
+   * own (not as a positioned member of a collection), so there is no meaningful
+   * 1-based position to fall back to as {@link ResolutionModeService#_entityLabel}
+   * does for steps and ingredient sets.
+   * @param {{name?: string}} component
+   * @returns {string}
+   * @private
+   */
+  _salvageComponentLabel(component) {
+    const name = typeof component?.name === 'string' ? component.name.trim() : '';
+    return name || 'this component';
+  }
+
+  /**
    * Reserved/duplicate routed `ResultGroup.name` validation, applied under
    * `routedByCheck` mode (check routing keys on the group name). Reserved names
    * (fail/miss/hazard families) may not name a result group; names must be unique
@@ -346,7 +362,7 @@ export class ResolutionModeService {
     // values by the manager's salvage token normalizer + the 1.4.0 migration
     // before they reach here, so this path only ever sees canonical modes.
     const mode = system.salvageResolutionMode || 'simple';
-    const componentLabel = component.name || component.id || 'unknown';
+    const componentLabel = this._salvageComponentLabel(component);
 
     if (!['simple', 'routed', 'progressive'].includes(mode)) {
       if (mode === 'alchemy') {
@@ -427,11 +443,13 @@ export class ResolutionModeService {
       if (results.length === 0) {
         errors.push(`Salvage for "${componentLabel}" requires ordered results in progressive mode`);
       }
-      for (const result of results) {
+      // Report the offending result by 1-based POSITION, never its internal id
+      // (issue 611) — results reference a component but carry no author name.
+      for (const [resultIndex, result] of results.entries()) {
         const difficulty = this._getDifficulty(system, result?.componentId || result?.systemItemId);
         if (!Number.isFinite(difficulty) || difficulty < 1) {
           errors.push(
-            `Result "${result?.id || 'unknown'}" references component without valid difficulty for salvage on "${componentLabel}"`
+            `Result ${resultIndex + 1} references component without valid difficulty for salvage on "${componentLabel}"`
           );
         }
       }
