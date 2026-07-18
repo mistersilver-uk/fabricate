@@ -249,6 +249,8 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 #### Feature Toggles
 
 - Gathering: persists `features.gathering` and makes the selected system's gated `Environments` tab reachable when enabled.
+- Salvage (`features.salvage`): GM toggle, default on — an absent key defaults true, a present key must be exactly true; gates the salvage subsystem (Checks tab, resolution-mode card, component editor, validation, runtime, and player salvage panel).
+- Chat output (`features.chatOutput`): GM toggle, default on; hint "Posts a summary chat card after crafting and gathering attempts." — gates the crafting, salvage, and gathering result chat cards.
 
 #### Feature Controls
 
@@ -263,6 +265,8 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 - Currency unit profile editor (`requirements.currency.units[]`)
 - Multi-step recipes toggle (`features.multiStepRecipes`)
 - Gathering toggle (`features.gathering`)
+- Salvage toggle (`features.salvage`, default on)
+- Chat output toggle (`features.chatOutput`, default on)
 
 #### Crafting Check Controls
 
@@ -290,7 +294,7 @@ Outcome forcing applies under BOTH authorities.
 - The per-trigger break-tools pill (and the routed per-tier `outcome.breakTools` column) renders ONLY under `checkDriven` authority (`showBreakTools={checkDriven}`); under `toolSpecific` it is hidden and a check never breaks tools.
 - There is no free-text trigger label, no per-block enable toggle, and no natural-1 auto-seed; an empty trigger list is inert and the GM adds triggers explicitly.
 Condition types are `rollTotal`, `progressiveValue` (progressive editors only), `diceGroup` aggregate, and `outcomeTier` (routed editors only); dice groups are labelled from the formula, with duplicate `NdS` groups disambiguated (`#1` / `#2`).
-- This authority gate applies per subsystem: crafting and salvage (salvage is always on) honour the system authority; gathering exposes the per-trigger break-tools control only when `features.gathering === true`, otherwise it stays `toolSpecific`.
+- This authority gate applies per subsystem: crafting honours the system authority; salvage is gated on `features.salvage` identically to gathering — its checks tab hides when the feature is off and `salvageBreakageAuthority` falls back to `toolSpecific` (consistent with the gate acknowledged at lines 163 and 960); gathering exposes the per-trigger break-tools control only when `features.gathering === true`, otherwise it stays `toolSpecific`.
 
 #### Requirements Controls
 
@@ -1111,8 +1115,11 @@ Each
 ### Craft Execution
 
 - The Crafting tab crafts through the existing `game.fabricate.craft` engine path
-  (via the `craftRecipe` facade seam); the engine returns `{ success, message }`
+  (via the `craftRecipe` facade seam); the engine returns `{ success, cancelled?, results, message }`
   and does NOT throw, so a failed craft surfaces its message rather than an error.
+  A dismissed interactive prompt returns `{ success: false, cancelled: true, results: null }`
+  with zero mutation, and any phantom run created by that call is discarded — the same
+  interactive/cancelled contract as salvage (see the path-agnostic §Interactive Roll Prompt).
 - A non-GM crafts directly against owned actors; there is no GM relay for player
   crafting.
 - Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
@@ -1136,7 +1143,20 @@ The run has STARTED and awarded nothing.
 Treating `success` as "done" would show a success state for a run that gave the player nothing.
 - A misconfigured required check (routed or progressive with no authored roll formula) returns `{ success: false, misconfigured: true }` with zero mutation and a GM-config message.
 Like a dismissed roll prompt, it **discards a run created by that call**, so a misconfigured abort never leaves a persisted `inProgress` salvage run; a reused pre-existing run is left untouched.
-- The UI passes `interactive: true`; the default `false` keeps macros and automation silent.
+- The UI passes `interactive: true`; the default `false` keeps macros and automation silent (see the path-agnostic §Interactive Roll Prompt for the shared contract).
+
+### Interactive Roll Prompt (path-agnostic)
+
+A check-bearing execution accepts a per-call `interactive` flag (default `false`, keeping macros/API silent).
+When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
+This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
+
+### Result Chat Cards
+
+- Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
+- The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
+- Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
+- Gathering posts its own result card under the same `features.chatOutput` toggle.
 
 ### Deferred (this iteration)
 
@@ -1513,6 +1533,11 @@ It never renders a hardcoded formula: the formula is system-authored, and the pr
 - A **time-gated** salvage (`success` with null results) shows a **waiting** state carrying the engine's message, **not** a success state.
 - The success ribbon stays **pinned to the salvaged row** until dismissed or another item is selected — **including when its last copy was consumed and the row leaves the listing**.
 Otherwise the selection falls through to another item and the ribbon renders against the wrong component; with single-copy components this is the common case.
+- **Result-driven tab routing.** A newly-arrived salvage result actively opens or reopens the Salvage tab in one ordered effect keyed on a NEW result reference — so it survives roll-dialog remounts, a manual Info click is not yanked back, a changed item key resets to Info, and the result branch wins when both fire.
+- **Depleted-stack honesty.** After the last copy is consumed the store reconciles the held row to `totalQuantity` 0, the header reads "None remaining", the ribbon's "Salvage again" is replaced by a nothing-left note, and the pre-roll action disables on depletion (`disabled = busy || misconfigured || waiting || depleted`).
+The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
+- **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
+- **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 
 ### Run Guardrails
 

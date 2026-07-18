@@ -315,10 +315,11 @@ Salvage is a single-step operation (no multi-step salvage):
 A salvage check is usable only when its mode has an authored roll formula (`salvageCraftingCheck.simple|routed|progressive.rollFormula`); the optional simple check runs only when `salvageCraftingCheck.simple.rollFormula` is authored.
 Routed and progressive salvage require their roll formula and fail loudly (with zero mutation) when it is missing.
 4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `resolution-modes/spec.md`, but using salvage-specific settings).
-5. **Consume**: `ingredientQuantity` is always 1 for salvage.
-Remove that many instances of the component from the actor's inventory.
+5. **Consume**: remove N = `Component.salvage.ingredientQuantity` instances (default 1, any positive integer) of the component from the actor's inventory, matching §Implicit Ingredient and `data-models/spec.md`.
 Apply tool usage/breakage as applicable.
 6. **Create**: Create result items on the actor.
+7. **Chat**: when `features.chatOutput` is enabled, post a salvage result card on resolved success or rolled failure only (never on cancelled, misconfigured, or time-gated outcomes); card creation failures are non-fatal.
+See the `ui-integration` chat card contract.
 
 If `Component.salvage.timeRequirement` is absent, salvage resolves immediately.
 If it is present, the run must resume automatically when world time reaches the derived completion timestamp, following the same startup and `updateWorldTime` re-check pattern used for crafting time gates.
@@ -343,10 +344,11 @@ On success, produce the single result group.
   The order is read from the run record's captured `resultOrder`, never from settings, and a
   salvage with no run record uses the authored order with no settings fallback.
   The permission is gated at read time, so a GM toggling it off mid-run takes effect on that run.
-  This is honoured at runtime today (via the API/macro path), but **no player salvage authoring
-  surface exists**: `CraftingEngine.salvage` has no UI callers, so the captured order is only ever
-  non-null once a player-facing salvage app exists.
-  The GM toggle is therefore authored policy, exported and honoured, rather than a dead control.
+  The Inventory tab's salvage panel (`InventorySalvagePanel.svelte`) is the first UI caller of
+  `CraftingEngine.salvage`: players reorder Progressive stages via the store's reorder/reset
+  actions persisted under the `salvage:<componentId>` scope, honouring
+  `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-integration` §Player Salvage Surface).
+  The GM toggle is authored policy, exported and honoured.
 
 ### Failure Consumption Policy
 
@@ -395,17 +397,18 @@ SalvageRun = {
     initiatedAt: number,
   },
 
-  lastCheckResult?: {
+  // Persisted field is `checkResult` (no `reason` key); the failure text is the
+  // separate top-level `failureReason` below.
+  checkResult?: {
     success: boolean,
-    reason: string,
     outcome?: string, // routed mode
     value?: number,   // progressive mode
     data?: object,
   },
+  failureReason?: string, // top-level failure text (null on success)
 
   consumedComponents?: Array<{
-    actorUuid: string,
-    itemUuid: string,
+    itemUuid: string, // no `actorUuid` on either salvage path
     quantity: number,
   }>,
   // Flattened tool-breakage evidence shared with crafting (written by
