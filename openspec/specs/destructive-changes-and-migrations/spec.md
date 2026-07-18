@@ -55,11 +55,23 @@ When `CraftingSystem.resolutionMode` changes:
 
 ### Disable Multi-step Feature
 
-If disabling `features.multiStepRecipes` for a system with multistep recipes:
+Disabling `features.multiStepRecipes` is a **non-destructive visibility/validation gate**, not a destructive migration.
+It mirrors the salvage-feature toggle: turning the feature off hides and gates the multi-step surfaces and treats the affected config as inert, but no persisted data is deleted or migrated, so turning it back on restores everything.
 
-1. Require explicit GM confirmation.
-2. Existing multistep recipes become invalid and must be deleted unless migrated.
-3. Any active runs for deleted recipes must be cleaned up.
+When `features.multiStepRecipes` is disabled for a system that has multi-step recipes (recipes carrying explicit `steps[]`):
+
+1. Existing multi-step recipes are **retained verbatim** in persisted data.
+   No recipe is deleted, migrated, or rewritten, and no active run, learned flag, or per-user preference is cleaned up.
+2. Each retained multi-step recipe is surfaced as a system-validation issue that gates its craftable visibility per `recipe-visibility` (a `blocks: 'visibility'` issue, not a `blocks: 'system'` blocker and not a `blocks: 'enable'` invalid-recipe error).
+   The issue is a warning: the recipe is deliberately gated, not structurally broken.
+3. Multi-step authoring surfaces hide while the feature is off; the multi-step step-mode control still renders for a recipe that is already multi-step so a GM retains the single-step revert path.
+4. The player side does not list or offer multi-step runs for the gated recipes: the listing filter excludes them and the crafting guard rejects a non-GM craft targeting them (reason `visibility`).
+   A GM still sees the recipes (GM bypass) to re-enable the feature or revert a recipe to a single step.
+5. An in-flight multi-step run is **left to finish**: disabling the feature never touches run records, mirroring the salvage honour-existing behaviour.
+   The gate applies to starting new crafts, not to a run already in progress.
+6. No GM confirmation is required, because the toggle is non-destructive; re-enabling the feature drops the validation issue and restores full visibility with zero data loss.
+
+This gating is enforced at the system-validation / visibility seam (`computeSystemVisibility` / `evaluateSystemValidation`), not only at the UI toggle, so import, copy, and migration writers that never pass through the manager toggle are gated on the same invariant.
 
 ### Change Visibility Knowledge Mode
 

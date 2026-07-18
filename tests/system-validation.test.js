@@ -622,3 +622,114 @@ describe('computeSystemVisibility', () => {
     assert.equal(blocksSystem, true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Multi-step visibility gating (issue 710): disabling `features.multiStepRecipes`
+// is a NON-destructive information-hiding toggle. Existing multi-step recipes are
+// retained verbatim and merely gated out of craftable visibility; re-enabling the
+// feature restores them losslessly.
+// ---------------------------------------------------------------------------
+
+/**
+ * A complete recipe with a single EXPLICIT step (`steps[]` non-empty), which is
+ * the persisted shape of a multi-step recipe. Its step carries the same sets/groups
+ * `makeRecipe` puts at the recipe level, so it is otherwise craftable.
+ */
+function makeMultiStepRecipe(overrides = {}) {
+  const single = makeRecipe(overrides);
+  return {
+    id: single.id,
+    name: single.name,
+    craftingSystemId: single.craftingSystemId,
+    enabled: single.enabled,
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Forge',
+        ingredientSets: single.ingredientSets,
+        resultGroups: single.resultGroups,
+        toolIds: [],
+      },
+    ],
+  };
+}
+
+describe('multi-step visibility gating — features.multiStepRecipes disabled', () => {
+  it('surfaces a visibility-gating issue (not a system blocker) for a retained multi-step recipe', () => {
+    const system = makeSystem({ features: { multiStepRecipes: false } });
+    const recipe = makeMultiStepRecipe({ id: 'ms-1', name: 'Layered Blade' });
+
+    const report = evaluateSystemValidation(system, { recipes: [recipe] });
+
+    const gate = report.issues.find((issue) => issue.code === 'multiStepFeatureDisabled');
+    assert.ok(gate, 'expected the disabled-feature gating issue to surface');
+    assert.equal(gate.kind, 'recipe');
+    assert.equal(gate.entityId, 'ms-1');
+    assert.equal(gate.blocks, 'visibility', 'gates visibility, not the whole system');
+    assert.equal(gate.severity, 'warning', 'gated, not invalid-broken');
+    assert.equal(gate.nav.view, 'recipe-edit');
+    assert.equal(report.blocksSystem, false, 'the whole system stays usable');
+  });
+
+  it('hides the multi-step recipe id via computeSystemVisibility while the feature is off', () => {
+    const system = makeSystem({ features: { multiStepRecipes: false } });
+    const recipe = makeMultiStepRecipe({ id: 'ms-2' });
+
+    const { blocksSystem, hiddenEntityIds } = computeSystemVisibility(system, {
+      recipes: [recipe],
+    });
+    assert.equal(blocksSystem, false);
+    assert.ok(hiddenEntityIds.has('ms-2'), 'the multi-step recipe is gated out of visibility');
+  });
+
+  it('does not gate a single-step recipe under the same disabled feature', () => {
+    const system = makeSystem({ features: { multiStepRecipes: false } });
+    const recipe = makeRecipe({ id: 'single-1' });
+
+    const report = evaluateSystemValidation(system, { recipes: [recipe] });
+    assert.ok(
+      !report.issues.some((issue) => issue.code === 'multiStepFeatureDisabled'),
+      'a single-step recipe raises no multi-step gate'
+    );
+    const { hiddenEntityIds } = computeSystemVisibility(system, { recipes: [recipe] });
+    assert.ok(!hiddenEntityIds.has('single-1'));
+  });
+
+  it('re-enabling the feature restores visibility with zero data loss (round-trip)', () => {
+    const recipe = makeMultiStepRecipe({ id: 'ms-3', name: 'Layered Blade' });
+    const stepsSnapshot = JSON.stringify(recipe.steps);
+
+    // Feature OFF → gated.
+    const offSystem = makeSystem({ features: { multiStepRecipes: false } });
+    const offVisibility = computeSystemVisibility(offSystem, { recipes: [recipe] });
+    assert.ok(offVisibility.hiddenEntityIds.has('ms-3'), 'gated while off');
+
+    // Feature ON → restored, and the recipe's persisted steps are untouched.
+    const onSystem = makeSystem({ features: { multiStepRecipes: true } });
+    const onVisibility = computeSystemVisibility(onSystem, { recipes: [recipe] });
+    assert.ok(!onVisibility.hiddenEntityIds.has('ms-3'), 'visibility restored when on');
+    const onReport = evaluateSystemValidation(onSystem, { recipes: [recipe] });
+    assert.ok(
+      !onReport.issues.some((issue) => issue.code === 'multiStepFeatureDisabled'),
+      'no gating issue once the feature is on'
+    );
+    assert.equal(
+      JSON.stringify(recipe.steps),
+      stepsSnapshot,
+      'the recipe steps are never mutated by the gate'
+    );
+  });
+
+  it('gates a recipe carried as a model instance (toJSON projection)', () => {
+    const system = makeSystem({ features: { multiStepRecipes: false } });
+    const json = makeMultiStepRecipe({ id: 'ms-model' });
+    const recipe = {
+      ...json,
+      toJSON() {
+        return json;
+      },
+    };
+    const { hiddenEntityIds } = computeSystemVisibility(system, { recipes: [recipe] });
+    assert.ok(hiddenEntityIds.has('ms-model'), 'model-shaped recipe is projected then gated');
+  });
+});

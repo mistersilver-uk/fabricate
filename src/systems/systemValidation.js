@@ -365,6 +365,43 @@ function collectSalvageIssues(system, components) {
 }
 
 /**
+ * Multi-step visibility gating. Disabling `features.multiStepRecipes` is a
+ * NON-destructive information-hiding toggle (mirroring the salvage-disable
+ * pattern), not a destructive migration: existing multi-step recipes (those
+ * carrying explicit `steps[]`) are RETAINED verbatim in persisted data and merely
+ * gated out of craftable visibility. Each such recipe raises a `blocks: 'visibility'`
+ * issue so the player listing and the craft guard hide it while a GM still sees it
+ * to re-enable the feature or revert the recipe to a single step. No recipe, run,
+ * learned flag, or preference is deleted; re-enabling the feature drops the issue and
+ * restores visibility losslessly. The issue is a `warning`, not `critical`: the
+ * recipe is deliberately gated, not structurally broken.
+ *
+ * @param {object} system The crafting system.
+ * @param {object[]} recipes Recipe models or JSON.
+ * @returns {SystemValidationIssue[]}
+ */
+function collectMultiStepGatingIssues(system, recipes) {
+  if (system?.features?.multiStepRecipes === true) return [];
+  const issues = [];
+  for (const recipe of asArray(recipes)) {
+    const raw = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe || {};
+    if (asArray(raw.steps).length === 0) continue;
+    issues.push({
+      kind: 'recipe',
+      entityId: raw.id ?? null,
+      entityName: trimmed(raw.name) || raw.id || 'recipe',
+      severity: 'warning',
+      blocks: 'visibility',
+      code: 'multiStepFeatureDisabled',
+      message:
+        'This recipe uses multiple steps, but the multi-step feature is disabled for its system, so it is hidden until the feature is re-enabled or the recipe is reverted to a single step.',
+      nav: { view: 'recipe-edit', tab: 'overview' },
+    });
+  }
+  return issues;
+}
+
+/**
  * Signature-collision blocker for ALCHEMY mode (subsumes #99). In alchemy mode
  * the engine infers the recipe from submitted ingredients, so overlapping
  * ingredient signatures make the whole system ambiguous and unusable. Runs the
@@ -592,6 +629,7 @@ export function evaluateSystemValidation(system, { recipes, environments, compon
     ...collectRecipeIssues(system, recipes, systemComponents),
     ...collectEnvironmentIssues(environments),
     ...collectSalvageIssues(system, components),
+    ...collectMultiStepGatingIssues(system, recipes),
     ...collectSystemBlockers(system, recipes, components),
   ];
 
@@ -631,6 +669,7 @@ export function computeSystemVisibility(system, { recipes, environments, compone
     ...collectRecipeIssues(system, recipes, systemComponents),
     ...collectEnvironmentIssues(environments),
     ...collectSalvageIssues(system, components),
+    ...collectMultiStepGatingIssues(system, recipes),
     ...collectSystemBlockers(system, recipes, components),
   ];
 
