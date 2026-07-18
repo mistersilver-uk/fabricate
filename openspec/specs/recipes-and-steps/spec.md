@@ -280,6 +280,9 @@ The `craftingRuns` actor-flag shape is defined in `data-models/spec.md` (*Crafti
 
 - History arrays are ordered **most-recent-first** (newest entry at index 0).
 - When a run reaches a terminal status (`succeeded`, `failed`, or `cancelled`), it is removed from `active` and prepended to `history`.
+- The terminal transition is **durable under concurrent and multi-client writes**.
+  A terminal run persisted to `history` by one writer is never lost to a later stale-cache write by another writer, another session, or the primary-GM world-time resume path.
+  Persistence reconciles against the currently-persisted actor document (union `history` by run `id`; apply `active` add/remove against the fresh document) rather than overwriting from a stale in-memory cache.
 
 ### Truncation Behaviour
 

@@ -1,15 +1,13 @@
-import {
-  getFabricateFlag,
-  setFabricateFlag,
-  deleteRemovedActiveRunFlags,
-} from '../config/flags.js';
+import { RunContainerManagerBase } from './runContainerStore.js';
 
 const HISTORY_LIMIT = 50;
 
 /**
- * Manages actor-scoped salvage runs (active + history).
+ * Manages actor-scoped salvage runs (active + history). The per-actor cache, baseline
+ * snapshots, document-coherent persistence, and run getters live in
+ * {@link RunContainerManagerBase}; this class adds the salvage-specific run lifecycle.
  */
-export class SalvageRunManager {
+export class SalvageRunManager extends RunContainerManagerBase {
   /**
    * @param {object} [deps]
    * @param {() => boolean} [deps.isPrimaryGM] Primary-GM gate for the timed
@@ -22,84 +20,8 @@ export class SalvageRunManager {
    *   check is WIRED at construction in `main.js` — that wiring is load-bearing.
    */
   constructor({ isPrimaryGM = () => true } = {}) {
-    this._cache = new Map(); // actorId -> container
+    super({ flagKey: 'salvageRuns' });
     this._isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
-  }
-
-  _normalizeContainer(raw = {}) {
-    const active = raw?.active && typeof raw.active === 'object' ? { ...raw.active } : {};
-    const history = Array.isArray(raw?.history) ? [...raw.history] : [];
-    return { active, history };
-  }
-
-  _nowWorldTime() {
-    return Number(game.time?.worldTime || 0);
-  }
-
-  _durationToSeconds(timeRequirement = null) {
-    if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
-    const minutes = Number(timeRequirement.minutes || 0);
-    const hours = Number(timeRequirement.hours || 0);
-    const days = Number(timeRequirement.days || 0);
-    const months = Number(timeRequirement.months || 0);
-    const years = Number(timeRequirement.years || 0);
-    const daySeconds = 24 * 60 * 60;
-
-    return Math.max(
-      0,
-      minutes * 60 +
-        hours * 60 * 60 +
-        days * daySeconds +
-        months * 30 * daySeconds +
-        years * 365 * daySeconds
-    );
-  }
-
-  async _persist(actor, container) {
-    this._cache.set(actor.id, container);
-    // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
-    // so completed/cleared runs don't resurrect on reload (see the shared helper).
-    await deleteRemovedActiveRunFlags(actor, 'salvageRuns', container);
-    await setFabricateFlag(actor, 'salvageRuns', container);
-  }
-
-  invalidateCache(actorId = null) {
-    if (actorId) {
-      this._cache.delete(actorId);
-    } else {
-      this._cache.clear();
-    }
-  }
-
-  _getContainer(actor) {
-    if (this._cache.has(actor.id)) {
-      return this._cache.get(actor.id);
-    }
-    return this._normalizeContainer(getFabricateFlag(actor, 'salvageRuns', null));
-  }
-
-  getActiveRuns(actor) {
-    const container = this._getContainer(actor);
-    return Object.values(container.active || {});
-  }
-
-  getActiveRun(actor, runId) {
-    const container = this._getContainer(actor);
-    return container.active?.[runId] || null;
-  }
-
-  getRunHistory(actor, limit = null) {
-    const container = this._getContainer(actor);
-    const history = Array.isArray(container.history) ? container.history : [];
-    if (!Number.isFinite(Number(limit)) || Number(limit) <= 0) return [...history];
-    return history.slice(0, Number(limit));
-  }
-
-  getRun(actor, runId) {
-    if (!runId) return null;
-    const container = this._getContainer(actor);
-    if (container.active?.[runId]) return container.active[runId];
-    return (container.history || []).find((run) => run?.id === runId) || null;
   }
 
   findActiveRunForComponent(actor, craftingSystemId, componentId) {
