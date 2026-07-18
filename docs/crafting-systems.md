@@ -145,6 +145,9 @@ Fabricate automatically posts a chat message to the table after every crafting o
 - Failure reason
 - Any ingredients consumed or tools broken as part of the failure
 
+Both success and failure messages show the **rolled check total** on its own row when a check ran.
+A guaranteed craft or salvage that needs no roll omits the row, because there is no total to report.
+
 Chat messages appear as if spoken by the crafting actor.
 
 **When chat output does not fire.** Chat messages are only posted for craft attempts that reach the engine's resolution step.

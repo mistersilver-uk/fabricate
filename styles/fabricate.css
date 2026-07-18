@@ -15690,6 +15690,28 @@
   opacity: 0.72;
 }
 
+/* The rolled check total (issue 688). Shown only when a check ran; a guaranteed
+   no-check craft/salvage omits it. Its own row below the header so the number
+   reads as the roll result, not more subtitle metadata. */
+.fabricate-craft-chat__roll {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fab-space-chip);
+  font-size: 0.85em;
+}
+
+.fabricate-craft-chat__roll-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.58;
+}
+
+.fabricate-craft-chat__roll-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .fabricate-gather-chat__section,
 .fabricate-craft-chat__section {
   display: flex;

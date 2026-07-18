@@ -1083,6 +1083,7 @@
       "Consumed": "Consumed",
       "Tools": "Tools Used",
       "Results": "Created",
+      "Roll": "Roll",
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure",
       "GatherSuccess": "Gathering Successful",

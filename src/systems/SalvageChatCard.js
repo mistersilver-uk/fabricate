@@ -26,6 +26,7 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
   results: 'FABRICATE.Chat.SalvageRecovered',
   consumed: 'FABRICATE.Chat.SalvageConsumed',
   tools: 'FABRICATE.Chat.SalvageTools',
+  roll: 'FABRICATE.Chat.Roll',
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
 });
@@ -40,6 +41,7 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
  * @param {Array<{name:string,img:string,quantity:number}>} [model.results]  - Recovered items.
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed] - The source broken down.
  * @param {Array<{name:string,img:string}>}                 [model.tools]    - Tools that broke.
+ * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite.
  * @param {string}  [model.failureReason]
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
  * @returns {string} HTML string suitable for ChatMessage content.
@@ -53,6 +55,7 @@ export function buildSalvageChatContent(model = {}, localize = (key) => key) {
       results: model.results,
       consumed: model.consumed,
       tools: model.tools,
+      rollValue: model.rollValue,
       failureReason: model.failureReason,
     },
     SALVAGE_CHAT_KEYS,
