@@ -95,17 +95,6 @@ describe('RecipeBrowser mounted behavior', () => {
     );
   });
 
-  it('renders the recents strip when recents are present', async () => {
-    const recipes = [recipe({ id: 'r1', name: 'Healing Potion' })];
-    const target = await harness.mount({
-      recipes,
-      totalCount: 1,
-      recents: [{ id: 'r1', name: 'Healing Potion', img: null }],
-    });
-    assert.ok(target.querySelector('[data-crafting-recents]'), 'recents strip rendered');
-    assert.ok(target.querySelector('[data-recent-id="r1"]'), 'recent chip rendered');
-  });
-
   it('forwards search input to onSearch', async () => {
     const searches = [];
     const target = await harness.mount({

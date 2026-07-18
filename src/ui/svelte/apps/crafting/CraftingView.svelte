@@ -57,14 +57,6 @@
     Boolean(rollResult) && dismissedRunFor !== selectedRecipe?.id
   );
 
-  // Recents: map the store's id list to display models from the current listing.
-  const recents = $derived(
-    (store?.recents ?? [])
-      .map((id) => recipes.find((recipe) => recipe?.id === id) ?? null)
-      .filter(Boolean)
-      .map((recipe) => ({ id: recipe.id, name: recipe.name, img: recipe.img }))
-  );
-
   // Shopping-list entries enriched with display name/img from the listing.
   const shoppingEntries = $derived(
     (store?.shoppingEntries ?? []).map((entry) => {
@@ -175,7 +167,6 @@
       <div class="crafting-view-column crafting-view-column-left">
         <RecipeBrowser
           recipes={store?.pageItems ?? []}
-          {recents}
           search={store?.search ?? ''}
           selectedRecipeId={selectedRecipe?.id ?? null}
           totalCount={store?.visibleRecipes?.length ?? 0}
