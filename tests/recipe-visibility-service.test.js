@@ -929,10 +929,14 @@ test('AC6.8 - learnRecipesFromOwnedItem anchors learning and deletion to the exa
       knowledge: {
         mode: 'learned',
         item: { limitUses: false },
-        learn: { consumeOnLearn: true, dragDropEnabled: true }
+        // consumeOnLearn is authored on the recipe item definition (caps), NOT the
+        // system-level field the normalizer strips (#706).
+        learn: { dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [
+      { id: 'book', originItemUuid: 'Compendium.world.items.book', caps: { learn: { consumeOnLearn: true } } }
+    ]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
   const firstCopy = new FakeItem({ uuid: 'Actor.actor-1.Item.copy-1', sourceId: 'Compendium.world.items.book' });
@@ -962,10 +966,14 @@ test('AC6.9 - learnRecipesFromOwnedItem learns multiple recipes and deletes once
       knowledge: {
         mode: 'itemOrLearned',
         item: { limitUses: false },
-        learn: { consumeOnLearn: true, dragDropEnabled: true }
+        // consumeOnLearn authored on the definition (caps), not the stripped
+        // system-level field (#706).
+        learn: { dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [
+      { id: 'book', originItemUuid: 'Compendium.world.items.book', caps: { learn: { consumeOnLearn: true } } }
+    ]
   });
   const recipes = [
     buildMockRecipe({ id: 'recipe-a', name: 'Recipe A', recipeItemId: 'book', linkedRecipeItemUuid: null }),
@@ -999,10 +1007,14 @@ test('AC6.10 - learnRecipesFromOwnedItem does not delete when every matched reci
       knowledge: {
         mode: 'learned',
         item: { limitUses: false },
-        learn: { consumeOnLearn: true, dragDropEnabled: true }
+        // consumeOnLearn authored on the definition (caps), not the stripped
+        // system-level field (#706).
+        learn: { dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [
+      { id: 'book', originItemUuid: 'Compendium.world.items.book', caps: { learn: { consumeOnLearn: true } } }
+    ]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
   const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
@@ -3254,4 +3266,99 @@ test('705 - learnRecipe consumes the selected item only when ITS book consumeOnL
   const learnA = await serviceA.learnRecipe({ recipe, craftingActor: actorA });
   assert.equal(learnA.success, true);
   assert.equal(bookAItem.deleted, false, "book A's consumeOnLearn:false retains the item");
+});
+
+// ---------------------------------------------------------------------------
+// #706 — bulk drop-learn reads consumeOnLearn from the matched book's caps, not
+// the legacy system-wide config the normalizer strips
+// ---------------------------------------------------------------------------
+
+// A knowledge system whose bulk-learnable book authors consumeOnLearn on its caps
+// (the real runtime shape), with NO system-level `knowledge.learn.consumeOnLearn`.
+function buildBulkLearnSystem(consumeOnLearn) {
+  return buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } },
+    },
+    recipeItemDefinitions: [
+      {
+        id: 'book',
+        originItemUuid: 'Compendium.world.items.book',
+        caps: { learn: { consumeOnLearn } },
+      },
+    ],
+  });
+}
+
+function bulkLearnOwnedBook(system) {
+  const recipe = buildMockRecipe({
+    id: 'recipe-1',
+    recipeItemId: 'book',
+    linkedRecipeItemUuid: null,
+  });
+  const item = new FakeItem({
+    uuid: 'Actor.a1.Item.book',
+    sourceId: 'Compendium.world.items.book',
+  });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+  return { service, item, actor };
+}
+
+test('706a - a dropped book with caps.consumeOnLearn:true is removed after bulk learn', async () => {
+  const { service, item, actor } = bulkLearnOwnedBook(buildBulkLearnSystem(true));
+
+  await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(item.deleted, true);
+});
+
+test('706b - a dropped book with caps.consumeOnLearn:false is retained after bulk learn', async () => {
+  const { service, item, actor } = bulkLearnOwnedBook(buildBulkLearnSystem(false));
+
+  const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(result.notificationKind, 'success');
+  assert.equal(item.deleted, false);
+});
+
+test('706c - a recipe resolving to no definition consumes on learn (fail-closed default)', async () => {
+  // A legacy-linked recipe with no authored definition: the owned item matches via the
+  // synthetic legacy entry, so `_matchDefinitionForItem` resolves to null and caps fall
+  // back to the uncapped default (consumeOnLearn on).
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', item: { limitUses: false }, learn: { dragDropEnabled: true } },
+    },
+  });
+  const recipe = buildMockRecipe({
+    id: 'recipe-1',
+    recipeItemId: null,
+    linkedRecipeItemUuid: 'Compendium.world.items.legacy',
+  });
+  const item = new FakeItem({
+    uuid: 'Actor.a1.Item.legacy',
+    sourceId: 'Compendium.world.items.legacy',
+  });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(item.deleted, true, 'fail-closed default consumes');
+});
+
+test('706d - the normalized system config carries no legacy consumeOnLearn, yet caps still consume', async () => {
+  const system = buildBulkLearnSystem(true);
+  const { service, item, actor } = bulkLearnOwnedBook(system);
+
+  // The legacy read the old code used is undefined here, so it could never have fired.
+  assert.equal(service._getKnowledgeConfig(system).learn?.consumeOnLearn, undefined);
+
+  await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+  assert.equal(item.deleted, true, 'consumption is driven by the definition caps');
 });

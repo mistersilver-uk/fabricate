@@ -1213,14 +1213,19 @@ export class RecipeVisibilityService {
       learnableRecipes.push(recipe);
     }
 
-    // `consumeOnLearn` is ignored for capped books (superseded by
-    // `destroyWhenSpent`), but capped recipes are already excluded above, so this
-    // only ever sees uncapped recipes (UN4).
-    const consumedItem = learnableRecipes.some((recipe) => {
-      const system = this._getCraftingSystem(recipe);
-      const knowledge = this._getKnowledgeConfig(system);
-      return knowledge?.learn?.consumeOnLearn === true;
-    });
+    // `consumeOnLearn` is read per recipe item from the SPECIFIC owned book's caps
+    // (issue 511 per-recipe-item caps; spec §Multi-Recipe Matching any-of semantics),
+    // NOT the legacy system-wide `knowledge.learn.consumeOnLearn` — that field is
+    // rebuilt away by the normalizer and stripped by the 1.11.0 migration, so it never
+    // fires at runtime. An unresolved definition fails closed to consume (the
+    // `_getRecipeItemCaps` default). `consumeOnLearn` is ignored for capped books
+    // (superseded by `destroyWhenSpent`), but capped recipes are already excluded above,
+    // so this only ever sees uncapped recipes (UN4).
+    const consumedItem = learnableRecipes.some(
+      (recipe) =>
+        this._getRecipeItemCaps(recipe, this._matchDefinitionForItem(recipe, ownedItem)).learn
+          .consumeOnLearn === true
+    );
 
     return this._buildOwnedItemLearningResult({
       actor,
