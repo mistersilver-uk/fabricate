@@ -142,18 +142,19 @@
   .manager-recipe-access-body {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
     gap: var(--fab-space-2);
     min-width: 0;
   }
 
-  /* The access rows, rehomed from the rail. They now sit in a ~900px tab rather than a
-     300px rail, so the list is CAPPED rather than stretched: an avatar + a name + a
-     sub-line is a short row, and letting it run the full tab width would strand the
-     name against acres of empty space and drag the eye across the gap. */
+  /* The access rows, rehomed from the rail (issue 740): the tab now fills the editor
+     width like its sibling tabs, so the list tiles into a responsive grid rather than a
+     single stretched column. An avatar + a name + a sub-line is a short row; auto-fill
+     tracks pack several rows per line so the full width reads dense instead of stranding
+     one name against empty space. minmax keeps each row wide enough for the identity
+     cluster and collapses to one column on a narrow editor. */
   .manager-recipe-access-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: var(--fab-space-1);
     margin: 0;
     padding: 0;
@@ -208,15 +209,9 @@
   }
 
   /* The deep-link out to the canonical authoring screen. `align-self: flex-start` so it
-     sizes to its label instead of stretching the width of the tab — the rail got this
-     free from its 300px column. */
+     sizes to its label instead of stretching the full width of the tab now that the body
+     no longer shrinks its children to content. */
   .manager-recipe-tab-action {
     align-self: flex-start;
-  }
-
-  .manager-recipe-access-list,
-  .manager-recipe-section-empty {
-    width: 100%;
-    max-width: 520px;
   }
 </style>
