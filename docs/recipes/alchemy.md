@@ -108,8 +108,10 @@ You can change this with the system's Consume on Fail setting.
 | On (default) | Submitted items are removed from the character's inventory |
 | Off | Submitted items are left intact, no items are consumed |
 
-This setting lives under the system's Alchemy options.
-See the [System Manager API reference]({% link api/system-manager.md %}) for the API that updates a system.
+You set this with the **Consume ingredients on a failed brew** toggle, in the **Alchemy behaviour** section of the system's **Crafting check** page, below the Alchemy check.
+It is on by default.
+The same toggle also governs a matched brew that fails its check, which consumes its ingredients the same way a fizzle does.
+You can also update it through the [System Manager API reference]({% link api/system-manager.md %}).
 
 ---
 
@@ -128,8 +130,9 @@ See [Visibility Rules](#visibility-rules).
 | Off (default) | Brewing a match never reveals the recipe, so it is revealed only by the discipline's other visibility settings |
 | On | A matched recipe is remembered for the character and revealed in their Known recipes list |
 
-This setting also lives under the system's Alchemy options.
-See the [System Manager API reference]({% link api/system-manager.md %}) for the API that updates a system.
+You set this with the **Learn a recipe when its ingredients are matched** toggle, in the same **Alchemy behaviour** section of the **Crafting check** page.
+It is off by default.
+You can also update it through the [System Manager API reference]({% link api/system-manager.md %}).
 
 ---
 
@@ -278,7 +281,7 @@ Each recipe has a single ingredient set that defines the hidden combination play
 With a Simple check, each recipe has an **On success** result set and a separate **On a failed check** result set.
 Fill the failure set when you want a failed brew to produce something, or leave it empty to have a failed brew produce nothing.
 Enable each recipe, because disabled recipes are never matched.
-The system's Alchemy options carry the Consume on Fail and Learn on Craft settings.
+The **Alchemy behaviour** section on the system's **Crafting check** page carries the Consume on Fail, Learn on Craft, and Show attempt history to players settings.
 See the [System Manager API reference]({% link api/system-manager.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure systems and recipes.
 
 {: .warning }
