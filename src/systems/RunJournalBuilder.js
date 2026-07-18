@@ -270,6 +270,7 @@ export class RunJournalBuilder {
     const activeStep =
       !terminal && Number.isFinite(currentStepIndex) ? runSteps[currentStepIndex] : null;
 
+    const systemId = stringOrNull(run.craftingSystemId);
     const steps = redacted
       ? []
       : runSteps.map((runStep, index) =>
@@ -279,6 +280,7 @@ export class RunJournalBuilder {
             system,
             recipe,
             index,
+            systemId,
           })
         );
     const currentStep =
@@ -426,7 +428,7 @@ export class RunJournalBuilder {
     return 'inProgress';
   }
 
-  _craftingStepModel({ runStep, recipeStep, system, recipe, index }) {
+  _craftingStepModel({ runStep, recipeStep, system, recipe, index, systemId = null }) {
     return {
       stepId: stringOrNull(runStep?.stepId),
       stepName: stringOrEmpty(runStep?.stepName),
@@ -435,6 +437,17 @@ export class RunJournalBuilder {
       timeGate: plainObjectOrNull(runStep?.timeGate),
       detail: this._stepDetail({ runStep, recipeStep, system, recipe }),
       lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
+      // The recipe's authored ingredient requirements (persisted snapshot at run
+      // creation) and the items actually consumed this step, each resolved to a
+      // UI-safe {componentId,itemUuid,quantity,name,img} row via the shared mapper.
+      // Consumed items are deleted at consume time, so their name/img come from the
+      // consume-time capture (or the componentId fallback) rather than a live lookup.
+      requirements: normalizeList(runStep?.requirements).map((entry) =>
+        this._mapResult(entry, systemId)
+      ),
+      consumedIngredients: normalizeList(runStep?.consumedIngredients).map((entry) =>
+        this._mapResult(entry, systemId)
+      ),
     };
   }
 
@@ -617,8 +630,13 @@ export class RunJournalBuilder {
    * @private
    */
   _isCraftingRedacted({ recipe, actor, viewer }) {
-    if (!recipe) return true;
+    // The GM bypass must precede the missing-recipe guard (issue 738): a recipe that
+    // no longer resolves (edited id / deleted) still has a run whose persisted step
+    // snapshots (requirements, roll, consumed items) the GM must see — collapsing it
+    // to a redacted empty card hid a GM's own history. A non-GM viewer still cannot
+    // verify visibility of an unresolvable recipe, so it stays redacted for them.
     if (viewer?.isGM === true) return false;
+    if (!recipe) return true;
     if (typeof this._recipeVisibility?.evaluateRecipeAccess !== 'function') return false;
     try {
       const access = this._recipeVisibility.evaluateRecipeAccess({

@@ -29,9 +29,21 @@
   const hasSteps = $derived(runType === 'crafting' || runType === 'salvage');
   const steps = $derived(Array.isArray(run?.steps) ? run.steps : []);
   const stepCount = $derived(steps.length);
-  // The step whose requirement facts to show: the active step when present, else
-  // the last step (terminal runs).
-  const detailStep = $derived(run?.currentStep ?? (stepCount > 0 ? steps[stepCount - 1] : null));
+  const TERMINAL_STEP = new Set(['succeeded', 'failed']);
+  // The step whose detail to show: the active step when present, else the last
+  // EXECUTED step for a terminal run. All recipe steps are pre-created, so a run
+  // that failed on an early step still carries trailing `pending` steps; picking the
+  // raw last array element would show an unreached step with no roll / consumed
+  // items. Walk back to the last step that actually ran (a terminal status or a
+  // recorded check), falling back to the last element only if none did.
+  function lastExecutedStep(list) {
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const candidate = list[i];
+      if (TERMINAL_STEP.has(candidate?.status) || candidate?.lastCheckResult) return candidate;
+    }
+    return list.length > 0 ? list[list.length - 1] : null;
+  }
+  const detailStep = $derived(run?.currentStep ?? lastExecutedStep(steps));
   const createdResults = $derived(Array.isArray(run?.createdResults) ? run.createdResults : []);
   // The results heading names the activity: gathered vs salvaged vs crafted.
   const resultsTitle = $derived(

@@ -489,6 +489,124 @@ test('crafting step exposes the recorded roll (resolved formula, total, dc) on l
   assert.equal(check.success, false);
 });
 
+// A component resolver over the SYSTEM fixture's components, used to prove
+// name/img resolution for projected requirements and legacy consumed refs.
+const getSystemComponent = (systemId, componentId) => {
+  if (systemId !== SYSTEM.id) return null;
+  return SYSTEM.components.find((c) => c.id === componentId) ?? null;
+};
+
+test('projects a step\'s consumed ingredients with the captured name/img (issue 738)', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        consumedIngredients: [
+          { actorUuid: 'Actor.actor-1', itemUuid: 'Item.iron', quantity: 2, name: 'Iron Bar', img: 'icons/iron.webp' },
+        ],
+        createdResults: [],
+      },
+    ],
+  });
+  const step = makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: GM })
+    .history[0].steps[0];
+  assert.equal(step.consumedIngredients.length, 1);
+  assert.equal(step.consumedIngredients[0].name, 'Iron Bar');
+  assert.equal(step.consumedIngredients[0].img, 'icons/iron.webp');
+  assert.equal(step.consumedIngredients[0].quantity, 2);
+});
+
+test('resolves a legacy consumed ref (no name/img) from its componentId (issue 738)', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        // Pre-capture record: only componentId + quantity persisted (item deleted).
+        consumedIngredients: [{ componentId: 'c1', itemUuid: 'Item.gone', quantity: 1 }],
+        createdResults: [],
+      },
+    ],
+  });
+  const step = makeBuilder({ history: [run], getComponent: getSystemComponent })
+    .buildListing({ actor: ACTOR, viewer: GM })
+    .history[0].steps[0];
+  assert.equal(step.consumedIngredients[0].name, 'Smith Hammer', 'name resolved via componentId fallback');
+  assert.equal(step.consumedIngredients[0].img, 'icons/hammer.webp');
+});
+
+test('projects a step\'s requirements snapshot, resolving name/img via getComponent (issue 738)', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        requirements: [{ componentId: 'c1', quantity: 3 }],
+        createdResults: [],
+      },
+    ],
+  });
+  const step = makeBuilder({ history: [run], getComponent: getSystemComponent })
+    .buildListing({ actor: ACTOR, viewer: GM })
+    .history[0].steps[0];
+  assert.equal(step.requirements.length, 1);
+  assert.equal(step.requirements[0].componentId, 'c1');
+  assert.equal(step.requirements[0].name, 'Smith Hammer');
+  assert.equal(step.requirements[0].img, 'icons/hammer.webp');
+  assert.equal(step.requirements[0].quantity, 3);
+});
+
+test('a GM sees a deleted-recipe run un-redacted, keeping its persisted step snapshots (issue 738)', () => {
+  const run = terminalCraftingRun({
+    recipeId: 'recipe-gone',
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        lastCheckResult: { success: false, value: 11, data: { total: 11, dc: 16 } },
+        requirements: [{ componentId: 'c1', quantity: 3 }],
+        consumedIngredients: [{ componentId: 'c1', itemUuid: 'Item.gone', quantity: 3 }],
+        createdResults: [],
+      },
+    ],
+  });
+  // recipe param resolves only RECIPE.id, so 'recipe-gone' is a deleted recipe.
+  const model = makeBuilder({ history: [run], getComponent: getSystemComponent })
+    .buildListing({ actor: ACTOR, viewer: GM })
+    .history[0];
+  assert.equal(model.redacted, false, 'a GM is never redacted, even for a deleted recipe');
+  assert.equal(model.steps.length, 1, 'steps survive the missing recipe');
+  assert.equal(model.steps[0].requirements[0].name, 'Smith Hammer');
+  assert.equal(model.steps[0].consumedIngredients[0].name, 'Smith Hammer');
+  assert.equal(model.steps[0].lastCheckResult.total, 11);
+});
+
+test('a non-GM still sees a deleted-recipe run redacted (issue 738)', () => {
+  const run = terminalCraftingRun({ recipeId: 'recipe-gone', status: 'failed' });
+  const model = makeBuilder({ history: [run] })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  assert.equal(model.redacted, true, 'a non-GM cannot verify visibility of an unresolvable recipe');
+  assert.deepEqual(model.steps, []);
+});
+
 test('crafting created results carry the recorded name/img', () => {
   const run = terminalCraftingRun({
     steps: [

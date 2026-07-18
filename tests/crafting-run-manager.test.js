@@ -612,3 +612,52 @@ test('CraftingRunManager: pruneInstantaneousActiveRuns removes single-step no-ti
     'time-gated, multi-step, and unknown-recipe runs are kept'
   );
 });
+
+test('createRun snapshots each step\'s component ingredient requirements (issue 738)', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Snapshotter');
+  const recipe = {
+    id: 'recipe-req',
+    craftingSystemId: 'system-1',
+    getExecutionSteps: () => [
+      {
+        id: 'step-1',
+        name: 'Forge',
+        // Primary (first) ingredient set is snapshotted; component-backed
+        // ingredients only (a tag/essence requirement carries no componentId).
+        ingredientSets: [
+          {
+            ingredients: [
+              { componentId: 'c-iron', quantity: 2 },
+              { componentId: 'c-coal', quantity: 1 },
+              { componentId: null, tag: 'flux' },
+            ],
+          },
+          { ingredients: [{ componentId: 'c-alt', quantity: 5 }] },
+        ],
+      },
+    ],
+  };
+
+  const run = await manager.createRun(actor, recipe, [actor], 'user-1');
+
+  assert.deepEqual(run.steps[0].requirements, [
+    { componentId: 'c-iron', quantity: 2 },
+    { componentId: 'c-coal', quantity: 1 },
+  ]);
+});
+
+test('createRun snapshots empty requirements for a step with no ingredient sets', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Empty');
+  const recipe = {
+    id: 'recipe-empty',
+    craftingSystemId: 'system-1',
+    getExecutionSteps: () => [{ id: 'step-1', name: 'Only Step' }],
+  };
+
+  const run = await manager.createRun(actor, recipe, [actor], 'user-1');
+  assert.deepEqual(run.steps[0].requirements, []);
+});

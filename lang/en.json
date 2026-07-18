@@ -722,7 +722,11 @@
           "FailureGeneric": "The crafting attempt failed.",
           "RollLabel": "Roll",
           "RollResult": "{formula} = {total}",
-          "RollResultWithDc": "{formula} = {total} vs DC {dc}"
+          "RollResultWithDc": "{formula} = {total} vs DC {dc}",
+          "RollResultValue": "Rolled {value}",
+          "RollResultValueWithDc": "Rolled {value} vs DC {dc}",
+          "RequirementsTitle": "Required ingredients",
+          "ConsumedTitle": "Consumed"
         },
         "Redacted": {
           "Title": "Hidden recipe"

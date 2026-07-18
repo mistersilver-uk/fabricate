@@ -174,6 +174,100 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(details.textContent.includes('Flask'), 'shows the final step tool via the fallback');
   });
 
+  it('selects the last EXECUTED step for a multi-step run that failed early (issue 738)', async () => {
+    // All recipe steps are pre-created, so an early failure leaves a trailing
+    // `pending` step. The detail must show the executed (failed) step, not the
+    // unreached pending one.
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: 'Botched the brew' },
+          lastCheckResult: { success: false, formula: '1d20', total: 7, dc: 12, value: 7 },
+          requirements: [],
+          consumedIngredients: []
+        },
+        {
+          stepId: 's2',
+          stepName: 'Bottle',
+          index: 1,
+          status: 'pending',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: 'Flask', toolNames: ['Flask'], checkLabel: null, failureText: null },
+          lastCheckResult: null,
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details.textContent.includes('Mortar & Pestle'), 'shows the executed (failed) step');
+    assert.ok(details.textContent.includes('Botched the brew'), 'shows the failed step failure text');
+    assert.ok(!details.textContent.includes('Flask'), 'does not show the unreached pending step');
+  });
+
+  it('renders the bare rolled value when a step has a value but no formula (issue 738)', async () => {
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          // Legacy record: only a bare value, no formula/total.
+          lastCheckResult: { success: false, formula: null, total: null, value: 9, dc: null },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details, 'step details render for a legacy no-formula roll');
+    assert.ok(details.textContent.includes('RollResultValue'), 'bare-value roll fallback rendered');
+    assert.ok(details.textContent.includes('9'), 'shows the bare rolled value');
+  });
+
+  it('lists a step\'s required and consumed ingredients (issue 738)', async () => {
+    const run = makeSucceededRun({
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'succeeded',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: null,
+          requirements: [{ componentId: 'c-herb', itemUuid: null, quantity: 2, name: 'Dried Herb', img: 'icons/herb.webp' }],
+          consumedIngredients: [{ componentId: 'c-herb', itemUuid: 'Item.herb', quantity: 2, name: 'Dried Herb', img: 'icons/herb.webp' }]
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const requirements = target.querySelector('[data-journal-requirements]');
+    const consumed = target.querySelector('[data-journal-consumed]');
+    assert.ok(requirements, 'requirements section rendered');
+    assert.ok(requirements.textContent.includes('Dried Herb'), 'requirement name rendered');
+    assert.ok(consumed, 'consumed section rendered');
+    assert.ok(consumed.querySelector('[data-journal-consumed-item]'), 'a consumed item row rendered');
+    assert.ok(consumed.textContent.includes('Dried Herb'), 'consumed name rendered');
+  });
+
   it('calls store.advance when the enabled Trigger button is clicked', async () => {
     const advanced = [];
     const svc = { journal: { busyRunId: '', advance: (run) => advanced.push(run?.id) }, getWorldTimeComponents: () => null };
