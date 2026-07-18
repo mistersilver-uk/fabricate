@@ -36,6 +36,7 @@ Soonest Ready puts the runs you can act on first, then the ones that will be rea
 
 A live count badge on the **Journal** tab shows how many active runs the selected character has.
 The badge stays accurate even while the Journal tab is closed, and it disappears when there are no active runs.
+It also keeps pace when another player or your GM starts, advances, or finishes a run for that character, so the count and the run lists update on their own once that character's data reaches your client, with no need to reload the window.
 
 ## History
 

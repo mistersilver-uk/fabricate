@@ -153,7 +153,8 @@ Evicts the in-memory run cache for one actor, or clears the entire cache when ca
 
 After a completed run is written to Foundry actor flags there is normally no need to call this method.
 `_persist()` keeps the cache and flags in sync automatically.
-Use `invalidateCache` only when external code has written directly to an actor's `fabricate.craftingRuns` flag and you want `CraftingRunManager` to re-read from flags on the next access.
+Fabricate also evicts this cache on its own whenever an actor's `fabricate.craftingRuns` flag changes on any connected client, including writes made in another session or by the primary GM's world-time resume, so cross-client run changes stay coherent without a manual call.
+Call `invalidateCache` yourself only when external code mutates run state without going through an actor document update, and you want `CraftingRunManager` to re-read from flags on the next access.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
