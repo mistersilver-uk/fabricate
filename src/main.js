@@ -1695,6 +1695,31 @@ class Fabricate {
   }
 
   /**
+   * The player's recently-crafted recipe ids (client-scoped, `RECENTLY_CRAFTED`),
+   * newest first. Backs the Crafting tab's Recents strip across reloads.
+   *
+   * @returns {string[]}
+   */
+  getRecentlyCraftedRecipeIds() {
+    const ids = getSetting(SETTING_KEYS.RECENTLY_CRAFTED);
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  /**
+   * Persist the recently-crafted recipe id list (`RECENTLY_CRAFTED`). The caller
+   * supplies the already-deduped, newest-first, capped list; `game.settings.set`
+   * REPLACES the whole array payload, so a plain write is correct (no `-=` merge
+   * handling). Client scope makes the write a synchronous localStorage commit, but
+   * the returned promise is passed through so callers can await it per gesture.
+   *
+   * @param {string[]} ids Recently-crafted recipe ids, newest first.
+   * @returns {*}
+   */
+  setRecentlyCraftedRecipeIds(ids) {
+    return setSetting(SETTING_KEYS.RECENTLY_CRAFTED, Array.isArray(ids) ? ids : []);
+  }
+
+  /**
    * The player's stored progressive result orders, keyed `recipe:<id>` / `salvage:<id>`
    * (`PROGRESSIVE_RESULT_ORDER`).
    *

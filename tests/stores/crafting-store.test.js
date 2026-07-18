@@ -16,9 +16,12 @@ function makeServices(overrides = {}) {
     notify: [],
     toggleFavourite: [],
     evaluateSelectedSet: [],
+    setRecentlyCrafted: [],
   };
   // Stateful favourites fake so toggleFavourite round-trips like the real setting.
   let favourites = Array.isArray(overrides.favourites) ? [...overrides.favourites] : [];
+  // Stateful recents fake so the store round-trips through the RECENTLY_CRAFTED seam.
+  let recentlyCrafted = Array.isArray(overrides.recentlyCrafted) ? [...overrides.recentlyCrafted] : [];
   const services = {
     listCraftingForActor: async (opts) => {
       calls.listCraftingForActor.push(opts);
@@ -51,6 +54,12 @@ function makeServices(overrides = {}) {
           : [...favourites, id];
       }
       return [...favourites];
+    },
+    getRecentlyCraftedRecipeIds: () => [...recentlyCrafted],
+    setRecentlyCraftedRecipeIds: async (ids) => {
+      calls.setRecentlyCrafted.push(ids);
+      recentlyCrafted = Array.isArray(ids) ? [...ids] : [];
+      return recentlyCrafted;
     },
   };
   return { services, calls };
@@ -478,16 +487,69 @@ describe('craftingStore', () => {
     );
   });
 
-  it('markRecent dedupes and caps newest-first', () => {
+  it('markRecent dedupes and caps newest-first', async () => {
     const { services } = makeServices();
     const store = createCraftingStore({ services });
 
-    store.markRecent('r1');
-    store.markRecent('r2');
-    store.markRecent('r1');
+    await store.markRecent('r1');
+    await store.markRecent('r2');
+    await store.markRecent('r1');
     flushSync();
 
     assert.deepEqual(store.recents, ['r1', 'r2'], 'newest first, no duplicates');
+  });
+
+  it('markRecent persists the updated list through the RECENTLY_CRAFTED seam', async () => {
+    const { services, calls } = makeServices();
+    const store = createCraftingStore({ services });
+
+    await store.markRecent('r1');
+    await store.markRecent('r2');
+    flushSync();
+
+    assert.deepEqual(calls.setRecentlyCrafted.at(-1), ['r2', 'r1'], 'newest-first list persisted');
+  });
+
+  it('load seeds recents from the persisted RECENTLY_CRAFTED setting', async () => {
+    const { services } = makeServices({ recentlyCrafted: ['r3', 'r1'] });
+    const store = createCraftingStore({ services });
+
+    await store.load();
+    flushSync();
+
+    assert.deepEqual(store.recents, ['r3', 'r1'], 'seeded newest-first from the setting');
+  });
+
+  it('load normalises an over-cap / duplicated persisted recents payload', async () => {
+    const stored = ['r1', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'r9'];
+    const { services } = makeServices({ recentlyCrafted: stored });
+    const store = createCraftingStore({ services });
+
+    await store.load();
+    flushSync();
+
+    assert.deepEqual(
+      store.recents,
+      ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8'],
+      'deduped and capped to the strip cap on seed'
+    );
+  });
+
+  it('recents survive a reload round-trip in order and under the cap', async () => {
+    const { services } = makeServices();
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    await store.markRecent('r1');
+    await store.markRecent('r2');
+    flushSync();
+
+    // A fresh store sharing the same (persisted) services state models a reload.
+    const reloaded = createCraftingStore({ services });
+    await reloaded.load();
+    flushSync();
+
+    assert.deepEqual(reloaded.recents, ['r2', 'r1'], 'newest-first order preserved across reload');
   });
 
   it('tickWorldTime bumps the world-time tick', () => {

@@ -234,6 +234,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
       getFavouriteRecipeIds: () => game?.fabricate?.getFavouriteRecipeIds?.() ?? [],
       toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
+      // Recents strip persistence (issue 715), client-scoped like favourites above.
+      // The setter's promise is RETURNED so `markRecent` can await the per-gesture
+      // write; `game.settings.set` replaces the whole array payload, so the store
+      // passes its already-capped newest-first list straight through.
+      getRecentlyCraftedRecipeIds: () => game?.fabricate?.getRecentlyCraftedRecipeIds?.() ?? [],
+      setRecentlyCraftedRecipeIds: (ids) => game?.fabricate?.setRecentlyCraftedRecipeIds?.(ids),
       // Progressive stage order (issue 651). Unlike the favourites seam directly above,
       // the setter is ASYNC and its promise is RETURNED, not dropped: under `scope: user`
       // this is a replicated document write that can reject, and the store's failure path

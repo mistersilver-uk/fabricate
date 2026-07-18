@@ -275,6 +275,10 @@ export function createCraftingStore({ services } = {}) {
       });
       listing = result ?? null;
       favouriteIds = services?.getFavouriteRecipeIds?.() ?? [];
+      // Seed the Recents strip from the persisted `RECENTLY_CRAFTED` client setting
+      // (issue 715), normalised so a stale over-cap payload can never over-fill the
+      // strip. markRecent writes the same normalised list back, so this round-trips.
+      recents = normalizeRecents(services?.getRecentlyCraftedRecipeIds?.());
       // Seed the player's stored stage orders, mirroring favouriteIds above. The
       // persisted snapshot is the revert target for a rejected write (D7a).
       const orders = services?.getProgressiveResultOrder?.() ?? {};
@@ -484,10 +488,29 @@ export function createCraftingStore({ services } = {}) {
     shoppingEntries = [];
   }
 
-  /** Record a recipe id as most-recently crafted (deduped, newest first, capped). */
-  function markRecent(recipeId) {
+  /** Dedupe (keeping the first, i.e. newest, occurrence) and cap a recents id list. */
+  function normalizeRecents(ids) {
+    const list = Array.isArray(ids) ? ids : [];
+    const deduped = [];
+    for (const id of list) {
+      if (!id || deduped.includes(id)) continue;
+      deduped.push(id);
+      if (deduped.length >= MAX_RECENTS) break;
+    }
+    return deduped;
+  }
+
+  /**
+   * Record a recipe id as most-recently crafted (deduped, newest first, capped) and
+   * persist the updated list through the `RECENTLY_CRAFTED` client setting (issue
+   * 715). The in-memory update is synchronous so the strip reflects the craft at
+   * once; the settings write is awaited so a per-gesture caller (`craft`) can
+   * sequence its quiet reload after the write lands.
+   */
+  async function markRecent(recipeId) {
     if (!recipeId) return;
-    recents = [recipeId, ...recents.filter((id) => id !== recipeId)].slice(0, MAX_RECENTS);
+    recents = normalizeRecents([recipeId, ...recents]);
+    await services?.setRecentlyCraftedRecipeIds?.(recents);
   }
 
   /**
@@ -534,7 +557,7 @@ export function createCraftingStore({ services } = {}) {
         return result;
       }
       lastRollResult = { ...lastRollResult, [recipeId]: result ?? null };
-      markRecent(recipeId);
+      await markRecent(recipeId);
       await load(true);
       return result ?? null;
     } catch (err) {
