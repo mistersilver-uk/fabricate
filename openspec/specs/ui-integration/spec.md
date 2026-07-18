@@ -1132,6 +1132,7 @@ It is a user's choice, not a failure, and MUST NOT be reported as an error.
 The run has STARTED and awarded nothing.
 Treating `success` as "done" would show a success state for a run that gave the player nothing.
 - A misconfigured required check (routed or progressive with no authored roll formula) returns `{ success: false, misconfigured: true }` with zero mutation and a GM-config message.
+Like a dismissed roll prompt, it **discards a run created by that call**, so a misconfigured abort never leaves a persisted `inProgress` salvage run; a reused pre-existing run is left untouched.
 - The UI passes `interactive: true`; the default `false` keeps macros and automation silent.
 
 ### Deferred (this iteration)
