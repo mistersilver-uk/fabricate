@@ -5469,8 +5469,8 @@
 }
 
 .fabricate-manager .manager-vocabulary-panel {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--fab-space-2);
   min-width: 0;
   min-height: 0;
@@ -5478,6 +5478,144 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-mv2-surface-2);
+}
+
+/* Tag & Categories tab bar (issue 689). One vocabulary tab is shown at a time; the
+   count badge tracks the custom entries in that vocabulary. */
+.fabricate-manager .manager-vocabulary-tabs {
+  display: flex;
+  gap: var(--fab-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-tabs .manager-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-025);
+  color: var(--fab-mv2-text-muted);
+  font: inherit;
+  line-height: 1.2;
+  height: auto;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-vocabulary-tabs .manager-tab.is-active {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-vocabulary-tabs .manager-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0 var(--fab-space-2xs);
+  border-radius: 999px;
+  background: var(--fab-overlay-light-035);
+  font-size: var(--fab-font-size-xs, 0.75rem);
+}
+
+.fabricate-manager .manager-vocabulary-search {
+  min-width: 0;
+}
+
+/* Live add-form hint (issue 689): tone-graded feedback as the GM types. */
+.fabricate-manager .manager-vocabulary-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-info-border);
+  border-radius: 8px;
+  background: var(--fab-info-soft);
+  color: var(--fab-info-text);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-hint.is-success {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+  color: var(--fab-success-text);
+}
+
+.fabricate-manager .manager-vocabulary-hint.is-danger {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+  color: var(--fab-danger-text);
+}
+
+/* Per-category icon (issue 689). */
+.fabricate-manager .manager-vocabulary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--fab-overlay-light-035);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager button.manager-vocabulary-icon.is-editable {
+  border: 1px solid var(--fab-mv2-border);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-vocabulary-icon-field {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-icon-input {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-icon-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-025);
+  min-width: 0;
+}
+
+/* Inline delete-confirm strip (issue 689): the destructive cascade is confirmed in
+   place under the row rather than through an external dialog. */
+.fabricate-manager .manager-vocabulary-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-danger-border);
+  border-radius: 8px;
+  background: var(--fab-danger-soft);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-confirm-copy {
+  display: grid;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-confirm-actions {
+  display: inline-flex;
+  gap: var(--fab-space-2);
+  flex: none;
 }
 
 .fabricate-manager .manager-vocabulary-heading,
@@ -5498,6 +5636,8 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   min-width: 0;
+  min-height: 0;
+  flex: 1;
   overflow: auto;
 }
 
@@ -5514,10 +5654,19 @@
   overflow: visible;
 }
 
+/* A category row leads with its icon; the tag rows have no icon column. */
+.fabricate-manager .manager-vocabulary-row:has(.manager-vocabulary-icon) {
+  grid-template-columns: 32px minmax(0, 1fr) auto 32px;
+}
+
 .fabricate-manager .manager-vocabulary-row.is-locked {
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-vocabulary-row.is-locked:has(.manager-vocabulary-icon) {
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
 }
 
 .fabricate-manager .manager-vocabulary-row.is-locked > .manager-chip {
