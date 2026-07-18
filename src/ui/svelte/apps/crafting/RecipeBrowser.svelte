@@ -1,19 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  RecipeBrowser is the left column: a search box, a Recents strip, and a
-  paginated, status-badged list of recipes. It is prop-driven (the store state is
+  RecipeBrowser is the left column: a search box and a paginated,
+  status-badged list of recipes. It is prop-driven (the store state is
   threaded in by CraftingView) so it stays presentational and independently
   testable. Pagination reuses the shared Pagination component.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import RecipeRecents from './RecipeRecents.svelte';
   import RecipeListRow from './RecipeListRow.svelte';
 
   let {
     recipes = [],
-    recents = [],
     search = '',
     selectedRecipeId = null,
     totalCount = 0,
@@ -139,8 +137,6 @@
       {/if}
     </div>
   </header>
-
-  <RecipeRecents {recents} {onSelect} />
 
   {#if hasResults}
     <div class="crafting-browser-list" role="list">

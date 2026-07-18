@@ -27,6 +27,10 @@ import { getFabricateFlag } from '../config/flags.js';
 // flag-shape handling would drift from the gate this projection has to agree with.
 // The module is deliberately import-free, so this adds no transitive edge.
 import { isToolBroken } from '../gatheringToolRuntime.js';
+// Dispatch each ingredient option's `match` through the registry so tag matchers
+// (and any future matcher type) expand to the component ids they consume, instead
+// of the builder re-reading `match.componentId` and missing every non-direct type.
+import { getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 // Single-sourced with the GM UI so the builder and the recipe-item editor share one
 // item-bag literal (the "treat as no image" sentinel).
@@ -1469,6 +1473,7 @@ export class InventoryListingBuilder {
     };
     const seen = new Set();
     const setCtx = {
+      system,
       recipeEntry,
       recipeSourceKey,
       recipeSourceValue,
@@ -1530,15 +1535,45 @@ export class InventoryListingBuilder {
 
   /**
    * Index one ingredient group's options as consumed components (role `ingredient`).
+   * Each option's `match` is expanded through the match-handler registry, so a tag
+   * matcher lists every component that satisfies it (a direct `component` match still
+   * expands to its own id), deduped per (componentId, source) via the shared `seen`.
    * @private
    */
-  _indexIngredientOptions(group, { componentUsedBy, recipeEntry, seen }) {
+  _indexIngredientOptions(group, { componentUsedBy, recipeEntry, seen, system }) {
+    const systemComponents = Array.isArray(system?.components) ? system.components : [];
     for (const option of Array.isArray(group?.options) ? group.options : []) {
-      const componentId = option?.componentId ?? option?.match?.componentId ?? null;
-      if (componentId) {
+      for (const componentId of this._optionConsumedComponentIds(option, systemComponents)) {
         pushUse(componentUsedBy, componentId, { ...recipeEntry, role: 'ingredient' }, seen);
       }
     }
+  }
+
+  /**
+   * The managed-component ids one ingredient option consumes, expanded through the
+   * match-handler registry against the option's OWN system components (ids are unique
+   * per system only, never cross-system). A legacy option carrying a bare top-level
+   * `componentId` and no `match` still resolves to that id.
+   *
+   * Essence-type options are deliberately excluded: an essence match feeds the separate
+   * `essenceUsedBy` channel (set-level essence requirements), and expanding it here would
+   * list every essence-bearing component as a consumed ingredient of the recipe — a
+   * distinct product question (issue #726 out-of-scope), not this index's contract.
+   * @private
+   */
+  _optionConsumedComponentIds(option, systemComponents) {
+    const match = option?.match ?? null;
+    if (match?.type === 'essence') return new Set();
+    const expanded = match
+      ? getMatchHandler(match).expandToComponentIds(match, systemComponents)
+      : new Set();
+    if (expanded.size > 0) return expanded;
+    // Direct-reference fallback: a bare componentId carried on the option or on an
+    // un-normalized match with no recognized `type` (the pre-registry index read
+    // `option.componentId ?? option.match.componentId`). A real matcher that legitimately
+    // expands to zero components stays empty and adds nothing.
+    const directId = option?.componentId ?? match?.componentId ?? match?.systemItemId ?? null;
+    return directId ? new Set([directId]) : new Set();
   }
 
   /**
