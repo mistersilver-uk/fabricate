@@ -16,9 +16,9 @@
   essence" is genuinely authorable and the popover is a single flat "Accept instead"
   list rather than the old two-heading Accept-instead / Require-as-well split.
 
-  Currency appears only when the system configures units; Essence appears only when the
-  system enables essences at all (`essenceOptions.length > 0`) — an OR essence may
-  repeat across groups, so it is NOT gated on system-minus-already-required.
+  Currency appears only when the system ENABLES currency and configures units; Essence
+  appears only when the system enables essences at all (`essenceOptions.length > 0`) — an
+  OR essence may repeat across groups, so it is NOT gated on system-minus-already-required.
 
   The `data-recipe-add` token family (`alternative-component` / `alternative-tag` /
   `alternative-essence` / `alternative-currency`) is PRESERVED on the choices.
@@ -33,6 +33,10 @@
     componentOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // Whether the system's currency feature is enabled. Preset units are seeded even for a
+    // disabled system, so the currency add-affordances gate on this flag too; existing
+    // currency alternatives still render (read-only) when it is false.
+    currencyEnabled = true,
     // The system's essences ({ id, name, icon }). Non-empty unlocks the essence OR
     // alternative (an essence match option appended to THIS requirement). Empty means
     // the system has no essences, so the choice is not offered at all.
@@ -49,6 +53,8 @@
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
   const hasAlternatives = $derived(options.length >= 2);
   const hasEssences = $derived((essenceOptions || []).length > 0);
+  // A currency alternative is authorable only when the feature is enabled AND units exist.
+  const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
 
   // The accessible name for the trigger, the dialog and its search field. The menu is a
   // single flat "Accept instead" list of real OR alternatives (issue 649).
@@ -73,7 +79,7 @@
       icon: 'fas fa-tags',
       label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')
     },
-    ...((currencyUnits || []).length > 0
+    ...(canAddCost
       ? [
           {
             id: 'currency',
@@ -191,6 +197,7 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
+          {currencyEnabled}
           {essenceOptions}
           canRemove={true}
           onChange={(nextOption) => updateOption(index, nextOption)}
@@ -224,7 +231,7 @@
         <i class="fas fa-tags" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
       </button>
-      {#if (currencyUnits || []).length > 0}
+      {#if canAddCost}
         <button
           type="button"
           class="manager-button is-dashed"
@@ -257,6 +264,7 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
+          {currencyEnabled}
           {essenceOptions}
           canRemove={true}
           showRequiredTag={true}

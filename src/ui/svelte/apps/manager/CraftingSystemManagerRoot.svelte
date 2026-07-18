@@ -752,6 +752,13 @@
       ? selectedSystem.requirements.currency.units
       : []
   );
+  // Units are seeded from adapter presets even for a currency-disabled system, so the
+  // recipe editor must gate cost affordances on the explicit enable flag, not on unit
+  // presence. Threaded alongside the units so existing requirements can render read-only
+  // (rather than vanish) when currency is off.
+  const selectedCurrencyEnabled = $derived(
+    selectedSystem?.requirements?.currency?.enabled === true
+  );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
@@ -5274,6 +5281,7 @@
         saveFailed={recipeSaveFailed}
         onPickImagePath={services?.pickImagePath}
         currencyUnits={selectedCurrencyUnits}
+        currencyEnabled={selectedCurrencyEnabled}
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}

@@ -8694,6 +8694,22 @@
   border-color: var(--fab-purple-soft);
 }
 
+/* A currency requirement authored before the feature was disabled: the flag marks it
+   inert, and its unit/amount render as static muted text (no picker, no stepper). */
+.fabricate-manager .manager-recipe-req-tag.is-disabled {
+  color: var(--fab-text-subtle);
+  border-color: var(--fab-mv2-border);
+  opacity: 0.85;
+}
+
+.fabricate-manager .manager-recipe-currency-unit.is-readonly,
+.fabricate-manager .manager-recipe-option-quantity.is-readonly {
+  display: inline-flex;
+  align-items: center;
+  color: var(--fab-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
 .fabricate-manager .manager-recipe-option-controls {
   display: flex;
   flex: 0 0 auto;

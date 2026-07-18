@@ -34,6 +34,10 @@
     componentOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // Whether the system's currency feature is enabled. A currency alternative persisted
+    // while currency was on stays VISIBLE when it is later disabled, but renders read-only
+    // (its unit + amount as static text, no pickers/stepper) so no authored data is hidden.
+    currencyEnabled = true,
     // The system's essences ({ id, name, icon }), for an essence OR alternative's
     // picker. Empty when the system has no essences (the essence arm never appears).
     essenceOptions = [],
@@ -84,6 +88,15 @@
       : 1
   );
   const selectedCurrencyUnit = $derived(findCurrencyUnit(currencyUnits, currencyUnitId));
+  // A currency alternative that outlived its feature: render it read-only rather than
+  // drop it, so a GM who disables currency still sees what the recipe already requires.
+  const currencyReadonly = $derived(matchType === 'currency' && !currencyEnabled);
+  const currencyUnitReadonlyLabel = $derived(
+    selectedCurrencyUnit
+      ? currencyUnitLabel(currencyUnits, currencyUnitId)
+      : currencyUnitId ||
+          text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback', 'Currency')
+  );
   const currencyPickerOptions = $derived(
     (currencyUnits || []).map((unit) => ({
       id: unit.id,
@@ -276,6 +289,23 @@
       </div>
     {:else}
       <div class="manager-recipe-option-currency" data-recipe-option-currency>
+        {#if currencyReadonly}
+          <!-- Currency feature disabled: the unit is a static label, not a picker, and a
+               flag marks the requirement inert. The value stays visible so nothing the
+               recipe already requires is silently hidden. -->
+          <span
+            class="manager-recipe-currency-unit is-readonly"
+            data-recipe-currency-unit
+            data-recipe-currency-readonly
+            >{currencyUnitReadonlyLabel}</span
+          >
+          <span
+            class="manager-recipe-req-tag is-disabled"
+            data-recipe-currency-disabled
+            title={text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint', 'Currency is disabled for this system; this cost is inactive until it is re-enabled.')}
+            >{text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
+          >
+        {:else}
         <span class="manager-recipe-currency-unit" data-recipe-currency-unit>
           <SearchablePopover
             options={currencyPickerOptions}
@@ -295,6 +325,7 @@
             onChoose={(unitId) => chooseCurrencyUnit(unitId)}
           />
         </span>
+        {/if}
       </div>
     {/if}
   </div>
@@ -328,6 +359,15 @@
         inputProps={{ 'data-recipe-essence-amount': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
         onChange={(value) => setEssenceAmount(value)}
       />
+    {:else if matchType === 'currency' && currencyReadonly}
+      <!-- Read-only amount: the value stays visible but is not editable while currency is
+           disabled. Keeps the same marker so tests still locate the currency count. -->
+      <span
+        class="manager-recipe-option-quantity is-readonly"
+        data-recipe-currency-amount
+        data-recipe-currency-readonly-amount
+        >{currencyAmount}</span
+      >
     {:else if matchType === 'currency'}
       <Stepper
         value={currencyAmount}
