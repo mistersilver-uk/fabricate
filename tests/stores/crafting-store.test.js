@@ -459,7 +459,7 @@ describe('craftingStore', () => {
     );
   });
 
-  it('on success records the roll result, marks the recipe recent, and refreshes', async () => {
+  it('on success records the roll result and refreshes', async () => {
     const { services, calls } = makeServices();
     const store = createCraftingStore({ services });
     await store.load();
@@ -470,24 +470,11 @@ describe('craftingStore', () => {
 
     assert.equal(result.success, true);
     assert.ok(store.lastRollResult.r1, 'roll result stored per recipe');
-    assert.deepEqual(store.recents, ['r1']);
     assert.equal(
       calls.listCraftingForActor.length,
       loadsAfterInitial + 1,
       'a successful craft quietly refreshes the listing'
     );
-  });
-
-  it('markRecent dedupes and caps newest-first', () => {
-    const { services } = makeServices();
-    const store = createCraftingStore({ services });
-
-    store.markRecent('r1');
-    store.markRecent('r2');
-    store.markRecent('r1');
-    flushSync();
-
-    assert.deepEqual(store.recents, ['r1', 'r2'], 'newest first, no duplicates');
   });
 
   it('tickWorldTime bumps the world-time tick', () => {

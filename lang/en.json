@@ -580,7 +580,6 @@
           "SearchLabel": "Search recipes",
           "Empty": "No recipes to show.",
           "NoMatches": "No recipes match your filters.",
-          "RecentsTitle": "Recent",
           "FavouritesOnly": "Favourites",
           "CraftableOnly": "Craftable",
           "SystemFilterLabel": "Crafting system",
