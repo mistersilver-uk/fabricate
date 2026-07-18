@@ -574,8 +574,9 @@ The run walks several phases in order; if an earlier phase fails, later phases a
 - **Phase C** — create a crafting system + sample recipes.
 - **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step).
   **This is where most drift shows up** when manager markup changes.
-  After the default-selection capture it also re-themes the real manager via the `data-fabricate-theme` attribute (exactly as the theme setting's `applyFabricateTheme` onChange does) and captures `manager-theme-<themeId>` for every Fabricate theme, then restores the default.
+  After the default-selection capture it can also re-theme the real manager via the `data-fabricate-theme` attribute (exactly as the theme setting's `applyFabricateTheme` onChange does) and capture `manager-theme-<themeId>` for every Fabricate theme, then restore the default.
   These are real, Foundry-rendered themed captures — theme fidelity is not validated via hand-authored mocks.
+  The theme sweep (and the matching player-alchemy `player-alchemy-theme-<themeId>` sweep in Phase E) is OFF by default because those 14 frames are unasserted and are not mapped to any PR view; set `FOUNDRY_SMOKE_THEMES=1` (or pass `--themes` to `node scripts/foundry-test-run.mjs`) to regenerate them when auditing theme fidelity.
 - **Phase E** — API-driven crafting flow, then open the unified Fabricate shell (`#fabricate-app`) from the Craft Item and Gathering sidebar buttons and assert the four-tab left nav (`fabricate-app-shell` screenshot).
   The shared actor-selection top bar mounts with the shell; the phase waits for it to flip `[data-actor-bar-state]` from `loading` to `ready` before capturing.
   The full profile also walks staged player gathering screenshots: environment list, event inspection, ready attempt detail, post-attempt refresh, missing-tool block, timed-run ready and active states, blind gathering, realm-locked listing, and stacked narrow-window layout.
@@ -589,12 +590,16 @@ After any run (success or failure), results are written to `test-results/`:
 
 | File | Description |
 |------|-------------|
-| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], phaseTimings[] }` — pass/fail result, smoke profile, timings, and list of errors |
+| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], phaseTimings[], viewTimings[] }` — pass/fail result, smoke profile, timings, and list of errors |
 | `console.log` | Full browser console output captured during the test |
 | `screenshot-*.png` | Per-step screenshots captured by the selected profile |
 | `screenshot-failure.png` | Captured only when a step throws (last DOM state) |
 
 When debugging a smoke failure, read `summary.json` first: the failing step's `error` field plus the surrounding successful steps usually point straight at the broken selector.
+
+At the end of every run the harness prints a phase-timings table followed by a "Slowest views" table.
+The per-view timings record the wall-clock spent reaching each captured frame (elapsed time between the previous captured frame, or the current phase start, and this frame) and are also persisted to `summary.json` as `viewTimings[]`.
+Use the slowest-views list to target future harness speedups at the views that actually cost time.
 
 ### What the smoke test checks
 
