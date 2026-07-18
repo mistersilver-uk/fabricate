@@ -53,7 +53,7 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
 
 | Mode                  | Ingredient Sets | Result Groups               | Check Requirement  | Routing Basis                       |
 |-----------------------|-----------------|-----------------------------|--------------------|-------------------------------------|
-| `simple`              | exactly 1       | exactly 1                   | optional           | single result group                 |
+| `simple`              | exactly 1       | 1 success (+ optional reserved failure group) | optional | single result group                 |
 | `routedByIngredients` | one or more     | one or more                 | optional           | `IngredientSet.resultGroupId`       |
 | `routedByCheck`       | one or more     | one or more                 | required           | system routed-check outcome         |
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
@@ -88,16 +88,17 @@ The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) ma
 
 ### Semantics
 
-- One ingredient set and one result group.
+- One ingredient set and one success result group, plus an **optional reserved `role: 'failure'` result group** (mirroring alchemy's none/simple path).
 - Optional pass/fail crafting check.
-- On success, produce the single result group.
+- On success, produce the single success result group.
+- On a failed (enabled) check, produce the reserved `role: 'failure'` group when one is authored; otherwise nothing is produced.
 
 ### Validation
 
 - Exactly one `IngredientSet`.
-- Exactly one `ResultGroup`.
-- The crafting check is optional: it runs only when `craftingCheck.simple.rollFormula` is authored (the engine rolls the formula and resolves pass/fail against the DC).
-With no authored formula the attempt proceeds with no check; there is no macro-return contract.
+- Exactly one success `ResultGroup` (validation counts only non-`failure` groups); an optional reserved `role: 'failure'` group is tolerated, and a simple recipe carrying one still validates.
+- The crafting check is optional: it runs only when `craftingCheck.simple.rollFormula` is authored **AND crafting checks are enabled** (`features.craftingChecks === true` or `craftingCheck.enabled === true`; both default false).
+With no authored formula, or with checks disabled, the attempt proceeds with no check; there is no macro-return contract.
 
 ## Routed by Ingredients Mode (`routedByIngredients`)
 
@@ -108,7 +109,7 @@ With no authored formula the attempt proceeds with no check; there is no macro-r
 The mode carries no `resultSelection`.
 - **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the chosen ingredient set.
 No other result groups are awarded.**
-- The crafting check is the SAME optional pass/fail check as `simple`/`alchemy` mode, stored in the shared **`craftingCheck.simple`** slot (which backs `simple`, `alchemy`, and `routedByIngredients` — it is not a simple-mode-only slot).
+- The crafting check uses the SAME shared **`craftingCheck.simple`** config slot as `simple`/`alchemy` mode (which backs `simple`, `alchemy`, and `routedByIngredients` — it is not a simple-mode-only slot), but its **run condition differs from simple mode**: routedByIngredients (like alchemy-Simple) rolls on an authored `craftingCheck.simple.rollFormula` alone, **ungated by the crafting-checks toggle**, whereas simple mode additionally requires crafting checks to be enabled (see §Simple Mode Validation).
 It runs only when `craftingCheck.simple.rollFormula` is authored; with no formula the attempt proceeds with no check.
 It is a pass/fail gate comparing the roll total against the DC (meet/exceed per `thresholdMode`), honouring per-recipe DC tiers (`checkTierId` → `craftingCheck.simple.tiers`), a dynamic-DC macro (`dcMode: 'dynamic'`), and the check's `checkBreakage` triggers.
 It never reads outcome tiers and never changes which result group is produced (routing stays `IngredientSet.resultGroupId`).
@@ -124,7 +125,8 @@ It never reads outcome tiers and never changes which result group is produced (r
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
 - Reference integrity (always applies): each `IngredientSet.resultGroupId` must point at a real `ResultGroup` in scope.
-- This mode never raises `routedCheckNoFormula`: a missing `craftingCheck.simple.rollFormula` simply means no check runs (its readiness is identical to its equally-optional `simple`/`alchemy` peers).
+- This mode never raises `routedCheckNoFormula`: a missing `craftingCheck.simple.rollFormula` simply means no check runs.
+It shares the `craftingCheck.simple` config slot with its `simple`/`alchemy` peers, but its run condition matches alchemy-Simple (an authored formula rolls on its own), not simple mode (which also requires the crafting-checks toggle enabled).
 
 ## Routed by Check Mode (`routedByCheck`)
 
@@ -151,12 +153,18 @@ The default (null/unset) imposes no override, so the outcome is the tier actuall
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
 The gate is fixed-type only; relative-type routed checks ignore it.
-It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected — only the crafting `routedByCheck` caller threads the recipe's minimum.
+It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected.
+Shipped runtime scope: the crafting dispatch threads `minOutcomeId: recipe.minSuccessOutcomeId` for **both** `routedByCheck` and **alchemy `checkMode: tiered`** (which is dispatched to the same `_runRoutedCheck` caller), so an alchemy tiered brew is min-tier gated at runtime when the carried id is valid.
+The authoring control, however, auto-hides outside `routedByCheck` (`resolveRecipeFixedOutcomeTierOptions`), so on an alchemy tiered brew the value is live but a GM can neither see nor clear it — a known spec/UI inconsistency (`ui-integration/spec.md` mandates that hiding), pending a follow-up decision (surface the control for alchemy tiered, or pass `minOutcomeId: null` on the alchemy dispatch).
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
+- **Routing is success-disposition-gated.**
+A check result whose matched tier has `success: false` takes the failure/consumption path regardless of the tier's name — the engine short-circuits on `!checkResult.success` before routing runs.
+Routing via `checkOutcomeIds` resolves only `success === true` tiers (a `success: false` tier must never produce a `disposition: 'success'` result), and validation/authoring offer success tiers only for assignment.
+So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a GM or import placed in a group's `checkOutcomeIds` never routes and never produces a success result.
 - Resolution rules (applied per step/scope; "exactly one result group" is evaluated per step for multi-step recipes):
-  1. Explicit tier assignment wins: when the outcome resolves to a routed-check outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
+  1. Explicit tier assignment wins: when a **success** outcome resolves to a routed-check success outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
   2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
   3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
   4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
@@ -285,6 +293,7 @@ The "no settings fallback" rule above is unaffected by that surface existing and
   - **Simple** — the mandatory shared `craftingCheck.simple` pass/fail check (cannot be disabled).
 Pass → the success result group; fail → the reserved `role: 'failure'` result group (produced only when non-empty; a matched fail is a genuine outcome, not a fizzle).
 The failure group's absence is tolerated (a settings-only None→Simple flip runs no recipe migration).
+This reserved failure-group mechanism is **shared** with plain `simple` resolution mode (see §Simple Mode), which mirrors the same none/simple path; `role: 'failure'` is not alchemy-only.
   - **Tiered** — behaves EXACTLY like `routedByCheck`: the mandatory `craftingCheck.routed` check (cannot be disabled) routes each success outcome to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles before result creation.
 Tiered has NO `role: 'failure'` group.
 - Multi-step recipes are not supported.
@@ -340,7 +349,8 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 
 - The bench drives a five-mode status model that governs the status pill, the Produces panel, and the Brew affordance: `empty`; `assembling` (the bench is a strict subset of a selected known recipe's signature); `ready` (the bench equals a known signature); `untried` (the bench matches no known recipe AND is not a remembered fizzle); `no-reaction` (the bench matches no known recipe AND IS a remembered fizzle).
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
-- **Client mode is advisory; the engine is authoritative on brew.** The client fails safe to `untried` for any signature not reducible to a concrete plain-component multiset (single-option groups, no essence-only requirement; the single-ingredient-set condition is now guaranteed by the mode invariant) and NEVER emits a false `ready`/`assembling`.
+- **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
+It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
 - **Brew-result banner status enum.** A resolved brew reports one of four banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).
 The same caveat applies to select-to-load auto-fill.

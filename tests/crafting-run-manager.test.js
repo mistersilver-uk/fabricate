@@ -500,6 +500,70 @@ test('CraftingRunManager: a terminal run finishing at world time 0 records finis
   );
 });
 
+test('CraftingRunManager: recordFizzle archives a failed recipe-less entry straight to history', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Fizzler');
+
+  const entry = await manager.recordFizzle(actor, {
+    craftingSystemId: 'system-alc',
+    userId: 'user-9',
+  });
+
+  assert.equal(entry.isFizzle, true, 'the entry is marked as a fizzle');
+  assert.equal(entry.recipeId, null, 'a fizzle references no recipe');
+  assert.equal(entry.status, 'failed', 'a fizzle is a failed attempt');
+  assert.equal(entry.craftingSystemId, 'system-alc');
+  assert.equal(entry.userId, 'user-9');
+  assert.deepEqual(entry.steps, [], 'a fizzle carries no step/signature data');
+  assert.equal(
+    manager.getActiveRuns(actor).length,
+    0,
+    'a fizzle never enters the active container'
+  );
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, 1, 'the fizzle is recorded in history');
+  assert.equal(history[0].id, entry.id);
+});
+
+test('CraftingRunManager: recordFizzle records unconditionally (no showAttemptHistoryToPlayers gate)', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Fizzler2');
+
+  await manager.recordFizzle(actor, { craftingSystemId: 'system-alc' });
+  await manager.recordFizzle(actor, { craftingSystemId: 'system-alc' });
+
+  assert.equal(
+    manager.getRunHistory(actor).length,
+    2,
+    'every fizzle is recorded regardless of any player-visibility setting'
+  );
+});
+
+test('CraftingRunManager: cleanupInvalidRuns keeps a fizzle on a valid system, prunes it on a removed system', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('FizzleCleanup');
+  actor.id = 'fizzle-cleanup';
+  globalThis.game.actors = [actor];
+
+  const kept = await manager.recordFizzle(actor, { craftingSystemId: 'system-live' });
+  const dropped = await manager.recordFizzle(actor, { craftingSystemId: 'system-gone' });
+
+  // Only `system-live` remains valid; no recipe ids are valid (a fizzle is
+  // recipe-less), so a naive recipe-keyed prune would drop BOTH.
+  await manager.cleanupInvalidRuns(new Set(), new Set(['system-live']));
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, 1, 'the fizzle on the removed system is pruned');
+  assert.equal(history[0].id, kept.id, 'the fizzle on a still-valid system survives');
+  assert.ok(
+    !history.some((run) => run.id === dropped.id),
+    'the removed-system fizzle is gone'
+  );
+});
+
 test('CraftingRunManager: pruneInstantaneousActiveRuns removes single-step no-time runs, keeps the rest', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
