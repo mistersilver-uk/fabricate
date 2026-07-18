@@ -45,6 +45,12 @@ import {
   isGeneralComponentCategory,
   normalizeCustomComponentCategories,
 } from '../../../utils/componentCategories.js';
+import { withCategoryIcon } from '../../../utils/categoryIcons.js';
+import {
+  planRecipeCategoryReassignments,
+  planComponentCategoryReassignments,
+  planTagRemovals,
+} from '../../../utils/vocabularyCascade.js';
 import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets,
@@ -2227,6 +2233,12 @@ function _buildSelectedSystemViewData(
     // normalizer and the write path behave. Distinct from `_buildManagedItemOptions`,
     // which projects the per-component `category` field.
     componentCategories: selectedSystem.componentCategories || [],
+    // Per-category icon maps (issue 689), parallel to the string vocabularies
+    // above. Like `componentCategories`, these are invisible to the Tags &
+    // Categories screen unless surfaced through this hand-built allowlist, however
+    // correctly the normalizer and write path behave.
+    categoryIcons: selectedSystem.categoryIcons || {},
+    componentCategoryIcons: selectedSystem.componentCategoryIcons || {},
     itemTags: selectedSystem.itemTags || selectedSystem.tags || [],
     essenceDefinitions,
     managedItemOptions,
@@ -5903,7 +5915,7 @@ export function createAdminStore(services) {
 
   // --- Category management ---
 
-  async function addCategory(value) {
+  async function addCategory(value, icon) {
     if (!value || !value.trim()) return;
     if (isGeneralRecipeCategory(value)) return;
     const systemManager = services.getCraftingSystemManager();
@@ -5911,25 +5923,48 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = normalizeCustomRecipeCategories([
-      ...(system.categories || []),
-      value.trim(),
-    ]);
-    await systemManager.updateSystem(sysId, { categories });
+    const name = value.trim();
+    const categories = normalizeCustomRecipeCategories([...(system.categories || []), name]);
+    const categoryIcons = withCategoryIcon(system.categoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { categories, categoryIcons });
     await refresh();
   }
 
+  // Deleting a referenced recipe category is a DESTRUCTIVE record rewrite (issue
+  // 689): every recipe carrying it is reassigned to `general` before the category
+  // (and its icon) is dropped from the vocabulary. Nothing is left dangling.
   async function removeCategory(category) {
     if (isGeneralRecipeCategory(category)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const recipeManager = services.getRecipeManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const recipes = recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || [];
+    for (const { id, category: reassigned } of planRecipeCategoryReassignments(recipes, category)) {
+      await recipeManager.updateRecipe(
+        id,
+        { category: reassigned },
+        { allowIncomplete: true, notify: false }
+      );
+    }
+    const categories = normalizeCustomRecipeCategories(
+      (system.categories || []).filter((c) => c !== category)
+    );
+    const categoryIcons = withCategoryIcon(system.categoryIcons, category, '');
+    await systemManager.updateSystem(sysId, { categories, categoryIcons });
+    await refresh();
+  }
+
+  async function setCategoryIcon(name, icon) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = normalizeCustomRecipeCategories(
-      (system.categories || []).filter((c) => c !== category)
-    );
-    await systemManager.updateSystem(sysId, { categories });
+    const categoryIcons = withCategoryIcon(system.categoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { categoryIcons });
     await refresh();
   }
 
@@ -5941,7 +5976,7 @@ export function createAdminStore(services) {
   // Note updateSystem's whole-array replace semantics make removal persist without
   // any `-=` deletion (unlike setFlag's deep merge).
 
-  async function addComponentCategory(value) {
+  async function addComponentCategory(value, icon) {
     if (!value || !value.trim()) return;
     if (isGeneralComponentCategory(value)) return;
     const systemManager = services.getCraftingSystemManager();
@@ -5949,14 +5984,18 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
+    const name = value.trim();
     const componentCategories = normalizeCustomComponentCategories([
       ...(system.componentCategories || []),
-      value.trim(),
+      name,
     ]);
-    await systemManager.updateSystem(sysId, { componentCategories });
+    const componentCategoryIcons = withCategoryIcon(system.componentCategoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { componentCategories, componentCategoryIcons });
     await refresh();
   }
 
+  // Cascade sibling of removeCategory (issue 689): reassign every component carrying
+  // the deleted component category to `general`, then drop the category and its icon.
   async function removeComponentCategory(category) {
     if (isGeneralComponentCategory(category)) return;
     const systemManager = services.getCraftingSystemManager();
@@ -5964,10 +6003,28 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
+    for (const { id, category: reassigned } of planComponentCategoryReassignments(
+      _getManagedItems(system),
+      category
+    )) {
+      await systemManager.updateItem(sysId, id, { category: reassigned });
+    }
     const componentCategories = normalizeCustomComponentCategories(
       (system.componentCategories || []).filter((c) => c !== category)
     );
-    await systemManager.updateSystem(sysId, { componentCategories });
+    const componentCategoryIcons = withCategoryIcon(system.componentCategoryIcons, category, '');
+    await systemManager.updateSystem(sysId, { componentCategories, componentCategoryIcons });
+    await refresh();
+  }
+
+  async function setComponentCategoryIcon(name, icon) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const componentCategoryIcons = withCategoryIcon(system.componentCategoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { componentCategoryIcons });
     await refresh();
   }
 
@@ -5986,12 +6043,18 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Cascade delete (issue 689): strip the deleted tag from every component carrying
+  // it before dropping it from the vocabulary, so no component is left referencing a
+  // tag that no longer exists.
   async function removeTag(tag) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
+    for (const { id, tags: nextTags } of planTagRemovals(_getManagedItems(system), tag)) {
+      await systemManager.updateItem(sysId, id, { tags: nextTags });
+    }
     const tags = (system.itemTags || system.tags || []).filter((t) => t !== tag);
     await systemManager.updateSystem(sysId, { itemTags: tags });
     await refresh();
@@ -8120,8 +8183,10 @@ export function createAdminStore(services) {
     toggleRequirement,
     addCategory,
     removeCategory,
+    setCategoryIcon,
     addComponentCategory,
     removeComponentCategory,
+    setComponentCategoryIcon,
     addTag,
     removeTag,
     addEssence,
