@@ -228,11 +228,13 @@ export function resolveRecipeCheckTierOptions(craftingCheck, craftingCheckMode) 
  *
  * Returns `[]` for every case other than `routedByCheck` + fixed, so the editor
  * control auto-hides otherwise. The gate is the system's real `resolutionMode`, NOT
- * the collapsed check-shape mode, because the minimum-tier gate is only threaded
- * through the `routedByCheck` runtime path (`_runRoutedCheck`); `routedByIngredients`
- * now authors its check on the shared `craftingCheck.simple` pass/fail slot and has
- * no outcome tiers, so it never reads `minSuccessOutcomeId` and surfacing the control
- * there would author a dead value. Names are returned raw (empty when unnamed) so the UI applies its own
+ * the collapsed check-shape mode, because the minimum-tier gate is only APPLIED on the
+ * `routedByCheck` runtime path: `routedByIngredients` authors its check on the shared
+ * `craftingCheck.simple` pass/fail slot and has no outcome tiers, and while alchemy
+ * `checkMode: tiered` dispatches through the same `_runRoutedCheck` runner, that
+ * dispatch forces `minOutcomeId: null` (`applyMinSuccessOutcome: false`), so a
+ * `minSuccessOutcomeId` carried outside `routedByCheck` is inert at runtime and
+ * surfacing the control there would author a dead value. Names are returned raw (empty when unnamed) so the UI applies its own
  * "Unnamed tier" label rather than leaking a tier's generated secret id. Pure (no
  * `$derived`/Foundry deps) so it can be unit-tested directly.
  *

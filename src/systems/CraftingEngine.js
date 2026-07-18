@@ -2807,7 +2807,15 @@ export class CraftingEngine {
             'alchemy tiered check mode requires a configured routed crafting check roll formula',
         };
       }
-      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+      // The per-recipe minimum-success-tier gate (`minSuccessOutcomeId`) is scoped to
+      // `routedByCheck` only: its authoring control auto-hides for alchemy, so a value
+      // carried here (authored before a mode switch, or imported) is unclearable. Pass
+      // `applyMinSuccessOutcome: false` so a carried id stays inert on an alchemy brew —
+      // tiered outcomes already gate success via each tier's `success` flag.
+      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, {
+        interactive,
+        applyMinSuccessOutcome: false,
+      });
     }
 
     const checkRequired = mode === 'progressive' || mode === 'routedByCheck';
@@ -2997,7 +3005,10 @@ export class CraftingEngine {
     recipe,
     ingredientSet,
     craftingActor,
-    { interactive = false } = {}
+    // `applyMinSuccessOutcome` gates the recipe minimum-tier bump: `routedByCheck`
+    // applies it, the alchemy tiered dispatch passes false so a carried (unclearable)
+    // `minSuccessOutcomeId` has no runtime effect on an alchemy brew.
+    { interactive = false, applyMinSuccessOutcome = true } = {}
   ) {
     const routed = system?.craftingCheck?.routed || {};
     const dc = await this._resolveSimpleCheckDc(
@@ -3021,8 +3032,9 @@ export class CraftingEngine {
       // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
       clampToNearest: true,
       // Fixed-type only: a recipe may require a minimum success tier; a roll below it
-      // fails the craft outright. Null for relative / unset recipes (no-op).
-      minOutcomeId: recipe?.minSuccessOutcomeId ?? null,
+      // fails the craft outright. Null for relative / unset recipes (no-op), and forced
+      // null for the alchemy tiered path (its authoring control is `routedByCheck`-only).
+      minOutcomeId: applyMinSuccessOutcome ? (recipe?.minSuccessOutcomeId ?? null) : null,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
