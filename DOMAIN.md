@@ -164,16 +164,17 @@ Module Configuration
 |  |- gatheringParties (world-level Fabricate parties; excluded from system import/export)
 |  |- theme
 |  `- experimentalFeatures
-`- Client settings
-   |- lastCraftingActor
-   |- lastComponentSources
-   |- lastManagedCraftingSystem
-   |- progressiveResultOrder
-   |- favouriteRecipes
-   |- recentlyCrafted
-   |- lastAlchemySystem
-   |- lastGatheringActor
-   `- chatOutput (canonical target; still implemented on system features in runtime)
+|- Client settings (per client/device)
+|  |- lastCraftingActor
+|  |- lastComponentSources
+|  |- lastManagedCraftingSystem
+|  |- favouriteRecipes
+|  |- recentlyCrafted
+|  |- lastAlchemySystem
+|  |- lastGatheringActor
+|  `- chatOutput (canonical target; still implemented on system features in runtime)
+`- User settings (per user, per world)
+   `- progressiveResultOrder (scope 'user'; a replicated document write, not localStorage — issue 651)
 
 Crafting System
 |- resolutionMode (simple | routedByIngredients | routedByCheck | progressive | alchemy)

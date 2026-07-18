@@ -149,8 +149,9 @@ An empty or stale persisted selection resolves to the first available crafting s
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders.
 If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`.
-When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route, and the `Crafting` nav group is not shown.
-When the setting is enabled, `Recipes` and `Books & Scrolls` are available as implemented routes for the selected system, nested inside an expandable `Crafting` nav group (see below); `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
+When the setting is disabled, `Recipes` and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route, and the `Crafting` nav group is not shown (there is no `Rules` rail item; the placeholder set is `recipes` + `graph`).
+When the setting is enabled, `Recipes` and `Books & Scrolls` are available as implemented routes for the selected system, nested inside an expandable `Crafting` nav group (see below); `Graph` remains a disabled planned rail item until its v2 route content is implemented.
+The top-level `Checks` rail item (hosting the Crafting / Salvage / Gathering / Validation sub-tabs) and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
 When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
 - When `fabricate.experimentalFeatures` is enabled, the selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, and the whole group (parent and every sub-item) is shown only while the setting is enabled.
 The parent row shows an expand/collapse control and the recipe count as its badge.
@@ -164,7 +165,7 @@ It hosts the system-level crafting rules that used to live on the System Overvie
 The Recipe Visibility control no longer lives on the System Overview page, and it authors the flat `visibilityMode` rather than the legacy `listMode` + `knowledge.mode` pair.
 Because the whole `Crafting` nav group is gated behind `fabricate.experimentalFeatures`, these controls are reachable only while that setting is on.
 This is an accepted consequence: with Experimental Features off, recipe resolution mode and recipe visibility are unreachable.
-Per-recipe-item use and learn caps are NOT on this page — each recipe item's caps are authored on its own Books & Scrolls item page (`books-scrolls-item`).
+Per-recipe-item use and learn caps are NOT on this page — each recipe item's caps are authored in its `recipe-item-edit` tabbed editor (or the quick-limit toggle in the `ItemPageInspector` aside).
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
 Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
 Activating only the expand/collapse control toggles the submenu without navigation.
@@ -215,6 +216,8 @@ Tabs:
 - Items
 - Essences (only when enabled)
 - Recipes
+- Tags & Categories
+- Checks (Crafting / Salvage / Gathering / Validation sub-tabs)
 - Environments (only when the selected system has `features.gathering === true`)
 
 ### Systems Tab
@@ -234,7 +237,7 @@ Changing recipe resolution mode is destructive and must follow `destructive-chan
 
 #### Salvage Resolution Mode Card
 
-The Salvage resolution mode card renders directly beneath the recipe resolution-mode card on the Crafting group's Settings page.
+The Salvage resolution mode card renders after the Recipe Visibility card (which itself sits below the recipe resolution-mode card) on the Crafting group's Settings page, and only when `features.salvage === true`.
 The card offers `simple` (the default), `progressive`, and `routed` (display name "Routed by check").
 Salvage has exactly one ingredient, so ingredient-set routing is meaningless and `alchemy` does not apply: neither is offered.
 `simple` returns one result group with an optional pass/fail salvage check.
@@ -270,10 +273,11 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 
 #### Crafting Check Controls
 
-- Enable checks
-- Check macro
-- Success macro
-- Failure macro
+A check is usable iff its mode carries an authored `rollFormula`; the legacy check-source/macro layer (`macroUuid` / `successMacroUuid` / `failureMacroUuid` / `checkSource` / `builtIn`) was removed by migration 1.8.0 and is not authored.
+
+- Enable checks (the on/off toggle for the optional simple-mode check)
+- Roll formula, DC, and tier controls per mode (`simple` / `routed` / `progressive`)
+- The simple-mode dynamic-DC macro (`craftingCheck.simple.macroUuid`) — the one surviving check-adjacent macro (it only computes the DC)
 - Failure consumption policy
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`) (progressive only)
@@ -420,14 +424,9 @@ It is not shown when `blocksSystem` is false.
 
 ### Item Sheets
 
-For actor-owned items, Fabricate may add item sheet header controls tied to recipe learning.
-
-- When `learn.dragDropEnabled === false` and knowledge mode supports learning, show a header icon/button to manually learn matching recipes from that owned item.
-- The manual learn control is shown only when the current user can update the owning actor and at least one matched recipe is learnable.
-- When an owned item matches recipes from multiple systems, the header control reflects only the manual-learning subset: matching recipes whose systems have `learn.dragDropEnabled === false`.
-- Clicking the control opens a confirmation prompt before learning.
-- On confirmation, run the learning flow from `recipe-visibility/spec.md`, including `consumeOnLearn` behavior and item removal when required.
-- If `learn.dragDropEnabled === true`, the manual header learn control is hidden by default.
+Fabricate no longer adds an item-sheet header learn control.
+The former control (`ItemSheetRecipeLearnControl.js`) was removed (issue #511); manual recipe learning is wired exclusively through the player **Inventory** surface — the book detail's learn affordances call `game.fabricate.learnRecipeFromInventory`, gated by `InventoryListingBuilder` (see §Books & Scrolls learning and `recipe-visibility/spec.md`).
+The learning flow itself (confirmation prompt, `consumeOnLearn` / `destroyWhenSpent` item removal, per-actor `learnedRecipes` write) is unchanged; only its invocation surface moved.
 
 ### Items Tab
 
@@ -605,10 +604,10 @@ Membership is authored on the item's **Contents** tab (writing the definition's 
 The caps are per recipe item, not a shared system-wide rule, so two recipe items in one system may show different chips (a one-recipe scroll beside a three-recipe tome).
 When the selected system has no recipe items, the surface shows an empty state.
 
-Opening a row navigates to a per-item caps page (`books-scrolls-item` subroute).
-That page's breadcrumb is `Crafting` then `Books & Scrolls` then the item name, and it renders a `RecipeItemCapsCard` that authors that one item's caps: the use cap (`caps.item.limitUses` / `maxUses` / `destroyWhenExhausted`), the learn cap (`caps.learn.limitRecipes` / `maxRecipes` / `destroyWhenSpent`), and `caps.learn.consumeOnLearn`.
-`consumeOnLearn` is hidden while the learn cap is enabled (the learn cap's `destroyWhenSpent` supersedes it).
-Editing is live-apply: each control passes its caps patch through `updateRecipeItemCaps(itemId, patch)`, which merges and normalizes it onto the recipe item definition, so the page stages no dirty draft and is not part of the Manager confirm-discard route-exit chain.
+Selecting a row opens the `ItemPageInspector` aside; its quick-limit toggle is the sole remaining live-apply caller of `store.updateRecipeItemCaps` (the patch merges and normalizes onto the recipe item definition), and that toggle stages no dirty draft.
+Editing a recipe item opens the full-window `recipe-item-edit` route — a tabbed editor (`RecipeItemEditorTabs`: Overview / Contents / Limits / Validation) over a root-held staged draft plus its last-persisted baseline.
+That draft **is** part of the Manager confirm-discard route-exit chain (`confirmRecipeItemRouteExit`), so navigating away with unsaved edits prompts to discard.
+The learn cap authors `caps.learn.limitRecipes` / `maxRecipes` / `destroyWhenSpent` and `caps.learn.consumeOnLearn`; `consumeOnLearn` is hidden while the learn cap is enabled (the learn cap's `destroyWhenSpent` supersedes it).
 The surface reads configuration only (recipe-item definitions plus the recipes referencing each item) and never reads per-item-instance runtime flags, so the admin store stays Foundry-free.
 
 The item's Limits authoring surface (`RecipeItemLimitsTab`), in knowledge mode inside the `limitLearning` detail block, renders (issue 544) a **Limit applies** control and **Recipes allowed** stepper on one line, then a two-column line of searchable typeahead pickers: **Required Knowledge** (left, authoring `caps.learn.prerequisiteIds` — recipes the reader must already know) and **Learning prerequisites** (right, authoring `caps.learn.characterPrerequisiteIds`).
@@ -1160,8 +1159,7 @@ This is the PR #497 per-call-flag decision, consumed uniformly by the crafting s
 
 ### Deferred (this iteration)
 
-- The learn affordance renders (the control plus its consume-on-learn warning), but
-  its execution flow is NOT wired in this iteration.
+- No learn affordance renders on the Crafting tab; recipe learning is wired only through the Inventory surface (see §Books & Scrolls learning and the Inventory learn path, `game.fabricate.learnRecipeFromInventory`).
 - The Alchemy tab and the Journal cross-link remain out of scope for the player
   Crafting tab.
 
@@ -1170,7 +1168,7 @@ This is the PR #497 per-call-flag decision, consumed uniformly by the crafting s
 The player app is a single shared window with a full-height left navigation rail.
 It carries five tabs, in this order:
 
-- **Crafting tab**: shown when >= 1 crafting system has a non-alchemy resolution mode
+- **Crafting tab**: always present
 - **Alchemy tab**: conditional — shown when >= 1 crafting system has `resolutionMode === "alchemy"`
 - **Gathering tab**
 - **Journal tab**
@@ -1240,7 +1238,8 @@ Identical rows minus working affordances are not acceptable: a player must not b
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 **Optional per-caller extensions.**
-The extension set is exactly four, all **opt-in and default-off**: an optional per-stage **quantity**, an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, and an optional **stacked row layout**.
+The extension set is exactly three, all **opt-in and default-off**: an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, and an optional **stacked row layout**.
+(The per-stage **quantity** opt-in was deleted, not defaulted off: no stage renders a quantity on either surface, consistent with the "result entries carry no quantity" rule.)
 A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
 This exists so a second consumer can add rendering without re-skinning the first.
 The fixed-state note is overridable because `canReorder: false` has **two** causes the component cannot distinguish: the GM pinned the order (the permission is off), or the player's order has already been **spent** by a resolved roll.
@@ -1250,10 +1249,9 @@ The set is enumerated deliberately: a future extension is added to this list, so
 
 The **stacked row layout** exists because the default inline row lays every part on one line and lets only the name flex, so the name absorbs every other part's width.
 In a narrow column (the player inspector's 300px) that measures a **zero-width name** and overflows the trailing controls out of the panel — the row does not degrade gracefully, it fails.
-Stacked, the reorder controls **lead** the row and the stage's identity is a flexible **column** (name and quantity in one wrapping text flow, its number beneath), so the name wraps instead of being crushed.
-A stacked row MUST print the **cumulative threshold only**, never the threshold and the per-stage difficulty together: the threshold is derived as the running sum of the difficulties before it, so the pair states the same information twice, and it is the redundant number that pushes the useful one out of the column.
-Both numbers remain correct to show inline, where the width exists and the difficulty serves as a cross-check.
-The threshold MUST NOT be labelled a **DC** on any surface: `DC` is a distinct authored concept that progressive resolution does not have (the projection resolves progressive's DC to null, and a component's `dcOverride` does not shift these thresholds), so the label would name a value the player cannot find and the GM cannot author.
+Stacked, the reorder controls **lead** the row and the stage's identity is a flexible **column** (the name in one wrapping text flow, its number beneath), so the name wraps instead of being crushed.
+Every progressive surface, stacked rows included, shows **both** the component's progressive DC ("DC N") and the cumulative threshold ("Reach ≥N"), per the issue #675 ruling and matching `resolution-modes` §Progressive Mode Semantics.
+The "DC N" value is `component.difficulty`, which the GM authors via the stepper titled "This component's Progressive DC"; the **check-level** DC remains nonexistent (the projection resolves it to null, and a component's `dcOverride` does not shift these thresholds).
 
 **Progressive salvage deltas.**
 
@@ -1362,8 +1360,7 @@ It is offered only when the rendered order actually **differs** from the authore
 - Show the outcome-tier table for `routedByCheck` recipes, with each tier's
   awarded results (success tiers only).
 - Show blocking reasons when not craftable (derived from `browseStatus`).
-- Show the learn action when applicable.
-- Show consume-on-learn warning text when applicable.
+- (No learn action on the Crafting tab: recipe learning is wired through the Inventory surface only — see §Books & Scrolls learning.)
 
 #### Shopping List Panel
 
@@ -1469,7 +1466,7 @@ A fizzle brew runs no check and shows no roll animation.
 - Confirmation dialogue when learn consumes item.
 - Success/failure notifications with actionable reasons.
 - Refresh list/detail state after completion.
-- The same learning flow must be invocable from the item sheet header learn control when drag-and-drop learning is disabled.
+- The learning flow is invoked from the Inventory surface (the book detail's learn affordances → `game.fabricate.learnRecipeFromInventory`); the former item-sheet header learn control was removed (issue #511, `ItemSheetRecipeLearnControl.js` deleted).
 
 ### Inventory Tab
 
@@ -1507,7 +1504,7 @@ There is **no repair affordance** anywhere; the treatment states why the tool is
 Brokenness is about **usability, not salvageability**, and MUST NOT gate the salvage surface.
 
 - **Inspector Info order.**
-Broken banner → description → essences → **Sources** (hidden for books) → Used by → Produced by.
+Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
 
 #### Player Salvage Surface
 
@@ -1884,7 +1881,11 @@ Client settings:
 - `fabricate.lastAlchemySystem`
 - `fabricate.favouriteRecipes`
 - `fabricate.recentlyCrafted`
-- `fabricate.progressiveResultOrder`
+- `fabricate.gatheringHideUnavailableEnvironments`
+
+User settings (per user, per world):
+
+- `fabricate.progressiveResultOrder` (scope `user`; an awaited, replicated document write, not a fire-and-forget local preference — issue #651)
 
 Actor flags:
 

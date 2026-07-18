@@ -458,7 +458,7 @@ It **counts across all actors** that hold the document and is **not reset** on t
 
 #### Player-Selected Learning From The Inventory Tab
 
-Players learn from an owned recipe item one recipe at a time in the player Inventory tab, which is the manual learn surface for every knowledge mode.
+Players learn from an owned recipe item one recipe at a time in the player Inventory tab, which is the manual learn surface for every knowledge mode; a **batch "Read & learn all N recipes"** affordance (below) is defined as a sequence of that single-recipe primitive, not a distinct engine path.
 A recipe item with an **effective** learn cap (its own `caps.learn.limitRecipes === true` AND a finite positive `caps.learn.maxRecipes`) is a **capped recipe item** and does not auto-learn every linked recipe on drop.
 A recipe item that toggled `limitRecipes` on but carries a missing or invalid `maxRecipes` is normalized so that `learnsAllowed` (and its legacy `maxRecipes` mirror) seeds to `1` — a limit of "0/undefined" is meaningless and would wrongly read as uncapped downstream (issue 544), so the observable behaviour for stored, normalized systems is a 1-learn budget rather than an uncapped auto-learn path.
 The runtime uncapped fallback survives only as a defensive dead path for raw, un-normalized data.
@@ -469,6 +469,9 @@ The runtime uncapped fallback survives only as a defensive dead path for raw, un
 - Learning one recipe (`RecipeVisibilityService.learnRecipeFromOwnedBook`) resolves the owned document deterministically, writes one `learnedRecipes` entry, and — for a capped recipe item — increments the document's learn budget count and removes the item when the budget is then spent if `caps.learn.destroyWhenSpent === true`.
 - `caps.learn.consumeOnLearn` is ignored on this path (it would delete a multi-recipe book on the first learn); only `destroyWhenSpent` on a spent cap removes the book.
 - A capped recipe item is refused a further learn once `count` reaches `maxRecipes`.
+- **Batch "Read & learn all N recipes"** (knowledge-mode book detail, `InventoryBookDetail` → `inventoryStore.learnAll()`; shipped in feat(#511), PR #527): offered only under a conservative eligibility rule — the book is learnable, its learn budget is not already spent, at least one recipe is unlearned, and either there is no learn limit or the projected cap covers the FULL book size (`caps.learn.learnsAllowed >= recipeTotal`).
+Gate-blocked recipes (`learnBlocked`, issue 544) are excluded so the batch never sends a recipe the runtime would refuse.
+It executes as sequential single-recipe learns through the same `learnRecipeFromInventory` seam, stopping on the first failure and surfacing its message, with a single reload if anything was learned.
 
 ### Drag-and-Drop Learn Configuration
 
@@ -557,7 +560,8 @@ When `dragDropEnabled === false`:
 - Drops must never trigger auto-learning from `createItem`, `preCreateItem`, or `dropActorSheetData`.
 - The actor still receives the dropped item through normal Foundry item-drop behaviour.
 - The manual learning affordance is the player **Inventory tab**: the owned recipe item appears as a learnable row and each not-yet-learned recipe offers a Learn action (see Player-Selected Learning From The Inventory Tab).
-- The Inventory learn path learns one recipe at a time and does not apply `consumeOnLearn`; a capped book removes itself only when its budget is spent and `destroyWhenSpent === true`.
+- The Inventory learn path's primitive learns one recipe at a time and does not apply `consumeOnLearn`; a capped book removes itself only when its budget is spent and `destroyWhenSpent === true`.
+The batch "Read & learn all" affordance (see Player-Selected Learning From The Inventory Tab) is a stop-on-first-failure sequence of that primitive, not a separate path.
 - Manual-learning eligibility is evaluated per matched recipe using that recipe's own knowledge configuration.
 In mixed-system worlds, the manual path only includes recipes from systems where `dragDropEnabled === false`.
 

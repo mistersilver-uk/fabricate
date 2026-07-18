@@ -10,8 +10,7 @@ Fabricate supports:
 - GM-defined crafting systems and recipes with explicit resolution modes
 - Configurable recipe visibility and knowledge gating
 - Multi-step crafting processes
-- Optional crafting check macros
-- Optional success and failure macros
+- Optional property macros, the simple-mode dynamic-DC macro, and currency macros
 - Optional essences and effect transfer
 - Optional time and currency requirements
 
@@ -59,11 +58,10 @@ A crafting system defines:
 
 - one system-wide resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`)
 - optional feature toggles
-- check behaviour and macros
-- failure/success hooks
+- check behaviour (rollFormula / DC / tier configuration); there is no success/failure macro or hook layer (the only hook fired is `fabricate.ready`)
 - requirement providers (time/currency)
 - recipe visibility mode
-- a recipe-level result selection provider (`ingredientSet`, `check`) only when mode is `alchemy`; the routed crafting modes derive their routing basis from the system mode and carry no provider
+- for `alchemy` systems, a system-level alchemy check mode (`alchemy.checkMode`: `none` / `simple` / `tiered`); the retired recipe-level `resultSelection.provider` (issue 554) is gone, and the routed crafting modes derive their routing basis from the system mode and carry no provider
 
 Changing resolution mode is destructive and governed by `destructive-changes-and-migrations/spec.md`.
 
@@ -111,17 +109,27 @@ World:
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
 - `fabricate.experimentalFeatures` for future experimental feature gates, disabled by default
+- `fabricate.recipeItemFlagStampVersion` (one-shot flag-stamp version)
+- `fabricate.componentFlagStampVersion` (one-shot flag-stamp version)
+- `fabricate.toolFlagStampVersion` (one-shot flag-stamp version)
+- `fabricate.ownedItemComponentStampVersion` (one-shot flag-stamp version)
 
-Client:
+Client (per client/device):
 
+- `fabricate.interactionPromptPosition`
 - `fabricate.lastCraftingActor`
 - `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
+- `fabricate.managerRailCollapsed`
 - `fabricate.lastAlchemySystem`
 - `fabricate.favouriteRecipes`
 - `fabricate.recentlyCrafted`
-- `fabricate.progressiveResultOrder`
+- `fabricate.gatheringHideUnavailableEnvironments`
+
+User (per user, per world):
+
+- `fabricate.progressiveResultOrder` (scope `user`; a replicated document write, not client-local — issue #651)
 
 ### Actor Flags
 
