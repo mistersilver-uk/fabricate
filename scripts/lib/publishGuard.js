@@ -342,7 +342,14 @@ function decideTarget({
   const sameBuild = provenanceProvesSameBuild(zip, sourceSha, buildProfile);
 
   // RULE 2. The absent head is branched on BEFORE any comparison — never handed to a comparator
-  // that would treat a missing operand as older than everything.
+  // that would treat a missing operand as older than everything. This allow-no-head is a
+  // FIRST-PUBLISH posture, and it is correct HERE: this guard runs at publish time, where an absent
+  // head means the target has never been written and so nothing can be moved backwards. It is NOT
+  // the promotion-time posture — `promote-to-public.yml`'s registry-lead check (evaluateRegistryLeadTarget
+  // in ./promoteGuards.js) HARD-FAILS an absent head on a cohort-retaining channel, because there an
+  // absent manifest is the 404 the Registry lead prohibition forbids: a retained cohort whose manifest
+  // 404s while the module is on the registry is offered a rewrite out of its private channel. The two
+  // postures answer different questions and do not conflict.
   if (!present) {
     // A zip with no manifest is a publish that died before its manifest write. Resume it (skip the
     // identical immutable zip) when provenance proves the same build; refuse an orphan zip of a
