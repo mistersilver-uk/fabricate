@@ -1713,9 +1713,21 @@ export class RecipeManager {
   }
 
   /**
-   * Import recipes from JSON
+   * Import recipes from JSON.
+   *
+   * Each recipe that cannot be imported is skipped and recorded as a conflict:
+   * `reason: 'invalid'` when activation validation fails (carrying the validation
+   * `errors`), or `reason: 'duplicate-id'` when a recipe with the same id already
+   * exists and `overwrite` is false. On completion the skipped recipes are surfaced
+   * in ONE aggregated conflict-report notification (spec item 3), kept distinct from
+   * the terminal counts notification (spec item 4). Duplicate-id skips are no longer
+   * silent.
+   *
    * @param {Object[]} recipesData - Array of recipe data
    * @param {boolean} overwrite - Whether to overwrite existing recipes
+   * @returns {Promise<{ imported: number, skipped: number, total: number,
+   *   conflicts: Array<{ recipeId: string, recipeName: string, reason: string,
+   *   errors?: string[] }> }>} import counts plus the per-recipe conflict list
    */
   async importRecipes(recipesData, overwrite = false) {
     this._assertGM('import recipes');
