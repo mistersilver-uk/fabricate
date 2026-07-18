@@ -207,7 +207,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Resolve a unique matching signature.
 3. If no signature matches:
    - return user-facing failure message,
-   - consume submitted ingredients,
+   - consume submitted ingredients only when `alchemy.consumeOnFail !== false` (default true), consistent with `resolution-modes/spec.md` §Alchemy Mode,
    - record the attempt as failed run history.
 4. If signature matches:
    - resolve the target recipe + ingredient set,
@@ -226,6 +226,10 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 1. Completed crafts and failed attempts are recorded.
 2. Failed attempts include no-signature failures and failed checks.
 3. Player history visibility is controlled by `alchemy.showAttemptHistoryToPlayers`.
+4. A no-signature fizzle records a failed, recipe-less run-history entry (`recipeId: null`, `isFizzle: true`, `status: "failed"`).
+   The entry is archived straight to history and never enters the active-runs container.
+   Recording is unconditional; the entry is player-visible only when `alchemy.showAttemptHistoryToPlayers` is enabled.
+   It carries no recipe or signature information, so it can never leak an undiscovered recipe, and is pruned only when its crafting system becomes invalid (not as an unknown-recipe run).
 
 The `alchemy.showAttemptHistoryToPlayers` flag now governs two distinct concepts:
 
