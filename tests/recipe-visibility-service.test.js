@@ -2888,3 +2888,128 @@ test('555 R5 - the tier-4 refusal still applies to a REGISTERED definition', () 
   const preview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'auto' });
   assert.equal(preview.matchedRecipes.length, 0, 'a registered book is still refused at tier 4');
 });
+
+// #703 — System-Validity Gate at craft time (guardCraftStart) + entity tier
+// ---------------------------------------------------------------------------
+
+// A system whose validation report blocks the whole system (progressive mode with
+// no configured progressive check → `progressiveNoCheck`, a `blocks: 'system'`
+// blocker).
+function buildBlockedSystem(id = 'system-1') {
+  return {
+    id,
+    resolutionMode: 'progressive',
+    craftingCheck: {},
+    components: [],
+    visibilityMode: 'global',
+    recipeVisibility: { listMode: 'global' },
+  };
+}
+
+// A simple-mode system whose one salvageable component has an invalid salvage config
+// (two result groups where simple mode requires exactly one) → a `blocks: 'visibility'`
+// critical whose entityId is the component id.
+function buildInvalidSalvageSystem({ id = 'system-1', componentId = 'invalid-comp' } = {}) {
+  return {
+    id,
+    resolutionMode: 'simple',
+    features: { salvage: true },
+    salvageResolutionMode: 'simple',
+    visibilityMode: 'global',
+    recipeVisibility: { listMode: 'global' },
+    components: [
+      {
+        id: componentId,
+        name: 'Faulty Widget',
+        salvage: {
+          enabled: true,
+          resultGroups: [
+            { id: 'g1', results: [] },
+            { id: 'g2', results: [] },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+test('703 - non-GM craft against a blocksSystem system is rejected at guardCraftStart', () => {
+  const system = buildBlockedSystem('system-1');
+  const recipe = buildMockRecipe({ id: 'r1', craftingSystemId: 'system-1' });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const guard = service.guardCraftStart({
+    viewer: { isGM: false, id: 'u1' },
+    recipe,
+    craftingActor: new FakeActor({ id: 'a1' }),
+  });
+
+  assert.equal(guard.craftable, false);
+  assert.equal(guard.reason, 'system-invalid');
+});
+
+test('703 - a GM bypasses the craft-time system-validity gate', () => {
+  const system = buildBlockedSystem('system-1');
+  const recipe = buildMockRecipe({ id: 'r1', craftingSystemId: 'system-1' });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const guard = service.guardCraftStart({
+    viewer: { isGM: true, id: 'gm' },
+    recipe,
+    craftingActor: new FakeActor({ id: 'a1' }),
+  });
+
+  assert.notEqual(guard.reason, 'system-invalid');
+  assert.equal(guard.visible, true);
+});
+
+test('703 - non-GM craft targeting a blocks:visibility entity is rejected; a GM succeeds', () => {
+  const system = buildInvalidSalvageSystem({ id: 'system-1', componentId: 'ent-x' });
+  // The targeted entity id (`recipe.id`) is the invalid-salvage component id, so it is
+  // carried in the system's `hiddenEntityIds`.
+  const recipe = buildMockRecipe({ id: 'ent-x', craftingSystemId: 'system-1' });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const playerGuard = service.guardCraftStart({
+    viewer: { isGM: false, id: 'u1' },
+    recipe,
+    craftingActor: new FakeActor({ id: 'a1' }),
+  });
+  assert.equal(playerGuard.craftable, false);
+  assert.equal(playerGuard.reason, 'visibility');
+
+  const gmGuard = service.guardCraftStart({
+    viewer: { isGM: true, id: 'gm' },
+    recipe,
+    craftingActor: new FakeActor({ id: 'a1' }),
+  });
+  assert.equal(gmGuard.craftable, true);
+});
+
+test('703 - guardCraftStart evaluates system visibility at most once per craft call', () => {
+  let getRecipesCalls = 0;
+  const recipeManager = {
+    getRecipes: () => {
+      getRecipesCalls += 1;
+      return [];
+    },
+  };
+  const system = {
+    id: 'system-1',
+    resolutionMode: 'simple',
+    components: [],
+    visibilityMode: 'global',
+    recipeVisibility: { listMode: 'global' },
+  };
+  const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system });
+  const recipe = buildMockRecipe({ id: 'r1', craftingSystemId: 'system-1' });
+
+  const guard = service.guardCraftStart({
+    viewer: { isGM: false, id: 'u1' },
+    recipe,
+    craftingActor: null,
+  });
+
+  assert.equal(guard.craftable, true, 'a valid global system stays craftable');
+  assert.equal(getRecipesCalls, 1, 'system visibility computed once, not per step');
+});

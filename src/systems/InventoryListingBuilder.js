@@ -38,6 +38,11 @@ import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
+import { computeSystemVisibility } from './systemValidation.js';
+
+// A shared empty set for the GM path, where no entity is visibility-hidden — avoids
+// allocating a throwaway Set per system on every listing build.
+const NO_HIDDEN_ENTITIES = new Set();
 
 // Knowledge modes in which a recipe item (book) can teach a recipe. In these
 // modes owning the book surfaces a Learn affordance in the inventory; other modes
@@ -153,7 +158,7 @@ export class InventoryListingBuilder {
     const systems = this.craftingSystemManager?.getSystems?.() ?? [];
     for (const system of Array.isArray(systems) ? systems : []) {
       rows.push(
-        ...this._buildSystemRows(system, sources, allowedRecipeIds),
+        ...this._buildSystemRows(system, sources, allowedRecipeIds, isGM),
         ...this._buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds)
       );
     }
@@ -217,7 +222,7 @@ export class InventoryListingBuilder {
    * index is only built for systems that produced at least one owned row.
    * @private
    */
-  _buildSystemRows(system, sources, allowedRecipeIds = null) {
+  _buildSystemRows(system, sources, allowedRecipeIds = null, isGM = true) {
     const components = Array.isArray(system?.components) ? system.components : [];
     if (components.length === 0) return [];
 
@@ -258,8 +263,21 @@ export class InventoryListingBuilder {
       essencesEnabled && Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
     const essenceDefById = new Map(essenceDefs.map((def) => [def.id, def]));
 
+    // The system's recipes, fetched ONCE per owned system and shared by the used-by
+    // index and the System-Validity Gate's entity tier — never re-queried per row.
+    const systemRecipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
+
+    // System-Validity Gate entity tier (spec §Listing Algorithm step 0): drop entities
+    // carrying a `blocks: 'visibility'` critical from a non-GM viewer's listing (today:
+    // components whose salvage config is invalid). Computed once per system; GMs bypass.
+    // This is a viewer-scoped projection filter — it NEVER mutates the stored `enabled`
+    // flag.
+    const hiddenEntityIds = isGM
+      ? NO_HIDDEN_ENTITIES
+      : this._hiddenEntityIdsForSystem(system, systemRecipes);
+
     const { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy } =
-      this._buildRecipeIndexes(system, allowedRecipeIds);
+      this._buildRecipeIndexes(system, allowedRecipeIds, systemRecipes);
     // Component ids registered as a Tool in the system library — a tool reads as a
     // tool even when no recipe references it.
     const toolComponentIds = new Set(
@@ -326,7 +344,13 @@ export class InventoryListingBuilder {
         broken: this._isToolBroken(system, component.id, representativeItem),
         // The player-facing salvage contract, or null when not salvageable. Component
         // rows only: essence and recipe-item rows are never salvageable.
-        salvage: this._buildSalvage({ system, component, componentById, rowSources }),
+        salvage: this._buildSalvage({
+          system,
+          component,
+          componentById,
+          rowSources,
+          hiddenEntityIds,
+        }),
         totalQuantity,
         sources: rowSources,
         essences: essencesEnabled ? this._componentEssences(rawEssences, essenceDefById) : [],
@@ -641,6 +665,27 @@ export class InventoryListingBuilder {
   }
 
   /**
+   * The ids of entities carrying a `blocks: 'visibility'` validation critical for one
+   * system (spec §System-Validity Gate entity tier) — today, components whose salvage
+   * config is invalid. Computed once per system via the shared `computeSystemVisibility`
+   * hot-path helper, reusing the recipes the caller already fetched. GM bypass is the
+   * caller's concern (the GM path never calls this).
+   *
+   * @param {object} system The owning crafting system.
+   * @param {object[]} recipes The system's recipes (already fetched by the caller).
+   * @returns {Set<string>}
+   * @private
+   */
+  _hiddenEntityIdsForSystem(system, recipes = []) {
+    if (!system?.id) return NO_HIDDEN_ENTITIES;
+    const { hiddenEntityIds } = computeSystemVisibility(system, {
+      recipes,
+      components: system.components || [],
+    });
+    return hiddenEntityIds;
+  }
+
+  /**
    * The player-facing salvage view-model for ONE component row (issue 675), or null
    * when the component is not salvageable. Essence and recipe-item rows are never
    * salvageable and always carry null.
@@ -664,9 +709,20 @@ export class InventoryListingBuilder {
    * @returns {object|null}
    * @private
    */
-  _buildSalvage({ system, component, componentById, rowSources }) {
+  _buildSalvage({
+    system,
+    component,
+    componentById,
+    rowSources,
+    hiddenEntityIds = NO_HIDDEN_ENTITIES,
+  }) {
     const salvage = component?.salvage ?? null;
     if (system?.features?.salvage !== true || salvage?.enabled !== true) return null;
+    // System-Validity Gate entity tier: a non-GM viewer never sees a salvage panel for
+    // a component whose salvage config produced a `blocks: 'visibility'` critical
+    // (spec §Listing Algorithm step 0). The stored `salvage.enabled` flag is left
+    // untouched — this is a viewer projection, not a config mutation.
+    if (hiddenEntityIds.has(component?.id)) return null;
 
     const check = system?.salvageCraftingCheck ?? {};
     // The mode the ENGINE dispatches on. `_runSalvageCraftingCheck` reads this and the
@@ -1179,7 +1235,7 @@ export class InventoryListingBuilder {
    *    producers are display-only (`recipeId: null`). One entry per producer.
    * @private
    */
-  _buildRecipeIndexes(system, allowedRecipeIds = null) {
+  _buildRecipeIndexes(system, allowedRecipeIds = null, systemRecipes = null) {
     const componentUsedBy = new Map();
     const componentRequiredFor = new Map();
     const essenceUsedBy = new Map();
@@ -1224,7 +1280,10 @@ export class InventoryListingBuilder {
     // (present but not consumed).
     const addRequiredFor = makeAdder(componentRequiredFor);
 
-    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
+    // Reuse the caller's already-fetched recipes when provided (one query per owned
+    // system); fall back to a direct fetch for standalone callers.
+    const recipes =
+      systemRecipes ?? this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
     for (const recipe of Array.isArray(recipes) ? recipes : []) {
       if (allowedRecipeIds && !allowedRecipeIds.has(recipe?.id)) continue;
       // Resolve the recipe image the way the GM Manager / player Crafting tab do

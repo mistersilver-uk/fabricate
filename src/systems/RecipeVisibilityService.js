@@ -3,6 +3,7 @@ import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
+import { computeSystemVisibility } from './systemValidation.js';
 
 const LEARN_RECIPE_MESSAGES = {
   systemNotFound: 'FABRICATE.Knowledge.SystemNotFound',
@@ -907,7 +908,39 @@ export class RecipeVisibilityService {
       .filter((entry) => entry.access.visible);
   }
 
+  // The System-Validity Gate's two facts for one system (spec §System-Validity
+  // Gate), evaluated once per call. Reads the system's recipes/components through the
+  // injected recipe manager. Fails open (empty) when the system id is missing so a
+  // broken collaborator never blocks a craft outright. Callers own the GM bypass.
+  _computeSystemVisibility(system) {
+    if (!system?.id) return { blocksSystem: false, hiddenEntityIds: new Set() };
+    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) || [];
+    return computeSystemVisibility(system, {
+      recipes,
+      components: system.components || [],
+    });
+  }
+
   guardCraftStart({ viewer, recipe, craftingActor, componentSourceActors = [] }) {
+    // System-Validity Gate (spec §Crafting Guard Algorithm step 0): reject a non-GM
+    // craft up front when the system's validation report blocks the whole system, or
+    // when the targeted recipe entity is marked `blocks: 'visibility'`. This is an
+    // INDEPENDENT layer from listing filtering — a non-GM must not bypass visibility
+    // by targeting a recipe id directly via API/macro. `computeSystemVisibility` is
+    // evaluated once here (not per step). GMs bypass so they can still reach a broken
+    // system to diagnose it (mirrors `GatheringEngine._isSystemBlockedForGathering`).
+    if (viewer?.isGM !== true) {
+      const system = this._getCraftingSystem(recipe);
+      if (system) {
+        const { blocksSystem, hiddenEntityIds } = this._computeSystemVisibility(system);
+        if (blocksSystem === true) {
+          return { visible: false, craftable: false, reason: 'system-invalid', knowledge: null };
+        }
+        if (hiddenEntityIds.has(String(recipe?.id))) {
+          return { visible: false, craftable: false, reason: 'visibility', knowledge: null };
+        }
+      }
+    }
     return this.evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors });
   }
 
