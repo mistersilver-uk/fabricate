@@ -53,6 +53,16 @@ When `CraftingSystem.resolutionMode` changes:
 3. Remove learned flags for that recipe from all actors.
 4. Remove recipe-specific UI preference data.
 
+### Delete a Referenced Category or Tag
+
+Deleting a vocabulary entry that records still reference is a confirmed destructive record rewrite, not a silent orphaning.
+
+1. Require explicit GM confirmation via the Tags & Categories screen's inline confirm strip; an unreferenced entry may be removed without a cascade.
+2. Deleting a referenced recipe category reassigns every recipe carrying it to `general` before the category (and its icon) is dropped from the vocabulary.
+3. Deleting a referenced component category reassigns every component carrying it to `general` before the category (and its icon) is dropped.
+4. Deleting a referenced item tag strips the tag from the `tags` of every component carrying it before the tag is dropped from the vocabulary.
+5. Nothing is left dangling: no recipe or component retains a `category` or tag value that no longer exists in the system vocabulary.
+
 ### Disable Multi-step Feature
 
 If disabling `features.multiStepRecipes` for a system with multistep recipes:
