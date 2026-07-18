@@ -239,6 +239,56 @@ export function rebindCopyComponentIds(prepared, { generateId = localId } = {}) 
 }
 
 /**
+ * Copy-mode: regenerate every recipe id and atomically remap every within-payload
+ * recipe-book membership reference (`recipeItemDefinitions[].recipeIds` entries) to
+ * the regenerated id (issue #701). Without this, copy-mode strips recipe ids (the
+ * downstream `Recipe` constructor mints fresh ones) but the book membership arrays
+ * still point at the pre-import ids, so every book in the copy renders empty and a
+ * faithful copy import reports every membership entry as a broken `RECIPE_ITEM`
+ * reference.
+ *
+ * The rewrite is KEY-AWARE and class-scoped: only `recipeIds[]` membership
+ * positions are rewritten. A membership entry naming a recipe id ABSENT from the
+ * payload (genuinely broken in the source) is preserved verbatim so it still
+ * resolves-and-reports downstream. Mirrors {@link rebindCopyComponentIds}; the
+ * component-id remap still must not touch `recipeIds[]` (the protection is per id
+ * class, not absolute).
+ *
+ * @param {{ system: object, recipes: object[] }} prepared
+ * @param {{ generateId?: () => string }} [deps]
+ * @returns {object} the same `prepared` reference, mutated
+ */
+export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
+  if (!prepared || typeof prepared !== 'object') return prepared;
+  const { system, recipes } = prepared;
+
+  // --- Old → new recipe-id map (built over recipes[].id only) ---
+  const idMap = new Map();
+  for (const recipe of arrayOf(recipes)) {
+    if (recipe && typeof recipe === 'object' && recipe.id) {
+      idMap.set(recipe.id, generateId());
+    }
+  }
+  if (idMap.size === 0) return prepared;
+
+  // Rewrite the recipe ids themselves.
+  for (const recipe of arrayOf(recipes)) {
+    if (recipe && typeof recipe === 'object' && recipe.id && idMap.has(recipe.id)) {
+      recipe.id = idMap.get(recipe.id);
+    }
+  }
+
+  // Remap book membership; a membership id absent from the map is left verbatim.
+  for (const def of arrayOf(system?.recipeItemDefinitions)) {
+    if (def && Array.isArray(def.recipeIds)) {
+      def.recipeIds = def.recipeIds.map((rid) => idMap.get(rid) ?? rid);
+    }
+  }
+
+  return prepared;
+}
+
+/**
  * Resolve and classify every reference in the payload. Returns a deep clone with
  * remapped external values applied, plus the structured `unresolvedReferences[]`
  * collection.
