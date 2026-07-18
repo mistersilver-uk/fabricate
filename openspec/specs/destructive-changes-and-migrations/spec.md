@@ -67,8 +67,9 @@ When `features.multiStepRecipes` is disabled for a system that has multi-step re
 3. Multi-step authoring surfaces hide while the feature is off; the multi-step step-mode control still renders for a recipe that is already multi-step so a GM retains the single-step revert path.
 4. The player side does not list or offer multi-step runs for the gated recipes: the listing filter excludes them and the crafting guard rejects a non-GM craft targeting them (reason `visibility`).
    A GM still sees the recipes (GM bypass) to re-enable the feature or revert a recipe to a single step.
-5. An in-flight multi-step run is **left to finish**: disabling the feature never touches run records, mirroring the salvage honour-existing behaviour.
-   The gate applies to starting new crafts, not to a run already in progress.
+5. Disabling the feature is **non-destructive to run records**: no in-flight multi-step run — including a timed run whose ingredients were already consumed at its start step — is deleted, cleaned up, or rewritten, mirroring the salvage honour-existing behaviour.
+   The gate is enforced uniformly at the crafting guard, which runs on every `craft()` call including each resumed step, so while the feature is off a non-GM cannot advance or finish a gated recipe's run: its remaining steps are gated (reason `visibility`) until the feature is re-enabled, at which point the retained run resumes losslessly.
+   A GM bypasses the gate and can advance or finish such a run at any time.
 6. No GM confirmation is required, because the toggle is non-destructive; re-enabling the feature drops the validation issue and restores full visibility with zero data loss.
 
 This gating is enforced at the system-validation / visibility seam (`computeSystemVisibility` / `evaluateSystemValidation`), not only at the UI toggle, so import, copy, and migration writers that never pass through the manager toggle are gated on the same invariant.

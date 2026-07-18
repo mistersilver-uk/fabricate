@@ -925,12 +925,35 @@ export class RecipeVisibilityService {
       craftingSystemId,
     });
 
+    const systemVisibilityCache = new Map();
     return recipes
       .map((recipe) => ({
         recipe,
         access: this.evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors }),
       }))
-      .filter((entry) => entry.access.visible);
+      .filter((entry) => entry.access.visible)
+      .filter((entry) => !this._isRecipeSystemGated(entry.recipe, viewer, systemVisibilityCache));
+  }
+
+  // System-Validity Gate for the LISTING path (spec §recipe-visibility Listing
+  // Algorithm step 0): drop a recipe whose system is `blocks: 'system'` invalid, or
+  // whose entity id is marked `blocks: 'visibility'` (e.g. a multi-step recipe under a
+  // system with `features.multiStepRecipes` disabled), for non-GM viewers. This is the
+  // listing counterpart to `guardCraftStart` so the player list and the craft guard
+  // agree — a globally-visible gated recipe must not slip through listing and be
+  // rejected only at craft-start. GMs bypass so they can still see and fix a gated
+  // system. Cached per call by system id (a multi-recipe system computes once).
+  _isRecipeSystemGated(recipe, viewer, cache) {
+    if (viewer?.isGM === true) return false;
+    const system = this._getCraftingSystem(recipe);
+    if (!system?.id) return false;
+    let visibility = cache.get(system.id);
+    if (!visibility) {
+      visibility = this._computeSystemVisibility(system);
+      cache.set(system.id, visibility);
+    }
+    if (visibility.blocksSystem === true) return true;
+    return visibility.hiddenEntityIds.has(String(recipe?.id));
   }
 
   // The System-Validity Gate's two facts for one system (spec §System-Validity

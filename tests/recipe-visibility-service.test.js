@@ -3362,3 +3362,84 @@ test('706d - the normalized system config carries no legacy consumeOnLearn, yet 
   await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
   assert.equal(item.deleted, true, 'consumption is driven by the definition caps');
 });
+
+// ---------------------------------------------------------------------------
+// Multi-step feature gate — LISTING path (issue 710)
+//
+// Disabling `features.multiStepRecipes` is a non-destructive visibility gate:
+// a multi-step recipe (steps[].length > 0) is retained in persisted data but
+// raises a `blocks: 'visibility'` issue, so the non-GM listing must drop it and
+// re-enabling the feature must list it again losslessly. These pin the listing
+// counterpart to guardCraftStart so the player list and the craft guard agree.
+// ---------------------------------------------------------------------------
+
+function buildMultiStepGateFixture(multiStepEnabled) {
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: { listMode: 'player' },
+    features: { multiStepRecipes: multiStepEnabled },
+  });
+  const singleStep = buildMockRecipe({
+    id: 'recipe-single',
+    visibility: { restricted: false, allowedUserIds: [] },
+  });
+  const multiStep = buildMockRecipe({
+    id: 'recipe-multi',
+    visibility: { restricted: false, allowedUserIds: [] },
+    steps: [{ id: 's1' }, { id: 's2' }],
+  });
+  return { system, recipes: [singleStep, multiStep] };
+}
+
+test('710 listing - multi-step recipe is hidden from a non-GM when the feature is disabled', () => {
+  const { system, recipes } = buildMultiStepGateFixture(false);
+  const service = buildService({ system, recipes });
+
+  const results = service.getVisibleRecipes({
+    viewer: { isGM: false, id: 'user-1' },
+    craftingSystemId: 'system-1',
+  });
+
+  const ids = results.map((entry) => entry.recipe.id);
+  assert.deepEqual(ids, ['recipe-single'], 'the globally-visible multi-step recipe is gated out of the listing');
+});
+
+test('710 listing - a GM still sees the gated multi-step recipe (bypass)', () => {
+  const { system, recipes } = buildMultiStepGateFixture(false);
+  const service = buildService({ system, recipes });
+
+  const results = service.getVisibleRecipes({
+    viewer: { isGM: true, id: 'gm-1' },
+    craftingSystemId: 'system-1',
+  });
+
+  const ids = results.map((entry) => entry.recipe.id).sort();
+  assert.deepEqual(ids, ['recipe-multi', 'recipe-single'], 'the GM bypass lists every recipe');
+});
+
+test('710 listing - re-enabling the feature restores the multi-step recipe with no data loss', () => {
+  const { system, recipes } = buildMultiStepGateFixture(true);
+  const service = buildService({ system, recipes });
+
+  const results = service.getVisibleRecipes({
+    viewer: { isGM: false, id: 'user-1' },
+    craftingSystemId: 'system-1',
+  });
+
+  const listed = results.find((entry) => entry.recipe.id === 'recipe-multi');
+  assert.ok(listed, 'the multi-step recipe is listed once the feature is on');
+  assert.deepEqual(listed.recipe.steps, recipes[1].steps, 'its steps are unchanged (round-trip is lossless)');
+});
+
+test('710 guard - a non-GM craft of a gated multi-step recipe is rejected with reason visibility', () => {
+  const { system, recipes } = buildMultiStepGateFixture(false);
+  const service = buildService({ system, recipes });
+
+  const guard = service.guardCraftStart({
+    viewer: { isGM: false, id: 'user-1' },
+    recipe: recipes[1],
+  });
+
+  assert.equal(guard.craftable, false);
+  assert.equal(guard.reason, 'visibility', 'listing and the craft guard agree on the gate');
+});
