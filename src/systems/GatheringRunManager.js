@@ -1,3 +1,5 @@
+import { reconcileRunContainer, historyIdsOf } from './runContainerCoherence.js';
+
 const FLAG_NAMESPACE = 'fabricate';
 const FLAG_KEY = 'gatheringRuns';
 const HISTORY_LIMIT = 50;
@@ -32,14 +34,20 @@ export class GatheringRunManager {
     this.getUserId = getUserId;
     this.getActors = getActors;
     this._cache = new Map();
+    // actorKey -> { activeKeys, historyIds } this manager last observed, so `_persist`
+    // can reconcile against the document and remove only what THIS writer dropped
+    // (never another client's concurrently-added run). See runContainerCoherence.
+    this._baseline = new Map();
   }
 
   invalidateCache(actorId = null) {
     if (actorId) {
       this._cache.delete(actorId);
+      this._baseline.delete(actorId);
       return;
     }
     this._cache.clear();
+    this._baseline.clear();
   }
 
   getActiveRuns(actor) {
@@ -243,18 +251,43 @@ export class GatheringRunManager {
   _getContainer(actor) {
     this._assertActor(actor);
     const key = actorKey(actor);
-    if (this._cache.has(key)) {
-      return this._cache.get(key);
-    }
-    const container = this._normalizeContainer(readGatheringRunsFlag(actor), actor);
+    const container = this._cache.has(key)
+      ? this._cache.get(key)
+      : this._normalizeContainer(readGatheringRunsFlag(actor), actor);
     this._cache.set(key, container);
+    // Snapshot the active keys + history ids the caller is about to mutate from, so
+    // `_persist` can distinguish an intentional removal from a run this manager never
+    // observed (another client's concurrent write).
+    this._recordBaseline(key, container);
     return container;
+  }
+
+  _recordBaseline(key, container) {
+    this._baseline.set(key, {
+      activeKeys: Object.keys(container.active || {}),
+      historyIds: historyIdsOf(container.history),
+    });
   }
 
   async _persist(actor, container) {
     const normalized = this._normalizeContainer(container, actor);
-    await writeGatheringRunsFlag(actor, normalized);
-    this._cache.set(actorKey(actor), normalized);
+    const key = actorKey(actor);
+    // Reconcile against the CURRENT document so a stale in-memory view cannot clobber
+    // runs written out-of-band by another client/session or the world-time resume
+    // (issues 733 + 739): union history by id, keep other writers' active runs.
+    const current = this._normalizeContainer(readGatheringRunsFlag(actor), actor);
+    const baseline = this._baseline.get(key);
+    const reconciled = reconcileRunContainer({
+      current,
+      next: normalized,
+      previousActiveKeys: baseline?.activeKeys ?? Object.keys(current.active),
+      previousHistoryIds: baseline?.historyIds ?? historyIdsOf(current.history),
+      compareHistory: compareNewestFirst,
+      historyLimit: HISTORY_LIMIT,
+    });
+    await writeGatheringRunsFlag(actor, reconciled);
+    this._cache.set(key, reconciled);
+    this._recordBaseline(key, reconciled);
   }
 
   _normalizeContainer(raw = {}, actor = null) {

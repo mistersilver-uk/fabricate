@@ -4,6 +4,12 @@ import {
   deleteRemovedActiveRunFlags,
 } from '../config/flags.js';
 
+import {
+  reconcileRunContainer,
+  compareFinishedAtNewestFirst,
+  historyIdsOf,
+} from './runContainerCoherence.js';
+
 const HISTORY_LIMIT = 50;
 
 /**
@@ -23,6 +29,10 @@ export class SalvageRunManager {
    */
   constructor({ isPrimaryGM = () => true } = {}) {
     this._cache = new Map(); // actorId -> container
+    // actorId -> { activeKeys, historyIds } this manager last observed, so `_persist`
+    // can reconcile against the document and remove only what THIS writer dropped
+    // (never another client's concurrently-added run). See runContainerCoherence.
+    this._baseline = new Map();
     this._isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
   }
 
@@ -56,26 +66,59 @@ export class SalvageRunManager {
   }
 
   async _persist(actor, container) {
+    // Reconcile against the CURRENT document so a stale in-memory view cannot clobber
+    // runs written out-of-band by another client/session or the world-time resume
+    // (issues 733 + 739): union history by id, keep other writers' active runs.
+    const current = this._normalizeContainer(getFabricateFlag(actor, 'salvageRuns', null));
+    const baseline = this._baseline.get(actor.id);
+    const reconciled = reconcileRunContainer({
+      current,
+      next: container,
+      previousActiveKeys: baseline?.activeKeys ?? Object.keys(current.active),
+      previousHistoryIds: baseline?.historyIds ?? historyIdsOf(current.history),
+      compareHistory: compareFinishedAtNewestFirst,
+      historyLimit: HISTORY_LIMIT,
+    });
+    // Apply the reconciled result onto the SAME container object and cache that
+    // reference, so a caller holding this container across an await (e.g.
+    // `processWorldTime` resuming a run mid-loop) sees the reconciliation and cannot
+    // re-persist a stale copy that resurrects a just-completed run.
+    container.active = reconciled.active;
+    container.history = reconciled.history;
     this._cache.set(actor.id, container);
+    this._recordBaseline(actor.id, container);
     // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
     // so completed/cleared runs don't resurrect on reload (see the shared helper).
     await deleteRemovedActiveRunFlags(actor, 'salvageRuns', container);
     await setFabricateFlag(actor, 'salvageRuns', container);
   }
 
+  _recordBaseline(actorId, container) {
+    this._baseline.set(actorId, {
+      activeKeys: Object.keys(container.active || {}),
+      historyIds: historyIdsOf(container.history),
+    });
+  }
+
   invalidateCache(actorId = null) {
     if (actorId) {
       this._cache.delete(actorId);
+      this._baseline.delete(actorId);
     } else {
       this._cache.clear();
+      this._baseline.clear();
     }
   }
 
   _getContainer(actor) {
-    if (this._cache.has(actor.id)) {
-      return this._cache.get(actor.id);
-    }
-    return this._normalizeContainer(getFabricateFlag(actor, 'salvageRuns', null));
+    const container = this._cache.has(actor.id)
+      ? this._cache.get(actor.id)
+      : this._normalizeContainer(getFabricateFlag(actor, 'salvageRuns', null));
+    // Snapshot the active keys + history ids the caller is about to mutate from, so
+    // `_persist` can distinguish an intentional removal from a run this manager never
+    // observed (another client's concurrent write).
+    this._recordBaseline(actor.id, container);
+    return container;
   }
 
   getActiveRuns(actor) {
