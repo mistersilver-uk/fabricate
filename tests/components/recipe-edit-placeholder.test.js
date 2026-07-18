@@ -185,10 +185,10 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     );
   });
 
-  it('redirects recipe-edit like recipes (fallback to system-edit) in normalizedActiveView', () => {
+  it('no longer redirects crafting views on the experimental toggle in normalizedActiveView (issue 745)', () => {
     assert.ok(
-      rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable) return'),
-      'normalizedActiveView should treat every crafting view (including recipe-edit) alike and fall back to system-edit'
+      !rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable'),
+      'normalizedActiveView should not gate crafting views (including recipe-edit) on the experimental toggle any more'
     );
   });
 

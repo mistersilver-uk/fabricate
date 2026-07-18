@@ -364,7 +364,9 @@ function gatheringSubitem(labelText) {
 }
 
 function gatheringToggle() {
-  return target.querySelector('.manager-nav-toggle');
+  // Target the Gathering group's toggle specifically: the Crafting group (unconditional
+  // as of issue 745) also renders a `.manager-nav-toggle`, ahead of Gathering in the rail.
+  return target.querySelector('#manager-nav-gathering + .manager-nav-toggle');
 }
 
 // The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
@@ -1831,14 +1833,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System Overview',
+        'Crafting',
         'Components',
         'Tags & Categories',
         'Essences',
         'Tools',
         'Checks',
         'Gathering',
-        'Recipes',
-        'Graph',
       ]
     );
     assert.equal(
@@ -1897,10 +1898,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('keeps experimental selected-system routes disabled by default', async () => {
+  it('keeps the Crafting group available and hides Graph with experimental features off (issue 745)', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
+    // No experimental flag: createStore defaults experimentalFeaturesEnabled to false,
+    // driving the real gating derivation (not a stubbed value).
     mounted = mount(Component, {
       target,
       props: {
@@ -1910,26 +1913,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const plannedButtons = ['Recipes', 'Graph'].map((label) => navButton(label));
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
-    assert.deepEqual(
-      plannedButtons.map((button) => button?.disabled === true),
-      [true, true]
-    );
-    assert.deepEqual(
-      plannedButtons.map((button) =>
-        button?.querySelector('.manager-nav-count')?.textContent.trim()
-      ),
-      ['Soon', 'Soon']
-    );
+    // The Crafting group is unconditional now (v1.3 headline): a live parent route,
+    // never a disabled "Soon" placeholder.
+    const crafting = craftingParent();
+    assert.ok(crafting, 'the Crafting group renders with the experimental toggle off');
+    assert.equal(crafting.disabled, false, 'the Crafting parent is a live route, not a placeholder');
 
-    navButton('Recipes').click();
+    // The unimplemented Graph placeholder is hidden while experimental features are off.
+    assert.equal(navButton('Graph'), undefined, 'Graph placeholder is hidden with experimental features off');
+
+    // Routing to Recipes works end to end without the experimental toggle.
+    crafting.click();
     await tick();
     flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
-    assert.equal(target.querySelector('.manager-recipes-table'), null);
-    assert.deepEqual(calls, []);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
   });
 
   it('routes the Checks nav to a four-tab view with a tab-aware context menu', async () => {
@@ -4078,12 +4075,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System Overview',
+        'Crafting',
         'Components',
         'Tags & Categories',
         'Tools',
         'Checks',
-        'Recipes',
-        'Graph',
       ]
     );
 
@@ -6704,8 +6700,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Save failed.'));
   });
 
-  it('renders the gated Crafting nav group only when experimental features are on', async () => {
-    // Experimental OFF: no Crafting group; Recipes shows as a disabled placeholder.
+  it('shows the Crafting group unconditionally and gates only Graph on experimental features (issue 745)', async () => {
+    // Experimental OFF (the shipped default): the Crafting group renders and the
+    // unimplemented Graph placeholder is hidden. Both assertions run through the real
+    // `experimentalFeaturesEnabled` gating derivation, not a stubbed value.
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -6716,8 +6714,29 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     flushSync();
-    assert.equal(target.querySelector('#manager-nav-crafting'), null, 'Crafting group hidden when experimental off');
-    assert.equal(Boolean(craftingParent()), false, 'no Crafting parent button when experimental off');
+    assert.ok(target.querySelector('#manager-nav-crafting'), 'Crafting group renders when experimental off');
+    assert.ok(craftingParent(), 'Crafting parent button present when experimental off');
+    assert.equal(navButton('Graph'), undefined, 'Graph placeholder hidden when experimental off');
+
+    // Experimental ON: the Crafting group is unchanged and the Graph placeholder
+    // appears as a disabled "Soon" item.
+    unmount(mounted);
+    target.remove();
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    assert.ok(target.querySelector('#manager-nav-crafting'), 'Crafting group still renders when experimental on');
+    const graph = navButton('Graph');
+    assert.ok(graph, 'Graph placeholder advertised when experimental on');
+    assert.equal(graph.disabled, true, 'Graph is a disabled placeholder');
+    assert.equal(graph.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
   });
 
   it('exposes the Crafting group with Gathering-parity a11y and nested Settings + Recipes', async () => {
@@ -7126,8 +7145,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const gatheringParent = target.querySelector('#manager-nav-gathering');
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
     assert.equal(gatheringParent.classList.contains('is-active'), false);
+    // The Crafting group also renders (unconditional as of issue 745), so target the
+    // Gathering group specifically rather than the first `.manager-nav-group`.
     assert.equal(
-      target.querySelector('.manager-nav-group').classList.contains('is-expanded'),
+      gatheringParent.closest('.manager-nav-group').classList.contains('is-expanded'),
       true
     );
     // The parent count is the sum of records (environments + tasks + events), not
@@ -7158,7 +7179,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true'
     );
     assert.equal(
-      target.querySelector('.manager-nav-group').classList.contains('is-expanded'),
+      target.querySelector('#manager-nav-gathering').closest('.manager-nav-group').classList.contains('is-expanded'),
       true
     );
 
