@@ -1064,6 +1064,66 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('hides the single-step Duration card when time requirements are disabled (issue 714)', async () => {
+    const target = await editHarness.mount(
+      identityProps({ timeRequirementsEnabled: false })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-section="duration"]'),
+      null,
+      'the single-step Duration card is gated off when the system time toggle is off'
+    );
+    editHarness.remount();
+  });
+
+  it('shows the single-step Duration card when time requirements are enabled (issue 714)', async () => {
+    const target = await editHarness.mount(
+      identityProps({ timeRequirementsEnabled: true })
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-section="duration"]'),
+      'the single-step Duration card renders when the system time toggle is on'
+    );
+    editHarness.remount();
+  });
+
+  it('hides the per-step duration editor through RecipeEditView when time requirements are disabled (issue 714)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, steps: STEPS },
+        timeRequirementsEnabled: false,
+      })
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-section="steps"]'),
+      'the multi-step Steps card renders'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-duration-trigger]'),
+      null,
+      'the inline per-step duration editor is gated off'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-step-time]'),
+      'the read-only step duration chip still surfaces the authored value'
+    );
+    editHarness.remount();
+  });
+
+  it('shows the per-step duration editor through RecipeEditView when time requirements are enabled (issue 714)', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, steps: STEPS },
+        timeRequirementsEnabled: true,
+      })
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-duration-trigger]'),
+      'the inline per-step duration editor renders when time requirements are on'
+    );
+    editHarness.remount();
+  });
+
   it('increments a duration unit via the up stepper chevron', async () => {
     const patches = [];
     const target = await editHarness.mount(

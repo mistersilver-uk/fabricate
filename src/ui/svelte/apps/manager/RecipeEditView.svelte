@@ -57,6 +57,10 @@
     // rendering of existing currency requirements when currency is off. Defaults true so
     // a caller that only passes units keeps the pre-gate behaviour.
     currencyEnabled = true,
+    // Whether the system's time-requirements feature is ENABLED (issue 714). Gates the
+    // single-step Duration card (Overview tab) and the per-step duration editor. Defaults
+    // true so a caller that omits it keeps the pre-gate always-authorable behaviour.
+    timeRequirementsEnabled = true,
     toolsLibrary = [],
     componentOptions = [],
     componentTagOptions = [],
@@ -365,6 +369,7 @@
             {multiStepEnabled}
             {onEnterMultiStep}
             {onRevertToSingleStep}
+            {timeRequirementsEnabled}
             {onUpdateRecipe}
             {onAddStep}
             {onReorderSteps}

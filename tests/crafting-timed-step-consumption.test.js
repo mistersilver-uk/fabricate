@@ -309,6 +309,88 @@ test('timed step consumes components at START (gate arm), leaving a waitingTime 
 });
 
 // ---------------------------------------------------------------------------
+// 2b. When the system's time requirements are DISABLED, a step's timeRequirement
+//     does NOT arm a gate — the craft resolves immediately (issue 714).
+// ---------------------------------------------------------------------------
+
+test('a timed step resolves immediately when requirements.time.enabled === false', async () => {
+  const system = {
+    id: 'sys-time-off',
+    resolutionMode: 'simple',
+    features: { craftingChecks: false, essences: false },
+    craftingCheck: { enabled: false, consumption: {} },
+    requirements: { time: { enabled: false } },
+    components: [{ id: 'wood', name: 'Wood' }],
+  };
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 3);
+  const plank = new FakeItem('plank-result', 'Plank', 1);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-time-off',
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+  engine._createSingleResult = async () => plank;
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, true, 'the craft completes in a single call — no time gate');
+  assert.equal(result.results.length, 1, 'results are produced immediately');
+  assert.equal(wood.system.quantity, 1, 'wood consumed once at finish (3 -> 1)');
+  assert.equal(
+    runManager.getActiveRuns(craftingActor).length,
+    0,
+    'no waiting run is left active when time requirements are off'
+  );
+  assert.equal(runManager.getRunHistory(craftingActor).length, 1, 'the completed run is archived');
+});
+
+test('a timed step still arms a gate when requirements.time is absent (default on)', async () => {
+  const system = {
+    id: 'sys-time-default',
+    resolutionMode: 'simple',
+    features: { craftingChecks: false, essences: false },
+    craftingCheck: { enabled: false, consumption: {} },
+    components: [{ id: 'wood', name: 'Wood' }],
+  };
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 5);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-time-default',
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'an absent time flag defaults ON, so the gate arms');
+  assert.match(result.message, /in progress/i);
+  const activeRuns = runManager.getActiveRuns(craftingActor);
+  assert.equal(activeRuns.length, 1, 'the waiting run is kept active');
+  assert.equal(activeRuns[0].status, 'waitingTime');
+});
+
+// ---------------------------------------------------------------------------
 // 3. FINISH produces results without components present, completes to history
 // ---------------------------------------------------------------------------
 
@@ -362,6 +444,64 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(history.length, 1, 'the completed run is archived to history');
   assert.equal(history[0].status, 'succeeded');
   assert.equal(history[0].steps[0].consumedIngredients.length, 1, 'run history records the consumed component');
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Disabling time requirements MID-RUN must still resume an already-armed
+//     gate — the flag gates arming a NEW gate only, never re-consumes (issue 714)
+// ---------------------------------------------------------------------------
+
+test('an already-armed gate still resumes (no double consume) when time requirements are disabled mid-run', async () => {
+  const system = {
+    id: 'sys-toggle-midrun',
+    resolutionMode: 'simple',
+    features: { craftingChecks: false, essences: false },
+    craftingCheck: { enabled: false, consumption: {} },
+    components: [{ id: 'wood', name: 'Wood' }],
+  };
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 2);
+  const plank = new FakeItem('plank-result', 'Plank', 1);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-toggle-midrun',
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+  engine._createSingleResult = async () => plank;
+
+  // START (time on by default): arm the gate + consume the wood.
+  const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(startResult.success, false, 'START arms the gate while time is enabled');
+  assert.equal(wood._deleted, true, 'wood fully consumed at START');
+
+  // GM disables time requirements while the gate is still maturing.
+  system.requirements = { time: { enabled: false } };
+  sourceActor.items = [];
+  game.time.worldTime = 1000 + 3600 + 1;
+
+  // Guard against any re-consumption at FINISH.
+  const consumeSpy = { called: false };
+  engine._consumeIngredients = async () => {
+    consumeSpy.called = true;
+    return [];
+  };
+
+  const finishResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(finishResult.success, true, 'the armed gate still resumes despite the disabled flag');
+  assert.equal(finishResult.results.length, 1, 'results are produced on resume');
+  assert.equal(consumeSpy.called, false, 'FINISH never re-consumes (no double count)');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run remains after resume');
+  assert.equal(runManager.getRunHistory(craftingActor).length, 1, 'the completed run is archived');
 });
 
 // ---------------------------------------------------------------------------

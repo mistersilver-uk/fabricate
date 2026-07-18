@@ -466,14 +466,24 @@ Systems can optionally require time or currency for crafting.
 
 ### Time Requirements
 
-When enabled, individual recipe steps can require an amount of time, given in minutes, hours, days, months, or years.
-The step is blocked until world time advances past the required duration.
+Time requirements let a recipe require an amount of time to craft, given in minutes, hours, days, months, or years.
+A single-step recipe carries one duration on its **Duration** card.
+Each step of a multi-step recipe can carry its own duration.
+While a duration is running, the step is blocked until world time advances past the required duration.
 
 Time gates are checked:
 
 - When a player tries to advance a step
 - Automatically when world time changes
 - On module startup
+
+Time requirements are on by default.
+You turn them on or off with the **Time requirements** toggle in the **Optional features** section of the system settings editor, next to the currency toggle.
+
+{: .note }
+> Fabricate shows the duration editors on a recipe only while time requirements are enabled for the system.
+> Turning them off later does not delete the durations you have already authored.
+> Each one stays visible as a read-only value, and a step no longer waits on time until you re-enable time requirements.
 
 ### Currency Requirements
 

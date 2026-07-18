@@ -15,6 +15,9 @@
 
   let {
     steps = [],
+    // Whether the system applies time requirements (issue 714). When off, the
+    // per-step duration editors (accordion trigger + expanded steppers) are hidden.
+    timeRequirementsEnabled = true,
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
@@ -35,15 +38,17 @@
     </div>
   </div>
 
-  <RecipeStepAccordion {steps} reorderable {onReorderSteps} {onUpdateStep} {onDeleteStep}>
+  <RecipeStepAccordion {steps} reorderable {timeRequirementsEnabled} {onReorderSteps} {onUpdateStep} {onDeleteStep}>
     {#snippet body(step)}
-      <div class="manager-recipe-step-durations">
-        <RecipeDurationSteppers
-          timeRequirement={step.timeRequirement || null}
-          showLabel={false}
-          onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
-        />
-      </div>
+      {#if timeRequirementsEnabled}
+        <div class="manager-recipe-step-durations">
+          <RecipeDurationSteppers
+            timeRequirement={step.timeRequirement || null}
+            showLabel={false}
+            onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
+          />
+        </div>
+      {/if}
       <label class="manager-field">
         <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>
         <input

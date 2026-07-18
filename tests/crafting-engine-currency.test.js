@@ -215,6 +215,17 @@ test('validateCurrencyProfile enforces macro config and actorInventory denominat
   assert.match(propertyMode.errors.join('; '), /actor data path/i);
 });
 
+test('CraftingSystemManager defaults time requirements ON, honouring an explicit opt-out', () => {
+  setupGlobals({});
+  const manager = new CraftingSystemManager({});
+  // Absent flag → enabled (backward compatibility: existing timed recipes keep running).
+  assert.equal(manager._normalizeRequirements({}).time.enabled, true);
+  assert.equal(manager._normalizeRequirements({ time: {} }).time.enabled, true);
+  // Explicit true stays true; explicit false is honoured as a GM opt-out.
+  assert.equal(manager._normalizeRequirements({ time: { enabled: true } }).time.enabled, true);
+  assert.equal(manager._normalizeRequirements({ time: { enabled: false } }).time.enabled, false);
+});
+
 test('CraftingSystemManager normalizes legacy system adapter currency to seeded units', () => {
   setupGlobals({});
   const manager = new CraftingSystemManager({});

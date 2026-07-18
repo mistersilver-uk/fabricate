@@ -65,8 +65,10 @@ See the [API reference]({% link api/recipe-manager.md %}) for the methods that c
 
 ## Time Gates
 
-When a step has a time requirement, the run waits on time after the step's ingredients are consumed.
+When a step has a time requirement and the system has time requirements enabled, the run waits on time after the step's ingredients are consumed.
 The step completes automatically when world time advances past the required duration.
+Time requirements are on by default, and a GM can turn them off per system.
+See [Time Requirements]({% link crafting-systems.md %}#time-requirements).
 
 Time gates are checked:
 

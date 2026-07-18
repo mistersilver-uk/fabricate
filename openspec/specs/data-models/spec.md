@@ -253,7 +253,7 @@ CraftingSystem = {
 
   requirements: {
     time: {
-      enabled: boolean, // default false
+      enabled: boolean, // default true
     },
 
     currency: {

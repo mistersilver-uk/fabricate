@@ -777,6 +777,12 @@
   const selectedCurrencyEnabled = $derived(
     selectedSystem?.requirements?.currency?.enabled === true
   );
+  // Time requirements default ON (issue 714): an absent flag keeps existing recipe/step
+  // durations authorable and applied, so gate the recipe Duration surfaces only on an
+  // explicit GM opt-out (`enabled === false`), mirroring the normalizer default.
+  const selectedTimeRequirementsEnabled = $derived(
+    selectedSystem?.requirements?.time?.enabled !== false
+  );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
@@ -5301,6 +5307,7 @@
         onPickImagePath={services?.pickImagePath}
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
+        timeRequirementsEnabled={selectedTimeRequirementsEnabled}
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}
@@ -5441,6 +5448,7 @@
         onSetCurrencyMacro={onSetCurrencyMacro}
         onClearCurrencyMacro={onClearCurrencyMacro}
         onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
+        onToggleTime={(next) => store.toggleRequirement?.('time', next)}
       />
         </section>
       </main>

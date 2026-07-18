@@ -13,6 +13,7 @@ import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateDefaultOnTimeRequirements } from './migrateDefaultOnTimeRequirements.js';
 import { migrateEssencesToIngredientGroups } from './migrateEssencesToIngredientGroups.js';
 import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
@@ -305,6 +306,18 @@ const MIGRATIONS = [
     // (1.17.0 is the essence-ingredient migration; this took 1.18.0 on rebase.)
     downgradeTo: '1.17.0',
     migrate: (data) => migrateRetireProgressiveAllowPlayerReorder(data.systems),
+  },
+  {
+    version: '1.19.0',
+    label:
+      'Default-on the recipe time requirement for upgraded worlds: delete a persisted ' +
+      'requirements.time.enabled === false (the pre-toggle normalizer coercion of an absent ' +
+      'flag), so the new default-on reader keeps existing timed recipes running',
+    // The last release before the toggle: a world downgraded to it re-coerces the deleted
+    // flag back to `false` via the pre-714 normalizer, landing on that release's own schema
+    // (time requirements ignored) — so the downgrade is lossless.
+    downgradeTo: '1.18.0',
+    migrate: (data) => migrateDefaultOnTimeRequirements(data.systems),
   },
   // Future migrations added here in version order
 ];
