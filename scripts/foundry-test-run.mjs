@@ -96,6 +96,16 @@ const RC_SCREENSHOT_BUDGET = new Set([
   'crafter-post-craft-inventory'
 ]);
 
+// R2 (#750): the two 7-theme sweeps (`captureManagerThemes` +
+// `captureAlchemyThemes`) produce 14 `*-theme-<id>` frames that NOTHING asserts
+// and that `scripts/ui-pr-screenshot-evidence.mjs` VIEW_RECIPES deliberately
+// does not map. They are OFF by default; opt in to regenerate them with
+// `FOUNDRY_SMOKE_THEMES=1` (or `--themes`). Restoring the sweeps costs ~5-8s and
+// 14 PNGs, so keep them off unless you are specifically auditing theme fidelity.
+const CAPTURE_THEME_SWEEPS =
+  ['1', 'true', 'yes'].includes(String(process.env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase())
+  || process.argv.slice(2).includes('--themes');
+
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
 const JOIN_USER_SELECT_SELECTOR = 'select[name="userid"]';
 const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
@@ -172,6 +182,32 @@ const phaseTimings = [];
 /** @type {{ name: string, startedAt: string, t0: number } | null} */
 let currentPhase = null;
 
+// ── Per-view timings (R3, #750) ─────────────────────────────────────────────
+// Phase timings are phase-granular only. This records the wall-clock spent
+// reaching each captured view — the elapsed time between the previous captured
+// frame (or the current phase start) and this frame — so the end-of-run summary
+// can surface the slowest individual views. It is an enabler for measuring
+// future cuts; it saves ~0s itself.
+/** @type {Array<{ label: string, phase: string, durationMs: number }>} */
+const viewTimings = [];
+let lastViewMarkAt = performance.now();
+
+/**
+ * Record the time taken to reach a captured view, attributed to `label`, and
+ * reset the stopwatch for the next view. Called from `screenshot()` after a
+ * frame is actually written (never for an rc no-op).
+ * @param {string} label
+ */
+function markViewTiming(label) {
+  const now = performance.now();
+  viewTimings.push({
+    label,
+    phase: currentPhase?.name ?? 'unknown',
+    durationMs: Math.round(now - lastViewMarkAt)
+  });
+  lastViewMarkAt = now;
+}
+
 /**
  * Begin a phase stopwatch. If another phase is already running it ends
  * automatically — phases are sequential, never nested.
@@ -180,6 +216,9 @@ let currentPhase = null;
 function startPhase(name) {
   if (currentPhase) endPhase();
   currentPhase = { name, startedAt: new Date().toISOString(), t0: performance.now() };
+  // Reset the per-view stopwatch so the first view of a phase is not charged
+  // for the inter-phase gap.
+  lastViewMarkAt = performance.now();
 }
 
 /**
@@ -220,6 +259,34 @@ function formatTimingsTable(timings) {
 }
 
 /**
+ * Render the slowest captured views as an aligned stdout table (R3, #750).
+ * Only the top `limit` are shown — enough to spot where the D0 walk spends its
+ * time — with each view's phase for context. Returns '' when nothing was
+ * captured (e.g. the rc profile skips the screenshot phases).
+ * @param {Array<{ label: string, phase: string, durationMs: number }>} timings
+ * @param {number} [limit=12]
+ * @returns {string}
+ */
+function formatSlowestViewsTable(timings, limit = 12) {
+  if (timings.length === 0) return '';
+  const sorted = timings.slice().sort((a, b) => b.durationMs - a.durationMs).slice(0, limit);
+  const rows = sorted.map(({ label, phase, durationMs }) => ({
+    view: `${label} (${phase})`,
+    seconds: (durationMs / 1000).toFixed(1)
+  }));
+  const viewWidth = Math.max(...rows.map(row => row.view.length));
+  const secondsWidth = Math.max(...rows.map(row => row.seconds.length));
+  const lines = [
+    `Slowest views (top ${sorted.length} of ${timings.length})`,
+    '─'.repeat(viewWidth + secondsWidth + 5)
+  ];
+  for (const row of rows) {
+    lines.push(`  ${row.view.padEnd(viewWidth)}  ${row.seconds.padStart(secondsWidth)}s`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Take a screenshot with an auto-incrementing numeric prefix. Under the
  * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; all
  * other labels are no-ops (the surrounding assertions still run).
@@ -232,6 +299,7 @@ async function screenshot(page, label) {
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
   await page.screenshot({ path });
+  markViewTiming(label);
 }
 
 /**
@@ -294,6 +362,8 @@ async function applyManagerTheme(page, themeId) {
  * @param {import('playwright').Page} page
  */
 async function captureManagerThemes(page) {
+  // R2 (#750): opt-in only — these 14 theme frames are unasserted and unmapped.
+  if (!CAPTURE_THEME_SWEEPS) return;
   for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
     await applyManagerTheme(page, themeId);
     await screenshot(page, `manager-theme-${themeId}`);
@@ -379,6 +449,8 @@ async function captureRecipeResultsTab(page, recipeName, label, contentSelector)
  * @param {import('playwright').Page} page
  */
 async function captureAlchemyThemes(page) {
+  // R2 (#750): opt-in only — these theme frames are unasserted and unmapped.
+  if (!CAPTURE_THEME_SWEEPS) return;
   for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
     await applyManagerTheme(page, themeId);
     await screenshot(page, `player-alchemy-theme-${themeId}`);
@@ -851,17 +923,111 @@ function withDeadline(promise, ms, label) {
 }
 
 /**
+ * Wait until an in-page `predicate` returns truthy, polling on animation frames
+ * so a settled layout is detected as soon as it quiesces instead of always
+ * paying a fixed wait (R4, #750). On timeout it falls back to a capped fixed
+ * wait, so a predicate bug degrades to the harness's previous fixed pacing
+ * rather than hanging or racing ahead. Predicates that need cross-poll state
+ * stash it on `window` and are reset by the caller before the first poll.
+ * @param {import('playwright').Page} page
+ * @param {Function} predicate
+ * @param {unknown} arg
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs = 500 } = {}) {
+  try {
+    await page.waitForFunction(predicate, arg, { timeout, polling: 'raf' });
+  } catch {
+    await page.waitForTimeout(fallbackMs);
+  }
+}
+
+/**
+ * Settle the Crafting System Manager frame after a resize: wait for the app's
+ * measured geometry to REACH the requested size and hold steady across a few
+ * animation frames, then return. Replaces the fixed 500ms wait (R4, #750) with
+ * an event-driven predicate whose fallback preserves the old timing.
+ * @param {import('playwright').Page} page
+ * @param {{ width: number, height: number }} size
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function waitForManagerGeometrySettled(page, { width, height }, { timeout = 1500, fallbackMs = 500 } = {}) {
+  await page.evaluate(() => { delete window.__fabGeomSettle; }).catch(() => {});
+  await waitForSettled(page, ({ width, height }) => {
+    const manager = document.querySelector('.fabricate-manager');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
+    if (!app) return false;
+    const rect = app.getBoundingClientRect();
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
+    if (Math.abs(w - width) > 3 || Math.abs(h - height) > 3) { window.__fabGeomSettle = null; return false; }
+    const state = window.__fabGeomSettle || { sig: null, stable: 0 };
+    const sig = `${w}x${h}`;
+    if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
+    window.__fabGeomSettle = state;
+    return state.stable >= 4; // ~4 steady RAF samples ≈ 65ms of quiescence.
+  }, { width, height }, { timeout, fallbackMs });
+}
+
+/**
+ * Settle the manager after an in-frame navigation (system-identity click,
+ * return-to-library, scope-select) that re-renders the nav rail. Waits for the
+ * nav labels to render and the frame's geometry + nav-item count to hold steady
+ * across several animation frames. Replaces the fixed 750ms identity settles
+ * (R4, #750); the caller's own subsequent explicit content/nav waits remain the
+ * real correctness gate, so this only trims the settle buffer. The capped
+ * fallback preserves the old 750ms pacing if the predicate never quiesces.
+ * @param {import('playwright').Page} page
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {}) {
+  await page.evaluate(() => { delete window.__fabNavSettle; }).catch(() => {});
+  await waitForSettled(page, () => {
+    const manager = document.querySelector('.fabricate-manager');
+    if (!manager) return false;
+    const navCount = manager.querySelectorAll('.manager-nav-label').length;
+    if (navCount === 0) return false;
+    const rect = manager.getBoundingClientRect();
+    const sig = `${Math.round(rect.width)}x${Math.round(rect.height)}:${navCount}`;
+    const state = window.__fabNavSettle || { sig: null, stable: 0 };
+    if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
+    window.__fabNavSettle = state;
+    return state.stable >= 6; // ~6 steady RAF samples ≈ 100ms of quiescence.
+  }, undefined, { timeout, fallbackMs });
+}
+
+/**
  * Resize the rendered Crafting System Manager application frame for
  * responsive screenshots and hit testing.
+ *
+ * R4 (#750): the D0 walk issues many consecutive identical
+ * `setManagerWindowSize(1280, 820)` calls; each otherwise repaid a viewport
+ * resize and a fixed settle for a no-op. Short-circuit when the app is ALREADY
+ * at the requested geometry (verified against the live DOM — a fresh `.show()`
+ * resets the app size, so a cached size alone is not trusted), which batches
+ * same-width frames by eliminating the redundant resizes between them. When a
+ * resize IS needed, settle on the app reaching a stable measured geometry
+ * instead of a blanket 500ms wait.
  * @param {import('playwright').Page} page
  * @param {{ width: number, height: number }} size
  */
 async function setManagerWindowSize(page, { width, height }) {
+  const viewportWidth = Math.max(1366, width + 80);
+  const viewportHeight = Math.max(768, height + 80);
+  const alreadySized = await page.evaluate(({ width, height, viewportWidth, viewportHeight }) => {
+    const manager = document.querySelector('.fabricate-manager');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
+    if (!app) return false;
+    const rect = app.getBoundingClientRect();
+    return Math.abs(window.innerWidth - viewportWidth) <= 2
+      && Math.abs(window.innerHeight - viewportHeight) <= 2
+      && Math.abs(rect.width - width) <= 2
+      && Math.abs(rect.height - height) <= 2;
+  }, { width, height, viewportWidth, viewportHeight }).catch(() => false);
+  if (alreadySized) return;
+
   await withDeadline(
-    page.setViewportSize({
-      width: Math.max(1366, width + 80),
-      height: Math.max(768, height + 80)
-    }),
+    page.setViewportSize({ width: viewportWidth, height: viewportHeight }),
     15_000,
     `setViewportSize ${width}x${height}`
   );
@@ -884,7 +1050,7 @@ async function setManagerWindowSize(page, { width, height }) {
     15_000,
     `setManagerWindowSize evaluate ${width}x${height}`
   );
-  await page.waitForTimeout(500);
+  await waitForManagerGeometrySettled(page, { width, height }, { timeout: 1500, fallbackMs: 500 });
 }
 
 /**
@@ -1224,7 +1390,7 @@ async function selectSmokeSystemInManager(page, systemId) {
     .catch(() => false);
   if (alreadySelected) return;
   await row.locator('.manager-system-identity').click();
-  await page.waitForTimeout(750);
+  await settleManagerNav(page);
 }
 
 async function seedSmokeGatheringLibrary(page, craftingSetup) {
@@ -2732,6 +2898,25 @@ async function installNotificationHidingCss(page) {
  * Close Foundry application windows across ApplicationV1 and ApplicationV2.
  * @param {import('playwright').Page} page
  */
+/**
+ * Wait for every Fabricate window (manager, shared app) and any dirty-draft
+ * "Discard Changes" prompt to leave the DOM after a close sweep (R5, #750).
+ * Replaces the two blanket 500ms waits per `closeOpenApplications` attempt with
+ * an event-driven detach check; the close usually completes well under 500ms.
+ * The capped fallback preserves the old fixed pacing if a window is slow to go,
+ * so a stuck close degrades to today's timing rather than hanging.
+ * @param {import('playwright').Page} page
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function waitForFabricateWindowsClosed(page, { timeout = 800, fallbackMs = 500 } = {}) {
+  await waitForSettled(page, () => {
+    const windows = document.querySelectorAll('.fabricate-manager, .fabricate-app').length;
+    const hasDiscard = Array.from(document.querySelectorAll('button'))
+      .some(button => /Discard Changes/.test(button.textContent || ''));
+    return windows === 0 && !hasDiscard;
+  }, undefined, { timeout, fallbackMs });
+}
+
 async function closeOpenApplications(page) {
   const closeSelector = [
     '.application:not(#sidebar) button[data-action="close"]',
@@ -2790,14 +2975,14 @@ async function closeOpenApplications(page) {
         });
       }
     }, closeSelector);
-    await page.waitForTimeout(500);
+    await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
 
     const closeButtons = page.locator(closeSelector);
     for (let i = 0; i < await closeButtons.count(); i++) {
       try { await closeButtons.nth(i).click({ timeout: 1_000, force: true }); } catch { /* ignore */ }
     }
-    await page.waitForTimeout(500);
+    await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
 
     const remaining = await page.locator('.fabricate-manager, .fabricate-app, button:has-text("Discard Changes")').count();
@@ -3330,10 +3515,22 @@ async function main() {
           throw new Error('dnd5e Starter Heroes compendium (dnd5e.heroes) not found — cannot seed smoke actors.');
         }
         const heroIndex = await heroPack.getIndex();
+        // R1 (#750): TWO-ACTOR CONTRACT. Phase B references only actors[0]
+        // (crafter) and actors[1] (travelMember); importing the whole Starter
+        // Heroes pack cost ~30-45s for actors nothing asserts. Sort the INDEX by
+        // name first (the same order the post-import sort produced), then import
+        // just the first two character entries — this preserves the exact
+        // crafter / travel-member identity while skipping the rest. Raise this
+        // cap if a future step needs a third seeded hero.
+        const sortedHeroEntries = Array.from(heroIndex)
+          .slice()
+          .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'en'));
         const importedHeroes = [];
-        for (const entry of heroIndex) {
+        for (const entry of sortedHeroEntries) {
+          if (entry.type && entry.type !== 'character') continue;
           const actor = await game.actors.importFromCompendium(heroPack, entry._id);
           if (actor?.type === 'character') importedHeroes.push(actor);
+          if (importedHeroes.length >= 2) break;
         }
         if (importedHeroes.length === 0) {
           throw new Error('dnd5e Starter Heroes compendium contained no character actors.');
@@ -4592,7 +4789,7 @@ async function main() {
         await captureManagerThemes(page);
 
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
@@ -4670,7 +4867,12 @@ async function main() {
         }
 
         await returnToSystemLibrary(page);
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
+        // The settle signature (geometry x navCount) can be identical across this
+        // transition, so anchor on the browser row actually re-mounting before the
+        // non-retrying count assertions below (issue 750 review finding).
+        await page.locator(managerSystemRowSelector(craftingSetup.systemId)).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
@@ -4698,7 +4900,7 @@ async function main() {
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
         const gatheringOffFact = await page.locator('.fabricate-manager [data-count-id="environments"]').first().evaluate(element => {
           const rect = element.getBoundingClientRect();
           const strong = element.querySelector('strong');
@@ -4810,7 +5012,7 @@ async function main() {
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
         await page.evaluate(async () => {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
@@ -4937,7 +5139,7 @@ async function main() {
         const scopeSelect = page.locator('.fabricate-manager [data-manager-scope-select]').first();
         try {
           await scopeSelect.selectOption({ label: 'Smoke Simple Forge' });
-          await page.waitForTimeout(750);
+          await settleManagerNav(page);
           await page.locator('.fabricate-manager .manager-recipe-row [data-recipe-check="none"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await assertRecipeRowsHittable(page, 'recipes no-check');
@@ -4947,7 +5149,7 @@ async function main() {
           });
         } finally {
           await scopeSelect.selectOption(craftingSetup.systemId).catch(() => {});
-          await page.waitForTimeout(750);
+          await settleManagerNav(page);
           await openManagerCraftingSection(page, 'recipes', 'recipes');
         }
 
@@ -7259,6 +7461,7 @@ async function main() {
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
     results.phaseTimings = phaseTimings;
+    results.viewTimings = viewTimings;
     // A browser that already CRASHED (the teardown case) can make close() reject. This is
     // the finally block and the run's verdict is already recorded in `results`, so a close
     // failure is post-run cleanup noise — never re-throw here (it would mask the try's
@@ -7276,6 +7479,12 @@ async function main() {
     const timingsTable = formatTimingsTable(combinedTimings);
     if (timingsTable) {
       process.stdout.write(`\n${timingsTable}\n\n`);
+    }
+    // R3 (#750): surface the slowest individual views under the phase table so a
+    // future measured cut can target them directly.
+    const slowestViewsTable = formatSlowestViewsTable(viewTimings);
+    if (slowestViewsTable) {
+      process.stdout.write(`${slowestViewsTable}\n\n`);
     }
 
     // Write summary.json
