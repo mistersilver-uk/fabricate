@@ -1557,7 +1557,7 @@ When the party has no resolved current realm, a "No current realm" placeholder i
 When more than one realm-enabled gathering system is present in the listing, a single chip cannot honestly represent two systems' realm contexts (per-system overrides and reveal modes can differ), so the listing-level chip is omitted and the chip falls back to the selection-driven value; its absence in that ambiguous case is intended.
 The chip carries an accessible name ("Realm: <value>") and announces its appearance and value changes through a polite live region.
 - The bar uses the player-app theming scope and base design tokens only; it must render correctly in both themes and must not depend on Manager-scoped tokens.
-Selecting an actor in the bar re-filters and persists the gathering listing; the `Crafting`, `Journal`, and `Inventory` tab bodies may remain placeholders while still rendering the bar.
+Selecting an actor in the bar re-filters and persists the gathering listing; the bar renders independently of the tab bodies, so bar rendering MUST NOT depend on any tab body's implementation state.
 - The popover keyboard/accessibility model follows the IconPicker interaction pattern: a `role="dialog"` popover with an `aria-label`; the trigger exposes `aria-haspopup` and `aria-expanded`; options are `role="option"` rows inside a `role="listbox"`; the popover supports Tab-through option buttons, Escape / outside-click dismissal, and focus-on-open of the search input.
 It does not provide listbox arrow-key roving focus or `aria-activedescendant`.
 The popover renders in-place below the trigger (left-aligned, dropping downward) as a descendant of the bar root, so an outside-click dismisses it.

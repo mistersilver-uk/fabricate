@@ -4,7 +4,7 @@
  * When a crafting system's `resolutionMode` changes, recipes are MIGRATED to fit
  * the new mode wherever possible instead of being deleted. A recipe is only
  * deleted when a per-recipe STRUCTURAL constraint of the target mode cannot be met
- * by seeding a provider or clearing the routed `resultSelection`:
+ * by clearing the routed `resultSelection` or collapsing to a single ingredient set:
  *
  *   - narrowing to `simple` or `progressive` (which require exactly one ingredient
  *     set AND one result group) from a recipe that carries more than one of either
@@ -23,15 +23,17 @@
  *
  *   | From \ To  | simple              | RI                       | RC                       | progressive         | alchemy                              |
  *   |------------|---------------------|--------------------------|--------------------------|---------------------|--------------------------------------|
- *   | simple     | —                   | clear                    | clear; reconcile         | clear               | seed                                 |
- *   | RI         | clear if 1×1 else del| —                        | carry; reconcile         | clear if 1×1 else del| seed=ingredientSet, single-step else del |
- *   | RC         | clear if 1×1 else del| carry; reconcile         | —                        | clear if 1×1 else del| seed=check, single-step else del     |
- *   | progressive| clear               | clear                    | clear; reconcile         | —                   | seed                                 |
+ *   | simple     | —                   | clear                    | clear; reconcile         | clear               | clear+collapse                       |
+ *   | RI         | clear if 1×1 else del| —                        | carry; reconcile         | clear if 1×1 else del| clear+collapse, single-step else del |
+ *   | RC         | clear if 1×1 else del| carry; reconcile         | —                        | clear if 1×1 else del| clear+collapse, single-step else del |
+ *   | progressive| clear               | clear                    | clear; reconcile         | —                   | clear+collapse                       |
  *   | alchemy    | clear if 1×1 else del| clear (drop), carry      | clear (drop), carry; recon| clear if 1×1 else del| —                                   |
  *
- *   - "seed": ALCHEMY is the only provider-routed target, so seed its
- *     `resultSelection.provider` — `ingredientSet`/`check` when the source is the
- *     matching routed mode, otherwise {@link chooseSeedProvider}'s choice.
+ *   - "clear+collapse": ALCHEMY no longer routes via a recipe-level provider
+ *     (retired for the system-level `alchemy.checkMode`, issue 554) and requires
+ *     exactly one ingredient set, so migrating in clears any stale `resultSelection`
+ *     and collapses a multi-ingredient-set recipe to its first set. It NEVER seeds a
+ *     provider; a multi-step recipe cannot migrate into alchemy and is deleted.
  *   - "clear": the target mode does not route via a recipe-level provider, so
  *     `resultSelection` is set to `null` (a no-op for routed modes, which never
  *     carry one).
@@ -46,9 +48,7 @@
  *   - "delete": a structural constraint cannot be met (narrowing a >1×1 recipe into
  *     `simple`/`progressive`, or moving a multi-step recipe into `alchemy`).
  *
- * `RI↔RC` never deletes (`carry`); it reconciles stale routing. Reuses the
- * `_seedProvider`/`_clone` idiom from `migrateLegacyResolutionModes.js`. The
- * alchemy provider set is `['ingredientSet', 'check']`.
+ * `RI↔RC` never deletes (`carry`); it reconciles stale routing.
  *
  * @module migrateRecipeForModeChange
  */
@@ -60,11 +60,11 @@ const SINGLE_GROUP_MODES = new Set(['simple', 'progressive']);
 
 /**
  * @typedef {object} ModeChangeResult
- * @property {'lossless'|'seeded'|'cleared'|'carry'|'delete'} outcome
+ * @property {'lossless'|'cleared'|'carry'|'delete'} outcome
  *   Classification of what happened: `lossless` (no-op carry, already conforming),
- *   `seeded` (an alchemy provider was seeded), `cleared` (`resultSelection` cleared),
- *   `carry` (carried verbatim into a mode that keeps existing routing), or
- *   `delete` (a structural constraint cannot be met — caller must delete).
+ *   `cleared` (`resultSelection` cleared and/or ingredient sets collapsed for the
+ *   new mode), `carry` (carried verbatim into a mode that keeps existing routing),
+ *   or `delete` (a structural constraint cannot be met — caller must delete).
  * @property {boolean} [reconcile] When true, the recipe survives but its routing
  *   data is stale for the new basis and must be re-authored (surfaced as a
  *   validation issue, never silently mis-routed).
@@ -79,7 +79,8 @@ const SINGLE_GROUP_MODES = new Set(['simple', 'progressive']);
  * @param {object} recipeJSON Recipe JSON (as produced by `Recipe#toJSON`).
  * @param {string} fromMode The current system resolution mode.
  * @param {string} toMode The target system resolution mode.
- * @param {object} [system] The target system (used to choose the seed provider).
+ * @param {object} [system] The target system. Retained for call-site parity with
+ *   `migrateRecipeForModeChange`; the per-recipe pass no longer seeds a provider.
  * @returns {ModeChangeResult}
  */
 export function classifyModeChange(recipeJSON, fromMode, toMode, system = {}) {
@@ -207,33 +208,6 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
   return { outcome: 'lossless', recipe: recipeJSON, reasons: ['no routed selection to clear'] };
 }
 
-/**
- * Choose the provider to seed for the ALCHEMY target mode (the only mode that still
- * routes via a recipe-level provider). Prefer `check` ONLY when the system has an
- * authored SIMPLE check roll formula (alchemy's check provider routes by the simple
- * check outcome), else the always-available `ingredientSet` provider. Seeding can
- * therefore never manufacture an avoidable system-level gap. A check is usable IFF
- * it has an authored roll formula — the legacy `enabled` / `features.craftingChecks`
- * toggles do not make a check usable, so they are not consulted here (aligns with
- * `ResolutionModeService._hasRollFormula` and `systemValidation`).
- *
- * Also used by the recipe editor to seed an alchemy provider when a recipe is
- * switched to Complex in an alchemy system (so the routing basis is never left
- * unselected), keeping that default in lockstep with this migration's contract.
- * The `toMode` param is retained for call-site clarity; only `alchemy` reaches here.
- * @param {object} system
- * @param {string} toMode The target resolution mode (`alchemy`).
- * @returns {'check'|'ingredientSet'}
- */
-export function chooseSeedProvider(system, toMode) {
-  const check = _isPlainObject(system?.craftingCheck) ? system.craftingCheck : {};
-  const hasUsableFormula =
-    toMode === 'alchemy'
-      ? _trimmed(check.simple?.rollFormula).length > 0
-      : _trimmed(check.routed?.rollFormula).length > 0;
-  return hasUsableFormula ? 'check' : 'ingredientSet';
-}
-
 /** Number of authoring steps on the recipe (0 for a flat recipe). */
 function _stepCount(recipe) {
   return Array.isArray(recipe.steps) ? recipe.steps.length : 0;
@@ -251,10 +225,6 @@ function _isOneByOne(recipe) {
   const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
   const resultGroups = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
   return ingredientSets.length <= 1 && resultGroups.length <= 1;
-}
-
-function _trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 function _isPlainObject(value) {
