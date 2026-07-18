@@ -39,7 +39,7 @@ GM only.
 **Returns:** `Promise<object>`
 
 The `features` object controls which optional behaviours are active.
-Every key defaults to `false` when omitted.
+Every key defaults to `false` when omitted, except `salvage`, which defaults to `true` for backward compatibility (an explicit `false` is still honoured).
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -51,7 +51,7 @@ Every key defaults to `false` when omitted.
 | `propertyMacros` | `boolean` | `false` | Allow result property macros |
 | `effectTransfer` | `boolean` | `false` | Copy active effects from ingredients to crafted results. Also requires `recipe.transferEffects: true` on each recipe. See [Effect Transfer]({% link effect-transfer.md %}). |
 | `multiStepRecipes` | `boolean` | `false` | Multi-step recipes |
-| `salvage` | `boolean` | `false` | Allow components to be broken down into constituent parts. When `true`, each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
+| `salvage` | `boolean` | `true` | Allow components to be broken down into constituent parts. Defaults to `true` for backward compatibility (an absent key reads on); an explicit `false` is honoured and disables it. When enabled, each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
 | `gathering` | `boolean` | `false` | Enable GM authoring for gathering environments and tasks. See [Gathering Environments]({% link gathering-environments.md %}). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
