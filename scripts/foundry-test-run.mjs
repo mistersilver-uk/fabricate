@@ -4868,6 +4868,11 @@ async function main() {
 
         await returnToSystemLibrary(page);
         await settleManagerNav(page);
+        // The settle signature (geometry x navCount) can be identical across this
+        // transition, so anchor on the browser row actually re-mounting before the
+        // non-retrying count assertions below (issue 750 review finding).
+        await page.locator(managerSystemRowSelector(craftingSetup.systemId)).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
