@@ -384,6 +384,20 @@ export class RecipeVisibilityService {
     );
   }
 
+  // Whether a system permits learning at all (spec §Learning Recipes → Preconditions).
+  // The flat `visibilityMode` is canonical when authored, so learning requires the
+  // resolved mode to be `'knowledge'` — a flat `item`/`global`/`restricted` system is
+  // rejected even though it retains the normalizer's residual `knowledge.mode` default
+  // of `itemOrLearned`. A legacy system with no authored flat mode still honours its
+  // `learned`/`itemOrLearned` sub-mode. Shared by `learnRecipe`,
+  // `learnRecipeFromOwnedBook`, and `_isRecipeEligibleForOwnedItemLearning` so the gate
+  // cannot drift between the explicit-learn and drop/picker paths.
+  _isLearnModeEnabled(system) {
+    if (this._getVisibilityMode(system) !== 'knowledge') return false;
+    const knowledge = this._getKnowledgeConfig(system);
+    return ['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned');
+  }
+
   // Per-recipe-item use/learn caps (issue 511). Caps live on the recipe's linked
   // recipe item definition (`definition.caps`) rather than one system-wide config,
   // so two books in the same system can differ. Resolves via the recipe's
@@ -948,9 +962,10 @@ export class RecipeVisibilityService {
     const system = this._getCraftingSystem(recipe);
     if (!system) return { success: false, message: LEARN_RECIPE_MESSAGES.systemNotFound };
 
-    const knowledge = this._getKnowledgeConfig(system);
-    const mode = knowledge?.mode || 'itemOrLearned';
-    if (!['learned', 'itemOrLearned'].includes(mode)) {
+    // Preconditions gate: the authored flat mode wins, so a flat `item`/`global`/
+    // `restricted` system rejects the learn even though it carries the residual
+    // `knowledge.mode` default (spec §Learning Recipes → Preconditions).
+    if (!this._isLearnModeEnabled(system)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learningDisabled };
     }
     if (!this._hasRecipeItemReference(recipe)) {
@@ -1045,13 +1060,11 @@ export class RecipeVisibilityService {
     const system = this._getCraftingSystem(recipe);
     if (!system) return false;
     // Learning only applies to the knowledge visibility mode (item-only and the
-    // non-knowledge modes never learn). Routed through `_getVisibilityMode` so both
-    // the flat enum and the legacy `listMode`/`knowledge.mode` pair resolve here.
-    if (this._getVisibilityMode(system) !== 'knowledge') return false;
+    // non-knowledge modes never learn). Shared with the service learn entry points via
+    // `_isLearnModeEnabled` so the flat-enum/legacy resolution cannot drift.
+    if (!this._isLearnModeEnabled(system)) return false;
 
     const knowledge = this._getKnowledgeConfig(system);
-    if (!['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned')) return false;
-
     // Effective cap only — a `limitRecipes` system with an invalid `maxRecipes`
     // behaves as uncapped here (fails closed to the normal learn path).
     const capped = this._isRecipeItemLearnCapped(recipe);
@@ -1522,9 +1535,9 @@ export class RecipeVisibilityService {
     const system = this._getCraftingSystem(recipe);
     if (!system) return { success: false, message: LEARN_RECIPE_MESSAGES.systemNotFound };
 
-    const knowledge = this._getKnowledgeConfig(system);
-    const mode = knowledge?.mode || 'itemOrLearned';
-    if (!['learned', 'itemOrLearned'].includes(mode)) {
+    // Preconditions gate (spec §Learning Recipes → Preconditions): shared with
+    // `learnRecipe` so the flat-mode requirement cannot drift between entry points.
+    if (!this._isLearnModeEnabled(system)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learningDisabled };
     }
     if (!this._hasRecipeItemReference(recipe)) {

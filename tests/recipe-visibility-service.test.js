@@ -3013,3 +3013,105 @@ test('703 - guardCraftStart evaluates system visibility at most once per craft c
   assert.equal(guard.craftable, true, 'a valid global system stays craftable');
   assert.equal(getRecipesCalls, 1, 'system visibility computed once, not per step');
 });
+
+// ---------------------------------------------------------------------------
+// #704 — learn preconditions honour the authored flat visibility mode
+// ---------------------------------------------------------------------------
+
+// A flat-authored system that keeps the normalizer's residual `knowledge.mode`
+// default of `itemOrLearned`. Under a non-`knowledge` flat mode, learning must be
+// refused even though the residual sub-mode would otherwise allow it.
+function buildFlatModeLearnSystem(visibilityMode) {
+  return buildMockSystem({
+    id: 'system-1',
+    visibilityMode,
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true, dragDropEnabled: true },
+      },
+    },
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'src-book' }],
+  });
+}
+
+function buildOwnedBookScenario(visibilityMode) {
+  const system = buildFlatModeLearnSystem(visibilityMode);
+  const recipe = buildMockRecipe({
+    id: 'recipe-1',
+    craftingSystemId: 'system-1',
+    recipeItemId: 'book',
+    linkedRecipeItemUuid: null,
+  });
+  const book = new FakeItem({ uuid: 'Actor.a1.Item.book', sourceId: 'src-book' });
+  const actor = new FakeActor({ id: 'a1', items: [book] });
+  const service = buildService({ system, recipes: [recipe] });
+  return { service, recipe, book, actor };
+}
+
+for (const flatMode of ['item', 'global', 'restricted']) {
+  test(`704 - learnRecipe refuses a flat '${flatMode}' system carrying the residual itemOrLearned sub-mode`, async () => {
+    const { service, recipe, book, actor } = buildOwnedBookScenario(flatMode);
+
+    const result = await service.learnRecipe({ recipe, craftingActor: actor });
+
+    assert.equal(result.success, false);
+    assert.equal(result.message, 'FABRICATE.Knowledge.LearningDisabled');
+    // No side effects: no learn write, no consumption.
+    assert.equal(actor.getFlag('fabricate', 'fabricate.learnedRecipes'), undefined);
+    assert.equal(book.deleted, false);
+  });
+
+  test(`704 - learnRecipeFromOwnedBook refuses a flat '${flatMode}' system (clean failure, no throw)`, async () => {
+    const { service, recipe, book, actor } = buildOwnedBookScenario(flatMode);
+
+    const result = await service.learnRecipeFromOwnedBook({ recipe, craftingActor: actor });
+
+    assert.equal(result.success, false);
+    assert.equal(result.message, 'FABRICATE.Knowledge.LearningDisabled');
+    assert.equal(actor.getFlag('fabricate', 'fabricate.learnedRecipes'), undefined);
+    assert.equal(book.deleted, false);
+  });
+}
+
+test('704 - a flat knowledge system still learns (positive path)', async () => {
+  const { service, recipe, actor } = buildOwnedBookScenario('knowledge');
+
+  const result = await service.learnRecipe({ recipe, craftingActor: actor });
+
+  assert.equal(result.success, true);
+  const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.ok(learned['recipe-1'], 'the recipe is recorded as learned');
+});
+
+test('704 - a legacy knowledge system with no authored flat mode keeps learned behaviour', async () => {
+  // No `visibilityMode` authored: the legacy `knowledge.mode` governs, so 'learned'
+  // still learns exactly as before the flat-mode gate.
+  const system = buildMockSystem({
+    id: 'system-1',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false, dragDropEnabled: true },
+      },
+    },
+    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'src-book' }],
+  });
+  const recipe = buildMockRecipe({
+    id: 'recipe-1',
+    craftingSystemId: 'system-1',
+    recipeItemId: 'book',
+    linkedRecipeItemUuid: null,
+  });
+  const book = new FakeItem({ uuid: 'Actor.a1.Item.book', sourceId: 'src-book' });
+  const actor = new FakeActor({ id: 'a1', items: [book] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipe({ recipe, craftingActor: actor });
+  assert.equal(result.success, true);
+  assert.ok(actor.getFlag('fabricate', 'fabricate.learnedRecipes')['recipe-1']);
+});
