@@ -3809,7 +3809,7 @@
             "AlchemyNoneTitle": "Resolves without a check",
             "AlchemyNoneLead": "This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered above to author a crafting check.",
             "FailureConsumptionHeading": "Failure consumption policy",
-            "FailureConsumptionIntro": "What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage mirrors the same policy.",
+            "FailureConsumptionIntro": "What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage failures follow their own separate policy.",
             "ConsumeIngredientsOnFail": "Consume ingredients on a failed check",
             "ConsumeIngredientsOnFailDesc": "The recipe’s ingredients are used up even when the crafting check fails. On by default.",
             "BreakToolsOnFail": "Break tools on a failed check",

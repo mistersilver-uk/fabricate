@@ -379,7 +379,7 @@
 
           <section class="manager-inspector-card" data-failure-consumption>
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionHeading', 'Failure consumption policy')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionIntro', 'What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage mirrors the same policy.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionIntro', 'What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage failures follow their own separate policy.')}</p>
             <div class="manager-checks-flag-list">
               <ToggleCard
                 variant="is-info"
