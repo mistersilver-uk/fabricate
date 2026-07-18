@@ -335,8 +335,14 @@ export class CraftingEngine {
       // ARMS the gate — then resumes at maturity (FINISH) to run the crafting
       // check and create results. Instant (0-second) timed steps and non-timed
       // steps fall through to the normal consume-at-finish path below unchanged.
+      // The enabled flag gates only ARMING a new gate: an already-armed gate must
+      // still resume even if the GM disabled time requirements mid-run, or the
+      // finish path would re-consume components already spent at START.
       const timeGateSeconds =
-        runManager && run && step.timeRequirement && this._timeRequirementsEnabled(recipe)
+        runManager &&
+        run &&
+        step.timeRequirement &&
+        (this._timeRequirementsEnabled(recipe) || !!run.steps?.[stepIndex]?.timeGate)
           ? runManager.durationToSeconds(step.timeRequirement)
           : 0;
       if (timeGateSeconds > 0) {
