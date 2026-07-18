@@ -304,6 +304,46 @@
             </div>
           </section>
 
+          <section class="manager-inspector-card" data-alchemy-behaviour>
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.SystemSettings.Alchemy.BehaviourHeading', 'Alchemy behaviour')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.SystemSettings.Alchemy.BehaviourIntro', 'How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.')}</p>
+            <div class="manager-checks-flag-list">
+              <ToggleCard
+                variant="is-info"
+                icon="fas fa-book-sparkles"
+                section="alchemy-learn-on-craft"
+                field="learnOnCraft"
+                title={text('FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraft', 'Learn a recipe when its ingredients are matched')}
+                sub={text('FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraftDesc', 'A matched brew records the recipe as discovered for that player, whether the check passes or fails. Off by default.')}
+                toggleLabel={text('FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraft', 'Learn a recipe when its ingredients are matched')}
+                on={alchemyLearnOnCraft}
+                onToggle={(next) => onUpdateAlchemyFlags({ learnOnCraft: next })}
+              />
+              <ToggleCard
+                variant="is-info"
+                icon="fas fa-fire-flame-curved"
+                section="alchemy-consume-on-fail"
+                field="consumeOnFail"
+                title={text('FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFail', 'Consume ingredients on a failed brew')}
+                sub={text('FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFailDesc', 'A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.')}
+                toggleLabel={text('FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFail', 'Consume ingredients on a failed brew')}
+                on={alchemyConsumeOnFail}
+                onToggle={(next) => onUpdateAlchemyFlags({ consumeOnFail: next })}
+              />
+              <ToggleCard
+                variant="is-info"
+                icon="fas fa-clock-rotate-left"
+                section="alchemy-show-attempt-history"
+                field="showAttemptHistoryToPlayers"
+                title={text('FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistory', 'Show attempt history to players')}
+                sub={text('FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistoryDesc', 'Record dead-end attempts so a player sees which ingredient combinations produced no reaction. On by default.')}
+                toggleLabel={text('FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistory', 'Show attempt history to players')}
+                on={alchemyShowAttemptHistory}
+                onToggle={(next) => onUpdateAlchemyFlags({ showAttemptHistoryToPlayers: next })}
+              />
+            </div>
+          </section>
+
           {#if alchemyCheckMode === 'tiered'}
             <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
           {:else if alchemyCheckMode === 'simple'}

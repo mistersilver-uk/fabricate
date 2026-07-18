@@ -2229,6 +2229,58 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('Checks: alchemy behaviour flags render as toggles reflecting stored values and persist via saveAlchemyConfig (issue 713)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    const behaviour = target.querySelector(
+      '[data-checks-panel="crafting"] [data-alchemy-behaviour]'
+    );
+    assert.ok(behaviour, 'the alchemy behaviour card renders on the alchemy crafting tab');
+    const learn = behaviour.querySelector('[data-recipe-field="learnOnCraft"]');
+    const consume = behaviour.querySelector('[data-recipe-field="consumeOnFail"]');
+    const history = behaviour.querySelector('[data-recipe-field="showAttemptHistoryToPlayers"]');
+    assert.ok(learn && consume && history, 'all three behaviour toggles render');
+    // Default fixture: learnOnCraft true, consumeOnFail true, showAttemptHistoryToPlayers
+    // false — a stored non-default false must read back OFF, not the default ON.
+    assert.equal(learn.getAttribute('aria-pressed'), 'true');
+    assert.equal(consume.getAttribute('aria-pressed'), 'true');
+    assert.equal(history.getAttribute('aria-pressed'), 'false');
+    // The consumption-policy card is alchemy-exclusive-off: alchemy resolves consumption
+    // through its own consumeOnFail flag, so the craftingCheck.consumption card is hidden.
+    assert.equal(
+      target.querySelector('[data-checks-panel="crafting"] [data-failure-consumption]'),
+      null,
+      'the failure consumption policy card is not shown in alchemy mode'
+    );
+
+    // Toggling one flag sends the FULL config with only that field flipped, so a partial
+    // saveAlchemyConfig does not silently re-default the untouched flags.
+    history.click();
+    await tick();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'saveAlchemyConfig');
+    assert.ok(saved, 'toggling persists through saveAlchemyConfig');
+    assert.deepEqual(saved[1], {
+      checkMode: 'simple',
+      learnOnCraft: true,
+      consumeOnFail: true,
+      showAttemptHistoryToPlayers: true,
+    });
+  });
+
   it('Checks: failure consumption policy renders two toggles reflecting stored values and persists via saveCraftingCheckConsumption (issue 712)', async () => {
     const calls = [];
     target = document.createElement('div');

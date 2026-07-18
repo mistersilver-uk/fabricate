@@ -2935,6 +2935,33 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.alchemy.showAttemptHistoryToPlayers, false);
     });
 
+    it('projects the alchemy behaviour flags into view state, preserving authored-off defaults (issue 713)', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) {
+        sys.resolutionMode = 'alchemy';
+        // Non-default fixtures for all three flags: a dropped projection field would
+        // invert the default-true consumeOnFail/showAttemptHistoryToPlayers to ON.
+        sys.alchemy = {
+          checkMode: 'simple',
+          learnOnCraft: true,
+          consumeOnFail: false,
+          showAttemptHistoryToPlayers: false,
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const alchemy = get(store.viewState).selectedSystem.alchemy;
+      assert.equal(alchemy.learnOnCraft, true, 'a stored learnOnCraft:true survives');
+      assert.equal(alchemy.consumeOnFail, false, 'an authored-off consumeOnFail survives');
+      assert.equal(
+        alchemy.showAttemptHistoryToPlayers,
+        false,
+        'an authored-off showAttemptHistoryToPlayers survives'
+      );
+    });
+
     it('updateRecipeItemCaps delegates a caps patch to the manager for the selected system', async () => {
       let updateCall = null;
       const services = createMockServices();

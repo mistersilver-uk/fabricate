@@ -4208,7 +4208,15 @@
           "CheckModeSimple": "Simple check",
           "CheckModeSimpleDesc": "A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.",
           "CheckModeTiered": "Tiered check",
-          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check."
+          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.",
+          "BehaviourHeading": "Alchemy behaviour",
+          "BehaviourIntro": "How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.",
+          "LearnOnCraft": "Learn a recipe when its ingredients are matched",
+          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. Off by default.",
+          "ConsumeOnFail": "Consume ingredients on a failed brew",
+          "ConsumeOnFailDesc": "A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.",
+          "ShowAttemptHistory": "Show attempt history to players",
+          "ShowAttemptHistoryDesc": "Record dead-end attempts so a player sees which ingredient combinations produced no reaction. On by default."
         }
       },
       "Features": {
@@ -4290,13 +4298,6 @@
           "NoCheckMacro": "No check macro",
           "OutcomesPlaceholder": "Outcomes (comma separated)",
           "SaveConfig": "Save Check Config"
-        },
-        "Alchemy": {
-          "Title": "Alchemy",
-          "Hint": "Configure the learning and failure behavior used by alchemy attempts in this crafting system.",
-          "LearnOnCraft": "Learn recipes after a successful attempt",
-          "ConsumeOnFail": "Consume submitted ingredients on failed attempts",
-          "ShowAttemptHistoryToPlayers": "Show attempt history to players"
         },
         "OutcomeRouting": {
           "Title": "Outcome Routing",
