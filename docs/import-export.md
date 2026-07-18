@@ -56,7 +56,8 @@ When you import a system you choose how to handle an existing system with the sa
 - **Overwrite** replaces the existing system and its recipes, and replaces only that system's gathering environments.
 - **Copy** imports the data as a new system with fresh identifiers, so it never collides with the original.
 
-Copy mode regenerates the system, realm, and environment identifiers while preserving Gathering Task, event, and modifier identifiers, so the environment-to-library links keep working in the copy.
+Copy mode regenerates the system, realm, environment, and recipe identifiers while preserving Gathering Task, event, and modifier identifiers, so the environment-to-library links keep working in the copy.
+Recipe book membership is carried across to the regenerated recipe identifiers, so every book in the copy still lists the same recipes.
 
 {: .note }
 > A crafting system's identifier may only contain letters, digits, hyphens, and underscores.

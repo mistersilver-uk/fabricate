@@ -256,6 +256,7 @@ export class RunJournalBuilder {
 
   _craftingRunModel({ run, actor, viewer, worldTime, terminal }) {
     if (!run?.id) return null;
+    if (run.isFizzle === true) return this._fizzleRunModel({ run, viewer });
     const recipe = this._recipeManager?.getRecipe?.(stringOrNull(run.recipeId)) ?? null;
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
     const redacted = this._isCraftingRedacted({ recipe, actor, viewer });
@@ -351,6 +352,59 @@ export class RunJournalBuilder {
       // A redacted run hides its recipe identity, so it cannot offer a manual
       // "Trigger Next Step" advance — only a discovered crafting run can.
       manualAdvance: !redacted,
+    };
+  }
+
+  /**
+   * Project a no-signature alchemy fizzle history entry. It references no recipe,
+   * so it carries a generic localized title and NO recipe/signature/step data — an
+   * undiscovered recipe can never leak through it. Player visibility honours the
+   * system's `alchemy.showAttemptHistoryToPlayers`: a non-GM viewer sees the entry
+   * only when that flag is enabled (the GM always sees it). Returns null when the
+   * entry must be hidden, so the caller's `.filter(Boolean)` drops it.
+   * @private
+   */
+  _fizzleRunModel({ run, viewer }) {
+    const system = this._getSystem(stringOrNull(run.craftingSystemId));
+    const isGM = viewer?.isGM === true;
+    const visibleToPlayers = system?.alchemy?.showAttemptHistoryToPlayers === true;
+    if (!isGM && !visibleToPlayers) return null;
+
+    const status = stringOrNull(run.status) || 'failed';
+    return {
+      id: stringOrNull(run.id),
+      runType: 'crafting',
+      status,
+      derivedStatus: status,
+      craftingSystemId: stringOrNull(run.craftingSystemId),
+      craftingSystemName: stringOrEmpty(system?.name),
+      names: {
+        title: this.localize('FABRICATE.App.Journal.Fizzle.Title'),
+        subtitle: stringOrEmpty(system?.name),
+      },
+      redacted: false,
+      img: DEFAULT_RUN_IMAGE,
+      stepIndex: null,
+      stepCount: 0,
+      multiStep: false,
+      isFinalStep: false,
+      stepLabel: '',
+      steps: [],
+      currentStep: null,
+      timeGate: null,
+      startedAt: numberOrNull(run.startedAt),
+      updatedAt: numberOrNull(run.updatedAt),
+      finishedAt: numberOrNull(run.finishedAt),
+      structureLabel: '',
+      resolutionModeLabel: this.localize(MODE_LABEL_KEYS.alchemy),
+      recipeId: null,
+      taskId: null,
+      flavor: '',
+      failureReason: this.localize('FABRICATE.App.Journal.Fizzle.Failure'),
+      createdResults: [],
+      createdResultCount: 0,
+      isFizzle: true,
+      manualAdvance: false,
     };
   }
 

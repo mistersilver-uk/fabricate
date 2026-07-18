@@ -1116,6 +1116,64 @@ test('craftAlchemy reaches the no-match disposition (and consumes) when ingredie
   assert.equal(deleted.length, 1, 'insufficient submission is still consumed on the no-match path');
 });
 
+test('craftAlchemy records a no-signature fizzle as run history, unconditionally', async () => {
+  const registeredItemUuid = 'Item.iron-ingot';
+  const components = [buildComponent('iron', registeredItemUuid)];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const system = buildAlchemySystem({
+    id: 'alchemy-sys',
+    components,
+    // showAttemptHistoryToPlayers is OFF on purpose: recording must STILL happen —
+    // that flag gates only Journal visibility, never whether the attempt is recorded.
+    alchemy: { learnOnCraft: false, consumeOnFail: true, showAttemptHistoryToPlayers: false },
+  });
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: (id) => (id === 'alchemy-sys' ? system : null),
+  });
+  const validator = new SignatureValidator({
+    getSystem: () => system,
+    getRecipesForSystem: () => [recipe],
+    getComponentsForSystem: () => components,
+  });
+
+  const fizzleCalls = [];
+  const runManager = {
+    async recordFizzle(actor, details) {
+      fizzleCalls.push({ actor, details });
+      return { id: 'fizz-1', isFizzle: true };
+    },
+  };
+  const engine = new CraftingEngine({ getRecipes: () => [recipe] }, runManager);
+
+  const actorItem = {
+    uuid: registeredItemUuid,
+    system: { quantity: 1 },
+    async delete() {},
+    async update() {},
+  };
+  const sourceActor = { items: [actorItem] };
+  const submitted = toAlchemyRecords(
+    buildIngotSubmissions(registeredItemUuid, 1),
+    components,
+    'alchemy-sys'
+  );
+
+  const craftingActor = { id: 'pc' };
+  const result = await engine.craftAlchemy(craftingActor, [sourceActor], submitted, {
+    craftingSystemId: 'alchemy-sys',
+    signatureValidator: validator,
+  });
+
+  assert.equal(result.disposition, 'no-match', 'the attempt fizzles');
+  assert.equal(fizzleCalls.length, 1, 'a no-signature fizzle is recorded once as run history');
+  assert.equal(fizzleCalls[0].actor, craftingActor, 'recorded against the crafting actor');
+  assert.equal(
+    fizzleCalls[0].details.craftingSystemId,
+    'alchemy-sys',
+    'the fizzle carries its crafting system id (and no recipe/signature data)'
+  );
+});
+
 test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals item quantity', async () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
 

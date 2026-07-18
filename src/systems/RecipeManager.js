@@ -1713,27 +1713,53 @@ export class RecipeManager {
   }
 
   /**
-   * Import recipes from JSON
+   * Import recipes from JSON.
+   *
+   * Each recipe that cannot be imported is skipped and recorded as a conflict:
+   * `reason: 'invalid'` when activation validation fails (carrying the validation
+   * `errors`), or `reason: 'duplicate-id'` when a recipe with the same id already
+   * exists and `overwrite` is false. On completion the skipped recipes are surfaced
+   * in ONE aggregated conflict-report notification (spec item 3), kept distinct from
+   * the terminal counts notification (spec item 4). Duplicate-id skips are no longer
+   * silent.
+   *
    * @param {Object[]} recipesData - Array of recipe data
    * @param {boolean} overwrite - Whether to overwrite existing recipes
+   * @returns {Promise<{ imported: number, skipped: number, total: number,
+   *   conflicts: Array<{ recipeId: string, recipeName: string, reason: string,
+   *   errors?: string[] }> }>} import counts plus the per-recipe conflict list
    */
   async importRecipes(recipesData, overwrite = false) {
     this._assertGM('import recipes');
 
     let imported = 0;
     let skipped = 0;
+    // Per-recipe conflict reasons, aggregated into ONE report at completion (spec
+    // item 3) rather than mid-loop console.warn (invalid) or silent skips (duplicate
+    // id). Distinct from the terminal counts notification below (spec item 4).
+    const conflicts = [];
 
     for (const recipeData of recipesData) {
       const recipe = Recipe.fromJSON(recipeData);
       const validation = this._validateRecipeForActivation(recipe);
 
       if (!validation.valid) {
-        console.warn(`Fabricate | Skipping invalid recipe: ${recipe.name}`, validation.errors);
+        conflicts.push({
+          recipeId: recipe.id,
+          recipeName: recipe.name,
+          reason: 'invalid',
+          errors: validation.errors,
+        });
         skipped++;
         continue;
       }
 
       if (this.recipes.has(recipe.id) && !overwrite) {
+        conflicts.push({
+          recipeId: recipe.id,
+          recipeName: recipe.name,
+          reason: 'duplicate-id',
+        });
         skipped++;
         continue;
       }
@@ -1744,9 +1770,36 @@ export class RecipeManager {
 
     await this.save();
     await this._cleanupFlagsAfterRecipeMutation();
+    // Spec item 3: one aggregated conflict report naming each skipped recipe and its
+    // reason (duplicate-id skips are no longer silent).
+    if (conflicts.length > 0) {
+      ui.notifications.warn(this._formatImportConflictReport(conflicts));
+    }
+    // Spec item 4: the terminal counts notification, kept distinct from the report.
     ui.notifications.info(`Imported ${imported} recipes (${skipped} skipped)`);
-    this._notifyRecipesChanged('import', { imported, skipped, total: recipesData.length });
-    return { imported, skipped, total: recipesData.length };
+    this._notifyRecipesChanged('import', {
+      imported,
+      skipped,
+      total: recipesData.length,
+      conflicts,
+    });
+    return { imported, skipped, total: recipesData.length, conflicts };
+  }
+
+  /**
+   * Build the aggregated import-conflict report string: names each skipped recipe
+   * and its machine-readable reason. Emitted once at import completion (spec item 3),
+   * distinct from the terminal counts notification (spec item 4).
+   * @param {Array<{ recipeId: string, recipeName: string, reason: string }>} conflicts
+   * @returns {string}
+   * @private
+   */
+  _formatImportConflictReport(conflicts) {
+    const reasonLabels = { 'duplicate-id': 'duplicate id', invalid: 'invalid' };
+    const details = conflicts
+      .map((c) => `"${c.recipeName || c.recipeId}" (${reasonLabels[c.reason] || c.reason})`)
+      .join(', ');
+    return `${conflicts.length} recipe(s) could not be imported: ${details}`;
   }
 
   /**

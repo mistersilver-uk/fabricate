@@ -881,3 +881,78 @@ test('duplicate run ids in history are de-duplicated (first kept) so the keyed J
     console.warn = original;
   }
 });
+
+// ── Alchemy fizzle history entries ───────────────────────────────────────────
+
+function fizzleRun(overrides = {}) {
+  return {
+    id: 'fizzle-1',
+    craftingSystemId: 'sys-1',
+    recipeId: null,
+    isFizzle: true,
+    status: 'failed',
+    startedAt: 5,
+    updatedAt: 5,
+    finishedAt: 5,
+    currentStepIndex: null,
+    steps: [],
+    ...overrides,
+  };
+}
+
+const ALCHEMY_SYSTEM_VISIBLE = {
+  ...SYSTEM,
+  alchemy: { showAttemptHistoryToPlayers: true },
+};
+const ALCHEMY_SYSTEM_HIDDEN = {
+  ...SYSTEM,
+  alchemy: { showAttemptHistoryToPlayers: false },
+};
+
+test('a fizzle history entry projects a generic title with no recipe/step/signature data', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_VISIBLE,
+  }).buildListing({ actor: ACTOR, viewer: GM });
+
+  assert.equal(listing.history.length, 1, 'the GM always sees the fizzle');
+  const [run] = listing.history;
+  assert.equal(run.isFizzle, true);
+  assert.equal(run.status, 'failed');
+  assert.equal(run.names.title, 'FABRICATE.App.Journal.Fizzle.Title', 'generic, non-leaky title');
+  assert.equal(run.recipeId, null, 'no recipe id leaks');
+  assert.deepEqual(run.steps, [], 'no step/signature data leaks');
+  assert.deepEqual(run.createdResults, [], 'a fizzle produced nothing');
+  assert.equal(run.resolutionModeLabel, 'FABRICATE.App.Journal.Mode.Alchemy');
+});
+
+test('a fizzle is hidden from a non-GM viewer when showAttemptHistoryToPlayers is off', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_HIDDEN,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.equal(listing.history.length, 0, 'the player does not see the gated fizzle');
+  assert.equal(listing.counts.history, 0);
+});
+
+test('a fizzle is visible (still non-leaky) to a non-GM viewer when the flag is on', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_VISIBLE,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.equal(listing.history.length, 1, 'the player sees the fizzle when the flag is on');
+  const [run] = listing.history;
+  assert.equal(run.names.title, 'FABRICATE.App.Journal.Fizzle.Title');
+  assert.equal(run.recipeId, null, 'no recipe identity leaks even when visible');
+});
+
+test('the GM sees a fizzle even when showAttemptHistoryToPlayers is off', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_HIDDEN,
+  }).buildListing({ actor: ACTOR, viewer: GM });
+
+  assert.equal(listing.history.length, 1, 'the GM is never gated by the player-visibility flag');
+});
