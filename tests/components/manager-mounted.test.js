@@ -308,6 +308,11 @@ function compileManagerRoot() {
     // The component category vocabulary (issue 676) — the SIBLING of the above, not a
     // reuse of it. Imported by ComponentEditView and the component browser.
     'src/utils/componentCategories.js',
+    // Per-category icons + vocabulary reference counting (issue 689). Imported by the
+    // root (icon lookup, usage roll-up); omitting either HANGS the mounted manager
+    // suite as `# cancelled`.
+    'src/utils/categoryIcons.js',
+    'src/utils/vocabularyUsage.js',
     // The component library's pure list model — filter/group/sort/paginate (issue 676),
     // the sibling of recipeBrowserModel below. Imported by ComponentsBrowserView AND by
     // the root (which lifts the browser state).
@@ -355,6 +360,12 @@ function navButton(labelText) {
   return Array.from(target.querySelectorAll('.manager-nav-button')).find((button) =>
     button.textContent.includes(labelText)
   );
+}
+
+// Set a control's value and fire the input event Svelte's bind:value listens for.
+function setInputValue(element, value) {
+  element.value = value;
+  element.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function gatheringSubitem(labelText) {
@@ -1364,20 +1375,22 @@ function createStore(calls = [], options = {}) {
       return options.updateEssenceResult ?? true;
     },
     removeEssence: (id) => calls.push(['removeEssence', id]),
-    addCategory: (value) => {
-      calls.push(['addCategory', value]);
+    addCategory: (value, icon) => {
+      calls.push(['addCategory', value, icon]);
       if (options.addCategoryReject) return Promise.reject(new Error('add category failed'));
       return options.addCategoryResult ?? true;
     },
     removeCategory: (value) => calls.push(['removeCategory', value]),
+    setCategoryIcon: (name, icon) => calls.push(['setCategoryIcon', name, icon]),
     // The COMPONENT category vocabulary (issue 676). The root calls these
     // optional-chained, so an absent store export no-ops SILENTLY — these stubs plus
     // the call-site assertions below are what make that detectable at all.
-    addComponentCategory: (value) => {
-      calls.push(['addComponentCategory', value]);
+    addComponentCategory: (value, icon) => {
+      calls.push(['addComponentCategory', value, icon]);
       return options.addComponentCategoryResult ?? true;
     },
     removeComponentCategory: (value) => calls.push(['removeComponentCategory', value]),
+    setComponentCategoryIcon: (name, icon) => calls.push(['setComponentCategoryIcon', name, icon]),
     addTag: (value) => {
       calls.push(['addTag', value]);
       if (options.addTagReject) return Promise.reject(new Error('add tag failed'));
@@ -5967,22 +5980,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(salvage.toolIds, ['anvil'], 'toolIds should be preserved');
   });
 
-  it('routes to tags and categories with add feedback, usage warnings, and store delegation', async () => {
+  it('routes to the tabbed tags and categories screen with live validation, icons, and cascade-safe inline delete (issue 689)', async () => {
     const calls = [];
-    const confirmations = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
         store: createStore(calls),
-        services: {
-          openCurrentAdmin: () => {},
-          confirmVocabularyRemoval: (kind, row, message) => {
-            confirmations.push([kind, row.name, message]);
-            return false;
-          },
-        },
+        services: { openCurrentAdmin: () => {} },
       },
     });
     flushSync();
@@ -5995,60 +6001,90 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tags');
-    assert.ok(target.textContent.includes('Recipe categories'));
-    assert.ok(target.textContent.includes('Item tags'));
-    assert.ok(target.textContent.includes('General'));
-    assert.ok(target.textContent.includes('potions'));
-    assert.ok(target.textContent.includes('ore'));
-    assert.ok(target.textContent.includes('Vocabulary counts'));
+    // The three vocabularies are tabs; the recipe tab is shown first.
+    assert.ok(target.querySelector('[data-vocabulary-tab="recipe"]'));
+    assert.ok(target.querySelector('[data-vocabulary-tab="component"]'));
+    assert.ok(target.querySelector('[data-vocabulary-tab="tag"]'));
+    assert.ok(target.textContent.includes('potions'), 'recipe tab shows its custom category');
     assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
+    // A referenced category carries a per-category icon on its row.
+    assert.ok(target.querySelector('[data-category-id="potions"] .manager-vocabulary-icon i'));
 
-    const howItWorksCard = target.querySelector('[data-tags-evidence="how-it-works"]');
-    assert.ok(howItWorksCard, 'tags inspector should render a How-it-works evidence card');
-    assert.ok(
-      howItWorksCard.textContent.includes('flat'),
-      'How-it-works should explain that categories are flat'
-    );
-    assert.ok(
-      howItWorksCard.textContent.includes('General'),
-      'How-it-works should explain reserved General'
-    );
-    assert.ok(howItWorksCard.textContent.includes('tag'), 'How-it-works should mention item tags');
+    // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
+    assert.ok(target.querySelector('[data-tags-evidence="how-it-works"]'));
+    assert.ok(target.querySelector('[data-tags-evidence="at-a-glance"]'));
+    assert.ok(target.querySelector('[data-tags-category-fact="component-categories"]'));
+    assert.ok(target.querySelector('[data-tags-category-fact="references"]'));
+    assert.ok(target.querySelector('[data-tags-evidence="reference-safe"]'));
 
-    // The Examples and General-category evidence cards were removed; only the
-    // How-it-works card and Vocabulary counts remain in the tags inspector.
-    assert.equal(
-      target.querySelector('[data-tags-evidence="examples"]'),
-      null,
-      'the Examples evidence card is removed'
-    );
-
+    // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');
-    categoryInput.value = 'General';
-    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
-    target
-      .querySelector('[aria-label="Recipe categories"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    setInputValue(categoryInput, 'General');
     await tick();
     flushSync();
+    assert.ok(target.querySelector('.manager-vocabulary-hint.is-danger'));
     assert.ok(target.textContent.includes('General is already available as the base category.'));
-    assert.ok(!calls.some((call) => call[0] === 'addCategory'));
+    target
+      .querySelector('[aria-label="Recipe categories"] form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.ok(!calls.some((call) => call[0] === 'addCategory'), 'a blocked add never reaches the store');
 
-    categoryInput.value = 'Elixirs';
-    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    // A valid add shows a success hint and delegates with the authored icon.
+    setInputValue(categoryInput, 'Elixirs');
+    const iconInput = target.querySelector('#manager-category-add-icon');
+    setInputValue(iconInput, 'fas fa-flask');
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.manager-vocabulary-hint.is-success'));
     target
       .querySelector('[aria-label="Recipe categories"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();
     flushSync();
-    assert.ok(calls.some((call) => call[0] === 'addCategory' && call[1] === 'Elixirs'));
+    const addCall = calls.find((call) => call[0] === 'addCategory');
+    assert.deepEqual(addCall, ['addCategory', 'Elixirs', 'fas fa-flask']);
     assert.equal(categoryInput.value, '');
-    assert.equal(document.activeElement, categoryInput);
 
+    // Per-tab search filters only the active vocabulary and shows an empty state.
+    const search = target.querySelector('.manager-vocabulary-search input[type="search"]');
+    setInputValue(search, 'zzzz');
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('No custom categories match this search.'));
+    setInputValue(search, '');
+    await tick();
+    flushSync();
+
+    // Deleting a referenced category confirms inline, then cascades through the store.
+    target.querySelector('[aria-label="Remove category potions"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-vocabulary-confirm="potions"]'),
+      'a referenced delete opens an inline confirm strip'
+    );
+    assert.ok(!calls.some((call) => call[0] === 'removeCategory'), 'nothing is removed before confirming');
+    target
+      .querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger')
+      .click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'removeCategory' && call[1] === 'potions'));
+
+    // The tag tab lowercases as you type and delegates the normalized value.
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-tag-id="ore"]'), 'the tag tab lists item tags');
     const tagInput = target.querySelector('#manager-tag-add');
-    tagInput.value = 'SPICE';
-    tagInput.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(tagInput, 'SPICE');
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.manager-vocabulary-hint.is-info'));
+    assert.ok(target.textContent.includes('Will be added as "spice"'));
     target
       .querySelector('[aria-label="Item tags"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -6056,51 +6092,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addTag' && call[1] === 'spice'));
-    assert.ok(target.textContent.includes('Tag added with cleaned-up lowercase text.'));
     assert.equal(tagInput.value, '');
-    assert.equal(document.activeElement, tagInput);
-
-    target.querySelector('[aria-label="Remove category potions"]').click();
-    await tick();
-    flushSync();
-    assert.deepEqual(confirmations[0]?.slice(0, 2), ['category', 'potions']);
-    assert.ok(!calls.some((call) => call[0] === 'removeCategory' && call[1] === 'potions'));
-
-    target.querySelector('[aria-label="Remove tag ore"]').click();
-    await tick();
-    flushSync();
-    assert.deepEqual(confirmations[1]?.slice(0, 2), ['tag', 'ore']);
-    assert.ok(!calls.some((call) => call[0] === 'removeTag' && call[1] === 'ore'));
-
-    const search = target.querySelector('.manager-toolbar input[type="search"]');
-    search.value = 'zzzz';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.ok(target.textContent.includes('No custom categories match this search.'));
-    assert.ok(target.textContent.includes('No item tags match this search.'));
-    assert.ok(target.textContent.includes('General'));
   });
 
-  it('manages COMPONENT categories as a third, independent vocabulary section (issue 676)', async () => {
-    // AC6 clause 3, at the call site. The screen renders THREE VocabularyPanel
-    // instances over independent vocabularies; the root calls the store's component
-    // handlers optional-chained, so without this an absent export no-ops silently.
+  it('manages COMPONENT categories as an independent tab, distinct from recipe categories (issue 676, 689)', async () => {
+    // The three vocabularies are tabs (issue 689); the component tab renders its own
+    // VocabularyPanel over the SIBLING `componentCategories` vocabulary. The root calls
+    // the store's component handlers optional-chained, so without a real export an
+    // absent one no-ops silently — these call-site assertions are what catch that.
     const calls = [];
-    const confirmations = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
         store: createStore(calls),
-        services: {
-          openCurrentAdmin: () => {},
-          confirmVocabularyRemoval: (kind, row) => {
-            confirmations.push([kind, row.name]);
-            return false;
-          },
-        },
+        services: { openCurrentAdmin: () => {} },
       },
     });
     flushSync();
@@ -6108,41 +6115,44 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    // The recipe tab leads; the component vocabulary is not yet mounted.
+    assert.equal(target.querySelector('[data-component-category-id]'), null);
+    target.querySelector('[data-vocabulary-tab="component"]').click();
+    await tick();
+    flushSync();
+
     const panel = target.querySelector('[aria-label="Component categories"]');
-    assert.ok(panel, 'the component-categories section renders');
+    assert.ok(panel, 'the component-categories tab renders its panel');
     // The seeded vocabulary reaches it through the selectedSystem viewState projection.
     assert.ok(
       target.querySelector('[data-component-category-id="reagent"]'),
       'the authored component category renders as its own row'
     );
-    // Its rows use a DISTINCT hook, so the three sections cannot collide on one.
     assert.ok(
       target.querySelector('[data-component-category-id="general"]'),
       'the reserved General row renders, locked'
     );
+    // The recipe vocabulary is a different tab, so it never leaks into this one.
     assert.equal(
       panel.querySelector('[data-category-id]'),
       null,
-      'the recipe vocabulary never leaks into the component section'
-    );
-    assert.equal(
-      target.querySelector('[aria-label="Recipe categories"] [data-component-category-id]'),
-      null,
-      'and the component vocabulary never leaks into the recipe section'
+      'the recipe vocabulary never leaks into the component tab'
     );
 
-    // The reserved bucket is refused before it can reach the store.
+    // The reserved bucket is refused before it can reach the store (live-blocked).
     const input = target.querySelector('#manager-component-category-add');
-    input.value = 'General';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(input, 'General');
+    await tick();
+    flushSync();
     panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     flushSync();
     assert.ok(!calls.some((call) => call[0] === 'addComponentCategory'));
 
     // A real add reaches the store's COMPONENT action — not addCategory.
-    input.value = 'Metal';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(input, 'Metal');
+    await tick();
+    flushSync();
     panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();
@@ -6150,19 +6160,59 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some((call) => call[0] === 'addComponentCategory' && call[1] === 'Metal'));
     assert.ok(
       !calls.some((call) => call[0] === 'addCategory'),
-      'the recipe vocabulary is never written by the component section'
+      'the recipe vocabulary is never written by the component tab'
     );
     assert.equal(input.value, '');
 
-    // Removal is confirmed under its own kind, and refusing it does not write.
+    // Removal opens an inline confirm strip under its own kind; cancelling writes nothing.
     target.querySelector('[aria-label="Remove component category Reagent"]').click();
     await tick();
     flushSync();
-    assert.deepEqual(confirmations.at(-1), ['component-category', 'Reagent']);
+    assert.ok(target.querySelector('[data-vocabulary-confirm="reagent"]'));
+    target
+      .querySelector('[data-vocabulary-confirm="reagent"] .manager-button:not(.is-danger)')
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-vocabulary-confirm="reagent"]'), null);
     assert.ok(!calls.some((call) => call[0] === 'removeComponentCategory'));
   });
 
-  it('keeps tags and categories add inputs when store add callbacks fail', async () => {
+  it('edits a per-category icon inline and delegates it to the store (issue 689)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Tags & Categories').click();
+    await tick();
+    flushSync();
+
+    // The editable icon button on a custom category row opens an inline icon editor.
+    target.querySelector('[data-category-id="potions"] .manager-vocabulary-icon.is-editable').click();
+    await tick();
+    flushSync();
+    const edit = target.querySelector('[data-vocabulary-icon-edit="potions"]');
+    assert.ok(edit, 'the icon editor strip opens for the row');
+    setInputValue(edit.querySelector('input'), 'fas fa-vial');
+    await tick();
+    flushSync();
+    edit.querySelector('.manager-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.find((call) => call[0] === 'setCategoryIcon'),
+      ['setCategoryIcon', 'potions', 'fas fa-vial']
+    );
+  });
+
+  it('keeps tags and categories add inputs when store add callbacks fail (issue 689)', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -6183,8 +6233,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     const categoryInput = target.querySelector('#manager-category-add');
-    categoryInput.value = 'Elixirs';
-    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(categoryInput, 'Elixirs');
+    await tick();
+    flushSync();
     target
       .querySelector('[aria-label="Recipe categories"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -6196,9 +6247,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(document.activeElement, categoryInput);
     assert.ok(target.textContent.includes('Category could not be added.'));
 
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
     const tagInput = target.querySelector('#manager-tag-add');
-    tagInput.value = 'SPICE';
-    tagInput.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(tagInput, 'spice');
+    await tick();
+    flushSync();
     target
       .querySelector('[aria-label="Item tags"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -6206,7 +6261,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addTag' && call[1] === 'spice'));
-    assert.equal(tagInput.value, 'SPICE');
+    assert.equal(tagInput.value, 'spice');
     assert.equal(document.activeElement, tagInput);
     assert.ok(target.textContent.includes('Tag could not be added.'));
   });
