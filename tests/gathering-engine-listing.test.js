@@ -1456,3 +1456,39 @@ test('listForActor still shows a system-blocked system to a GM (GM bypass)', asy
   assert.equal(listing.environments.length, 1, 'GM bypasses the system blocker');
   assert.equal(listing.environments[0].id, 'env-a');
 });
+
+test('listForActor does not echo the inert legacy environment.region on a normal player entry', async () => {
+  const engine = makeEngine({
+    // The legacy free-text region is stored on the environment but must not
+    // travel in the player-facing listing payload (the geography pip was removed
+    // with the gathering-regions unification; players read resolved realms).
+    environments: [environment({ region: 'north' })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+
+  assert.equal(listing.environments.length, 1);
+  const entry = listing.environments[0];
+  assert.equal(entry.locked, false, 'precondition: this is the normal (unlocked) environment model');
+  assert.equal(Object.hasOwn(entry, 'region'), false, 'the normal player entry carries no region key');
+});
+
+test('listForActor does not echo the inert legacy environment.region on a locked teaser', async () => {
+  const engine = makeEngine({
+    environments: [environment({
+      id: 'env-locked-region',
+      name: 'Sealed Vault',
+      enabled: false,
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt' },
+      region: 'north'
+    })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+
+  assert.equal(listing.environments.length, 1);
+  const locked = listing.environments[0];
+  assert.equal(locked.locked, true, 'precondition: this is the identity-only locked teaser');
+  assert.equal(Object.hasOwn(locked, 'region'), false, 'the locked teaser carries no region key');
+});
