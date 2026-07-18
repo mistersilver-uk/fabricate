@@ -1059,7 +1059,13 @@ function salvageSystem({ mode = 'simple', check = {}, salvage = {}, tools, featu
 
 function salvageOf(system, { items = [item('Iron', 1)] } = {}) {
   const { builder } = makeBuilder({ systems: [system] });
-  const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', items) });
+  // A GM viewer so the projection is exercised for every config, including the ones a
+  // non-GM viewer now has hidden by the System-Validity Gate's entity tier (#703); the
+  // non-GM hiding is covered by its own dedicated tests below.
+  const listing = builder.buildListing({
+    craftingActor: actor('a1', 'Akra', items),
+    viewer: { isGM: true, id: 'gm' }
+  });
   return rowByComponent(listing, 'c1')?.salvage ?? null;
 }
 
@@ -1488,5 +1494,50 @@ describe('InventoryListingBuilder - derived broken verdict', () => {
       craftingActor: actor('a1', 'Akra', [toolItem('Iron', { usage: { timesUsed: 2 } })]),
     });
     assert.equal(rowByComponent(listing, 'c1').broken, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #703 — System-Validity Gate entity tier: a component whose salvage config is
+// invalid (a `blocks: 'visibility'` critical) is dropped from a non-GM viewer's
+// salvage panel, retained for a GM, and its stored `enabled` flag is never mutated.
+// ---------------------------------------------------------------------------
+
+describe('InventoryListingBuilder - salvage entity-tier visibility gate (#703)', () => {
+  // Simple mode requires exactly one salvage result group; two makes the component's
+  // salvage config invalid, raising a `blocks: 'visibility'` critical keyed on c1.
+  function invalidSalvageSystem() {
+    return salvageSystem({
+      mode: 'simple',
+      salvage: {
+        resultGroups: [
+          { id: 'g1', results: [{ componentId: 'c2' }] },
+          { id: 'g2', results: [{ componentId: 'c3' }] },
+        ],
+      },
+    });
+  }
+
+  it('omits the salvage panel for a non-GM viewer when the component is visibility-blocked', () => {
+    const system = invalidSalvageSystem();
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      viewer: { isGM: false, id: 'u1' },
+    });
+    assert.equal(rowByComponent(listing, 'c1').salvage, null);
+    // The stored config is untouched — this is a viewer projection, not a mutation.
+    assert.equal(system.components[0].salvage.enabled, true);
+  });
+
+  it('retains the salvage panel for a GM viewer even when the component is visibility-blocked', () => {
+    const system = invalidSalvageSystem();
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      viewer: { isGM: true, id: 'gm' },
+    });
+    assert.notEqual(rowByComponent(listing, 'c1').salvage, null);
+    assert.equal(system.components[0].salvage.enabled, true);
   });
 });

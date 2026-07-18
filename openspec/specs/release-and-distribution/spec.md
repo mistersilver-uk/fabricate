@@ -88,6 +88,13 @@ The release line and the prerelease line MUST NOT be merged into a hotfix line.
 - **WHEN** a fix must reach the current public version while a patch version is soaking
 - **THEN** the soaking patch is promoted first (it carries no unreleased feature), and no hotfix line is cut, because the version it would compute already exists
 
+#### Scenario: a hotfix that would raise the declared minimum Foundry version
+
+- **WHEN** a hotfix is promoted whose declared minimum Foundry version is one Foundry considers newer than the current public release's
+- **THEN** the promotion fails before the release is made public, naming the raised minimum and the current public version it exceeds
+- **AND** the comparison is Foundry's own over core generation values, never a semantic-version comparison and never against the module version
+- **AND** the remedy named is to ship the fix without raising the minimum, so no client the hotfix targets is stranded
+
 ### Requirement: Version scheme
 
 Prerelease identifiers MUST preserve the property that a stable version does not supersede its own prereleases under Foundry's comparison, so that publishing a stable version never offers an update to a private prerelease cohort.
@@ -170,6 +177,13 @@ Its manifest MUST nevertheless be left in place, so that the tooling and credent
 
 - **WHEN** promotion to `public` is attempted for a version that any private target of its source channel does not advertise
 - **THEN** the promotion fails before anything is published
+
+#### Scenario: a cohort-retaining private target has no published head
+
+- **WHEN** promotion to `public` is attempted while a cohort-retaining private target of `beta` or `early-access` that the source channel does not cover returns 404 for its manifest URL
+- **THEN** the promotion fails before the registry publication, because a retained cohort whose manifest 404s while the module is listed on the registry is offered a rewrite out of its private channel
+- **AND** the failure names the remedy: publish that channel's head before re-running the promotion
+- **AND** a target of the source channel is exempt here, because the promotion's source-advertises verification already refuses an absent head on it
 
 ### Requirement: Self-contained distribution targets
 

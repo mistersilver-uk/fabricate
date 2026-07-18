@@ -727,6 +727,10 @@
         "Redacted": {
           "Title": "Hidden recipe"
         },
+        "Fizzle": {
+          "Title": "Failed alchemy attempt",
+          "Failure": "The submitted ingredients matched no known recipe."
+        },
         "Empty": {
           "NoActor": "Select a character to see their crafting, gathering, and salvage runs.",
           "Active": "No active runs.",

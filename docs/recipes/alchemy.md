@@ -262,6 +262,12 @@ A combination that fizzles never runs a check, so there is no roll when an untri
 A banner confirms the outcome after each brew.
 It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, or the mixture fizzled.
 
+A failed brew is also recorded in the character's Journal history, whether it failed its check or fizzled with no match.
+A fizzle is listed there as a generic **Failed alchemy attempt** that never names a recipe, so it cannot reveal a recipe you have not yet discovered.
+Players see these history entries only when the system's **Show attempt history to players** option is on.
+The GM always sees them.
+See [Journal]({% link journal.md %}) for where a character's runs and attempts are listed.
+
 ---
 
 ## Setting Up an Alchemy System

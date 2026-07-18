@@ -447,7 +447,23 @@ class Fabricate {
       adapters: new Map([['pf2e', new Pf2eInventoryCoinAdapter()]]),
     });
     this.actorPropertyCoinSpender = new ActorPropertyCoinSpender();
-    this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager);
+    // Wire the gathering persistence seams the GM UI path already passes
+    // (SvelteCraftingSystemManagerApp) so the public API surface
+    // (importSystemFromFile / importFromPack / getCompendiumImporter) persists the
+    // gathering authoring bundle instead of silently dropping it (issue #699). The
+    // environment store is constructed AFTER this importer (below), so resolve it
+    // lazily through a thin delegating object — matching the exportSystem
+    // lazy-read idiom — rather than capturing the still-undefined field here.
+    this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager, {
+      environmentStore: {
+        list: () => this.gatheringEnvironmentStore?.list?.() ?? [],
+        load: () => this.gatheringEnvironmentStore?.load?.() ?? [],
+        save: (environments) => this.gatheringEnvironmentStore?.save?.(environments)
+      },
+      getSetting: (key) => getSetting(key),
+      setSetting: (key, value) => setSetting(key, value),
+      isGM: () => game.user?.isGM === true
+    });
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,

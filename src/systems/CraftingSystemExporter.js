@@ -9,7 +9,11 @@ import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
   assembleGatheringAuthoringBundle,
 } from './authoringExport.js';
-import { rebindCopyContainerIds, rebindCopyComponentIds } from './importReferenceResolver.js';
+import {
+  rebindCopyContainerIds,
+  rebindCopyComponentIds,
+  rebindCopyRecipeIds,
+} from './importReferenceResolver.js';
 
 const SYSTEM_ID_PLACEHOLDER = '__SYSTEM_ID__';
 
@@ -182,9 +186,13 @@ export function prepareForImport(rawData, mode = 'keep') {
     // Append "(Copy)" to the name so the user can distinguish it
     system.name = `${system.name || 'Crafting System'} (Copy)`;
 
-    for (const recipe of recipes) {
-      delete recipe.id;
-    }
+    // Regenerate recipe ids with an old→new map and atomically remap each
+    // recipe-book membership array (recipeItemDefinitions[].recipeIds) to the
+    // regenerated id, so a copy's books resolve to the copy's recipes instead of
+    // dangling at the pre-import ids (issue #701). Done eagerly here rather than
+    // leaving id minting to the downstream Recipe constructor so Phase 5 reference
+    // resolution sees the regenerated ids.
+    rebindCopyRecipeIds(prepared);
 
     // Regenerate record-CONTAINER ids (realm ids, environment record ids) and
     // rewire their internal cross-references, while PRESERVING task / event /

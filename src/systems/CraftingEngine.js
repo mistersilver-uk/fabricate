@@ -281,6 +281,7 @@ export class CraftingEngine {
         if (!guard.craftable) {
           const reasonMap = {
             'missing-system': 'Crafting system not found',
+            'system-invalid': 'Crafting system is invalid',
             visibility: 'Recipe is not visible to this user',
             knowledge: 'Missing recipe knowledge',
             locked: 'Recipe is locked',
@@ -1721,6 +1722,19 @@ export class CraftingEngine {
       await this._recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg);
       if (shouldConsume) {
         await this._consumeSubmittedAlchemyItems(componentSourceActors, submissionItems);
+      }
+      // Record the fizzle as failed run history. A fizzle matches no enabled
+      // recipe, so the entry is recipe-less and carries no recipe/signature data
+      // (it cannot leak an undiscovered recipe). Recording is UNCONDITIONAL: the
+      // `showAttemptHistoryToPlayers` flag gates only player VISIBILITY of the
+      // entry at the Journal, never whether the attempt is recorded — so do NOT
+      // copy `_recordAlchemyDeadEnd`'s recording gate here.
+      const runManager = this.craftingRunManager || game.fabricate?.getCraftingRunManager?.();
+      if (typeof runManager?.recordFizzle === 'function') {
+        await runManager.recordFizzle(craftingActor, {
+          craftingSystemId: systemId,
+          userId: game.user?.id ?? null,
+        });
       }
       return {
         success: false,
@@ -3863,12 +3877,18 @@ export class CraftingEngine {
     // roll formula) is a GM-side system gap, not a rolled failure: abort with ZERO
     // mutation so the component is never consumed and no tools are broken. The
     // failure-consumption policy below applies only to genuine rolled failures.
+    // Discard a run created by THIS call so a misconfigured abort leaves no orphaned
+    // `inProgress` run — parity with the cancelled branch below and `craft()`'s
+    // phantom-discard. A reused pre-existing run is left untouched.
     if (checkResult.misconfigured) {
+      if (salvageRunManager && salvageRun && salvageRunCreatedThisCall) {
+        await salvageRunManager.discardRun(actor, salvageRun.id);
+      }
       return {
         success: false,
         results: null,
         message: checkResult.message,
-        salvageRun,
+        salvageRun: salvageRunCreatedThisCall ? null : salvageRun,
       };
     }
 
