@@ -334,8 +334,8 @@ Algorithm:
    - If the recipe belongs to no recipe item definition (no `recipeIds` membership, and no legacy `recipeItemId`/`linkedRecipeItemUuid` fallback): false.
    - Resolve the recipe's member `recipeItemDefinition`(s) from `craftingSystem.recipeItemDefinitions`.
    - If no definition resolves: false.
-   - Else, gather candidate items from crafting actor plus component sources (if allowed).
-   - Keep candidates matching by UUID or `resolveSourceUuid(candidate)`.
+   - Else, gather candidate items from the crafting actor plus any supplied component-source actors, unconditionally (`_collectCandidateItems` and its callers include supplied `componentSourceActors` with no gate).
+   - Keep candidates matching any member definition per the four-tier, system-scoped matcher defined in §Recipe Item Matching (durable per-system identity, own uuid, compendium source, transitive `_stats.duplicateSource`, evaluated against the `registeredItemUuid` + `originItemUuid` + `aliasItemUuids` union) — this step defers to that section rather than restating a subset of it.
    - If limited uses are enabled, keep only non-exhausted candidates.
 4. Evaluate by mode:
    - `item`: grant if `hasMatchedItem`.
@@ -611,5 +611,4 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 - Integration tests for consume-on-learn in drop flow: item is removed when required by matched recipe settings.
 - Integration tests for actor resolution and permissions: ignore drop when target actor cannot be resolved or user lacks write permission.
 - Integration tests for recipe-scope filtering: only knowledge-mode recipes with learn-capable modes are evaluated during drop.
-- Integration tests for `dragDropEnabled === false`: drops do not auto-learn and item-sheet manual learn flow is available instead.
-- Integration tests for "Craftable only" filter: recipes are included when actor inventory satisfies requirements via `_stats.compendiumSource`, `flags.core.sourceId`, or direct UUID match.
+- Integration tests for `dragDropEnabled === false`: drops do not auto-learn and the Inventory-tab manual learn flow is available instead.
