@@ -76,7 +76,7 @@
         {#if run.multiStep}
           <StepTimeline {steps} currentIndex={run.stepIndex} />
         {/if}
-        <StepDetails step={detailStep} />
+        <StepDetails step={detailStep} multiStep={run?.multiStep === true} />
       {:else}
         <p class="journal-detail-gathering-summary" data-journal-gathering-summary>
           {localize('FABRICATE.App.Journal.WhatToExpect.Gathering')}

@@ -713,6 +713,7 @@
         },
         "StepDetails": {
           "Title": "Step requirements",
+          "TitleSingleStep": "Craft requirements",
           "RequiresTime": "Requires time",
           "PrimaryTool": "Primary tool",
           "Check": "Check",
@@ -789,7 +790,7 @@
           "TitleSalvage": "Salvaged items"
         },
         "Progress": {
-          "Label": "Step progress"
+          "Label": "Crafting progress"
         },
         "Tips": {
           "Title": "Tips",
