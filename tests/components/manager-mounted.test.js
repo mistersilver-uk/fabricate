@@ -1437,6 +1437,12 @@ function createStore(calls = [], options = {}) {
     saveCraftingCheckActive: (enabled) => {
       calls.push(['saveCraftingCheckActive', enabled]);
     },
+    saveCraftingCheckConsumption: (patch) => {
+      calls.push(['saveCraftingCheckConsumption', patch]);
+    },
+    saveAlchemyConfig: (config) => {
+      calls.push(['saveAlchemyConfig', config]);
+    },
     saveSalvageCheckProgressive: (progressive) => {
       calls.push(['saveSalvageCheckProgressive', progressive]);
     },
@@ -2221,6 +2227,105 @@ describe('CraftingSystemManager mounted behavior', () => {
       [['setAlchemyCheckMode', 'tiered']],
       'choosing a mode routes through the store setAlchemyCheckMode action'
     );
+  });
+
+  it('Checks: alchemy behaviour flags render as toggles reflecting stored values and persist via saveAlchemyConfig (issue 713)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    const behaviour = target.querySelector(
+      '[data-checks-panel="crafting"] [data-alchemy-behaviour]'
+    );
+    assert.ok(behaviour, 'the alchemy behaviour card renders on the alchemy crafting tab');
+    const learn = behaviour.querySelector('[data-recipe-field="learnOnCraft"]');
+    const consume = behaviour.querySelector('[data-recipe-field="consumeOnFail"]');
+    const history = behaviour.querySelector('[data-recipe-field="showAttemptHistoryToPlayers"]');
+    assert.ok(learn && consume && history, 'all three behaviour toggles render');
+    // Default fixture: learnOnCraft true, consumeOnFail true, showAttemptHistoryToPlayers
+    // false — a stored non-default false must read back OFF, not the default ON.
+    assert.equal(learn.getAttribute('aria-pressed'), 'true');
+    assert.equal(consume.getAttribute('aria-pressed'), 'true');
+    assert.equal(history.getAttribute('aria-pressed'), 'false');
+    // The consumption-policy card is alchemy-exclusive-off: alchemy resolves consumption
+    // through its own consumeOnFail flag, so the craftingCheck.consumption card is hidden.
+    assert.equal(
+      target.querySelector('[data-checks-panel="crafting"] [data-failure-consumption]'),
+      null,
+      'the failure consumption policy card is not shown in alchemy mode'
+    );
+
+    // Toggling one flag sends the FULL config with only that field flipped, so a partial
+    // saveAlchemyConfig does not silently re-default the untouched flags.
+    history.click();
+    await tick();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'saveAlchemyConfig');
+    assert.ok(saved, 'toggling persists through saveAlchemyConfig');
+    assert.deepEqual(saved[1], {
+      checkMode: 'simple',
+      learnOnCraft: true,
+      consumeOnFail: true,
+      showAttemptHistoryToPlayers: true,
+    });
+  });
+
+  it('Checks: failure consumption policy renders two toggles reflecting stored values and persists via saveCraftingCheckConsumption (issue 712)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          alchemyResolutionMode: 'simple',
+          craftingCheck: {
+            consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    const policy = target.querySelector(
+      '[data-checks-panel="crafting"] [data-failure-consumption]'
+    );
+    assert.ok(policy, 'the failure consumption policy card renders on the non-alchemy crafting tab');
+    const consume = policy.querySelector('[data-recipe-field="consumeIngredientsOnFail"]');
+    const breakTools = policy.querySelector('[data-recipe-field="breakToolsOnFail"]');
+    assert.ok(consume && breakTools, 'both policy toggles render');
+    // Stored non-default fixture: consume OFF, break ON — the projection reads them back
+    // exactly (a dropped default-true field would invert consumeIngredientsOnFail to ON).
+    assert.equal(consume.getAttribute('aria-pressed'), 'false');
+    assert.equal(breakTools.getAttribute('aria-pressed'), 'true');
+    // The alchemy behaviour card is not shown outside alchemy mode.
+    assert.equal(
+      target.querySelector('[data-checks-panel="crafting"] [data-alchemy-behaviour]'),
+      null,
+      'the alchemy behaviour card is not shown in non-alchemy crafting mode'
+    );
+
+    consume.click();
+    await tick();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'saveCraftingCheckConsumption');
+    assert.ok(saved, 'toggling persists through saveCraftingCheckConsumption');
+    assert.deepEqual(saved[1], { consumeIngredientsOnFail: true });
   });
 
   it('points each Checks help card at the matching documentation page', () => {

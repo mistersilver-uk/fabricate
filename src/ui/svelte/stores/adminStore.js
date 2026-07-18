@@ -2274,6 +2274,17 @@ function _buildSelectedSystemViewData(
       progressive: selectedSystem.craftingCheck?.progressive
         ? _clonePlain(selectedSystem.craftingCheck.progressive)
         : null,
+      // Failure consumption policy (issue 712). Unprojected before, so the checks
+      // editor could not read it back. Mirror the manager normalizer's defaults so
+      // a system authored with `consumeIngredientsOnFail: false` seeds OFF, not the
+      // default ON — a dropped default-true field is inverted, not merely absent.
+      consumption: {
+        consumeIngredientsOnFail:
+          selectedSystem.craftingCheck?.consumption?.consumeIngredientsOnFail !== false,
+        breakToolsOnFail:
+          (selectedSystem.craftingCheck?.consumption?.breakToolsOnFail ??
+            selectedSystem.craftingCheck?.consumption?.consumeCatalystsOnFail) === true,
+      },
     },
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -7228,6 +7239,28 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Live-persist a single failure-consumption policy flag (issue 712). MUST spread
+  // BOTH the existing craftingCheck block AND its nested `consumption` sub-object:
+  // updateSystem shallow-merges the top level, so a naive
+  // `{ craftingCheck: { consumption: { …patch } } }` would drop every sibling of
+  // craftingCheck AND the untouched consumption flag, which the normalizer then
+  // re-defaults (silent data loss). Callers pass a single-field patch.
+  async function saveCraftingCheckConsumption(patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: {
+        ...existing,
+        consumption: { ...(existing.consumption || {}), ...patch },
+      },
+    });
+    await refresh();
+  }
+
   // Shallow-merge a patch into the selected system's salvageCraftingCheck and
   // persist (the manager normalizes the whole check on write). Shared by every
   // salvage check saver below so the boilerplate lives in one place.
@@ -8153,6 +8186,7 @@ export function createAdminStore(services) {
     saveCraftingCheckSimple,
     saveCraftingCheckProgressive,
     saveCraftingCheckActive,
+    saveCraftingCheckConsumption,
     saveSalvageCheckActive,
     saveSalvageCheckProgressive,
     saveSalvageCheckSimple,
