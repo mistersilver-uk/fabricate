@@ -1722,6 +1722,19 @@ export class CraftingEngine {
       if (shouldConsume) {
         await this._consumeSubmittedAlchemyItems(componentSourceActors, submissionItems);
       }
+      // Record the fizzle as failed run history. A fizzle matches no enabled
+      // recipe, so the entry is recipe-less and carries no recipe/signature data
+      // (it cannot leak an undiscovered recipe). Recording is UNCONDITIONAL: the
+      // `showAttemptHistoryToPlayers` flag gates only player VISIBILITY of the
+      // entry at the Journal, never whether the attempt is recorded — so do NOT
+      // copy `_recordAlchemyDeadEnd`'s recording gate here.
+      const runManager = this.craftingRunManager || game.fabricate?.getCraftingRunManager?.();
+      if (typeof runManager?.recordFizzle === 'function') {
+        await runManager.recordFizzle(craftingActor, {
+          craftingSystemId: systemId,
+          userId: game.user?.id ?? null,
+        });
+      }
       return {
         success: false,
         results: null,
