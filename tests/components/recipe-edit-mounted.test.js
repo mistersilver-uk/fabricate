@@ -2972,6 +2972,118 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // The normalizer seeds preset units even when currency is DISABLED, so a "units exist"
+  // gate alone leaks the Add cost affordances into a currency-off system. These drive
+  // RecipeEditView (the wrapper), so they also prove currencyEnabled is declared AND
+  // forwarded through every layer down to the set/group cards — a tab-only prop that
+  // skips a wrapper silently drops to its default and never gates.
+  it('hides every Add cost control when currency is disabled despite seeded units', async () => {
+    const { target } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          currencyUnits: CURRENCY_UNITS,
+          currencyEnabled: false,
+        },
+      }
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-add="cost"]'),
+      null,
+      'no set-level Add cost button'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-add="alternative-cost"]'),
+      null,
+      'no requirement-level Add cost button'
+    );
+    editHarness.remount();
+  });
+
+  it('omits the Currency choice from the "or..." menu when currency is disabled', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          currencyUnits: CURRENCY_UNITS,
+          currencyEnabled: false,
+        },
+      }
+    );
+    await openOrMenu(target, 'grp-1');
+    assert.equal(
+      document.querySelector('[data-recipe-add="alternative-currency"]'),
+      null,
+      'the "or..." Accept-instead menu offers no Currency choice'
+    );
+    editHarness.remount();
+  });
+
+  it('shows the Add cost controls when currency is enabled with units', async () => {
+    const { target } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          currencyUnits: CURRENCY_UNITS,
+          currencyEnabled: true,
+        },
+      }
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-add="cost"]'),
+      'the set-level Add cost button renders'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-add="alternative-cost"]'),
+      'the requirement-level Add cost button renders'
+    );
+    editHarness.remount();
+  });
+
+  it('keeps an existing currency requirement visible but read-only when currency is disabled', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 100 } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          currencyUnits: CURRENCY_UNITS,
+          currencyEnabled: false,
+        },
+      }
+    );
+    const currency = target.querySelector('[data-recipe-option-currency]');
+    assert.ok(currency, 'the persisted currency requirement is still rendered (not hidden)');
+    // The unit is a static read-only label, not the interactive picker.
+    assert.equal(
+      currency.querySelector('.manager-recipe-currency-trigger'),
+      null,
+      'the interactive unit picker is gone'
+    );
+    assert.ok(
+      currency.querySelector('[data-recipe-currency-readonly]'),
+      'the unit renders read-only'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-currency-disabled]'),
+      'a flag marks the cost inactive while currency is off'
+    );
+    // The amount is static text, not the editable Stepper.
+    const amount = target.querySelector('[data-recipe-currency-amount]');
+    assert.ok(amount, 'the persisted amount is still shown');
+    assert.equal(amount.closest('.fab-stepper'), null, 'the amount is static, not a Stepper');
+    assert.match(amount.textContent, /100/, 'the persisted amount value is displayed');
+    editHarness.remount();
+  });
+
   it('removing the last alternative drops the whole requirement from the set', async () => {
     const { target, patches } = await mountIngredientGroups(
       [

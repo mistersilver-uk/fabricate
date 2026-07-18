@@ -52,6 +52,11 @@
     saveFailed = false,
     onPickImagePath = null,
     currencyUnits = [],
+    // Whether the system's currency feature is ENABLED (not merely seeded with preset
+    // units). Gates the ingredient "Add cost" affordances and drives the read-only
+    // rendering of existing currency requirements when currency is off. Defaults true so
+    // a caller that only passes units keeps the pre-gate behaviour.
+    currencyEnabled = true,
     toolsLibrary = [],
     componentOptions = [],
     componentTagOptions = [],
@@ -372,6 +377,7 @@
             {canAddSet}
             {isMultiStep}
             {currencyUnits}
+            {currencyEnabled}
             {componentOptions}
             {essenceOptions}
             {itemTags}
