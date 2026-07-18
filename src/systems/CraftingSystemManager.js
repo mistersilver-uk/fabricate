@@ -20,6 +20,7 @@ import {
   TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
   TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST,
 } from '../models/Tool.js';
+import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
 import {
   normalizeComponentCategory,
   normalizeCustomComponentCategories,
@@ -252,6 +253,20 @@ export class CraftingSystemManager {
       // a component category is never offered as a recipe category and vice versa.
       // The reserved `general` bucket is implied, never persisted in the array.
       componentCategories: normalizeCustomComponentCategories(system.componentCategories),
+
+      // Per-category icons (issue 689). A parallel name-keyed map, kept separate
+      // from the string vocabulary arrays so those stay backwards-compatible.
+      // Each map is filtered to the categories that currently exist (plus the
+      // reserved `general` bucket), so a removed category drops its icon on the
+      // next normalize — updateSystem REPLACES the whole map, no `-=` needed.
+      categoryIcons: normalizeCategoryIconMap(system.categoryIcons, [
+        'general',
+        ...normalizeCustomRecipeCategories(system.categories),
+      ]),
+      componentCategoryIcons: normalizeCategoryIconMap(system.componentCategoryIcons, [
+        'general',
+        ...normalizeCustomComponentCategories(system.componentCategories),
+      ]),
 
       // Transitional aliases for existing UI code paths
       categories: normalizeCustomRecipeCategories(system.categories),
