@@ -293,12 +293,14 @@ function formatSlowestViewsTable(timings, limit = 12) {
  * @param {import('playwright').Page} page
  * @param {string} label
  */
-async function screenshot(page, label) {
+async function screenshot(page, label, options = {}) {
   if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
   screenshotCounter++;
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
-  await page.screenshot({ path });
+  // `options` forwards Playwright screenshot options (e.g. a `clip` box for a
+  // region capture such as the chat sidebar); default is a full-page shot.
+  await page.screenshot({ path, ...options });
   markViewTiming(label);
 }
 
@@ -2288,7 +2290,12 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
       { name: 'Elixir of Vigor', img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
       { name: 'Verdant Tonic', img: 'icons/consumables/potions/flask-corked-blue.webp' },
       { name: 'Powdered Root', img: 'icons/consumables/plants/dried-herb-bundle-brown.webp' },
-      { name: 'Soothing Balm', img: 'icons/consumables/potions/bottle-round-corked-red.webp' }
+      { name: 'Soothing Balm', img: 'icons/consumables/potions/bottle-round-corked-red.webp' },
+      // Issue #752: the minimal alchemy-mode system's one signature — a reagent
+      // and the brew it renders into. Kept tiny so the manager alchemy-settings
+      // capture has a representative alchemy system without growing Phase C.
+      { name: 'Smoke Bench Reagent', img: 'icons/consumables/plants/grass-leaves-green.webp' },
+      { name: 'Smoke Bench Brew', img: 'icons/consumables/potions/bottle-conical-corked-blue.webp' }
     ];
     const createdProducts = await Item.createDocuments(
       productSpecs.map((spec) => ({ name: spec.name, type: itemType, img: spec.img }))
@@ -2416,10 +2423,48 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
       }]
     });
 
+    // ── System 3: Smoke Alchemy Bench (issue #752) ──────────────────────────
+    // The minimal alchemy-mode system whose Crafting → Settings surface the
+    // manager alchemy-settings capture photographs (demonstrating #736's #713
+    // half). Smallest viable config: one reagent, one product, one signature.
+    const bench = await csm.createSystem({
+      name: 'Smoke Alchemy Bench',
+      description: 'Issue #752: minimal alchemy-mode system for the manager alchemy-settings capture.'
+    });
+    if (!bench?.id) throw new Error('Alchemy fixtures: Smoke Alchemy Bench create failed');
+    const benchId = bench.id;
+    await csm.updateSystem(benchId, {
+      resolutionMode: 'alchemy',
+      enabled: true,
+      alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+    });
+    const benchMap = {
+      'Smoke Bench Reagent': await registerComponent(benchId, productByName['Smoke Bench Reagent']),
+      'Smoke Bench Brew': await registerComponent(benchId, productByName['Smoke Bench Brew'])
+    };
+    const benchRecipe = await rm.createRecipe({
+      name: 'Smoke Bench Brew',
+      description: 'Alchemy: one reagent renders into a bench brew.',
+      craftingSystemId: benchId,
+      img: 'icons/consumables/potions/bottle-conical-corked-blue.webp',
+      resultSelection: { provider: 'ingredientSet' },
+      ingredientSets: [{
+        name: 'Reagent base',
+        ingredientGroups: [{
+          name: 'Smoke Bench Reagent',
+          options: [{ quantity: 1, match: { type: 'component', componentId: benchMap['Smoke Bench Reagent'] } }]
+        }]
+      }],
+      resultGroups: [{
+        name: 'Brew',
+        results: [{ componentId: benchMap['Smoke Bench Brew'], quantity: 1 }]
+      }]
+    });
+
     // Every recipe must have been created enabled (createRecipe throws on an
     // invalid alchemy shape; a disabled recipe would drop its system from the
     // chooser since the listing filters `{ enabled: true }`).
-    const alchemyRecipes = [elixirRecipe, tonicRecipe, balmRecipe];
+    const alchemyRecipes = [elixirRecipe, tonicRecipe, balmRecipe, benchRecipe];
     for (const recipe of alchemyRecipes) {
       if (!recipe?.id) throw new Error('Alchemy fixtures: recipe create returned no id');
       if (recipe.enabled !== true) {
@@ -2431,12 +2476,13 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
     }
 
     return {
-      alchemySystemIds: [cauldronId, herbalistId],
+      alchemySystemIds: [cauldronId, herbalistId, benchId],
       cauldronSystemId: cauldronId,
       herbalistSystemId: herbalistId,
+      benchSystemId: benchId,
       alchemyRecipeIds: alchemyRecipes.map((recipe) => recipe.id),
       alchemyProductItemIds,
-      alchemyComponentMap: { [cauldronId]: cauldronMap, [herbalistId]: herbalistMap }
+      alchemyComponentMap: { [cauldronId]: cauldronMap, [herbalistId]: herbalistMap, [benchId]: benchMap }
     };
   }, { crafterId });
 }
@@ -5487,6 +5533,29 @@ async function main() {
         await screenshot(page, 'manager-checks-validation');
         process.stdout.write('  D0: checks validation tab screenshotted\n');
 
+        // Checks → Crafting tab, scrolled to the failure-consumption controls
+        // (issue #752 — evidence for #736's #712 half). The smoke system resolves
+        // routedByCheck, so the crafting tab renders the routed CraftingCheckEditor;
+        // its failure-consumption controls land at the bottom of that editor after
+        // #712 rebases, so scroll the editor's last section into view before the
+        // capture. Guarded so a hiccup records a failed step, not an abort.
+        try {
+          await page.locator('.fabricate-manager [data-checks-tab-button="crafting"]').first().click();
+          const craftingCheckEditor = page
+            .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-check-editor]')
+            .first();
+          await craftingCheckEditor.waitFor({ state: 'visible', timeout: 5_000 });
+          await craftingCheckEditor.locator('section').last()
+            .scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-checks-crafting-consumption');
+          process.stdout.write('  D0: checks crafting consumption screenshotted\n');
+          results.steps.push({ step: 'checks-crafting-consumption', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'checks-crafting-consumption', passed: false, error: err.message });
+          process.stderr.write(`Checks crafting consumption capture failed: ${err.message}\n`);
+        }
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
@@ -5510,6 +5579,30 @@ async function main() {
           throw new Error('Manager tags inspector did not render the How-it-works evidence card.');
         }
         await captureStableManagerView(page, { layout: 'tags-categories normal', label: 'manager-tags-categories-normal' });
+
+        // Tags & Categories → Item tags panel, scrolled to its seeded rows
+        // (issue #752 — evidence for #735's row rendering). The smoke system seeds
+        // exactly three item tags (rare, reagent, metallic), so the Item tags
+        // vocabulary renders three [data-tag-id] rows. Guarded so a hiccup records
+        // a failed step rather than aborting the phase.
+        try {
+          const itemTagsPanel = page
+            .locator('.fabricate-manager .manager-vocabulary-panel[aria-label="Item tags"]')
+            .first();
+          await itemTagsPanel.waitFor({ state: 'visible', timeout: 5_000 });
+          const tagRowCount = await itemTagsPanel.locator('[data-tag-id]').count();
+          if (tagRowCount < 3) {
+            throw new Error(`Item tags panel rendered ${tagRowCount} tag rows, expected the three seeded tags.`);
+          }
+          await itemTagsPanel.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-tags-categories-tags-tab');
+          process.stdout.write('  D0: tags item-tags rows screenshotted\n');
+          results.steps.push({ step: 'tags-categories-tags-tab', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'tags-categories-tags-tab', passed: false, error: err.message });
+          process.stderr.write(`Tags item-tags capture failed: ${err.message}\n`);
+        }
 
         await captureStableManagerView(page, {
           width: 1000,
@@ -6337,6 +6430,92 @@ async function main() {
           await closeOpenApplications(page).catch(() => {});
         }
 
+        // Manager alchemy-settings capture (issue #752 — evidence for #736's #713
+        // half): the Crafting → Settings surface of an ALCHEMY-mode system (the
+        // minimal "Smoke Alchemy Bench" seeded in Phase C). The Crafting nav group
+        // requires experimental features, which are still enabled here — the
+        // experimental-off capture below is the last D0 action, and the phase's
+        // finally restores the world value. Self-contained fresh manager session,
+        // guarded so a hiccup records a failed step rather than aborting the phase.
+        const alchemyBenchSystemId = alchemyFixtures?.benchSystemId;
+        if (alchemyBenchSystemId) {
+          try {
+            await closeOpenApplications(page);
+            await page.evaluate(() => {
+              game.fabricate.api.getCraftingSystemManagerAppClass().show();
+            });
+            await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+            await setManagerWindowSize(page, { width: 1280, height: 820 });
+            await page.locator(`${managerSystemRowSelector(alchemyBenchSystemId)} .manager-system-identity`).first().click();
+            await settleManagerNav(page);
+            await openManagerCraftingSection(page, 'settings', 'crafting-settings');
+            await page.locator('.fabricate-manager [data-crafting-settings]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            // Confirm this is the alchemy variant: the resolution card marks the
+            // alchemy option active for an alchemy-mode system.
+            if (await page.locator('.fabricate-manager [data-crafting-resolution-mode-option="alchemy"].is-active').count() === 0) {
+              throw new Error('Crafting settings did not render with alchemy as the selected resolution mode.');
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'manager-alchemy-settings');
+            process.stdout.write('  D0: alchemy settings screenshotted\n');
+            await closeOpenApplications(page);
+            results.steps.push({ step: 'manager-alchemy-settings', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'manager-alchemy-settings', passed: false, error: err.message });
+            process.stderr.write(`Manager alchemy-settings capture failed: ${err.message}\n`);
+            await closeOpenApplications(page).catch(() => {});
+          }
+        } else {
+          results.steps.push({ step: 'manager-alchemy-settings', passed: false, error: 'alchemy bench fixture not seeded' });
+          process.stderr.write('Manager alchemy-settings capture skipped: alchemy bench fixture not seeded.\n');
+        }
+
+        // Manager experimental-off capture (issue #752 — evidence for #746): the
+        // selected-system rail with fabricate.experimentalFeatures DISABLED. On
+        // main this is the pre-fix state (Graph present, Crafting group absent);
+        // after #746 rebases the same frame shows the crafting group unconditional
+        // and the graph gone. The setting is WORLD-scoped, so this explicit
+        // false→capture is restored to previousExperimentalFeatures by the phase's
+        // finally. The assertion stays minimal (rail rendered, setting off) so it
+        // passes both before and after the fix. Guarded so a hiccup records a
+        // failed step rather than aborting the phase.
+        try {
+          await closeOpenApplications(page);
+          await page.evaluate(async () => {
+            await game.settings.set('fabricate', 'experimentalFeatures', false);
+          });
+          await page.evaluate(() => {
+            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          });
+          await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await setManagerWindowSize(page, { width: 1280, height: 820 });
+          await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
+          await settleManagerNav(page);
+          const experimentalOffNav = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
+            labels.map(label => label.textContent?.trim()).filter(Boolean)
+          );
+          if (!experimentalOffNav.includes('System Overview')) {
+            throw new Error(`Manager experimental-off rail did not render the selected-system nav. Saw: ${experimentalOffNav.join(', ')}`);
+          }
+          const experimentalStillOff = await page.evaluate(() =>
+            Boolean(game.settings.get('fabricate', 'experimentalFeatures'))
+          );
+          if (experimentalStillOff !== false) {
+            throw new Error('Experimental features did not read as disabled at capture time.');
+          }
+          await assertManagerLayoutStable(page, 'experimental off');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-experimental-off');
+          process.stdout.write('  D0: experimental-off rail screenshotted\n');
+          await closeOpenApplications(page);
+          results.steps.push({ step: 'manager-experimental-off', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'manager-experimental-off', passed: false, error: err.message });
+          process.stderr.write(`Manager experimental-off capture failed: ${err.message}\n`);
+          await closeOpenApplications(page).catch(() => {});
+        }
+
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, {
@@ -6774,6 +6953,30 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'player-crafting-run-summary');
 
+          // Roll-result box evidence (issue #752 — evidence for #727's pill fix):
+          // the run summary only renders when a craft recorded a roll result, and
+          // it embeds the RollResultBox (awarded pills + outcome). Capture that box
+          // directly so a change under crafting/detail maps to a real frame that
+          // proves the pills + roll total. Guarded so a non-craftable selection
+          // (no run summary) records a failed step rather than aborting the phase.
+          try {
+            const rollResultBox = appShell
+              .locator('[data-crafting-run-summary] [data-recipe-section="roll-result"]')
+              .first();
+            await rollResultBox.waitFor({ state: 'visible', timeout: 10_000 });
+            await rollResultBox.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-roll-result');
+            results.steps.push({ step: 'player-crafting-roll-result', passed: true });
+          } catch (rollResultError) {
+            results.steps.push({
+              step: 'player-crafting-roll-result',
+              passed: false,
+              error: String(rollResultError?.message ?? rollResultError)
+            });
+            process.stdout.write(`  Player Crafting roll-result capture skipped: ${rollResultError?.message ?? rollResultError}\n`);
+          }
+
           // Multi-option ingredient selector evidence (issue #552): select the
           // seeded 'Smoke Weave Filigree' recipe, whose single ingredient group
           // offers two interchangeable coils the crafter holds, so the detail
@@ -7127,6 +7330,33 @@ async function main() {
         await screenshot(page, 'post-craft');
         process.stdout.write('  Screenshotted post-craft state.\n');
 
+        // Chat card evidence (issue #752 — evidence for #727's roll-total fix):
+        // the API craft above posts a crafting result card to chat. Activate the
+        // sidebar chat tab, scroll the newest fabricate craft card into view, and
+        // clip the screenshot to the sidebar bounding box (a viewport region shot,
+        // not the full page). Full-profile only, and guarded so a hiccup records a
+        // failed step rather than aborting the phase.
+        if (RUN_SCREENSHOT_PHASES) {
+          try {
+            await page.locator('#sidebar [data-tab="chat"]').first().click({ force: true }).catch(() => {});
+            const craftChatCard = page.locator('#sidebar .fabricate-craft-chat').last();
+            await craftChatCard.waitFor({ state: 'visible', timeout: 10_000 });
+            await craftChatCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await page.waitForTimeout(200);
+            const sidebarClip = await page.locator('#sidebar').first().boundingBox();
+            await screenshot(page, 'chat-craft-card', sidebarClip ? { clip: sidebarClip } : {});
+            process.stdout.write('  Screenshotted the crafting chat card.\n');
+            results.steps.push({ step: 'chat-craft-card', passed: true });
+          } catch (chatCardError) {
+            results.steps.push({
+              step: 'chat-craft-card',
+              passed: false,
+              error: String(chatCardError?.message ?? chatCardError)
+            });
+            process.stderr.write(`Chat craft card capture failed: ${chatCardError?.message ?? chatCardError}\n`);
+          }
+        }
+
         // Open the crafter's sheet to show the crafted item (inventory tab)
         process.stdout.write('  Opening the crafter\'s inventory to verify crafted item...\n');
         await page.evaluate(async (crafterId) => {
@@ -7263,6 +7493,42 @@ async function main() {
 
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'fabricate-journal');
+
+          // Journal craft-detail capture (issue #752 — evidence for #748, and
+          // future #738): select a CRAFTING history run so the run-detail
+          // requirements card (StepDetails) is visible. The Phase E "Brew Healing
+          // Potion" craft guarantees at least one terminal crafting run. Full
+          // profile only (the rc journal frame is untouched); this runs after the
+          // fabricate-journal capture so it never disturbs that frame's selection.
+          if (RUN_SCREENSHOT_PHASES) {
+            const historyRows = appShell.locator('.journal-history-row[data-history-run-id]');
+            const historyCount = await historyRows.count();
+            let craftingRunSelected = false;
+            for (let i = 0; i < historyCount; i += 1) {
+              await historyRows.nth(i).scrollIntoViewIfNeeded().catch(() => {});
+              await historyRows.nth(i).click().catch(() => {});
+              const selectedCraftingRun = await appShell
+                .locator('[data-journal-detail][data-run-type="crafting"]')
+                .first()
+                .waitFor({ state: 'visible', timeout: 5_000 })
+                .then(() => true)
+                .catch(() => false);
+              if (selectedCraftingRun) {
+                craftingRunSelected = true;
+                break;
+              }
+            }
+            if (!craftingRunSelected) {
+              throw new Error('Journal history had no crafting run to show the run-detail requirements card.');
+            }
+            // Best-effort: bring the requirements (StepDetails) card into the frame
+            // when the crafting step carries facts (the routed-by-check smoke craft
+            // does). The crafting run-detail article is the hard requirement above.
+            await appShell.locator('[data-journal-detail][data-run-type="crafting"] [data-journal-card="step-details"]')
+              .first().scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'fabricate-journal-craft-detail');
+          }
         };
         let journalErr = null;
         for (let attempt = 1; attempt <= JOURNAL_CAPTURE_ATTEMPTS; attempt += 1) {

@@ -132,11 +132,38 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/checks\/checksReadiness\.js$/,
     ],
   },
+  // Issue 752: the Checks → Crafting tab scrolled to the failure-consumption
+  // controls (evidence for #736's #712 half). The routed crafting check editor
+  // (CraftingCheckEditor) renders those controls, so a change to it or the Checks
+  // shell republishes this frame.
+  {
+    id: 'manager-checks-crafting-consumption',
+    label: 'Manager Checks tab — crafting failure-consumption controls',
+    smokeLabels: ['manager-checks-crafting-consumption'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
+    ],
+  },
   {
     id: 'manager-tags-categories',
     label: 'Manager tags and categories',
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/],
+  },
+  // Issue 752: the Item tags vocabulary rows (evidence for #735's row rendering).
+  // Its OWN recipe, not a preferred label on manager-tags-categories: `collect`
+  // emits one file per recipe id, so a shared entry would publish only the
+  // alphabetically-first frame. The item-tags panel lives in VocabularyPanel, so a
+  // change to either the screen or the shared panel republishes this frame.
+  {
+    id: 'manager-tags-categories-tags-tab',
+    label: 'Manager tags and categories — Item tags rows',
+    smokeLabels: ['manager-tags-categories-tags-tab'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
+    ],
   },
   {
     id: 'manager-essences',
@@ -222,6 +249,24 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-crafting-settings',
     label: 'Manager Crafting → Settings placeholder',
     smokeLabels: ['manager-crafting-settings'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+  },
+  // Issue 752: the Crafting → Settings surface of an ALCHEMY-mode system (evidence
+  // for #736's #713 half). The surface is CraftingSettingsView, whose alchemy
+  // relabel is the load-bearing content, so a change to it republishes this frame.
+  {
+    id: 'manager-alchemy-settings',
+    label: 'Manager Crafting → Settings for an alchemy-mode system',
+    smokeLabels: ['manager-alchemy-settings'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSettingsView\.svelte$/],
+  },
+  // Issue 752: the selected-system rail with experimental features DISABLED
+  // (evidence for #746 — crafting group unconditional, graph absent). The rail is
+  // owned by CraftingSystemManagerRoot, so a change to it republishes this frame.
+  {
+    id: 'manager-experimental-off',
+    label: 'Manager rail — experimental features disabled',
+    smokeLabels: ['manager-experimental-off'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
   // The recipe editor publishes TEN distinct frames (overview/identity, ingredients,
@@ -348,6 +393,16 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
   },
+  // Issue 752: the roll-result box (awarded pills + outcome) after a craft
+  // (evidence for #727's pill fix). Scoped to the crafting DETAIL sources
+  // (RollResultBox lives there) so it does not collide with the broad
+  // player-crafting glob's ordinary states — a detail change maps to BOTH.
+  {
+    id: 'player-crafting-roll-result',
+    label: 'Player crafting — roll-result box (awarded pills + outcome)',
+    smokeLabels: ['player-crafting-roll-result'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\//],
+  },
   // The progressive player stage list (issue 651). `collect` emits ONE file per view id
   // (see below), so each state is its own view — a single `player-crafting` entry would
   // publish only one frame and the other states would never reach the PR.
@@ -416,6 +471,17 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['fabricate-journal'],
     matches: [/^src\/ui\/svelte\/apps\/journal\//],
   },
+  // Issue 752: the Journal with a CRAFTING history run selected so the run-detail
+  // requirements card (RunDetail + StepDetails) is visible (evidence for #748, and
+  // future #738). Its OWN recipe — `collect` emits one file per recipe id, so a
+  // shared label on fabricate-journal would publish only one frame. Any journal
+  // detail change republishes both frames.
+  {
+    id: 'fabricate-journal-craft-detail',
+    label: 'Player Journal — crafting run detail (requirements card)',
+    smokeLabels: ['fabricate-journal-craft-detail'],
+    matches: [/^src\/ui\/svelte\/apps\/journal\//],
+  },
   {
     id: 'player-inventory',
     label: 'Player Inventory tab',
@@ -444,6 +510,20 @@ export const VIEW_RECIPES = Object.freeze([
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],
     matches: [/^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/],
+  },
+  // Issue 752: the crafting result card posted to chat after a craft (evidence for
+  // #727's roll-total fix). The card markup is built in CraftingChatCard.js and
+  // shared with SalvageChatCard.js — both live under src/systems (not a UI render
+  // path), so this frame is collected for a PR touching them even though the
+  // screenshot gate itself only trips on src/ui/styles/svelte/css changes.
+  {
+    id: 'chat-craft-card',
+    label: 'Chat — crafting result card',
+    smokeLabels: ['chat-craft-card'],
+    matches: [
+      /^src\/systems\/CraftingChatCard\.js$/,
+      /^src\/systems\/SalvageChatCard\.js$/,
+    ],
   },
   {
     id: 'interactable-config',
