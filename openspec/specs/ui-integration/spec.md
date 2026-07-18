@@ -1505,6 +1505,11 @@ Brokenness is about **usability, not salvageability**, and MUST NOT gate the sal
 
 - **Inspector Info order.**
 Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
+- **Used-by reverse index composition.**
+The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
+Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match.type).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.
+Entries are deduplicated per component and per source, so a component consumed both directly and via a tag lists the recipe once.
+Essence-type options continue to feed the separate essence contributor channel and add no component used-by entries.
 
 #### Player Salvage Surface
 
