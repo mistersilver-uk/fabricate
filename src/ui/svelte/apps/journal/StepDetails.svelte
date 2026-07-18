@@ -39,7 +39,10 @@
   const lastCheck = $derived(step?.lastCheckResult ?? null);
   const rollFormula = $derived(String(lastCheck?.formula ?? ''));
   const rollTotal = $derived(Number(lastCheck?.total));
-  const rollValue = $derived(Number(lastCheck?.value));
+  // A recorded check result always carries an explicit `value` key (null when no
+  // number was rolled), and Number(null) === 0 is finite — so coerce a null/absent
+  // value to NaN instead of a fabricated 0 that would render a roll that never happened.
+  const rollValue = $derived(lastCheck?.value == null ? Number.NaN : Number(lastCheck.value));
   const rollDc = $derived(Number(lastCheck?.dc));
   const rollFailed = $derived(lastCheck?.success === false);
 

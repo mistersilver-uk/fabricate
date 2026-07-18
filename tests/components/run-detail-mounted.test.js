@@ -241,6 +241,40 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(details.textContent.includes('9'), 'shows the bare rolled value');
   });
 
+  it('renders no roll row when a check result has neither formula nor value (issue 738)', async () => {
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: {
+            requiredSeconds: null,
+            primaryToolName: null,
+            toolNames: [],
+            checkLabel: null,
+            failureText: 'Botched the brew'
+          },
+          // A minimal recorded check with an explicit null value must not fabricate "Rolled 0".
+          lastCheckResult: { success: false, formula: null, total: null, value: null, dc: null },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details, 'step details render for the failed step');
+    assert.ok(details.textContent.includes('Botched the brew'), 'shows the failure text');
+    assert.ok(!details.textContent.includes('RollResultValue'), 'no bare-value roll row rendered');
+    assert.ok(!details.textContent.includes('RollResult'), 'no roll row rendered at all');
+  });
+
   it('lists a step\'s required and consumed ingredients (issue 738)', async () => {
     const run = makeSucceededRun({
       currentStep: null,
