@@ -1043,7 +1043,7 @@
       },
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
-        "Hint": "Reserved for future experimental Fabricate features in this world. No current features are gated by this switch. Disabled by default."
+        "Hint": "Shows experimental Fabricate surfaces that are still in development for this world — currently the recipe graph in the crafting manager. The crafting authoring tools are always available and are not gated by this switch. Disabled by default."
       },
       "RepairComponentSources": {
         "Name": "Repair Item Data",

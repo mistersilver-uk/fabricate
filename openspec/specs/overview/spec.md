@@ -108,7 +108,7 @@ World:
 - `fabricate.gatheringParties` for world-level Fabricate-managed gathering parties (excluded from crafting-system import/export)
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
-- `fabricate.experimentalFeatures` for future experimental feature gates, disabled by default
+- `fabricate.experimentalFeatures` gates experimental Fabricate surfaces still in development, currently the recipe graph placeholder in the crafting manager (no longer the crafting authoring group, which is always available), disabled by default
 - `fabricate.recipeItemFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.componentFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.toolFlagStampVersion` (one-shot flag-stamp version)

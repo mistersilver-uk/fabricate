@@ -22,7 +22,7 @@ The [visibility modes below](#visibility-modes) walk through each mode you can s
 
 Choose the visibility mode in the **Recipe Visibility** card.
 You find it on the **Settings** page of the **Crafting** menu in the Crafting Admin panel, below the resolution-mode card.
-The Crafting menu is an experimental feature, so recipe visibility is reachable only when **Experimental Features** is turned on for the world.
+The Crafting menu is always available for every crafting system.
 See [The Crafting Menu]({% link crafting-systems.md %}#the-crafting-menu).
 The card offers four modes: **Global**, **Restricted**, **Item**, and **Knowledge**.
 Exactly one mode is active for the whole system.
@@ -320,8 +320,7 @@ After a drag-and-drop learn attempt, Fabricate shows notifications for successfu
 ## Books & Scrolls
 
 **Books & Scrolls** is a GM management surface that gathers every recipe item in a crafting system into one place.
-It is an experimental feature.
-It only appears when **Experimental Features** is turned on for the world in Fabricate's module settings.
+It appears in the **Crafting** menu whenever the system is in **Item** or **Knowledge** visibility mode.
 
 Despite the name, Books & Scrolls manages every recipe item regardless of its Foundry item type.
 A ring, a wand, a gem, or a plain note that is linked to a recipe all appear here alongside books and scrolls.
@@ -329,7 +328,7 @@ A ring, a wand, a gem, or a plain note that is linked to a recipe all appear her
 
 ### Opening Books & Scrolls
 
-When Experimental Features is on, the Crafting Admin panel's left menu shows an expandable **Crafting** group in place of the single **Recipes** entry.
+The Crafting Admin panel's left menu shows an expandable **Crafting** group whenever a crafting system is selected.
 Expand the group and open **Books & Scrolls** from it.
 **Books & Scrolls** appears in the group only while the system is in **Item** or **Knowledge** visibility mode, which are the modes that use recipe items.
 See [The Crafting Menu]({% link crafting-systems.md %}#the-crafting-menu) for the rest of the group.
