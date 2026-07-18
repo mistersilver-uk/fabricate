@@ -277,7 +277,8 @@ A check is usable iff its mode carries an authored `rollFormula`; the legacy che
 - Enable checks (the on/off toggle for the optional simple-mode check)
 - Roll formula, DC, and tier controls per mode (`simple` / `routed` / `progressive`)
 - The simple-mode dynamic-DC macro (`craftingCheck.simple.macroUuid`) — the one surviving check-adjacent macro (it only computes the DC)
-- Failure consumption policy
+- Failure consumption policy — two live-persisting toggles in the non-alchemy crafting sub-tab editing `craftingCheck.consumption.consumeIngredientsOnFail` (default `true`; whether a recipe's ingredients are consumed on a failed crafting check) and `craftingCheck.consumption.breakToolsOnFail` (default `false`; whether required tools break on a failed check — the 1.7.0 rename of `consumeCatalystsOnFail`).
+The engine applies this policy on every failed crafting check and mirrors it for salvage failure; it is NOT shown in alchemy mode, where consumption is governed by the distinct `alchemy.consumeOnFail` flag.
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`) (progressive only)
 

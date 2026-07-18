@@ -16,6 +16,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import ToggleCard from '../ToggleCard.svelte';
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
@@ -39,6 +40,19 @@
     craftingCheck = null,
     craftingCheckSimple = null,
     craftingCheckProgressive = null,
+    // Failure consumption policy (issue 712): the system-level `craftingCheck.consumption`
+    // block ({ consumeIngredientsOnFail, breakToolsOnFail }), edited by two live-persisting
+    // toggles in the non-alchemy crafting sub-tab. The engine applies it on every failed
+    // crafting check (and mirrors it for salvage); alchemy resolves consumption through its
+    // own `consumeOnFail` flag instead, so these toggles are hidden in alchemy mode.
+    craftingConsumption = null,
+    // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
+    // already honours. Restored as live-persisting toggles below the alchemy check-mode
+    // selector. Defaults mirror the manager normalizer (learnOnCraft OFF; consumeOnFail and
+    // showAttemptHistoryToPlayers ON).
+    alchemyLearnOnCraft = false,
+    alchemyConsumeOnFail = true,
+    alchemyShowAttemptHistory = true,
     salvageResolutionMode = 'simple',
     salvageCheckSimple = null,
     salvageCheckRouted = null,
@@ -63,6 +77,8 @@
     onUpdateGatheringCheckProgressive = () => {},
     onUpdateGatheringCheckRouted = () => {},
     onSetAlchemyCheckMode = () => {},
+    onUpdateCraftingConsumption = () => {},
+    onUpdateAlchemyFlags = () => {},
     onTabChange = () => {},
     onToggleCheckActive = () => {}
   } = $props();
@@ -105,6 +121,12 @@
         'A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.'
     }
   ];
+
+  // Failure consumption policy toggle states (issue 712). `consumeIngredientsOnFail`
+  // defaults ON (`!== false`), `breakToolsOnFail` defaults OFF (`=== true`), matching
+  // the manager normalizer so an authored-OFF system does not read back ON.
+  const consumeIngredientsOnFail = $derived(craftingConsumption?.consumeIngredientsOnFail !== false);
+  const breakToolsOnFail = $derived(craftingConsumption?.breakToolsOnFail === true);
 
   let activeTab = $state('crafting');
 
@@ -301,17 +323,48 @@
             </section>
           {/if}
         </div>
-      {:else if activeTab === 'crafting' && craftingRouted}
-        <div data-checks-panel="crafting">
-          <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
-        </div>
-      {:else if activeTab === 'crafting' && craftingSimple}
-        <div data-checks-panel="crafting">
-          <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
-        </div>
-      {:else if activeTab === 'crafting' && craftingProgressive}
-        <div data-checks-panel="crafting">
-          <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckProgressive} />
+      {:else if activeTab === 'crafting' && (craftingRouted || craftingSimple || craftingProgressive)}
+        <!-- Non-alchemy crafting: the per-mode editor plus the system-level failure
+             consumption policy (issue 712). The wrapper keeps `data-checks-panel="crafting"`
+             (the tests key on it) but deliberately NOT the `manager-checks-page` class,
+             which the routed test asserts is absent once the editor renders. -->
+        <div class="manager-checks-editor-stack" data-checks-panel="crafting">
+          {#if craftingRouted}
+            <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+          {:else if craftingSimple}
+            <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
+          {:else}
+            <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckProgressive} />
+          {/if}
+
+          <section class="manager-inspector-card" data-failure-consumption>
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionHeading', 'Failure consumption policy')}</h3>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionIntro', 'What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage mirrors the same policy.')}</p>
+            <div class="manager-checks-flag-list">
+              <ToggleCard
+                variant="is-info"
+                icon="fas fa-fire-flame-curved"
+                section="failure-consume-ingredients"
+                field="consumeIngredientsOnFail"
+                title={text('FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail', 'Consume ingredients on a failed check')}
+                sub={text('FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFailDesc', 'The recipe’s ingredients are used up even when the crafting check fails. On by default.')}
+                toggleLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail', 'Consume ingredients on a failed check')}
+                on={consumeIngredientsOnFail}
+                onToggle={(next) => onUpdateCraftingConsumption({ consumeIngredientsOnFail: next })}
+              />
+              <ToggleCard
+                variant="is-info"
+                icon="fas fa-hammer-crash"
+                section="failure-break-tools"
+                field="breakToolsOnFail"
+                title={text('FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail', 'Break tools on a failed check')}
+                sub={text('FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFailDesc', 'Required tools break when the crafting check fails. Off by default.')}
+                toggleLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail', 'Break tools on a failed check')}
+                on={breakToolsOnFail}
+                onToggle={(next) => onUpdateCraftingConsumption({ breakToolsOnFail: next })}
+              />
+            </div>
+          </section>
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">

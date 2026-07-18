@@ -612,6 +612,21 @@
     gatheringRoutedDraft = next;
   }
 
+  // Live-persist an alchemy behaviour-flag patch (issue 713). saveAlchemyConfig
+  // rewrites all three flags from its argument, so send the current projected values
+  // with the single toggled field overridden — passing a bare `{ learnOnCraft }` would
+  // silently re-default consumeOnFail/showAttemptHistoryToPlayers to their defaults.
+  function onUpdateAlchemyFlags(patch) {
+    const current = selectedSystem?.alchemy || {};
+    store?.saveAlchemyConfig?.({
+      checkMode: current.checkMode,
+      learnOnCraft: current.learnOnCraft === true,
+      consumeOnFail: current.consumeOnFail !== false,
+      showAttemptHistoryToPlayers: current.showAttemptHistoryToPlayers !== false,
+      ...patch,
+    });
+  }
+
   async function saveCraftingCheck() {
     if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
     if (craftingCheckMode === 'routed') {
@@ -5098,6 +5113,10 @@
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
+            craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
+            alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
+            alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
+            alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !== false}
             {salvageResolutionMode}
             salvageCheckSimple={salvageSimpleDraft}
             salvageCheckRouted={salvageRoutedDraft}
@@ -5117,6 +5136,8 @@
             {onUpdateGatheringCheckProgressive}
             {onUpdateGatheringCheckRouted}
             onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
+            onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
+            {onUpdateAlchemyFlags}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
           />

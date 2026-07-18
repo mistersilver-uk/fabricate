@@ -2515,6 +2515,63 @@ describe('createAdminStore', () => {
       assert.equal(updateArgs.updates.craftingCheck.routed.rollExpression, '1d20');
     });
 
+    it('projects craftingCheck.consumption into view state, preserving an authored-off consumeIngredientsOnFail (issue 712)', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const sys = manager.getSystem('sys1');
+      if (sys) {
+        // A `false` fixture: a dropped projection field would invert the default-true
+        // flag to ON, so pin the false round-trip explicitly.
+        sys.craftingCheck = {
+          enabled: true,
+          consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
+        };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.equal(
+        vs.selectedSystem.craftingCheck.consumption.consumeIngredientsOnFail,
+        false,
+        'an authored-off consumeIngredientsOnFail survives the projection'
+      );
+      assert.equal(vs.selectedSystem.craftingCheck.consumption.breakToolsOnFail, true);
+    });
+
+    it('saveCraftingCheckConsumption spreads the nested consumption block and preserves other check fields (issue 712)', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = {
+          enabled: true,
+          mode: 'passFail',
+          outcomes: ['fail', 'pass'],
+          consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
+          simple: { rollFormula: '1d20', dc: 12 },
+        };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveCraftingCheckConsumption({ consumeIngredientsOnFail: false });
+      assert.ok(updateArgs !== null);
+      // The toggled field is written…
+      assert.equal(updateArgs.updates.craftingCheck.consumption.consumeIngredientsOnFail, false);
+      // …the untouched sibling flag survives (shallow-spread guard)…
+      assert.equal(updateArgs.updates.craftingCheck.consumption.breakToolsOnFail, false);
+      // …and the rest of the craftingCheck block is preserved.
+      assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['fail', 'pass']);
+      assert.deepEqual(updateArgs.updates.craftingCheck.simple, { rollFormula: '1d20', dc: 12 });
+    });
+
     it('saveSalvageCheckActive toggles the salvage check enabled flag', async () => {
       let updateArgs = null;
       const services = createMockServices();
