@@ -43,7 +43,7 @@ permissions:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20           # Full pipeline: up + smoke + down
+    timeout-minutes: 25           # Full pipeline: up + smoke + down (18-min run watchdog + cold setup/teardown)
     env:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
