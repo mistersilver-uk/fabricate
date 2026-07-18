@@ -5545,8 +5545,18 @@ async function main() {
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-check-editor]')
             .first();
           await craftingCheckEditor.waitFor({ state: 'visible', timeout: 5_000 });
-          await craftingCheckEditor.locator('section').last()
-            .scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          // Issue 712's failure-consumption card is a SIBLING of the check editor
+          // inside the crafting panel, so anchor on it directly when present and
+          // fall back to the editor's last section on builds that predate it.
+          const consumptionCard = page
+            .locator('.fabricate-manager [data-checks-panel="crafting"] [data-failure-consumption]')
+            .first();
+          if (await consumptionCard.count() > 0) {
+            await consumptionCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          } else {
+            await craftingCheckEditor.locator('section').last()
+              .scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          }
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-checks-crafting-consumption');
           process.stdout.write('  D0: checks crafting consumption screenshotted\n');
@@ -6455,6 +6465,18 @@ async function main() {
             // alchemy option active for an alchemy-mode system.
             if (await page.locator('.fabricate-manager [data-crafting-resolution-mode-option="alchemy"].is-active').count() === 0) {
               throw new Error('Crafting settings did not render with alchemy as the selected resolution mode.');
+            }
+            // Issue 713's behaviour flags render in the Checks view for an
+            // alchemy-mode system — capture there when the card exists so the
+            // frame demonstrates the flags; fall back to the settings surface
+            // on builds that predate the card.
+            await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+            await settleManagerNav(page);
+            const alchemyBehaviourCard = page
+              .locator('.fabricate-manager [data-alchemy-behaviour]')
+              .first();
+            if (await alchemyBehaviourCard.count() > 0) {
+              await alchemyBehaviourCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
             }
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'manager-alchemy-settings');
