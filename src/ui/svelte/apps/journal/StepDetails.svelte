@@ -38,13 +38,19 @@
   // distinct from the authored `checkLabel` requirement above.
   const lastCheck = $derived(step?.lastCheckResult ?? null);
   const rollFormula = $derived(String(lastCheck?.formula ?? ''));
-  const rollTotal = $derived(Number(lastCheck?.total));
-  // A recorded check result always carries an explicit `value` key (null when no
-  // number was rolled), and Number(null) === 0 is finite — so coerce a null/absent
-  // value to NaN instead of a fabricated 0 that would render a roll that never happened.
-  const rollValue = $derived(lastCheck?.value == null ? Number.NaN : Number(lastCheck.value));
-  const rollDc = $derived(Number(lastCheck?.dc));
+  // Number(null) === 0 is finite, so a null/absent numeric key would fabricate a
+  // "0" — for `value` that renders a roll that never happened, for `total`/`dc` a
+  // spurious "= 0" / "vs DC 0" when there is no total or no static DC (progressive /
+  // dynamic-DC checks emit `dc: null`). Coerce a null/absent key to NaN so the
+  // Number.isFinite guards below suppress those cases.
+  const rollTotal = $derived(numberOrNaN(lastCheck?.total));
+  const rollValue = $derived(numberOrNaN(lastCheck?.value));
+  const rollDc = $derived(numberOrNaN(lastCheck?.dc));
   const rollFailed = $derived(lastCheck?.success === false);
+
+  function numberOrNaN(raw) {
+    return raw == null ? Number.NaN : Number(raw);
+  }
 
   // Prefer the full "formula = total" phrasing; fall back to the bare rolled value
   // for legacy / no-formula records that persisted only a `value` (they otherwise
@@ -71,6 +77,14 @@
   const consumed = $derived(
     Array.isArray(step?.consumedIngredients) ? step.consumedIngredients : []
   );
+
+  // Compose the componentId/itemUuid with the array index so two rows referencing
+  // the same component (e.g. distinct ingredient groups both citing one component,
+  // or legacy consumed rows with a null itemUuid) can never collide into a Svelte
+  // each_key_duplicate crash. Rows are not reorderable here, so the index is stable.
+  function itemKey(item, index) {
+    return `${item?.componentId ?? ''}:${item?.itemUuid ?? ''}:${index}`;
+  }
 
   const hasAnyFact = $derived(
     requiredTime !== '' ||
@@ -131,7 +145,7 @@
           {localize('FABRICATE.App.Journal.StepDetails.RequirementsTitle')}
         </h4>
         <ul class="journal-step-items-list">
-          {#each requirements as item, index (item.componentId ?? item.itemUuid ?? index)}
+          {#each requirements as item, index (itemKey(item, index))}
             <li class="journal-step-item" data-journal-requirement>
               {#if item.img}
                 <img class="journal-step-item-thumb" src={item.img} alt="" />
@@ -154,7 +168,7 @@
           {localize('FABRICATE.App.Journal.StepDetails.ConsumedTitle')}
         </h4>
         <ul class="journal-step-items-list">
-          {#each consumed as item, index (item.itemUuid ?? item.componentId ?? index)}
+          {#each consumed as item, index (itemKey(item, index))}
             <li class="journal-step-item" data-journal-consumed-item>
               {#if item.img}
                 <img class="journal-step-item-thumb" src={item.img} alt="" />

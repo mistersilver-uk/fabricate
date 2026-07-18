@@ -241,6 +241,87 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(details.textContent.includes('9'), 'shows the bare rolled value');
   });
 
+  it('does not fabricate "vs DC 0" when a formula roll has no static DC (issue 738)', async () => {
+    // Progressive / dynamic-DC checks persist `dc: null`. Number(null) === 0 is
+    // finite, so an unguarded coercion would render the WithDc variant "vs DC 0".
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: { success: false, formula: '1d20', total: 7, dc: null, value: 7 },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details.textContent.includes('RollResult'), 'a roll row is still rendered');
+    assert.ok(!details.textContent.includes('WithDc'), 'the WithDc variant is not used for a null DC');
+    assert.ok(!details.textContent.includes('"dc"'), 'no DC is interpolated into the roll');
+  });
+
+  it('does not fabricate "vs DC 0" for a bare-value roll with no static DC (issue 738)', async () => {
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: { success: false, formula: null, total: null, value: 9, dc: null },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details.textContent.includes('RollResultValue'), 'the bare-value roll row is rendered');
+    assert.ok(!details.textContent.includes('WithDc'), 'the WithDc variant is not used for a null DC');
+  });
+
+  it('renders duplicate-component requirement rows without an each_key crash (issue 738)', async () => {
+    // Two ingredient groups can reference the same component; those rows share a
+    // componentId and each carry a null itemUuid, so a componentId-only key would
+    // collide into a Svelte each_key_duplicate crash.
+    const run = makeSucceededRun({
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'succeeded',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: null,
+          requirements: [
+            { componentId: 'c-iron', itemUuid: null, quantity: 2, name: 'Iron', img: 'icons/iron.webp' },
+            { componentId: 'c-iron', itemUuid: null, quantity: 1, name: 'Iron', img: 'icons/iron.webp' }
+          ],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const rows = target.querySelectorAll('[data-journal-requirement]');
+    assert.equal(rows.length, 2, 'both same-component requirement rows render');
+  });
+
   it('renders no roll row when a check result has neither formula nor value (issue 738)', async () => {
     const run = makeSucceededRun({
       status: 'failed',
