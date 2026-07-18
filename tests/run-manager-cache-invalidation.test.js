@@ -4,35 +4,15 @@ import assert from 'node:assert/strict';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { runContainersChanged } from '../src/systems/runFlagInvalidation.js';
+import {
+  FakeActor as SharedActor,
+  setupRunManagerGlobals as setupGlobals,
+} from './helpers/run-manager-fakes.js';
 
 // Issue 739 (read side): the run managers cache an actor's runs in memory and never
 // learn about a write another client (or the primary-GM world-time resume) makes to the
 // actor's run flags. `invalidateCache(actorId)` — wired to the `updateActor` hook in
 // main.js — drops the stale cache so the next read reflects the synced document.
-
-// A minimal actor whose flags stand in for the SYNCED Foundry actor document.
-class SharedActor {
-  constructor(name = 'PlayerPC') {
-    this.id = name;
-    this.name = name;
-    this.uuid = `Actor.${name}`;
-    this._flags = {};
-  }
-  getFlag(ns, key) {
-    return this._flags?.[ns]?.[key];
-  }
-  async setFlag(ns, key, value) {
-    this._flags[ns] = this._flags[ns] || {};
-    this._flags[ns][key] = value;
-    return value;
-  }
-}
-
-function setupGlobals(worldTime = 1000) {
-  let n = 0;
-  globalThis.foundry = { utils: { randomID: () => `rid-${++n}` } };
-  globalThis.game = { user: { id: 'gm-1' }, time: { worldTime }, actors: [] };
-}
 
 function stepRecipe(id) {
   return {

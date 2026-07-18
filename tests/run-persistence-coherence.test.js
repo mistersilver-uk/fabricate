@@ -3,34 +3,12 @@ import assert from 'node:assert/strict';
 
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { FakeActor, setupRunManagerGlobals as setupGlobals } from './helpers/run-manager-fakes.js';
 
 // Salvage + gathering twins of the crafting stale-cache clobber regression
 // (failed-craft-journal-gap.test.js test 3, issues 733 + 739): a second writer whose
 // in-memory container predates a terminal run persisted by another writer must NOT drop
 // that run when it persists its own change.
-
-class FakeActor {
-  constructor(name = 'Shared') {
-    this.id = name.replace(/\s+/g, '-').toLowerCase();
-    this.name = name;
-    this.uuid = `Actor.${this.id}`;
-    this._flags = {};
-  }
-  getFlag(namespace, key) {
-    return this._flags?.[namespace]?.[key];
-  }
-  async setFlag(namespace, key, value) {
-    this._flags[namespace] = this._flags[namespace] || {};
-    this._flags[namespace][key] = value;
-    return value;
-  }
-}
-
-function setupGlobals(worldTime = 1000, actors = []) {
-  let id = 0;
-  globalThis.foundry = { utils: { randomID: () => `rid-${++id}` } };
-  globalThis.game = { user: { id: 'gm-1' }, time: { worldTime }, actors };
-}
 
 test('SalvageRunManager: a stale-cache resume persist keeps a terminal run written by another writer', async () => {
   const actor = new FakeActor('SalvageShared');

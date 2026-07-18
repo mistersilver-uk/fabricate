@@ -66,7 +66,7 @@ test('reconcileRunHistory: an intentional history removal (cleanup) is not re-ad
   ];
   const next = [{ id: 'x', finishedAt: 20 }];
   // The writer observed both x and y and dropped y (a system cleanup).
-  const merged = reconcileRunHistory(current, next, ['x', 'y'], compareFinishedAtNewestFirst, 50);
+  const merged = reconcileRunHistory(current, next, compareFinishedAtNewestFirst, ['x', 'y'], 50);
   assert.deepEqual(
     merged.map((e) => e.id),
     ['x'],
@@ -81,7 +81,7 @@ test('reconcileRunHistory: a document-only entry the writer never saw survives a
   ];
   const next = [{ id: 'seen', finishedAt: 10 }];
   // The writer only ever observed `seen`; `concurrent` was written out-of-band.
-  const merged = reconcileRunHistory(current, next, ['seen'], compareFinishedAtNewestFirst, 50);
+  const merged = reconcileRunHistory(current, next, compareFinishedAtNewestFirst, ['seen'], 50);
   assert.deepEqual(
     merged.map((e) => e.id),
     ['concurrent', 'seen'],

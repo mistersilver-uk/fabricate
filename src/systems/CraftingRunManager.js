@@ -1,14 +1,6 @@
-import {
-  getFabricateFlag,
-  setFabricateFlag,
-  deleteRemovedActiveRunFlags,
-} from '../config/flags.js';
+import { getFabricateFlag } from '../config/flags.js';
 
-import {
-  reconcileRunContainer,
-  compareFinishedAtNewestFirst,
-  historyIdsOf,
-} from './runContainerCoherence.js';
+import { persistFabricateRunContainer, runContainerBaseline } from './runContainerCoherence.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -104,38 +96,23 @@ export class CraftingRunManager {
   }
 
   async _persist(actor, container) {
-    // Reconcile against the CURRENT document so a stale in-memory view cannot clobber
-    // runs written out-of-band by another client/session or the world-time resume
-    // (issues 733 + 739): union history by id, keep other writers' active runs.
-    const current = this._normalizeContainer(getFabricateFlag(actor, 'craftingRuns', null));
-    const baseline = this._baseline.get(actor.id);
-    const reconciled = reconcileRunContainer({
-      current,
-      next: container,
-      previousActiveKeys: baseline?.activeKeys ?? Object.keys(current.active),
-      previousHistoryIds: baseline?.historyIds ?? historyIdsOf(current.history),
-      compareHistory: compareFinishedAtNewestFirst,
+    // Reconcile the about-to-persist container against the CURRENT document, cache the
+    // reconciled reference, and write the flag with explicit removed-key deletion, so a
+    // stale in-memory view cannot clobber runs written out-of-band by another
+    // client/session or the world-time resume (issues 733 + 739). See the shared helper.
+    await persistFabricateRunContainer({
+      actor,
+      container,
+      flagKey: 'craftingRuns',
+      normalizeContainer: (raw) => this._normalizeContainer(raw),
+      cache: this._cache,
+      baseline: this._baseline,
       historyLimit: HISTORY_LIMIT,
     });
-    // Apply the reconciled result onto the SAME container object and cache that
-    // reference, so a caller holding this container across an await (e.g.
-    // `processWorldTime` resuming a run mid-loop) sees the reconciliation and cannot
-    // re-persist a stale copy that resurrects a just-completed run.
-    container.active = reconciled.active;
-    container.history = reconciled.history;
-    this._cache.set(actor.id, container);
-    this._recordBaseline(actor.id, container);
-    // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
-    // so completed/discarded runs don't resurrect on reload (see the shared helper).
-    await deleteRemovedActiveRunFlags(actor, 'craftingRuns', container);
-    await setFabricateFlag(actor, 'craftingRuns', container);
   }
 
   _recordBaseline(actorId, container) {
-    this._baseline.set(actorId, {
-      activeKeys: Object.keys(container.active || {}),
-      historyIds: historyIdsOf(container.history),
-    });
+    this._baseline.set(actorId, runContainerBaseline(container));
   }
 
   invalidateCache(actorId = null) {

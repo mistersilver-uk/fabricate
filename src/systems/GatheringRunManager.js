@@ -1,4 +1,4 @@
-import { reconcileRunContainer, historyIdsOf } from './runContainerCoherence.js';
+import { reconcileAgainstDocument, runContainerBaseline } from './runContainerCoherence.js';
 
 const FLAG_NAMESPACE = 'fabricate';
 const FLAG_KEY = 'gatheringRuns';
@@ -263,10 +263,7 @@ export class GatheringRunManager {
   }
 
   _recordBaseline(key, container) {
-    this._baseline.set(key, {
-      activeKeys: Object.keys(container.active || {}),
-      historyIds: historyIdsOf(container.history),
-    });
+    this._baseline.set(key, runContainerBaseline(container));
   }
 
   async _persist(actor, container) {
@@ -275,13 +272,10 @@ export class GatheringRunManager {
     // Reconcile against the CURRENT document so a stale in-memory view cannot clobber
     // runs written out-of-band by another client/session or the world-time resume
     // (issues 733 + 739): union history by id, keep other writers' active runs.
-    const current = this._normalizeContainer(readGatheringRunsFlag(actor), actor);
-    const baseline = this._baseline.get(key);
-    const reconciled = reconcileRunContainer({
-      current,
+    const reconciled = reconcileAgainstDocument({
+      current: this._normalizeContainer(readGatheringRunsFlag(actor), actor),
       next: normalized,
-      previousActiveKeys: baseline?.activeKeys ?? Object.keys(current.active),
-      previousHistoryIds: baseline?.historyIds ?? historyIdsOf(current.history),
+      baseline: this._baseline.get(key),
       compareHistory: compareNewestFirst,
       historyLimit: HISTORY_LIMIT,
     });

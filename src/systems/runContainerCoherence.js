@@ -12,6 +12,12 @@
  * removing only what THIS writer intentionally dropped).
  */
 
+import {
+  getFabricateFlag,
+  setFabricateFlag,
+  deleteRemovedActiveRunFlags,
+} from '../config/flags.js';
+
 function isRunMap(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -59,16 +65,16 @@ export function unionRunHistory(currentHistory, nextHistory, compareHistory, his
  *
  * @param {Array} currentHistory the persisted document's history
  * @param {Array} nextHistory the writer's about-to-persist history
- * @param {Iterable<string>} previousHistoryIds the history ids the writer last observed
  * @param {(a: object, b: object) => number} [compareHistory] newest-first comparator
+ * @param {Iterable<string>} [previousHistoryIds] the history ids the writer last observed
  * @param {number} [historyLimit] retention cap
  * @returns {Array} the reconciled history
  */
 export function reconcileRunHistory(
   currentHistory,
   nextHistory,
-  previousHistoryIds = [],
   compareHistory,
+  previousHistoryIds = [],
   historyLimit = 0
 ) {
   const next = Array.isArray(nextHistory) ? nextHistory : [];
@@ -133,11 +139,103 @@ export function reconcileRunContainer({
     history: reconcileRunHistory(
       current?.history,
       next?.history,
-      previousHistoryIds,
       compareHistory,
+      previousHistoryIds,
       historyLimit
     ),
   };
+}
+
+/**
+ * Build the baseline snapshot (active keys + history ids) a run manager records so a
+ * later `_persist` can distinguish an intentional removal from another writer's
+ * concurrently-added run. Shared by every actor-scoped run manager's `_recordBaseline`.
+ *
+ * @param {{active?: object, history?: Array}} container
+ * @returns {{activeKeys: string[], historyIds: Array}}
+ */
+export function runContainerBaseline(container) {
+  return {
+    activeKeys: Object.keys(container?.active || {}),
+    historyIds: historyIdsOf(container?.history),
+  };
+}
+
+/**
+ * Reconcile the about-to-persist `next` container against the freshly-read `current`
+ * document, using the writer's last-observed `baseline` (falling back to the current
+ * document when the writer has no baseline yet). Wraps {@link reconcileRunContainer}
+ * with the baseline-fallback logic every run manager repeats.
+ *
+ * @param {object} args
+ * @param {{active?: object, history?: Array}} args.current freshly-read document container
+ * @param {{active?: object, history?: Array}} args.next the writer's about-to-persist container
+ * @param {{activeKeys?: string[], historyIds?: Array}|null} [args.baseline] last-observed snapshot
+ * @param {(a: object, b: object) => number} [args.compareHistory] newest-first comparator
+ * @param {number} [args.historyLimit] retention cap
+ * @returns {{active: object, history: Array}} the reconciled container
+ */
+export function reconcileAgainstDocument({
+  current,
+  next,
+  baseline,
+  compareHistory,
+  historyLimit = 0,
+} = {}) {
+  return reconcileRunContainer({
+    current,
+    next,
+    previousActiveKeys: baseline?.activeKeys ?? Object.keys(current?.active || {}),
+    previousHistoryIds: baseline?.historyIds ?? historyIdsOf(current?.history),
+    compareHistory,
+    historyLimit,
+  });
+}
+
+/**
+ * Persist a doubly-nested Fabricate run container (crafting / salvage) coherently:
+ * read the CURRENT document, reconcile the about-to-persist container against it
+ * (keeping other writers' runs), apply the reconciled result onto the SAME container
+ * object, refresh the manager's cache + baseline, then write the flag with an explicit
+ * removed-active-key deletion (setFlag's recursive merge can't delete keys, so a
+ * completed/discarded run would otherwise resurrect on reload).
+ *
+ * Shared by CraftingRunManager and SalvageRunManager, which differ only in flag key.
+ *
+ * @param {object} args
+ * @param {object} args.actor the actor owning the container
+ * @param {{active: object, history: Array}} args.container mutated in place with the reconciled result
+ * @param {string} args.flagKey the container flag key ('craftingRuns' | 'salvageRuns')
+ * @param {(raw?: object) => {active: object, history: Array}} args.normalizeContainer manager normalizer
+ * @param {Map} args.cache the manager's actorId -> container cache
+ * @param {Map} args.baseline the manager's actorId -> baseline-snapshot map
+ * @param {(a: object, b: object) => number} [args.compareHistory] newest-first comparator
+ * @param {number} [args.historyLimit] retention cap
+ */
+export async function persistFabricateRunContainer({
+  actor,
+  container,
+  flagKey,
+  normalizeContainer,
+  cache,
+  baseline,
+  compareHistory = compareFinishedAtNewestFirst,
+  historyLimit = 0,
+}) {
+  const current = normalizeContainer(getFabricateFlag(actor, flagKey, null));
+  const reconciled = reconcileAgainstDocument({
+    current,
+    next: container,
+    baseline: baseline.get(actor.id),
+    compareHistory,
+    historyLimit,
+  });
+  container.active = reconciled.active;
+  container.history = reconciled.history;
+  cache.set(actor.id, container);
+  baseline.set(actor.id, runContainerBaseline(container));
+  await deleteRemovedActiveRunFlags(actor, flagKey, container);
+  await setFabricateFlag(actor, flagKey, container);
 }
 
 /** Collect the run ids present in a history list, for baseline snapshots. */
