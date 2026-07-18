@@ -481,6 +481,12 @@ If the actor cannot pay, the step is blocked and the craft is stopped before any
 
 You configure currency in the system settings editor, in the **Currency units** card.
 
+{: .note }
+> The recipe editor offers to add a currency cost only while currency is enabled for the system and at least one unit is defined.
+> This keeps the editor from offering a cost the system cannot honour.
+> Turning currency off later does not delete the costs you have already authored.
+> Each one stays visible on its recipe, but becomes read-only and is marked **Currency off**, and it stays inactive until you re-enable currency.
+
 #### Choosing a spend strategy
 
 The **Spend strategy** selector decides how Fabricate reads and spends an actor's money.
