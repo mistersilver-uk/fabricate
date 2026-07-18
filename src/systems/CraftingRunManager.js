@@ -363,6 +363,47 @@ export class CraftingRunManager {
     return run;
   }
 
+  /**
+   * Record a no-signature alchemy fizzle as a failed, recipe-less run-history
+   * entry. A fizzle matches NO enabled recipe, so the entry carries
+   * `recipeId: null` and `isFizzle: true` and never enters the `active`
+   * container — it is archived straight to history. Recording is UNCONDITIONAL:
+   * the `alchemy.showAttemptHistoryToPlayers` flag governs player VISIBILITY at
+   * the Journal projection (see {@link RunJournalBuilder}), never whether the
+   * attempt is recorded. The entry holds no recipe or signature data, so it can
+   * never leak an undiscovered recipe.
+   *
+   * @param {Actor} actor
+   * @param {object} [details]
+   * @param {string|null} [details.craftingSystemId]
+   * @param {string|null} [details.userId]
+   * @returns {Promise<object>} the recorded fizzle history entry
+   */
+  async recordFizzle(actor, { craftingSystemId = null, userId = null } = {}) {
+    const container = this._getContainer(actor);
+    const now = this._nowWorldTime();
+    const entry = {
+      id: foundry.utils.randomID(),
+      actorUuid: actor.uuid,
+      userId: userId || game.user?.id || null,
+      craftingSystemId: craftingSystemId ?? null,
+      recipeId: null,
+      isFizzle: true,
+      status: 'failed',
+      startedAt: now,
+      updatedAt: now,
+      finishedAt: now,
+      currentStepIndex: null,
+      steps: [],
+    };
+    container.history.unshift(entry);
+    if (container.history.length > HISTORY_LIMIT) {
+      container.history = container.history.slice(0, HISTORY_LIMIT);
+    }
+    await this._persist(actor, container);
+    return entry;
+  }
+
   async processWorldTime(worldTime = this._nowWorldTime()) {
     // Timed resume only (issue 656): driven from the synced updateWorldTime hook, and
     // flipping waitingTime→inProgress triggers _persist → actor.setFlag, a broadcast
@@ -435,8 +476,11 @@ export class CraftingRunManager {
       }
 
       const nextHistory = (container.history || []).filter((run) => {
-        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
         const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
+        // A no-signature fizzle is recipe-less by design; keep it while its system
+        // is valid rather than pruning it as an unknown-recipe run.
+        if (run?.isFizzle) return systemValid;
+        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
         return recipeValid && systemValid;
       });
       if (nextHistory.length !== (container.history || []).length) {

@@ -15,7 +15,7 @@
  *  11. validateImportData: rejects non-array recipes
  *  12. validateImportData: warns on recipe without name
  *  13. prepareForImport: keep mode preserves IDs
- *  14. prepareForImport: copy mode strips IDs and appends "(Copy)"
+ *  14. prepareForImport: copy mode strips the system ID, appends "(Copy)", regenerates recipe IDs
  *  15. prepareForImport: does not mutate original data
  *  16. makeExportFilename: generates slug from system name
  *  17. makeExportFilename: handles special characters
@@ -294,7 +294,7 @@ test('prepareForImport: keep mode preserves IDs', () => {
   assert.equal(prepared.recipes[0].id, 'r1');
 });
 
-test('prepareForImport: copy mode strips IDs and appends "(Copy)"', () => {
+test('prepareForImport: copy mode strips the system ID, appends "(Copy)", and regenerates recipe IDs', () => {
   const data = {
     system: { id: 'sys-1', name: 'Test System' },
     recipes: [{ id: 'r1', name: 'Recipe', craftingSystemId: '__SYSTEM_ID__' }]
@@ -304,7 +304,10 @@ test('prepareForImport: copy mode strips IDs and appends "(Copy)"', () => {
 
   assert.equal(prepared.system.id, undefined, 'System ID should be stripped');
   assert.equal(prepared.system.name, 'Test System (Copy)');
-  assert.equal(prepared.recipes[0].id, undefined, 'Recipe ID should be stripped');
+  // Recipe ids are now REGENERATED (not stripped) so book membership can be
+  // remapped to them — issue #701.
+  assert.ok(prepared.recipes[0].id, 'Recipe ID should be regenerated, not stripped');
+  assert.notEqual(prepared.recipes[0].id, 'r1', 'Recipe ID should be a fresh id');
 });
 
 test('prepareForImport: does not mutate original data', () => {

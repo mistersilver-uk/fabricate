@@ -63,9 +63,9 @@ A non-GM import attempt MUST leave no partial system and no rejected writes.
 ### Reference handling
 
 Import MUST classify every cross-reference as internal or external.
-Internal references are resolvable within the payload: environment-to-task and environment-to-event identifier linkages, drop-row `componentId`, tool `componentId`, recipe `recipeItemId`, and essence `sourceComponentId`.
+Internal references are resolvable within the payload: environment-to-task and environment-to-event identifier linkages; drop-row `componentId`; tool `componentId` and `onBreak.replacementComponentId` across both the system tools and the gathering-library tool slice; recipe ingredient-option, result, and catalyst component references including the recursive `alternatives[]` refs and the flat `ingredients`/`results` aliases at both top level and per step; component salvage result references and legacy salvage catalysts; recipe `recipeItemId`; essence `sourceComponentId`; and `recipeItemDefinitions[].recipeIds` recipe-book membership.
 A broken internal reference is a data-integrity warning that MUST be kept verbatim and reported.
-This classification is unchanged by copy-mode component-id regeneration: after the copy transform (see Copy-mode identifier rebinding) no internal component reference points at a pre-regeneration id, so a faithful copy import surfaces zero broken component references.
+This classification is unchanged by copy-mode component-id and recipe-id regeneration: after the copy transform (see Copy-mode identifier rebinding) no internal component reference and no recipe-book membership reference points at a pre-regeneration id, so a faithful copy import surfaces zero broken component references and zero broken `RECIPE_ITEM` references.
 External references point at world documents that may be absent: component `originItemUuid`, environment `sceneUuid`, realm `sceneMappings[].sceneUuid` and `sceneMappings[].sceneRegionUuid`, drop-row `itemUuid`, and macro UUIDs.
 Import MUST accept the pre-`1.16.0` source-reference field names (`sourceUuid` / `sourceItemUuid` / `fallbackItemIds`) on components, recipe-item definitions, and tools, and emit the renamed fields (`registeredItemUuid` / `originItemUuid` / `aliasItemUuids`); an export produced after the rename carries the new names.
 Import MUST preserve unresolved references rather than dropping them.
@@ -77,8 +77,11 @@ Import MUST surface that collection to the GM in a readable report.
 Copy-mode import MUST rebind record-container identifiers: the system identifier, realm identifiers, and environment record identifiers.
 Copy-mode import MUST regenerate component identifiers in addition to the record-container identifiers, and MUST atomically remap every within-payload reference to a regenerated component id.
 The remapped references are: recipe ingredient-option and result component refs including the `systemItemId` alias, the recursive `alternatives[]` refs, and the legacy flat `ingredients`/`results` aliases; `tool.componentId` in both the system and gathering-library tool slices; tool `onBreak.replacementComponentId`; essence `sourceComponentId`/`associatedSystemItemId`; component salvage result refs; gathering task/event drop-row `componentId`; and legacy `catalysts[]` component refs when present in a legacy or hand-edited payload.
-The remap MUST be key-aware: a value at a non-reference position that coincidentally equals a component id (a `recipeIds[]` entry, an outcome or salvage-group id, a scene or macro UUID) MUST NOT be rewritten.
-After the transform, no within-payload reference may point at a pre-regeneration or absent component id.
+Copy-mode import MUST also regenerate recipe identifiers, and MUST atomically remap every within-payload recipe-book membership reference (`recipeItemDefinitions[].recipeIds` entries) to the regenerated recipe id, so a copy's books resolve to the copy's recipes.
+The remap MUST be key-aware and per id class: a value at a non-reference position that coincidentally equals an id MUST NOT be rewritten by that class's remap.
+A `recipeIds[]` entry is protected from the component-id remap but IS rewritten by the recipe-id remap; an outcome or salvage-group id, or a scene or macro UUID, is rewritten by no remap.
+A membership entry naming a recipe id absent from the payload MUST be preserved verbatim and reported as a broken internal reference.
+After the transform, no within-payload reference may point at a pre-regeneration or absent component id, and no `recipeIds[]` membership entry may point at a pre-regeneration recipe id.
 Copy-mode import MUST preserve task, event, character-modifier, recipe-item-definition, and salvage-group identifiers so environment-to-library linkages and routing survive.
 Keep-mode import MUST NOT regenerate component identifiers or any reference.
 
