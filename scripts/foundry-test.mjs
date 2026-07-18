@@ -81,11 +81,15 @@ async function main() {
   }
 
   // Step 2: Run the smoke test (capture result, always proceed to down).
-  // The run phase gets its own wall-clock budget so the 20-minute GitHub
+  // The run phase gets its own wall-clock budget so the 25-minute GitHub
   // Actions job timeout can never preempt Docker teardown + artifact upload.
-  // Override with FOUNDRY_RUN_TIMEOUT_MS; defaults to 15 minutes.
+  // Override with FOUNDRY_RUN_TIMEOUT_MS; defaults to 18 minutes. The default
+  // sits comfortably above the observed rc run duration (~870-930s across all
+  // phases) so ordinary hosted-runner variance no longer trips the watchdog on
+  // an otherwise-passing smoke, while staying well under the job cap so
+  // teardown + upload always run.
   process.stdout.write('=== foundry-test: RUN ===\n');
-  const runTimeoutMs = Number(process.env.FOUNDRY_RUN_TIMEOUT_MS ?? 15 * 60_000);
+  const runTimeoutMs = Number(process.env.FOUNDRY_RUN_TIMEOUT_MS ?? 18 * 60_000);
   const runCode = runScript(run, [], runTimeoutMs);
 
   // Step 3: Tear down regardless of test result

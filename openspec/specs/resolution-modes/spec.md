@@ -381,7 +381,7 @@ Canonical text uses "alchemy (crafting) system"; "discipline" is reserved for pl
 - Includes: component inventory, workbench, and the known-recipes list.
 - Recorded run/attempt **history stays a Journal concern** — the tab has NO history panel and NO active-runs surface.
 Its only local memory is the internal fizzle dead-end set (which is not run history).
-- Excludes: shopping list, recipe browsing, recents, favourites.
+- Excludes: shopping list, recipe browsing, favourites.
 - This is a deliberate narrowing from the earlier "active runs, history" scope.
 
 ### Validation

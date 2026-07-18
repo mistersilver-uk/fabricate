@@ -1367,10 +1367,6 @@ It is offered only when the rendered order actually **differs** from the authore
 - Session-scoped aggregation of materials needed for queued recipes.
 - Shown only on the Crafting tab.
 
-#### Recents Section
-
-- Recently crafted recipes for quick access.
-
 #### Right Rail (Run Summary or Shopping List)
 
 - The right rail is a single keyed body that shows exactly one of two panels for
@@ -1450,7 +1446,6 @@ Run monitoring remains a Journal concern (see *Journal App*); the tab's internal
 
 - Shopping list
 - Recipe browse list
-- Recents
 - Favourites
 
 ### Alchemy Attempt Feedback
@@ -1885,7 +1880,6 @@ Client settings:
 - `fabricate.managerRailCollapsed`
 - `fabricate.lastAlchemySystem`
 - `fabricate.favouriteRecipes`
-- `fabricate.recentlyCrafted`
 - `fabricate.gatheringHideUnavailableEnvironments`
 
 User settings (per user, per world):

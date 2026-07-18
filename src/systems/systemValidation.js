@@ -352,11 +352,12 @@ function collectSalvageIssues(system, components) {
     issues.push({
       kind: 'salvage',
       entityId: component.id ?? null,
-      entityName: trimmed(component.name) || component.id || 'component',
+      entityName: trimmed(component.name) || 'component',
       severity: 'critical',
       blocks: 'visibility',
       code: 'invalidSalvage',
-      message: errors[0] || `Salvage for "${component.name || component.id}" is invalid.`,
+      message:
+        errors[0] || `Salvage for "${trimmed(component.name) || 'this component'}" is invalid.`,
       nav: { view: 'items' },
     });
   }

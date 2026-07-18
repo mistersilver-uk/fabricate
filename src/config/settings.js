@@ -27,7 +27,6 @@ export const SETTING_KEYS = Object.freeze({
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
-  RECENTLY_CRAFTED: 'recentlyCrafted',
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
@@ -219,13 +218,6 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.FAVOURITE_RECIPES]: {
     name: 'Favourite Recipes',
-    scope: 'client',
-    config: false,
-    type: Array,
-    default: [],
-  },
-  [SETTING_KEYS.RECENTLY_CRAFTED]: {
-    name: 'Recently Crafted Recipes',
     scope: 'client',
     config: false,
     type: Array,

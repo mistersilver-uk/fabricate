@@ -124,7 +124,6 @@ Client (per client/device):
 - `fabricate.managerRailCollapsed`
 - `fabricate.lastAlchemySystem`
 - `fabricate.favouriteRecipes`
-- `fabricate.recentlyCrafted`
 - `fabricate.gatheringHideUnavailableEnvironments`
 
 User (per user, per world):
