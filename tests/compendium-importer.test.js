@@ -687,3 +687,114 @@ test('#492: unresolved component source items fold into unresolvedReferences', a
   assert.equal(sourceItemRefs[0].disposition, 'reported');
   assert.equal(sourceItemRefs[0].referenceValue, 'Compendium.source.items.iron-ore');
 });
+
+// ---------------------------------------------------------------------------
+// #700 — component source-reference field upcast (pre-1.16.0 legacy names)
+// ---------------------------------------------------------------------------
+
+// A component carrying ONLY the pre-1.16.0 field names, mirroring an export
+// produced before issue 560's rename.
+function makeLegacyComponent(overrides = {}) {
+  return {
+    id: 'legacy-comp',
+    name: 'Iron Ore',
+    sourceItemUuid: 'Compendium.source.items.iron-ore',
+    sourceUuid: 'Compendium.source.items.iron-ore',
+    fallbackItemIds: ['Item.legacy-alias-1', 'Item.legacy-alias-2'],
+    ...overrides
+  };
+}
+
+test('#700: a legacy-named component upcasts alias uuids and takes the resolution path', async () => {
+  // Source item resolves exactly, so the component is remapped (method=exact) —
+  // proving the legacy component reached resolution rather than the id-less exit.
+  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? { id: 'found' } : null;
+  globalThis.game = { ...globalThis.game, packs: [], user: { isGM: true } };
+
+  const createdSystems = [];
+  const systemManager = makeMockSystemManager({ createdSystems });
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
+
+  const summary = await importer.importFromPackData(makePackData({
+    recipes: [],
+    system: { id: 'test-system', name: 'Test System', components: [makeLegacyComponent()] }
+  }));
+
+  const comp = createdSystems[0].components[0];
+  // Legacy fallbackItemIds became aliasItemUuids, and fallbackItemIds is gone.
+  assert.deepEqual(comp.aliasItemUuids, ['Item.legacy-alias-1', 'Item.legacy-alias-2'],
+    'aliasItemUuids populated from the legacy fallbackItemIds');
+  assert.ok(!('fallbackItemIds' in comp), 'legacy fallbackItemIds is not persisted (shadowing bug fixed)');
+  assert.ok(!('sourceItemUuid' in comp), 'legacy sourceItemUuid renamed away');
+  assert.ok(!('sourceUuid' in comp), 'legacy sourceUuid renamed away');
+
+  // Resolution + classification ran: the component is counted and reported.
+  assert.equal(summary.components.remapped.length, 1, 'legacy component counted in remapped');
+  assert.equal(summary.components.remapped[0].method, 'exact');
+  assert.equal(summary.components.remapped[0].componentId, 'legacy-comp');
+});
+
+test('#700: an unresolvable legacy source ref yields a SOURCE_ITEM unresolvedReferences entry', async () => {
+  globalThis.fromUuid = async () => null; // source item absent
+  globalThis.game = { ...globalThis.game, packs: [], user: { isGM: true } };
+
+  const createdSystems = [];
+  const systemManager = makeMockSystemManager({ createdSystems });
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
+
+  const summary = await importer.importFromPackData(makePackData({
+    recipes: [],
+    system: { id: 'test-system', name: 'Test System', components: [makeLegacyComponent()] }
+  }));
+
+  // The legacy component is classified as unresolved (not silently omitted).
+  assert.equal(summary.components.unresolved.length, 1, 'legacy component classified as unresolved');
+  assert.equal(summary.components.unresolved[0].componentId, 'legacy-comp');
+  assert.equal(summary.components.unresolved[0].originItemUuid, 'Compendium.source.items.iron-ore');
+
+  // And it surfaces in the unified reference report as a SOURCE_ITEM entry.
+  const sourceItemRefs = summary.unresolvedReferences.filter((r) => r.kind === 'sourceItem');
+  assert.equal(sourceItemRefs.length, 1);
+  assert.equal(sourceItemRefs[0].disposition, 'reported');
+  assert.equal(sourceItemRefs[0].referenceValue, 'Compendium.source.items.iron-ore');
+
+  // The alias uuids survived onto the persisted component (retained, not dropped).
+  const comp = createdSystems[0].components[0];
+  assert.deepEqual(comp.aliasItemUuids, ['Item.legacy-alias-1', 'Item.legacy-alias-2']);
+  assert.ok(!('fallbackItemIds' in comp));
+});
+
+test('#700: new names win when both legacy and renamed source fields are present', async () => {
+  globalThis.fromUuid = async () => null;
+  globalThis.game = { ...globalThis.game, packs: [], user: { isGM: true } };
+
+  const createdSystems = [];
+  const systemManager = makeMockSystemManager({ createdSystems });
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
+
+  await importer.importFromPackData(makePackData({
+    recipes: [],
+    system: {
+      id: 'test-system',
+      name: 'Test System',
+      components: [makeLegacyComponent({
+        // Post-rename fields also present — they must win, legacy discarded.
+        originItemUuid: 'Compendium.new.items.iron-ore',
+        registeredItemUuid: 'Compendium.new.items.iron-ore',
+        aliasItemUuids: ['Item.new-alias']
+      })]
+    }
+  }));
+
+  const comp = createdSystems[0].components[0];
+  assert.equal(comp.originItemUuid, 'Compendium.new.items.iron-ore', 'new originItemUuid wins');
+  assert.equal(comp.registeredItemUuid, 'Compendium.new.items.iron-ore', 'new registeredItemUuid wins');
+  assert.deepEqual(comp.aliasItemUuids, ['Item.new-alias'],
+    'new aliasItemUuids wins, legacy fallbackItemIds discarded');
+  assert.ok(!('fallbackItemIds' in comp));
+  assert.ok(!('sourceItemUuid' in comp));
+  assert.ok(!('sourceUuid' in comp));
+});
