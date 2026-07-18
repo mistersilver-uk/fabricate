@@ -68,6 +68,10 @@
     multiStepEnabled = false,
     onEnterMultiStep = () => {},
     onRevertToSingleStep = () => {},
+    // Whether the system applies time requirements (issue 714). When off, the
+    // single-step Duration card and the per-step duration editor are hidden.
+    // Defaults true so a caller that omits it keeps the pre-gate behaviour.
+    timeRequirementsEnabled = true,
     onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
@@ -279,12 +283,13 @@
   {#if isMultiStep}
     <RecipeStepsCard
       steps={recipe?.steps || []}
+      {timeRequirementsEnabled}
       {onAddStep}
       {onReorderSteps}
       {onUpdateStep}
       {onDeleteStep}
     />
-  {:else}
+  {:else if timeRequirementsEnabled}
     <section class="manager-recipe-duration-card" data-recipe-section="duration">
       <div class="manager-recipe-duration-card-head">
         <div>

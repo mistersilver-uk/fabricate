@@ -563,6 +563,10 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes("store.toggleRequirement?.('currency', next)"),
       'root should thread onToggleCurrency to store.toggleRequirement'
     );
+    assert.ok(
+      rootSource.includes("store.toggleRequirement?.('time', next)"),
+      'root should thread onToggleTime to store.toggleRequirement (issue 714)'
+    );
     for (const snippet of [
       'class="manager-systems-table"',
       'manager-system-row',

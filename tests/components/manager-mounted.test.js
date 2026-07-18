@@ -12348,6 +12348,40 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('renders the time-requirements feature toggle in Optional features and routes its change (issue 714)', async () => {
+    const { calls } = await mountCurrencyEditor({
+      selectedCurrency: {
+        enabled: false,
+        spendStrategy: 'actorProperty',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [],
+      },
+    });
+
+    const tile = target.querySelector('[data-feature-key="time"]');
+    assert.ok(tile, 'time toggle tile should render in Optional features');
+    const toggle = tile.querySelector('[data-system-time-toggle]');
+    assert.ok(toggle, 'time toggle button should render');
+    // Time requirements default ON, so an absent flag reads as enabled.
+    assert.equal(
+      toggle.getAttribute('aria-pressed'),
+      'true',
+      'toggle reflects default-on time requirements'
+    );
+    assert.ok(tile.querySelector('small'), 'time tile should include a hint');
+
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(
+        (call) => call[0] === 'toggleRequirement' && call[1] === 'time' && call[2] === false
+      ),
+      'clicking the on toggle should disable time requirements through toggleRequirement'
+    );
+  });
+
   it('hides the Currency Units card when currency is disabled and shows it when enabled', async () => {
     await mountCurrencyEditor({
       selectedCurrency: {

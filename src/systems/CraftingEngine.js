@@ -336,7 +336,7 @@ export class CraftingEngine {
       // check and create results. Instant (0-second) timed steps and non-timed
       // steps fall through to the normal consume-at-finish path below unchanged.
       const timeGateSeconds =
-        runManager && run && step.timeRequirement
+        runManager && run && step.timeRequirement && this._timeRequirementsEnabled(recipe)
           ? runManager.durationToSeconds(step.timeRequirement)
           : 0;
       if (timeGateSeconds > 0) {
@@ -3201,6 +3201,19 @@ export class CraftingEngine {
   _getRecipeSystem(recipe) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     return systemManager?.getSystem(recipe?.craftingSystemId) ?? null;
+  }
+
+  /**
+   * Whether the recipe's system applies time requirements. The GM toggle
+   * `system.requirements.time.enabled` gates whether a step's `timeRequirement`
+   * arms a timed run; when off, timed steps resolve immediately (as they did
+   * before the toggle existed for any recipe without a duration). Defaults ON so
+   * an absent flag preserves the pre-toggle behaviour of existing timed recipes —
+   * only an explicit `false` disables gating.
+   * @private
+   */
+  _timeRequirementsEnabled(recipe) {
+    return this._getRecipeSystem(recipe)?.requirements?.time?.enabled !== false;
   }
 
   /**

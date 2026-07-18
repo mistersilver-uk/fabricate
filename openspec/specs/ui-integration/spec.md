@@ -262,7 +262,8 @@ so the confirmation copy is salvage-accurate and not the recipe-deletion warning
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
 - Effect transfer toggle (`features.effectTransfer`)
-- Time requirements toggle (`requirements.time.enabled`)
+- Time requirements toggle (`requirements.time.enabled`): GM toggle, default on — an absent key defaults true, a present key must be exactly `false` to disable.
+It renders as a tile in the System Settings Optional features section (beside the currency toggle) and gates the recipe Duration surfaces (the single-step Duration card and the per-step duration editor) and the application of recipe/step durations at craft time.
 - Currency requirements toggle (`requirements.currency.enabled`)
 - Currency unit profile editor (`requirements.currency.units[]`)
 - Multi-step recipes toggle (`features.multiStepRecipes`)
@@ -301,7 +302,10 @@ Condition types are `rollTotal`, `progressiveValue` (progressive editors only), 
 
 #### Requirements Controls
 
-- Time toggle
+- Time toggle in the Optional features section, bound to `requirements.time.enabled` (default on).
+It renders always (like the currency toggle).
+When time requirements are enabled the recipe Duration card (single-step) and the per-step duration editor are authorable and their durations apply at craft time; when disabled, both editors are hidden and a step's `timeRequirement` no longer arms a timed run (the craft resolves immediately).
+Existing authored durations are preserved while the toggle is off (they render as read-only chips where a step summary is shown) and re-apply when it is turned back on.
 - Currency toggle in the Optional features section, bound to `requirements.currency.enabled`.
 It renders always (independent of which optional feature flags exist on the system), so the section is never empty.
 - Currency units card under character modifiers, rendered only when `requirements.currency.enabled === true`.
@@ -980,7 +984,7 @@ A "Manage presets" link routes to the system's Checks screen.
 Per step controls:
 
 - Step name and description
-- Time requirement (when enabled)
+- Time requirement — the inline per-step duration editor renders only when the system's time requirements are enabled (`requirements.time.enabled`, default on); when disabled the step shows a read-only duration chip instead of the editor
 - Currency requirement (when enabled)
 - Ingredient set editor
 

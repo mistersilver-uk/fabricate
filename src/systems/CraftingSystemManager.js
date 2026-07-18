@@ -945,7 +945,12 @@ export class CraftingSystemManager {
     const currency = requirements?.currency || {};
     return {
       time: {
-        enabled: time.enabled === true,
+        // Default ON for backward compatibility, mirroring the `features.salvage`
+        // convention: recipes authored before this GM toggle existed carry
+        // `timeRequirement` / step-duration configs that already run, so an absent
+        // flag must keep them applying and their editors available. Only an explicit
+        // `false` (a deliberate GM opt-out) disables time requirements.
+        enabled: time.enabled !== false,
       },
       currency: this._normalizeCurrencyConfig(currency),
     };

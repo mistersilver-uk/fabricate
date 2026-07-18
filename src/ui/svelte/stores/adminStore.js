@@ -2247,7 +2247,7 @@ function _buildSelectedSystemViewData(
     characterPrerequisites: normalizeCharacterPrerequisiteList(selectedSystem.characterPrerequisites),
 
     requirements: selectedSystem.requirements || {
-      time: { enabled: false },
+      time: { enabled: true },
       currency: { enabled: false, units: [] },
     },
 
@@ -5873,7 +5873,7 @@ export function createAdminStore(services) {
     const requirements = JSON.parse(
       JSON.stringify(
         system.requirements || {
-          time: { enabled: false },
+          time: { enabled: true },
           currency: { enabled: false, units: [] },
         }
       )
@@ -7281,7 +7281,7 @@ export function createAdminStore(services) {
     const requirements = JSON.parse(
       JSON.stringify(
         system.requirements || {
-          time: { enabled: false },
+          time: { enabled: true },
           currency: { enabled: false, units: [] },
         }
       )
