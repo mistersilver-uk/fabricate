@@ -242,7 +242,7 @@ GatheringRealm = {
   secret: boolean,    // default false
   biomes: string[],   // terrain/ecology traits from the system biome vocabulary
   sort?: number,
-  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; reserved for Phase 3 Scene Region automation
+  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; authored via the Travel route's Map Region Links tab, applied at runtime by live sensing
   modifiers?: GatheringRealmModifier[],         // reserved for Phase 4 realm modifiers
 }
 ```
@@ -256,7 +256,8 @@ GatheringRealm = {
 5. Secret realms may affect runtime availability, but their identity must not be disclosed to a non-GM viewer until the selected actor has discovered the realm or `GatheringRealmSettings.revealMode === "alwaysVisible"`.
 6. Disabled realms must not satisfy environment availability for non-GM users, except when a GM manual override explicitly includes a disabled realm for diagnostic/preview purposes.
 7. Stale realm ids in environments, party overrides, or discovery flags are ignored at runtime and surfaced to GMs as repair evidence.
-8. `sceneMappings` and `modifiers` normalize, validate (unique ids, known enums, finite values), and round-trip, but are **not yet applied at runtime** — Scene Region resolution (Phase 3) and modifier application (Phase 4) are not shipped.
+8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via the Travel route's Map Region Links tab (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by live token-derived sensing (Phase 3, shipped).
+`modifiers` normalize, validate, and round-trip but are **not yet applied at runtime** — realm modifier application (Phase 4) is not shipped.
 The `sceneMappings[].sceneRegionUuid`/`sceneUuid` fields name Foundry `RegionDocument` objects and are **not** renamed.
 
 ### Gathering Realm Settings
@@ -325,12 +326,13 @@ Canonical source tokens: `manualOverride`, `travelActor`, `unresolved` (player-f
 1. A GM manual override (`currentRealmOverrides[systemId].mode === "manual"`) is authoritative and resolves to `manualOverride`.
 A manual override that explicitly includes a *disabled* realm id still resolves that realm (GM diagnostic/preview inclusion).
 Realm ids referencing *missing* realms become `staleRealmIds` and do not resolve.
-2. `mode: "none"`, an absent override, or a disabled / travel-actor-less party resolves to `unresolved` (no current realm).
-There is no token-derived fallback in Phase 1.
-3. The `travelActor` source token is reserved for Phase 3 token-derived Scene Region sensing, which slots between the override and unresolved branches without changing the resolver contract.
-Until then it is surfaced to the GM as "automation not yet available".
+2. When no manual override resolves, resolution falls through to **live token-derived sensing**: `senseSceneRegions` is called over the party's travel-actor tokens and matched against each realm's `sceneMappings[].sceneRegionUuid`, resolving to `source: 'travelActor'` with no stored state (`GatheringLocationService.resolveCurrentRealms`).
+3. `mode: "none"`, an absent override, or a disabled / travel-actor-less party where sensing yields no match resolves to `unresolved` (no current realm).
+The `travelActor` source token slots between the override and unresolved branches without changing the resolver contract.
 4. Clearing an override is a stamped mutation: it sets `mode: "none"`, empties `realmIds`, and updates `updatedAt`/`updatedByUserId`.
 5. Changing current realm refreshes gathering listings but must not retroactively rewrite completed gathering history.
+6. The live `senseSceneRegions` collaborator is injected into `GatheringLocationService` in `src/main.js`; the runtime implementation prefers V13 `TokenDocument#regions` membership with a position hit-test fallback.
+The service itself stays Foundry-free, defaulting the collaborator to `() => []`.
 
 ### Environment Location Availability
 

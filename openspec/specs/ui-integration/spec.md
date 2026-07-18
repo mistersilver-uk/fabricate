@@ -777,7 +777,8 @@ Assigning a travel actor already used by another enabled party, or an actor alre
 - Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-realm evidence per source state, member/travel-actor summary, stale references).
 Override editing exists in exactly one place (center).
 - The current-realm evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
-The `Travel actor` source is presented as "automation not yet available" rather than hidden, so the model is complete before Phase 3.
+The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from token-derived sensing (Phase 3, shipped).
+- The Travel route presents a third **Map Region Links** tab (`GatheringTravelTabs.svelte`) that lists the Scene Regions on the active scene (`GatheringMapLinksTab.svelte`) with a per-region realm picker (`MapRegionLinkPicker.svelte`) linking each scene region to at most one realm (single-valued per scene region, written by `adminStore.setMapRegionLink`).
 - Each stale member / travel-actor / override-realm reference gets a remove/clear action; "repair" means removing the stale reference and re-assigning through the normal pickers.
 - The route embeds the canonical **realm authoring surface** using a realm list + detail layout: the list creates/selects/deletes realms; the detail pane edits the selected realm's name, description, image, enabled, secret, and biomes (chosen from the system biome vocabulary).
 Edits merge-patch over the existing record so unedited fields (sort, sceneMappings, modifiers) round-trip untouched.
@@ -787,7 +788,7 @@ The legacy environments-browser "Region" filter has been removed.
 - Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern.
 Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
 
-Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): realm discovery controls, and the player-facing travel/current-realm view. (Realm authoring — name/description/img/secret/biomes — and the environment realm-membership control now ship inside the Travel route and environment editor; the legacy realm ordering/sceneMappings/modifiers authoring remains reserved.)
+Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): realm discovery controls, and the player-facing travel/current-realm view. (Realm authoring — name/description/img/secret/biomes — and the environment realm-membership control now ship inside the Travel route and environment editor; `sceneMappings` authoring now ships via the Map Region Links tab; only the legacy realm ordering and Phase 4 `modifiers` authoring remain reserved.)
 
 ### Gathering Event Library
 
@@ -1614,7 +1615,7 @@ When location-aware gathering is enabled, the player Gathering app shows current
 - Show the current realm name(s) when the selected actor is allowed to know them.
 Show "Undiscovered realm" style placeholders for secret current realms the selected actor has not discovered.
 - Show the current-realm evidence source using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
-While Scene Region automation is unimplemented, the `Travel actor` source is presented as "automation not yet available" rather than hidden.
+A player's current realm may resolve live from travel-actor sensing (`source: 'travelActor'`, Phase 3, shipped) as well as from a manual override.
 - If the actor is not in a party, show a concise no-party location state that still does not block non-location-gated environments.
 - Current-realm display must fit narrow Foundry ApplicationV2 layouts without overlapping actor/stamina controls, and current-realm chips must wrap within the app container without forcing horizontal scrolling.
 
