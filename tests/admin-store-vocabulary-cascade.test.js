@@ -30,14 +30,14 @@ function createServices() {
       { id: 'c2', name: 'Sage', category: 'general', tags: ['herb'] },
     ],
   };
-  const makeRecipe = (id, category) => ({
+  const makeRecipe = (id, category, ingredientSets = []) => ({
     id,
     name: id,
     img: 'icons/svg/item-bag.svg',
     description: '',
     category,
     steps: [],
-    ingredientSets: [],
+    ingredientSets,
     resultGroups: [],
     toJSON() {
       return {
@@ -45,12 +45,20 @@ function createServices() {
         name: id,
         category,
         steps: [],
-        ingredientSets: [],
+        ingredientSets,
         resultGroups: [],
       };
     },
   });
-  const recipes = [makeRecipe('r1', 'Potions'), makeRecipe('r2', 'general')];
+  // r3 filters an ingredient on the `ore` tag, so deleting `ore` must rewrite it,
+  // not just the components that carry the tag.
+  const recipes = [
+    makeRecipe('r1', 'Potions'),
+    makeRecipe('r2', 'general'),
+    makeRecipe('r3', 'general', [
+      { ingredientGroups: [{ options: [{ match: { type: 'tags', tags: ['ore'] } }] }] },
+    ]),
+  ];
   const itemWrites = [];
   const recipeWrites = [];
   const systemManager = {
@@ -140,10 +148,18 @@ describe('adminStore vocabulary cascade + icons (issue 689)', () => {
     assert.equal(services._system.componentCategoryIcons.reagent, undefined);
   });
 
-  it('strips a deleted tag from every component carrying it', async () => {
+  it('strips a deleted tag from every component and every recipe placeholder', async () => {
     const { store, services } = await storeFor();
     await store.removeTag('ore');
     assert.deepEqual(services._itemWrites, [['c1', { tags: ['metal'] }]]);
+    // The recipe tag-placeholder that filtered on `ore` is rewritten too, so no
+    // recipe is left naming a tag the vocabulary no longer holds.
+    assert.deepEqual(services._recipeWrites, [
+      [
+        'r3',
+        { ingredientSets: [{ ingredientGroups: [{ options: [{ match: { type: 'tags', tags: [] } }] }] }] },
+      ],
+    ]);
     assert.deepEqual(services._system.itemTags, ['herb']);
   });
 });

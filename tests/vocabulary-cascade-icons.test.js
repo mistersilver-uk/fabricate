@@ -12,6 +12,7 @@ import {
   planRecipeCategoryReassignments,
   planComponentCategoryReassignments,
   planTagRemovals,
+  planRecipeTagRemovals,
 } from '../src/utils/vocabularyCascade.js';
 import { buildVocabularyUsage, countRecipeTagPlaceholders } from '../src/utils/vocabularyUsage.js';
 
@@ -87,6 +88,63 @@ describe('vocabularyCascade (issue 689)', () => {
       { id: 'c1', tags: ['herb'] },
       { id: 'c3', tags: ['moon'] },
     ]);
+  });
+
+  it('strips a deleted tag from recipe tag-placeholder ingredients, grouped and legacy shapes', () => {
+    const recipes = [
+      {
+        id: 'r1',
+        ingredientSets: [
+          {
+            ingredientGroups: [
+              { options: [{ match: { type: 'tags', tags: ['herb', 'ore'], tagMatch: 'any' } }] },
+              { options: [{ match: { type: 'component', componentId: 'c1' } }] },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'r2',
+        steps: [
+          { ingredientSets: [{ ingredients: [{ match: { type: 'tags', tags: ['ORE'] } }] }] },
+        ],
+      },
+      // No placeholder names the tag, so it is never patched.
+      { id: 'r3', ingredientSets: [{ ingredientGroups: [{ options: [] }] }] },
+    ];
+    assert.deepEqual(planRecipeTagRemovals(recipes, 'ore'), [
+      {
+        id: 'r1',
+        updates: {
+          ingredientSets: [
+            {
+              ingredientGroups: [
+                { options: [{ match: { type: 'tags', tags: ['herb'], tagMatch: 'any' } }] },
+                { options: [{ match: { type: 'component', componentId: 'c1' } }] },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'r2',
+        updates: {
+          steps: [{ ingredientSets: [{ ingredients: [{ match: { type: 'tags', tags: [] } }] }] }],
+        },
+      },
+    ]);
+  });
+
+  it('leaves an emptied placeholder with an empty tags array, never the deleted tag', () => {
+    const recipes = [
+      { id: 'r1', ingredientSets: [{ ingredientGroups: [{ options: [{ match: { type: 'tags', tags: ['ore'] } }] }] }] },
+    ];
+    const [patch] = planRecipeTagRemovals(recipes, 'ore');
+    assert.deepEqual(patch.updates.ingredientSets[0].ingredientGroups[0].options[0].match.tags, []);
+  });
+
+  it('returns no recipe patch for the empty tag name', () => {
+    assert.deepEqual(planRecipeTagRemovals([{ id: 'r1', ingredientSets: [] }], ''), []);
   });
 });
 
