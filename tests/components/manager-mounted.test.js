@@ -328,8 +328,9 @@ function compileManagerRoot() {
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',
     'src/gatheringImageDefaults.js',
-    // CraftingSystemManagerRoot seeds a routing provider when a recipe enters
-    // Complex mode, reusing chooseSeedProvider from this pure migration module.
+    // adminStore imports classifyModeChange from this pure migration module to
+    // dry-run migrate/delete counts before a resolution-mode change; copy it so the
+    // mounted import resolves.
     'src/migration/migrateRecipeForModeChange.js',
     // RecipeValidationTab localizes a signature-collision blocker row via this pure
     // leaf (issue 549); copy it so the mounted import resolves.

@@ -1,9 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   FabricateAppRoot is the shell for the unified Fabricate window. It renders a
-  full-height left navigation with four tabs (Crafting, Gathering, Journal,
-  Inventory). Tab content is an empty placeholder for now — this is the
-  structural shell consumer surfaces will be built into.
+  full-height left navigation and the active tab's implemented consumer surface:
+  Crafting, Gathering, Journal, Inventory, and the conditional Alchemy tab (five
+  tabs when Alchemy is available, four otherwise).
 
   The active tab is owned by the host application (SvelteFabricateApp); nav
   clicks call `onSelectTab` and the host pushes the new tab back down via

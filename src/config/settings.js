@@ -196,13 +196,15 @@ const BASE_DEFINITIONS = Object.freeze({
     // document write that can reject, not a synchronous localStorage write.
     //
     // The flip needed no data migration, and the reason is NOT "nothing reads it" —
-    // that would not imply absence. The real reason: NO WRITER HAS EVER EXISTED. The
-    // only `setSetting` call for this key lives in `cleanupStalePreferences`, which
-    // fires only when `changed` is true, which requires entries nothing creates; the map
-    // has permanently been its `{}` default. Foundry also has no scope-migration
-    // facility (`ClientSettings#get` dispatches on scope at read time), so any
-    // pre-existing localStorage key is orphaned in place — never read, never deleted,
-    // never an error.
+    // that would not imply absence. The real reason: NO WRITER EXISTED before this
+    // change introduced one. The scope flip and the first real writer,
+    // `setProgressiveResultOrder`, landed in the same commit, so no stored value
+    // predated it: until then the only `setSetting` call for this key lived in
+    // `cleanupStalePreferences`, which fires only when `changed` is true, which
+    // required entries nothing created, so the map stayed its `{}` default. Foundry
+    // also has no scope-migration facility (`ClientSettings#get` dispatches on scope
+    // at read time), so any pre-existing localStorage key is orphaned in place —
+    // never read, never deleted, never an error.
     scope: 'user',
     config: false,
     type: Object,

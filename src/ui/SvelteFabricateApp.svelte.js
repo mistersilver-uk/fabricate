@@ -31,8 +31,10 @@ function normalizeInteractableRef(ref) {
 
 /**
  * The unified Fabricate window: a single shared application with a full-height
- * left navigation (Crafting, Gathering, Journal, Inventory). Tab content is an
- * empty placeholder shell for now.
+ * left navigation (Crafting, Gathering, Journal, Inventory, and the conditional
+ * Alchemy tab). Each tab renders its implemented consumer surface; this class owns
+ * the active tab and wires the crafting, inventory, salvage, alchemy, and gathering
+ * service seams the tab views call.
  *
  * The Alchemy tab is conditional: it appears only when an enabled alchemy
  * crafting system has at least one recipe (see {@link isAlchemyTabAvailable}),
