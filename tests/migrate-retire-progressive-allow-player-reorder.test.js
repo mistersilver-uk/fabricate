@@ -122,13 +122,15 @@ test('the runner applies 1.18.0 and bumps the migration version', async () => {
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.18.0');
+  // Lands at the current highest (1.19.0, the time-requirement default-on backfill runs
+  // after 1.18.0 in the same pass); it is a no-op on this fixture, so the strip still holds.
+  assert.equal(store.get('migrationVersion'), '1.19.0');
   assert.ok(!('allowPlayerReorder' in store.get('craftingSystems')[0].craftingCheck.progressive));
 });
 
-test('1.18.0 is version-gated — it does not re-run once the version is already 1.18.0', async () => {
+test('1.18.0 is version-gated — it does not re-run once the version is already at the latest', async () => {
   const store = new Map([
-    ['migrationVersion', '1.18.0'],
+    ['migrationVersion', '1.19.0'],
     ['craftingSystems', [{ id: 'sys', craftingCheck: { progressive: { allowPlayerReorder: true } } }]],
   ]);
   const runner = new MigrationRunner({

@@ -949,7 +949,10 @@ export class CraftingSystemManager {
         // convention: recipes authored before this GM toggle existed carry
         // `timeRequirement` / step-duration configs that already run, so an absent
         // flag must keep them applying and their editors available. Only an explicit
-        // `false` (a deliberate GM opt-out) disables time requirements.
+        // `false` (a deliberate GM opt-out) disables time requirements. The pre-toggle
+        // normalizer coerced an absent flag to a PERSISTED `false`, so upgraded worlds
+        // are re-defaulted on once by the 1.19.0 `migrateDefaultOnTimeRequirements`
+        // migration (which deletes that stored `false`) — not here on read.
         enabled: time.enabled !== false,
       },
       currency: this._normalizeCurrencyConfig(currency),
