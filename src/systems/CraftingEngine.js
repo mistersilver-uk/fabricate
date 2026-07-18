@@ -3863,12 +3863,18 @@ export class CraftingEngine {
     // roll formula) is a GM-side system gap, not a rolled failure: abort with ZERO
     // mutation so the component is never consumed and no tools are broken. The
     // failure-consumption policy below applies only to genuine rolled failures.
+    // Discard a run created by THIS call so a misconfigured abort leaves no orphaned
+    // `inProgress` run — parity with the cancelled branch below and `craft()`'s
+    // phantom-discard. A reused pre-existing run is left untouched.
     if (checkResult.misconfigured) {
+      if (salvageRunManager && salvageRun && salvageRunCreatedThisCall) {
+        await salvageRunManager.discardRun(actor, salvageRun.id);
+      }
       return {
         success: false,
         results: null,
         message: checkResult.message,
-        salvageRun,
+        salvageRun: salvageRunCreatedThisCall ? null : salvageRun,
       };
     }
 
