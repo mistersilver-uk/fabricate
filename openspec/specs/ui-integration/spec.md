@@ -24,7 +24,7 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
-- Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, for future experimental feature gates.
+- Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, gating experimental surfaces still in development (currently the recipe-graph placeholder).
 It defaults to disabled.
 - Fabricate exposes a per-client module setting, `fabricate.interactionPromptPosition`, for the on-screen anchor of the region-entry interaction prompt toast.
 It offers the four screen corners and four edge-centers and defaults to `bottom-center` (the prompt's historical position).
