@@ -148,7 +148,7 @@ jobs:
           import { readFile, appendFile } from 'node:fs/promises';
           import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
           import { deriveS3Layout, resolveChannelConfig } from './scripts/release-s3.js';
-          import { foundryIsNewerVersion } from './scripts/lib/semver.js';
+          import { evaluateRegistryLeadTarget } from './scripts/lib/promoteGuards.js';
 
           const version = process.env.VERSION;
           const sourceChannel = process.env.SOURCE_CHANNEL;
@@ -217,27 +217,32 @@ jobs:
             console.log(`source target ${target.label} advertises v${version} ✓`);
           }
 
-          // 3. REGISTRY-LEAD read: no private target of beta OR early-access may be left Foundry-older
-          //    than the version about to reach the registry. Such a head would be offered a rewrite
-          //    out of its private channel once v${version} is on the registry — a silent, irreversible
-          //    cohort defection. This HARD-FAILS for EVERY case (release-line AND hotfix, beta AND
-          //    early-access) before the POST. There is NO catch-up: publishing a stable version onto a
-          //    private channel would level that head with the registry and discard the fail-safe
-          //    property that a prerelease head always sorts ABOVE its own GA — the cohort would then
-          //    defect on the NEXT public version. The normal flow never trips this, because beta sits
-          //    at a "${version}-beta.N" (or higher) head and foundryIsNewerVersion(version, that) is
-          //    false. A hit is therefore a genuine anomaly — a stale head from a failed publish, or an
-          //    abandoned old beta — exactly when a human should stop and look.
+          // 3. REGISTRY-LEAD read: no private target of beta OR early-access that RETAINS a cohort may
+          //    be left in a state Foundry would resolve as a defection once v${version} reaches the
+          //    registry. Two states qualify, both delegated per target to evaluateRegistryLeadTarget:
+          //    a head Foundry considers OLDER than v${version} (a backwards head), and an ABSENT head
+          //    (a 404 manifest URL) on a cohort-retaining NON-SOURCE target — the spec's own 404 half,
+          //    enforced as "a verification performed by the promotion, never an assumption". A
+          //    source-channel target's absent head is left to the source-advertises check (step 2). This
+          //    HARD-FAILS for EVERY qualifying case (release-line AND hotfix, beta AND early-access)
+          //    before the POST. There is NO catch-up: publishing a stable version onto a private channel
+          //    would level that head with the registry and discard the fail-safe property that a
+          //    prerelease head always sorts ABOVE its own GA — the cohort would then defect on the NEXT
+          //    public version. The normal flow never trips this, because beta sits at a "${version}-beta.N"
+          //    (or higher) head. A hit is therefore a genuine anomaly — a stale head from a failed
+          //    publish, or an abandoned old beta — exactly when a human should stop and look.
           for (const channel of ['beta', 'early-access']) {
             for (const target of targetsFor(channel)) {
               const head = await readHead(target.manifestKey, target.label);
-              if (head === null) continue; // an absent private head advertises nothing older.
-              if (!foundryIsNewerVersion(version, head)) continue; // head is equal-or-newer: safe.
-              if (channel === 'beta') {
-                fail(`registry-lead: beta target ${target.label} advertises v${head}, older than the v${version} being promoted to public. Foundry would defect that cohort. Advance beta first — push the feature work to main so beta.yml mints a newer beta (whose prerelease head sorts above v${version}) — then re-run this promotion.`);
-              } else {
-                fail(`registry-lead: early-access target ${target.label} advertises v${head}, older than the v${version} being promoted to public. Foundry would defect that cohort. Advance early-access first (promote a newer version onto it) — then re-run this promotion.`);
-              }
+              const verdict = evaluateRegistryLeadTarget({
+                channel,
+                sourceChannel,
+                label: target.label,
+                head,
+                version,
+              });
+              if (verdict.decision === 'refuse') fail(verdict.reason);
+              console.log(`registry-lead: ${verdict.reason}`);
             }
           }
 
@@ -492,6 +497,51 @@ jobs:
             fi
           done
           echo "Both required assets are present."
+
+      - name: Assert a hotfix does not raise the declared minimum Foundry version
+        # Spec (Release and Distribution §Hotfix isolation): "A hotfix MUST NOT raise the module's
+        # declared minimum Foundry version" — Foundry refuses to install a package whose minimum
+        # exceeds the running core version, stranding exactly the users the hotfix is for. Only the
+        # hotfix path is constrained; a release-line promotion MAY raise it, so this step runs only when
+        # the guard reported is_hotfix. NOT mutating — runs on a dry run too, before the un-draft. It
+        # compares the promoted artefact's compatibility.minimum against the CURRENT PUBLIC release's
+        # (prev_public), using Foundry's own comparator on core GENERATION values — never SemVer, never
+        # the module version.
+        if: ${{ needs.guard.outputs.is_hotfix == 'true' }}
+        env:
+          VERSION: ${{ inputs.version }}
+          PREV_PUBLIC: ${{ needs.guard.outputs.prev_public }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "${PREV_PUBLIC:-}" ]; then
+            echo "::error::hotfix v$VERSION reports no current public version (prev_public) to compare against — the minimum-version prohibition cannot be verified. Refusing to promote."
+            exit 1
+          fi
+          # The prev_public release is public, so its module.json asset is readable; download it to a
+          # SEPARATE dir so it never shadows the promoted artefact's own module.json.
+          gh release download "v$PREV_PUBLIC" --pattern module.json --dir /tmp/promote-prev --clobber
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { assertHotfixMinimumNotRaised } from './scripts/lib/promoteGuards.js';
+
+          const version = process.env.VERSION;
+          const previousVersion = process.env.PREV_PUBLIC;
+          const promoted = JSON.parse(await readFile('/tmp/promote/module.json', 'utf8'));
+          const previous = JSON.parse(await readFile('/tmp/promote-prev/module.json', 'utf8'));
+
+          const verdict = assertHotfixMinimumNotRaised({
+            isHotfix: true,
+            version,
+            promotedMinimum: promoted?.compatibility?.minimum,
+            previousVersion,
+            previousMinimum: previous?.compatibility?.minimum,
+          });
+          if (!verdict.ok) {
+            console.error(`::error::${verdict.error}`);
+            process.exit(1);
+          }
+          console.log(verdict.reason);
+          NODE
 
       - name: Aggregate superseded drafts' notes into this release's body
         # BOUNDED predicate: only STABLE drafts, STRICTLY between the current public version and the
