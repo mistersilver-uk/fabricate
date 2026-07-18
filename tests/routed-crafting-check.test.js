@@ -271,6 +271,47 @@ test('evaluateCheckBreakage: an engine routed breakTools tier DOES force breakag
   assert.equal(evaluateCheckBreakage({ checkResult: r }).forceBreak, true);
 });
 
+// ── Recipe minimum-success-tier gate: routedByCheck-only (issue 725) ──────────
+// The gate is scoped to `routedByCheck`. Alchemy `checkMode: tiered` runs through the
+// SAME `_runRoutedCheck`, but the dispatch forces `minOutcomeId: null`, so a carried
+// (unclearable) `minSuccessOutcomeId` is inert on an alchemy brew.
+
+const MIN_GATE_FIXED = [
+  { id: 'f-lo', name: 'Low', success: true, breakTools: false, start: 1, end: 10 },
+  { id: 'f-hi', name: 'High', success: true, breakTools: false, start: 11, end: 20 },
+];
+
+test('routedByCheck: a recipe minSuccessOutcomeId still gates below the required tier', async () => {
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ type: 'fixed', fixedOutcomes: MIN_GATE_FIXED }),
+  });
+  // 5 lands in Low [1,10]; the recipe demands High (start 11) → below the minimum.
+  stubRoll(5, [{ number: 1, faces: 20, total: 5 }]);
+  const r = await runRoutedCheck(engine, {
+    craftingSystemId: 'sys-1',
+    minSuccessOutcomeId: 'f-hi',
+  });
+  assert.equal(r.success, false, 'a roll below the required minimum tier fails outright');
+  assert.equal(r.outcome, null, 'the matched tier is dropped so nothing routes');
+});
+
+test('alchemy tiered: a persisted minSuccessOutcomeId has NO runtime effect', async () => {
+  const { engine, system } = makeRoutedEngine({
+    resolutionMode: 'alchemy',
+    routed: defaultRouted({ type: 'fixed', fixedOutcomes: MIN_GATE_FIXED }),
+  });
+  system.alchemy = { checkMode: 'tiered' };
+  // The SAME below-minimum roll: on an alchemy brew the carried id is ignored, so the
+  // naturally-matched Low tier stands and the brew succeeds.
+  stubRoll(5, [{ number: 1, faces: 20, total: 5 }]);
+  const r = await runRoutedCheck(engine, {
+    craftingSystemId: 'sys-1',
+    minSuccessOutcomeId: 'f-hi',
+  });
+  assert.equal(r.success, true, 'the carried minimum-tier gate does not apply to alchemy tiered');
+  assert.equal(r.outcome, 'Low', 'the naturally-rolled tier routes unchanged');
+});
+
 // ── Headless ──────────────────────────────────────────────────────────────────
 
 test('no Roll engine does not block the craft and fabricates no route', async () => {
