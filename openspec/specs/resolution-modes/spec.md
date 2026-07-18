@@ -154,8 +154,11 @@ A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit i
 A stale or unknown `minSuccessOutcomeId` no-ops.
 The gate is fixed-type only; relative-type routed checks ignore it.
 It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected.
-Shipped runtime scope: the crafting dispatch threads `minOutcomeId: recipe.minSuccessOutcomeId` for **both** `routedByCheck` and **alchemy `checkMode: tiered`** (which is dispatched to the same `_runRoutedCheck` caller), so an alchemy tiered brew is min-tier gated at runtime when the carried id is valid.
-The authoring control, however, auto-hides outside `routedByCheck` (`resolveRecipeFixedOutcomeTierOptions`), so on an alchemy tiered brew the value is live but a GM can neither see nor clear it — a known spec/UI inconsistency (`ui-integration/spec.md` mandates that hiding), pending a follow-up decision (surface the control for alchemy tiered, or pass `minOutcomeId: null` on the alchemy dispatch).
+Runtime scope: the minimum-success-tier gate is `routedByCheck`-only.
+The crafting dispatch threads `minOutcomeId: recipe.minSuccessOutcomeId` on the `routedByCheck` path alone; although **alchemy `checkMode: tiered`** is dispatched to the same `_runRoutedCheck` caller, that dispatch forces `minOutcomeId: null` (`applyMinSuccessOutcome: false`), so a `minSuccessOutcomeId` carried on an alchemy tiered brew — authored before a mode switch, or imported — has NO runtime effect.
+Alchemy tiered brews already gate success through each outcome tier's own `success` flag, so they need no per-recipe minimum.
+This matches the authoring control, which auto-hides outside `routedByCheck` (`resolveRecipeFixedOutcomeTierOptions`): the value the GM cannot see or clear is also the value the runtime ignores.
+A persisted alchemy `minSuccessOutcomeId` is left inert by the dispatch guard rather than migrated away.
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
