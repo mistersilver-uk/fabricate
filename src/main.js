@@ -10,6 +10,7 @@ import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
 import { RunJournalBuilder } from './systems/RunJournalBuilder.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
+import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
@@ -2781,6 +2782,33 @@ async function runInteractableMarkerSync() {
 Hooks.on('updateWorldTime', (worldTime) => {
   void processFabricateWorldTime(worldTime);
 });
+
+// Cross-client run-cache coherence (issues 733 + 739): the run managers cache an
+// actor's runs in memory and never learn about a write another client (or the
+// primary-GM world-time resume) made to the actor's run flags. `updateActor` fires on
+// every client when the synced document lands — key-filtered to the run-container flag
+// paths (updateActor also fires on every HP tick, so the filter is load-bearing) — so
+// we drop the stale cache and the next read reflects the persisted document. Firing on
+// the origin client too is harmless: its next read simply re-reads the live flag.
+Hooks.on('updateActor', (actor, changes) => {
+  invalidateRunCachesForActorUpdate(actor, changes);
+});
+
+function invalidateRunCachesForActorUpdate(actor, changes) {
+  if (!actor?.id) return;
+  const changed = runContainersChanged(changes, foundry.utils.hasProperty);
+  if (changed.length === 0) return;
+  // The crafting/salvage caches are keyed by `actor.id`; the gathering cache is keyed
+  // by the actor uuid (its `actorKey`), so pass each manager the key it stores under.
+  const invalidators = {
+    crafting: () => fabricate.craftingRunManager?.invalidateCache(actor.id),
+    salvage: () => fabricate.salvageRunManager?.invalidateCache(actor.id),
+    gathering: () => fabricate.gatheringRunManager?.invalidateCache(actor.uuid ?? actor.id),
+  };
+  for (const key of changed) {
+    invalidators[key]?.();
+  }
+}
 
 // GM-only scene-control button (Phase 7): adds a Fabricate control group whose
 // single button launches the Interactable browser app. Foundry V13 passes

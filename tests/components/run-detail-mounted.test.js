@@ -66,6 +66,36 @@ describe('RunDetail mounted behavior', () => {
     assert.equal(target.querySelector('[data-step-index="1"]').getAttribute('data-step-state'), 'pending');
   });
 
+  it('titles the requirements card "Step requirements" for a multi-step run', async () => {
+    const target = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
+    const title = target.querySelector('[data-journal-card="step-details"] .journal-card-title');
+    assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.Title', 'multi-step keeps the step title');
+  });
+
+  it('titles the requirements card "Craft requirements" for a single-step run', async () => {
+    const step = {
+      stepId: 's1',
+      stepName: 'Brew',
+      index: 0,
+      status: 'waitingTime',
+      timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
+      detail: { requiredSeconds: 1000, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: null },
+      lastCheckResult: null
+    };
+    const run = makeCraftingRun({
+      multiStep: false,
+      isFinalStep: true,
+      stepLabel: '',
+      steps: [step],
+      currentStep: step,
+      structureLabel: 'Single-Step Recipe'
+    });
+    const target = await harness.mount({ run, now: 0, services: services() });
+    assert.equal(target.querySelector('[data-journal-timeline]'), null, 'single-step run omits the step timeline');
+    const title = target.querySelector('[data-journal-card="step-details"] .journal-card-title');
+    assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.TitleSingleStep', 'single-step uses the craft title');
+  });
+
   it('disables Trigger while the gate is unmatured and enables it once ready', async () => {
     const waiting = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
     assert.equal(waiting.querySelector('[data-journal-trigger]').disabled, true, 'waiting → disabled');

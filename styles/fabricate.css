@@ -1756,6 +1756,25 @@
   min-width: 0;
 }
 
+/* Non-alchemy crafting sub-tab: stack the per-mode editor above the failure
+   consumption policy card (issue 712). Not `manager-checks-page` — the routed test
+   asserts that class is absent once the editor renders. */
+.fabricate-manager .manager-checks-editor-stack {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  min-width: 0;
+}
+
+/* Stacked list of ToggleCards inside a check card (failure consumption policy,
+   alchemy behaviour flags). */
+.fabricate-manager .manager-checks-flag-list {
+  display: grid;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
+  min-width: 0;
+}
+
 .fabricate-manager .manager-checks-card-head {
   display: flex;
   align-items: center;
@@ -8692,6 +8711,22 @@
 .fabricate-manager .manager-recipe-req-tag.is-tag {
   color: var(--fab-purple);
   border-color: var(--fab-purple-soft);
+}
+
+/* A currency requirement authored before the feature was disabled: the flag marks it
+   inert, and its unit/amount render as static muted text (no picker, no stepper). */
+.fabricate-manager .manager-recipe-req-tag.is-disabled {
+  color: var(--fab-text-subtle);
+  border-color: var(--fab-mv2-border);
+  opacity: 0.85;
+}
+
+.fabricate-manager .manager-recipe-currency-unit.is-readonly,
+.fabricate-manager .manager-recipe-option-quantity.is-readonly {
+  display: inline-flex;
+  align-items: center;
+  color: var(--fab-text-subtle);
+  font-variant-numeric: tabular-nums;
 }
 
 .fabricate-manager .manager-recipe-option-controls {

@@ -24,7 +24,7 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
-- Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, for future experimental feature gates.
+- Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, gating experimental surfaces still in development (currently the recipe-graph placeholder).
 It defaults to disabled.
 - Fabricate exposes a per-client module setting, `fabricate.interactionPromptPosition`, for the on-screen anchor of the region-entry interaction prompt toast.
 It offers the four screen corners and four edge-centers and defaults to `bottom-center` (the prompt's historical position).
@@ -148,12 +148,12 @@ An empty or stale persisted selection resolves to the first available crafting s
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders.
 If a route is still planned only, it may remain in the placeholder/deferred-view set.
-- Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`.
-When the setting is disabled, `Recipes` and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route, and the `Crafting` nav group is not shown (there is no `Rules` rail item; the placeholder set is `recipes` + `graph`).
-When the setting is enabled, `Recipes` and `Books & Scrolls` are available as implemented routes for the selected system, nested inside an expandable `Crafting` nav group (see below); `Graph` remains a disabled planned rail item until its v2 route content is implemented.
+- The Manager V2 selected-system `Crafting` nav group (recipes, crafting settings, access, books & scrolls, recipe item editor) is **unconditional**: it renders whenever a crafting system is selected, regardless of `fabricate.experimentalFeatures` (issue 745, the v1.3 headline).
+The only experimental-gated selected-system rail item is `Graph`: it renders as a disabled planned rail item with the `Soon` treatment **only** while `fabricate.experimentalFeatures` is enabled, and cannot become the active route until its v2 route content is implemented (#442).
+There is no `Recipes` placeholder rail item and no `Rules` rail item; the deferred-placeholder set is `graph` alone, shown only under the experimental toggle.
 The top-level `Checks` rail item (hosting the Crafting / Salvage / Gathering / Validation sub-tabs) and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
-When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
-- When `fabricate.experimentalFeatures` is enabled, the selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, and the whole group (parent and every sub-item) is shown only while the setting is enabled.
+When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+- The selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, shown whenever a crafting system is selected.
 The parent row shows an expand/collapse control and the recipe count as its badge.
 Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked open — activating it keeps the submenu expanded rather than collapsing it.
 The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
@@ -163,8 +163,7 @@ Route exit from any Crafting child route runs through the Manager confirm-discar
 - The `Crafting` group's `Settings` sub-route (`crafting-settings`, component `CraftingSettingsView`) is a real system-settings page, not a placeholder.
 It hosts the system-level crafting rules that used to live on the System Overview page: the recipe **resolution mode** card, the salvage **resolution mode** card (only when `features.salvage`), and the **Recipe Visibility** card — a single radio-card selector for the flat `visibilityMode` enum (`global` / `restricted` / `item` / `knowledge`) written through `setVisibilityMode`, paired with a `CraftingEffectPanel` that summarizes what the chosen mode enables.
 The Recipe Visibility control no longer lives on the System Overview page, and it authors the flat `visibilityMode` rather than the legacy `listMode` + `knowledge.mode` pair.
-Because the whole `Crafting` nav group is gated behind `fabricate.experimentalFeatures`, these controls are reachable only while that setting is on.
-This is an accepted consequence: with Experimental Features off, recipe resolution mode and recipe visibility are unreachable.
+Because the `Crafting` nav group is unconditional (issue 745), these controls are reachable for every selected system, independent of `fabricate.experimentalFeatures`.
 Per-recipe-item use and learn caps are NOT on this page — each recipe item's caps are authored in its `recipe-item-edit` tabbed editor (or the quick-limit toggle in the `ItemPageInspector` aside).
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
 Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
@@ -231,7 +230,7 @@ Display list + detail editor for crafting systems.
 - Recipe resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`)
 - Salvage resolution mode
 
-Recipe resolution mode and salvage resolution mode remain system fields, but their editor cards moved to the Crafting group's Settings page (`crafting-settings`), gated behind `fabricate.experimentalFeatures`.
+Recipe resolution mode and salvage resolution mode remain system fields, but their editor cards moved to the Crafting group's Settings page (`crafting-settings`).
 They are no longer edited on the System Overview page.
 Changing recipe resolution mode is destructive and must follow `destructive-changes-and-migrations/spec.md` confirmation/cleanup rules.
 
@@ -278,7 +277,9 @@ A check is usable iff its mode carries an authored `rollFormula`; the legacy che
 - Enable checks (the on/off toggle for the optional simple-mode check)
 - Roll formula, DC, and tier controls per mode (`simple` / `routed` / `progressive`)
 - The simple-mode dynamic-DC macro (`craftingCheck.simple.macroUuid`) — the one surviving check-adjacent macro (it only computes the DC)
-- Failure consumption policy
+- Failure consumption policy — two live-persisting toggles in the non-alchemy crafting sub-tab editing `craftingCheck.consumption.consumeIngredientsOnFail` (default `true`; whether a recipe's ingredients are consumed on a failed crafting check) and `craftingCheck.consumption.breakToolsOnFail` (default `false`; whether required tools break on a failed check — the 1.7.0 rename of `consumeCatalystsOnFail`).
+The engine applies this policy on every failed crafting check; it is NOT shown in alchemy mode, where consumption is governed by the distinct `alchemy.consumeOnFail` flag.
+Salvage failure consumption is a separate, independently-defaulted policy read from `salvageCraftingCheck.consumption` (`consumeComponentOnFail`, default `true`; `breakToolsOnFail`, default `false`) that this crafting control does not change.
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`) (progressive only)
 
@@ -596,7 +597,7 @@ Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a sing
 
 ### Books & Scrolls Surface
 
-`Books & Scrolls` is the `Crafting` group's recipe-item management surface, shown only while `fabricate.experimentalFeatures` is enabled.
+`Books & Scrolls` is the `Crafting` group's recipe-item management surface, available whenever a crafting system is selected (the `Crafting` group is unconditional as of issue 745).
 It is a display name only: the surface manages every recipe item in the selected system regardless of the item's Foundry item type (book, scroll, ring, wand, gem, note), and `recipe item` remains the canonical noun.
 
 The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership, with a legacy `recipe.recipeItemId` fallback for un-migrated systems) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
@@ -888,7 +889,7 @@ The editor header shows the recipe's image, its name, and a `⟨category⟩ · �
 The Overview tab additionally offers an optional **Minimum success tier** dropdown, shown only when the selected system runs a `routedByCheck` check whose routed `type` is `fixed`.
 Its options are that fixed check's success outcome tiers ranked ascending by `start`, preceded by a default `No override (use rolled tier)` entry, and it authors the recipe's `minSuccessOutcomeId`.
 Selecting a tier makes a craft that rolls below it fail outright (see `resolution-modes/spec.md`); the control is hidden for relative-type checks and for non-`routedByCheck` systems.
-Note: because alchemy `checkMode: tiered` dispatches through the same routed-check runner, its `minSuccessOutcomeId` is still enforced at runtime, yet this control auto-hides for alchemy — so a carried value on an alchemy tiered brew is live but not editable or clearable here (a known inconsistency pending the follow-up decision recorded in `resolution-modes/spec.md`).
+Note: alchemy `checkMode: tiered` dispatches through the same routed-check runner but the engine forces `minOutcomeId: null` on that path, so a `minSuccessOutcomeId` carried on an alchemy tiered brew is inert at runtime — matching this control's hiding for alchemy (a value the GM cannot edit or clear here is also one the runtime ignores; see `resolution-modes/spec.md`).
 
 ### Visibility Form
 
@@ -924,8 +925,11 @@ A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of
 It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Currency, and Essence — each appended to that requirement as a new OR alternative for the row's own picker to fill in.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
-Currency and Essence appear only when the system configures currency units or enables essences, so the menu never offers a choice the system cannot honour.
+Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
+Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" popover's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND configures units, not merely when units exist; the normalizer seeds preset units even for a disabled-currency system, so unit presence alone is not authorisation.
+Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
+A currency requirement persisted while currency was enabled remains **visible** when the feature is later disabled, but renders read-only (its unit and amount as static text, flagged inactive) rather than being silently hidden.
 The per-option `tagMatch` (any / all) control is retained on every tag alternative.
 The set-level **"Add essence requirement"** control is retained and now appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
 
@@ -1025,6 +1029,15 @@ The `checkOutcomeIds` assignment picker offers **success tiers only** (`success 
 - At the **top of the Checks tab's Crafting sub-tab**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode` (`none` / `simple` / `tiered`), rendered ABOVE the per-mode editor and persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
 Selecting a mode swaps the editor below it live.
 - The selector is NOT rendered on the Crafting Settings page; that page keeps only the Recipe resolution, Recipe visibility, and (when salvage is on) Salvage resolution cards.
+- The three behaviour flags the selector preserves (`learnOnCraft`, `consumeOnFail`, `showAttemptHistoryToPlayers`) are themselves authored by the **Alchemy behaviour-flag controls** below the selector; see that requirement for the sanctioned authoring path.
+
+### Alchemy behaviour-flag controls (issue 713)
+
+- Below the alchemy check-mode selector on the Checks tab's Crafting sub-tab (shown only when `resolutionMode === "alchemy"`, regardless of `checkMode`): three live-persisting toggle cards editing the system-level alchemy behaviour flags — `learnOnCraft` (default `false`), `consumeOnFail` (default `true`), and `showAttemptHistoryToPlayers` (default `true`).
+- Each toggle reflects the stored value (including a stored non-default value) and persists through `store.saveAlchemyConfig`, which spreads the nested `alchemy` block so `checkMode` and the other two flags are preserved.
+Because `saveAlchemyConfig` rewrites all three flags from its argument, the caller sends the current projected values with only the toggled field overridden.
+- The controls' semantics are defined by `resolution-modes/spec.md` (consume-on-fail) and `recipe-visibility/spec.md` (learn-on-craft, attempt history); this requirement covers only the authoring surface.
+The failure-consumption toggles of §Crafting Check Controls are the distinct, non-alchemy `craftingCheck.consumption` policy and are NOT shown in alchemy mode.
 
 ### Checks tab per-mode behaviour (issue 554)
 
@@ -1369,10 +1382,6 @@ It is offered only when the rendered order actually **differs** from the authore
 - Session-scoped aggregation of materials needed for queued recipes.
 - Shown only on the Crafting tab.
 
-#### Recents Section
-
-- Recently crafted recipes for quick access.
-
 #### Right Rail (Run Summary or Shopping List)
 
 - The right rail is a single keyed body that shows exactly one of two panels for
@@ -1452,7 +1461,6 @@ Run monitoring remains a Journal concern (see *Journal App*); the tab's internal
 
 - Shopping list
 - Recipe browse list
-- Recents
 - Favourites
 
 ### Alchemy Attempt Feedback
@@ -1507,6 +1515,11 @@ Brokenness is about **usability, not salvageability**, and MUST NOT gate the sal
 
 - **Inspector Info order.**
 Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
+- **Used-by reverse index composition.**
+The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
+Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.
+Entries are deduplicated per component and per source, so a component consumed both directly and via a tag lists the recipe once.
+Essence-type options continue to feed the separate essence contributor channel and add no component used-by entries.
 
 #### Player Salvage Surface
 
@@ -1823,16 +1836,20 @@ Those per-activity sections remain authoritative for their own tab, and the Jour
 - The nav entry carries a live **active-run count badge** showing the number of active (non-terminal) runs for the selected actor (`JournalListing.counts.active`).
 - The badge is hidden when the count is zero.
 - The badge stays fresh even while the Journal tab is closed: the shell re-fetches the listing on world-time advance and scene change, so another open tab still shows an accurate count.
+- The badge count and the Journal listing MUST reflect the currently-persisted runs for the selected actor regardless of which client created or advanced them.
+A run started or advanced by another user — including via the primary-GM world-time timed resume — MUST become visible to a GM viewing that actor after the actor document syncs, without a full app reload.
+Per-client run-manager caches MUST NOT serve stale runs: they are invalidated when the selected actor's run-container flags change on any client, so this cross-client freshness holds and the "badge stays fresh on world-time advance" guarantee above continues to hold across clients.
 
 ### Run Monitoring
 
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
-- Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface; each row presents the run's title, run type, status pill, step progress (crafting), and a time-remaining/countdown where a `timeGate` exists.
+- Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface; each row presents the run's title, run type, status pill, crafting progress, and a time-remaining/countdown where a `timeGate` exists.
 - Each run's status pill reflects the projection's `derivedStatus` (`waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), which is derived from the active step/run time gate against world time, not the persisted status (see `data-models/spec.md`).
 - Selecting a run opens a centre detail panel (steps, requirements, and — for a succeeded run — its crafted items, titled `FABRICATE.App.Journal.Results.Title` so it does not collide with the right column's "Recent results" card) plus a right column ordered "about this run" → "what to expect" → "recent results" → "tips".
 - All countdowns and timestamps are world-time based.
 - **Single-step recipes suppress redundant step chrome.**
-A run whose projection reports `multiStep: false` (see `data-models/spec.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip and the "Step requirements" card are retained.
+A run whose projection reports `multiStep: false` (see `data-models/spec.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip is retained.
+A single-step run's requirements card uses the single-step title (`FABRICATE.App.Journal.StepDetails.TitleSingleStep`, "Craft requirements") while a multi-step run's card keeps "Step requirements" (`FABRICATE.App.Journal.StepDetails.Title`), and the run-card progress bar carries a run-neutral "Crafting progress" (`FABRICATE.App.Journal.Progress.Label`) aria-label for every run.
 A single-step crafting run's "what to expect" card uses the single-step explainer (`FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep`) instead of the multi-step crafting copy.
 
 ### Run-Type-Aware Actions Panel
@@ -1882,7 +1899,6 @@ Client settings:
 - `fabricate.managerRailCollapsed`
 - `fabricate.lastAlchemySystem`
 - `fabricate.favouriteRecipes`
-- `fabricate.recentlyCrafted`
 - `fabricate.gatheringHideUnavailableEnvironments`
 
 User settings (per user, per world):

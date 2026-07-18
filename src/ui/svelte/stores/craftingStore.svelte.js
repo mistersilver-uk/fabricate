@@ -9,7 +9,7 @@
  *
  * The store holds the redaction-safe `RecipeListingModel` listing produced by the
  * `CraftingListingBuilder` (via `services.listCraftingForActor`) plus the local
- * browse state (search, pagination, selection, shopping list, recents) and the
+ * browse state (search, pagination, selection, shopping list) and the
  * craft action. The selected character + component-source actors are owned by the
  * sibling stores/seams; this store reads the current ids through `services` when
  * it loads or crafts.
@@ -39,7 +39,6 @@ const DEFAULT_PAGE_SIZE = 12;
 // (`ProgressiveStageList` fires `onReorder` from `ondrop`, never from `ondragover`), so it
 // settles immediately and the drop-path flush below commits it without waiting.
 const ORDER_COMMIT_DEBOUNCE_MS = 400;
-const MAX_RECENTS = 8;
 // Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (systems/CraftingListingBuilder.js). A
 // local copy keeps the store free of the builder import so its unit-test compiler
 // need not resolve that module graph.
@@ -69,7 +68,6 @@ export function createCraftingStore({ services } = {}) {
   // Per-recipe last craft outcome, keyed by recipe id. A plain object reassigned
   // on write so the rune tracks the change.
   let lastRollResult = $state({});
-  let recents = $state([]);
   let worldTimeTick = $state(0);
   // Left-column filters (client-local browse state, alongside search/pagination).
   let favouriteIds = $state([]);
@@ -484,17 +482,11 @@ export function createCraftingStore({ services } = {}) {
     shoppingEntries = [];
   }
 
-  /** Record a recipe id as most-recently crafted (deduped, newest first, capped). */
-  function markRecent(recipeId) {
-    if (!recipeId) return;
-    recents = [recipeId, ...recents.filter((id) => id !== recipeId)].slice(0, MAX_RECENTS);
-  }
-
   /**
    * Craft a recipe. Guards against re-entrancy via `craftInFlight`; on a
    * `{ success: false }` result it surfaces the message through `services.notify`
-   * and leaves the listing untouched; on success it records the roll outcome,
-   * marks the recipe recent, and quietly refreshes the listing.
+   * and leaves the listing untouched; on success it records the roll outcome and
+   * quietly refreshes the listing.
    *
    * The `services.craftRecipe` call is wrapped: the underlying crafting engine can
    * throw (e.g. on the currency-payment macro path), so a thrown error is caught
@@ -534,7 +526,6 @@ export function createCraftingStore({ services } = {}) {
         return result;
       }
       lastRollResult = { ...lastRollResult, [recipeId]: result ?? null };
-      markRecent(recipeId);
       await load(true);
       return result ?? null;
     } catch (err) {
@@ -593,9 +584,6 @@ export function createCraftingStore({ services } = {}) {
     },
     get lastRollResult() {
       return lastRollResult;
-    },
-    get recents() {
-      return recents;
     },
     get worldTimeTick() {
       return worldTimeTick;
@@ -671,6 +659,5 @@ export function createCraftingStore({ services } = {}) {
     clearShoppingList,
     craft,
     tickWorldTime,
-    markRecent,
   };
 }

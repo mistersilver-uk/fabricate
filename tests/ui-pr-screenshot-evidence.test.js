@@ -148,14 +148,48 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[2].smokeLabels, ['player-alchemy-stacked']);
   });
 
-  it('maps player journal app files to the fabricate-journal recipe', () => {
+  it('maps player journal app files to the fabricate-journal recipes (incl. the craft-detail frame)', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/journal/JournalView.svelte',
       'src/ui/svelte/apps/journal/RunDetail.svelte',
     ]);
 
-    assert.deepEqual(views.map(view => view.id), ['fabricate-journal']);
+    // Issue 752: the craft-detail frame is its own recipe so `collect` publishes
+    // it alongside the resting journal frame (one file per recipe id).
+    assert.deepEqual(views.map(view => view.id), ['fabricate-journal', 'fabricate-journal-craft-detail']);
     assert.deepEqual(views[0].smokeLabels, ['fabricate-journal']);
+    assert.deepEqual(views[1].smokeLabels, ['fabricate-journal-craft-detail']);
+  });
+
+  // Issue 752: the seven demonstration capture states each map to the sources of
+  // the in-flight PR whose fix they show, and each is its own recipe (one file
+  // per recipe id) so `collect` publishes every frame rather than collapsing them.
+  it('maps the issue-752 demonstration frames to their in-flight PR sources', () => {
+    const idsFor = (file) => mapChangedFilesToViews([file]).map(view => view.id);
+
+    // #746 rail state — CraftingSystemManagerRoot owns the rail.
+    assert.ok(idsFor('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte').includes('manager-experimental-off'));
+    // #736/#712 crafting failure-consumption — the routed crafting check editor.
+    assert.ok(idsFor('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte').includes('manager-checks-crafting-consumption'));
+    // #736/#713 alchemy settings — CraftingSettingsView carries the alchemy relabel.
+    assert.deepEqual(idsFor('src/ui/svelte/apps/manager/CraftingSettingsView.svelte'), ['manager-alchemy-settings']);
+    // #727 pills — RollResultBox lives under the crafting detail sources.
+    assert.ok(idsFor('src/ui/svelte/apps/crafting/detail/RollResultBox.svelte').includes('player-crafting-roll-result'));
+    // #727 roll total — the chat card markup is built in CraftingChatCard.js.
+    assert.deepEqual(idsFor('src/systems/CraftingChatCard.js'), ['chat-craft-card']);
+    assert.deepEqual(idsFor('src/systems/SalvageChatCard.js'), ['chat-craft-card']);
+    // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
+    assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
+
+    // Each new frame carries exactly its own single smoke label.
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-experimental-off'], ['manager-experimental-off']);
+    assert.deepEqual(byId['manager-checks-crafting-consumption'], ['manager-checks-crafting-consumption']);
+    assert.deepEqual(byId['manager-alchemy-settings'], ['manager-alchemy-settings']);
+    assert.deepEqual(byId['fabricate-journal-craft-detail'], ['fabricate-journal-craft-detail']);
+    assert.deepEqual(byId['player-crafting-roll-result'], ['player-crafting-roll-result']);
+    assert.deepEqual(byId['chat-craft-card'], ['chat-craft-card']);
+    assert.deepEqual(byId['manager-tags-categories-tags-tab'], ['manager-tags-categories-tags-tab']);
   });
 
   it('maps player inventory app files to the player-inventory recipe', () => {

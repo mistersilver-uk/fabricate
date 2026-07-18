@@ -91,7 +91,7 @@ Toggle optional features in the **Features** card on the System tab of the Craft
 Each toggle takes effect immediately for all future crafting attempts in that system.
 
 You set the recipe and salvage resolution modes on the **Settings** page of the **Crafting** menu, not on the main System settings page.
-The Crafting menu is an experimental feature, so these cards are reachable only when **Experimental Features** is turned on for the world.
+The Crafting menu is always available for every crafting system.
 See [The Crafting Menu](#the-crafting-menu).
 
 Changing the **recipe resolution mode** migrates your recipes to the new mode wherever it can, instead of deleting them all.
@@ -171,7 +171,7 @@ See [Effect Transfer]({% link effect-transfer.md %}) for how the feature is enab
 
 Recipe visibility controls which players can see and access recipes through the visibility service and planned player Crafting UI.
 You configure this per crafting system in the **Recipe Visibility** card on the **Settings** page of the **Crafting** menu.
-The Crafting menu is an experimental feature, so this card is reachable only when **Experimental Features** is turned on for the world.
+The Crafting menu is always available for every crafting system.
 See [The Crafting Menu](#the-crafting-menu).
 
 Each system uses one of four visibility modes:
@@ -264,17 +264,16 @@ Nothing is permanently disabled behind the scenes.
 {: .gm }
 > The Crafting Admin panel is GM-only.
 
-The **Crafting** menu is an experimental grouping of the recipe-focused sections in the Crafting Admin panel.
-It only appears when **Experimental Features** is turned on for the world in Fabricate's module settings.
-While it is off, the panel's left menu shows **Recipes** as a disabled **Soon** item and does not show the Crafting group or Books & Scrolls.
+The **Crafting** menu groups the recipe-focused sections of the Crafting Admin panel.
+It is always available.
+Whenever a crafting system is selected, the panel's left menu shows an expandable **Crafting** group, in the same style as the **Gathering** group.
 
-When Experimental Features is on, that single entry becomes an expandable **Crafting** group in the left menu, in the same style as the **Gathering** group.
 Expand it to reveal its sections.
 **Settings** and **Recipes** are always present, and the system's [visibility mode](#recipe-visibility) decides which of the other two sections appear.
 
 - **Settings** hosts the system-level crafting rules: the recipe resolution mode, the salvage resolution mode, and the **Recipe Visibility** card.
   These cards used to live on the System settings page and moved here.
-  Because the whole Crafting group is experimental, they are reachable only while Experimental Features is on.
+  They are reachable for every crafting system.
 - **Recipes** is the existing recipe browser and editor.
 - **Access** appears only in **Restricted** visibility mode.
   It is where you grant individual recipes to specific characters and players.
@@ -483,6 +482,12 @@ Fabricate checks whether the crafting actor can afford the step before the craft
 If the actor cannot pay, the step is blocked and the craft is stopped before any ingredients are consumed.
 
 You configure currency in the system settings editor, in the **Currency units** card.
+
+{: .note }
+> The recipe editor offers to add a currency cost only while currency is enabled for the system and at least one unit is defined.
+> This keeps the editor from offering a cost the system cannot honour.
+> Turning currency off later does not delete the costs you have already authored.
+> Each one stays visible on its recipe, but becomes read-only and is marked **Currency off**, and it stays inactive until you re-enable currency.
 
 #### Choosing a spend strategy
 

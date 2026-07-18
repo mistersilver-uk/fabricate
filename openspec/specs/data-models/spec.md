@@ -1481,6 +1481,11 @@ Requirements:
 3. When a run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. History should be newest-first and capped by a configured or default limit.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
+6. Run-flag writes must be document-coherent.
+A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
+A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
+The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
 
 ### Gathering Runs Flag
 
@@ -1500,6 +1505,10 @@ Requirements:
 3. When a gathering run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. Within one actor's `gatheringRuns.active`, at most one active run may exist for a given `taskId`.
 5. Detailed `GatheringRun` shape and lifecycle semantics are defined in `gathering-and-harvesting/spec.md`.
+6. Run-flag writes must be document-coherent.
+A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
+A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
 
 ### Learned Recipes Flag
 

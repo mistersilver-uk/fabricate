@@ -24,6 +24,10 @@
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // Whether the system's currency feature is enabled. The normalizer seeds preset units
+    // even for a disabled system, so the "Add cost" affordance gates on this flag too;
+    // existing currency requirements still render (read-only) when it is false.
+    currencyEnabled = true,
     // Routed check-mode recipes route by the check outcome, not by a named
     // ingredient set, so the set name is hidden there (showSetName = false).
     showSetName = true,
@@ -50,6 +54,9 @@
   const displayName = $derived(set?.name?.trim() ? set.name : defaultName);
 
   const groups = $derived(Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []);
+
+  // Cost is authorable only when the currency feature is enabled AND the system has units.
+  const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
 
   const componentPickerOptions = $derived(
     (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
@@ -183,6 +190,7 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
+          {currencyEnabled}
           {essenceOptions}
           onChange={(nextGroup) => updateGroup(index, nextGroup)}
           onRemove={() => removeGroup(index)}
@@ -237,7 +245,7 @@
         onChoose={(id) => addEssenceGroup(id)}
       />
     {/if}
-    {#if (currencyUnits || []).length > 0}
+    {#if canAddCost}
       <button
         type="button"
         class="manager-button is-dashed"

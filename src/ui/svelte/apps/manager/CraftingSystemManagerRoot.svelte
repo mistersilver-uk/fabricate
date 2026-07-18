@@ -60,7 +60,6 @@
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
     isCraftingRoute as isCraftingView,
-    CRAFTING_VIEWS,
   } from './crafting/craftingNav.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
@@ -120,7 +119,8 @@
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
   // Crafting nav group (issue 511): mirrors the gathering group's expand state.
-  // The whole group is gated behind experimental features (`recipesRouteEnabled`).
+  // The group is always available as of issue 745 (v1.3 headline); only its
+  // expand/collapse state lives here.
   let craftingMenuExpanded = $state(false);
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
@@ -330,8 +330,9 @@
   // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
   // so the shared header Save persists the right draft.
   let checksActiveTab = $state('crafting');
+  // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
+  // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
-    { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
   ];
 
@@ -350,9 +351,11 @@
     ['routedByIngredients', 'routedByCheck'].includes(selectedSystem?.resolutionMode || 'simple')
   );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
-  const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
+  // Experimental toggle (issue 745): the Crafting group is now unconditional; this
+  // gate only decides whether the unimplemented Graph placeholder is advertised.
+  const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
-  const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
+  const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
 
   // The pure `evaluateSystemValidation` report, computed in the admin store from
   // the selected system's recipes/environments/components. Drives the GM system
@@ -609,6 +612,21 @@
     gatheringRoutedDraft = next;
   }
 
+  // Live-persist an alchemy behaviour-flag patch (issue 713). saveAlchemyConfig
+  // rewrites all three flags from its argument, so send the current projected values
+  // with the single toggled field overridden — passing a bare `{ learnOnCraft }` would
+  // silently re-default consumeOnFail/showAttemptHistoryToPlayers to their defaults.
+  function onUpdateAlchemyFlags(patch) {
+    const current = selectedSystem?.alchemy || {};
+    store?.saveAlchemyConfig?.({
+      checkMode: current.checkMode,
+      learnOnCraft: current.learnOnCraft === true,
+      consumeOnFail: current.consumeOnFail !== false,
+      showAttemptHistoryToPlayers: current.showAttemptHistoryToPlayers !== false,
+      ...patch,
+    });
+  }
+
   async function saveCraftingCheck() {
     if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
     if (craftingCheckMode === 'routed') {
@@ -751,6 +769,13 @@
     Array.isArray(selectedSystem?.requirements?.currency?.units)
       ? selectedSystem.requirements.currency.units
       : []
+  );
+  // Units are seeded from adapter presets even for a currency-disabled system, so the
+  // recipe editor must gate cost affordances on the explicit enable flag, not on unit
+  // presence. Threaded alongside the units so existing requirements can render read-only
+  // (rather than vanish) when currency is off.
+  const selectedCurrencyEnabled = $derived(
+    selectedSystem?.requirements?.currency?.enabled === true
   );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
@@ -1367,8 +1392,8 @@
   // model (`buildCraftingNavItems`): Recipes and Settings are always present,
   // Access appears under `restricted`, Books & Scrolls under `item`/`knowledge`.
   // Each sub-item maps to a distinct route, so highlighting is derived from the
-  // active route via `resolveActiveCraftingTab`. The whole group is gated behind
-  // `recipesRouteEnabled` (experimental features).
+  // active route via `resolveActiveCraftingTab`. The group is unconditional as of
+  // issue 745 (v1.3 headline).
   const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
@@ -1943,13 +1968,12 @@
     return Array.isArray(setting?.values) ? setting.values : [];
   }
 
-  function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
+  function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
-    if (CRAFTING_VIEWS.includes(view) && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
@@ -2030,7 +2054,8 @@
   }
 
   function isViewAvailableForSystem(view, system) {
-    if (view.id === 'recipes') return !recipesRouteEnabled;
+    // Issue 745: the Graph placeholder is advertised only behind the experimental toggle.
+    if (view.id === 'graph') return experimentalFeaturesEnabled;
     if (!view.feature) return true;
     return system?.features?.[view.feature] === true;
   }
@@ -2331,7 +2356,6 @@
 
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
-    if ((view === 'recipes' || view === 'crafting-settings' || view === 'access' || view === 'books-scrolls' || view === 'recipe-item-edit') && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
@@ -3571,7 +3595,6 @@
   // exit runs through `confirmRouteExit` (the Manager confirm-discard guard) via
   // `setView`/`afterTruthyResult`.
   function openCraftingSection(tabId = 'recipes') {
-    if (!recipesRouteEnabled) return;
     const item = craftingNavItems.find(tab => tab.id === tabId) || craftingNavItems[0];
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
@@ -3635,7 +3658,6 @@
   // route). Seeds both draft and baseline from the persisted projection and loads
   // the world-item options so the Overview tab's item picker has candidates.
   function editRecipeItem(recipeItemId) {
-    if (!recipesRouteEnabled) return;
     afterTruthyResult(confirmRouteExit('recipe-item-edit'), () => {
       selectedRecipeItemId = recipeItemId;
       recipeItemEditSaving = false;
@@ -3732,7 +3754,6 @@
   // Create a new recipe item: open the world-item picker, add the picked item as a
   // definition, then open its editor. Live side effect + navigation.
   async function createRecipeItem() {
-    if (!recipesRouteEnabled) return;
     worldItemOptions = (await services?.getWorldItemOptions?.()) || [];
     itemPickerOpen = true;
   }
@@ -4838,53 +4859,52 @@
               <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
             {/if}
           </button>
-          {#if recipesRouteEnabled}
-            <div class={`manager-nav-group ${craftingMenuExpanded ? 'is-expanded' : ''}`}>
-              <button
-                type="button"
-                class="manager-nav-button manager-nav-parent"
-                id="manager-nav-crafting"
-                aria-current={isCraftingRoute ? 'page' : undefined}
-                aria-expanded={craftingMenuExpanded}
-                onclick={activateCraftingParent}
-              >
-                <i class="fas fa-hammer" aria-hidden="true"></i>
-                <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
-                <span class="manager-nav-count">{craftingNavCount}</span>
-              </button>
-              <button
-                type="button"
-                class="manager-nav-toggle"
-                aria-label={craftingMenuExpanded
-                  ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
-                  : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
-                aria-controls="manager-crafting-submenu"
-                aria-expanded={craftingMenuExpanded}
-                onclick={toggleCraftingMenu}
-              >
-                <i class={craftingMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
-              </button>
-              {#if craftingMenuExpanded}
-                <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
-                  {#each craftingNavItems as craftingItem (craftingItem.id)}
-                    <button
-                      type="button"
-                      class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
-                      id={`manager-crafting-nav-${craftingItem.id}`}
-                      aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id ? 'page' : undefined}
-                      onclick={() => openCraftingSection(craftingItem.id)}
-                    >
-                      <i class={craftingItem.icon} aria-hidden="true"></i>
-                      <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
-                      {#if craftingItem.count != null}
-                        <span class="manager-nav-count">{craftingItem.count}</span>
-                      {/if}
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/if}
+          <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
+          <div class={`manager-nav-group ${craftingMenuExpanded ? 'is-expanded' : ''}`}>
+            <button
+              type="button"
+              class="manager-nav-button manager-nav-parent"
+              id="manager-nav-crafting"
+              aria-current={isCraftingRoute ? 'page' : undefined}
+              aria-expanded={craftingMenuExpanded}
+              onclick={activateCraftingParent}
+            >
+              <i class="fas fa-hammer" aria-hidden="true"></i>
+              <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
+              <span class="manager-nav-count">{craftingNavCount}</span>
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              aria-label={craftingMenuExpanded
+                ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
+                : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
+              aria-controls="manager-crafting-submenu"
+              aria-expanded={craftingMenuExpanded}
+              onclick={toggleCraftingMenu}
+            >
+              <i class={craftingMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+            </button>
+            {#if craftingMenuExpanded}
+              <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
+                {#each craftingNavItems as craftingItem (craftingItem.id)}
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
+                    id={`manager-crafting-nav-${craftingItem.id}`}
+                    aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id ? 'page' : undefined}
+                    onclick={() => openCraftingSection(craftingItem.id)}
+                  >
+                    <i class={craftingItem.icon} aria-hidden="true"></i>
+                    <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
+                    {#if craftingItem.count != null}
+                      <span class="manager-nav-count">{craftingItem.count}</span>
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
           <button type="button" class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`} aria-current={currentView === 'components' || currentView === 'component-edit' ? 'page' : undefined} onclick={() => setView('components')}>
             <i class="fas fa-boxes" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
@@ -5093,6 +5113,10 @@
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
+            craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
+            alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
+            alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
+            alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !== false}
             {salvageResolutionMode}
             salvageCheckSimple={salvageSimpleDraft}
             salvageCheckRouted={salvageRoutedDraft}
@@ -5112,6 +5136,8 @@
             {onUpdateGatheringCheckProgressive}
             {onUpdateGatheringCheckRouted}
             onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
+            onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
+            {onUpdateAlchemyFlags}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
           />
@@ -5274,6 +5300,7 @@
         saveFailed={recipeSaveFailed}
         onPickImagePath={services?.pickImagePath}
         currencyUnits={selectedCurrencyUnits}
+        currencyEnabled={selectedCurrencyEnabled}
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}

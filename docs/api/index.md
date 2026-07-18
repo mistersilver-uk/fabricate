@@ -413,14 +413,13 @@ Fabricate stores data in Foundry's settings and flags:
 | World setting | `fabricate.gatheringConfig` | Gathering library, rules, condition vocabularies, and per-system gathering configuration |
 | World setting | `fabricate.migrationVersion` | Last completed Fabricate data migration version |
 | World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default, with other presets `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` palette) |
-| World setting | `fabricate.experimentalFeatures` | Reserved future experimental feature switch, disabled by default |
+| World setting | `fabricate.experimentalFeatures` | Reveals in-development Fabricate surfaces, currently the unimplemented recipe Graph placeholder in the crafting manager, disabled by default |
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |
 | Client setting | `fabricate.lastManagedCraftingSystem` | Last viewed system in GM admin |
 | Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system (discipline) for the Alchemy Workbench tab |
 | Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
-| Client setting | `fabricate.recentlyCrafted` | Recently crafted recipe entries for the current client |
 | User setting | `fabricate.progressiveResultOrder` | Player progressive result-stage order, keyed `recipe:<recipeId>` / `salvage:<componentId>` to a list of result ids (Object, default `{}`). Registered with `scope: 'user'`, which is per user **within one world**. The same player in a second world reads the default. Writing it is an asynchronous, replicated document write that can reject, not a synchronous `localStorage` write, so a caller must `await` it. |
 | Client setting | `fabricate.gatheringHideUnavailableEnvironments` | Player "hide unavailable (locked) environments" toggle for the Gathering app Environments column (Boolean, default `false`, per client/device) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |

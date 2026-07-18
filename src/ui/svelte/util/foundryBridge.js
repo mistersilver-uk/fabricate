@@ -313,6 +313,43 @@ export function subscribeTravelMarkerMove(handler) {
   };
 }
 
+/**
+ * Subscribe to run-flag writes on the relevant actor so callers can quietly re-fetch
+ * run-derived views (the Journal listing, the nav active-run count badge) when a run
+ * is created, advanced, or archived by ANY client — including the primary-GM
+ * world-time resume (issues 733 + 739). Registers Foundry's `updateActor` hook (which
+ * fires on every connected client) and only invokes `handler` when the changed actor
+ * is one the caller cares about (`isRelevantActor(actorId)`) AND the diff touches a
+ * Fabricate run-container flag path. `updateActor` fires on every HP tick, so both
+ * filters are load-bearing. Returns an unsubscribe function; no-ops gracefully when
+ * the Foundry `Hooks` global is absent (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked (no args) on a relevant run-flag change.
+ * @param {object} [options]
+ * @param {(actorId: string|null) => boolean} [options.isRelevantActor] Predicate,
+ *   read at FIRE time so it tracks the current selection. Defaults to always-true.
+ * @returns {Function} Unsubscribe callback.
+ */
+export function subscribeActorRunFlagChange(handler, { isRelevantActor } = {}) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const relevant = typeof isRelevantActor === 'function' ? isRelevantActor : () => true;
+  const hasProperty = globalThis.foundry?.utils?.hasProperty;
+  const touchesRunFlag = (changes) =>
+    typeof hasProperty === 'function' &&
+    (hasProperty(changes, 'flags.fabricate.fabricate.craftingRuns') ||
+      hasProperty(changes, 'flags.fabricate.fabricate.salvageRuns') ||
+      hasProperty(changes, 'flags.fabricate.gatheringRuns'));
+  const onUpdate = (actor, changes) => {
+    const actorId = actor?.id ?? null;
+    if (actorId && relevant(actorId) && touchesRunFlag(changes)) handler();
+  };
+  const id = hooks.on('updateActor', onUpdate);
+  return () => {
+    hooks.off?.('updateActor', id);
+  };
+}
+
 export function notifyInfo(msg) {
   globalThis.ui?.notifications?.info(msg);
 }

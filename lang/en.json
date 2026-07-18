@@ -580,7 +580,6 @@
           "SearchLabel": "Search recipes",
           "Empty": "No recipes to show.",
           "NoMatches": "No recipes match your filters.",
-          "RecentsTitle": "Recent",
           "FavouritesOnly": "Favourites",
           "CraftableOnly": "Craftable",
           "SystemFilterLabel": "Crafting system",
@@ -714,6 +713,7 @@
         },
         "StepDetails": {
           "Title": "Step requirements",
+          "TitleSingleStep": "Craft requirements",
           "RequiresTime": "Requires time",
           "PrimaryTool": "Primary tool",
           "Check": "Check",
@@ -790,7 +790,7 @@
           "TitleSalvage": "Salvaged items"
         },
         "Progress": {
-          "Label": "Step progress"
+          "Label": "Crafting progress"
         },
         "Tips": {
           "Title": "Tips",
@@ -1044,7 +1044,7 @@
       },
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
-        "Hint": "Reserved for future experimental Fabricate features in this world. No current features are gated by this switch. Disabled by default."
+        "Hint": "Shows experimental Fabricate surfaces that are still in development for this world — currently the recipe graph in the crafting manager. The crafting authoring tools are always available and are not gated by this switch. Disabled by default."
       },
       "RepairComponentSources": {
         "Name": "Repair Item Data",
@@ -1879,6 +1879,9 @@
           "RemoveCost": "Remove cost",
           "PickCurrency": "Pick currency",
           "NoCurrencyDefined": "No currencies defined",
+          "CurrencyDisabledTag": "Currency off",
+          "CurrencyDisabledHint": "Currency is disabled for this system; this cost is inactive until it is re-enabled.",
+          "CurrencyDisabledUnitFallback": "Currency",
           "Quantity": "Quantity",
           "Essences": "Essences",
           "AddEssence": "Add essence",
@@ -3807,6 +3810,12 @@
             "ConfigHint": "Roll, difficulty, and outcome settings for the crafting check will appear here.",
             "AlchemyNoneTitle": "Resolves without a check",
             "AlchemyNoneLead": "This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered above to author a crafting check.",
+            "FailureConsumptionHeading": "Failure consumption policy",
+            "FailureConsumptionIntro": "What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage failures follow their own separate policy.",
+            "ConsumeIngredientsOnFail": "Consume ingredients on a failed check",
+            "ConsumeIngredientsOnFailDesc": "The recipe’s ingredients are used up even when the crafting check fails. On by default.",
+            "BreakToolsOnFail": "Break tools on a failed check",
+            "BreakToolsOnFailDesc": "Required tools break when the crafting check fails. Off by default.",
             "HelpKicker": "Crafting checks",
             "HelpTitle": "About crafting checks",
             "HelpDesc": "The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.",
@@ -4201,7 +4210,15 @@
           "CheckModeSimple": "Simple check",
           "CheckModeSimpleDesc": "A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.",
           "CheckModeTiered": "Tiered check",
-          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check."
+          "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.",
+          "BehaviourHeading": "Alchemy behaviour",
+          "BehaviourIntro": "How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.",
+          "LearnOnCraft": "Learn a recipe when its ingredients are matched",
+          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. Off by default.",
+          "ConsumeOnFail": "Consume ingredients on a failed brew",
+          "ConsumeOnFailDesc": "A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.",
+          "ShowAttemptHistory": "Show attempt history to players",
+          "ShowAttemptHistoryDesc": "Record dead-end attempts so a player sees which ingredient combinations produced no reaction. On by default."
         }
       },
       "Features": {
@@ -4283,13 +4300,6 @@
           "NoCheckMacro": "No check macro",
           "OutcomesPlaceholder": "Outcomes (comma separated)",
           "SaveConfig": "Save Check Config"
-        },
-        "Alchemy": {
-          "Title": "Alchemy",
-          "Hint": "Configure the learning and failure behavior used by alchemy attempts in this crafting system.",
-          "LearnOnCraft": "Learn recipes after a successful attempt",
-          "ConsumeOnFail": "Consume submitted ingredients on failed attempts",
-          "ShowAttemptHistoryToPlayers": "Show attempt history to players"
         },
         "OutcomeRouting": {
           "Title": "Outcome Routing",

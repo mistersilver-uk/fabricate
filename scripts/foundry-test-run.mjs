@@ -96,6 +96,16 @@ const RC_SCREENSHOT_BUDGET = new Set([
   'crafter-post-craft-inventory'
 ]);
 
+// R2 (#750): the two 7-theme sweeps (`captureManagerThemes` +
+// `captureAlchemyThemes`) produce 14 `*-theme-<id>` frames that NOTHING asserts
+// and that `scripts/ui-pr-screenshot-evidence.mjs` VIEW_RECIPES deliberately
+// does not map. They are OFF by default; opt in to regenerate them with
+// `FOUNDRY_SMOKE_THEMES=1` (or `--themes`). Restoring the sweeps costs ~5-8s and
+// 14 PNGs, so keep them off unless you are specifically auditing theme fidelity.
+const CAPTURE_THEME_SWEEPS =
+  ['1', 'true', 'yes'].includes(String(process.env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase())
+  || process.argv.slice(2).includes('--themes');
+
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
 const JOIN_USER_SELECT_SELECTOR = 'select[name="userid"]';
 const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
@@ -172,6 +182,32 @@ const phaseTimings = [];
 /** @type {{ name: string, startedAt: string, t0: number } | null} */
 let currentPhase = null;
 
+// ── Per-view timings (R3, #750) ─────────────────────────────────────────────
+// Phase timings are phase-granular only. This records the wall-clock spent
+// reaching each captured view — the elapsed time between the previous captured
+// frame (or the current phase start) and this frame — so the end-of-run summary
+// can surface the slowest individual views. It is an enabler for measuring
+// future cuts; it saves ~0s itself.
+/** @type {Array<{ label: string, phase: string, durationMs: number }>} */
+const viewTimings = [];
+let lastViewMarkAt = performance.now();
+
+/**
+ * Record the time taken to reach a captured view, attributed to `label`, and
+ * reset the stopwatch for the next view. Called from `screenshot()` after a
+ * frame is actually written (never for an rc no-op).
+ * @param {string} label
+ */
+function markViewTiming(label) {
+  const now = performance.now();
+  viewTimings.push({
+    label,
+    phase: currentPhase?.name ?? 'unknown',
+    durationMs: Math.round(now - lastViewMarkAt)
+  });
+  lastViewMarkAt = now;
+}
+
 /**
  * Begin a phase stopwatch. If another phase is already running it ends
  * automatically — phases are sequential, never nested.
@@ -180,6 +216,9 @@ let currentPhase = null;
 function startPhase(name) {
   if (currentPhase) endPhase();
   currentPhase = { name, startedAt: new Date().toISOString(), t0: performance.now() };
+  // Reset the per-view stopwatch so the first view of a phase is not charged
+  // for the inter-phase gap.
+  lastViewMarkAt = performance.now();
 }
 
 /**
@@ -220,18 +259,49 @@ function formatTimingsTable(timings) {
 }
 
 /**
+ * Render the slowest captured views as an aligned stdout table (R3, #750).
+ * Only the top `limit` are shown — enough to spot where the D0 walk spends its
+ * time — with each view's phase for context. Returns '' when nothing was
+ * captured (e.g. the rc profile skips the screenshot phases).
+ * @param {Array<{ label: string, phase: string, durationMs: number }>} timings
+ * @param {number} [limit=12]
+ * @returns {string}
+ */
+function formatSlowestViewsTable(timings, limit = 12) {
+  if (timings.length === 0) return '';
+  const sorted = timings.slice().sort((a, b) => b.durationMs - a.durationMs).slice(0, limit);
+  const rows = sorted.map(({ label, phase, durationMs }) => ({
+    view: `${label} (${phase})`,
+    seconds: (durationMs / 1000).toFixed(1)
+  }));
+  const viewWidth = Math.max(...rows.map(row => row.view.length));
+  const secondsWidth = Math.max(...rows.map(row => row.seconds.length));
+  const lines = [
+    `Slowest views (top ${sorted.length} of ${timings.length})`,
+    '─'.repeat(viewWidth + secondsWidth + 5)
+  ];
+  for (const row of rows) {
+    lines.push(`  ${row.view.padEnd(viewWidth)}  ${row.seconds.padStart(secondsWidth)}s`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Take a screenshot with an auto-incrementing numeric prefix. Under the
  * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; all
  * other labels are no-ops (the surrounding assertions still run).
  * @param {import('playwright').Page} page
  * @param {string} label
  */
-async function screenshot(page, label) {
+async function screenshot(page, label, options = {}) {
   if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
   screenshotCounter++;
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
-  await page.screenshot({ path });
+  // `options` forwards Playwright screenshot options (e.g. a `clip` box for a
+  // region capture such as the chat sidebar); default is a full-page shot.
+  await page.screenshot({ path, ...options });
+  markViewTiming(label);
 }
 
 /**
@@ -294,6 +364,8 @@ async function applyManagerTheme(page, themeId) {
  * @param {import('playwright').Page} page
  */
 async function captureManagerThemes(page) {
+  // R2 (#750): opt-in only — these 14 theme frames are unasserted and unmapped.
+  if (!CAPTURE_THEME_SWEEPS) return;
   for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
     await applyManagerTheme(page, themeId);
     await screenshot(page, `manager-theme-${themeId}`);
@@ -379,6 +451,8 @@ async function captureRecipeResultsTab(page, recipeName, label, contentSelector)
  * @param {import('playwright').Page} page
  */
 async function captureAlchemyThemes(page) {
+  // R2 (#750): opt-in only — these theme frames are unasserted and unmapped.
+  if (!CAPTURE_THEME_SWEEPS) return;
   for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
     await applyManagerTheme(page, themeId);
     await screenshot(page, `player-alchemy-theme-${themeId}`);
@@ -851,17 +925,111 @@ function withDeadline(promise, ms, label) {
 }
 
 /**
+ * Wait until an in-page `predicate` returns truthy, polling on animation frames
+ * so a settled layout is detected as soon as it quiesces instead of always
+ * paying a fixed wait (R4, #750). On timeout it falls back to a capped fixed
+ * wait, so a predicate bug degrades to the harness's previous fixed pacing
+ * rather than hanging or racing ahead. Predicates that need cross-poll state
+ * stash it on `window` and are reset by the caller before the first poll.
+ * @param {import('playwright').Page} page
+ * @param {Function} predicate
+ * @param {unknown} arg
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs = 500 } = {}) {
+  try {
+    await page.waitForFunction(predicate, arg, { timeout, polling: 'raf' });
+  } catch {
+    await page.waitForTimeout(fallbackMs);
+  }
+}
+
+/**
+ * Settle the Crafting System Manager frame after a resize: wait for the app's
+ * measured geometry to REACH the requested size and hold steady across a few
+ * animation frames, then return. Replaces the fixed 500ms wait (R4, #750) with
+ * an event-driven predicate whose fallback preserves the old timing.
+ * @param {import('playwright').Page} page
+ * @param {{ width: number, height: number }} size
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function waitForManagerGeometrySettled(page, { width, height }, { timeout = 1500, fallbackMs = 500 } = {}) {
+  await page.evaluate(() => { delete window.__fabGeomSettle; }).catch(() => {});
+  await waitForSettled(page, ({ width, height }) => {
+    const manager = document.querySelector('.fabricate-manager');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
+    if (!app) return false;
+    const rect = app.getBoundingClientRect();
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
+    if (Math.abs(w - width) > 3 || Math.abs(h - height) > 3) { window.__fabGeomSettle = null; return false; }
+    const state = window.__fabGeomSettle || { sig: null, stable: 0 };
+    const sig = `${w}x${h}`;
+    if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
+    window.__fabGeomSettle = state;
+    return state.stable >= 4; // ~4 steady RAF samples ≈ 65ms of quiescence.
+  }, { width, height }, { timeout, fallbackMs });
+}
+
+/**
+ * Settle the manager after an in-frame navigation (system-identity click,
+ * return-to-library, scope-select) that re-renders the nav rail. Waits for the
+ * nav labels to render and the frame's geometry + nav-item count to hold steady
+ * across several animation frames. Replaces the fixed 750ms identity settles
+ * (R4, #750); the caller's own subsequent explicit content/nav waits remain the
+ * real correctness gate, so this only trims the settle buffer. The capped
+ * fallback preserves the old 750ms pacing if the predicate never quiesces.
+ * @param {import('playwright').Page} page
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {}) {
+  await page.evaluate(() => { delete window.__fabNavSettle; }).catch(() => {});
+  await waitForSettled(page, () => {
+    const manager = document.querySelector('.fabricate-manager');
+    if (!manager) return false;
+    const navCount = manager.querySelectorAll('.manager-nav-label').length;
+    if (navCount === 0) return false;
+    const rect = manager.getBoundingClientRect();
+    const sig = `${Math.round(rect.width)}x${Math.round(rect.height)}:${navCount}`;
+    const state = window.__fabNavSettle || { sig: null, stable: 0 };
+    if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
+    window.__fabNavSettle = state;
+    return state.stable >= 6; // ~6 steady RAF samples ≈ 100ms of quiescence.
+  }, undefined, { timeout, fallbackMs });
+}
+
+/**
  * Resize the rendered Crafting System Manager application frame for
  * responsive screenshots and hit testing.
+ *
+ * R4 (#750): the D0 walk issues many consecutive identical
+ * `setManagerWindowSize(1280, 820)` calls; each otherwise repaid a viewport
+ * resize and a fixed settle for a no-op. Short-circuit when the app is ALREADY
+ * at the requested geometry (verified against the live DOM — a fresh `.show()`
+ * resets the app size, so a cached size alone is not trusted), which batches
+ * same-width frames by eliminating the redundant resizes between them. When a
+ * resize IS needed, settle on the app reaching a stable measured geometry
+ * instead of a blanket 500ms wait.
  * @param {import('playwright').Page} page
  * @param {{ width: number, height: number }} size
  */
 async function setManagerWindowSize(page, { width, height }) {
+  const viewportWidth = Math.max(1366, width + 80);
+  const viewportHeight = Math.max(768, height + 80);
+  const alreadySized = await page.evaluate(({ width, height, viewportWidth, viewportHeight }) => {
+    const manager = document.querySelector('.fabricate-manager');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
+    if (!app) return false;
+    const rect = app.getBoundingClientRect();
+    return Math.abs(window.innerWidth - viewportWidth) <= 2
+      && Math.abs(window.innerHeight - viewportHeight) <= 2
+      && Math.abs(rect.width - width) <= 2
+      && Math.abs(rect.height - height) <= 2;
+  }, { width, height, viewportWidth, viewportHeight }).catch(() => false);
+  if (alreadySized) return;
+
   await withDeadline(
-    page.setViewportSize({
-      width: Math.max(1366, width + 80),
-      height: Math.max(768, height + 80)
-    }),
+    page.setViewportSize({ width: viewportWidth, height: viewportHeight }),
     15_000,
     `setViewportSize ${width}x${height}`
   );
@@ -884,7 +1052,7 @@ async function setManagerWindowSize(page, { width, height }) {
     15_000,
     `setManagerWindowSize evaluate ${width}x${height}`
   );
-  await page.waitForTimeout(500);
+  await waitForManagerGeometrySettled(page, { width, height }, { timeout: 1500, fallbackMs: 500 });
 }
 
 /**
@@ -1224,7 +1392,7 @@ async function selectSmokeSystemInManager(page, systemId) {
     .catch(() => false);
   if (alreadySelected) return;
   await row.locator('.manager-system-identity').click();
-  await page.waitForTimeout(750);
+  await settleManagerNav(page);
 }
 
 async function seedSmokeGatheringLibrary(page, craftingSetup) {
@@ -2122,7 +2290,12 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
       { name: 'Elixir of Vigor', img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
       { name: 'Verdant Tonic', img: 'icons/consumables/potions/flask-corked-blue.webp' },
       { name: 'Powdered Root', img: 'icons/consumables/plants/dried-herb-bundle-brown.webp' },
-      { name: 'Soothing Balm', img: 'icons/consumables/potions/bottle-round-corked-red.webp' }
+      { name: 'Soothing Balm', img: 'icons/consumables/potions/bottle-round-corked-red.webp' },
+      // Issue #752: the minimal alchemy-mode system's one signature — a reagent
+      // and the brew it renders into. Kept tiny so the manager alchemy-settings
+      // capture has a representative alchemy system without growing Phase C.
+      { name: 'Smoke Bench Reagent', img: 'icons/consumables/plants/grass-leaves-green.webp' },
+      { name: 'Smoke Bench Brew', img: 'icons/consumables/potions/bottle-conical-corked-blue.webp' }
     ];
     const createdProducts = await Item.createDocuments(
       productSpecs.map((spec) => ({ name: spec.name, type: itemType, img: spec.img }))
@@ -2250,10 +2423,48 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
       }]
     });
 
+    // ── System 3: Smoke Alchemy Bench (issue #752) ──────────────────────────
+    // The minimal alchemy-mode system whose Crafting → Settings surface the
+    // manager alchemy-settings capture photographs (demonstrating #736's #713
+    // half). Smallest viable config: one reagent, one product, one signature.
+    const bench = await csm.createSystem({
+      name: 'Smoke Alchemy Bench',
+      description: 'Issue #752: minimal alchemy-mode system for the manager alchemy-settings capture.'
+    });
+    if (!bench?.id) throw new Error('Alchemy fixtures: Smoke Alchemy Bench create failed');
+    const benchId = bench.id;
+    await csm.updateSystem(benchId, {
+      resolutionMode: 'alchemy',
+      enabled: true,
+      alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+    });
+    const benchMap = {
+      'Smoke Bench Reagent': await registerComponent(benchId, productByName['Smoke Bench Reagent']),
+      'Smoke Bench Brew': await registerComponent(benchId, productByName['Smoke Bench Brew'])
+    };
+    const benchRecipe = await rm.createRecipe({
+      name: 'Smoke Bench Brew',
+      description: 'Alchemy: one reagent renders into a bench brew.',
+      craftingSystemId: benchId,
+      img: 'icons/consumables/potions/bottle-conical-corked-blue.webp',
+      resultSelection: { provider: 'ingredientSet' },
+      ingredientSets: [{
+        name: 'Reagent base',
+        ingredientGroups: [{
+          name: 'Smoke Bench Reagent',
+          options: [{ quantity: 1, match: { type: 'component', componentId: benchMap['Smoke Bench Reagent'] } }]
+        }]
+      }],
+      resultGroups: [{
+        name: 'Brew',
+        results: [{ componentId: benchMap['Smoke Bench Brew'], quantity: 1 }]
+      }]
+    });
+
     // Every recipe must have been created enabled (createRecipe throws on an
     // invalid alchemy shape; a disabled recipe would drop its system from the
     // chooser since the listing filters `{ enabled: true }`).
-    const alchemyRecipes = [elixirRecipe, tonicRecipe, balmRecipe];
+    const alchemyRecipes = [elixirRecipe, tonicRecipe, balmRecipe, benchRecipe];
     for (const recipe of alchemyRecipes) {
       if (!recipe?.id) throw new Error('Alchemy fixtures: recipe create returned no id');
       if (recipe.enabled !== true) {
@@ -2265,12 +2476,13 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
     }
 
     return {
-      alchemySystemIds: [cauldronId, herbalistId],
+      alchemySystemIds: [cauldronId, herbalistId, benchId],
       cauldronSystemId: cauldronId,
       herbalistSystemId: herbalistId,
+      benchSystemId: benchId,
       alchemyRecipeIds: alchemyRecipes.map((recipe) => recipe.id),
       alchemyProductItemIds,
-      alchemyComponentMap: { [cauldronId]: cauldronMap, [herbalistId]: herbalistMap }
+      alchemyComponentMap: { [cauldronId]: cauldronMap, [herbalistId]: herbalistMap, [benchId]: benchMap }
     };
   }, { crafterId });
 }
@@ -2732,6 +2944,25 @@ async function installNotificationHidingCss(page) {
  * Close Foundry application windows across ApplicationV1 and ApplicationV2.
  * @param {import('playwright').Page} page
  */
+/**
+ * Wait for every Fabricate window (manager, shared app) and any dirty-draft
+ * "Discard Changes" prompt to leave the DOM after a close sweep (R5, #750).
+ * Replaces the two blanket 500ms waits per `closeOpenApplications` attempt with
+ * an event-driven detach check; the close usually completes well under 500ms.
+ * The capped fallback preserves the old fixed pacing if a window is slow to go,
+ * so a stuck close degrades to today's timing rather than hanging.
+ * @param {import('playwright').Page} page
+ * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ */
+async function waitForFabricateWindowsClosed(page, { timeout = 800, fallbackMs = 500 } = {}) {
+  await waitForSettled(page, () => {
+    const windows = document.querySelectorAll('.fabricate-manager, .fabricate-app').length;
+    const hasDiscard = Array.from(document.querySelectorAll('button'))
+      .some(button => /Discard Changes/.test(button.textContent || ''));
+    return windows === 0 && !hasDiscard;
+  }, undefined, { timeout, fallbackMs });
+}
+
 async function closeOpenApplications(page) {
   const closeSelector = [
     '.application:not(#sidebar) button[data-action="close"]',
@@ -2790,14 +3021,14 @@ async function closeOpenApplications(page) {
         });
       }
     }, closeSelector);
-    await page.waitForTimeout(500);
+    await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
 
     const closeButtons = page.locator(closeSelector);
     for (let i = 0; i < await closeButtons.count(); i++) {
       try { await closeButtons.nth(i).click({ timeout: 1_000, force: true }); } catch { /* ignore */ }
     }
-    await page.waitForTimeout(500);
+    await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
 
     const remaining = await page.locator('.fabricate-manager, .fabricate-app, button:has-text("Discard Changes")').count();
@@ -3330,10 +3561,22 @@ async function main() {
           throw new Error('dnd5e Starter Heroes compendium (dnd5e.heroes) not found — cannot seed smoke actors.');
         }
         const heroIndex = await heroPack.getIndex();
+        // R1 (#750): TWO-ACTOR CONTRACT. Phase B references only actors[0]
+        // (crafter) and actors[1] (travelMember); importing the whole Starter
+        // Heroes pack cost ~30-45s for actors nothing asserts. Sort the INDEX by
+        // name first (the same order the post-import sort produced), then import
+        // just the first two character entries — this preserves the exact
+        // crafter / travel-member identity while skipping the rest. Raise this
+        // cap if a future step needs a third seeded hero.
+        const sortedHeroEntries = Array.from(heroIndex)
+          .slice()
+          .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'en'));
         const importedHeroes = [];
-        for (const entry of heroIndex) {
+        for (const entry of sortedHeroEntries) {
+          if (entry.type && entry.type !== 'character') continue;
           const actor = await game.actors.importFromCompendium(heroPack, entry._id);
           if (actor?.type === 'character') importedHeroes.push(actor);
+          if (importedHeroes.length >= 2) break;
         }
         if (importedHeroes.length === 0) {
           throw new Error('dnd5e Starter Heroes compendium contained no character actors.');
@@ -4592,7 +4835,7 @@ async function main() {
         await captureManagerThemes(page);
 
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
@@ -4670,7 +4913,12 @@ async function main() {
         }
 
         await returnToSystemLibrary(page);
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
+        // The settle signature (geometry x navCount) can be identical across this
+        // transition, so anchor on the browser row actually re-mounting before the
+        // non-retrying count assertions below (issue 750 review finding).
+        await page.locator(managerSystemRowSelector(craftingSetup.systemId)).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
         navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
@@ -4698,7 +4946,7 @@ async function main() {
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
         const gatheringOffFact = await page.locator('.fabricate-manager [data-count-id="environments"]').first().evaluate(element => {
           const rect = element.getBoundingClientRect();
           const strong = element.querySelector('strong');
@@ -4810,7 +5058,7 @@ async function main() {
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
-        await page.waitForTimeout(750);
+        await settleManagerNav(page);
         await page.evaluate(async () => {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
@@ -4937,7 +5185,7 @@ async function main() {
         const scopeSelect = page.locator('.fabricate-manager [data-manager-scope-select]').first();
         try {
           await scopeSelect.selectOption({ label: 'Smoke Simple Forge' });
-          await page.waitForTimeout(750);
+          await settleManagerNav(page);
           await page.locator('.fabricate-manager .manager-recipe-row [data-recipe-check="none"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await assertRecipeRowsHittable(page, 'recipes no-check');
@@ -4947,7 +5195,7 @@ async function main() {
           });
         } finally {
           await scopeSelect.selectOption(craftingSetup.systemId).catch(() => {});
-          await page.waitForTimeout(750);
+          await settleManagerNav(page);
           await openManagerCraftingSection(page, 'recipes', 'recipes');
         }
 
@@ -5285,6 +5533,39 @@ async function main() {
         await screenshot(page, 'manager-checks-validation');
         process.stdout.write('  D0: checks validation tab screenshotted\n');
 
+        // Checks → Crafting tab, scrolled to the failure-consumption controls
+        // (issue #752 — evidence for #736's #712 half). The smoke system resolves
+        // routedByCheck, so the crafting tab renders the routed CraftingCheckEditor;
+        // its failure-consumption controls land at the bottom of that editor after
+        // #712 rebases, so scroll the editor's last section into view before the
+        // capture. Guarded so a hiccup records a failed step, not an abort.
+        try {
+          await page.locator('.fabricate-manager [data-checks-tab-button="crafting"]').first().click();
+          const craftingCheckEditor = page
+            .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-check-editor]')
+            .first();
+          await craftingCheckEditor.waitFor({ state: 'visible', timeout: 5_000 });
+          // Issue 712's failure-consumption card is a SIBLING of the check editor
+          // inside the crafting panel, so anchor on it directly when present and
+          // fall back to the editor's last section on builds that predate it.
+          const consumptionCard = page
+            .locator('.fabricate-manager [data-checks-panel="crafting"] [data-failure-consumption]')
+            .first();
+          if (await consumptionCard.count() > 0) {
+            await consumptionCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          } else {
+            await craftingCheckEditor.locator('section').last()
+              .scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          }
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-checks-crafting-consumption');
+          process.stdout.write('  D0: checks crafting consumption screenshotted\n');
+          results.steps.push({ step: 'checks-crafting-consumption', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'checks-crafting-consumption', passed: false, error: err.message });
+          process.stderr.write(`Checks crafting consumption capture failed: ${err.message}\n`);
+        }
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
@@ -5308,6 +5589,30 @@ async function main() {
           throw new Error('Manager tags inspector did not render the How-it-works evidence card.');
         }
         await captureStableManagerView(page, { layout: 'tags-categories normal', label: 'manager-tags-categories-normal' });
+
+        // Tags & Categories → Item tags panel, scrolled to its seeded rows
+        // (issue #752 — evidence for #735's row rendering). The smoke system seeds
+        // exactly three item tags (rare, reagent, metallic), so the Item tags
+        // vocabulary renders three [data-tag-id] rows. Guarded so a hiccup records
+        // a failed step rather than aborting the phase.
+        try {
+          const itemTagsPanel = page
+            .locator('.fabricate-manager .manager-vocabulary-panel[aria-label="Item tags"]')
+            .first();
+          await itemTagsPanel.waitFor({ state: 'visible', timeout: 5_000 });
+          const tagRowCount = await itemTagsPanel.locator('[data-tag-id]').count();
+          if (tagRowCount < 3) {
+            throw new Error(`Item tags panel rendered ${tagRowCount} tag rows, expected the three seeded tags.`);
+          }
+          await itemTagsPanel.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-tags-categories-tags-tab');
+          process.stdout.write('  D0: tags item-tags rows screenshotted\n');
+          results.steps.push({ step: 'tags-categories-tags-tab', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'tags-categories-tags-tab', passed: false, error: err.message });
+          process.stderr.write(`Tags item-tags capture failed: ${err.message}\n`);
+        }
 
         await captureStableManagerView(page, {
           width: 1000,
@@ -6135,6 +6440,104 @@ async function main() {
           await closeOpenApplications(page).catch(() => {});
         }
 
+        // Manager alchemy-settings capture (issue #752 — evidence for #736's #713
+        // half): the Crafting → Settings surface of an ALCHEMY-mode system (the
+        // minimal "Smoke Alchemy Bench" seeded in Phase C). The Crafting nav group
+        // requires experimental features, which are still enabled here — the
+        // experimental-off capture below is the last D0 action, and the phase's
+        // finally restores the world value. Self-contained fresh manager session,
+        // guarded so a hiccup records a failed step rather than aborting the phase.
+        const alchemyBenchSystemId = alchemyFixtures?.benchSystemId;
+        if (alchemyBenchSystemId) {
+          try {
+            await closeOpenApplications(page);
+            await page.evaluate(() => {
+              game.fabricate.api.getCraftingSystemManagerAppClass().show();
+            });
+            await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+            await setManagerWindowSize(page, { width: 1280, height: 820 });
+            await page.locator(`${managerSystemRowSelector(alchemyBenchSystemId)} .manager-system-identity`).first().click();
+            await settleManagerNav(page);
+            await openManagerCraftingSection(page, 'settings', 'crafting-settings');
+            await page.locator('.fabricate-manager [data-crafting-settings]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            // Confirm this is the alchemy variant: the resolution card marks the
+            // alchemy option active for an alchemy-mode system.
+            if (await page.locator('.fabricate-manager [data-crafting-resolution-mode-option="alchemy"].is-active').count() === 0) {
+              throw new Error('Crafting settings did not render with alchemy as the selected resolution mode.');
+            }
+            // Issue 713's behaviour flags render in the Checks view for an
+            // alchemy-mode system — capture there when the card exists so the
+            // frame demonstrates the flags; fall back to the settings surface
+            // on builds that predate the card.
+            await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+            await settleManagerNav(page);
+            const alchemyBehaviourCard = page
+              .locator('.fabricate-manager [data-alchemy-behaviour]')
+              .first();
+            if (await alchemyBehaviourCard.count() > 0) {
+              await alchemyBehaviourCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'manager-alchemy-settings');
+            process.stdout.write('  D0: alchemy settings screenshotted\n');
+            await closeOpenApplications(page);
+            results.steps.push({ step: 'manager-alchemy-settings', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'manager-alchemy-settings', passed: false, error: err.message });
+            process.stderr.write(`Manager alchemy-settings capture failed: ${err.message}\n`);
+            await closeOpenApplications(page).catch(() => {});
+          }
+        } else {
+          results.steps.push({ step: 'manager-alchemy-settings', passed: false, error: 'alchemy bench fixture not seeded' });
+          process.stderr.write('Manager alchemy-settings capture skipped: alchemy bench fixture not seeded.\n');
+        }
+
+        // Manager experimental-off capture (issue #752 — evidence for #746): the
+        // selected-system rail with fabricate.experimentalFeatures DISABLED. On
+        // main this is the pre-fix state (Graph present, Crafting group absent);
+        // after #746 rebases the same frame shows the crafting group unconditional
+        // and the graph gone. The setting is WORLD-scoped, so this explicit
+        // false→capture is restored to previousExperimentalFeatures by the phase's
+        // finally. The assertion stays minimal (rail rendered, setting off) so it
+        // passes both before and after the fix. Guarded so a hiccup records a
+        // failed step rather than aborting the phase.
+        try {
+          await closeOpenApplications(page);
+          await page.evaluate(async () => {
+            await game.settings.set('fabricate', 'experimentalFeatures', false);
+          });
+          await page.evaluate(() => {
+            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          });
+          await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await setManagerWindowSize(page, { width: 1280, height: 820 });
+          await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
+          await settleManagerNav(page);
+          const experimentalOffNav = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
+            labels.map(label => label.textContent?.trim()).filter(Boolean)
+          );
+          if (!experimentalOffNav.includes('System Overview')) {
+            throw new Error(`Manager experimental-off rail did not render the selected-system nav. Saw: ${experimentalOffNav.join(', ')}`);
+          }
+          const experimentalStillOff = await page.evaluate(() =>
+            Boolean(game.settings.get('fabricate', 'experimentalFeatures'))
+          );
+          if (experimentalStillOff !== false) {
+            throw new Error('Experimental features did not read as disabled at capture time.');
+          }
+          await assertManagerLayoutStable(page, 'experimental off');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-experimental-off');
+          process.stdout.write('  D0: experimental-off rail screenshotted\n');
+          await closeOpenApplications(page);
+          results.steps.push({ step: 'manager-experimental-off', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'manager-experimental-off', passed: false, error: err.message });
+          process.stderr.write(`Manager experimental-off capture failed: ${err.message}\n`);
+          await closeOpenApplications(page).catch(() => {});
+        }
+
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, {
@@ -6572,6 +6975,30 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'player-crafting-run-summary');
 
+          // Roll-result box evidence (issue #752 — evidence for #727's pill fix):
+          // the run summary only renders when a craft recorded a roll result, and
+          // it embeds the RollResultBox (awarded pills + outcome). Capture that box
+          // directly so a change under crafting/detail maps to a real frame that
+          // proves the pills + roll total. Guarded so a non-craftable selection
+          // (no run summary) records a failed step rather than aborting the phase.
+          try {
+            const rollResultBox = appShell
+              .locator('[data-crafting-run-summary] [data-recipe-section="roll-result"]')
+              .first();
+            await rollResultBox.waitFor({ state: 'visible', timeout: 10_000 });
+            await rollResultBox.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-roll-result');
+            results.steps.push({ step: 'player-crafting-roll-result', passed: true });
+          } catch (rollResultError) {
+            results.steps.push({
+              step: 'player-crafting-roll-result',
+              passed: false,
+              error: String(rollResultError?.message ?? rollResultError)
+            });
+            process.stdout.write(`  Player Crafting roll-result capture skipped: ${rollResultError?.message ?? rollResultError}\n`);
+          }
+
           // Multi-option ingredient selector evidence (issue #552): select the
           // seeded 'Smoke Weave Filigree' recipe, whose single ingredient group
           // offers two interchangeable coils the crafter holds, so the detail
@@ -6925,6 +7352,33 @@ async function main() {
         await screenshot(page, 'post-craft');
         process.stdout.write('  Screenshotted post-craft state.\n');
 
+        // Chat card evidence (issue #752 — evidence for #727's roll-total fix):
+        // the API craft above posts a crafting result card to chat. Activate the
+        // sidebar chat tab, scroll the newest fabricate craft card into view, and
+        // clip the screenshot to the sidebar bounding box (a viewport region shot,
+        // not the full page). Full-profile only, and guarded so a hiccup records a
+        // failed step rather than aborting the phase.
+        if (RUN_SCREENSHOT_PHASES) {
+          try {
+            await page.locator('#sidebar [data-tab="chat"]').first().click({ force: true }).catch(() => {});
+            const craftChatCard = page.locator('#sidebar .fabricate-craft-chat').last();
+            await craftChatCard.waitFor({ state: 'visible', timeout: 10_000 });
+            await craftChatCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await page.waitForTimeout(200);
+            const sidebarClip = await page.locator('#sidebar').first().boundingBox();
+            await screenshot(page, 'chat-craft-card', sidebarClip ? { clip: sidebarClip } : {});
+            process.stdout.write('  Screenshotted the crafting chat card.\n');
+            results.steps.push({ step: 'chat-craft-card', passed: true });
+          } catch (chatCardError) {
+            results.steps.push({
+              step: 'chat-craft-card',
+              passed: false,
+              error: String(chatCardError?.message ?? chatCardError)
+            });
+            process.stderr.write(`Chat craft card capture failed: ${chatCardError?.message ?? chatCardError}\n`);
+          }
+        }
+
         // Open the crafter's sheet to show the crafted item (inventory tab)
         process.stdout.write('  Opening the crafter\'s inventory to verify crafted item...\n');
         await page.evaluate(async (crafterId) => {
@@ -7061,6 +7515,42 @@ async function main() {
 
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'fabricate-journal');
+
+          // Journal craft-detail capture (issue #752 — evidence for #748, and
+          // future #738): select a CRAFTING history run so the run-detail
+          // requirements card (StepDetails) is visible. The Phase E "Brew Healing
+          // Potion" craft guarantees at least one terminal crafting run. Full
+          // profile only (the rc journal frame is untouched); this runs after the
+          // fabricate-journal capture so it never disturbs that frame's selection.
+          if (RUN_SCREENSHOT_PHASES) {
+            const historyRows = appShell.locator('.journal-history-row[data-history-run-id]');
+            const historyCount = await historyRows.count();
+            let craftingRunSelected = false;
+            for (let i = 0; i < historyCount; i += 1) {
+              await historyRows.nth(i).scrollIntoViewIfNeeded().catch(() => {});
+              await historyRows.nth(i).click().catch(() => {});
+              const selectedCraftingRun = await appShell
+                .locator('[data-journal-detail][data-run-type="crafting"]')
+                .first()
+                .waitFor({ state: 'visible', timeout: 5_000 })
+                .then(() => true)
+                .catch(() => false);
+              if (selectedCraftingRun) {
+                craftingRunSelected = true;
+                break;
+              }
+            }
+            if (!craftingRunSelected) {
+              throw new Error('Journal history had no crafting run to show the run-detail requirements card.');
+            }
+            // Best-effort: bring the requirements (StepDetails) card into the frame
+            // when the crafting step carries facts (the routed-by-check smoke craft
+            // does). The crafting run-detail article is the hard requirement above.
+            await appShell.locator('[data-journal-detail][data-run-type="crafting"] [data-journal-card="step-details"]')
+              .first().scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'fabricate-journal-craft-detail');
+          }
         };
         let journalErr = null;
         for (let attempt = 1; attempt <= JOURNAL_CAPTURE_ATTEMPTS; attempt += 1) {
@@ -7259,6 +7749,7 @@ async function main() {
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
     results.phaseTimings = phaseTimings;
+    results.viewTimings = viewTimings;
     // A browser that already CRASHED (the teardown case) can make close() reject. This is
     // the finally block and the run's verdict is already recorded in `results`, so a close
     // failure is post-run cleanup noise — never re-throw here (it would mask the try's
@@ -7276,6 +7767,12 @@ async function main() {
     const timingsTable = formatTimingsTable(combinedTimings);
     if (timingsTable) {
       process.stdout.write(`\n${timingsTable}\n\n`);
+    }
+    // R3 (#750): surface the slowest individual views under the phase table so a
+    // future measured cut can target them directly.
+    const slowestViewsTable = formatSlowestViewsTable(viewTimings);
+    if (slowestViewsTable) {
+      process.stdout.write(`${slowestViewsTable}\n\n`);
     }
 
     // Write summary.json

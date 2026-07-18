@@ -229,6 +229,121 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.equal(usedBy[0].role, 'ingredient', 'direct ingredient usage wins over essence');
   });
 
+  it('lists a component under used-by when a tag-matcher ingredient consumes it', () => {
+    // The ingredient names no component id; it matches every component tagged `metal`.
+    // c1 (Iron) carries `metal`; c2 (Coal) carries `fuel`, so only Iron is consumed.
+    const recipe = {
+      id: 'r-tag',
+      name: 'Tag Forge',
+      img: 'icons/tag.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    assert.deepEqual(rowByComponent(listing, 'c1').usedBy, [
+      {
+        recipeId: 'r-tag',
+        recipeName: 'Tag Forge',
+        recipeImg: 'icons/tag.webp',
+        role: 'ingredient',
+      },
+    ]);
+    // Coal is not tagged `metal`, so it gains no entry from this tag matcher.
+    assert.deepEqual(rowByComponent(listing, 'c2').usedBy, []);
+  });
+
+  it('lists a component once when a recipe consumes it both directly and via a tag matcher', () => {
+    const recipe = {
+      id: 'r-dup',
+      name: 'Direct And Tag',
+      img: 'icons/dup.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ componentId: 'c1' }] },
+            { id: 'g2', options: [{ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    const usedBy = rowByComponent(listing, 'c1').usedBy;
+    assert.equal(usedBy.length, 1, 'the recipe appears once across the direct and tag matches');
+    assert.equal(usedBy[0].recipeId, 'r-dup');
+    assert.equal(usedBy[0].role, 'ingredient');
+  });
+
+  it('contributes no used-by entry when a tag matcher matches zero components', () => {
+    const recipe = {
+      id: 'r-empty',
+      name: 'Empty Tags',
+      img: 'icons/empty.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ match: { type: 'tags', tags: [], tagMatch: 'any' } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    assert.deepEqual(rowByComponent(listing, 'c1').usedBy, []);
+    assert.deepEqual(rowByComponent(listing, 'c2').usedBy, []);
+  });
+
+  it('does not expand an essence-type ingredient option into the component used-by index', () => {
+    // An essence-type OPTION match is excluded from componentUsedBy: it would otherwise
+    // list every essence-bearing component as a consumed ingredient. The essence channel
+    // (fed by set-level `essences`) is left untouched — here it stays empty.
+    const recipe = {
+      id: 'r-ess-opt',
+      name: 'Essence Option',
+      img: 'icons/ess.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    // c1 (fire:2) and c2 (fire:1) both carry fire, yet neither is a consumed ingredient.
+    assert.deepEqual(rowByComponent(listing, 'c1').usedBy, []);
+    assert.deepEqual(rowByComponent(listing, 'c2').usedBy, []);
+    // The essence row exists (Iron/Coal carry fire) but this recipe is not on it —
+    // an essence OPTION does not feed the essenceUsedBy channel, only set-level essences do.
+    const fire = listing.rows.find((row) => row.isEssenceSource && row.componentId === 'fire');
+    assert.deepEqual(fire.usedBy, []);
+  });
+
   it('builds the used-by index once per system that has owned rows', () => {
     const { getRecipesCalls } = ownAll();
     assert.equal(getRecipesCalls.length, 1);
@@ -297,7 +412,11 @@ describe('InventoryListingBuilder — used-by index', () => {
     const { builder } = makeBuilder();
     const blueprint = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
     assert.equal(builder._resolveRecipeImg({ img: 'icons/blade.webp' }), 'icons/blade.webp');
-    assert.equal(builder._resolveRecipeImg({ img: '' }), blueprint, 'empty img → blueprint, not a bag');
+    assert.equal(
+      builder._resolveRecipeImg({ img: '' }),
+      blueprint,
+      'empty img → blueprint, not a bag'
+    );
     assert.equal(builder._resolveRecipeImg({}), blueprint);
     // Foundry's generic item-bag default is treated as "no image" → blueprint.
     assert.equal(builder._resolveRecipeImg({ img: 'icons/svg/item-bag.svg' }), blueprint);
@@ -645,8 +764,22 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   }
 
   const RECIPES = [
-    { id: 'r1', name: 'Fireball', description: 'Boom.', img: 'icons/fb.webp', craftingSystemId: 'sys-b', recipeItemId: 'def-1' },
-    { id: 'r2', name: 'Ice Lance', description: 'Chill.', img: 'icons/il.webp', craftingSystemId: 'sys-b', recipeItemId: 'def-1' },
+    {
+      id: 'r1',
+      name: 'Fireball',
+      description: 'Boom.',
+      img: 'icons/fb.webp',
+      craftingSystemId: 'sys-b',
+      recipeItemId: 'def-1',
+    },
+    {
+      id: 'r2',
+      name: 'Ice Lance',
+      description: 'Chill.',
+      img: 'icons/il.webp',
+      craftingSystemId: 'sys-b',
+      recipeItemId: 'def-1',
+    },
   ];
 
   function bookBuilder({ system, recipes = RECIPES, recipeVisibility = null } = {}) {
@@ -680,9 +813,17 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   }
 
   it('flags a book’s recipes learnBlocked when the reader fails its character prerequisites (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 2,
+    };
     const system = {
-      ...bookSystem({ caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: ['p-expert'] } } }),
+      ...bookSystem({
+        caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: ['p-expert'] } },
+      }),
       characterPrerequisites: [EXPERT],
     };
     const actorWithRollData = (rank) => ({
@@ -695,19 +836,38 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       viewer: { isGM: false },
     });
     const blockedRecipes = bookRow(blocked).recipes;
-    assert.ok(blockedRecipes.every((r) => r.learnBlocked === true), 'all recipes blocked');
+    assert.ok(
+      blockedRecipes.every((r) => r.learnBlocked === true),
+      'all recipes blocked'
+    );
     assert.equal(blockedRecipes[0].learnBlockedReason, 'Expert Crafter');
 
     const passing = bookBuilder({ system }).buildListing({
       craftingActor: actorWithRollData(3),
       viewer: { isGM: false },
     });
-    assert.ok(bookRow(passing).recipes.every((r) => r.learnBlocked === false), 'passing reader unblocked');
+    assert.ok(
+      bookRow(passing).recipes.every((r) => r.learnBlocked === false),
+      'passing reader unblocked'
+    );
   });
 
   it('surfaces per-book requirements (Required Knowledge + Learning prerequisites) with met/unmet (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', icon: 'fas fa-hat-wizard', path: 'skills.cra.rank', op: 'gte', value: 2 };
-    const NOVICE = { id: 'p-fail', name: 'Master Only', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      icon: 'fas fa-hat-wizard',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 2,
+    };
+    const NOVICE = {
+      id: 'p-fail',
+      name: 'Master Only',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 9,
+    };
     const system = {
       ...bookSystem({
         caps: {
@@ -734,7 +894,12 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       getRollData: () => ({ skills: { cra: { rank: 3 } } }),
     };
 
-    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    const row = bookRow(
+      bookBuilder({ system, recipes }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: false },
+      })
+    );
     const reqs = row.requirements;
     // Dangling ids (ghost recipe, p-missing prereq) are skipped (fail-open): 2 + 2 = 4.
     assert.equal(reqs.length, 4, 'dangling requirement ids are skipped');
@@ -757,18 +922,31 @@ describe('InventoryListingBuilder — recipe-item books', () => {
 
     // learnBlocked folds in Required Knowledge AND character prereqs; the reason lists
     // ONLY the unmet requirement names.
-    assert.ok(row.recipes.every((r) => r.learnBlocked === true), 'book is blocked while any requirement is unmet');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === true),
+      'book is blocked while any requirement is unmet'
+    );
     assert.equal(row.recipes[0].learnBlockedReason, 'Ritual, Master Only');
   });
 
   it('has no requirements and is not learnBlocked when Limited learning is off (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 9,
+    };
     const system = {
       ...bookSystem({
         caps: {
           item: {},
           // Both gates configured but Limited learning OFF ⇒ neither enforced.
-          learn: { limitLearning: false, prerequisiteIds: ['r-unknown'], characterPrerequisiteIds: ['p-expert'] },
+          learn: {
+            limitLearning: false,
+            prerequisiteIds: ['r-unknown'],
+            characterPrerequisiteIds: ['p-expert'],
+          },
         },
       }),
       characterPrerequisites: [EXPERT],
@@ -778,20 +956,38 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
       getRollData: () => ({ skills: { cra: { rank: 0 } } }),
     };
-    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    const row = bookRow(
+      bookBuilder({ system, recipes }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: false },
+      })
+    );
     assert.deepEqual(row.requirements, [], 'no requirements when Limited learning is off');
-    assert.ok(row.recipes.every((r) => r.learnBlocked === false), 'not blocked when Limited learning is off');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === false),
+      'not blocked when Limited learning is off'
+    );
   });
 
   it('does not surface requirements or learnBlocked on a craft-only (item-mode) book (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 9,
+    };
     // An item-mode book is CRAFTED by being held, never learned; its stored learn caps
     // (even with limitLearning on + prereq ids) are inert and must not leak chips.
     const system = {
       ...bookSystem({
         caps: {
           item: { limitUses: false },
-          learn: { limitLearning: true, prerequisiteIds: ['r-unknown'], characterPrerequisiteIds: ['p-expert'] },
+          learn: {
+            limitLearning: true,
+            prerequisiteIds: ['r-unknown'],
+            characterPrerequisiteIds: ['p-expert'],
+          },
         },
       }),
       visibilityMode: 'item',
@@ -802,10 +998,18 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
       getRollData: () => ({ skills: { cra: { rank: 0 } } }),
     };
-    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    const row = bookRow(
+      bookBuilder({ system, recipes }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: false },
+      })
+    );
     assert.equal(row.learnable, false, 'the item-mode book is not learnable');
     assert.deepEqual(row.requirements, [], 'no requirement chips on a craft-only book');
-    assert.ok(row.recipes.every((r) => r.learnBlocked === false), 'recipes are not learn-blocked on a craft-only book');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === false),
+      'recipes are not learn-blocked on a craft-only book'
+    );
   });
 
   it('redacts an undiscovered required-knowledge recipe name but still counts + blocks it (issue 544)', () => {
@@ -818,7 +1022,10 @@ describe('InventoryListingBuilder — recipe-item books', () => {
         },
       }),
     };
-    const recipes = [...RECIPES, { id: 'r-secret', name: 'Forbidden Ritual', craftingSystemId: 'sys-b' }];
+    const recipes = [
+      ...RECIPES,
+      { id: 'r-secret', name: 'Forbidden Ritual', craftingSystemId: 'sys-b' },
+    ];
     // The visibility service marks r-secret a teaser (undiscovered) for this reader,
     // so it is excluded from the allowed set; r1/r2 stay visible.
     const recipeVisibility = {
@@ -840,13 +1047,23 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.equal(secret.met, false, 'still counts as unmet');
     assert.equal(secret.name, 'a hidden recipe', 'its name is redacted to the generic label');
     assert.ok(!/Forbidden Ritual/.test(secret.name), 'the real teaser name is not disclosed');
-    assert.ok(row.recipes.every((r) => r.learnBlocked === true), 'it still blocks learning');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === true),
+      'it still blocks learning'
+    );
 
     // A GM (allowedRecipeIds null) sees the real name.
     const gmRow = bookRow(
-      bookBuilder({ system, recipes, recipeVisibility }).buildListing({ craftingActor: actor, viewer: { isGM: true } })
+      bookBuilder({ system, recipes, recipeVisibility }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: true },
+      })
     );
-    assert.equal(gmRow.requirements.find((r) => r.id === 'r-secret').name, 'Forbidden Ritual', 'the GM sees the real name');
+    assert.equal(
+      gmRow.requirements.find((r) => r.id === 'r-secret').name,
+      'Forbidden Ritual',
+      'the GM sees the real name'
+    );
   });
 
   it('classifies book learn/craft from the flat visibilityMode (item→craft, knowledge→learn, global/restricted→no rows)', () => {
@@ -939,7 +1156,11 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.ok(row, 'an item-only book still appears in the inventory');
     assert.equal(row.learnable, false, 'an item-only book offers no Learn affordance');
     assert.equal(row.limits.learning, null, 'no learning limit for an item-only book');
-    assert.deepEqual(row.limits.uses, { max: 3, used: 1, remaining: 2 }, 'the craft-use limit still shows');
+    assert.deepEqual(
+      row.limits.uses,
+      { max: 3, used: 1, remaining: 2 },
+      'the craft-use limit still shows'
+    );
     assert.deepEqual(
       row.recipes.map((r) => r.id),
       ['r1', 'r2'],
@@ -1064,7 +1285,7 @@ function salvageOf(system, { items = [item('Iron', 1)] } = {}) {
   // non-GM hiding is covered by its own dedicated tests below.
   const listing = builder.buildListing({
     craftingActor: actor('a1', 'Akra', items),
-    viewer: { isGM: true, id: 'gm' }
+    viewer: { isGM: true, id: 'gm' },
   });
   return rowByComponent(listing, 'c1')?.salvage ?? null;
 }
@@ -1321,7 +1542,9 @@ describe('InventoryListingBuilder - salvage view-model', () => {
     const salvage = salvageOf(
       salvageSystem({
         mode: 'simple',
-        salvage: { resultGroups: [{ id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 3 }] }] },
+        salvage: {
+          resultGroups: [{ id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 3 }] }],
+        },
       })
     );
     assert.deepEqual(
@@ -1431,7 +1654,7 @@ describe('InventoryListingBuilder - derived broken verdict', () => {
       assert.equal(
         rowByComponent(listing, 'c1').broken,
         true,
-        `${mode.mode}: the persisted past fact needs no roll and no usage`,
+        `${mode.mode}: the persisted past fact needs no roll and no usage`
       );
     }
   });

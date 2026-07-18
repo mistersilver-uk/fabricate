@@ -942,13 +942,20 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('visiblePlaceholderViews'),
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
-    assert.ok(rootSource.includes('recipesRouteEnabled'), 'root should derive the recipes route from the experimental feature gate');
-    assert.ok(rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable'), 'route normalization should reject every crafting view while the experimental gate is disabled');
-    assert.ok(rootSource.includes("if ((view === 'recipes' || view === 'crafting-settings' || view === 'access' || view === 'books-scrolls' || view === 'recipe-item-edit') && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes/crafting navigation while disabled');
-    assert.ok(rootSource.includes("{#if recipesRouteEnabled}"), 'recipes should not be hard-wired as an always-active rail route');
+    // Issue 745: the Crafting group is unconditional (v1.3 headline); the experimental
+    // toggle now only gates the unimplemented Graph placeholder.
+    assert.ok(rootSource.includes('const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true)'), 'root should derive the experimental gate for the Graph placeholder');
+    assert.ok(!rootSource.includes('recipesRouteEnabled'), 'the recipes-route experimental gate should be gone');
+    assert.ok(!rootSource.includes('!recipesAvailable'), 'route normalization should no longer gate crafting views on the experimental toggle');
+    assert.ok(!rootSource.includes("{#if recipesRouteEnabled}"), 'the Crafting rail group should render unconditionally');
+    assert.ok(rootSource.includes("if (view.id === 'graph') return experimentalFeaturesEnabled;"), 'the Graph placeholder should be gated on the experimental toggle');
     assert.ok(
-      rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
-      'root should keep disabled Recipes in the planned placeholder list when experimental features are off'
+      !rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
+      'the disabled Recipes placeholder should be removed now that Crafting is always available'
+    );
+    assert.ok(
+      rootSource.includes("{ id: 'graph', icon: 'fas fa-project-diagram'"),
+      'the Graph placeholder should remain in the planned placeholder list'
     );
     assert.ok(rootSource.includes('selectSystemAndShowBrowser'), 'root should keep an explicit systems-browser route');
     assert.ok(rootSource.includes('manager-scope-card'), 'root should render the selected system in a rail card');

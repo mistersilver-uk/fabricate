@@ -80,6 +80,25 @@ See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#
 
 Developers configuring a custom check for a non-D&D-5e system should refer to the API reference for the expected setup.
 
+## Failure consumption policy
+
+When a crafting check fails, you decide what happens to the recipe's ingredients and its required Tools.
+Two toggles on the **Crafting check** page set this policy for the whole system.
+
+- **Consume ingredients on a failed check** is on by default.
+The recipe's ingredients are used up even when the crafting check fails.
+Turn it off to return the ingredients on a failed check, so a failed attempt costs the crafter nothing.
+- **Break tools on a failed check** is off by default.
+Turn it on to break the required Tools whenever the crafting check fails.
+
+This policy applies to every failed crafting check in the system, across the simple, Routed by ingredients, Routed by check, and Progressive modes.
+It does not appear in Alchemy mode, where a failed brew follows the system's own [Consume on Fail]({% link recipes/alchemy.md %}#consume-on-fail) setting instead.
+Salvage failures follow their own separate policy, so this control does not change what a failed salvage consumes.
+See [Salvage]({% link salvage.md %}).
+
+The **Break tools on a failed check** toggle is a system-wide rule that breaks every required Tool on any failed check.
+It is separate from the per-trigger **Tool breakage triggers** panel below, which decides breakage from the specifics of the roll.
+
 ## Tool breakage triggers
 
 You can let a check decide whether the required Tools break for an attempt, so the same roll that picks the result also decides whether the Tools survive.

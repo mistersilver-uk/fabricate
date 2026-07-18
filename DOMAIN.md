@@ -176,7 +176,6 @@ Module Configuration
 |  |- lastManagedCraftingSystem
 |  |- managerRailCollapsed
 |  |- favouriteRecipes
-|  |- recentlyCrafted
 |  |- lastAlchemySystem
 |  |- lastGatheringActor
 |  |- gatheringHideUnavailableEnvironments

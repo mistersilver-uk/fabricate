@@ -22,6 +22,10 @@
     recipe = null,
     isMultiStep = false,
     currencyUnits = [],
+    // Gates the "Add cost" affordances (and read-only rendering of existing currency
+    // requirements) on the system's currency feature being enabled, not merely on unit
+    // presence. Forwarded to every section, or it silently drops to its default.
+    currencyEnabled = true,
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
@@ -88,6 +92,7 @@
             {essenceOptions}
             {itemTags}
             {currencyUnits}
+            {currencyEnabled}
             {showSetName}
             onChange={(nextSets) => onUpdateIngredientSets(step.id, nextSets)}
           />
@@ -102,6 +107,7 @@
       {essenceOptions}
       {itemTags}
       {currencyUnits}
+      {currencyEnabled}
       {showSetName}
       onChange={(nextSets) => onUpdateIngredientSets(null, nextSets)}
     />

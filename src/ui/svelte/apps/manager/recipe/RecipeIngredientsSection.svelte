@@ -21,6 +21,10 @@
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
+    // Whether the system's currency feature is enabled. Gates the "Add cost" affordances
+    // and the read-only rendering of existing currency requirements; forwarded to every
+    // set card, or it silently drops to its default.
+    currencyEnabled = true,
     showSetName = true,
     // Whether this system's mode allows more than one ingredient set (i.e. NOT
     // simple/progressive, which are structurally 1×1, and NOT alchemy, which forces
@@ -123,6 +127,7 @@
         {essenceOptions}
         {itemTags}
         {currencyUnits}
+        {currencyEnabled}
         onChange={(nextSet) => updateSimpleSet(nextSet)}
       />
     </div>
@@ -147,6 +152,7 @@
             {essenceOptions}
             {itemTags}
             {currencyUnits}
+            {currencyEnabled}
             {showSetName}
             defaultName={defaultSetName(index)}
             onChange={(nextSet) => updateSet(index, nextSet)}
