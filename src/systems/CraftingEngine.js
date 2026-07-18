@@ -1132,10 +1132,14 @@ export class CraftingEngine {
         ? { componentId: entry.componentId, systemItemId: entry.componentId }
         : null,
     }));
-    const consumedRunRefs = summary.map((entry) => ({
-      actorUuid: entry.actorUuid ?? null,
-      itemUuid: entry.itemUuid ?? null,
-      quantity: entry.quantity,
+    // Route the reconstructed snapshots through the same mapper the immediate craft
+    // paths use so the persisted run refs carry the consume-time name/img (captured
+    // into the summary at START, ~:1014). Preserve the summary's componentId too — the
+    // Journal projection falls back to it for the name/img when a live lookup fails
+    // (RunJournalBuilder._mapResult). Dropping these left timed-step history rows blank.
+    const consumedRunRefs = consumedItems.map((consumed) => ({
+      ...mapConsumedIngredientRef(consumed),
+      componentId: consumed.ingredient?.componentId ?? null,
     }));
 
     // Tools are reusable and were NOT consumed at START, so re-resolve them here

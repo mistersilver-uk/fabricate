@@ -98,7 +98,6 @@
 
 {#if hasContent}
   <JournalCard kind="step-details" title={localize(titleKey)}>
-
     <div class="journal-fact-list">
       {#if requiredTime !== ''}
         <JournalFactRow

@@ -1432,6 +1432,7 @@ CraftingRunStepState = {
     quantity: number,
     name?: string | null, // captured at consume time; absent on pre-capture historical records
     img?: string | null,  // captured at consume time; absent on pre-capture historical records
+    componentId?: string | null, // captured on the timed-step FINISH path (and legacy refs); a projection name/img fallback
   }>,
   // Flattened tool-breakage evidence written by `_applyToolBreakage`. Each entry
   // is one tool's usage/breakage record; `componentId` and `broken` are load-bearing
