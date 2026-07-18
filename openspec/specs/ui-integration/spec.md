@@ -1858,12 +1858,21 @@ Client settings:
 - `fabricate.recentlyCrafted`
 - `fabricate.progressiveResultOrder`
 
-Flags:
+Actor flags:
 
 - `flags.fabricate.learnedRecipes`
 - `flags.fabricate.craftingRuns`
+- `flags.fabricate.salvageRuns` (`{ active, history }`, defined canonically in `recipes-and-steps`)
 - `flags.fabricate.gatheringRuns`
 - `flags.fabricate.discoveredGatheringRealms`
+
+Item flags:
+
+- `flags.fabricate.toolBroken` (the authoritative presence-gate disqualifier for a broken tool)
+- `flags.fabricate.componentId`
+- `flags.fabricate.roles`
+
+Note: the crafting and salvage run containers are physically stored at the doubly-nested path `flags.fabricate.fabricate.<key>` while gathering is single-scoped; the uniform logical notation above is the contract.
 
 ## Compatibility
 

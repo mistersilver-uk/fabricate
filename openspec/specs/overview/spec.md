@@ -127,6 +127,8 @@ Client:
 
 - `flags.fabricate.craftingRuns.active` for resumable in-progress runs
 - `flags.fabricate.craftingRuns.history` for completed/failed/cancelled run history
+- `flags.fabricate.salvageRuns.active` for in-progress salvage runs
+- `flags.fabricate.salvageRuns.history` for completed/failed/cancelled salvage run history
 - `flags.fabricate.gatheringRuns.active` for in-progress time-gated gathering runs
 - `flags.fabricate.gatheringRuns.history` for completed/failed/cancelled gathering run history
 - `flags.fabricate.learnedRecipes` for learned recipe records

@@ -460,7 +460,8 @@ It **counts across all actors** that hold the document and is **not reset** on t
 
 Players learn from an owned recipe item one recipe at a time in the player Inventory tab, which is the manual learn surface for every knowledge mode.
 A recipe item with an **effective** learn cap (its own `caps.learn.limitRecipes === true` AND a finite positive `caps.learn.maxRecipes`) is a **capped recipe item** and does not auto-learn every linked recipe on drop.
-A recipe item that toggled `limitRecipes` on but carries a missing or invalid `maxRecipes` is not treated as capped -- it fails closed to the uncapped auto-learn path rather than bricking its recipes with a zero budget.
+A recipe item that toggled `limitRecipes` on but carries a missing or invalid `maxRecipes` is normalized so that `learnsAllowed` (and its legacy `maxRecipes` mirror) seeds to `1` — a limit of "0/undefined" is meaningless and would wrongly read as uncapped downstream (issue 544), so the observable behaviour for stored, normalized systems is a 1-learn budget rather than an uncapped auto-learn path.
+The runtime uncapped fallback survives only as a defensive dead path for raw, un-normalized data.
 
 - Owned recipe items surface in the Inventory listing (`InventoryListingBuilder`) as learnable rows for any `knowledge` list-mode system, carrying their linked recipes (each with a per-actor `learned` flag) and their applicable limits.
   A `learnable` row flag is set only for `learned` / `itemOrLearned` modes; an item-only book lists its recipes and its craft-use limit but offers no Learn affordance (it grants access by being held).

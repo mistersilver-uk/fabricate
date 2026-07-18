@@ -406,16 +406,32 @@ SalvageRun = {
     itemUuid: string,
     quantity: number,
   }>,
+  // Flattened tool-breakage evidence shared with crafting (written by
+  // `_applyToolBreakage`). `componentId` and `broken` are load-bearing for the
+  // salvage chat card and the Run Journal.
   usedTools?: Array<{
-    actorUuid: string,
-    itemUuid: string,
+    actorUuid: string | null,
+    itemUuid: string | null,
     quantity: number,
+    componentId: string | null,
+    broken: boolean,
+    // checkDriven-only evidence and skip/marker fields, as in the crafting
+    // CraftingRunStepState.usedTools shape (data-models):
+    authority?: string,
+    reason?: string,
+    triggerId?: string,
+    checkId?: string,
+    virtual?: boolean,
+    spared?: boolean,
+    skippedImmune?: boolean,
   }>,
   createdResults?: Array<{
     itemUuid: string,
     // the producing component id, or `null` for pre-fix historical runs
     componentId: string | null,
     quantity: number,
+    name?: string | null, // captured at award time; absent on pre-capture historical records
+    img?: string | null,  // captured at award time; absent on pre-capture historical records
   }>,
 }
 ```
