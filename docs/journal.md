@@ -42,6 +42,11 @@ The badge stays accurate even while the Journal tab is closed, and it disappears
 Below the active list, **History** shows runs that have finished.
 A finished run carries a status of **Succeeded**, **Failed**, or **Cancelled**.
 
+Failed alchemy brews appear here too.
+An alchemy attempt that matched no recipe is listed as a generic **Failed alchemy attempt** that never names a recipe, so it cannot reveal an undiscovered recipe.
+For an alchemy system, whether players see these failed attempts is controlled by the GM's **Show attempt history to players** option.
+The GM always sees them.
+
 History is paginated.
 You can choose how many runs to show per page and step through the pages.
 You can also sort history by **Newest** or **Oldest**.
