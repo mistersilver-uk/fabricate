@@ -38,6 +38,11 @@ import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
+import { computeSystemVisibility } from './systemValidation.js';
+
+// A shared empty set for the GM path, where no entity is visibility-hidden — avoids
+// allocating a throwaway Set per system on every listing build.
+const NO_HIDDEN_ENTITIES = new Set();
 
 // Knowledge modes in which a recipe item (book) can teach a recipe. In these
 // modes owning the book surfaces a Learn affordance in the inventory; other modes
@@ -76,6 +81,42 @@ function finiteOrNull(value) {
 function itemStackQuantity(item) {
   const raw = Number(item?.system?.quantity);
   return Number.isFinite(raw) && raw > 0 ? raw : 1;
+}
+
+/**
+ * Push a used-by entry onto a reverse index, deduped per (targetId, role) via the
+ * caller's `seen` set so one recipe contributes a single entry per component/essence
+ * per role even across multiple ingredient sets.
+ */
+function pushUse(index, targetId, entry, seen) {
+  const dedupeKey = `${targetId}:${entry.role}`;
+  if (seen.has(dedupeKey)) return;
+  seen.add(dedupeKey);
+  const list = index.get(targetId);
+  if (list) list.push(entry);
+  else index.set(targetId, [entry]);
+}
+
+/**
+ * A one-entry-per-(componentId, source key) accumulator over `targetMap`, shared by the
+ * produced-by and required-for indexes (each gets its own closed-over `seen` + target
+ * map). Returns `(componentId, key, value) => void`.
+ */
+function makeAdder(targetMap) {
+  const seen = new Map();
+  return (componentId, key, value) => {
+    if (!componentId) return;
+    let keys = seen.get(componentId);
+    if (!keys) {
+      keys = new Set();
+      seen.set(componentId, keys);
+    }
+    if (keys.has(key)) return;
+    keys.add(key);
+    const list = targetMap.get(componentId);
+    if (list) list.push(value);
+    else targetMap.set(componentId, [value]);
+  };
 }
 
 export class InventoryListingBuilder {
@@ -153,7 +194,7 @@ export class InventoryListingBuilder {
     const systems = this.craftingSystemManager?.getSystems?.() ?? [];
     for (const system of Array.isArray(systems) ? systems : []) {
       rows.push(
-        ...this._buildSystemRows(system, sources, allowedRecipeIds),
+        ...this._buildSystemRows(system, sources, allowedRecipeIds, isGM),
         ...this._buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds)
       );
     }
@@ -217,11 +258,75 @@ export class InventoryListingBuilder {
    * index is only built for systems that produced at least one owned row.
    * @private
    */
-  _buildSystemRows(system, sources, allowedRecipeIds = null) {
+  _buildSystemRows(system, sources, allowedRecipeIds = null, isGM = true) {
     const components = Array.isArray(system?.components) ? system.components : [];
     if (components.length === 0) return [];
 
-    // owned: componentId → { component, sources: Map<actorId, {name, img, qty}> }
+    const owned = this._collectOwnedEntities(
+      sources,
+      (item) => findMatchingComponent(item, components, system?.id),
+      'component'
+    );
+    if (owned.size === 0) return [];
+
+    const context = this._systemRowContext({ system, sources, allowedRecipeIds, isGM, components });
+
+    const componentRows = [];
+    // essenceTotals: essenceId → Map<actorId, {name, img, qty}>
+    const essenceTotals = new Map();
+    // essenceContributors: essenceId → [{componentId, name, img, quantity}] — the
+    // owned components that carry the essence and how much each contributes.
+    const essenceContributors = new Map();
+
+    for (const { component, sources: sourceMap, item: representativeItem } of owned.values()) {
+      const rowSources = context.orderSources(sourceMap);
+      const totalQuantity = rowSources.reduce((sum, source) => sum + source.quantity, 0);
+      if (totalQuantity <= 0) continue;
+
+      const rawEssences =
+        component.essences && typeof component.essences === 'object' ? component.essences : {};
+
+      componentRows.push(
+        this._buildComponentRow({
+          component,
+          representativeItem,
+          rowSources,
+          totalQuantity,
+          rawEssences,
+          context,
+        })
+      );
+
+      // Fold this component's essence content into the per-essence source totals
+      // (perUnit content × owned quantity, per source actor) and the per-essence
+      // contributing-components list (perUnit × this component's owned quantity).
+      if (context.essencesEnabled) {
+        this._foldEssenceContent({
+          rawEssences,
+          essenceDefById: context.essenceDefById,
+          totalQuantity,
+          component,
+          rowSources,
+          essenceContributors,
+          essenceTotals,
+        });
+      }
+    }
+
+    const essenceRows = this._buildEssenceRows({ essenceTotals, essenceContributors, context });
+    return [...componentRows, ...essenceRows];
+  }
+
+  /**
+   * Scan every source actor's items for those matching a system entity (component or
+   * recipe-item book) and accumulate the owned quantity per source, crafting-actor
+   * first. `match(item) => entity|null` adapts it to either the component matcher or the
+   * recipe-item matcher; `entityKey` names the entity slot on each entry (`'component'`
+   * or `'def'`). Each entry's `item` is the first matched document in source order — the
+   * representative document whose tool-usage / use-learn counters the row reports.
+   * @private
+   */
+  _collectOwnedEntities(sources, match, entityKey) {
     const owned = new Map();
     for (const actor of sources) {
       const key = actorKey(actor);
@@ -229,28 +334,41 @@ export class InventoryListingBuilder {
       const actorImg = stringOrNull(actor?.img);
       const items = actor?.items ? [...actor.items] : [];
       for (const item of items) {
-        const component = findMatchingComponent(item, components, system?.id);
-        if (!component?.id) continue;
+        const entity = match(item);
+        if (!entity?.id) continue;
         const qty = itemStackQuantity(item);
-        let entry = owned.get(component.id);
+        let entry = owned.get(entity.id);
         if (!entry) {
-          // `item` is the first matched document in source order (crafting actor
-          // first) — the representative document whose tool-usage counter decides the
-          // row's derived `broken` verdict.
-          entry = { component, sources: new Map(), item };
-          owned.set(component.id, entry);
+          entry = { [entityKey]: entity, sources: new Map(), item };
+          owned.set(entity.id, entry);
         }
-        const current = entry.sources.get(key);
-        if (current) {
-          current.qty += qty;
-        } else {
-          entry.sources.set(key, { actorId: key, name: actorName, img: actorImg, qty });
-        }
+        this._addSourceQuantity(entry.sources, key, actorName, actorImg, qty);
       }
     }
+    return owned;
+  }
 
-    if (owned.size === 0) return [];
+  /**
+   * Add `qty` to a source-quantity map keyed by actor id, merging into the existing
+   * entry when that actor already contributed. The `{ actorId, name, img, qty }` shape
+   * is shared by owned-entity sources and per-essence source totals.
+   * @private
+   */
+  _addSourceQuantity(sourcesMap, actorId, name, img, qty) {
+    const current = sourcesMap.get(actorId);
+    if (current) current.qty += qty;
+    else sourcesMap.set(actorId, { actorId, name, img, qty });
+  }
 
+  /**
+   * Resolve the per-system derived context shared by every owned row: essence
+   * definitions, the recipe-derived reverse indexes, the tool-component set, the
+   * visibility-hidden entity ids, the stable source ordering and the component-by-id
+   * lookup. The system's recipes are fetched ONCE here and shared by the used-by index
+   * and the System-Validity Gate's entity tier — never re-queried per row.
+   * @private
+   */
+  _systemRowContext({ system, sources, allowedRecipeIds, isGM, components }) {
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
     const essencesEnabled = system?.enableEssences === true;
@@ -258,8 +376,21 @@ export class InventoryListingBuilder {
       essencesEnabled && Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
     const essenceDefById = new Map(essenceDefs.map((def) => [def.id, def]));
 
+    // The system's recipes, fetched ONCE per owned system and shared by the used-by
+    // index and the System-Validity Gate's entity tier — never re-queried per row.
+    const systemRecipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
+
+    // System-Validity Gate entity tier (spec §Listing Algorithm step 0): drop entities
+    // carrying a `blocks: 'visibility'` critical from a non-GM viewer's listing (today:
+    // components whose salvage config is invalid). Computed once per system; GMs bypass.
+    // This is a viewer-scoped projection filter — it NEVER mutates the stored `enabled`
+    // flag.
+    const hiddenEntityIds = isGM
+      ? NO_HIDDEN_ENTITIES
+      : this._hiddenEntityIdsForSystem(system, systemRecipes);
+
     const { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy } =
-      this._buildRecipeIndexes(system, allowedRecipeIds);
+      this._buildRecipeIndexes(system, allowedRecipeIds, systemRecipes);
     // Component ids registered as a Tool in the system library — a tool reads as a
     // tool even when no recipe references it.
     const toolComponentIds = new Set(
@@ -285,100 +416,168 @@ export class InventoryListingBuilder {
     // which resolve each produced component id to a name/image/difficulty.
     const componentById = new Map(components.filter((entry) => entry?.id).map((c) => [c.id, c]));
 
-    const componentRows = [];
-    // essenceTotals: essenceId → Map<actorId, {name, img, qty}>
-    const essenceTotals = new Map();
-    // essenceContributors: essenceId → [{componentId, name, img, quantity}] — the
-    // owned components that carry the essence and how much each contributes.
-    const essenceContributors = new Map();
+    return {
+      system,
+      systemId,
+      systemName,
+      essencesEnabled,
+      essenceDefById,
+      hiddenEntityIds,
+      componentUsedBy,
+      componentRequiredFor,
+      essenceUsedBy,
+      componentProducedBy,
+      toolComponentIds,
+      orderSources,
+      componentById,
+    };
+  }
 
-    for (const { component, sources: sourceMap, item: representativeItem } of owned.values()) {
-      const rowSources = orderSources(sourceMap);
-      const totalQuantity = rowSources.reduce((sum, source) => sum + source.quantity, 0);
-      if (totalQuantity <= 0) continue;
+  /**
+   * Build one owned-component inventory row. A component is "used by" a recipe when it
+   * is a direct ingredient/tool AND when the recipe requires an essence the component
+   * carries (e.g. Ham, which carries Bacon essence, is used by a recipe that needs
+   * Bacon essence) — deduped by recipe so a recipe that uses it both ways appears once.
+   * @private
+   */
+  _buildComponentRow({
+    component,
+    representativeItem,
+    rowSources,
+    totalQuantity,
+    rawEssences,
+    context,
+  }) {
+    const {
+      system,
+      systemId,
+      systemName,
+      essencesEnabled,
+      essenceDefById,
+      toolComponentIds,
+      componentUsedBy,
+      essenceUsedBy,
+      componentRequiredFor,
+      componentProducedBy,
+      componentById,
+      hiddenEntityIds,
+    } = context;
 
-      const rawEssences =
-        component.essences && typeof component.essences === 'object' ? component.essences : {};
-      // A component is "used by" a recipe when it is a direct ingredient/tool AND
-      // when the recipe requires an essence the component carries (e.g. Ham, which
-      // carries Bacon essence, is used by a recipe that needs Bacon essence).
-      // Deduped by recipe so a recipe that uses it both ways appears once.
-      const directUsedBy = componentUsedBy.get(component.id) ?? [];
-      const usedBy = essencesEnabled
-        ? this._mergeEssenceUsedBy(directUsedBy, rawEssences, essenceUsedBy)
-        : directUsedBy;
+    const directUsedBy = componentUsedBy.get(component.id) ?? [];
+    const usedBy = essencesEnabled
+      ? this._mergeEssenceUsedBy(directUsedBy, rawEssences, essenceUsedBy)
+      : directUsedBy;
 
-      componentRows.push({
-        key: `${systemId}:${component.id}`,
-        componentId: stringOrNull(component.id),
-        systemId,
-        systemName,
-        name: stringOrEmpty(component.name),
-        img: stringOrNull(component.img),
-        icon: null,
-        description: stringOrEmpty(component.description),
-        tags: Array.isArray(component.tags) ? component.tags.map(stringOrEmpty) : [],
-        tier: component.tier ?? null,
-        isEssenceSource: false,
-        isTool: toolComponentIds.has(component.id),
-        // A derived, read-only runtime verdict (issue 675). It drives the card overlay,
-        // the "Broken" pip and the inspector banner — and it does NOT gate salvage.
-        broken: this._isToolBroken(system, component.id, representativeItem),
-        // The player-facing salvage contract, or null when not salvageable. Component
-        // rows only: essence and recipe-item rows are never salvageable.
-        salvage: this._buildSalvage({ system, component, componentById, rowSources }),
-        totalQuantity,
-        sources: rowSources,
-        essences: essencesEnabled ? this._componentEssences(rawEssences, essenceDefById) : [],
-        usedBy,
-        requiredFor: componentRequiredFor.get(component.id) ?? [],
-        producedBy: componentProducedBy.get(component.id) ?? [],
-        contributors: [],
-      });
+    return {
+      key: `${systemId}:${component.id}`,
+      componentId: stringOrNull(component.id),
+      systemId,
+      systemName,
+      name: stringOrEmpty(component.name),
+      img: stringOrNull(component.img),
+      icon: null,
+      description: stringOrEmpty(component.description),
+      tags: Array.isArray(component.tags) ? component.tags.map(stringOrEmpty) : [],
+      tier: component.tier ?? null,
+      isEssenceSource: false,
+      isTool: toolComponentIds.has(component.id),
+      // A derived, read-only runtime verdict (issue 675). It drives the card overlay,
+      // the "Broken" pip and the inspector banner — and it does NOT gate salvage.
+      broken: this._isToolBroken(system, component.id, representativeItem),
+      // The player-facing salvage contract, or null when not salvageable. Component
+      // rows only: essence and recipe-item rows are never salvageable.
+      salvage: this._buildSalvage({
+        system,
+        component,
+        componentById,
+        rowSources,
+        hiddenEntityIds,
+      }),
+      totalQuantity,
+      sources: rowSources,
+      essences: essencesEnabled ? this._componentEssences(rawEssences, essenceDefById) : [],
+      usedBy,
+      requiredFor: componentRequiredFor.get(component.id) ?? [],
+      producedBy: componentProducedBy.get(component.id) ?? [],
+      contributors: [],
+    };
+  }
 
-      // Fold this component's essence content into the per-essence source totals
-      // (perUnit content × owned quantity, per source actor) and the per-essence
-      // contributing-components list (perUnit × this component's owned quantity).
-      if (essencesEnabled) {
-        for (const [essenceId, perUnit] of Object.entries(rawEssences)) {
-          const content = Number(perUnit);
-          if (!essenceDefById.has(essenceId) || !Number.isFinite(content) || content <= 0) continue;
-
-          const contribution = content * totalQuantity;
-          if (contribution > 0) {
-            const contributors = essenceContributors.get(essenceId) ?? [];
-            contributors.push({
-              componentId: stringOrNull(component.id),
-              name: stringOrEmpty(component.name),
-              img: stringOrNull(component.img),
-              quantity: contribution,
-            });
-            essenceContributors.set(essenceId, contributors);
-          }
-
-          let bySource = essenceTotals.get(essenceId);
-          if (!bySource) {
-            bySource = new Map();
-            essenceTotals.set(essenceId, bySource);
-          }
-          for (const source of rowSources) {
-            const existing = bySource.get(source.actorId);
-            const add = content * source.quantity;
-            if (existing) {
-              existing.qty += add;
-            } else {
-              bySource.set(source.actorId, {
-                actorId: source.actorId,
-                name: source.actorName,
-                img: source.actorImg,
-                qty: add,
-              });
-            }
-          }
-        }
-      }
+  /**
+   * Fold one owned component's essence content into the running per-essence source
+   * totals and contributing-components list. Skips ids with no definition or a
+   * non-positive per-unit content.
+   * @private
+   */
+  _foldEssenceContent({
+    rawEssences,
+    essenceDefById,
+    totalQuantity,
+    component,
+    rowSources,
+    essenceContributors,
+    essenceTotals,
+  }) {
+    for (const [essenceId, perUnit] of Object.entries(rawEssences)) {
+      const content = Number(perUnit);
+      if (!essenceDefById.has(essenceId) || !Number.isFinite(content) || content <= 0) continue;
+      this._addEssenceContributor(
+        essenceContributors,
+        essenceId,
+        component,
+        content * totalQuantity
+      );
+      this._accumulateEssenceTotals(essenceTotals, essenceId, rowSources, content);
     }
+  }
 
+  /**
+   * Append a contributing-component entry (perUnit × the component's owned quantity) to
+   * an essence's contributor list, skipping a non-positive contribution.
+   * @private
+   */
+  _addEssenceContributor(essenceContributors, essenceId, component, contribution) {
+    if (contribution <= 0) return;
+    const contributors = essenceContributors.get(essenceId) ?? [];
+    contributors.push({
+      componentId: stringOrNull(component.id),
+      name: stringOrEmpty(component.name),
+      img: stringOrNull(component.img),
+      quantity: contribution,
+    });
+    essenceContributors.set(essenceId, contributors);
+  }
+
+  /**
+   * Fold an essence's per-source content (perUnit × each source's owned quantity) into
+   * the running per-essence source-total map.
+   * @private
+   */
+  _accumulateEssenceTotals(essenceTotals, essenceId, rowSources, content) {
+    let bySource = essenceTotals.get(essenceId);
+    if (!bySource) {
+      bySource = new Map();
+      essenceTotals.set(essenceId, bySource);
+    }
+    for (const source of rowSources) {
+      this._addSourceQuantity(
+        bySource,
+        source.actorId,
+        source.actorName,
+        source.actorImg,
+        content * source.quantity
+      );
+    }
+  }
+
+  /**
+   * Project the per-essence aggregate rows (one synthetic row per essence the owned
+   * components carry). An essence row is never a document: it cannot break and it cannot
+   * be salvaged.
+   * @private
+   */
+  _buildEssenceRows({ essenceTotals, essenceContributors, context }) {
+    const { systemId, systemName, essenceDefById, essenceUsedBy, orderSources } = context;
     const essenceRows = [];
     for (const [essenceId, bySource] of essenceTotals) {
       const def = essenceDefById.get(essenceId);
@@ -410,8 +609,7 @@ export class InventoryListingBuilder {
         contributors: essenceContributors.get(essenceId) ?? [],
       });
     }
-
-    return [...componentRows, ...essenceRows];
+    return essenceRows;
   }
 
   /**
@@ -505,27 +703,12 @@ export class InventoryListingBuilder {
     // `item` is the first matched document in crafting-actor-first order (the
     // representative document whose use/learn counters the row reports).
     const defById = new Map(definitions.filter((def) => def?.id).map((def) => [def.id, def]));
-    const owned = new Map();
     const orderedSourceIds = sources.map(actorKey);
-    for (const actor of sources) {
-      const key = actorKey(actor);
-      const actorName = stringOrEmpty(actor?.name);
-      const actorImg = stringOrNull(actor?.img);
-      const items = actor?.items ? [...actor.items] : [];
-      for (const item of items) {
-        const def = this._matchRecipeItemDefinition(item, definitions, systemId);
-        if (!def?.id) continue;
-        const qty = itemStackQuantity(item);
-        let entry = owned.get(def.id);
-        if (!entry) {
-          entry = { def, sources: new Map(), item };
-          owned.set(def.id, entry);
-        }
-        const current = entry.sources.get(key);
-        if (current) current.qty += qty;
-        else entry.sources.set(key, { actorId: key, name: actorName, img: actorImg, qty });
-      }
-    }
+    const owned = this._collectOwnedEntities(
+      sources,
+      (item) => this._matchRecipeItemDefinition(item, definitions, systemId),
+      'def'
+    );
     if (owned.size === 0) return [];
 
     const learnedMap = this._getLearnedMapFor(craftingActor);
@@ -641,6 +824,27 @@ export class InventoryListingBuilder {
   }
 
   /**
+   * The ids of entities carrying a `blocks: 'visibility'` validation critical for one
+   * system (spec §System-Validity Gate entity tier) — today, components whose salvage
+   * config is invalid. Computed once per system via the shared `computeSystemVisibility`
+   * hot-path helper, reusing the recipes the caller already fetched. GM bypass is the
+   * caller's concern (the GM path never calls this).
+   *
+   * @param {object} system The owning crafting system.
+   * @param {object[]} recipes The system's recipes (already fetched by the caller).
+   * @returns {Set<string>}
+   * @private
+   */
+  _hiddenEntityIdsForSystem(system, recipes = []) {
+    if (!system?.id) return NO_HIDDEN_ENTITIES;
+    const { hiddenEntityIds } = computeSystemVisibility(system, {
+      recipes,
+      components: system.components || [],
+    });
+    return hiddenEntityIds;
+  }
+
+  /**
    * The player-facing salvage view-model for ONE component row (issue 675), or null
    * when the component is not salvageable. Essence and recipe-item rows are never
    * salvageable and always carry null.
@@ -664,9 +868,20 @@ export class InventoryListingBuilder {
    * @returns {object|null}
    * @private
    */
-  _buildSalvage({ system, component, componentById, rowSources }) {
+  _buildSalvage({
+    system,
+    component,
+    componentById,
+    rowSources,
+    hiddenEntityIds = NO_HIDDEN_ENTITIES,
+  }) {
     const salvage = component?.salvage ?? null;
     if (system?.features?.salvage !== true || salvage?.enabled !== true) return null;
+    // System-Validity Gate entity tier: a non-GM viewer never sees a salvage panel for
+    // a component whose salvage config produced a `blocks: 'visibility'` critical
+    // (spec §Listing Algorithm step 0). The stored `salvage.enabled` flag is left
+    // untouched — this is a viewer projection, not a config mutation.
+    if (hiddenEntityIds.has(component?.id)) return null;
 
     const check = system?.salvageCraftingCheck ?? {};
     // The mode the ENGINE dispatches on. `_runSalvageCraftingCheck` reads this and the
@@ -1179,112 +1394,158 @@ export class InventoryListingBuilder {
    *    producers are display-only (`recipeId: null`). One entry per producer.
    * @private
    */
-  _buildRecipeIndexes(system, allowedRecipeIds = null) {
+  _buildRecipeIndexes(system, allowedRecipeIds = null, systemRecipes = null) {
     const componentUsedBy = new Map();
     const componentRequiredFor = new Map();
     const essenceUsedBy = new Map();
     const componentProducedBy = new Map();
 
-    // Tool id → componentId, so a recipe's tool references resolve to components.
-    const toolComponentById = new Map();
-    for (const tool of Array.isArray(system?.tools) ? system.tools : []) {
-      if (tool?.id && tool.componentId) toolComponentById.set(tool.id, tool.componentId);
-    }
-
-    // Used-by: per-recipe dedupe of (targetId, role).
-    const pushUse = (index, targetId, entry, seen) => {
-      const dedupeKey = `${targetId}:${entry.role}`;
-      if (seen.has(dedupeKey)) return;
-      seen.add(dedupeKey);
-      const list = index.get(targetId);
-      if (list) list.push(entry);
-      else index.set(targetId, [entry]);
-    };
-
-    // A one-entry-per-(componentId, source key) accumulator, shared by the
-    // produced-by and required-for indexes (each with its own seen + target map).
-    const makeAdder = (targetMap) => {
-      const seen = new Map();
-      return (componentId, key, value) => {
-        if (!componentId) return;
-        let keys = seen.get(componentId);
-        if (!keys) {
-          keys = new Set();
-          seen.set(componentId, keys);
-        }
-        if (keys.has(key)) return;
-        keys.add(key);
-        const list = targetMap.get(componentId);
-        if (list) list.push(value);
-        else targetMap.set(componentId, [value]);
-      };
-    };
+    const toolComponentById = this._toolComponentByIdMap(system);
     const addProduced = makeAdder(componentProducedBy);
     // Required-for: recipes/gathering tasks that require the component as a TOOL
     // (present but not consumed).
     const addRequiredFor = makeAdder(componentRequiredFor);
 
-    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
+    // Reuse the caller's already-fetched recipes when provided (one query per owned
+    // system); fall back to a direct fetch for standalone callers.
+    const recipes =
+      systemRecipes ?? this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
+    const recipeCtx = {
+      system,
+      toolComponentById,
+      componentUsedBy,
+      essenceUsedBy,
+      addProduced,
+      addRequiredFor,
+    };
     for (const recipe of Array.isArray(recipes) ? recipes : []) {
       if (allowedRecipeIds && !allowedRecipeIds.has(recipe?.id)) continue;
-      // Resolve the recipe image the way the GM Manager / player Crafting tab do
-      // (recipeItemImg || recipe.img): a recipe whose icon lives on its linked recipe
-      // item keeps the model default `recipe.img` otherwise. `recipe.img` is itself
-      // model-defaulted to the alchemical blueprint, so the trailing fallback is the
-      // blueprint — never the generic component item-bag.
-      const recipeItemImg = recipe?.recipeItemId
-        ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
-            ?.img || ''
-        : '';
-      const recipeImg = stringOrNull(recipeItemImg || recipe?.img);
-      const recipeEntry = {
-        recipeId: stringOrNull(recipe?.id),
-        recipeName: stringOrEmpty(recipe?.name),
-        recipeImg,
-      };
-      // The produced-by / required-for entry for this recipe (a navigable recipe).
-      const recipeSourceKey = `recipe:${recipe?.id}`;
-      const recipeSourceValue = {
-        kind: 'recipe',
-        recipeId: recipeEntry.recipeId,
-        name: recipeEntry.recipeName,
-        img: recipeImg,
-      };
-      // Per-recipe dedupe of (targetId, role) pairs so one recipe contributes a
-      // single entry per component/essence per role even across multiple sets.
-      const seen = new Set();
-      const ingredientSets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
-      for (const set of ingredientSets) {
-        for (const group of Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []) {
-          for (const option of Array.isArray(group?.options) ? group.options : []) {
-            const componentId = option?.componentId ?? option?.match?.componentId ?? null;
-            if (componentId) {
-              pushUse(componentUsedBy, componentId, { ...recipeEntry, role: 'ingredient' }, seen);
-            }
-          }
-        }
-        for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
-          const componentId = toolComponentById.get(toolId);
-          if (componentId) addRequiredFor(componentId, recipeSourceKey, recipeSourceValue);
-        }
-        for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
-          if (Number(quantity) > 0) {
-            pushUse(essenceUsedBy, essenceId, { ...recipeEntry, role: 'ingredient' }, seen);
-          }
-        }
-      }
-      for (const toolId of Array.isArray(recipe?.toolIds) ? recipe.toolIds : []) {
-        const componentId = toolComponentById.get(toolId);
-        if (componentId) addRequiredFor(componentId, recipeSourceKey, recipeSourceValue);
-      }
-
-      // Produced-by (recipe): every output result component id.
-      for (const componentId of this._recipeResultComponentIds(recipe)) {
-        addProduced(componentId, recipeSourceKey, recipeSourceValue);
-      }
+      this._indexRecipeReferences(recipe, recipeCtx);
     }
 
-    // Produced-by (salvage): a component whose salvage results yield the component id.
+    this._indexSalvageProducers(system, addProduced);
+    this._indexGatheringProducers(system, toolComponentById, addProduced, addRequiredFor);
+
+    return { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy };
+  }
+
+  /**
+   * Tool id → componentId, so a recipe's / gathering task's tool references resolve to
+   * the components they require.
+   * @private
+   */
+  _toolComponentByIdMap(system) {
+    const toolComponentById = new Map();
+    for (const tool of Array.isArray(system?.tools) ? system.tools : []) {
+      if (tool?.id && tool.componentId) toolComponentById.set(tool.id, tool.componentId);
+    }
+    return toolComponentById;
+  }
+
+  /**
+   * Index one recipe's consumed (ingredient/essence), required (tool) and produced
+   * (result) component references. Per-recipe dedupe of (targetId, role) pairs so one
+   * recipe contributes a single entry per component/essence per role even across
+   * multiple ingredient sets.
+   * @private
+   */
+  _indexRecipeReferences(
+    recipe,
+    { system, toolComponentById, componentUsedBy, essenceUsedBy, addProduced, addRequiredFor }
+  ) {
+    const recipeImg = this._resolveIndexedRecipeImg(recipe, system);
+    const recipeEntry = {
+      recipeId: stringOrNull(recipe?.id),
+      recipeName: stringOrEmpty(recipe?.name),
+      recipeImg,
+    };
+    // The produced-by / required-for entry for this recipe (a navigable recipe).
+    const recipeSourceKey = `recipe:${recipe?.id}`;
+    const recipeSourceValue = {
+      kind: 'recipe',
+      recipeId: recipeEntry.recipeId,
+      name: recipeEntry.recipeName,
+      img: recipeImg,
+    };
+    const seen = new Set();
+    const setCtx = {
+      recipeEntry,
+      recipeSourceKey,
+      recipeSourceValue,
+      toolComponentById,
+      componentUsedBy,
+      essenceUsedBy,
+      addRequiredFor,
+      seen,
+    };
+    for (const set of Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []) {
+      this._indexIngredientSet(set, setCtx);
+    }
+    for (const toolId of Array.isArray(recipe?.toolIds) ? recipe.toolIds : []) {
+      const componentId = toolComponentById.get(toolId);
+      if (componentId) addRequiredFor(componentId, recipeSourceKey, recipeSourceValue);
+    }
+
+    // Produced-by (recipe): every output result component id.
+    for (const componentId of this._recipeResultComponentIds(recipe)) {
+      addProduced(componentId, recipeSourceKey, recipeSourceValue);
+    }
+  }
+
+  /**
+   * Resolve a recipe's used-by/produced-by image the way the GM Manager / player
+   * Crafting tab do (recipeItemImg || recipe.img): a recipe whose icon lives on its
+   * linked recipe item keeps the model default `recipe.img` otherwise. `recipe.img` is
+   * itself model-defaulted to the alchemical blueprint, so the trailing fallback is the
+   * blueprint — never the generic component item-bag.
+   * @private
+   */
+  _resolveIndexedRecipeImg(recipe, system) {
+    const recipeItemImg = recipe?.recipeItemId
+      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
+          ?.img || ''
+      : '';
+    return stringOrNull(recipeItemImg || recipe?.img);
+  }
+
+  /**
+   * Index one ingredient set: its ingredient options (consumed components), its required
+   * tools and its required essences.
+   * @private
+   */
+  _indexIngredientSet(set, ctx) {
+    for (const group of Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []) {
+      this._indexIngredientOptions(group, ctx);
+    }
+    for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
+      const componentId = ctx.toolComponentById.get(toolId);
+      if (componentId) ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+    }
+    for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
+      if (Number(quantity) > 0) {
+        pushUse(ctx.essenceUsedBy, essenceId, { ...ctx.recipeEntry, role: 'ingredient' }, ctx.seen);
+      }
+    }
+  }
+
+  /**
+   * Index one ingredient group's options as consumed components (role `ingredient`).
+   * @private
+   */
+  _indexIngredientOptions(group, { componentUsedBy, recipeEntry, seen }) {
+    for (const option of Array.isArray(group?.options) ? group.options : []) {
+      const componentId = option?.componentId ?? option?.match?.componentId ?? null;
+      if (componentId) {
+        pushUse(componentUsedBy, componentId, { ...recipeEntry, role: 'ingredient' }, seen);
+      }
+    }
+  }
+
+  /**
+   * Produced-by (salvage): a component whose salvage results yield the component id.
+   * @private
+   */
+  _indexSalvageProducers(system, addProduced) {
     for (const source of Array.isArray(system?.components) ? system.components : []) {
       if (source?.salvage?.enabled !== true) continue;
       const value = {
@@ -1302,8 +1563,14 @@ export class InventoryListingBuilder {
         }
       }
     }
+  }
 
-    // Produced-by (gathering): a gathering task drop row yields the component id.
+  /**
+   * Produced-by (gathering): a gathering task drop row yields the component id, plus the
+   * task's required tools (present, not consumed).
+   * @private
+   */
+  _indexGatheringProducers(system, toolComponentById, addProduced, addRequiredFor) {
     const tasks = this._getGatheringTasksForSystem(system?.id) ?? [];
     for (const task of Array.isArray(tasks) ? tasks : []) {
       if (task?.enabled === false) continue;
@@ -1323,19 +1590,23 @@ export class InventoryListingBuilder {
         if (row?.enabled === false) continue;
         addProduced(row?.componentId, key, value);
       }
-
-      // Required-for (gathering): the task's required tools (present, not consumed),
-      // resolved via the system Tool library (task.toolIds) or inline task.tools.
-      for (const toolId of Array.isArray(task?.toolIds) ? task.toolIds : []) {
-        const componentId = toolComponentById.get(toolId);
-        if (componentId) addRequiredFor(componentId, key, value);
-      }
-      for (const inlineTool of Array.isArray(task?.tools) ? task.tools : []) {
-        if (inlineTool?.componentId) addRequiredFor(inlineTool.componentId, key, value);
-      }
+      this._indexGatheringTools(task, key, value, toolComponentById, addRequiredFor);
     }
+  }
 
-    return { componentUsedBy, componentRequiredFor, essenceUsedBy, componentProducedBy };
+  /**
+   * Required-for (gathering): a task's required tools, resolved via the system Tool
+   * library (`task.toolIds`) or read from inline `task.tools`.
+   * @private
+   */
+  _indexGatheringTools(task, key, value, toolComponentById, addRequiredFor) {
+    for (const toolId of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+      const componentId = toolComponentById.get(toolId);
+      if (componentId) addRequiredFor(componentId, key, value);
+    }
+    for (const inlineTool of Array.isArray(task?.tools) ? task.tools : []) {
+      if (inlineTool?.componentId) addRequiredFor(inlineTool.componentId, key, value);
+    }
   }
 
   /**

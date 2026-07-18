@@ -69,8 +69,12 @@ Checks whether a user has knowledge of a recipe.
 ### guardCraftStart(params)
 
 Guard check before starting or resuming a crafting run.
-It delegates to `evaluateRecipeAccess`, so it returns the same access object and blocks the action when `craftable` is `false`.
-For an alchemy system `craftable` is always `true` for a non-GM, so this guard never blocks a brew on visibility.
+For a non-GM it first runs a system-validity check on the recipe's crafting system.
+When the system has a blocker that makes it unusable it returns `craftable: false` with reason `"system-invalid"`, and when this specific recipe is individually hidden it returns reason `"visibility"`.
+This runs even when the recipe is targeted directly, so a non-GM cannot bypass visibility by passing a recipe that never appeared in their listing.
+A GM bypasses this check so they can still reach a broken system to diagnose it.
+It then delegates to `evaluateRecipeAccess`, so it otherwise returns the same access object and blocks the action when `craftable` is `false`.
+For an alchemy system `craftable` is always `true` for a non-GM once the system-validity check passes, so this guard never blocks a valid brew on visibility.
 
 **Returns:** `{ visible: boolean, craftable: boolean, reason: string, knowledge: object }`
 

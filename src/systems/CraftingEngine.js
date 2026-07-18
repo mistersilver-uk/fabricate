@@ -281,6 +281,7 @@ export class CraftingEngine {
         if (!guard.craftable) {
           const reasonMap = {
             'missing-system': 'Crafting system not found',
+            'system-invalid': 'Crafting system is invalid',
             visibility: 'Recipe is not visible to this user',
             knowledge: 'Missing recipe knowledge',
             locked: 'Recipe is locked',
