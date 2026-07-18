@@ -470,3 +470,102 @@ test('progressive mode — empty results array in single group → invalid', () 
     `expected error about empty results in progressive mode, got: ${JSON.stringify(result.errors)}`
   );
 });
+
+// ---------------------------------------------------------------------------
+// Group 5: Messages never leak an internal component / result id (issue 611)
+//
+// A salvage validation message must identify the component by its author-given
+// NAME, or a name-free phrase when unnamed — never the raw internal id. The same
+// applies to a progressive result (reported by 1-based position, not its id).
+// ---------------------------------------------------------------------------
+
+const SECRET_COMPONENT_ID = 'secret-internal-component-id';
+
+function unnamed(overrides = {}) {
+  return buildComponent({ id: SECRET_COMPONENT_ID, name: undefined, ...overrides });
+}
+
+function assertNoComponentIdLeak(errors) {
+  for (const message of errors) {
+    assert.ok(
+      !message.includes(SECRET_COMPONENT_ID),
+      `message leaked the internal component id: ${message}`
+    );
+  }
+}
+
+test('named component — message uses the component name, not its id (simple mode)', () => {
+  const service = buildService();
+  const component = buildComponent({
+    id: SECRET_COMPONENT_ID,
+    name: 'Iron Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] },
+  });
+  const system = buildSystem({ salvageResolutionMode: 'simple' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, false);
+  assertNoComponentIdLeak(result.errors);
+  assert.ok(
+    result.errors.some((e) => e.includes('Iron Ore')),
+    `expected the component name in the message, got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('unnamed component — simple mode message uses a name-free phrase, not the id', () => {
+  const service = buildService();
+  const component = unnamed({
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] },
+  });
+  const system = buildSystem({ salvageResolutionMode: 'simple' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, false);
+  assertNoComponentIdLeak(result.errors);
+  assert.ok(
+    result.errors.some((e) => /this component/i.test(e)),
+    `expected a name-free component phrase, got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('unnamed component — routed mode messages never leak the id', () => {
+  const service = buildService();
+  const system = buildRoutedSystem();
+  const component = buildRoutedComponent({ pass: 'rg-does-not-exist' });
+  component.id = SECRET_COMPONENT_ID;
+  component.name = undefined;
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, false);
+  assertNoComponentIdLeak(result.errors);
+});
+
+test('unnamed component — progressive result reported by position, no component/result id', () => {
+  const service = buildService();
+  const system = buildProgressiveSystem([{ id: 'scrap-bad', difficulty: 0.5 }]);
+  const component = unnamed({
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      resultGroups: [{ id: 'rg-1', results: [{ id: 'r-secret-id', componentId: 'scrap-bad' }] }],
+    },
+  });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, false);
+  assertNoComponentIdLeak(result.errors);
+  const difficultyError = result.errors.find((e) => /difficulty/i.test(e));
+  assert.ok(difficultyError, `expected a difficulty error, got: ${JSON.stringify(result.errors)}`);
+  assert.ok(
+    !difficultyError.includes('r-secret-id'),
+    `message leaked the internal result id: ${difficultyError}`
+  );
+  assert.ok(
+    /Result 1\b/.test(difficultyError),
+    `expected the result reported by 1-based position, got: ${difficultyError}`
+  );
+});

@@ -128,7 +128,10 @@ Hooks.once('fabricate.ready', () => {
 - `'Progressive salvage mode requires crafting checks enabled'`
 - `'Progressive salvage mode requires salvageCraftingCheck.progressive configuration'`
 - `'Salvage for "Silver Ore" requires ordered results in progressive mode'`
-- `'Result "r-1" references component without valid difficulty for salvage on "Silver Ore"'`
+- `'Result 1 references component without valid difficulty for salvage on "Silver Ore"'`
+
+A message identifies the component by its author-given name and identifies an offending progressive result by its 1-based position.
+When a component has no author-given name, the message uses a name-free phrase such as `this component` rather than the component's internal id.
 
 ### resolveResultGroups(params)
 

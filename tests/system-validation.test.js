@@ -233,6 +233,30 @@ describe('evaluateSystemValidation — composition', () => {
     assert.equal(salvage.blocks, 'visibility');
   });
 
+  it('never surfaces the internal component id as the salvage issue label (issue 611)', () => {
+    // An UNNAMED component previously fell back to its internal id for both the
+    // rendered entityName and the message string; the entityId (used only for
+    // deep-link navigation) still carries the id, but no user-facing label may.
+    const component = {
+      id: 'secret-internal-component-id',
+      salvage: { resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }] },
+    };
+    const system = makeSystem({ salvageResolutionMode: 'simple' });
+    const report = evaluateSystemValidation(system, { components: [component] });
+
+    const salvage = report.issues.find((issue) => issue.kind === 'salvage');
+    assert.ok(salvage, 'expected the invalid-salvage issue to surface');
+    assert.equal(salvage.entityId, 'secret-internal-component-id', 'entityId keeps the id for nav');
+    assert.ok(
+      !salvage.entityName.includes('secret-internal-component-id'),
+      `entityName leaked the internal id: ${salvage.entityName}`
+    );
+    assert.ok(
+      !salvage.message.includes('secret-internal-component-id'),
+      `message leaked the internal id: ${salvage.message}`
+    );
+  });
+
   it('treats a component with no salvage result sets as not salvageable (no issue)', () => {
     // An empty salvage config means the component simply is not salvageable — an
     // opt-in state, not a misconfiguration — so it must produce no salvage issue,
