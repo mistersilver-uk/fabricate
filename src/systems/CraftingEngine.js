@@ -49,6 +49,21 @@ function toolDisplayReference(tool) {
 }
 
 /**
+ * The RAW rolled total to render on a result chat card, or null when no check ran.
+ * A progressive check overwrites `value` with the AWARDING value on a forced crit
+ * (`MAX_SAFE_INTEGER` for SUCCESS, `0` for FAILURE — see `runFormulaProgressive` in
+ * checkRoll.js), so the card must read `data.total` (the raw roll) and only fall
+ * back to `value` for runners that omit `data.total`. For simple/routed checks
+ * `value === data.total`, so this is a no-op there.
+ *
+ * @param {object|null} checkResult
+ * @returns {number|null}
+ */
+export function rollTotalForCard(checkResult) {
+  return checkResult?.data?.total ?? checkResult?.value ?? null;
+}
+
+/**
  * Stamp the durable per-system component identity on a crafted OUTPUT item's data,
  * BEFORE creation, so the inventory matcher attributes it to its OWN component
  * regardless of naming collisions or Foundry's transitive `_stats.duplicateSource`
@@ -620,7 +635,7 @@ export class CraftingEngine {
           tools: usedToolPairs,
           createdResults: [],
           failureReason: checkResult.message || 'Crafting check failed',
-          rollValue: checkResult?.value ?? null,
+          rollValue: rollTotalForCard(checkResult),
         });
         return {
           success: false,
@@ -693,7 +708,7 @@ export class CraftingEngine {
           tools: usedToolPairsOnValidationFail,
           createdResults: [],
           failureReason: message,
-          rollValue: checkResult?.value ?? null,
+          rollValue: rollTotalForCard(checkResult),
         });
         return {
           success: false,
@@ -745,7 +760,7 @@ export class CraftingEngine {
             tools: [],
             createdResults: [],
             failureReason: message,
-            rollValue: checkResult?.value ?? null,
+            rollValue: rollTotalForCard(checkResult),
           });
           return {
             success: false,
@@ -856,7 +871,7 @@ export class CraftingEngine {
         consumedIngredients: consumedItems,
         tools: toolValidation.tools,
         createdResults: resultItems,
-        rollValue: checkResult?.value ?? null,
+        rollValue: rollTotalForCard(checkResult),
       });
 
       return {
@@ -1197,7 +1212,7 @@ export class CraftingEngine {
         tools: usedToolPairs,
         createdResults: [],
         failureReason: message,
-        rollValue: checkResult?.value ?? null,
+        rollValue: rollTotalForCard(checkResult),
       });
       return { resolved: true, result: { success: false, results: null, message } };
     };
@@ -1296,7 +1311,7 @@ export class CraftingEngine {
         tools: toolItems,
         createdResults: [],
         failureReason: message,
-        rollValue: checkResult?.value ?? null,
+        rollValue: rollTotalForCard(checkResult),
       });
       return {
         resolved: true,
@@ -1350,7 +1365,7 @@ export class CraftingEngine {
       consumedIngredients: consumedItems,
       tools: toolItems,
       createdResults: resultItems,
-      rollValue: checkResult?.value ?? null,
+      rollValue: rollTotalForCard(checkResult),
     });
 
     const stepLabel = step.name || `step ${stepIndex + 1}`;
@@ -1475,7 +1490,7 @@ export class CraftingEngine {
       tools: appliedTools,
       createdResults: resultItems,
       failureReason: checkResult.message || 'Crafting check failed',
-      rollValue: checkResult?.value ?? null,
+      rollValue: rollTotalForCard(checkResult),
     });
 
     return {
@@ -3986,7 +4001,7 @@ export class CraftingEngine {
         results: [],
         usedTools,
         failureReason: checkResult.message || 'Salvage check failed',
-        rollValue: checkResult?.value ?? null,
+        rollValue: rollTotalForCard(checkResult),
       });
 
       return {
@@ -4088,7 +4103,7 @@ export class CraftingEngine {
       results: resultItems,
       usedTools,
       failureReason: '',
-      rollValue: checkResult?.value ?? null,
+      rollValue: rollTotalForCard(checkResult),
     });
 
     return {
