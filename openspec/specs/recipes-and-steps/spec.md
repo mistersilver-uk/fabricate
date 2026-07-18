@@ -119,8 +119,9 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
      (the recipe's selected tier or a dynamic-DC macro, not a flat configured DC),
      so a recipe tier or dynamic DC shifts every relative threshold.
    - **Routed by ingredients (`routedByIngredients` mode)**: the result group is selected by the chosen
-     ingredient set, so the check is OPTIONAL — when `craftingCheck.routed.rollFormula` is authored it runs
+     ingredient set, so the check is OPTIONAL — when `craftingCheck.simple.rollFormula` is authored it runs
      as a pass/fail layer that never changes which result group is produced; with no formula no check runs.
+     (It uses the shared `craftingCheck.simple` slot, not `craftingCheck.routed`.)
    - **Progressive**: roll the progressive formula;
      its total is the numeric `value` spent against ordered result difficulties.
 
@@ -129,8 +130,9 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    `routedByCheck` and progressive modes REQUIRE a configured check, while `routedByIngredients` (like simple) has an OPTIONAL check.
    A check is **usable** iff the active mode's check config carries an authored roll formula
    (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`), in which case it is
-   engine-evaluated as above; `craftingCheck.enabled` is only the on/off toggle for optional
-   simple/`routedByIngredients`/alchemy checks, not a proxy for "the check works".
+   engine-evaluated as above; `craftingCheck.enabled` (or `features.craftingChecks`) is only the on/off toggle
+   gating the OPTIONAL **simple**-mode check, not a proxy for "the check works" — `routedByIngredients` and
+   alchemy-Simple run on an authored formula alone, ungated by that toggle.
    The deprecated macro / built-in adapter check sources (root `macroUuid`, `successMacroUuid`,
    `failureMacroUuid`, `checkSource`, and the `builtIn` adapter config) were removed in 1.8.0;
    there is no longer a `checkSource` axis. (The dynamic-DC macro on `simple.macroUuid` is a

@@ -842,7 +842,8 @@ Recipe = {
 4. `resultSelection.provider` is RETIRED for alchemy (issue 554): alchemy routes on the SYSTEM-level `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`), not a per-recipe provider.
    The 1.14.0 migration strips `resultSelection` from every alchemy recipe.
    No live mode reads `resultSelection`: `routedByIngredients` routes by `IngredientSet.resultGroupId` and `routedByCheck` routes by `ResultGroup.name`/`checkOutcomeIds` against the system routed check, and alchemy routes per its `checkMode`.
-5. Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
+5. Result-group selection with a reserved `role: 'failure'` group applies to plain `simple` resolution mode (success group on a passed check, reserved failure group on a fail when authored) as well as alchemy.
+Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
    - `none`: one ingredient set + one result group; a matched brew always produces that group (no check).
    - `simple`: the success result group on a passed `craftingCheck.simple`, and the reserved `role: 'failure'` result group on a fail (produced only when non-empty).
    - `tiered`: identical to `routedByCheck` — each success outcome tier routes to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles.
@@ -1302,11 +1303,11 @@ Group one or more results.
 ResultGroup = {
   id: string,
   name: string,
-  // Reserved role discriminator (issue 554). `'failure'` marks the alchemy Simple
-  // reserved failure result group; absent/other = a success group. Simple-only —
-  // forbidden on None/Tiered groups. The reserved failure group is undeletable in
-  // the editor and defaults to empty. Preserved verbatim by normalization so a
-  // settings-only mode flip round-trips it.
+  // Reserved role discriminator (issue 554). `'failure'` marks the reserved failure
+  // result group, valid on plain `simple` recipes and on alchemy `simple` checkMode;
+  // absent/other = a success group. Still forbidden on None/Tiered groups. The
+  // reserved failure group is undeletable in the editor and defaults to empty.
+  // Preserved verbatim by normalization so a settings-only mode flip round-trips it.
   role?: "failure",
   // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
   // alchemy tiered). Empty for non-tiered groups.
