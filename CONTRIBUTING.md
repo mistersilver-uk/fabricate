@@ -584,6 +584,17 @@ The run walks several phases in order; if an earlier phase fails, later phases a
 
 The former standalone player-facing Crafting and Gathering app phases (D2/D3/E2) and standalone Recipe Editor were removed when those surfaces were retired; both sidebar buttons now open the unified Fabricate window.
 
+The `full` profile also captures seven demonstration frames whose purpose is to show an in-flight PR's fix once it rebases, not to satisfy the screenshot gate (issue 752).
+Each is full-profile only, leaves the world as it found it, and rides an existing manager or player session.
+
+- `manager-experimental-off` — the selected-system rail with `fabricate.experimentalFeatures` disabled (the world-scoped flag is restored afterward).
+- `manager-checks-crafting-consumption` — the Checks → Crafting tab scrolled to the failure-consumption controls.
+- `manager-alchemy-settings` — the Crafting → Settings surface of the minimal "Smoke Alchemy Bench" alchemy-mode system seeded in Phase C.
+- `fabricate-journal-craft-detail` — the Journal with a crafting history run selected so the run-detail requirements card is visible.
+- `player-crafting-roll-result` — the crafting run summary's roll-result box (awarded pills and outcome) after a UI craft.
+- `chat-craft-card` — the chat sidebar clipped to the crafting result card posted by the Phase E craft.
+- `manager-tags-categories-tags-tab` — the Tags & Categories screen's Item tags rows (the three seeded tags).
+
 ### Test artifacts
 
 After any run (success or failure), results are written to `test-results/`:
