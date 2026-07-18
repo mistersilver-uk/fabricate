@@ -50,6 +50,7 @@ import {
   planRecipeCategoryReassignments,
   planComponentCategoryReassignments,
   planTagRemovals,
+  planRecipeTagRemovals,
 } from '../../../utils/vocabularyCascade.js';
 import {
   getCharacterModifierPresetsForFoundrySystem,
@@ -6044,16 +6045,25 @@ export function createAdminStore(services) {
   }
 
   // Cascade delete (issue 689): strip the deleted tag from every component carrying
-  // it before dropping it from the vocabulary, so no component is left referencing a
-  // tag that no longer exists.
+  // it AND from every recipe tag-placeholder ingredient naming it before dropping it
+  // from the vocabulary. The recipe strip is what keeps the tag reference count (which
+  // credits those placeholders) honest — nothing is left referencing a tag that no
+  // longer exists. Placeholders emptied by the strip persist via allowIncomplete.
   async function removeTag(tag) {
     const systemManager = services.getCraftingSystemManager();
+    const recipeManager = services.getRecipeManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
     for (const { id, tags: nextTags } of planTagRemovals(_getManagedItems(system), tag)) {
       await systemManager.updateItem(sysId, id, { tags: nextTags });
+    }
+    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map((recipe) =>
+      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
+    );
+    for (const { id, updates } of planRecipeTagRemovals(recipes, tag)) {
+      await recipeManager.updateRecipe(id, updates, { allowIncomplete: true, notify: false });
     }
     const tags = (system.itemTags || system.tags || []).filter((t) => t !== tag);
     await systemManager.updateSystem(sysId, { itemTags: tags });

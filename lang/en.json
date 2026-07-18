@@ -2444,7 +2444,7 @@
           "RecipeCategories": "Recipe categories",
           "TotalReferences": "Total references",
           "ReferenceSafeTitle": "Reference-safe by default",
-          "ReferenceSafeHint": "Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling."
+          "ReferenceSafeHint": "Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it and from any recipe ingredient that filters on it. Nothing is left dangling."
         },
         "Essence": {
           "Kicker": "Essence definitions",
