@@ -5089,6 +5089,12 @@ async function main() {
         }
         await assertManagerLayoutStable(page, 'system edit normal');
         await assertNoScreenshotOverlays(page);
+        // Scroll the optional-feature tiles fully into frame so the capture
+        // shows the complete feature set (incl. the issue-714 time tile).
+        const timeFeatureTile = page.locator('.fabricate-manager [data-feature-key="time"]').first();
+        if (await timeFeatureTile.count() > 0) {
+          await timeFeatureTile.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+        }
         await screenshot(page, 'manager-system-edit-normal');
 
         await setManagerWindowSize(page, { width: 900, height: 700 });
