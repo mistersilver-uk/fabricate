@@ -13,7 +13,15 @@
   import JournalCard from './JournalCard.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
 
-  let { step = null } = $props();
+  let { step = null, multiStep = true } = $props();
+
+  // Single-step crafting runs read as a plain "craft", so the requirements card
+  // drops the step-scoped title; multi-step runs keep "Step requirements".
+  const titleKey = $derived(
+    multiStep
+      ? 'FABRICATE.App.Journal.StepDetails.Title'
+      : 'FABRICATE.App.Journal.StepDetails.TitleSingleStep'
+  );
 
   const detail = $derived(step?.detail ?? null);
   const requiredSeconds = $derived(Number(detail?.requiredSeconds));
@@ -56,7 +64,7 @@
 </script>
 
 {#if hasAnyFact}
-  <JournalCard kind="step-details" title={localize('FABRICATE.App.Journal.StepDetails.Title')}>
+  <JournalCard kind="step-details" title={localize(titleKey)}>
     <div class="journal-fact-list">
       {#if requiredTime !== ''}
         <JournalFactRow
