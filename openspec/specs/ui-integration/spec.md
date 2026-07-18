@@ -148,12 +148,12 @@ An empty or stale persisted selection resolves to the first available crafting s
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders.
 If a route is still planned only, it may remain in the placeholder/deferred-view set.
-- Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`.
-When the setting is disabled, `Recipes` and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route, and the `Crafting` nav group is not shown (there is no `Rules` rail item; the placeholder set is `recipes` + `graph`).
-When the setting is enabled, `Recipes` and `Books & Scrolls` are available as implemented routes for the selected system, nested inside an expandable `Crafting` nav group (see below); `Graph` remains a disabled planned rail item until its v2 route content is implemented.
+- The Manager V2 selected-system `Crafting` nav group (recipes, crafting settings, access, books & scrolls, recipe item editor) is **unconditional**: it renders whenever a crafting system is selected, regardless of `fabricate.experimentalFeatures` (issue 745, the v1.3 headline).
+The only experimental-gated selected-system rail item is `Graph`: it renders as a disabled planned rail item with the `Soon` treatment **only** while `fabricate.experimentalFeatures` is enabled, and cannot become the active route until its v2 route content is implemented (#442).
+There is no `Recipes` placeholder rail item and no `Rules` rail item; the deferred-placeholder set is `graph` alone, shown only under the experimental toggle.
 The top-level `Checks` rail item (hosting the Crafting / Salvage / Gathering / Validation sub-tabs) and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
-When `Recipes` is the active implemented route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, redirect-when-unavailable (falling back to `system-edit` exactly as `recipes` does, since Recipes is nested under the experimental system-edit gate), breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
-- When `fabricate.experimentalFeatures` is enabled, the selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, and the whole group (parent and every sub-item) is shown only while the setting is enabled.
+When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+- The selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, shown whenever a crafting system is selected.
 The parent row shows an expand/collapse control and the recipe count as its badge.
 Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked open — activating it keeps the submenu expanded rather than collapsing it.
 The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
@@ -163,8 +163,7 @@ Route exit from any Crafting child route runs through the Manager confirm-discar
 - The `Crafting` group's `Settings` sub-route (`crafting-settings`, component `CraftingSettingsView`) is a real system-settings page, not a placeholder.
 It hosts the system-level crafting rules that used to live on the System Overview page: the recipe **resolution mode** card, the salvage **resolution mode** card (only when `features.salvage`), and the **Recipe Visibility** card — a single radio-card selector for the flat `visibilityMode` enum (`global` / `restricted` / `item` / `knowledge`) written through `setVisibilityMode`, paired with a `CraftingEffectPanel` that summarizes what the chosen mode enables.
 The Recipe Visibility control no longer lives on the System Overview page, and it authors the flat `visibilityMode` rather than the legacy `listMode` + `knowledge.mode` pair.
-Because the whole `Crafting` nav group is gated behind `fabricate.experimentalFeatures`, these controls are reachable only while that setting is on.
-This is an accepted consequence: with Experimental Features off, recipe resolution mode and recipe visibility are unreachable.
+Because the `Crafting` nav group is unconditional (issue 745), these controls are reachable for every selected system, independent of `fabricate.experimentalFeatures`.
 Per-recipe-item use and learn caps are NOT on this page — each recipe item's caps are authored in its `recipe-item-edit` tabbed editor (or the quick-limit toggle in the `ItemPageInspector` aside).
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
 Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
@@ -231,7 +230,7 @@ Display list + detail editor for crafting systems.
 - Recipe resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`)
 - Salvage resolution mode
 
-Recipe resolution mode and salvage resolution mode remain system fields, but their editor cards moved to the Crafting group's Settings page (`crafting-settings`), gated behind `fabricate.experimentalFeatures`.
+Recipe resolution mode and salvage resolution mode remain system fields, but their editor cards moved to the Crafting group's Settings page (`crafting-settings`).
 They are no longer edited on the System Overview page.
 Changing recipe resolution mode is destructive and must follow `destructive-changes-and-migrations/spec.md` confirmation/cleanup rules.
 
@@ -596,7 +595,7 @@ Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a sing
 
 ### Books & Scrolls Surface
 
-`Books & Scrolls` is the `Crafting` group's recipe-item management surface, shown only while `fabricate.experimentalFeatures` is enabled.
+`Books & Scrolls` is the `Crafting` group's recipe-item management surface, available whenever a crafting system is selected (the `Crafting` group is unconditional as of issue 745).
 It is a display name only: the surface manages every recipe item in the selected system regardless of the item's Foundry item type (book, scroll, ring, wand, gem, note), and `recipe item` remains the canonical noun.
 
 The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership, with a legacy `recipe.recipeItemId` fallback for un-migrated systems) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
