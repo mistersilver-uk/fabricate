@@ -230,7 +230,7 @@ test('runner: surfaces the GM-notice system names and never persists the transie
   const summary = await runner.run();
 
   assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'system names surfaced for the GM notice');
-  assert.equal(settings.store.get('migrationVersion'), '1.16.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.19.0');
 
   // The transient field is never written into any persisted setting payload.
   for (const { value } of settings.calls.set) {
@@ -296,5 +296,5 @@ test('runner: no GM notice and no gatheringConfig rewrite when there is no legac
   const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringConfig'), false, 'no rewrite when nothing to unify');
   assert.equal(setKeys.includes('craftingSystems'), false, 'systems untouched when no regions derived');
-  assert.equal(settings.store.get('migrationVersion'), '1.16.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.19.0');
 });

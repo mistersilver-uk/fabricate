@@ -1,7 +1,7 @@
 /**
  * Represents a tool required to attempt a gathering task.
  *
- * Spec contract (002-data-models.md, gathering-and-harvesting):
+ * Spec contract (data-models/spec.md, gathering-and-harvesting):
  *   componentId:       string | null          - OPTIONAL managed-component link (issue 561);
  *                                               null for a first-class tool registered from an
  *                                               Item uuid, populated for a whetstone or a

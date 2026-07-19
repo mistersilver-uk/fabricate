@@ -229,6 +229,121 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.equal(usedBy[0].role, 'ingredient', 'direct ingredient usage wins over essence');
   });
 
+  it('lists a component under used-by when a tag-matcher ingredient consumes it', () => {
+    // The ingredient names no component id; it matches every component tagged `metal`.
+    // c1 (Iron) carries `metal`; c2 (Coal) carries `fuel`, so only Iron is consumed.
+    const recipe = {
+      id: 'r-tag',
+      name: 'Tag Forge',
+      img: 'icons/tag.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    assert.deepEqual(rowByComponent(listing, 'c1').usedBy, [
+      {
+        recipeId: 'r-tag',
+        recipeName: 'Tag Forge',
+        recipeImg: 'icons/tag.webp',
+        role: 'ingredient',
+      },
+    ]);
+    // Coal is not tagged `metal`, so it gains no entry from this tag matcher.
+    assert.deepEqual(rowByComponent(listing, 'c2').usedBy, []);
+  });
+
+  it('lists a component once when a recipe consumes it both directly and via a tag matcher', () => {
+    const recipe = {
+      id: 'r-dup',
+      name: 'Direct And Tag',
+      img: 'icons/dup.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ componentId: 'c1' }] },
+            { id: 'g2', options: [{ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    const usedBy = rowByComponent(listing, 'c1').usedBy;
+    assert.equal(usedBy.length, 1, 'the recipe appears once across the direct and tag matches');
+    assert.equal(usedBy[0].recipeId, 'r-dup');
+    assert.equal(usedBy[0].role, 'ingredient');
+  });
+
+  it('contributes no used-by entry when a tag matcher matches zero components', () => {
+    const recipe = {
+      id: 'r-empty',
+      name: 'Empty Tags',
+      img: 'icons/empty.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ match: { type: 'tags', tags: [], tagMatch: 'any' } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    assert.deepEqual(rowByComponent(listing, 'c1').usedBy, []);
+    assert.deepEqual(rowByComponent(listing, 'c2').usedBy, []);
+  });
+
+  it('does not expand an essence-type ingredient option into the component used-by index', () => {
+    // An essence-type OPTION match is excluded from componentUsedBy: it would otherwise
+    // list every essence-bearing component as a consumed ingredient. The essence channel
+    // (fed by set-level `essences`) is left untouched — here it stays empty.
+    const recipe = {
+      id: 'r-ess-opt',
+      name: 'Essence Option',
+      img: 'icons/ess.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: [],
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 'g1', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
+          ],
+        },
+      ],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    // c1 (fire:2) and c2 (fire:1) both carry fire, yet neither is a consumed ingredient.
+    assert.deepEqual(rowByComponent(listing, 'c1').usedBy, []);
+    assert.deepEqual(rowByComponent(listing, 'c2').usedBy, []);
+    // The essence row exists (Iron/Coal carry fire) but this recipe is not on it —
+    // an essence OPTION does not feed the essenceUsedBy channel, only set-level essences do.
+    const fire = listing.rows.find((row) => row.isEssenceSource && row.componentId === 'fire');
+    assert.deepEqual(fire.usedBy, []);
+  });
+
   it('builds the used-by index once per system that has owned rows', () => {
     const { getRecipesCalls } = ownAll();
     assert.equal(getRecipesCalls.length, 1);
@@ -297,7 +412,11 @@ describe('InventoryListingBuilder — used-by index', () => {
     const { builder } = makeBuilder();
     const blueprint = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
     assert.equal(builder._resolveRecipeImg({ img: 'icons/blade.webp' }), 'icons/blade.webp');
-    assert.equal(builder._resolveRecipeImg({ img: '' }), blueprint, 'empty img → blueprint, not a bag');
+    assert.equal(
+      builder._resolveRecipeImg({ img: '' }),
+      blueprint,
+      'empty img → blueprint, not a bag'
+    );
     assert.equal(builder._resolveRecipeImg({}), blueprint);
     // Foundry's generic item-bag default is treated as "no image" → blueprint.
     assert.equal(builder._resolveRecipeImg({ img: 'icons/svg/item-bag.svg' }), blueprint);
@@ -645,8 +764,22 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   }
 
   const RECIPES = [
-    { id: 'r1', name: 'Fireball', description: 'Boom.', img: 'icons/fb.webp', craftingSystemId: 'sys-b', recipeItemId: 'def-1' },
-    { id: 'r2', name: 'Ice Lance', description: 'Chill.', img: 'icons/il.webp', craftingSystemId: 'sys-b', recipeItemId: 'def-1' },
+    {
+      id: 'r1',
+      name: 'Fireball',
+      description: 'Boom.',
+      img: 'icons/fb.webp',
+      craftingSystemId: 'sys-b',
+      recipeItemId: 'def-1',
+    },
+    {
+      id: 'r2',
+      name: 'Ice Lance',
+      description: 'Chill.',
+      img: 'icons/il.webp',
+      craftingSystemId: 'sys-b',
+      recipeItemId: 'def-1',
+    },
   ];
 
   function bookBuilder({ system, recipes = RECIPES, recipeVisibility = null } = {}) {
@@ -680,9 +813,17 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   }
 
   it('flags a book’s recipes learnBlocked when the reader fails its character prerequisites (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 2,
+    };
     const system = {
-      ...bookSystem({ caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: ['p-expert'] } } }),
+      ...bookSystem({
+        caps: { item: {}, learn: { limitLearning: true, characterPrerequisiteIds: ['p-expert'] } },
+      }),
       characterPrerequisites: [EXPERT],
     };
     const actorWithRollData = (rank) => ({
@@ -695,19 +836,38 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       viewer: { isGM: false },
     });
     const blockedRecipes = bookRow(blocked).recipes;
-    assert.ok(blockedRecipes.every((r) => r.learnBlocked === true), 'all recipes blocked');
+    assert.ok(
+      blockedRecipes.every((r) => r.learnBlocked === true),
+      'all recipes blocked'
+    );
     assert.equal(blockedRecipes[0].learnBlockedReason, 'Expert Crafter');
 
     const passing = bookBuilder({ system }).buildListing({
       craftingActor: actorWithRollData(3),
       viewer: { isGM: false },
     });
-    assert.ok(bookRow(passing).recipes.every((r) => r.learnBlocked === false), 'passing reader unblocked');
+    assert.ok(
+      bookRow(passing).recipes.every((r) => r.learnBlocked === false),
+      'passing reader unblocked'
+    );
   });
 
   it('surfaces per-book requirements (Required Knowledge + Learning prerequisites) with met/unmet (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', icon: 'fas fa-hat-wizard', path: 'skills.cra.rank', op: 'gte', value: 2 };
-    const NOVICE = { id: 'p-fail', name: 'Master Only', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      icon: 'fas fa-hat-wizard',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 2,
+    };
+    const NOVICE = {
+      id: 'p-fail',
+      name: 'Master Only',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 9,
+    };
     const system = {
       ...bookSystem({
         caps: {
@@ -734,7 +894,12 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       getRollData: () => ({ skills: { cra: { rank: 3 } } }),
     };
 
-    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    const row = bookRow(
+      bookBuilder({ system, recipes }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: false },
+      })
+    );
     const reqs = row.requirements;
     // Dangling ids (ghost recipe, p-missing prereq) are skipped (fail-open): 2 + 2 = 4.
     assert.equal(reqs.length, 4, 'dangling requirement ids are skipped');
@@ -757,18 +922,31 @@ describe('InventoryListingBuilder — recipe-item books', () => {
 
     // learnBlocked folds in Required Knowledge AND character prereqs; the reason lists
     // ONLY the unmet requirement names.
-    assert.ok(row.recipes.every((r) => r.learnBlocked === true), 'book is blocked while any requirement is unmet');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === true),
+      'book is blocked while any requirement is unmet'
+    );
     assert.equal(row.recipes[0].learnBlockedReason, 'Ritual, Master Only');
   });
 
   it('has no requirements and is not learnBlocked when Limited learning is off (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 9,
+    };
     const system = {
       ...bookSystem({
         caps: {
           item: {},
           // Both gates configured but Limited learning OFF ⇒ neither enforced.
-          learn: { limitLearning: false, prerequisiteIds: ['r-unknown'], characterPrerequisiteIds: ['p-expert'] },
+          learn: {
+            limitLearning: false,
+            prerequisiteIds: ['r-unknown'],
+            characterPrerequisiteIds: ['p-expert'],
+          },
         },
       }),
       characterPrerequisites: [EXPERT],
@@ -778,20 +956,38 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
       getRollData: () => ({ skills: { cra: { rank: 0 } } }),
     };
-    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    const row = bookRow(
+      bookBuilder({ system, recipes }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: false },
+      })
+    );
     assert.deepEqual(row.requirements, [], 'no requirements when Limited learning is off');
-    assert.ok(row.recipes.every((r) => r.learnBlocked === false), 'not blocked when Limited learning is off');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === false),
+      'not blocked when Limited learning is off'
+    );
   });
 
   it('does not surface requirements or learnBlocked on a craft-only (item-mode) book (issue 544)', () => {
-    const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 9 };
+    const EXPERT = {
+      id: 'p-expert',
+      name: 'Expert Crafter',
+      path: 'skills.cra.rank',
+      op: 'gte',
+      value: 9,
+    };
     // An item-mode book is CRAFTED by being held, never learned; its stored learn caps
     // (even with limitLearning on + prereq ids) are inert and must not leak chips.
     const system = {
       ...bookSystem({
         caps: {
           item: { limitUses: false },
-          learn: { limitLearning: true, prerequisiteIds: ['r-unknown'], characterPrerequisiteIds: ['p-expert'] },
+          learn: {
+            limitLearning: true,
+            prerequisiteIds: ['r-unknown'],
+            characterPrerequisiteIds: ['p-expert'],
+          },
         },
       }),
       visibilityMode: 'item',
@@ -802,10 +998,18 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       ...bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
       getRollData: () => ({ skills: { cra: { rank: 0 } } }),
     };
-    const row = bookRow(bookBuilder({ system, recipes }).buildListing({ craftingActor: actor, viewer: { isGM: false } }));
+    const row = bookRow(
+      bookBuilder({ system, recipes }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: false },
+      })
+    );
     assert.equal(row.learnable, false, 'the item-mode book is not learnable');
     assert.deepEqual(row.requirements, [], 'no requirement chips on a craft-only book');
-    assert.ok(row.recipes.every((r) => r.learnBlocked === false), 'recipes are not learn-blocked on a craft-only book');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === false),
+      'recipes are not learn-blocked on a craft-only book'
+    );
   });
 
   it('redacts an undiscovered required-knowledge recipe name but still counts + blocks it (issue 544)', () => {
@@ -818,7 +1022,10 @@ describe('InventoryListingBuilder — recipe-item books', () => {
         },
       }),
     };
-    const recipes = [...RECIPES, { id: 'r-secret', name: 'Forbidden Ritual', craftingSystemId: 'sys-b' }];
+    const recipes = [
+      ...RECIPES,
+      { id: 'r-secret', name: 'Forbidden Ritual', craftingSystemId: 'sys-b' },
+    ];
     // The visibility service marks r-secret a teaser (undiscovered) for this reader,
     // so it is excluded from the allowed set; r1/r2 stay visible.
     const recipeVisibility = {
@@ -840,13 +1047,23 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.equal(secret.met, false, 'still counts as unmet');
     assert.equal(secret.name, 'a hidden recipe', 'its name is redacted to the generic label');
     assert.ok(!/Forbidden Ritual/.test(secret.name), 'the real teaser name is not disclosed');
-    assert.ok(row.recipes.every((r) => r.learnBlocked === true), 'it still blocks learning');
+    assert.ok(
+      row.recipes.every((r) => r.learnBlocked === true),
+      'it still blocks learning'
+    );
 
     // A GM (allowedRecipeIds null) sees the real name.
     const gmRow = bookRow(
-      bookBuilder({ system, recipes, recipeVisibility }).buildListing({ craftingActor: actor, viewer: { isGM: true } })
+      bookBuilder({ system, recipes, recipeVisibility }).buildListing({
+        craftingActor: actor,
+        viewer: { isGM: true },
+      })
     );
-    assert.equal(gmRow.requirements.find((r) => r.id === 'r-secret').name, 'Forbidden Ritual', 'the GM sees the real name');
+    assert.equal(
+      gmRow.requirements.find((r) => r.id === 'r-secret').name,
+      'Forbidden Ritual',
+      'the GM sees the real name'
+    );
   });
 
   it('classifies book learn/craft from the flat visibilityMode (item→craft, knowledge→learn, global/restricted→no rows)', () => {
@@ -939,7 +1156,11 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     assert.ok(row, 'an item-only book still appears in the inventory');
     assert.equal(row.learnable, false, 'an item-only book offers no Learn affordance');
     assert.equal(row.limits.learning, null, 'no learning limit for an item-only book');
-    assert.deepEqual(row.limits.uses, { max: 3, used: 1, remaining: 2 }, 'the craft-use limit still shows');
+    assert.deepEqual(
+      row.limits.uses,
+      { max: 3, used: 1, remaining: 2 },
+      'the craft-use limit still shows'
+    );
     assert.deepEqual(
       row.recipes.map((r) => r.id),
       ['r1', 'r2'],
@@ -1016,5 +1237,530 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       ['r1'],
       'the teaser recipe r2 is not named on the book'
     );
+  });
+});
+
+// --- Salvage view-model (issue 675) -----------------------------------------
+//
+// The whole point of this projection is that the panel stays presentational: mode,
+// usability, DC and thresholds are decided HERE, against the same fields the engine
+// dispatches on. Two failure modes these tests exist to catch are invisible to every
+// other gate: reading `craftingCheck` (the RECIPE block) instead of
+// `salvageCraftingCheck`, and shifting a routed FIXED range by `dcOverride`.
+
+function salvageSystem({ mode = 'simple', check = {}, salvage = {}, tools, features } = {}) {
+  return makeSystem({
+    features: features ?? { salvage: true },
+    salvageResolutionMode: mode,
+    // The RECIPE check block, deliberately authored with values that are WRONG for
+    // salvage: any projection that reads it instead of `salvageCraftingCheck` fails
+    // these tests loudly rather than rendering a plausible wrong number.
+    craftingCheck: {
+      simple: { rollFormula: '1d20 + 99', dc: 99 },
+      routed: { type: 'relative', rollFormula: '1d20 + 99', dc: 99, relativeOutcomes: [] },
+      progressive: { rollFormula: '1d20 + 99', awardMode: 'exceed' },
+    },
+    salvageCraftingCheck: check,
+    ...(tools ? { tools } : {}),
+    components: [
+      {
+        id: 'c1',
+        name: 'Iron',
+        img: 'icons/iron.webp',
+        tags: ['metal'],
+        essences: {},
+        difficulty: 5,
+        salvage: { enabled: true, resultGroups: [], ...salvage },
+      },
+      { id: 'c2', name: 'Coal', img: 'icons/coal.webp', tags: [], essences: {}, difficulty: 3 },
+      { id: 'c3', name: 'Slag', img: 'icons/slag.webp', tags: [], essences: {}, difficulty: 4 },
+    ],
+  });
+}
+
+function salvageOf(system, { items = [item('Iron', 1)] } = {}) {
+  const { builder } = makeBuilder({ systems: [system] });
+  // A GM viewer so the projection is exercised for every config, including the ones a
+  // non-GM viewer now has hidden by the System-Validity Gate's entity tier (#703); the
+  // non-GM hiding is covered by its own dedicated tests below.
+  const listing = builder.buildListing({
+    craftingActor: actor('a1', 'Akra', items),
+    viewer: { isGM: true, id: 'gm' },
+  });
+  return rowByComponent(listing, 'c1')?.salvage ?? null;
+}
+
+describe('InventoryListingBuilder - salvage view-model', () => {
+  it('is null when the system feature is off, and null when the component is not salvageable', () => {
+    assert.equal(salvageOf(salvageSystem({ features: { salvage: false } })), null);
+    assert.equal(salvageOf(salvageSystem({ salvage: { enabled: false } })), null);
+  });
+
+  it('is null on an essence row, which is never salvageable', () => {
+    const system = makeSystem({ features: { salvage: true } });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    const essence = listing.rows.find((r) => r.isEssenceSource);
+    assert.ok(essence, 'the fixture produces an essence row');
+    assert.equal(essence.salvage, null);
+  });
+
+  it('reads salvageCraftingCheck.simple - never craftingCheck - and shifts its DC by dcOverride', () => {
+    const base = salvageOf(
+      salvageSystem({ mode: 'simple', check: { simple: { rollFormula: '1d20 + 4', dc: 12 } } })
+    );
+    assert.equal(base.mode, 'simple');
+    assert.equal(base.checkUsable, true, 'an authored formula is the ONLY usability gate');
+    assert.equal(base.misconfigured, false);
+    assert.equal(base.dc, 12, 'the salvage DC, not the recipe block DC 99');
+
+    const overridden = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        check: { simple: { rollFormula: '1d20 + 4', dc: 12 } },
+        salvage: { dcOverride: 17 },
+      })
+    );
+    assert.equal(overridden.dc, 17, 'a per-component override replaces the default DC');
+  });
+
+  it('reports simple mode with NO authored salvage formula as unusable, not misconfigured', () => {
+    // The smoke fixture's exact shape: `salvageResolutionMode: 'simple'` with no salvage
+    // check authored. The raw mode alone would render a pass/fail body ("On a success" +
+    // a loss note) under a footer that never prompts. The effective read is the PAIR.
+    const salvage = salvageOf(salvageSystem({ mode: 'simple', check: {} }));
+    assert.equal(salvage.mode, 'simple');
+    assert.equal(salvage.checkUsable, false);
+    assert.equal(salvage.misconfigured, false, 'simple never REQUIRES a check');
+  });
+
+  it('projects the simple result group the engine actually awards', () => {
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        salvage: {
+          resultGroups: [
+            { id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 2 }] },
+            { id: 'g2', results: [{ id: 'r2', componentId: 'c3', quantity: 9 }] },
+          ],
+        },
+      })
+    );
+    // The engine takes `allGroups.slice(0, 1)` in simple mode, so the second group is
+    // never awarded and is never shown.
+    assert.deepEqual(
+      salvage.results.map((r) => [r.componentId, r.name, r.quantity]),
+      [['c2', 'Coal', 2]]
+    );
+  });
+
+  it('routed + RELATIVE renders effective, dcOverride-shifted thresholds', () => {
+    const check = {
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20 + 4',
+        dc: 15,
+        relativeOutcomes: [
+          { id: 'o1', name: 'Fail', success: false, dc: -5 },
+          { id: 'o2', name: 'Pass', success: true, dc: 0 },
+          { id: 'o3', name: 'Crit', success: true, dc: 5 },
+        ],
+      },
+    };
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'routed',
+        check,
+        salvage: {
+          outcomeRouting: { Pass: 'g1' },
+          resultGroups: [{ id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] }],
+        },
+      })
+    );
+    assert.equal(salvage.routedType, 'relative');
+    assert.equal(salvage.dc, 15, 'the base DC the deltas resolve against');
+    assert.deepEqual(
+      salvage.routedOutcomes.map((o) => [o.name, o.threshold]),
+      [
+        ['Fail', 10],
+        ['Pass', 15],
+        ['Crit', 20],
+      ]
+    );
+    // The tier's NAME keys `outcomeRouting` to a result group - exactly how the engine
+    // resolves the award.
+    assert.deepEqual(
+      salvage.routedOutcomes.find((o) => o.name === 'Pass').results.map((r) => r.name),
+      ['Coal']
+    );
+    assert.deepEqual(salvage.routedOutcomes.find((o) => o.name === 'Fail').results, []);
+
+    const shifted = salvageOf(
+      salvageSystem({ mode: 'routed', check, salvage: { dcOverride: 18 } })
+    );
+    assert.equal(shifted.dc, 18);
+    assert.deepEqual(
+      shifted.routedOutcomes.map((o) => o.threshold),
+      [13, 18, 23],
+      'an override shifts every RELATIVE threshold, because each is a delta on the base'
+    );
+  });
+
+  // AC2. The case the smoke fixture CANNOT catch: its routed salvage is
+  // `type: 'relative'`, so a projection that shifts everything by `dcOverride` passes
+  // every gate green while a fixed-authored world is shown a routing table the engine
+  // will never honour. `checkRoll`'s fixed branch matches `start <= total <= end` and
+  // never reads a DC at all - and the GM editor hides the DC field for this pairing.
+  it('routed + FIXED renders the authored [start, end] ranges verbatim and shows NO DC', () => {
+    const check = {
+      routed: {
+        type: 'fixed',
+        rollFormula: '1d20 + 4',
+        dc: 15,
+        fixedOutcomes: [
+          { id: 'o1', name: 'Fail', success: false, start: 1, end: 9 },
+          { id: 'o2', name: 'Pass', success: true, start: 10, end: 19 },
+          { id: 'o3', name: 'Crit', success: true, start: 20, end: 30 },
+        ],
+      },
+    };
+    const salvage = salvageOf(salvageSystem({ mode: 'routed', check }));
+    assert.equal(salvage.routedType, 'fixed');
+    assert.equal(salvage.dc, null, 'a fixed routed check has no DC to show');
+    assert.deepEqual(
+      salvage.routedOutcomes.map((o) => [o.name, o.start, o.end, o.threshold]),
+      [
+        ['Fail', 1, 9, null],
+        ['Pass', 10, 19, null],
+        ['Crit', 20, 30, null],
+      ]
+    );
+
+    // The load-bearing half: an override must move NOTHING here.
+    const overridden = salvageOf(
+      salvageSystem({ mode: 'routed', check, salvage: { dcOverride: 18 } })
+    );
+    assert.equal(overridden.dc, null, 'an override does not invent a DC for a fixed check');
+    assert.deepEqual(
+      overridden.routedOutcomes.map((o) => [o.start, o.end]),
+      [
+        [1, 9],
+        [10, 19],
+        [20, 30],
+      ],
+      'dcOverride shifts the simple DC and routed RELATIVE thresholds ONLY'
+    );
+  });
+
+  it('routed with no authored salvage formula is misconfigured and shows no outcomes', () => {
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'routed',
+        check: {
+          routed: { type: 'relative', relativeOutcomes: [{ id: 'o1', name: 'Pass', dc: 0 }] },
+        },
+      })
+    );
+    assert.equal(salvage.checkUsable, false);
+    assert.equal(salvage.misconfigured, true);
+    assert.deepEqual(salvage.routedOutcomes, [], 'no tiers under a footer that always fails');
+  });
+
+  it('progressive stages use SALVAGE own award mode and carry cumulative thresholds', () => {
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'progressive',
+        // Salvage awards `equal`; the recipe block above says `exceed`. Reading the
+        // recipe block would render 5/8 instead of 4/7 - a plausible wrong number.
+        check: { progressive: { rollFormula: '1d20 + 4', awardMode: 'equal' } },
+        salvage: {
+          resultGroups: [
+            {
+              id: 'g1',
+              results: [
+                { id: 'r1', componentId: 'c3', quantity: 1 },
+                { id: 'r2', componentId: 'c2', quantity: 1 },
+              ],
+            },
+          ],
+        },
+      })
+    );
+    assert.equal(salvage.mode, 'progressive');
+    assert.equal(salvage.dc, null, 'progressive has no DC');
+    assert.deepEqual(
+      salvage.stages.map((s) => [s.name, s.difficulty, s.threshold]),
+      [
+        ['Slag', 4, 4],
+        ['Coal', 3, 7],
+      ]
+    );
+  });
+
+  it('675: a progressive stage carries NO quantity, whatever the GM authored', () => {
+    // Progressive results are quantity-less: the award loop charges an entry's
+    // difficulty once and grants ONE item (`CraftingEngine._resolveSalvageResultGroups`
+    // forces `quantity: 1`), so a projected count could only ever be a number the
+    // engine ignores - and the row printed it: "Balehound Teeth x2", one awarded.
+    // Repetition, not a count, is how the GM asks for two.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'progressive',
+        check: { progressive: { rollFormula: '1d20 + 4', awardMode: 'equal' } },
+        salvage: {
+          resultGroups: [
+            {
+              id: 'g1',
+              results: [
+                { id: 'r1', componentId: 'c3', quantity: 2 },
+                { id: 'r2', componentId: 'c3', quantity: 9 },
+              ],
+            },
+          ],
+        },
+      })
+    );
+    assert.deepEqual(
+      salvage.stages.map((s) => s.quantity),
+      [undefined, undefined],
+      'the stored count is inert in this mode and is not projected at all'
+    );
+    // The same component listed twice is TWO stages - the one-to-one mapping is what
+    // makes repetition expressive, so it must not collapse.
+    assert.deepEqual(
+      salvage.stages.map((s) => [s.id, s.name]),
+      [
+        ['r1', 'Slag'],
+        ['r2', 'Slag'],
+      ]
+    );
+  });
+
+  it('675: simple-mode results DO carry quantity - the rule is progressive-only', () => {
+    // The counter-case, so the deletion above cannot creep into the simple/routed
+    // projection: those modes award the authored count and always have.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        salvage: {
+          resultGroups: [{ id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 3 }] }],
+        },
+      })
+    );
+    assert.deepEqual(
+      salvage.results.map((r) => r.quantity),
+      [3]
+    );
+  });
+
+  it('progressive with no authored salvage formula is misconfigured and shows no stages', () => {
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'progressive',
+        check: { progressive: { awardMode: 'equal' } },
+        salvage: { resultGroups: [{ id: 'g1', results: [{ id: 'r1', componentId: 'c2' }] }] },
+      })
+    );
+    assert.equal(salvage.misconfigured, true);
+    assert.deepEqual(salvage.stages, []);
+  });
+
+  it('allowPlayerResultReorder defaults TRUE; only an explicit false pins the order', () => {
+    assert.equal(salvageOf(salvageSystem({})).allowPlayerResultReorder, true);
+    assert.equal(
+      salvageOf(salvageSystem({ salvage: { allowPlayerResultReorder: false } }))
+        .allowPlayerResultReorder,
+      false
+    );
+  });
+
+  it('targetActorId is the first OWNED actor holding the component', () => {
+    const system = salvageSystem({});
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', []),
+      componentSourceActors: [actor('a2', 'Camp Chest', [item('Iron', 3)])],
+    });
+    assert.equal(rowByComponent(listing, 'c1').salvage.targetActorId, 'a2');
+  });
+});
+
+describe('InventoryListingBuilder - derived broken verdict', () => {
+  // Brokenness has TWO sources and the fixtures must be able to express both
+  // independently: `toolBroken` is a persisted PAST FACT (written by the flagBroken
+  // on-break action for every breakage mode, and carrying NO toolUsage for a
+  // chance/formula tool), while `toolUsage` exhaustion is a PROJECTION that only
+  // limitedUses supports.
+  function toolItem(name, { usage = undefined, brokenFlag = undefined } = {}) {
+    return {
+      name,
+      system: { quantity: 1 },
+      // Mirrors the real flag paths: `Tool#applyUsage` writes through
+      // `getFabricateFlag(item, 'toolUsage')` (normalized to `fabricate.toolUsage`),
+      // while `applyBreakage` writes `toolBroken` the same way.
+      getFlag: (scope, key) => {
+        if (scope !== 'fabricate') return undefined;
+        if (key === 'fabricate.toolUsage') return usage;
+        if (key === 'fabricate.toolBroken') return brokenFlag;
+        return undefined;
+      },
+    };
+  }
+
+  const tools = [{ id: 't1', componentId: 'c1', breakage: { mode: 'limitedUses', maxUses: 2 } }];
+
+  it('reports a limitedUses tool broken once its uses are spent - and still salvageable', () => {
+    const { builder } = makeBuilder({ systems: [salvageSystem({ tools })] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [toolItem('Iron', { usage: { timesUsed: 2 } })]),
+    });
+    const row = rowByComponent(listing, 'c1');
+    assert.equal(row.broken, true);
+    // Decision 6: brokenness does NOT gate salvageability. The engine has no broken
+    // check, and recycling a spent tool is the most useful thing left to do with it.
+    assert.equal(row.salvage.enabled, true, 'a broken tool is still salvageable');
+  });
+
+  it('reports an unspent tool, and a tool with no flags at all, as intact', () => {
+    const system = salvageSystem({ tools });
+    const listing = makeBuilder({ systems: [system] }).builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [toolItem('Iron', { usage: { timesUsed: 1 } })]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').broken, false);
+
+    const fresh = makeBuilder({ systems: [system] }).builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+    });
+    assert.equal(rowByComponent(fresh, 'c1').broken, false);
+  });
+
+  // THE HEADLINE CASE. `flagBroken` is the ONLY on-break mode that leaves a broken item
+  // in the player's inventory — `destroy` and `replaceWith` remove it — so nearly every
+  // broken tool a player can actually SEE is one of these. A breakageChance /
+  // diceExpression tool that has broken carries `toolBroken: true` and NO `toolUsage` at
+  // all. Reading usage alone rendered it intact — no wash, no pip, no banner — while the
+  // runtime presence gate refused it for crafting, making the whole broken treatment
+  // very nearly unreachable.
+  it('reports a broken-FLAGGED tool broken for a non-limitedUses mode, with no usage flag', () => {
+    for (const mode of [
+      { mode: 'breakageChance', breakageChance: 1 },
+      { mode: 'diceExpression', formula: '1d6', threshold: 1 },
+    ]) {
+      const system = salvageSystem({ tools: [{ id: 't1', componentId: 'c1', breakage: mode }] });
+      const { builder } = makeBuilder({ systems: [system] });
+      const listing = builder.buildListing({
+        craftingActor: actor('a1', 'Akra', [toolItem('Iron', { brokenFlag: true })]),
+      });
+      assert.equal(
+        rowByComponent(listing, 'c1').broken,
+        true,
+        `${mode.mode}: the persisted past fact needs no roll and no usage`
+      );
+    }
+  });
+
+  it('reports a broken-FLAGGED tool broken even with no Tool entry and no usage', () => {
+    // The flag is the AUTHORITATIVE presence-gate disqualifier, so it does not depend on
+    // resolving a breakage mode at all.
+    const { builder } = makeBuilder({ systems: [salvageSystem({ tools: [] })] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [toolItem('Iron', { brokenFlag: true })]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').broken, true);
+  });
+
+  it('never PROJECTS a non-limitedUses tool broken from usage: those modes roll at attempt time', () => {
+    // Unflagged, a chance tool with a huge timesUsed is NOT broken — it has simply been
+    // used a lot. This is the projection's genuine limit, distinct from the flag above.
+    const system = salvageSystem({
+      tools: [
+        { id: 't1', componentId: 'c1', breakage: { mode: 'breakageChance', breakageChance: 1 } },
+      ],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [toolItem('Iron', { usage: { timesUsed: 99 } })]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').broken, false);
+  });
+
+  // THE FALSE POSITIVE. Under the GM-selectable `checkDriven` authority the active check
+  // decides whether tools break and per-tool modes are ignored (except immune) — but
+  // `applyToolUsageAndBreakage` still calls `applyUsage` unconditionally, so `timesUsed`
+  // climbs past `maxUses` on a tool the engine will never break by exhaustion. Ungated,
+  // the row claimed "Broken" PERMANENTLY for a perfectly usable tool.
+  it('does not project exhaustion under checkDriven authority, where usage decides nothing', () => {
+    const system = salvageSystem({ tools });
+    system.toolBreakage = { authority: 'checkDriven' };
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [toolItem('Iron', { usage: { timesUsed: 99 } })]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').broken, false, 'usage accrues but decides nothing');
+  });
+
+  it('still honours the broken FLAG under checkDriven: a forced break is a real past fact', () => {
+    const system = salvageSystem({ tools });
+    system.toolBreakage = { authority: 'checkDriven' };
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [toolItem('Iron', { brokenFlag: true })]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').broken, true);
+  });
+
+  it('projects exhaustion under the default toolSpecific authority', () => {
+    const system = salvageSystem({ tools });
+    system.toolBreakage = { authority: 'toolSpecific' };
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [toolItem('Iron', { usage: { timesUsed: 2 } })]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').broken, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #703 — System-Validity Gate entity tier: a component whose salvage config is
+// invalid (a `blocks: 'visibility'` critical) is dropped from a non-GM viewer's
+// salvage panel, retained for a GM, and its stored `enabled` flag is never mutated.
+// ---------------------------------------------------------------------------
+
+describe('InventoryListingBuilder - salvage entity-tier visibility gate (#703)', () => {
+  // Simple mode requires exactly one salvage result group; two makes the component's
+  // salvage config invalid, raising a `blocks: 'visibility'` critical keyed on c1.
+  function invalidSalvageSystem() {
+    return salvageSystem({
+      mode: 'simple',
+      salvage: {
+        resultGroups: [
+          { id: 'g1', results: [{ componentId: 'c2' }] },
+          { id: 'g2', results: [{ componentId: 'c3' }] },
+        ],
+      },
+    });
+  }
+
+  it('omits the salvage panel for a non-GM viewer when the component is visibility-blocked', () => {
+    const system = invalidSalvageSystem();
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      viewer: { isGM: false, id: 'u1' },
+    });
+    assert.equal(rowByComponent(listing, 'c1').salvage, null);
+    // The stored config is untouched — this is a viewer projection, not a mutation.
+    assert.equal(system.components[0].salvage.enabled, true);
+  });
+
+  it('retains the salvage panel for a GM viewer even when the component is visibility-blocked', () => {
+    const system = invalidSalvageSystem();
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      viewer: { isGM: true, id: 'gm' },
+    });
+    assert.notEqual(rowByComponent(listing, 'c1').salvage, null);
+    assert.equal(system.components[0].salvage.enabled, true);
   });
 });

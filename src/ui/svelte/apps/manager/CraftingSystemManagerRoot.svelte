@@ -19,14 +19,20 @@
     getRecipeCategoryLabel,
     normalizeRecipeCategory
   } from '../../../../utils/recipeCategories.js';
+  import {
+    getComponentCategoryLabel,
+    normalizeComponentCategory
+  } from '../../../../utils/componentCategories.js';
+  import { categoryIconFor } from '../../../../utils/categoryIcons.js';
+  import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
+  import { createComponentBrowserState } from '../../../../utils/componentBrowserModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
-  import ComponentSourceInspector from './ComponentSourceInspector.svelte';
-  import ComponentDifficultyInspector from './ComponentDifficultyInspector.svelte';
+  import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -41,6 +47,10 @@
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeBrowserInspector from './recipes/RecipeBrowserInspector.svelte';
+  // The component library's inspector (issue 676) — the sibling of the above. It lives
+  // under `components/` (the BROWSER's dir), NOT `component/`, which the screenshot map
+  // globs for the component EDITOR's frames.
+  import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
   import CraftingSettingsView from './CraftingSettingsView.svelte';
   import AccessTabView from './AccessTabView.svelte';
@@ -52,11 +62,8 @@
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
     isCraftingRoute as isCraftingView,
-    CRAFTING_VIEWS,
   } from './crafting/craftingNav.js';
   import RecipeEditView from './RecipeEditView.svelte';
-  import RecipeContextRail from './recipe/RecipeContextRail.svelte';
-  import { evaluateRecipeReadiness } from './recipe/recipeReadiness.js';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -96,13 +103,6 @@
   // is the last-persisted snapshot. Both are deep PLAIN clones so JSON.stringify
   // comparison drives the dirty flag (mirrors the gathering-task/event editors).
   let recipeDraft = $state(null);
-  // Requested recipe-editor tab + nonce: the context rail deep-links into a tab of
-  // the editor it sits beside (the tab state lives inside RecipeEditView).
-  let requestedRecipeTab = $state('');
-  let requestedRecipeTabNonce = $state(0);
-  // The recipe editor's live active tab, lifted out of RecipeEditView so the sibling
-  // context rail can show its validation summary only on the Validation tab (§G4).
-  let recipeActiveTab = $state('overview');
   let recipeDraftBaseline = $state(null);
   // The recipe browser's filter / sort / group / paginate view-state, lifted OUT of
   // RecipesBrowserView so it survives the editor round-trip (issue 643). Opening the
@@ -113,11 +113,16 @@
   // the browser remounts against this intact object. Fresh open still starts at defaults
   // (this is seeded once, on first mount).
   let recipeBrowserState = $state(createRecipeBrowserState());
+  // Same lift, same reason, for the component library (issue 676): its filter/sort/
+  // group/page state used to live inside ComponentsBrowserView, so every editor
+  // round-trip reset it.
+  let componentBrowserState = $state(createComponentBrowserState());
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
   // Crafting nav group (issue 511): mirrors the gathering group's expand state.
-  // The whole group is gated behind experimental features (`recipesRouteEnabled`).
+  // The group is always available as of issue 745 (v1.3 headline); only its
+  // expand/collapse state lives here.
   let craftingMenuExpanded = $state(false);
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
@@ -251,15 +256,13 @@
 
   // Progressive crafting check draft — same staged pattern, used for progressive
   // resolution mode. Only the roll formula and crit table are edited here; the
-  // award settings (awardMode/allowPlayerReorder) are carried through untouched so
-  // a save never drops them.
+  // award setting (awardMode) is carried through untouched so a save never drops it.
   function cloneProgressiveCheck(progressive) {
     const source = progressive && typeof progressive === 'object' ? progressive : {};
     return {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
-      allowPlayerReorder: source.allowPlayerReorder === true,
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
@@ -329,8 +332,9 @@
   // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
   // so the shared header Save persists the right draft.
   let checksActiveTab = $state('crafting');
+  // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
+  // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
-    { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
   ];
 
@@ -349,9 +353,11 @@
     ['routedByIngredients', 'routedByCheck'].includes(selectedSystem?.resolutionMode || 'simple')
   );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
-  const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
+  // Experimental toggle (issue 745): the Crafting group is now unconditional; this
+  // gate only decides whether the unimplemented Graph placeholder is advertised.
+  const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
-  const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
+  const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
 
   // The pure `evaluateSystemValidation` report, computed in the admin store from
   // the selected system's recipes/environments/components. Drives the GM system
@@ -507,10 +513,34 @@
   const salvageOutcomeNames = $derived(
     routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
   );
-  // System components offered to the salvage result picker ({id, name, img}).
-  const salvageComponentOptions = $derived(
-    itemCards.map((item) => ({ id: item.id, name: item.name, img: item.img }))
-  );
+  // The second axis of the per-component salvage panel's derived presentation
+  // (issue 676, decision 2): salvageResolutionMode × salvage-check enablement.
+  const salvageCheckEnabled = $derived(selectedSystem?.salvageCraftingCheck?.enabled === true);
+  // DC presets come from `salvageCraftingCheck.simple.tiers` in EVERY resolution mode,
+  // routed included (decision 7, case 5) — there is no `.routed.tiers` sibling.
+  const salvageCheckTiers = $derived(selectedSystem?.salvageCraftingCheck?.simple?.tiers || []);
+  const salvageCheckDcMode = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static');
+  const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
+  // System components offered to the salvage yield picker.
+  //
+  // READ FROM `managedItemOptions`, NEVER FROM `itemCards` (issue 676). `itemCards` is
+  // the component BROWSER's list and is SEARCH-FILTERED:
+  //   itemCards ← _buildItemCards(…, itemSearchTerm, …) ← getItems(systemId, search)
+  // where `itemSearchTerm` is `get(itemSearch)`, the browser's search store. Projecting
+  // the picker from it leaked that search into the editor: typing "iron" in the browser
+  // and then opening any component silently narrowed the yield picker to components
+  // matching "iron" — a filter applied by a control that is not on screen, with no
+  // feedback. `selectedSystem.managedItemOptions` is `_buildManagedItemOptions` over the
+  // UNFILTERED managed items, and is already what the recipe editor's component pickers
+  // read; salvage was the one surface that diverged.
+  //
+  // It is REUSED rather than re-projected here on purpose. The old hand-rolled map was an
+  // ALLOWLIST whose every field had to be remembered — an omitted `difficulty` reaches the
+  // editor as `undefined` and the progressive row's badge silently reads "No difficulty"
+  // for every row, which looks like unauthored data rather than a dropped projection.
+  // `_buildManagedItemOptions` already carries `id`/`name`/`img`/`description`/`category`/
+  // `difficulty`, so there is one projection to keep correct instead of two.
+  const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
   // Reseed the routed + simple check drafts and baselines when the selected system
   // changes (not on every refresh of the same system, so a save never clobbers an
@@ -582,6 +612,21 @@
 
   function onUpdateGatheringCheckRouted(next) {
     gatheringRoutedDraft = next;
+  }
+
+  // Live-persist an alchemy behaviour-flag patch (issue 713). saveAlchemyConfig
+  // rewrites all three flags from its argument, so send the current projected values
+  // with the single toggled field overridden — passing a bare `{ learnOnCraft }` would
+  // silently re-default consumeOnFail/showAttemptHistoryToPlayers to their defaults.
+  function onUpdateAlchemyFlags(patch) {
+    const current = selectedSystem?.alchemy || {};
+    store?.saveAlchemyConfig?.({
+      checkMode: current.checkMode,
+      learnOnCraft: current.learnOnCraft === true,
+      consumeOnFail: current.consumeOnFail !== false,
+      showAttemptHistoryToPlayers: current.showAttemptHistoryToPlayers !== false,
+      ...patch,
+    });
   }
 
   async function saveCraftingCheck() {
@@ -696,14 +741,59 @@
     (toolsComponentPageIndex + 1) * toolsComponentPageSize
   ));
   const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
-  const categoryRows = $derived(buildCategoryRows(selectedSystem?.categories || [], tagCategoryUsage.categoryUsage));
+  const categoryRows = $derived(buildCategoryRows(
+    selectedSystem?.categories || [],
+    tagCategoryUsage.categoryUsage,
+    selectedSystem?.categoryIcons || {}
+  ));
+  const componentCategoryRows = $derived(buildComponentCategoryRows(
+    selectedSystem?.componentCategories || [],
+    tagCategoryUsage.componentCategoryUsage,
+    selectedSystem?.componentCategoryIcons || {}
+  ));
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
   const tagCategoryCounts = $derived({
     baseCategories: 1,
     customCategories: categoryRows.filter(row => row.id !== 'general').length,
+    customComponentCategories: componentCategoryRows.filter(row => row.id !== 'general').length,
     itemTags: tagRows.length,
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
+    componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount
+  });
+  // The Tags & Categories screen shows one vocabulary tab at a time; the active tab
+  // is owned here so the inspector's contextual help can follow it (the view is a
+  // controlled component over this state). Each help block is title + three bullets.
+  let tagsActiveTab = $state('recipe');
+  const tagsHelp = $derived.by(() => {
+    if (tagsActiveTab === 'component') {
+      return {
+        title: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle', 'How component categories work'),
+        items: [
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.')
+        ]
+      };
+    }
+    if (tagsActiveTab === 'tag') {
+      return {
+        title: text('FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle', 'How component tags work'),
+        items: [
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.')
+        ]
+      };
+    }
+    return {
+      title: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle', 'How recipe categories work'),
+      items: [
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.'),
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.'),
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.')
+      ]
+    };
   });
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
@@ -720,6 +810,19 @@
     Array.isArray(selectedSystem?.requirements?.currency?.units)
       ? selectedSystem.requirements.currency.units
       : []
+  );
+  // Units are seeded from adapter presets even for a currency-disabled system, so the
+  // recipe editor must gate cost affordances on the explicit enable flag, not on unit
+  // presence. Threaded alongside the units so existing requirements can render read-only
+  // (rather than vanish) when currency is off.
+  const selectedCurrencyEnabled = $derived(
+    selectedSystem?.requirements?.currency?.enabled === true
+  );
+  // Time requirements default ON (issue 714): an absent flag keeps existing recipe/step
+  // durations authorable and applied, so gate the recipe Duration surfaces only on an
+  // explicit GM opt-out (`enabled === false`), mirroring the normalizer default.
+  const selectedTimeRequirementsEnabled = $derived(
+    selectedSystem?.requirements?.time?.enabled !== false
   );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
@@ -1152,11 +1255,11 @@
   });
 
   // --- Recipe editor context rail (issue 643 §4b) --------------------------------
-  // The rail's top section is MODE-CONDITIONAL off the same craftingEffect matrix the
-  // nav and Crafting Settings read, so there is exactly one source of truth for which
-  // conditional surface a visibility mode implies.
-  const recipeRailEffect = $derived(craftingEffect(selectedSystem?.visibilityMode || 'knowledge'));
-  // Resolution happens in the STORE (the rail never touches ids): granted characters
+  // The recipe editor's Access / Books & Scrolls tabs are MODE-CONDITIONAL off the same
+  // craftingEffect matrix the nav and Crafting Settings read, so there is exactly one
+  // source of truth for which conditional surface a visibility mode implies.
+  const recipeVisibilityEffect = $derived(craftingEffect(selectedSystem?.visibilityMode || 'knowledge'));
+  // Resolution happens in the STORE (the tab never touches ids): granted characters
   // resolve over EVERY world actor, not the player-character roster, because the
   // runtime predicate applies no type filter. The rosters are passed explicitly so the
   // reactive dependency on them is visible here rather than hidden inside the store.
@@ -1166,16 +1269,6 @@
       characters: $viewState.accessCharacters || [],
     }) || { players: [], characters: [] }
   );
-  // The rail's validation mini-list reads the SAME pure evaluator the Validation tab
-  // renders, so the two can never disagree.
-  const recipeRailReadiness = $derived(evaluateRecipeReadiness({ ...(recipeDraft || {}) }, {
-    systemComponents: selectedSystem?.componentTagOptions || [],
-    routingProvider: recipeRoutingProvider,
-    routedOutcomeTierOptions: recipeRoutedOutcomeTierOptions,
-    alchemy: recipeAlchemy,
-    signatureConflicts: recipeSignatureConflicts,
-  }));
-
   const recipeEditDirty = $derived(Boolean(recipeDraft)
     && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
@@ -1214,9 +1307,30 @@
   // the component editor's save flow (it persists on Save, not on change). The
   // draft is seeded on edit-entry (editComponent); these derive its visibility,
   // dirtiness, and the combined dirty state the Save button + route guard use.
+  // `component.difficulty` is ONE component-level scalar read by SEVERAL
+  // progressive surfaces, each with its OWN resolution mode:
+  //   - progressive recipes   → ResolutionModeService  (system.resolutionMode)
+  //   - progressive salvage   → CraftingEngine         (system.salvageResolutionMode)
+  //   - progressive gathering → GatheringEngine        (the system's gathering
+  //     economy `resolutionMode`; `difficultyForResult` costs each result by the
+  //     component's difficulty)
+  // Gating on the RECIPE mode alone was the bug (issue 676): a system that is
+  // `routedByCheck` for recipes but progressive for salvage reads difficulty and
+  // could never author it. Read the gathering economy straight off viewState
+  // rather than via `gatheringResolutionMode` (declared further down) so this
+  // derivation carries no declaration-order coupling. The economy is ONE block
+  // per system (`gatheringConfig.systems[systemId].economy`), so this is a direct
+  // read of the edited system's mode, not a scan.
+  const gatheringProgressive = $derived(
+    $viewState.gatheringConfig?.systems?.[selectedSystemId]?.economy?.resolutionMode === 'progressive'
+  );
   const componentDifficultyShown = $derived(
     currentView === 'component-edit'
-    && selectedSystem?.resolutionMode === 'progressive'
+    && (
+      selectedSystem?.resolutionMode === 'progressive'
+      || salvageResolutionMode === 'progressive'
+      || gatheringProgressive
+    )
     && !!componentForEdit
   );
   const componentDifficultyDirty = $derived(
@@ -1325,8 +1439,8 @@
   // model (`buildCraftingNavItems`): Recipes and Settings are always present,
   // Access appears under `restricted`, Books & Scrolls under `item`/`knowledge`.
   // Each sub-item maps to a distinct route, so highlighting is derived from the
-  // active route via `resolveActiveCraftingTab`. The whole group is gated behind
-  // `recipesRouteEnabled` (experimental features).
+  // active route via `resolveActiveCraftingTab`. The group is unconditional as of
+  // issue 745 (v1.3 headline).
   const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
@@ -1732,6 +1846,35 @@
     return `${category} · ${mode}${dcSuffix}`;
   }
 
+  // The component editor's header subline: "<category> · Linked <source>" (issue 676,
+  // decision 4). The SOURCE segment names where the linked item lives — the same origin
+  // the browser row's status pill reports — because the editor's whole premise is that
+  // name, image and description follow that item. An unlinked component says so.
+  function componentEditSubtitle() {
+    const category = getComponentCategoryLabel(
+      normalizeComponentCategory(componentForEdit?.category),
+      localize
+    );
+    return `${category} · ${componentEditSourceSegment()}`;
+  }
+
+  function componentEditSourceSegment() {
+    if (!componentForEdit?.hasRegisteredItemUuid) {
+      return text('FABRICATE.Admin.Manager.Component.UnlinkedBadge', 'Not linked');
+    }
+    if (componentForEdit?.sourceMissing) {
+      return text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing');
+    }
+    const origin = componentForEdit?.sourceOrigin || '';
+    const sourceLabel = componentForEdit?.sourceOriginLabel
+      || (origin === 'compendium'
+        ? text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium')
+        : origin === 'world'
+          ? text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory')
+          : text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'));
+    return `${text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')} ${sourceLabel}`;
+  }
+
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
@@ -1872,13 +2015,12 @@
     return Array.isArray(setting?.values) ? setting.values : [];
   }
 
-  function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
+  function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
-    if (CRAFTING_VIEWS.includes(view) && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
@@ -1938,6 +2080,7 @@
     if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Subtitle', 'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.');
     if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditSubtitle', 'Link a world item and recipes, then set its use and learn caps.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
+    if (currentView === 'component-edit' && componentForEdit) return componentEditSubtitle();
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
     if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Subtitle', 'Manage recipe category and item tag vocabulary for the selected crafting system.');
     if (currentView === 'essences') return text('FABRICATE.Admin.Manager.Essence.Subtitle', 'Manage essence definitions for the selected crafting system.');
@@ -1958,7 +2101,8 @@
   }
 
   function isViewAvailableForSystem(view, system) {
-    if (view.id === 'recipes') return !recipesRouteEnabled;
+    // Issue 745: the Graph placeholder is advertised only behind the experimental toggle.
+    if (view.id === 'graph') return experimentalFeaturesEnabled;
     if (!view.feature) return true;
     return system?.features?.[view.feature] === true;
   }
@@ -2259,7 +2403,6 @@
 
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
-    if ((view === 'recipes' || view === 'crafting-settings' || view === 'access' || view === 'books-scrolls' || view === 'recipe-item-edit') && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
@@ -2508,17 +2651,8 @@
     openCraftingSection('access');
   }
 
-  // Switch the recipe editor's active tab from outside the editor (the rail's
-  // validation mini-list). The tab lives inside RecipeEditView, so this is the
-  // requested-tab + nonce handshake the system editor already uses — a nonce, not a
-  // plain value, so asking for the SAME tab twice still re-selects it.
-  function openRecipeEditorTab(tab) {
-    requestedRecipeTab = tab;
-    requestedRecipeTabNonce += 1;
-  }
-
   // Remove ONE book from this recipe's membership (issue 511 many-to-many) — used
-  // by the context rail's per-book unlink. Other linked books are kept. ADDING a
+  // by the Books & Scrolls tab's per-book unlink. Other linked books are kept. ADDING a
   // recipe to a book is authored on Books & Scrolls, not here.
   async function handleRemoveRecipeItem(recipeItemId) {
     const rid = recipeDraft?.id;
@@ -2749,6 +2883,13 @@
     afterTruthyResult(confirmRouteExit('components'), () => { activeView = 'components'; });
   }
 
+  // The salvage DC control's "Manage presets" deep link (issue 676, decision 7).
+  // Routed through setView so it passes confirmRouteExit like every other navigation
+  // — never by assigning `activeView`, which would silently discard a dirty draft.
+  function openSalvageCheckPresets() {
+    setView('checks');
+  }
+
   function cancelComponentEdit() {
     backToComponentsBrowse();
   }
@@ -2823,14 +2964,34 @@
     store.deleteComponent?.(itemId);
   }
 
-  function addCategory(value) {
+  function addCategory(value, icon) {
     if (!selectedSystemId) return;
-    return store.addCategory?.(value);
+    return store.addCategory?.(value, icon);
   }
 
   function removeCategory(category) {
     if (!selectedSystemId) return;
     return store.removeCategory?.(category);
+  }
+
+  function setCategoryIcon(name, icon) {
+    if (!selectedSystemId) return;
+    return store.setCategoryIcon?.(name, icon);
+  }
+
+  function addComponentCategory(value, icon) {
+    if (!selectedSystemId) return;
+    return store.addComponentCategory?.(value, icon);
+  }
+
+  function removeComponentCategory(category) {
+    if (!selectedSystemId) return;
+    return store.removeComponentCategory?.(category);
+  }
+
+  function setComponentCategoryIcon(name, icon) {
+    if (!selectedSystemId) return;
+    return store.setComponentCategoryIcon?.(name, icon);
   }
 
   function addTag(value) {
@@ -2841,22 +3002,6 @@
   function removeTag(tag) {
     if (!selectedSystemId) return;
     return store.removeTag?.(tag);
-  }
-
-  function confirmTagCategoryRemoval(kind, row) {
-    if (!row || (row.totalUsage || 0) <= 0) return true;
-    const messageKey = kind === 'category'
-      ? 'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirm'
-      : 'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirm';
-    const fallback = kind === 'category'
-      ? 'Remove {name}? {count} references may keep this category value until you update them.'
-      : 'Remove {name}? {count} references may keep this tag value until you update them.';
-    const message = text(messageKey, fallback)
-      .replace('{name}', row.name)
-      .replace('{count}', row.totalUsage || 0);
-    if (services?.confirmVocabularyRemoval) return services.confirmVocabularyRemoval(kind, row, message) !== false;
-    if (typeof globalThis.confirm === 'function') return globalThis.confirm(message);
-    return false;
   }
 
   async function saveEssenceEdit(essenceId, updates) {
@@ -3475,7 +3620,6 @@
   // exit runs through `confirmRouteExit` (the Manager confirm-discard guard) via
   // `setView`/`afterTruthyResult`.
   function openCraftingSection(tabId = 'recipes') {
-    if (!recipesRouteEnabled) return;
     const item = craftingNavItems.find(tab => tab.id === tabId) || craftingNavItems[0];
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
@@ -3539,7 +3683,6 @@
   // route). Seeds both draft and baseline from the persisted projection and loads
   // the world-item options so the Overview tab's item picker has candidates.
   function editRecipeItem(recipeItemId) {
-    if (!recipesRouteEnabled) return;
     afterTruthyResult(confirmRouteExit('recipe-item-edit'), () => {
       selectedRecipeItemId = recipeItemId;
       recipeItemEditSaving = false;
@@ -3636,7 +3779,6 @@
   // Create a new recipe item: open the world-item picker, add the picked item as a
   // definition, then open its editor. Live side effect + navigation.
   async function createRecipeItem() {
-    if (!recipesRouteEnabled) return;
     worldItemOptions = (await services?.getWorldItemOptions?.()) || [];
     itemPickerOpen = true;
   }
@@ -4090,34 +4232,10 @@
     return environment;
   }
 
-  function componentSourceState(item) {
-    if (item?.sourceMissing) {
-      return {
-        id: 'missing',
-        label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
-        className: 'is-warning'
-      };
-    }
-    if (item?.sourceOrigin === 'compendium') {
-      return {
-        id: 'compendium',
-        label: item.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
-        className: 'is-active'
-      };
-    }
-    if (item?.sourceOrigin === 'world') {
-      return {
-        id: 'world',
-        label: item.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
-        className: 'is-active'
-      };
-    }
-    return {
-      id: 'unknown',
-      label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
-      className: 'is-disabled'
-    };
-  }
+  // `componentSourceState` lived here to tone the inline components inspector's source
+  // chip. That inspector is now `ComponentBrowserInspector` (issue 676), which derives
+  // its own linked badge, and the browser row derives its origin pill in
+  // `ComponentsBrowserView` — so the helper had no callers left.
 
   function componentEvidenceItems(item) {
     const evidence = [];
@@ -4182,28 +4300,15 @@
     return normalized || 'general';
   }
 
+  // Reference counting delegates to the pure `buildVocabularyUsage` helper (issue
+  // 689), which — unlike the pre-689 inline count — also credits a tag for every
+  // recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it, so a
+  // tag only ever used as an ingredient filter no longer reads as "Unused".
   function buildTagCategoryUsage(system, recipes, items) {
-    const categoryUsage = new Map();
-    const tagUsage = new Map();
-    for (const recipe of recipes || []) {
-      const categoryKey = normalizeVocabularyKey(recipe?.category);
-      categoryUsage.set(categoryKey, (categoryUsage.get(categoryKey) || 0) + 1);
-    }
-    for (const item of items || []) {
-      for (const tag of item?.tags || []) {
-        const tagKey = normalizeVocabularyKey(tag);
-        tagUsage.set(tagKey, (tagUsage.get(tagKey) || 0) + 1);
-      }
-    }
-    return {
-      categoryUsage,
-      tagUsage,
-      categoryReferenceCount: Array.from(categoryUsage.values()).reduce((sum, count) => sum + count, 0),
-      tagReferenceCount: Array.from(tagUsage.values()).reduce((sum, count) => sum + count, 0)
-    };
+    return buildVocabularyUsage(recipes, items);
   }
 
-  function buildCategoryRows(categories, usage) {
+  function buildCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Admin.Manager.Recipe.General', 'General');
     const customRows = uniqueSorted(categories || []).map(category => {
       const key = normalizeVocabularyKey(category);
@@ -4212,6 +4317,7 @@
         id: key,
         kind: 'category',
         name: category,
+        icon: categoryIconFor(icons, category),
         recipeUsageCount,
         totalUsage: recipeUsageCount,
         locked: false
@@ -4222,7 +4328,41 @@
         id: 'general',
         kind: 'category',
         name: generalName,
+        icon: categoryIconFor(icons, 'general'),
         recipeUsageCount: usage.get('general') || 0,
+        totalUsage: usage.get('general') || 0,
+        locked: true
+      },
+      ...customRows
+    ];
+  }
+
+  // Component-category rows (issue 676). Shaped exactly like buildCategoryRows so the
+  // Tags & Categories screen can render both sections through one row component, but
+  // fed from its own vocabulary and its own usage map. `kind` distinguishes them for
+  // the removal-confirmation copy.
+  function buildComponentCategoryRows(categories, usage, icons) {
+    const generalName = text('FABRICATE.Common.General', 'General');
+    const customRows = uniqueSorted(categories || []).map(category => {
+      const key = normalizeVocabularyKey(category);
+      const componentUsageCount = usage.get(key) || 0;
+      return {
+        id: key,
+        kind: 'component-category',
+        name: category,
+        icon: categoryIconFor(icons, category),
+        componentUsageCount,
+        totalUsage: componentUsageCount,
+        locked: false
+      };
+    });
+    return [
+      {
+        id: 'general',
+        kind: 'component-category',
+        name: generalName,
+        icon: categoryIconFor(icons, 'general'),
+        componentUsageCount: usage.get('general') || 0,
         totalUsage: usage.get('general') || 0,
         locked: true
       },
@@ -4362,7 +4502,9 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToComponentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span>
+          <!-- Name the component, not the generic "Edit component" — the same rule the
+               recipe breadcrumb follows. -->
+          <span>{componentForEdit?.name || text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span>
         {/if}
         {#if currentView === 'environments'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -4408,6 +4550,19 @@
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={recipeDraft.name || ''}>{recipeDraft.name || viewTitle()}</h1>
             <p class="manager-subtitle" data-recipe-edit-subline>{viewSubtitle()}</p>
+          </div>
+        </div>
+      {:else if currentView === 'component-edit' && componentForEdit}
+        <!-- The component editor's identity header (issue 676, decision 4 — it must match
+             the recipe editor's exactly, and was never implemented: this route fell
+             through to the generic static "Edit component" heading below). The linked
+             item's real image, its NAME, and the "<category> · Linked <source>" subline.
+             It reuses the recipe heading's classes wholesale — same shape, same CSS. -->
+        <div class="manager-recipe-edit-heading" data-component-edit-heading>
+          <Medallion src={componentForEdit.img} icon="fas fa-cube" size={44} />
+          <div class="manager-recipe-edit-heading-copy">
+            <h1 class="manager-title" title={componentForEdit.name || ''}>{componentForEdit.name || viewTitle()}</h1>
+            <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
           </div>
         </div>
       {:else}
@@ -4470,17 +4625,16 @@
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
       {:else if currentView === 'component-edit'}
-        {#if componentEditCombinedDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button" onclick={cancelComponentEdit} disabled={componentEditSaving}>
-          <i class="fas fa-times" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Component.Cancel', 'Cancel')}</span>
-        </button>
-        <button type="submit" form="manager-component-edit-form" class="manager-button is-primary" disabled={!canSaveComponentEdit}>
-          <i class={componentEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{componentEditSaveLabel()}</span>
-        </button>
+        <ComponentEditorHeader
+          dirty={componentEditCombinedDirty}
+          saving={componentEditSaving}
+          canSave={canSaveComponentEdit}
+          formId="manager-component-edit-form"
+          dirtyLabel={text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}
+          backLabel={text('FABRICATE.Admin.Manager.Component.Back', 'Back')}
+          saveLabel={componentEditSaveLabel()}
+          onBack={backToComponentsBrowse}
+        />
       {:else if currentView === 'tags'}
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
@@ -4710,53 +4864,52 @@
               <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
             {/if}
           </button>
-          {#if recipesRouteEnabled}
-            <div class={`manager-nav-group ${craftingMenuExpanded ? 'is-expanded' : ''}`}>
-              <button
-                type="button"
-                class="manager-nav-button manager-nav-parent"
-                id="manager-nav-crafting"
-                aria-current={isCraftingRoute ? 'page' : undefined}
-                aria-expanded={craftingMenuExpanded}
-                onclick={activateCraftingParent}
-              >
-                <i class="fas fa-hammer" aria-hidden="true"></i>
-                <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
-                <span class="manager-nav-count">{craftingNavCount}</span>
-              </button>
-              <button
-                type="button"
-                class="manager-nav-toggle"
-                aria-label={craftingMenuExpanded
-                  ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
-                  : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
-                aria-controls="manager-crafting-submenu"
-                aria-expanded={craftingMenuExpanded}
-                onclick={toggleCraftingMenu}
-              >
-                <i class={craftingMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
-              </button>
-              {#if craftingMenuExpanded}
-                <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
-                  {#each craftingNavItems as craftingItem (craftingItem.id)}
-                    <button
-                      type="button"
-                      class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
-                      id={`manager-crafting-nav-${craftingItem.id}`}
-                      aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id ? 'page' : undefined}
-                      onclick={() => openCraftingSection(craftingItem.id)}
-                    >
-                      <i class={craftingItem.icon} aria-hidden="true"></i>
-                      <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
-                      {#if craftingItem.count != null}
-                        <span class="manager-nav-count">{craftingItem.count}</span>
-                      {/if}
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/if}
+          <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
+          <div class={`manager-nav-group ${craftingMenuExpanded ? 'is-expanded' : ''}`}>
+            <button
+              type="button"
+              class="manager-nav-button manager-nav-parent"
+              id="manager-nav-crafting"
+              aria-current={isCraftingRoute ? 'page' : undefined}
+              aria-expanded={craftingMenuExpanded}
+              onclick={activateCraftingParent}
+            >
+              <i class="fas fa-hammer" aria-hidden="true"></i>
+              <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
+              <span class="manager-nav-count">{craftingNavCount}</span>
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              aria-label={craftingMenuExpanded
+                ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
+                : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
+              aria-controls="manager-crafting-submenu"
+              aria-expanded={craftingMenuExpanded}
+              onclick={toggleCraftingMenu}
+            >
+              <i class={craftingMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+            </button>
+            {#if craftingMenuExpanded}
+              <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
+                {#each craftingNavItems as craftingItem (craftingItem.id)}
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
+                    id={`manager-crafting-nav-${craftingItem.id}`}
+                    aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id ? 'page' : undefined}
+                    onclick={() => openCraftingSection(craftingItem.id)}
+                  >
+                    <i class={craftingItem.icon} aria-hidden="true"></i>
+                    <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
+                    {#if craftingItem.count != null}
+                      <span class="manager-nav-count">{craftingItem.count}</span>
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
           <button type="button" class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`} aria-current={currentView === 'components' || currentView === 'component-edit' ? 'page' : undefined} onclick={() => setView('components')}>
             <i class="fas fa-boxes" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
@@ -4965,6 +5118,10 @@
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
+            craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
+            alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
+            alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
+            alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !== false}
             {salvageResolutionMode}
             salvageCheckSimple={salvageSimpleDraft}
             salvageCheckRouted={salvageRoutedDraft}
@@ -4984,6 +5141,8 @@
             {onUpdateGatheringCheckProgressive}
             {onUpdateGatheringCheckRouted}
             onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
+            onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
+            {onUpdateAlchemyFlags}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
           />
@@ -5067,13 +5226,19 @@
     {:else if currentView === 'tags' && selectedSystem}
       <TagsCategoriesView
         {categoryRows}
+        {componentCategoryRows}
         {tagRows}
         counts={tagCategoryCounts}
+        activeTab={tagsActiveTab}
+        onTabChange={(id) => (tagsActiveTab = id)}
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
+        onAddComponentCategory={addComponentCategory}
+        onRemoveComponentCategory={removeComponentCategory}
         onAddTag={addTag}
         onRemoveTag={removeTag}
-        onConfirmRemove={confirmTagCategoryRemoval}
+        onSetCategoryIcon={setCategoryIcon}
+        onSetComponentCategoryIcon={setComponentCategoryIcon}
       />
     {:else if currentView === 'component-edit' && selectedSystem}
       {#if componentForEdit}
@@ -5084,10 +5249,24 @@
         showTags={componentEditShowTags}
         showEssences={componentEditShowEssences}
         showSalvage={componentSalvageEnabled}
+        categoryOptions={selectedSystem?.componentCategories || []}
         salvageResolutionMode={salvageResolutionMode}
         salvageOutcomeNames={salvageOutcomeNames}
+        {salvageCheckEnabled}
+        {salvageCheckTiers}
+        {salvageCheckDcMode}
+        {salvageCheckDc}
         componentOptions={salvageComponentOptions}
         saving={componentEditSaving}
+        showDifficulty={componentDifficultyShown}
+        difficulty={componentDifficultyDraft}
+        onDifficultyChange={(value) => stageComponentDifficulty(value)}
+        onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
+        onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
+        onOpenSource={(uuid) => openComponentSource(uuid)}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+        onManageCheckPresets={openSalvageCheckPresets}
+        onOpenComponent={(componentId) => editComponent(componentId)}
         onSave={saveComponentEdit}
         onDirtyChange={(dirty) => { componentEditDirty = dirty; }}
         onDraftChange={handleComponentDraftChange}
@@ -5106,19 +5285,17 @@
     {:else if currentView === 'components'}
       <ComponentsBrowserView
         {itemCards}
-        totalComponentsCount={selectedCounts.components}
         itemSearchTerm={$viewState.itemSearchTerm || ''}
         selectedComponentId={selectedComponent?.id || ''}
-        selectedSystemName={selectedSystem?.name || ''}
         {selectedSystemId}
         selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        categoryVocabulary={selectedSystem?.componentCategories || []}
+        bind:browserState={componentBrowserState}
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
         onSearchChange={(term) => store.setItemSearch?.(term)}
         onSelectComponent={(id) => selectComponent(id)}
         onDropComponent={(data) => dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
-        onDeleteComponent={(id) => deleteComponent(id)}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
@@ -5131,6 +5308,8 @@
         saveFailed={recipeSaveFailed}
         onPickImagePath={services?.pickImagePath}
         currencyUnits={selectedCurrencyUnits}
+        currencyEnabled={selectedCurrencyEnabled}
+        timeRequirementsEnabled={selectedTimeRequirementsEnabled}
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}
@@ -5147,9 +5326,17 @@
         signatureConflicts={recipeSignatureConflicts}
         onOpenComponent={(componentId) => editComponent(componentId)}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-        requestedTab={requestedRecipeTab}
-        requestedTabNonce={requestedRecipeTabNonce}
-        onActiveTabChange={(tab) => { recipeActiveTab = tab; }}
+        visibilityEffect={recipeVisibilityEffect}
+        accessPlayers={recipeAccessRoster.players}
+        accessCharacters={recipeAccessRoster.characters}
+        {recipeItemDefinitions}
+        onRemoveRecipeItem={handleRemoveRecipeItem}
+        onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
+        onOpenAccess={openRecipeAccess}
+        onOpenBooksScrolls={() => openCraftingSection('books-scrolls')}
+        multiStepEnabled={recipeMultiStepEnabled}
+        onEnterMultiStep={handleEnterMultiStep}
+        onRevertToSingleStep={handleRevertToSingleStep}
         onOpenCraftingSettings={() => openCraftingSection('settings')}
         onUpdateRecipe={(patch) => patchRecipeDraft(patch)}
         onToggleEnabled={handleToggleRecipeEnabled}
@@ -5210,6 +5397,7 @@
         recipeCategories={$viewState.recipeCategories || []}
         recipeSearchTerm={$viewState.recipeSearchTerm || ''}
         selectedRecipeId={selectedRecipe?.id || ''}
+        {selectedSystemId}
         {showRecipeCategories}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
         bind:browserState={recipeBrowserState}
@@ -5262,6 +5450,7 @@
         onSetCurrencyMacro={onSetCurrencyMacro}
         onClearCurrencyMacro={onClearCurrencyMacro}
         onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
+        onToggleTime={(next) => store.toggleRequirement?.('time', next)}
       />
         </section>
       </main>
@@ -5279,53 +5468,48 @@
       />
     {/if}
 
-    <!-- The recipe editor's context rail is ALWAYS present (issue 643 §8): recipe-edit
-         is absent from the two-column override list, so a hidden inspector used to
-         leave a 300px dead column. An always-present rail incidentally fixes that. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit'}
+    <!-- Suppressing the aside here and releasing the column in `styles/fabricate.css`
+         are ONE decision expressed twice — do only the first and a 300px empty box still
+         holds the strip open; do only the second and this (empty) aside wraps to an
+         implicit grid row underneath the editor. Keep the two lists in step.
+
+         `recipe-edit` joined this list in issue 676, the same route `component-edit`
+         took in decision 4: its context rail is deleted and its content became real
+         tabs (Access, Books & Scrolls) and an Overview control (Step mode), so the
+         editor has nothing to put in a third column and the tabs take the width back. -->
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
-        <section class="manager-inspector-card">
-          <div class="manager-inspector-title-row">
-            <span class="manager-inspector-icon" aria-hidden="true">
-              <i class="fas fa-tags"></i>
-            </span>
-            <div class="manager-inspector-copy">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.TagsCategories.Selected', 'Selected vocabulary')}</p>
-              <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.TagsCategories.Library', 'Tags & Categories')}</h2>
-              <div class="manager-chip-row">
-                <span class="manager-chip is-active">{text('FABRICATE.Admin.Manager.TagsCategories.AlwaysOn', 'Always available')}</span>
-              </div>
+        <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
+          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}</h3>
+          <div class="manager-fact-grid">
+            <div class="manager-fact" data-tags-category-fact="recipe-categories">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.RecipeCategories', 'Recipe categories')}</span></span>
+            </div>
+            <div class="manager-fact" data-tags-category-fact="component-categories">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.customComponentCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ComponentCategories', 'Component categories')}</span></span>
+            </div>
+            <div class="manager-fact" data-tags-category-fact="item-tags">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags')}</span></span>
+            </div>
+            <div class="manager-fact" data-tags-category-fact="references">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.componentCategoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.TotalReferences', 'Total references')}</span></span>
             </div>
           </div>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.InspectorHint', 'Define the vocabulary GMs use when assigning recipe categories and component tags.')}</p>
         </section>
 
         <section class="manager-inspector-card" data-tags-evidence="how-it-works">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksTitle', 'How it works')}</h3>
+          <h3 class="manager-card-title">{tagsHelp.title}</h3>
           <ul class="manager-evidence-list">
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksFlat', 'Categories are flat — each recipe picks one, with no parent or child folders.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksGeneral', 'General is the reserved fallback for recipes without a custom category.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksTags', 'Item tags appear on components and on tag-placeholder ingredients in recipes.')}</li>
+            {#each tagsHelp.items as tip (tip)}
+              <li>{tip}</li>
+            {/each}
           </ul>
         </section>
 
-        <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.Counts', 'Vocabulary counts')}</h3>
-          <div class="manager-fact-grid">
-            <div class="manager-fact" data-tags-category-fact="base-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.baseCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.BaseCategory', 'Base category')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="custom-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.CustomCategories', 'Custom categories')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="item-tags">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="references">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.References', 'References')}</span></span>
-            </div>
-          </div>
+        <section class="manager-inspector-card" data-tags-evidence="reference-safe">
+          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle', 'Reference-safe by default')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint', 'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.')}</p>
         </section>
       {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
@@ -6546,67 +6730,15 @@
         {/if}
       {:else if currentView === 'components'}
         {#if selectedComponent}
-          <section class="manager-inspector-card">
-            <div class="manager-inspector-title-row is-hero-large">
-              <img class="manager-component-preview" src={componentImage(selectedComponent)} alt="" />
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Component.Selected', 'Selected component')}</p>
-                <h2 class="manager-inspector-name" title={selectedComponent.name}>{selectedComponent.name}</h2>
-                <div class="manager-chip-row">
-                  <span class={`manager-chip ${componentSourceState(selectedComponent).className}`}>{componentSourceState(selectedComponent).label}</span>
-                </div>
-              </div>
-            </div>
-
-            <p class="manager-muted">
-              {truncateDescription(selectedComponent.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-            </p>
-          </section>
-
-          {#if showComponentTags}
-            <section class="manager-inspector-card" data-component-section="tags">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}</h3>
-              <div class="manager-feature-list">
-                {#each selectedComponent.tags || [] as tag (tag)}
-                  <span class="manager-chip">{tag}</span>
-                {:else}
-                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}</span>
-                {/each}
-              </div>
-            </section>
-          {/if}
-
-          {#if showComponentEssences}
-            <section class="manager-inspector-card" data-component-section="essences">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')}</h3>
-              <div class="manager-feature-list">
-                {#each selectedComponent.essences || [] as essence (essence.id)}
-                  <span class="manager-chip manager-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
-                    <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
-                  </span>
-                {:else}
-                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoEssences', 'No essences')}</span>
-                {/each}
-              </div>
-            </section>
-          {/if}
-
-          <section class="manager-inspector-card" data-component-section="source">
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Source', 'Source')}</h3>
-            {#if selectedComponent.hasRegisteredItemUuid}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SourceHint', 'This component keeps a stored source ID for import matching and replacement.')}</p>
-              {#if selectedComponent.sourceMissing}
-                <p class="environment-stale-warning" data-component-source-missing>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</p>
-              {/if}
-              <button type="button" class="manager-button" data-component-action="copy-source" title={selectedComponent.registeredItemUuidDisplay} onclick={() => copyComponentSource(selectedComponent.registeredItemUuidDisplay)}>
-                <i class="fas fa-copy" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')}</span>
-              </button>
-            {:else}
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoSourceHint', 'This component does not expose a stored source UUID in the current item-card data.')}</p>
-            {/if}
-          </section>
-
+          <ComponentBrowserInspector
+            {selectedComponent}
+            showTags={showComponentTags}
+            showEssences={showComponentEssences}
+            onEdit={() => editComponent(selectedComponent?.id)}
+            onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+            onUnlink={(id) => unlinkComponentSource(id)}
+            onDelete={(id) => deleteComponent(id)}
+          />
         {:else if itemCards.length === 0}
           <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.Component.EmptySetup.Title', 'Set up components')}>
             <div class="manager-setup-card-header">
@@ -6772,47 +6904,10 @@
           </div>
         {/if}
       {:else if currentView === 'component-edit'}
-        {#if componentForEdit}
-          <ComponentSourceInspector
-            component={componentForEdit}
-            onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
-            onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
-            onOpenSource={(uuid) => openComponentSource(uuid)}
-            onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-          />
-          {#if componentDifficultyShown}
-            <ComponentDifficultyInspector
-              value={componentDifficultyDraft}
-              saving={componentEditSaving}
-              onChange={(value) => stageComponentDifficulty(value)}
-            />
-          {/if}
-        {:else}
-          <section class="manager-inspector-card">
-            <div class="manager-inspector-copy">
-              <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h2>
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}</p>
-            </div>
-          </section>
-        {/if}
-      {:else if currentView === 'recipe-edit'}
-        <RecipeContextRail
-          recipe={recipeDraft}
-          activeTab={recipeActiveTab}
-          visibilityEffect={recipeRailEffect}
-          accessPlayers={recipeAccessRoster.players}
-          accessCharacters={recipeAccessRoster.characters}
-          {recipeItemDefinitions}
-          multiStepEnabled={recipeMultiStepEnabled}
-          readiness={recipeRailReadiness}
-          onRemoveRecipeItem={handleRemoveRecipeItem}
-          onEnterMultiStep={handleEnterMultiStep}
-          onRevertToSingleStep={handleRevertToSingleStep}
-          onOpenItem={(uuid) => services?.onOpenSource?.(uuid)}
-          onOpenAccess={openRecipeAccess}
-          onOpenBooksScrolls={() => openCraftingSection('books-scrolls')}
-          onSelectIssue={() => openRecipeEditorTab('validation')}
-        />
+        <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single
+             scrolling column: the source actions rehomed into the identity strip and
+             the progressive-difficulty control into the body, both inside
+             ComponentEditView. Nothing was lost — see ComponentIdentityStrip. -->
       {:else if currentView === 'access'}
         <GrantAccessInspector
           recipe={selectedRecipeForAccess}

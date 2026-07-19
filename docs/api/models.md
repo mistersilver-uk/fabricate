@@ -32,6 +32,7 @@ new Recipe({
   craftingSystemId,      // string -- links to a crafting system
   enabled,               // boolean (default true)
   locked,                // boolean (default false)
+  allowPlayerResultReorder, // boolean (default true) -- progressive mode only
   linkedRecipeItemUuid,  // string | null
   visibility: {
     restricted,          // boolean (default false)
@@ -48,6 +49,13 @@ new Recipe({
   metadata               // object (created, modified, author, version)
 })
 ```
+
+{: .note }
+> `allowPlayerResultReorder` is the GM-authored permission for player re-ordering of this recipe's progressive result stages (issue 651).
+> It defaults to `true`, and an absent key reads as `true`, which is why the 1.17.0 migration does not seed it.
+> Only an explicit `false` pins the authored stage order.
+> It is read in progressive mode only, and it replaces the retired system-level `craftingCheck.progressive.allowPlayerReorder`.
+> The salvage equivalent is `component.salvage.allowPlayerResultReorder`.
 
 {: .note }
 > The per-recipe `resultSelection.provider` is retired (issue 554).
@@ -111,10 +119,13 @@ IngredientGroup.fromJSON({
 new Ingredient({
   quantity,       // number (default 1)
   match: {
-    type,         // "component" | "tags"
+    type,         // "component" | "tags" | "currency" | "essence"
     componentId,  // string (for component type)
     tags,         // string[] (for tags type)
-    tagMatch      // "any" | "all" (for tags type)
+    tagMatch,     // "any" | "all" (for tags type)
+    unit,         // string (currency unit abbreviation, for currency type)
+    essenceId,    // string (for essence type)
+    amount        // number (currency cost or essence amount, for currency/essence types)
   },
   extractEffects, // boolean (default false)
   effectFilter    // string | null (regex for filtering effects)

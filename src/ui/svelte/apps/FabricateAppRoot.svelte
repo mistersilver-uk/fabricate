@@ -1,9 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   FabricateAppRoot is the shell for the unified Fabricate window. It renders a
-  full-height left navigation with four tabs (Crafting, Gathering, Journal,
-  Inventory). Tab content is an empty placeholder for now — this is the
-  structural shell consumer surfaces will be built into.
+  full-height left navigation and the active tab's implemented consumer surface:
+  Crafting, Gathering, Journal, Inventory, and the conditional Alchemy tab (five
+  tabs when Alchemy is available, four otherwise).
 
   The active tab is owned by the host application (SvelteFabricateApp); nav
   clicks call `onSelectTab` and the host pushes the new tab back down via
@@ -15,7 +15,8 @@
     subscribeSceneChange,
     subscribeWorldTime,
     subscribeInventoryChange,
-    subscribeCraftingDataChange
+    subscribeCraftingDataChange,
+    subscribeActorRunFlagChange
   } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
@@ -85,6 +86,19 @@
   });
   $effect(() => subscribeWorldTime(() => services?.journal?.load?.(true)));
   $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
+  // Cross-client run refresh (issues 733 + 739): a run created/advanced/archived by
+  // another client (or the primary-GM world-time resume) writes the selected actor's
+  // run flags. main.js drops the stale run-manager cache on the same updateActor hook,
+  // so this quiet re-fetch reads the freshly-persisted runs without a full app reload.
+  // Gated to the selected journal actor so unrelated actors' updates are ignored.
+  $effect(() =>
+    subscribeActorRunFlagChange(() => services?.journal?.load?.(true), {
+      isRelevantActor: (actorId) => {
+        const selected = services?.getSelectedActorId?.() || null;
+        return Boolean(selected) && String(selected) === String(actorId);
+      }
+    })
+  );
 
   // Is the actor whose items just changed one this app's crafting/inventory views
   // read from? Membership in the selected crafting actor + the component-source

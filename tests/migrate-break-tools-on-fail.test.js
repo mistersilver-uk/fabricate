@@ -173,7 +173,7 @@ test('runs through MigrationRunner from 1.6.0, renames the key, and lands at the
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.16.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.19.0', 'advances to the new highest version');
   const system = settings.store.get('craftingSystems')[0];
   assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
   assert.equal('consumeCatalystsOnFail' in system.craftingCheck.consumption, false);
@@ -198,5 +198,5 @@ test('runner: craftingSystems left untouched (no write) when nothing needs renam
 
   const setKeys = settings.calls.set.map((c) => c.key);
   assert.equal(setKeys.includes('craftingSystems'), false, 'no rewrite when already migrated');
-  assert.equal(settings.store.get('migrationVersion'), '1.16.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.19.0');
 });

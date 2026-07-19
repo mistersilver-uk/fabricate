@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   subscribeInventoryChange,
   subscribeCraftingDataChange,
+  subscribeActorRunFlagChange,
 } from '../../src/ui/svelte/util/foundryBridge.js';
 
 // Minimal fake of Foundry's Hooks: records handlers per name so tests can fire them
@@ -173,5 +174,76 @@ describe('subscribeCraftingDataChange', () => {
   it('no-ops when Hooks is absent', () => {
     delete globalThis.Hooks;
     assert.doesNotThrow(() => subscribeCraftingDataChange(() => {})());
+  });
+});
+
+describe('subscribeActorRunFlagChange', () => {
+  let hooks;
+  beforeEach(() => {
+    hooks = makeHooks();
+    globalThis.Hooks = hooks;
+    // hasProperty resolves a POSIX-dotted path against a nested change diff.
+    globalThis.foundry = {
+      utils: {
+        hasProperty: (object, path) =>
+          String(path)
+            .split('.')
+            .every((seg) => {
+              if (object == null || typeof object !== 'object' || !(seg in object)) return false;
+              object = object[seg];
+              return true;
+            }),
+      },
+    };
+  });
+  afterEach(() => {
+    delete globalThis.Hooks;
+    delete globalThis.foundry;
+  });
+
+  const craftingRunChange = {
+    flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } },
+  };
+
+  it('registers and unsubscribes the updateActor hook', () => {
+    const unsubscribe = subscribeActorRunFlagChange(() => {});
+    assert.equal(hooks.count('updateActor'), 1);
+    unsubscribe();
+    assert.equal(hooks.count('updateActor'), 0);
+  });
+
+  it('fires for a relevant actor when the diff touches a run-container flag', () => {
+    let calls = 0;
+    subscribeActorRunFlagChange(() => (calls += 1), { isRelevantActor: (id) => id === 'actor-1' });
+    hooks.fire('updateActor', { id: 'actor-1' }, craftingRunChange);
+    assert.equal(calls, 1);
+  });
+
+  it('ignores irrelevant actors and non-run-flag diffs (e.g. an HP tick)', () => {
+    let calls = 0;
+    subscribeActorRunFlagChange(() => (calls += 1), { isRelevantActor: (id) => id === 'actor-1' });
+
+    hooks.fire('updateActor', { id: 'actor-2' }, craftingRunChange); // wrong actor
+    hooks.fire('updateActor', { id: 'actor-1' }, { system: { attributes: { hp: { value: 3 } } } });
+    // The single-scope (wrong-depth) crafting path must not match.
+    hooks.fire('updateActor', { id: 'actor-1' }, { flags: { fabricate: { craftingRuns: {} } } });
+
+    assert.equal(calls, 0);
+  });
+
+  it('matches the single-scope gathering flag path', () => {
+    let calls = 0;
+    subscribeActorRunFlagChange(() => (calls += 1));
+    hooks.fire(
+      'updateActor',
+      { id: 'a' },
+      { flags: { fabricate: { gatheringRuns: { history: [] } } } }
+    );
+    assert.equal(calls, 1);
+  });
+
+  it('no-ops when Hooks is absent', () => {
+    delete globalThis.Hooks;
+    assert.doesNotThrow(() => subscribeActorRunFlagChange(() => {})());
   });
 });

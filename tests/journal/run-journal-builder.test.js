@@ -22,6 +22,10 @@ const SYSTEM = {
   id: 'sys-1',
   name: 'Blacksmithing',
   resolutionMode: 'simple',
+  // Multi-step feature ON: a multi-step recipe projects as a multi-step run. When
+  // the feature is off the run collapses to a single-step projection (issue 710) —
+  // see the dedicated collapse test below.
+  features: { multiStepRecipes: true },
   craftingCheck: { simple: { rollFormula: '1d20', dc: 15, tiers: [] } },
   tools: [{ id: 't1', label: 'Hammer', componentId: 'c1' }],
   components: [{ id: 'c1', name: 'Smith Hammer', img: 'icons/hammer.webp' }],
@@ -134,6 +138,7 @@ function makeBuilder({
   getGatheringTask = null,
   getResultItem = null,
   getRecipeItemImg = null,
+  getComponent = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -160,6 +165,7 @@ function makeBuilder({
     getGatheringTask,
     getResultItem,
     getRecipeItemImg,
+    getComponent,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -255,6 +261,24 @@ test('isFinalStep is false on a non-final step of a multi-step recipe', () => {
   }).activeRuns[0];
   assert.equal(run.multiStep, true);
   assert.equal(run.isFinalStep, false);
+});
+
+test('collapses a multi-step run to a single-step projection when the feature is off (issue 710)', () => {
+  // The run record still carries per-step detail, but with the system's multi-step
+  // feature OFF the recipe ran as one atomic chain, so the Journal presents it as a
+  // single-step run: multiStep false, a Single-Step structure label, and a blank
+  // "Step X of Y" label. Re-enabling the feature restores the multi-step projection.
+  const collapsedSystem = { ...SYSTEM, features: { multiStepRecipes: false } };
+  const run = makeBuilder({
+    active: [activeCraftingRun()],
+    system: collapsedSystem,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.multiStep, false, 'a collapsed multi-step run projects as single-step');
+  assert.equal(run.stepLabel, '', 'the "Step X of Y" label is blanked while collapsed');
+  assert.equal(run.structureLabel, 'FABRICATE.App.Journal.Structure.SingleStep');
+  // The per-step run record is untouched — both steps are still recorded.
+  assert.equal(run.steps.length, 2, 'the run record retains its per-step detail');
 });
 
 test('single-step recipe blanks the step label and marks the run final', () => {
@@ -487,6 +511,124 @@ test('crafting step exposes the recorded roll (resolved formula, total, dc) on l
   assert.equal(check.success, false);
 });
 
+// A component resolver over the SYSTEM fixture's components, used to prove
+// name/img resolution for projected requirements and legacy consumed refs.
+const getSystemComponent = (systemId, componentId) => {
+  if (systemId !== SYSTEM.id) return null;
+  return SYSTEM.components.find((c) => c.id === componentId) ?? null;
+};
+
+test('projects a step\'s consumed ingredients with the captured name/img (issue 738)', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        consumedIngredients: [
+          { actorUuid: 'Actor.actor-1', itemUuid: 'Item.iron', quantity: 2, name: 'Iron Bar', img: 'icons/iron.webp' },
+        ],
+        createdResults: [],
+      },
+    ],
+  });
+  const step = makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: GM })
+    .history[0].steps[0];
+  assert.equal(step.consumedIngredients.length, 1);
+  assert.equal(step.consumedIngredients[0].name, 'Iron Bar');
+  assert.equal(step.consumedIngredients[0].img, 'icons/iron.webp');
+  assert.equal(step.consumedIngredients[0].quantity, 2);
+});
+
+test('resolves a legacy consumed ref (no name/img) from its componentId (issue 738)', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        // Pre-capture record: only componentId + quantity persisted (item deleted).
+        consumedIngredients: [{ componentId: 'c1', itemUuid: 'Item.gone', quantity: 1 }],
+        createdResults: [],
+      },
+    ],
+  });
+  const step = makeBuilder({ history: [run], getComponent: getSystemComponent })
+    .buildListing({ actor: ACTOR, viewer: GM })
+    .history[0].steps[0];
+  assert.equal(step.consumedIngredients[0].name, 'Smith Hammer', 'name resolved via componentId fallback');
+  assert.equal(step.consumedIngredients[0].img, 'icons/hammer.webp');
+});
+
+test('projects a step\'s requirements snapshot, resolving name/img via getComponent (issue 738)', () => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        requirements: [{ componentId: 'c1', quantity: 3 }],
+        createdResults: [],
+      },
+    ],
+  });
+  const step = makeBuilder({ history: [run], getComponent: getSystemComponent })
+    .buildListing({ actor: ACTOR, viewer: GM })
+    .history[0].steps[0];
+  assert.equal(step.requirements.length, 1);
+  assert.equal(step.requirements[0].componentId, 'c1');
+  assert.equal(step.requirements[0].name, 'Smith Hammer');
+  assert.equal(step.requirements[0].img, 'icons/hammer.webp');
+  assert.equal(step.requirements[0].quantity, 3);
+});
+
+test('a GM sees a deleted-recipe run un-redacted, keeping its persisted step snapshots (issue 738)', () => {
+  const run = terminalCraftingRun({
+    recipeId: 'recipe-gone',
+    status: 'failed',
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'failed',
+        failureReason: 'Crafting check failed',
+        lastCheckResult: { success: false, value: 11, data: { total: 11, dc: 16 } },
+        requirements: [{ componentId: 'c1', quantity: 3 }],
+        consumedIngredients: [{ componentId: 'c1', itemUuid: 'Item.gone', quantity: 3 }],
+        createdResults: [],
+      },
+    ],
+  });
+  // recipe param resolves only RECIPE.id, so 'recipe-gone' is a deleted recipe.
+  const model = makeBuilder({ history: [run], getComponent: getSystemComponent })
+    .buildListing({ actor: ACTOR, viewer: GM })
+    .history[0];
+  assert.equal(model.redacted, false, 'a GM is never redacted, even for a deleted recipe');
+  assert.equal(model.steps.length, 1, 'steps survive the missing recipe');
+  assert.equal(model.steps[0].requirements[0].name, 'Smith Hammer');
+  assert.equal(model.steps[0].consumedIngredients[0].name, 'Smith Hammer');
+  assert.equal(model.steps[0].lastCheckResult.total, 11);
+});
+
+test('a non-GM still sees a deleted-recipe run redacted (issue 738)', () => {
+  const run = terminalCraftingRun({ recipeId: 'recipe-gone', status: 'failed' });
+  const model = makeBuilder({ history: [run] })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+  assert.equal(model.redacted, true, 'a non-GM cannot verify visibility of an unresolvable recipe');
+  assert.deepEqual(model.steps, []);
+});
+
 test('crafting created results carry the recorded name/img', () => {
   const run = terminalCraftingRun({
     steps: [
@@ -590,6 +732,138 @@ test('salvage runs pass through with crafting-named time fields, runType salvage
   assert.equal(run.derivedStatus, 'succeeded');
   assert.equal(run.createdResultCount, 1);
   assert.equal(run.createdResults[0].itemUuid, 'Item.scrap');
+});
+
+// A realistic salvage run carries neither a `label` nor a `taskId` — only the source
+// `componentId` + `craftingSystemId`. getComponent resolves the source component to
+// its authored name/img for the run title + image (bug 1).
+const SALVAGE_COMPONENT = { name: 'Balehound Teeth', img: 'icons/teeth.webp' };
+const getSalvageComponent = (systemId, componentId) =>
+  systemId === 'sys-1' && componentId === 'bhBalehoundTeth1' ? SALVAGE_COMPONENT : null;
+
+test('salvage run resolves its title + image from the source componentId', () => {
+  const salvageRun = {
+    id: 'salvage-title',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhBalehoundTeth1',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    createdResults: [],
+  };
+  const run = makeBuilder({
+    salvageHistory: [salvageRun],
+    getComponent: getSalvageComponent,
+    worldTime: 300,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
+
+  assert.equal(run.names.title, 'Balehound Teeth', 'title is the bare source-component name');
+  assert.equal(run.img, 'icons/teeth.webp', 'image is the source component img');
+});
+
+test('salvage run title falls back to the raw componentId when it cannot be resolved', () => {
+  const salvageRun = {
+    id: 'salvage-unresolved',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhBalehoundTeth1',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    createdResults: [],
+  };
+  // No getComponent resolver: the builder falls back to the raw id + default image,
+  // mirroring how a gathering run falls back to its raw taskId.
+  const run = makeBuilder({ salvageHistory: [salvageRun], worldTime: 300 }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).history[0];
+
+  assert.equal(run.names.title, 'bhBalehoundTeth1', 'falls back to the raw componentId');
+  assert.equal(run.img, 'icons/svg/item-bag.svg', 'falls back to the default bag image');
+});
+
+test('salvage created result with only a componentId resolves name/img via getComponent', () => {
+  // Records persisted before name/img capture carry only { itemUuid, componentId,
+  // quantity }. This is the maintainer's already-persisted history — the componentId
+  // resolver must repair it without any captured name/img and without a resolvable uuid.
+  const salvageRun = {
+    id: 'salvage-persisted',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhSourceHide01',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    createdResults: [{ itemUuid: 'Item.gone', componentId: 'bhEarCartilage01', quantity: 2 }],
+  };
+  const getComponent = (systemId, componentId) =>
+    systemId === 'sys-1' && componentId === 'bhEarCartilage01'
+      ? { name: 'Ear Cartilage', img: 'icons/cartilage.webp' }
+      : null;
+  const run = makeBuilder({ salvageHistory: [salvageRun], getComponent, worldTime: 300 })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+
+  assert.equal(run.createdResults[0].name, 'Ear Cartilage', 'name resolved via componentId');
+  assert.equal(run.createdResults[0].img, 'icons/cartilage.webp', 'img resolved via componentId');
+  assert.equal(run.createdResults[0].quantity, 2);
+});
+
+test('a captured salvage result name/img is NOT overridden by the componentId resolver', () => {
+  const salvageRun = {
+    id: 'salvage-captured',
+    craftingSystemId: 'sys-1',
+    componentId: 'bhSourceHide01',
+    status: 'succeeded',
+    startedAt: 200,
+    finishedAt: 260,
+    // A new (post-fix) record captures name/img at award time.
+    createdResults: [
+      {
+        itemUuid: 'Item.teeth',
+        componentId: 'bhEarCartilage01',
+        quantity: 1,
+        name: 'Captured Name',
+        img: 'icons/captured.webp',
+      },
+    ],
+  };
+  const getComponent = () => ({ name: 'Resolver Name', img: 'icons/resolver.webp' });
+  const run = makeBuilder({ salvageHistory: [salvageRun], getComponent, worldTime: 300 })
+    .buildListing({ actor: ACTOR, viewer: PLAYER })
+    .history[0];
+
+  assert.equal(run.createdResults[0].name, 'Captured Name', 'captured name wins');
+  assert.equal(run.createdResults[0].img, 'icons/captured.webp', 'captured img wins');
+});
+
+test('a crafting run model is unaffected by the componentId result fallback', () => {
+  // Crafting created-results carry name/img (and no componentId), so the new
+  // componentId fallback is a no-op — the model is unchanged.
+  const run = terminalCraftingRun({
+    steps: [
+      {
+        stepId: 's0',
+        stepName: 'Forge',
+        index: 0,
+        status: 'succeeded',
+        createdResults: [
+          { itemUuid: 'Item.plank', quantity: 2, name: 'Plank', img: 'icons/plank.webp' },
+        ],
+      },
+    ],
+  });
+  // A getComponent that would fire if consulted — it must not be, since name/img exist.
+  const getComponent = () => ({ name: 'WRONG', img: 'icons/wrong.webp' });
+  const model = makeBuilder({ history: [run], getComponent }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).history[0];
+
+  assert.equal(model.runType, 'crafting');
+  assert.equal(model.names.title, 'Iron Sword');
+  assert.equal(model.createdResults[0].name, 'Plank');
+  assert.equal(model.createdResults[0].img, 'icons/plank.webp');
+  assert.equal(model.createdResults[0].componentId, null);
 });
 
 test('aggregates createdResults across multiple result-bearing steps', () => {
@@ -746,4 +1020,79 @@ test('duplicate run ids in history are de-duplicated (first kept) so the keyed J
   } finally {
     console.warn = original;
   }
+});
+
+// ── Alchemy fizzle history entries ───────────────────────────────────────────
+
+function fizzleRun(overrides = {}) {
+  return {
+    id: 'fizzle-1',
+    craftingSystemId: 'sys-1',
+    recipeId: null,
+    isFizzle: true,
+    status: 'failed',
+    startedAt: 5,
+    updatedAt: 5,
+    finishedAt: 5,
+    currentStepIndex: null,
+    steps: [],
+    ...overrides,
+  };
+}
+
+const ALCHEMY_SYSTEM_VISIBLE = {
+  ...SYSTEM,
+  alchemy: { showAttemptHistoryToPlayers: true },
+};
+const ALCHEMY_SYSTEM_HIDDEN = {
+  ...SYSTEM,
+  alchemy: { showAttemptHistoryToPlayers: false },
+};
+
+test('a fizzle history entry projects a generic title with no recipe/step/signature data', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_VISIBLE,
+  }).buildListing({ actor: ACTOR, viewer: GM });
+
+  assert.equal(listing.history.length, 1, 'the GM always sees the fizzle');
+  const [run] = listing.history;
+  assert.equal(run.isFizzle, true);
+  assert.equal(run.status, 'failed');
+  assert.equal(run.names.title, 'FABRICATE.App.Journal.Fizzle.Title', 'generic, non-leaky title');
+  assert.equal(run.recipeId, null, 'no recipe id leaks');
+  assert.deepEqual(run.steps, [], 'no step/signature data leaks');
+  assert.deepEqual(run.createdResults, [], 'a fizzle produced nothing');
+  assert.equal(run.resolutionModeLabel, 'FABRICATE.App.Journal.Mode.Alchemy');
+});
+
+test('a fizzle is hidden from a non-GM viewer when showAttemptHistoryToPlayers is off', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_HIDDEN,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.equal(listing.history.length, 0, 'the player does not see the gated fizzle');
+  assert.equal(listing.counts.history, 0);
+});
+
+test('a fizzle is visible (still non-leaky) to a non-GM viewer when the flag is on', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_VISIBLE,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.equal(listing.history.length, 1, 'the player sees the fizzle when the flag is on');
+  const [run] = listing.history;
+  assert.equal(run.names.title, 'FABRICATE.App.Journal.Fizzle.Title');
+  assert.equal(run.recipeId, null, 'no recipe identity leaks even when visible');
+});
+
+test('the GM sees a fizzle even when showAttemptHistoryToPlayers is off', () => {
+  const listing = makeBuilder({
+    history: [fizzleRun()],
+    system: ALCHEMY_SYSTEM_HIDDEN,
+  }).buildListing({ actor: ACTOR, viewer: GM });
+
+  assert.equal(listing.history.length, 1, 'the GM is never gated by the player-visibility flag');
 });

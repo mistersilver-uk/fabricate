@@ -1,4 +1,4 @@
-# Specification 001: Project Overview
+# Project Overview
 
 ## Purpose
 
@@ -10,8 +10,7 @@ Fabricate supports:
 - GM-defined crafting systems and recipes with explicit resolution modes
 - Configurable recipe visibility and knowledge gating
 - Multi-step crafting processes
-- Optional crafting check macros
-- Optional success and failure macros
+- Optional property macros, the simple-mode dynamic-DC macro, and currency macros
 - Optional essences and effect transfer
 - Optional time and currency requirements
 
@@ -59,13 +58,12 @@ A crafting system defines:
 
 - one system-wide resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`)
 - optional feature toggles
-- check behaviour and macros
-- failure/success hooks
+- check behaviour (rollFormula / DC / tier configuration); there is no success/failure macro or hook layer (the only hook fired is `fabricate.ready`)
 - requirement providers (time/currency)
 - recipe visibility mode
-- a recipe-level result selection provider (`ingredientSet`, `check`) only when mode is `alchemy`; the routed crafting modes derive their routing basis from the system mode and carry no provider
+- for `alchemy` systems, a system-level alchemy check mode (`alchemy.checkMode`: `none` / `simple` / `tiered`); the retired recipe-level `resultSelection.provider` (issue 554) is gone, and the routed crafting modes derive their routing basis from the system mode and carry no provider
 
-Changing resolution mode is destructive and governed by `007-destructive-changes-and-migrations.md`.
+Changing resolution mode is destructive and governed by `destructive-changes-and-migrations/spec.md`.
 
 ### Resolution Modes
 
@@ -75,18 +73,18 @@ Changing resolution mode is destructive and governed by `007-destructive-changes
 - `progressive`
 - `alchemy`
 
-Mode semantics and validation are defined in `004-resolution-modes.md`.
+Mode semantics and validation are defined in `resolution-modes/spec.md`.
 
 ### Recipes and Steps
 
 Recipes can be implicit single-step or explicit multistep.
-Execution lifecycle semantics are defined in `005-recipes-and-steps.md`.
+Execution lifecycle semantics are defined in `recipes-and-steps/spec.md`.
 
 ### Recipe Visibility and Learning
 
 Visibility and craftability are determined by per-system visibility settings and per-recipe settings.
 Item-based knowledge matching is identity-based and supports direct UUID plus source UUID matching (`_stats.compendiumSource` with legacy `flags.core.sourceId` fallback).
-Behaviour is defined in `006-recipe-visibility.md`.
+Behaviour is defined in `recipe-visibility/spec.md`.
 
 ## Data Flow
 
@@ -110,29 +108,40 @@ World:
 - `fabricate.gatheringParties` for world-level Fabricate-managed gathering parties (excluded from crafting-system import/export)
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
-- `fabricate.experimentalFeatures` for future experimental feature gates, disabled by default
+- `fabricate.experimentalFeatures` gates experimental Fabricate surfaces still in development, currently the recipe graph placeholder in the crafting manager (no longer the crafting authoring group, which is always available), disabled by default
+- `fabricate.recipeItemFlagStampVersion` (one-shot flag-stamp version)
+- `fabricate.componentFlagStampVersion` (one-shot flag-stamp version)
+- `fabricate.toolFlagStampVersion` (one-shot flag-stamp version)
+- `fabricate.ownedItemComponentStampVersion` (one-shot flag-stamp version)
 
-Client:
+Client (per client/device):
 
+- `fabricate.interactionPromptPosition`
 - `fabricate.lastCraftingActor`
 - `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
+- `fabricate.managerRailCollapsed`
 - `fabricate.lastAlchemySystem`
 - `fabricate.favouriteRecipes`
-- `fabricate.recentlyCrafted`
-- `fabricate.progressiveResultOrder`
+- `fabricate.gatheringHideUnavailableEnvironments`
+
+User (per user, per world):
+
+- `fabricate.progressiveResultOrder` (scope `user`; a replicated document write, not client-local — issue #651)
 
 ### Actor Flags
 
 - `flags.fabricate.craftingRuns.active` for resumable in-progress runs
 - `flags.fabricate.craftingRuns.history` for completed/failed/cancelled run history
+- `flags.fabricate.salvageRuns.active` for in-progress salvage runs
+- `flags.fabricate.salvageRuns.history` for completed/failed/cancelled salvage run history
 - `flags.fabricate.gatheringRuns.active` for in-progress time-gated gathering runs
 - `flags.fabricate.gatheringRuns.history` for completed/failed/cancelled gathering run history
 - `flags.fabricate.learnedRecipes` for learned recipe records
 - `flags.fabricate.discoveredGatheringRealms` for actor-scoped gathering realm discovery (keyed by system then realm)
 
-Clean-up semantics for stale runs/learned records are defined in `007-destructive-changes-and-migrations.md`.
+Clean-up semantics for stale runs/learned records are defined in `destructive-changes-and-migrations/spec.md`.
 
 ## Permissions
 

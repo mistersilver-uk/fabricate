@@ -66,6 +66,36 @@ describe('RunDetail mounted behavior', () => {
     assert.equal(target.querySelector('[data-step-index="1"]').getAttribute('data-step-state'), 'pending');
   });
 
+  it('titles the requirements card "Step requirements" for a multi-step run', async () => {
+    const target = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
+    const title = target.querySelector('[data-journal-card="step-details"] .journal-card-title');
+    assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.Title', 'multi-step keeps the step title');
+  });
+
+  it('titles the requirements card "Craft requirements" for a single-step run', async () => {
+    const step = {
+      stepId: 's1',
+      stepName: 'Brew',
+      index: 0,
+      status: 'waitingTime',
+      timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
+      detail: { requiredSeconds: 1000, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: null },
+      lastCheckResult: null
+    };
+    const run = makeCraftingRun({
+      multiStep: false,
+      isFinalStep: true,
+      stepLabel: '',
+      steps: [step],
+      currentStep: step,
+      structureLabel: 'Single-Step Recipe'
+    });
+    const target = await harness.mount({ run, now: 0, services: services() });
+    assert.equal(target.querySelector('[data-journal-timeline]'), null, 'single-step run omits the step timeline');
+    const title = target.querySelector('[data-journal-card="step-details"] .journal-card-title');
+    assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.TitleSingleStep', 'single-step uses the craft title');
+  });
+
   it('disables Trigger while the gate is unmatured and enables it once ready', async () => {
     const waiting = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
     assert.equal(waiting.querySelector('[data-journal-trigger]').disabled, true, 'waiting → disabled');
@@ -142,6 +172,215 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(details, 'step details render for a terminal run without a currentStep');
     // detailStep falls back to the LAST step (Flask), not the first.
     assert.ok(details.textContent.includes('Flask'), 'shows the final step tool via the fallback');
+  });
+
+  it('selects the last EXECUTED step for a multi-step run that failed early (issue 738)', async () => {
+    // All recipe steps are pre-created, so an early failure leaves a trailing
+    // `pending` step. The detail must show the executed (failed) step, not the
+    // unreached pending one.
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: 'Botched the brew' },
+          lastCheckResult: { success: false, formula: '1d20', total: 7, dc: 12, value: 7 },
+          requirements: [],
+          consumedIngredients: []
+        },
+        {
+          stepId: 's2',
+          stepName: 'Bottle',
+          index: 1,
+          status: 'pending',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: 'Flask', toolNames: ['Flask'], checkLabel: null, failureText: null },
+          lastCheckResult: null,
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details.textContent.includes('Mortar & Pestle'), 'shows the executed (failed) step');
+    assert.ok(details.textContent.includes('Botched the brew'), 'shows the failed step failure text');
+    assert.ok(!details.textContent.includes('Flask'), 'does not show the unreached pending step');
+  });
+
+  it('renders the bare rolled value when a step has a value but no formula (issue 738)', async () => {
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          // Legacy record: only a bare value, no formula/total.
+          lastCheckResult: { success: false, formula: null, total: null, value: 9, dc: null },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details, 'step details render for a legacy no-formula roll');
+    assert.ok(details.textContent.includes('RollResultValue'), 'bare-value roll fallback rendered');
+    assert.ok(details.textContent.includes('9'), 'shows the bare rolled value');
+  });
+
+  it('does not fabricate "vs DC 0" when a formula roll has no static DC (issue 738)', async () => {
+    // Progressive / dynamic-DC checks persist `dc: null`. Number(null) === 0 is
+    // finite, so an unguarded coercion would render the WithDc variant "vs DC 0".
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: { success: false, formula: '1d20', total: 7, dc: null, value: 7 },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details.textContent.includes('RollResult'), 'a roll row is still rendered');
+    assert.ok(!details.textContent.includes('WithDc'), 'the WithDc variant is not used for a null DC');
+    assert.ok(!details.textContent.includes('"dc"'), 'no DC is interpolated into the roll');
+  });
+
+  it('does not fabricate "vs DC 0" for a bare-value roll with no static DC (issue 738)', async () => {
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: { success: false, formula: null, total: null, value: 9, dc: null },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details.textContent.includes('RollResultValue'), 'the bare-value roll row is rendered');
+    assert.ok(!details.textContent.includes('WithDc'), 'the WithDc variant is not used for a null DC');
+  });
+
+  it('renders duplicate-component requirement rows without an each_key crash (issue 738)', async () => {
+    // Two ingredient groups can reference the same component; those rows share a
+    // componentId and each carry a null itemUuid, so a componentId-only key would
+    // collide into a Svelte each_key_duplicate crash.
+    const run = makeSucceededRun({
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'succeeded',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: null,
+          requirements: [
+            { componentId: 'c-iron', itemUuid: null, quantity: 2, name: 'Iron', img: 'icons/iron.webp' },
+            { componentId: 'c-iron', itemUuid: null, quantity: 1, name: 'Iron', img: 'icons/iron.webp' }
+          ],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const rows = target.querySelectorAll('[data-journal-requirement]');
+    assert.equal(rows.length, 2, 'both same-component requirement rows render');
+  });
+
+  it('renders no roll row when a check result has neither formula nor value (issue 738)', async () => {
+    const run = makeSucceededRun({
+      status: 'failed',
+      derivedStatus: 'failed',
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'failed',
+          timeGate: null,
+          detail: {
+            requiredSeconds: null,
+            primaryToolName: null,
+            toolNames: [],
+            checkLabel: null,
+            failureText: 'Botched the brew'
+          },
+          // A minimal recorded check with an explicit null value must not fabricate "Rolled 0".
+          lastCheckResult: { success: false, formula: null, total: null, value: null, dc: null },
+          requirements: [],
+          consumedIngredients: []
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const details = target.querySelector('[data-journal-card="step-details"]');
+    assert.ok(details, 'step details render for the failed step');
+    assert.ok(details.textContent.includes('Botched the brew'), 'shows the failure text');
+    assert.ok(!details.textContent.includes('RollResultValue'), 'no bare-value roll row rendered');
+    assert.ok(!details.textContent.includes('RollResult'), 'no roll row rendered at all');
+  });
+
+  it('lists a step\'s required and consumed ingredients (issue 738)', async () => {
+    const run = makeSucceededRun({
+      currentStep: null,
+      steps: [
+        {
+          stepId: 's1',
+          stepName: 'Brew',
+          index: 0,
+          status: 'succeeded',
+          timeGate: null,
+          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          lastCheckResult: null,
+          requirements: [{ componentId: 'c-herb', itemUuid: null, quantity: 2, name: 'Dried Herb', img: 'icons/herb.webp' }],
+          consumedIngredients: [{ componentId: 'c-herb', itemUuid: 'Item.herb', quantity: 2, name: 'Dried Herb', img: 'icons/herb.webp' }]
+        }
+      ]
+    });
+    const target = await harness.mount({ run, now: 5000, services: services() });
+    const requirements = target.querySelector('[data-journal-requirements]');
+    const consumed = target.querySelector('[data-journal-consumed]');
+    assert.ok(requirements, 'requirements section rendered');
+    assert.ok(requirements.textContent.includes('Dried Herb'), 'requirement name rendered');
+    assert.ok(consumed, 'consumed section rendered');
+    assert.ok(consumed.querySelector('[data-journal-consumed-item]'), 'a consumed item row rendered');
+    assert.ok(consumed.textContent.includes('Dried Herb'), 'consumed name rendered');
   });
 
   it('calls store.advance when the enabled Trigger button is clicked', async () => {

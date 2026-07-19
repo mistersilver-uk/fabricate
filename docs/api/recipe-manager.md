@@ -278,7 +278,11 @@ GM only.
 | `recipesData` | `object[]` | Array of recipe data objects |
 | `overwrite` | `boolean` | Whether to overwrite existing recipes with the same ID |
 
-**Returns:** `Promise<{ imported: number, skipped: number, total: number }>`
+**Returns:** `Promise<{ imported: number, skipped: number, total: number, conflicts: object[] }>`
 
-The import emits one aggregate success notification.
+Each recipe that cannot be imported is skipped and recorded in `conflicts`.
+A conflict has `recipeId`, `recipeName`, and a `reason` of either `"invalid"` (activation validation failed, and the entry also carries the validation `errors`) or `"duplicate-id"` (a recipe with the same ID already exists and `overwrite` is `false`).
+
+The import emits one aggregate success notification with the imported and skipped counts.
 It does not emit per-recipe create/update notifications.
+When there are conflicts it also emits one aggregated conflict-report warning that names each skipped recipe and its reason, so duplicate-ID skips are no longer silent.

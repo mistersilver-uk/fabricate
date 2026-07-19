@@ -22,7 +22,7 @@ When no character is selected the Journal shows a short prompt:
 ## Active Runs
 
 The left column lists the selected character's **Active Runs**: every run that has not yet finished.
-Each entry shows the run's name, the crafting system it belongs to, a status badge, and step progress for crafting runs.
+Each entry shows the run's name, the crafting system it belongs to, a status badge, and a crafting-progress bar for crafting runs.
 
 Runs that are still waiting on the game clock show a countdown to when they will be ready.
 The status badge tells you where a run stands:
@@ -36,11 +36,17 @@ Soonest Ready puts the runs you can act on first, then the ones that will be rea
 
 A live count badge on the **Journal** tab shows how many active runs the selected character has.
 The badge stays accurate even while the Journal tab is closed, and it disappears when there are no active runs.
+It also keeps pace when another player or your GM starts, advances, or finishes a run for that character, so the count and the run lists update on their own once that character's data reaches your client, with no need to reload the window.
 
 ## History
 
 Below the active list, **History** shows runs that have finished.
 A finished run carries a status of **Succeeded**, **Failed**, or **Cancelled**.
+
+Failed alchemy brews appear here too.
+An alchemy attempt that matched no recipe is listed as a generic **Failed alchemy attempt** that never names a recipe, so it cannot reveal an undiscovered recipe.
+For an alchemy system, whether players see these failed attempts is controlled by the GM's **Show attempt history to players** option.
+The GM always sees them.
 
 History is paginated.
 You can choose how many runs to show per page and step through the pages.
@@ -53,8 +59,9 @@ Select any run, active or finished, to open its full detail in the centre column
 The detail panel opens with the run's name, image, status badge, and tags for the recipe structure and the current step.
 A single-step recipe is labelled as such, and a multi-step recipe shows which step the run is on, like "Step 2 of 4".
 
-For crafting runs the detail panel shows a **step timeline** and the current step's requirements.
-The step requirements list what the step needs, which can include:
+For crafting runs the detail panel shows the run's requirements, plus a **step timeline** for multi-step recipes.
+A multi-step recipe titles this card **Step requirements**, and a single-step recipe titles it **Craft requirements**.
+The requirements list what the run needs, which can include:
 
 - **Requires time**, the world time the step must wait through.
 - **Primary tool**, the main tool the step uses.

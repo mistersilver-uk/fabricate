@@ -8,7 +8,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
 const overviewPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte');
-const railPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeContextRail.svelte');
+// Issue 676 deleted RecipeContextRail; its content lives in these two tabs (plus the
+// Step-mode control on Overview above).
+const accessTabPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte');
+const booksTabPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte'
+);
+const tabsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
 const browserInspectorPath = resolve(
@@ -36,7 +43,9 @@ const editSource = readFileSync(editPath, 'utf8');
 // editor is fully controlled: the root holds the recipe draft and the shell forwards
 // identity edits via onUpdateRecipe / onToggleEnabled (no form, no local draft state).
 const overviewSource = readFileSync(overviewPath, 'utf8');
-const railSource = readFileSync(railPath, 'utf8');
+const accessTabSource = readFileSync(accessTabPath, 'utf8');
+const booksTabSource = readFileSync(booksTabPath, 'utf8');
+const tabsSource = readFileSync(tabsPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const browserSource = readFileSync(browserPath, 'utf8');
 const browserInspectorSource = readFileSync(browserInspectorPath, 'utf8');
@@ -71,19 +80,22 @@ describe('RecipeEditView identity-only single column', () => {
     assert.equal(overviewSource.includes('manager-task-core-card'), false, 'no reused task core card wrapper');
     assert.ok(overviewSource.includes('manager-recipe-micro-label'), 'uppercase micro-labels over fields');
     assert.ok(overviewSource.includes('manager-task-image-picker'), 'keeps the shared image picker (capability)');
-    assert.ok(overviewSource.includes('manager-status-toggle'), 'reuses the status toggle');
+    assert.ok(overviewSource.includes('ToggleCard'), 'reuses the shared ToggleCard for the status toggles (issue 658 retrofit)');
     // Category authored on Overview (prototype §5.1), not the rail.
     assert.ok(overviewSource.includes('data-recipe-category-select'), 'category select lives on Overview');
-    // Two side-by-side status cards (Enabled + Locked).
-    assert.ok(overviewSource.includes('manager-recipe-status-card'), 'status cards for enabled + locked');
-    assert.ok(overviewSource.includes('data-recipe-section="enabled-status"'), 'enabled status card');
-    assert.ok(overviewSource.includes('data-recipe-section="locked-status"'), 'locked status card');
+    // Two side-by-side status cards (Enabled + Locked) now render through the shared
+    // ToggleCard extracted in issue 651; the issue-658 retrofit is a byte-faithful DOM
+    // no-op, so the section/field markers move from inlined attributes onto props.
+    assert.ok(overviewSource.includes('variant="is-enabled"'), 'enabled status card via ToggleCard');
+    assert.ok(overviewSource.includes('variant="is-locked"'), 'locked status card via ToggleCard');
+    assert.ok(overviewSource.includes('section="enabled-status"'), 'enabled status card section marker');
+    assert.ok(overviewSource.includes('section="locked-status"'), 'locked status card section marker');
     // Always-visible inline duration steppers replace the popover on the tab.
     assert.ok(overviewSource.includes('RecipeDurationSteppers'), 'inline duration steppers on the Duration card');
     assert.ok(overviewSource.includes('data-recipe-field="name"'), 'name field bound');
     assert.ok(overviewSource.includes('data-recipe-field="description"'), 'description field bound');
-    assert.ok(overviewSource.includes('data-recipe-field="enabled"'), 'enabled toggle bound');
-    assert.ok(overviewSource.includes('data-recipe-field="locked"'), 'locked toggle bound');
+    assert.ok(overviewSource.includes('field="enabled"'), 'enabled toggle bound');
+    assert.ok(overviewSource.includes('field="locked"'), 'locked toggle bound');
     assert.ok(overviewSource.includes('data-recipe-field="img"'), 'image picker bound');
   });
 
@@ -106,8 +118,11 @@ describe('RecipeEditView identity-only single column', () => {
     assert.ok(editSource.includes('{onToggleEnabled}'), 'the enabled toggle forwards onToggleEnabled');
   });
 
-  it('carries no recipe-item editing state, props, or card in the view', () => {
-    assert.equal(editSource.includes('recipeItemDefinitions'), false, 'no recipeItemDefinitions prop');
+  // The view threads `recipeItemDefinitions` to the read-only Books & Scrolls TAB
+  // (issue 676 rehomed it here from the deleted rail). What must never come back is the
+  // AUTHORING path: adding a recipe to a book is owned by the book's own editor, and a
+  // recipe-side add would be a second writer for the same many-to-many.
+  it('carries no recipe-item AUTHORING state, props, or drop zone in the view', () => {
     assert.equal(editSource.includes('knowledgeMode'), false, 'no knowledgeMode prop');
     assert.equal(editSource.includes('onAddRecipeItem'), false, 'no add-recipe-item prop');
     assert.equal(editSource.includes('onSetRecipeItem'), false, 'no set-recipe-item prop');
@@ -115,6 +130,9 @@ describe('RecipeEditView identity-only single column', () => {
     assert.equal(editSource.includes('manager-environment-scene-linked'), false, 'no recipe-item linked card');
     assert.equal(editSource.includes('dragDrop'), false, 'no dragDrop import/usage');
     assert.equal(editSource.includes('resolveDropData'), false, 'no resolveDropData import/usage');
+    // The read-only summary props ARE expected, and are forwarded to the tab.
+    assert.ok(editSource.includes('recipeItemDefinitions'), 'forwards the definition library to the books tab');
+    assert.ok(editSource.includes('onRemoveRecipeItem'), 'forwards the per-row unlink (a removal, not authoring)');
   });
 
   it('does not render a draft-state card', () => {
@@ -123,81 +141,65 @@ describe('RecipeEditView identity-only single column', () => {
   });
 });
 
-describe('RecipeContextRail (issue 643 §4b)', () => {
-  it('renders inspector cards with the frozen recipe-item section marker', () => {
-    assert.ok(railSource.includes('manager-inspector-card'), 'reuses inspector card');
+// Issue 676 deleted RecipeContextRail. Its two content sections became real tabs and
+// its Step-mode control moved to Overview; its validation summary + mini check list
+// were dropped as duplicates of the Validation tab, which reads the same evaluator.
+describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rail)', () => {
+  it('renders the frozen recipe-item section marker', () => {
     assert.ok(
-      railSource.includes('data-recipe-section="recipe-item"'),
+      booksTabSource.includes('data-recipe-section="recipe-item"'),
       'recipe-item section marker (FROZEN: the smoke harness waits on it)'
     );
     assert.ok(
-      railSource.includes('manager-environment-scene-linked'),
-      'reuses linked container class'
+      booksTabSource.includes('data-recipe-tab="books-scrolls"'),
+      'carries the tab marker, like every other recipe tab'
     );
   });
 
-  it('is MODE-CONDITIONAL off craftingEffect, and renders neither section under global', () => {
-    assert.ok(railSource.includes('visibilityEffect?.showAccess'), 'restricted branch');
-    assert.ok(railSource.includes('visibilityEffect?.showBooksScrolls'), 'item/knowledge branch');
-    // The prop must NOT be called `effect`: the compiler then reads `$effect(...)` as
-    // a store subscription (`$` + `effect`) and the component throws at mount.
+  // The book rows must NOT borrow the gathering environment editor's vocabulary, which
+  // is what the rail did. A book is not a scene, and borrowing a neighbour's classes is
+  // how a surface silently inherits that neighbour's ramp (issue 676's amber tag pills).
+  it('uses its own row vocabulary, not the gathering scene-widget classes', () => {
     assert.equal(
-      /^\s*effect = /m.test(railSource),
+      booksTabSource.includes('manager-environment-scene-linked'),
       false,
-      'the craftingEffect prop is never named `effect` (it would shadow the $effect rune)'
+      'no borrowed gathering scene-row class'
     );
+    assert.equal(
+      booksTabSource.includes('manager-environment-scene-thumb'),
+      false,
+      'no borrowed gathering scene-thumb class'
+    );
+    assert.ok(booksTabSource.includes('manager-recipe-book-link'), 'owns its row class');
+    assert.ok(booksTabSource.includes('manager-recipe-book-thumb'), 'owns its thumb class');
   });
 
   it('carries NO book drop zone and NO "link another" — adding to a book lives on Books & Scrolls', () => {
-    assert.equal(railSource.includes('use:dragDrop'), false, 'no drop action');
-    assert.equal(railSource.includes('data-recipe-item-dropzone'), false, 'no drop zone');
-    assert.equal(railSource.includes('onAddRecipeItem'), false, 'no add-recipe-item path');
-    assert.equal(railSource.includes('RecipeItemLinkAnother'), false, 'no link-another affordance');
+    assert.equal(booksTabSource.includes('use:dragDrop'), false, 'no drop action');
+    assert.equal(booksTabSource.includes('data-recipe-item-dropzone'), false, 'no drop zone');
+    assert.equal(booksTabSource.includes('onAddRecipeItem'), false, 'no add-recipe-item path');
+    assert.equal(booksTabSource.includes('RecipeItemLinkAnother'), false, 'no link-another affordance');
     // Removing THIS recipe from a book it already appears in is still allowed.
-    assert.ok(railSource.includes('onRemoveRecipeItem('), 'per-row removal retained');
-    assert.ok(railSource.includes('data-recipe-open-books'), 'deep-links to Books & Scrolls');
-  });
-
-  it('never resolves access ids itself and never mutates the grant', () => {
-    // The store resolves (over EVERY world actor, not the PC roster); the rail takes
-    // resolved rows. Unresolvable ids are dropped from display, never persisted away.
-    assert.ok(railSource.includes('accessPlayers'), 'takes resolved players');
-    assert.ok(railSource.includes('accessCharacters'), 'takes resolved characters');
-    assert.equal(railSource.includes('characterIds'), false, 'the rail never touches grant ids');
-    assert.equal(railSource.includes('playerIds'), false, 'the rail never touches grant ids');
-    assert.equal(railSource.includes('saveRecipeAccess'), false, 'the rail is read-only');
-    assert.ok(railSource.includes('data-recipe-open-access'), 'deep-links to the Access tab');
-  });
-
-  it('treats the character->player relation as a SET, with the whole-table case distinct', () => {
-    assert.ok(railSource.includes('controlledBy'), 'reads the controller SET');
-    assert.ok(
-      railSource.includes('sharedWithAllPlayers'),
-      'ownership.default >= OWNER reaches the whole table'
-    );
-    assert.ok(
-      railSource.includes('Rail.SharedWithAllPlayers'),
-      'the whole-table case has its OWN string, never "Played by <one name>"'
-    );
-    assert.equal(railSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+    assert.ok(booksTabSource.includes('onRemoveRecipeItem('), 'per-row removal retained');
+    assert.ok(booksTabSource.includes('data-recipe-open-books'), 'deep-links to Books & Scrolls');
   });
 
   it('uses item iconography and the shared image constant', () => {
-    assert.ok(railSource.includes('fa-suitcase'), 'missing thumb uses a suitcase icon');
+    assert.ok(booksTabSource.includes('fa-suitcase'), 'missing thumb uses a suitcase icon');
     assert.ok(
-      railSource.includes(
+      booksTabSource.includes(
         "import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js'"
       ),
       'image fallback uses the shared DEFAULT_RECIPE_IMAGE constant'
     );
-    assert.equal(railSource.includes("'icons/svg/item-bag.svg'"), false, 'no bag-SVG literal');
-    assert.equal(railSource.includes('fa-map'), false, 'no map icon');
+    assert.equal(booksTabSource.includes("'icons/svg/item-bag.svg'"), false, 'no bag-SVG literal');
+    assert.equal(booksTabSource.includes('fa-map'), false, 'no map icon');
   });
 
   it('uses the canonical recipeItemId, never the legacy linkedRecipeItemUuid', () => {
-    assert.ok(railSource.includes('recipeItemId'), 'references recipeItemId');
+    assert.ok(booksTabSource.includes('recipeItemId'), 'references recipeItemId');
     assert.equal(
-      railSource.includes('linkedRecipeItemUuid'),
+      booksTabSource.includes('linkedRecipeItemUuid'),
       false,
       'never references the legacy alias'
     );
@@ -205,41 +207,117 @@ describe('RecipeContextRail (issue 643 §4b)', () => {
 
   it('does not delete the shared recipe-item definition on unlink', () => {
     assert.equal(
-      railSource.includes('deleteRecipeItemDefinition'),
+      booksTabSource.includes('deleteRecipeItemDefinition'),
       false,
       'unlink must not delete the shared definition'
     );
   });
 
   it('resolves each linked book in a cancelled-guarded $effect', () => {
-    assert.ok(railSource.includes('globalThis.fromUuid'), 'resolves via fromUuid');
-    assert.ok(railSource.includes('let cancelled = false'), 'effect carries a cancelled guard');
-    assert.ok(railSource.includes('cancelled = true'), 'cleanup flips the cancelled guard');
+    assert.ok(booksTabSource.includes('globalThis.fromUuid'), 'resolves via fromUuid');
+    assert.ok(booksTabSource.includes('let cancelled = false'), 'effect carries a cancelled guard');
+    assert.ok(booksTabSource.includes('cancelled = true'), 'cleanup flips the cancelled guard');
   });
 
   it('carries the linked-list a11y contract and the missing state', () => {
-    assert.ok(railSource.includes('data-recipe-item-links'), 'renders the linked-items list');
-    assert.ok(railSource.includes('aria-label='), 'the list has an aria-label');
-    assert.ok(railSource.includes('manager-icon-button is-danger'), 'visible danger unlink button');
-    assert.ok(railSource.includes('onOpenItem('), 'open wired');
+    assert.ok(booksTabSource.includes('data-recipe-item-links'), 'renders the linked-items list');
+    assert.ok(booksTabSource.includes('aria-label='), 'the list has an aria-label');
+    assert.ok(booksTabSource.includes('manager-icon-button is-danger'), 'visible danger unlink button');
+    assert.ok(booksTabSource.includes('onOpenItem('), 'open wired');
     assert.ok(
-      railSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'),
+      booksTabSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'),
       'missing state copy'
     );
   });
+});
 
-  it('renders Step mode as a real SegmentedControl and the validation mini-list, with NO Recipe mode toggle', () => {
-    assert.ok(railSource.includes("import SegmentedControl from '../SegmentedControl.svelte'"));
-    assert.ok(railSource.includes("optionDataAttr=\"data-recipe-step-mode-option\""));
-    // The Step-mode control fills its rail track full-width (issue 643).
-    assert.ok(railSource.includes('fill={true}'), 'Step-mode SegmentedControl opts into fill');
-    // Recipe complexity is emergent from the ingredient-set count now (issue 643):
-    // the rail carries no Simple/Complex control at all.
-    assert.equal(railSource.includes('data-recipe-mode-option'), false, 'no Recipe mode segmented control');
-    assert.equal(railSource.includes('data-recipe-section="recipe-mode"'), false, 'no Recipe mode rail section');
-    assert.equal(railSource.includes('onSetComplexity'), false, 'the rail no longer wires a complexity setter');
-    assert.ok(railSource.includes('data-recipe-validation-clear'), 'an All clear pill');
-    assert.ok(railSource.includes('data-recipe-rail-check'), 'the failing-check list');
+describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', () => {
+  it('renders the frozen access section marker', () => {
+    assert.ok(
+      accessTabSource.includes('data-recipe-section="access"'),
+      'access section marker (FROZEN: the smoke harness waits on it)'
+    );
+    assert.ok(accessTabSource.includes('data-recipe-tab="access"'), 'carries the tab marker');
+  });
+
+  it('never resolves access ids itself and never mutates the grant', () => {
+    // The store resolves (over EVERY world actor, not the PC roster); the tab takes
+    // resolved rows. Unresolvable ids are dropped from display, never persisted away.
+    assert.ok(accessTabSource.includes('accessPlayers'), 'takes resolved players');
+    assert.ok(accessTabSource.includes('accessCharacters'), 'takes resolved characters');
+    assert.equal(accessTabSource.includes('characterIds'), false, 'the tab never touches grant ids');
+    assert.equal(accessTabSource.includes('playerIds'), false, 'the tab never touches grant ids');
+    assert.equal(accessTabSource.includes('saveRecipeAccess'), false, 'the tab is read-only');
+    assert.ok(accessTabSource.includes('data-recipe-open-access'), 'deep-links to the Access screen');
+  });
+
+  it('treats the character->player relation as a SET, with the whole-table case distinct', () => {
+    assert.ok(accessTabSource.includes('controlledBy'), 'reads the controller SET');
+    assert.ok(
+      accessTabSource.includes('sharedWithAllPlayers'),
+      'ownership.default >= OWNER reaches the whole table'
+    );
+    assert.ok(
+      accessTabSource.includes('AccessTab.SharedWithAllPlayers'),
+      'the whole-table case has its OWN string, never "Played by <one name>"'
+    );
+    assert.equal(accessTabSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  });
+});
+
+describe('RecipeEditorTabs gates Access / Books & Scrolls on craftingEffect (issue 676)', () => {
+  it('is MODE-CONDITIONAL off craftingEffect, and offers neither tab under global', () => {
+    assert.ok(tabsSource.includes('visibilityEffect?.showAccess'), 'restricted branch');
+    assert.ok(tabsSource.includes('visibilityEffect?.showBooksScrolls'), 'item/knowledge branch');
+    // The prop must NOT be called `effect`: the compiler then reads `$effect(...)` as
+    // a store subscription (`$` + `effect`) and the component throws at mount.
+    assert.equal(
+      /^\s*effect = /m.test(tabsSource),
+      false,
+      'the craftingEffect prop is never named `effect` (it would shadow the $effect rune)'
+    );
+  });
+
+  // The gate is on the tab BUTTON, not just the panel: a tab that opens an empty panel
+  // is worse than no tab. RecipeEditView derives TAB_IDS from the SAME effect so a
+  // deep-link cannot select a tab the strip does not render.
+  it('derives the editor TAB_IDS from the same visibilityEffect the strip reads', () => {
+    assert.ok(
+      editSource.includes("visibilityEffect?.showAccess ? ['access'] : []"),
+      'TAB_IDS gates access on the same effect'
+    );
+    assert.ok(
+      editSource.includes("visibilityEffect?.showBooksScrolls ? ['books-scrolls'] : []"),
+      'TAB_IDS gates books-scrolls on the same effect'
+    );
+    assert.ok(
+      editSource.includes("if (!TAB_IDS.includes(activeTab)) activeTab = 'overview'"),
+      'a mode change that retires the active tab falls back to Overview'
+    );
+  });
+});
+
+describe('Step mode lives on the Overview tab (issue 676: rehomed from the deleted rail)', () => {
+  it('renders Step mode as a real SegmentedControl beside the steps it governs', () => {
+    assert.ok(overviewSource.includes("import SegmentedControl from '../SegmentedControl.svelte'"));
+    assert.ok(overviewSource.includes('optionDataAttr="data-recipe-step-mode-option"'));
+    assert.ok(
+      overviewSource.includes('data-recipe-section="recipe-step-mode"'),
+      'carries the step-mode section marker'
+    );
+    // The rail was the ONLY consumer of these two handlers; without the rehome,
+    // multi-step recipes would be unreachable for every system with the feature on.
+    assert.ok(overviewSource.includes('onEnterMultiStep'), 'wires the enter-multi-step handler');
+    assert.ok(overviewSource.includes('onRevertToSingleStep'), 'wires the revert handler');
+    assert.ok(overviewSource.includes('multiStepEnabled'), 'gated on the system feature');
+  });
+
+  // Recipe complexity is emergent from the ingredient-set count (issue 643): no editor
+  // surface carries a Simple/Complex control.
+  it('carries NO Recipe mode toggle', () => {
+    assert.equal(overviewSource.includes('data-recipe-mode-option'), false, 'no Recipe mode segmented control');
+    assert.equal(overviewSource.includes('data-recipe-section="recipe-mode"'), false, 'no Recipe mode section');
+    assert.equal(overviewSource.includes('onSetComplexity'), false, 'no complexity setter');
   });
 });
 
@@ -402,7 +480,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     // from structure, and alchemy already forced a single set, so there is no toggle
     // to hide any more.
     assert.equal(rootSource.includes('hideComplexToggle'), false, 'no hideComplexToggle prop threaded from the root');
-    assert.equal(railSource.includes('hideComplexToggle'), false, 'the rail declares no hideComplexToggle prop');
+    assert.equal(overviewSource.includes('hideComplexToggle'), false, 'Overview declares no hideComplexToggle prop');
     // Alchemy forbids adding ingredient sets; the emergent add-set affordance is gated
     // on recipeCanAddSet, which excludes alchemy.
     assert.ok(
@@ -470,40 +548,48 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.equal(recipeViewMount.includes('onDirtyChange='), false, 'no onDirtyChange prop on the controlled view');
   });
 
-  it('renders the context rail in the global inspector aside, ALWAYS present on recipe-edit', () => {
-    assert.ok(rootSource.includes("import RecipeContextRail from './recipe/RecipeContextRail.svelte'"), 'imports the rail component');
-    assert.ok(rootSource.includes('<RecipeContextRail'), 'renders the rail in an aside branch');
-    // The rail is never hidden: recipe-edit is absent from the two-column override
-    // list, so a hidden inspector left a 300px dead column (issue 643 §8).
+  it('renders NO context rail on recipe-edit — the tabs take the released column (issue 676)', () => {
+    assert.equal(rootSource.includes('RecipeContextRail'), false, 'the rail component is gone entirely');
     assert.equal(rootSource.includes('recipeInspectorVisible'), false, 'no conditional-hide gate remains');
     assert.ok(
-      rootSource.includes('recipeRailEffect = $derived(craftingEffect('),
-      'the rail composition is driven by the canonical craftingEffect matrix'
+      rootSource.includes('recipeVisibilityEffect = $derived(craftingEffect('),
+      'the conditional tabs are driven by the canonical craftingEffect matrix'
     );
     assert.ok(
       rootSource.includes('store.resolveRecipeAccess?.('),
-      'access ids are resolved in the STORE, never in the rail'
+      'access ids are resolved in the STORE, never in the tab'
     );
     // The aside's suppression list no longer names recipe-edit at all.
     const asideGuard = rootSource.slice(
       rootSource.indexOf("{#if currentView !== 'environment-edit' && currentView !== 'checks'"),
       rootSource.indexOf('<aside class="manager-inspector"')
     );
-    assert.equal(
+    // Issue 676: the aside IS suppressed on recipe-edit now. This guard and the
+    // two-column override list in styles/fabricate.css are ONE decision expressed twice
+    // — suppress without releasing and a 300px empty box holds the strip open; release
+    // without suppressing and the empty aside wraps to a row under the editor.
+    assert.ok(
       asideGuard.includes("currentView !== 'recipe-edit'"),
-      false,
-      'the aside is never suppressed on recipe-edit — the context rail is always present'
+      'the aside is suppressed on recipe-edit, matching the released grid column'
+    );
+    assert.ok(
+      /\[data-manager-view="recipe-edit"\] \.manager-body/.test(css),
+      'recipe-edit is in the two-column override list, releasing the rail column to the tabs'
     );
   });
 
-  it('no longer passes recipe-item props to RecipeEditView', () => {
+  it('passes the read-only recipe-item summary props to RecipeEditView, but no authoring path', () => {
     const start = rootSource.indexOf('<RecipeEditView');
     const end = rootSource.indexOf('/>', start);
     const block = rootSource.slice(start, end);
-    assert.equal(block.includes('recipeItemDefinitions'), false, 'no recipeItemDefinitions prop on the view');
     assert.equal(block.includes('knowledgeMode'), false, 'no knowledgeMode prop on the view');
     assert.equal(block.includes('onAddRecipeItem'), false, 'no add-recipe-item prop on the view');
     assert.equal(block.includes('onSetRecipeItem'), false, 'no set-recipe-item prop on the view');
+    // The Books & Scrolls tab (issue 676) needs the library + the unlink; the rail took
+    // exactly these before it was deleted.
+    assert.ok(block.includes('{recipeItemDefinitions}'), 'the definition library reaches the books tab');
+    assert.ok(block.includes('onRemoveRecipeItem={handleRemoveRecipeItem}'), 'the per-row unlink is wired');
+    assert.ok(block.includes('visibilityEffect={recipeVisibilityEffect}'), 'the tab gate is wired');
   });
 
   it('wires confirmRecipeRouteExit into the route-exit chain via the services discard seam', () => {
@@ -625,8 +711,14 @@ describe('linked scene/recipe-item name truncation (shared class)', () => {
     assert.match(block[0], /text-align:\s*left/, 'stays left-aligned');
   });
 
-  it('is the shared class used by both the recipe-item and environment scene cards', () => {
-    assert.ok(railSource.includes('class="manager-environment-scene-name'), 'the rail books card uses the shared name class');
+  // Issue 676: the recipe's book rows no longer borrow this gathering class — a book is
+  // not a scene. The class remains the environment editor's own.
+  it('is not borrowed by the recipe Books & Scrolls tab', () => {
+    assert.equal(
+      booksTabSource.includes('manager-environment-scene-name'),
+      false,
+      'the books tab owns its row vocabulary rather than borrowing the gathering scene widget'
+    );
   });
 });
 
@@ -707,10 +799,10 @@ describe('recipe default image is the blueprint, sourced from one canonical lite
     );
     assert.equal(editSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the view');
     assert.ok(
-      railSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js'"),
-      'RecipeContextRail imports the constant'
+      booksTabSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js'"),
+      'RecipeBooksScrollsTab imports the constant'
     );
-    assert.equal(railSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the rail');
+    assert.equal(booksTabSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"), false, 'no local bag-SVG literal in the books tab');
   });
 });
 

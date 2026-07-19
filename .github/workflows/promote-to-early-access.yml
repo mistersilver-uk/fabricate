@@ -44,6 +44,12 @@ jobs:
         with:
           ref: release
           fetch-depth: 0
+          # The push below authenticates as the bypass App, never as github-actions[bot]. checkout
+          # stores its own credential as an http.extraheader, and an Authorization header BEATS the
+          # credential in a remote URL — so any persisted credential silently wins over the App
+          # token. Never persist it here. (checkout writes that header to a temp config file, not
+          # the local one, so a `git config --unset-all` in the push step cannot reach it.)
+          persist-credentials: false
 
       - name: Validate the tag shape
         id: validate
@@ -172,11 +178,8 @@ jobs:
           #   1. A push made with GITHUB_TOKEN does NOT trigger another workflow (GitHub's recursion
           #      guard), so release.yml (push: [release]) would never fire — the whole point here.
           #   2. It is the ruleset bypass actor, so a future ruleset on `release` still lets it push.
-          # actions/checkout left an http.extraheader carrying the DEFAULT GITHUB_TOKEN
-          # (github-actions[bot]); it overrides the credential in the remote URL, so without clearing
-          # it the push would authenticate as github-actions[bot] and neither trigger release.yml nor
-          # bypass a ruleset. Clear it, then point origin at the App token.
-          git config --unset-all http.https://github.com/.extraheader || true
+          # The App token is the ONLY credential here — the checkout step sets
+          # persist-credentials: false so nothing can override it.
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git checkout -B release origin/release
           # --no-ff, NEVER a squash: semantic-release recomputes the stable version from the

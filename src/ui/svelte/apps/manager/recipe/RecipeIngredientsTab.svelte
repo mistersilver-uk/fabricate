@@ -21,7 +21,16 @@
   let {
     recipe = null,
     isMultiStep = false,
+    // COLLAPSED chain (issue 710): the system's multi-step feature is off but the
+    // recipe still carries authored steps. Step-level ingredient authoring is gated
+    // read-only; the note points the GM back to the feature toggle. The step data is
+    // preserved and restored on re-enable.
+    collapsed = false,
     currencyUnits = [],
+    // Gates the "Add cost" affordances (and read-only rendering of existing currency
+    // requirements) on the system's currency feature being enabled, not merely on unit
+    // presence. Forwarded to every section, or it silently drops to its default.
+    currencyEnabled = true,
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
@@ -74,7 +83,9 @@
     <p class="manager-muted">{heading.intro}</p>
   </div>
 
-  {#if isMultiStep}
+  {#if collapsed}
+    <p class="manager-muted" data-recipe-collapsed-note>{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote', 'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.')}</p>
+  {:else if isMultiStep}
     {#if steps.length === 0}
       <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its ingredients.')}</p>
     {:else}
@@ -88,6 +99,7 @@
             {essenceOptions}
             {itemTags}
             {currencyUnits}
+            {currencyEnabled}
             {showSetName}
             onChange={(nextSets) => onUpdateIngredientSets(step.id, nextSets)}
           />
@@ -102,6 +114,7 @@
       {essenceOptions}
       {itemTags}
       {currencyUnits}
+      {currencyEnabled}
       {showSetName}
       onChange={(nextSets) => onUpdateIngredientSets(null, nextSets)}
     />

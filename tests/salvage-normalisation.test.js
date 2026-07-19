@@ -351,7 +351,13 @@ test('full round-trip: system with salvage enabled, component with full salvage 
   assert.equal(system.salvageCraftingCheck.consumption.breakToolsOnFail, true);
   assert.deepEqual(system.salvageCraftingCheck.outcomes, ['critical', 'pass', 'fail']);
   assert.equal(system.salvageCraftingCheck.progressive.awardMode, 'partial');
-  assert.equal(system.salvageCraftingCheck.progressive.allowPlayerReorder, true);
+  // Issue 651: the salvage progressive block shares the crafting progressive allowlist,
+  // so the retired system-level reorder flag is dropped here too.
+  assert.equal(
+    system.salvageCraftingCheck.progressive.allowPlayerReorder,
+    undefined,
+    'the retired system-level allowPlayerReorder is dropped'
+  );
 
   // Component-level checks
   const comp = system.components[0];

@@ -1116,6 +1116,64 @@ test('craftAlchemy reaches the no-match disposition (and consumes) when ingredie
   assert.equal(deleted.length, 1, 'insufficient submission is still consumed on the no-match path');
 });
 
+test('craftAlchemy records a no-signature fizzle as run history, unconditionally', async () => {
+  const registeredItemUuid = 'Item.iron-ingot';
+  const components = [buildComponent('iron', registeredItemUuid)];
+  const recipe = buildQuantityRecipe('iron', 5);
+  const system = buildAlchemySystem({
+    id: 'alchemy-sys',
+    components,
+    // showAttemptHistoryToPlayers is OFF on purpose: recording must STILL happen —
+    // that flag gates only Journal visibility, never whether the attempt is recorded.
+    alchemy: { learnOnCraft: false, consumeOnFail: true, showAttemptHistoryToPlayers: false },
+  });
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: (id) => (id === 'alchemy-sys' ? system : null),
+  });
+  const validator = new SignatureValidator({
+    getSystem: () => system,
+    getRecipesForSystem: () => [recipe],
+    getComponentsForSystem: () => components,
+  });
+
+  const fizzleCalls = [];
+  const runManager = {
+    async recordFizzle(actor, details) {
+      fizzleCalls.push({ actor, details });
+      return { id: 'fizz-1', isFizzle: true };
+    },
+  };
+  const engine = new CraftingEngine({ getRecipes: () => [recipe] }, runManager);
+
+  const actorItem = {
+    uuid: registeredItemUuid,
+    system: { quantity: 1 },
+    async delete() {},
+    async update() {},
+  };
+  const sourceActor = { items: [actorItem] };
+  const submitted = toAlchemyRecords(
+    buildIngotSubmissions(registeredItemUuid, 1),
+    components,
+    'alchemy-sys'
+  );
+
+  const craftingActor = { id: 'pc' };
+  const result = await engine.craftAlchemy(craftingActor, [sourceActor], submitted, {
+    craftingSystemId: 'alchemy-sys',
+    signatureValidator: validator,
+  });
+
+  assert.equal(result.disposition, 'no-match', 'the attempt fizzles');
+  assert.equal(fizzleCalls.length, 1, 'a no-signature fizzle is recorded once as run history');
+  assert.equal(fizzleCalls[0].actor, craftingActor, 'recorded against the crafting actor');
+  assert.equal(
+    fizzleCalls[0].details.craftingSystemId,
+    'alchemy-sys',
+    'the fizzle carries its crafting system id (and no recipe/signature data)'
+  );
+});
+
 test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals item quantity', async () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
 
@@ -1334,4 +1392,108 @@ test('_matchAlchemySignature resolves a cross-group multi-overlap submission to 
 
   assert.equal(matchesX.matched, true, 'resolves to the first overlapping component (cX)');
   assert.equal(matchesY.matched, false, 'not also counted toward the second overlapping component (cY)');
+});
+
+// ---------------------------------------------------------------------------
+// Essence as a first-class ingredient GROUP option (issue 649): differential
+// parity vs the legacy per-set map, and the group-granular essences-disabled rule.
+// ---------------------------------------------------------------------------
+
+// A single-option essence group — exactly what the 1.17.0 migration produces from a
+// positive `set.essences[essenceId]` entry.
+function essenceOptionGroup(essenceId, amount) {
+  return { id: `ge-${crypto.randomUUID()}`, options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }] };
+}
+
+test('_matchAlchemySignature: legacy essences map and migrated essence group give the SAME result', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => [],
+  });
+  const legacy = buildRecipe('legacy', [buildIngredientSet([], { fire: 2 })], [{ id: 'rg', name: 'R', results: [] }]);
+  const migrated = buildRecipe('migrated', [buildIngredientSet([essenceOptionGroup('fire', 2)])], [{ id: 'rg', name: 'R', results: [] }]);
+  const item = buildSubmittedItem('Item.herb', { fire: 1 });
+
+  for (const submitted of [[item, item], [item]]) {
+    const legacyResult = matchSig(engine, submitted, [legacy], [], validator, { system: essenceSystem });
+    const migratedResult = matchSig(engine, submitted, [migrated], [], validator, { system: essenceSystem });
+    assert.equal(migratedResult.matched, legacyResult.matched, 'both representations match identically');
+  }
+});
+
+test('_matchAlchemySignature: a "component OR essence" group matches via either arm', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const ember = buildComponent('ember', 'Compendium.test.ember');
+  const components = [ember];
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components,
+  });
+  const group = {
+    id: 'g-or',
+    options: [
+      { match: { type: 'component', componentId: 'ember' } },
+      { quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } },
+    ],
+  };
+  const recipe = buildRecipe('or-recipe', [buildIngredientSet([group])], [{ id: 'rg', name: 'R', results: [] }]);
+
+  const emberItem = buildSubmittedItem('Item.ember', {});
+  emberItem._stats = { compendiumSource: 'Compendium.test.ember' };
+  const fireItem = buildSubmittedItem('Item.fire', { fire: 1 });
+
+  assert.equal(
+    matchSig(engine, [emberItem], [recipe], components, validator, { system: essenceSystem }).matched,
+    true,
+    'the component arm satisfies the group'
+  );
+  assert.equal(
+    matchSig(engine, [fireItem, fireItem], [recipe], components, validator, { system: essenceSystem }).matched,
+    true,
+    'the essence arm satisfies the group'
+  );
+  assert.equal(
+    matchSig(engine, [buildSubmittedItem('Item.water', { water: 1 })], [recipe], components, validator, { system: essenceSystem }).matched,
+    false,
+    'neither arm is satisfied → no match'
+  );
+});
+
+test('_matchAlchemySignature: insufficient essence under the group shape does not match', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const validator = new SignatureValidator({ getSystem: () => null, getRecipesForSystem: () => [], getComponentsForSystem: () => [] });
+  const recipe = buildRecipe('r', [buildIngredientSet([essenceOptionGroup('fire', 3)])], [{ id: 'rg', name: 'R', results: [] }]);
+  const item = buildSubmittedItem('Item.herb', { fire: 1 });
+  assert.equal(matchSig(engine, [item, item], [recipe], [], validator, { system: essenceSystem }).matched, false);
+});
+
+test('_matchAlchemySignature: essences DISABLED — a migrated essence-only set is unmatchable', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const validator = new SignatureValidator({ getSystem: () => null, getRecipesForSystem: () => [], getComponentsForSystem: () => [] });
+  const recipe = buildRecipe('r', [buildIngredientSet([essenceOptionGroup('fire', 2)])], [{ id: 'rg', name: 'R', results: [] }]);
+  const item = buildSubmittedItem('Item.herb', { fire: 1 });
+  assert.equal(
+    matchSig(engine, [item, item], [recipe], [], validator, { system: noEssenceSystem }).matched,
+    false,
+    'an essence-only set never shadows any submission when essences are off'
+  );
+});
+
+test('_matchAlchemySignature: essences DISABLED — a MIXED set matches on its non-essence group', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const ember = buildComponent('ember', 'Compendium.test.ember');
+  const components = [ember];
+  const validator = new SignatureValidator({ getSystem: () => null, getRecipesForSystem: () => [], getComponentsForSystem: () => components });
+  const mixed = buildIngredientSet([buildIngredientGroup('ember'), essenceOptionGroup('fire', 2)]);
+  const recipe = buildRecipe('r', [mixed], [{ id: 'rg', name: 'R', results: [] }]);
+  const emberItem = buildSubmittedItem('Item.ember', {});
+  emberItem._stats = { compendiumSource: 'Compendium.test.ember' };
+  assert.equal(
+    matchSig(engine, [emberItem], [recipe], components, validator, { system: noEssenceSystem }).matched,
+    true,
+    'the essence-only group is skipped; the component group still matches'
+  );
 });

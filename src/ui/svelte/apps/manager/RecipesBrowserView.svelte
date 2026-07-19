@@ -38,6 +38,7 @@
     recipeCategories = [],
     recipeSearchTerm = '',
     selectedRecipeId = '',
+    selectedSystemId = '',
     showRecipeCategories = false,
     resolutionMode = 'simple',
     onSearchChange = () => {},
@@ -60,6 +61,22 @@
   // fallback. Both are `$state` proxies, so nested writes (`ui.statusFilter = …`)
   // are reactive AND, when bound, propagate back to the root so the state persists.
   const ui = $derived(browserState ?? ownBrowserState);
+
+  let lastSystemId = $state('');
+
+  // Switching system resets the CATEGORY filter and the group/page position — a
+  // recipe category names a vocabulary the new system does not share, so carrying it
+  // over filters the new library down to nothing. Mirrors ComponentsBrowserView. The
+  // status/lock filters are NOT reset: enabled and locked mean the same thing in every
+  // system, so they are preferences like sort/page-size, not a stale vocabulary. The
+  // search term is cleared by the store on selectSystem (it is shared state).
+  $effect(() => {
+    if (selectedSystemId === lastSystemId) return;
+    ui.categoryFilter = 'all';
+    ui.pageIndex = 0;
+    ui.collapsedCategories = new Set();
+    lastSystemId = selectedSystemId;
+  });
 
   // The blocked-enable flash. Enabling is GATED (an incomplete recipe is refused),
   // and this view CLAIMS the refusal message by handing the store an `onBlocked`
@@ -120,7 +137,7 @@
   const lockOptions = $derived([
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
     { value: 'unlocked', labelKey: 'FABRICATE.Admin.Manager.Recipe.Unlocked', fallback: 'Unlocked' },
-    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.Locked', fallback: 'Locked' }
+    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.LockedLabel', fallback: 'Locked' }
   ]);
 
   const SORT_LABELS = {
@@ -178,11 +195,24 @@
     return `manager-recipe-group-${category || 'all'}`;
   }
 
-  // The header counts what the GROUP RENDERS, not what the whole filtered list holds.
+  // The header says BOTH numbers, because either one alone lies (issue 676).
   // `buildRecipeBrowserModel` groups the PAGE, so counting `model.filtered` would put
-  // "12 recipes" above three rows on page 2.
+  // "12 recipes" above the three rows page 2 renders — but counting only the page put
+  // "Alchemy · 25 recipes" above page 1 of a 282-strong Alchemy bucket, which says the
+  // bucket holds 25. So a partially-shown group reads "25 of 282 recipes": `group.total`
+  // is the category's size across the FILTERED list (the model computes it from the same
+  // filtered rows it paged, so an active filter is always respected).
+  //
+  // A group shown WHOLE says it once — "25 recipes", not "25 of 25". Grouping is on by
+  // default and most libraries fit one page, so the "of" form would otherwise be pure
+  // noise on the common case. The plural agrees with the TOTAL, which is >= 2 whenever
+  // the "of" form is used, so "1 of 282 recipes" is the only singular that reaches it.
   function groupCountText(group) {
     const count = (group?.recipes || []).length;
+    const total = group?.total ?? count;
+    if (total > count) {
+      return format('FABRICATE.Admin.Manager.Recipe.GroupCountOfTotal', '{count} of {total} recipes', { count, total });
+    }
     return count === 1
       ? text('FABRICATE.Admin.Manager.Recipe.GroupCountOne', '1 recipe')
       : format('FABRICATE.Admin.Manager.Recipe.GroupCount', '{count} recipes', { count });
@@ -204,7 +234,7 @@
   // would be REFUSED, so the row says so rather than merely "incomplete".
   const STATUS_LABELS = {
     disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
-    locked: ['FABRICATE.Admin.Manager.Recipe.Locked', 'Locked'],
+    locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
     blocked: ['FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable"],
     incomplete: ['FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete']
   };

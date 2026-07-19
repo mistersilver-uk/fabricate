@@ -1,9 +1,9 @@
-# Specification 005: Recipes and Steps
+# Recipes and Steps
 
 ## Purpose
 
 Define recipe structure, step execution lifecycle, and recipe-run behaviour.
-This spec does not redefine mode semantics; mode-specific resolution is defined in `004-resolution-modes.md`.
+This spec does not redefine mode semantics; mode-specific resolution is defined in `resolution-modes/spec.md`.
 
 ## Recipe Structure
 
@@ -63,7 +63,11 @@ Each step can define:
 - A recipe/step is craftable when at least one `IngredientSet` is satisfied (OR across sets).
 - Within an `IngredientSet`, all `ingredientGroups` must be satisfied (AND across groups).
 - Within an `IngredientGroup`, any one option in `options` satisfies the group (OR within group).
-- By default a group resolves to the first item-satisfiable option in author order (then the first affordable currency option); items strictly beat currency.
+- **Order-independence (the user-facing guarantee):** an ingredient set is satisfiable iff there EXISTS an assignment of items to its AND-groups that satisfies every group (one option each, respecting per-option quantity and the shared no-double-count ledger).
+The resolver finds such an assignment whenever one exists — including reassigning a dual-purpose item (one that could satisfy more than one group) away from the group that would strand another — so craftability does NOT depend on inventory or group iteration order.
+- **Items strictly beat currency (the ordering MECHANISM):** a currency option is chosen for a group only when no item/essence assignment across the set can satisfy that group; currency options (free — no ledger draw) are considered only after every item/essence branch is exhausted.
+- **Deterministic pick:** the greedy author-order assignment whenever one satisfies (byte-for-byte the pre-663 behaviour, zero churn), otherwise the first satisfying assignment found by an item-level search under a fixed author-order traversal (per group, non-currency options in author order then currency; per option, the greedy item subset first then alternatives).
+The search is bounded by a generous node/subset safeguard; on the rare bound-hit it degrades to the greedy author-order pass (never worse than the pre-663 behaviour, never a double-count) — an implementation safeguard, not user-facing behaviour.
 - A player MAY override which option a multi-option group consumes, and — for a tag option matching more than one held stack — which specific held item, via `IngredientSet.resolveIngredientSelection`'s `optionOverrides` argument (keyed by `group.id` → `{ optionIndex, heldItemId? }`).
 An override is honoured whether satisfiable or not: a satisfiable option wins; an insufficient option reports that option's have/need and blocks the craft with the missing-materials message (it is never silently redirected to a different option).
 An explicit override MAY select a currency alternative over an available item option (routing to `currencySpends` when affordable); with no override the default items-first resolution is byte-for-byte unchanged.
@@ -71,6 +75,8 @@ The same override threads through both the display (`RecipeManager.evaluateCraft
 - AND-across-ingredient-sets is not supported.
 - OR groups are always enabled and are not feature-toggled.
 - Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are always supported, including simple recipes, when their tag IDs exist in the crafting system's `itemTags` list.
+- An `IngredientGroup` option MAY be an essence alternative (`Ingredient.match.type === "essence"`), consuming essence-carrying items to meet `match.amount`, and participates in `optionOverrides` like any other option — so "component OR essence" is authorable.
+The legacy per-set `IngredientSet.essences` map is a back-compat read for one release (the 1.17.0 migration folds each positive entry into a single-option essence group).
 - **Tools** are the required-but-not-always-consumed, potentially-breakable prerequisite primitive (replacing recipe-side catalysts).
 They are referenced by id at recipe level, step level, and ingredient-set level via `toolIds`; the applicable set for an ingredient set is the union of those ids resolved against the per-system Tools library (`RecipeManager.getToolsForSet`).
 Every applicable Tool must be present (matched via the shared tool matcher) and pass its optional `requirement` before the recipe is craftable; `RecipeManager.evaluateCraftability` returns `toolStates` and `missing.tools`.
@@ -86,13 +92,13 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 ### Start or Resume
 
 1. Resolve recipe and active step.
-2. Re-check visibility/knowledge guards from `006-recipe-visibility.md`.
+2. Re-check visibility/knowledge guards from `recipe-visibility/spec.md`.
 3. Validate actor and component sources.
 
 ### Pre-Resolution Validation
 
-1. Validate ingredient/tool availability.
-2. Validate optional essence requirements when enabled.
+1. Validate ingredient/tool availability, including essence-option requirements inside ingredient-set resolution (an essence option is satisfied by consuming essence-carrying items to meet `match.amount`).
+2. Honor the legacy per-set essence map for one release (back-compat read) alongside the essence options.
 3. Validate step-level time requirements when enabled.
 
 ### Check and Resolution
@@ -113,8 +119,9 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
      (the recipe's selected tier or a dynamic-DC macro, not a flat configured DC),
      so a recipe tier or dynamic DC shifts every relative threshold.
    - **Routed by ingredients (`routedByIngredients` mode)**: the result group is selected by the chosen
-     ingredient set, so the check is OPTIONAL — when `craftingCheck.routed.rollFormula` is authored it runs
+     ingredient set, so the check is OPTIONAL — when `craftingCheck.simple.rollFormula` is authored it runs
      as a pass/fail layer that never changes which result group is produced; with no formula no check runs.
+     (It uses the shared `craftingCheck.simple` slot, not `craftingCheck.routed`.)
    - **Progressive**: roll the progressive formula;
      its total is the numeric `value` spent against ordered result difficulties.
 
@@ -123,8 +130,9 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    `routedByCheck` and progressive modes REQUIRE a configured check, while `routedByIngredients` (like simple) has an OPTIONAL check.
    A check is **usable** iff the active mode's check config carries an authored roll formula
    (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`), in which case it is
-   engine-evaluated as above; `craftingCheck.enabled` is only the on/off toggle for optional
-   simple/`routedByIngredients`/alchemy checks, not a proxy for "the check works".
+   engine-evaluated as above; `craftingCheck.enabled` (or `features.craftingChecks`) is only the on/off toggle
+   gating the OPTIONAL **simple**-mode check, not a proxy for "the check works" — `routedByIngredients` and
+   alchemy-Simple run on an authored formula alone, ungated by that toggle.
    The deprecated macro / built-in adapter check sources (root `macroUuid`, `successMacroUuid`,
    `failureMacroUuid`, `checkSource`, and the `builtIn` adapter config) were removed in 1.8.0;
    there is no longer a `checkSource` axis. (The dynamic-DC macro on `simple.macroUuid` is a
@@ -135,11 +143,11 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    roll-formula checks (`engineEvaluated === true`).
 
    The check/tier/trigger data-model shapes (`RoutedCheck`, `CheckBreakage` triggers, `thresholdMode`,
-   `breakTools`, recipe tiers, dynamic DC) are defined in `002-data-models.md`;
+   `breakTools`, recipe tiers, dynamic DC) are defined in `data-models/spec.md`;
    the per-mode routing rules (including `ResultGroup.checkOutcomeIds` tier→result-group
-   assignment) are defined in `004-resolution-modes.md`.
+   assignment) are defined in `resolution-modes/spec.md`.
 
-2. Resolve the result group by active mode rules in `004-resolution-modes.md`.
+2. Resolve the result group by active mode rules in `resolution-modes/spec.md`.
    For `routedByCheck` mode, an authored success-outcome tier that resolves by name but
    that no result group assigns via `checkOutcomeIds` (when the recipe otherwise uses tier
    assignment) yields a distinct **unrouted-tier** diagnostic rather than silently falling back
@@ -171,7 +179,7 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 Crafting is the only player-triggerable run type.
 A matured crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
-The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `003-ui-integration.md` *Journal App*).
+The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-integration/spec.md` *Journal App*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
 - On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.
@@ -183,7 +191,7 @@ A non-owner is told to ask an owner or GM rather than the run advancing silently
 #### Maturity Asymmetry Between Run Types
 
 A matured crafting step waits for the manual trigger above.
-By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `009-gathering-and-harvesting.md`).
+By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
 The Journal therefore presents gathering and salvage runs as auto-resolving and offers them no trigger button.
 
 ## Alchemy Execution Lifecycle
@@ -193,7 +201,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 ### Preconditions
 
 1. `features.multiStepRecipes` must be `false`.
-2. Candidate recipes must satisfy alchemy signature uniqueness invariants from `002` and `004`.
+2. Candidate recipes must satisfy alchemy signature uniqueness invariants from `data-models/spec.md` and `resolution-modes/spec.md`.
 
 ### Attempt Flow
 
@@ -201,7 +209,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Resolve a unique matching signature.
 3. If no signature matches:
    - return user-facing failure message,
-   - consume submitted ingredients,
+   - consume submitted ingredients only when `alchemy.consumeOnFail !== false` (default true), consistent with `resolution-modes/spec.md` §Alchemy Mode,
    - record the attempt as failed run history.
 4. If signature matches:
    - resolve the target recipe + ingredient set,
@@ -220,6 +228,10 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 1. Completed crafts and failed attempts are recorded.
 2. Failed attempts include no-signature failures and failed checks.
 3. Player history visibility is controlled by `alchemy.showAttemptHistoryToPlayers`.
+4. A no-signature fizzle records a failed, recipe-less run-history entry (`recipeId: null`, `isFizzle: true`, `status: "failed"`).
+   The entry is archived straight to history and never enters the active-runs container.
+   Recording is unconditional; the entry is player-visible only when `alchemy.showAttemptHistoryToPlayers` is enabled.
+   It carries no recipe or signature information, so it can never leak an undiscovered recipe, and is pruned only when its crafting system becomes invalid (not as an unknown-recipe run).
 
 The `alchemy.showAttemptHistoryToPlayers` flag now governs two distinct concepts:
 
@@ -252,11 +264,11 @@ Transfer scaling by essence quantity is out of scope for this phase.
 
 - In-progress runs may be stored under `Actor.flags.fabricate.craftingRuns`.
 - Run records should include recipe ID, current step index, selected ingredient data, and time-gate state.
-- Runs must be cleaned up when recipe/system destructive operations invalidate them (see `007`).
+- Runs must be cleaned up when recipe/system destructive operations invalidate them (see `destructive-changes-and-migrations/spec.md`).
 
 ## Run-History Retention
 
-The actor-flag shape for `craftingRuns` and `salvageRuns` is defined in `002-data-models.md`.
+The `craftingRuns` actor-flag shape is defined in `data-models/spec.md` (*Crafting Runs Flag*); the `salvageRuns` shape is defined in this spec (see *SalvageRun Actor Flag* below).
 
 ### Retention Limit
 
@@ -268,6 +280,9 @@ The actor-flag shape for `craftingRuns` and `salvageRuns` is defined in `002-dat
 
 - History arrays are ordered **most-recent-first** (newest entry at index 0).
 - When a run reaches a terminal status (`succeeded`, `failed`, or `cancelled`), it is removed from `active` and prepended to `history`.
+- The terminal transition is **durable under concurrent and multi-client writes**.
+  A terminal run persisted to `history` by one writer is never lost to a later stale-cache write by another writer, another session, or the primary-GM world-time resume path.
+  Persistence reconciles against the currently-persisted actor document (union `history` by run `id`; apply `active` add/remove against the fresh document) rather than overwriting from a stale in-memory cache.
 
 ### Truncation Behaviour
 
@@ -302,11 +317,12 @@ Salvage is a single-step operation (no multi-step salvage):
 3. **Check**: Roll the salvage check for the active `salvageResolutionMode`.
 A salvage check is usable only when its mode has an authored roll formula (`salvageCraftingCheck.simple|routed|progressive.rollFormula`); the optional simple check runs only when `salvageCraftingCheck.simple.rollFormula` is authored.
 Routed and progressive salvage require their roll formula and fail loudly (with zero mutation) when it is missing.
-4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
-5. **Consume**: `ingredientQuantity` is always 1 for salvage.
-Remove that many instances of the component from the actor's inventory.
+4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `resolution-modes/spec.md`, but using salvage-specific settings).
+5. **Consume**: remove N = `Component.salvage.ingredientQuantity` instances (default 1, any positive integer) of the component from the actor's inventory, matching §Implicit Ingredient and `data-models/spec.md`.
 Apply tool usage/breakage as applicable.
 6. **Create**: Create result items on the actor.
+7. **Chat**: when `features.chatOutput` is enabled, post a salvage result card on resolved success or rolled failure only (never on cancelled, misconfigured, or time-gated outcomes); card creation failures are non-fatal.
+See the `ui-integration` chat card contract.
 
 If `Component.salvage.timeRequirement` is absent, salvage resolves immediately.
 If it is present, the run must resume automatically when world time reaches the derived completion timestamp, following the same startup and `updateWorldTime` re-check pattern used for crafting time gates.
@@ -326,6 +342,16 @@ On success, produce the single result group.
   The engine-evaluated progressive salvage check rolls the configured formula to produce the
   numeric `value`; with no authored formula the salvage fails loudly (zero mutation).
   Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
+  The order the awards are spent down is governed by `Component.salvage.allowPlayerResultReorder`
+  (default `true`) — see `resolution-modes` §Player Reorder for the full contract.
+  The order is read from the run record's captured `resultOrder`, never from settings, and a
+  salvage with no run record uses the authored order with no settings fallback.
+  The permission is gated at read time, so a GM toggling it off mid-run takes effect on that run.
+  The Inventory tab's salvage panel (`InventorySalvagePanel.svelte`) is the first UI caller of
+  `CraftingEngine.salvage`: players reorder Progressive stages via the store's reorder/reset
+  actions persisted under the `salvage:<componentId>` scope, honouring
+  `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-integration` §Player Salvage Surface).
+  The GM toggle is authored policy, exported and honoured.
 
 ### Failure Consumption Policy
 
@@ -352,9 +378,15 @@ Actor.flags.fabricate.salvageRuns = {
 SalvageRun = {
   id: string,
   actorUuid: string,
-  userId: string,
+  userId: string,           // the user who STARTED the run
   craftingSystemId: string,
   componentId: string,
+
+  // The player's progressive result order, CAPTURED at run start (a list of result ids,
+  // or null when there was none). The award path reads the order from here and never
+  // from settings, so a world-time resume awards down the starting user's order however
+  // wins the resume race. See resolution-modes §Player Reorder.
+  resultOrder?: string[] | null,
 
   status: "inProgress" | "waitingTime" | "succeeded" | "failed" | "cancelled",
 
@@ -368,28 +400,46 @@ SalvageRun = {
     initiatedAt: number,
   },
 
-  lastCheckResult?: {
+  // Persisted field is `checkResult` (no `reason` key); the failure text is the
+  // separate top-level `failureReason` below.
+  checkResult?: {
     success: boolean,
-    reason: string,
     outcome?: string, // routed mode
     value?: number,   // progressive mode
     data?: object,
   },
+  failureReason?: string, // top-level failure text (null on success)
 
   consumedComponents?: Array<{
-    actorUuid: string,
-    itemUuid: string,
+    itemUuid: string, // no `actorUuid` on either salvage path
     quantity: number,
   }>,
+  // Flattened tool-breakage evidence shared with crafting (written by
+  // `_applyToolBreakage`). `componentId` and `broken` are load-bearing for the
+  // salvage chat card and the Run Journal.
   usedTools?: Array<{
-    actorUuid: string,
-    itemUuid: string,
+    actorUuid: string | null,
+    itemUuid: string | null,
     quantity: number,
+    componentId: string | null,
+    broken: boolean,
+    // checkDriven-only evidence and skip/marker fields, as in the crafting
+    // CraftingRunStepState.usedTools shape (data-models):
+    authority?: string,
+    reason?: string,
+    triggerId?: string,
+    checkId?: string,
+    virtual?: boolean,
+    spared?: boolean,
+    skippedImmune?: boolean,
   }>,
   createdResults?: Array<{
-    actorUuid: string,
     itemUuid: string,
+    // the producing component id, or `null` for pre-fix historical runs
+    componentId: string | null,
     quantity: number,
+    name?: string | null, // captured at award time; absent on pre-capture historical records
+    img?: string | null,  // captured at award time; absent on pre-capture historical records
   }>,
 }
 ```

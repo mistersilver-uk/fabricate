@@ -10,6 +10,7 @@ import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
 import { RunJournalBuilder } from './systems/RunJournalBuilder.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
+import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
@@ -43,6 +44,7 @@ import {
   gatheringRunItemRef
 } from './gatheringResultCreation.js';
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
+import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
@@ -422,14 +424,21 @@ class Fabricate {
     // Create managers
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
-    this.craftingRunManager = new CraftingRunManager();
-    this.salvageRunManager = new SalvageRunManager();
+    // Wire the real primary-GM check into the timed world-time resume paths (issue
+    // 656). Both managers default `isPrimaryGM` to `() => true` (fail-open, so unit
+    // fixtures resume), so passing the real `activeGM` check here is load-bearing —
+    // it gates the synced-hook `setFlag` writes to exactly one client.
+    const isPrimaryGM = () => game.users?.activeGM?.id === game.user?.id;
+    this.craftingRunManager = new CraftingRunManager({ isPrimaryGM });
+    this.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
     this.gatheringRunManager = new GatheringRunManager();
     this.gatheringGateAndCheckEvaluator = new GatheringGateAndCheckEvaluator({
       evaluateExpression: evaluateGatheringExpression
     });
     this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
-    this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
+    this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager, {
+      getPlayerResultOrder: entry => this._readPlayerResultOrder(entry)
+    });
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
     // The generic actor-inventory spender resolves a per-system coin adapter by
@@ -439,7 +448,23 @@ class Fabricate {
       adapters: new Map([['pf2e', new Pf2eInventoryCoinAdapter()]]),
     });
     this.actorPropertyCoinSpender = new ActorPropertyCoinSpender();
-    this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager);
+    // Wire the gathering persistence seams the GM UI path already passes
+    // (SvelteCraftingSystemManagerApp) so the public API surface
+    // (importSystemFromFile / importFromPack / getCompendiumImporter) persists the
+    // gathering authoring bundle instead of silently dropping it (issue #699). The
+    // environment store is constructed AFTER this importer (below), so resolve it
+    // lazily through a thin delegating object — matching the exportSystem
+    // lazy-read idiom — rather than capturing the still-undefined field here.
+    this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager, {
+      environmentStore: {
+        list: () => this.gatheringEnvironmentStore?.list?.() ?? [],
+        load: () => this.gatheringEnvironmentStore?.load?.() ?? [],
+        save: (environments) => this.gatheringEnvironmentStore?.save?.(environments)
+      },
+      getSetting: (key) => getSetting(key),
+      setSetting: (key, value) => setSetting(key, value),
+      isGM: () => game.user?.isGM === true
+    });
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,
@@ -447,7 +472,8 @@ class Fabricate {
       this.itemPilesIntegration,
       this.salvageRunManager,
       this.actorInventoryCoinSpender,
-      this.actorPropertyCoinSpender
+      this.actorPropertyCoinSpender,
+      { getPlayerResultOrder: entry => this._readPlayerResultOrder(entry) }
     );
 
     // Initialize recipe manager
@@ -591,9 +617,16 @@ class Fabricate {
     );
     await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
+    // Flatten the per-system salvage component sets the run cleanup above already
+    // computed: the progressive-order map's `salvage:<componentId>` keys are not
+    // system-scoped, so the prune needs one flat id set.
+    const validComponentIds = new Set(
+      [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
+    );
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
       resolveGatheringActor,
-      isSelectableGatheringActor
+      isSelectableGatheringActor,
+      validComponentIds
     });
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
@@ -608,6 +641,13 @@ class Fabricate {
    * Run versioned startup data migrations via MigrationRunner.
    */
   async _runMigrations() {
+    // Primary-GM only, so exactly one client runs the migration pass in a multi-GM
+    // world and no player/assistant races the world-scoped setting writes. `isGM` is
+    // true for assistant GMs too (they hold SETTINGS_MODIFY), so an `isGM` gate would
+    // let the full GM AND every assistant transform-and-write concurrently
+    // (last-writer-wins); `activeGM` fires on exactly one client. Mirrors the
+    // primary-GM startup writers below (runRecipeItemFlagAutoStamp et al.).
+    if (game.users?.activeGM?.id !== game.user?.id) return;
     const runner = new MigrationRunner({
       getSetting,
       setSetting,
@@ -681,6 +721,21 @@ class Fabricate {
           'Populate gatheringCraftingCheck.routed.rollFormula for any stripped gathering task. Affected items:',
         { droppedRollTableRecipes, strippedGatheringTasks }
       );
+    }
+
+    // One-time GM-facing notice: when the 1.17.0 essence-group migration disabled
+    // recipes to clear a newly-introduced alchemy signature collision (folding
+    // per-set essences into signature-bearing groups can overlap two sets). Name the
+    // disabled recipes so the GM can rework and re-enable them.
+    const essenceCollisionDisabledRecipes = Array.isArray(summary?.essenceCollisionDisabledRecipes)
+      ? summary.essenceCollisionDisabledRecipes
+      : [];
+    if (essenceCollisionDisabledRecipes.length > 0 && game.user?.isGM) {
+      const recipeList = essenceCollisionDisabledRecipes.join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
+        recipes: recipeList,
+      }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
+      ui.notifications?.warn?.(message);
     }
   }
 
@@ -1331,6 +1386,46 @@ class Fabricate {
   }
 
   /**
+   * Salvage one owned component for the current selection (issue 675) — the seam
+   * behind the player Inventory tab's Salvage panel, and the first UI caller of
+   * `CraftingEngine.salvage`.
+   *
+   * TAKES AN `actorId`, NEVER AN `actorUuid`. `CraftingEngine.salvage` performs NO
+   * ownership check of its own; `_resolveCraftingActor` — reached here through
+   * `_resolveCraftingSources` — is the ONLY ownership gate on this path, which is
+   * why every player facade (`craftRecipe`, `listInventoryForActor`, the alchemy
+   * pair) takes an id. A uuid would go straight to `fromUuid()` and the engine would
+   * mutate Items directly; a stale, console-supplied, or foreign uuid would reach
+   * the server and THROW rather than return the `{ success: false, message }` a
+   * store expects. Exact `craftRecipe` parity on that gate is the contract.
+   *
+   * Note there is deliberately no public `Fabricate#salvage` delegator to mirror
+   * `craftRecipe`'s `this.craft`: this routes to the engine directly.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] Crafting actor id; defaults to the
+   *   persisted last-crafting selection.
+   * @param {string} options.systemId Crafting system id.
+   * @param {string} options.componentId Id of the component to salvage.
+   * @param {boolean} [options.interactive] When true, prompt the player with the
+   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
+   *   so Dice So Nice animates it. Defaults to false so macros and automation stay
+   *   silent. A dismissed prompt returns `{ success: false, cancelled: true, results:
+   *   null }` with zero mutation.
+   * @returns {Promise<{success: boolean, results: Array|null, message: string, value?: number|null, salvageRun?: object|null, cancelled?: boolean}>}
+   */
+  async salvageComponent({ actorId = null, systemId, componentId, interactive = false } = {}) {
+    this._requireReady();
+    const { craftingActor } = this._resolveCraftingSources({ rememberedActorId: actorId });
+    if (!craftingActor) {
+      return { success: false, results: null, message: 'No crafting actor selected' };
+    }
+    return await this.craftingEngine.salvage(craftingActor.uuid, systemId, componentId, {
+      interactive
+    });
+  }
+
+  /**
    * Re-evaluate the craftability of ONE ingredient set with in-session per-group
    * option overrides applied (issue 552). Backs the crafting store's
    * `selectedCraftability` recompute when the player picks a non-default option, so
@@ -1597,6 +1692,63 @@ class Fabricate {
       ? current.filter((id) => id !== recipeId)
       : [...current, recipeId];
     setSetting(SETTING_KEYS.FAVOURITE_RECIPES, next);
+    return next;
+  }
+
+  /**
+   * The player's stored progressive result orders, keyed `recipe:<id>` / `salvage:<id>`
+   * (`PROGRESSIVE_RESULT_ORDER`).
+   *
+   * USER-scoped, NOT client-scoped: this preference is per user PER WORLD. It reaches
+   * that user on any device they open THIS world from, and the same player in another
+   * world gets a fresh map. It does NOT follow the account globally — that phrasing is
+   * wrong for `scope: 'user'` and is banned in `AGENTS.md` for exactly this reason.
+   * (The `getFavouriteRecipeIds` neighbour above IS client-scoped, i.e. per device; do
+   * not read its JSDoc as describing this one.)
+   *
+   * @returns {Record<string, string[]>}
+   */
+  getProgressiveResultOrder() {
+    const stored = getSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER);
+    return stored && typeof stored === 'object' ? stored : {};
+  }
+
+  /**
+   * The Foundry edge for the `getPlayerResultOrder` seam injected into
+   * `ResolutionModeService` and `CraftingEngine` (issue 651 D1).
+   *
+   * Deliberately a one-line settings read returning DATA (an id list), not a sorted
+   * array: the reconciliation itself lives in the pure `applyPlayerResultOrder`, so the
+   * ordering logic is unit-testable with no settings stub.
+   *
+   * @param {{ scope: 'recipe'|'salvage', id: string }} entry
+   * @returns {string[]|null} The executing user's stored order, or null when there is none.
+   */
+  _readPlayerResultOrder(entry) {
+    const key = progressiveOrderKey(entry);
+    if (!key) return null;
+    const order = this.getProgressiveResultOrder()[key];
+    return Array.isArray(order) ? order : null;
+  }
+
+  /**
+   * Persist the player's preferred result order for one namespaced key.
+   *
+   * ASYNC AND MUST BE AWAITED. Under `user` scope `set` is a real, replicated document
+   * write that can REJECT — unlike the fire-and-forget `setSetting(...)` used by
+   * `toggleFavouriteRecipe` above, which is correct only because that setting is
+   * client-scoped (a synchronous localStorage write that cannot fail). Swallowing the
+   * promise here would let a caller believe an order that was never stored.
+   *
+   * @param {string} key Namespaced key from `progressiveOrderKey` (`recipe:<id>`/`salvage:<id>`).
+   * @param {string[]} orderedIds The player's preferred result ids.
+   * @returns {Promise<Record<string, string[]>>} The updated map.
+   */
+  async setProgressiveResultOrder(key, orderedIds) {
+    const current = this.getProgressiveResultOrder();
+    if (!key) return current;
+    const next = { ...current, [key]: Array.isArray(orderedIds) ? orderedIds : [] };
+    await setSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER, next);
     return next;
   }
 
@@ -1917,6 +2069,8 @@ class Fabricate {
         getRecipeItemImg: (systemId, recipeItemId) =>
           this.craftingSystemManager?.getRecipeItemDefinition?.(systemId, recipeItemId)?.img ?? null,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
+        getComponent: (systemId, componentId) =>
+          this._resolveJournalComponent(systemId, componentId),
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
@@ -1976,6 +2130,21 @@ class Fabricate {
       doc = null;
     }
     return doc ? { name: doc.name ?? null, img: doc.img ?? null } : null;
+  }
+
+  /**
+   * Resolve a system component to `{ name, img }` for the Journal. Powers a salvage
+   * run's title (from the source `componentId`) and the name/img fallback for a
+   * salvage created-result that captured neither. Returns null when the system or
+   * component cannot be resolved (the Journal then falls back to the raw id + default
+   * image, or — for a result — the uuid resolution / bare componentId).
+   * @private
+   */
+  _resolveJournalComponent(systemId, componentId) {
+    if (!systemId || !componentId) return null;
+    const system = this.craftingSystemManager?.getSystem(systemId);
+    const component = (system?.components || []).find((entry) => entry?.id === componentId);
+    return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 
   /**
@@ -2217,7 +2386,20 @@ function bindFabricateGlobal() {
     if (!system) throw new Error(`System "${systemId}" not found`);
     const recipes = recipeManager.getRecipes({ craftingSystemId: systemId }).map(r => r.toJSON());
     const version = game.modules?.get('fabricate')?.version || '0.0.0';
-    return CraftingSystemExporter.buildExportPayload(system, recipes, version);
+    // Gathering authoring rides along, mirroring adminStore.exportSystem: the FULL
+    // global environment array (the exporter filters to this system) plus the whole
+    // gatheringConfig setting (the exporter slices this system's block + shared
+    // vocabularies). Passing three args here dropped both, making the public-API
+    // export lossy versus the import path (issue #642).
+    const gatheringEnvironments = fabricate.gatheringEnvironmentStore?.list?.() ?? [];
+    const gatheringConfig = getSetting(SETTING_KEYS.GATHERING_CONFIG) || {};
+    return CraftingSystemExporter.buildExportPayload(
+      system,
+      recipes,
+      version,
+      gatheringEnvironments,
+      gatheringConfig
+    );
   };
 
   game.fabricate.importSystemFromFile = async (file, options = {}) => {
@@ -2600,6 +2782,33 @@ async function runInteractableMarkerSync() {
 Hooks.on('updateWorldTime', (worldTime) => {
   void processFabricateWorldTime(worldTime);
 });
+
+// Cross-client run-cache coherence (issues 733 + 739): the run managers cache an
+// actor's runs in memory and never learn about a write another client (or the
+// primary-GM world-time resume) made to the actor's run flags. `updateActor` fires on
+// every client when the synced document lands — key-filtered to the run-container flag
+// paths (updateActor also fires on every HP tick, so the filter is load-bearing) — so
+// we drop the stale cache and the next read reflects the persisted document. Firing on
+// the origin client too is harmless: its next read simply re-reads the live flag.
+Hooks.on('updateActor', (actor, changes) => {
+  invalidateRunCachesForActorUpdate(actor, changes);
+});
+
+function invalidateRunCachesForActorUpdate(actor, changes) {
+  if (!actor?.id) return;
+  const changed = runContainersChanged(changes, foundry.utils.hasProperty);
+  if (changed.length === 0) return;
+  // The crafting/salvage caches are keyed by `actor.id`; the gathering cache is keyed
+  // by the actor uuid (its `actorKey`), so pass each manager the key it stores under.
+  const invalidators = {
+    crafting: () => fabricate.craftingRunManager?.invalidateCache(actor.id),
+    salvage: () => fabricate.salvageRunManager?.invalidateCache(actor.id),
+    gathering: () => fabricate.gatheringRunManager?.invalidateCache(actor.uuid ?? actor.id),
+  };
+  for (const key of changed) {
+    invalidators[key]?.();
+  }
+}
 
 // GM-only scene-control button (Phase 7): adds a Fabricate control group whose
 // single button launches the Interactable browser app. Foundry V13 passes

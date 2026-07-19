@@ -27,7 +27,6 @@ export const SETTING_KEYS = Object.freeze({
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
-  RECENTLY_CRAFTED: 'recentlyCrafted',
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
@@ -188,7 +187,24 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
     name: 'Progressive Result Order Preferences',
-    scope: 'client',
+    // `user` scope (issue 651), NOT `client`: a player's chosen stage order is a standing
+    // preference that must reach them on any device they open this world from, rather
+    // than sit in one browser's localStorage. This is per user PER WORLD (the same player
+    // in a second world gets a fresh order) — never describe it as following the account,
+    // which is wrong for `user` scope. Note also that `set` is now an async, replicated
+    // document write that can reject, not a synchronous localStorage write.
+    //
+    // The flip needed no data migration, and the reason is NOT "nothing reads it" —
+    // that would not imply absence. The real reason: NO WRITER EXISTED before this
+    // change introduced one. The scope flip and the first real writer,
+    // `setProgressiveResultOrder`, landed in the same commit, so no stored value
+    // predated it: until then the only `setSetting` call for this key lived in
+    // `cleanupStalePreferences`, which fires only when `changed` is true, which
+    // required entries nothing created, so the map stayed its `{}` default. Foundry
+    // also has no scope-migration facility (`ClientSettings#get` dispatches on scope
+    // at read time), so any pre-existing localStorage key is orphaned in place —
+    // never read, never deleted, never an error.
+    scope: 'user',
     config: false,
     type: Object,
     default: {},
@@ -202,13 +218,6 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.FAVOURITE_RECIPES]: {
     name: 'Favourite Recipes',
-    scope: 'client',
-    config: false,
-    type: Array,
-    default: [],
-  },
-  [SETTING_KEYS.RECENTLY_CRAFTED]: {
-    name: 'Recently Crafted Recipes',
     scope: 'client',
     config: false,
     type: Array,

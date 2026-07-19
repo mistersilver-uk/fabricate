@@ -417,14 +417,38 @@ export class AlchemyListingBuilder {
     if (!Array.isArray(sets) || sets.length !== 1) return null;
     const set = sets[0];
     const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
-    if (groups.length > 0) return null;
-    const resolved = this._resolveEssenceList(set?.essences, system);
+
+    // Legacy shape (back-compat read): no ingredient groups + a per-set essences map.
+    if (groups.length === 0) {
+      const resolved = this._resolveEssenceList(set?.essences, system);
+      return resolved.length > 0 ? resolved : null;
+    }
+
+    // First-class shape (issue 649): an essence-only set is one whose EVERY group is a
+    // SINGLE-OPTION essence group (exactly what the 1.17.0 migration produces). A mixed
+    // set, or a group with an OR of essences, cannot be verified client-side, so it
+    // fails safe to null (the store then offers no auto-fill).
+    const essenceMap = {};
+    for (const group of groups) {
+      const options = Array.isArray(group?.options) ? group.options : [];
+      if (options.length !== 1 || options[0]?.match?.type !== 'essence') return null;
+      const match = options[0].match;
+      const id = String(match.essenceId || '').trim();
+      const amount = Number(match.amount) || 0;
+      if (id && amount > 0) essenceMap[id] = Math.max(essenceMap[id] || 0, amount);
+    }
+    // Fold any legacy per-set map entries (transitional).
+    for (const [id, qty] of Object.entries(set?.essences || {})) {
+      const amount = Number(qty) || 0;
+      if (amount > 0) essenceMap[id] = Math.max(essenceMap[id] || 0, amount);
+    }
+    const resolved = this._resolveEssenceList(essenceMap, system);
     return resolved.length > 0 ? resolved : null;
   }
 
   _projectSet(set, recipe, system, components) {
     const groups = (Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []).map((group) =>
-      this._projectGroup(group, components)
+      this._projectGroup(group, components, system)
     );
     const essences = this._projectEssences(set, system);
     return {
@@ -435,12 +459,21 @@ export class AlchemyListingBuilder {
     };
   }
 
-  _projectGroup(group, components) {
+  _projectGroup(group, components, system = null) {
     const options = (Array.isArray(group?.options) ? group.options : []).map((option) => {
       const componentId = this._optionComponentId(option);
       const component = componentId
         ? components.find((candidate) => candidate.id === componentId)
         : null;
+      // An essence-type ingredient option (componentId is null) resolves to the
+      // essence's NAME + ICON from the system's essence definitions, and its
+      // display quantity is the required essence AMOUNT (`match.amount`), NOT the
+      // per-option quantity — the raw essence id is never player-facing. The
+      // component path is unchanged (name from the component, quantity from the
+      // option).
+      if (!component && option?.match?.type === 'essence') {
+        return this._projectEssenceOption(option, system);
+      }
       return {
         componentId: stringOrNull(componentId),
         name: component ? stringOrEmpty(component.name) : this._optionLabel(option),
@@ -451,6 +484,27 @@ export class AlchemyListingBuilder {
     return { options };
   }
 
+  /**
+   * Project an essence-type ingredient option into the same display shape a
+   * component option uses, resolving the essence's NAME + ICON against the
+   * system's `essenceDefinitions` (falling back to the raw id only when no
+   * definition exists) and surfacing the required essence AMOUNT as `quantity`.
+   */
+  _projectEssenceOption(option, system) {
+    const match = option?.match ?? {};
+    const essenceId = String(match.essenceId || '').trim();
+    const defs = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const def = defs.find((candidate) => candidate.id === essenceId) ?? null;
+    return {
+      componentId: null,
+      essenceId: stringOrNull(essenceId),
+      name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
+      img: null,
+      icon: stringOrNull(def?.icon),
+      quantity: Math.max(1, Number(match.amount) || 1),
+    };
+  }
+
   _optionComponentId(option) {
     return option?.match?.componentId ?? option?.componentId ?? null;
   }
@@ -458,6 +512,10 @@ export class AlchemyListingBuilder {
   _optionLabel(option) {
     const tags = option?.match?.tags;
     if (Array.isArray(tags) && tags.length > 0) return tags.join(', ');
+    if (option?.match?.type === 'essence') {
+      const id = String(option.match.essenceId || '').trim();
+      if (id) return id;
+    }
     return this.localize('FABRICATE.Labels.UnknownComponent');
   }
 

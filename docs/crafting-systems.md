@@ -34,13 +34,60 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 
 ### Tags And Categories
 
-Custom recipe categories organize recipe browsing and authoring, and item tags allow component labeling plus tag-based ingredient matching.
+The **Tags & Categories** screen holds three separate vocabularies for the selected system: recipe categories, component categories, and item tags.
+Each vocabulary has its own tab, so you work on one at a time.
+Each tab shows a count of its custom entries, its own search box, and an add form that checks your entry as you type.
+As you type, the add form tells you whether the name is ready to add, already taken, or reserved, and for a tag it previews the lowercase text that will be stored.
+
+A panel on the right of the screen gives an at-a-glance count of each vocabulary and the total number of references across all three.
+It also carries a **Reference-safe by default** note, because removing a referenced entry reassigns or strips the records that use it rather than leaving them pointing at something that no longer exists.
+
+#### Recipe categories
+
+Custom recipe categories organize recipe browsing and authoring.
 The reserved **General** recipe category is always present and is not stored in the custom category list.
+Each recipe category can carry an icon.
+Set it from the **Icon** field when you add the category, or change it later from the icon button on the category's row.
 
 In the player recipe browser, each recipe that belongs to a custom category shows that category as a small label on its row.
 Recipes in the reserved **General** category show no label, so the default bucket does not tag every row.
 A **Category** filter, placed above the crafting-system filter, lets players narrow the list to a single category.
 The filter offers only the categories that appear in the player's visible recipes, sorted alphabetically with **General** pinned last, and its default **All categories** option shows the full list.
+
+Removing a custom recipe category is reference-safe.
+Fabricate asks you to confirm on the row and tells you how many recipes will be reassigned to **General**.
+Confirming reassigns those recipes to **General** so none is left pointing at a category that no longer exists.
+
+#### Component categories
+
+Component categories group your components in the component browser.
+They are managed in the **Component categories** section of the same screen, and they are a **separate vocabulary from recipe categories**.
+The two never mix.
+A component category such as **Reagent** is never offered as a recipe category, and a recipe category is never offered as a component category.
+Keeping them apart is deliberate, so that adding a way to group your components does not add clutter to the recipe browser your players use.
+
+Add a category by typing a name and clicking **Add component category**.
+Each component category can also carry an icon, set from the **Icon** field when you add it or changed later from its row.
+The reserved **General** category is always available and is not stored in your custom list, so you cannot add or remove it.
+Every component belongs to exactly one category, and a component you have never categorised is in **General**.
+There is no uncategorised state.
+
+Removing a custom component category is reference-safe.
+Fabricate asks you to confirm on the row and tells you how many components will be reassigned to **General**.
+Confirming moves those components to **General** rather than leaving them pointing at a category that no longer exists.
+
+#### Item tags
+
+Item tags allow component labeling plus tag-based ingredient matching.
+Tags are many-valued, so a component can carry as many as you like.
+Tags are always stored in lowercase, so the add form previews the exact text it will save.
+Tags are assigned to components in the component editor only.
+They are not shown on component browser rows and they do not filter the browser, because grouping is what categories are for.
+
+A tag's reference count on this screen includes both the components that carry it and the recipe ingredients that filter on it.
+Removing a tag is reference-safe.
+Fabricate asks you to confirm on the row and tells you how many references will lose the tag.
+Confirming strips the tag from every component that carries it and from every recipe ingredient that filters on it, so nothing is left pointing at a tag that no longer exists.
 
 ### Feature Toggles
 
@@ -51,10 +98,11 @@ Most optional features are off by default and must be explicitly enabled by a GM
 
 | Feature             | Default | Description                                                                                                                                               |
 |:--------------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Salvage             | On      | Enable component salvage, its check configuration, and the player Salvage tab in the Inventory inspector. Turning it off preserves whatever salvage you have already authored |
 | Essences            | Off     | Enable the essences system for abstract ingredient properties                                                                                             |
 | Property macros     | Off     | Allow result items to have their properties set by a macro                                                                                                |
 | Effect transfer     | Off     | Transfer active effects from essence source items to crafted results                                                                                      |
-| Multi-step recipes  | Off     | Allow recipes with multiple sequential steps                                                                                                              |
+| Multi-step recipes  | Off     | Allow recipes with multiple sequential steps. Turning it off keeps any multi-step recipes you have authored and collapses each one into a single combined action that produces its final results, until you turn it back on |
 | Gathering           | Off     | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -63,7 +111,7 @@ Toggle optional features in the **Features** card on the System tab of the Craft
 Each toggle takes effect immediately for all future crafting attempts in that system.
 
 You set the recipe and salvage resolution modes on the **Settings** page of the **Crafting** menu, not on the main System settings page.
-The Crafting menu is an experimental feature, so these cards are reachable only when **Experimental Features** is turned on for the world.
+The Crafting menu is always available for every crafting system.
 See [The Crafting Menu](#the-crafting-menu).
 
 Changing the **recipe resolution mode** migrates your recipes to the new mode wherever it can, instead of deleting them all.
@@ -117,6 +165,9 @@ Fabricate automatically posts a chat message to the table after every crafting o
 - Failure reason
 - Any ingredients consumed or tools broken as part of the failure
 
+Both success and failure messages show the **rolled check total** on its own row when a check ran.
+A guaranteed craft or salvage that needs no roll omits the row, because there is no total to report.
+
 Chat messages appear as if spoken by the crafting actor.
 
 **When chat output does not fire.** Chat messages are only posted for craft attempts that reach the engine's resolution step.
@@ -140,7 +191,7 @@ See [Effect Transfer]({% link effect-transfer.md %}) for how the feature is enab
 
 Recipe visibility controls which players can see and access recipes through the visibility service and planned player Crafting UI.
 You configure this per crafting system in the **Recipe Visibility** card on the **Settings** page of the **Crafting** menu.
-The Crafting menu is an experimental feature, so this card is reachable only when **Experimental Features** is turned on for the world.
+The Crafting menu is always available for every crafting system.
 See [The Crafting Menu](#the-crafting-menu).
 
 Each system uses one of four visibility modes:
@@ -233,17 +284,16 @@ Nothing is permanently disabled behind the scenes.
 {: .gm }
 > The Crafting Admin panel is GM-only.
 
-The **Crafting** menu is an experimental grouping of the recipe-focused sections in the Crafting Admin panel.
-It only appears when **Experimental Features** is turned on for the world in Fabricate's module settings.
-While it is off, the panel's left menu shows **Recipes** as a disabled **Soon** item and does not show the Crafting group or Books & Scrolls.
+The **Crafting** menu groups the recipe-focused sections of the Crafting Admin panel.
+It is always available.
+Whenever a crafting system is selected, the panel's left menu shows an expandable **Crafting** group, in the same style as the **Gathering** group.
 
-When Experimental Features is on, that single entry becomes an expandable **Crafting** group in the left menu, in the same style as the **Gathering** group.
 Expand it to reveal its sections.
 **Settings** and **Recipes** are always present, and the system's [visibility mode](#recipe-visibility) decides which of the other two sections appear.
 
 - **Settings** hosts the system-level crafting rules: the recipe resolution mode, the salvage resolution mode, and the **Recipe Visibility** card.
   These cards used to live on the System settings page and moved here.
-  Because the whole Crafting group is experimental, they are reachable only while Experimental Features is on.
+  They are reachable for every crafting system.
 - **Recipes** is the existing recipe browser and editor.
 - **Access** appears only in **Restricted** visibility mode.
   It is where you grant individual recipes to specific characters and players.
@@ -294,11 +344,11 @@ It runs while Fabricate starts up, before the module is ready for use.
 |:-------------------------------------|:------------------------------------------------------------------------------------------------------------|
 | Last viewed system in GM admin       | Cleared if the remembered system is no longer one of the current crafting systems                           |
 | Last selected gathering actor        | Cleared when the remembered actor no longer exists or is no longer selectable by the current user           |
-| Progressive result order preferences | Any entry for a recipe that no longer exists is removed                                                      |
+| Progressive result order preferences | Any entry for a recipe or a salvageable component that no longer exists is removed                           |
 
 ### Why this matters
 
-If you delete a crafting system or recipe while a player has a session open in another browser tab, their browser may still hold preferences pointing to things that no longer exist.
+If you delete a crafting system, recipe, or component while a player has a session open in another browser tab, their saved preferences may still point to things that no longer exist.
 The same can happen after restoring a world from a backup.
 The cleanup pass on the next load prevents stale references from causing unexpected behaviour in the crafting UI.
 
@@ -388,12 +438,45 @@ If the folder contains no Item documents, a notification says so and nothing is 
 > Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row.
 If your Foundry version does not support this drag shape, use single-item drops instead, or import the pack through the [API]({% link api/system-manager.md %}).
 
+### Browsing Components
+
+The **Items** tab lists the system's components as a single grouped list.
+Each row shows the component's name and a short description line.
+
+The toolbar above the list gives you:
+
+- a **Category** filter, defaulting to **All categories**
+- an essence filter, defaulting to **All essences**
+- a **Group by category** switch, on by default
+- a **Sort by** control offering **Name**, **Category**, **Essences**, and **Salvage**, with a button to flip between ascending and descending
+
+While **Group by category** is on, the list is split into a heading per category with a count of the components in it, and you can collapse a group you are not working on.
+The reserved **General** category is always shown last, because it is the catch-all rather than a category you chose.
+Long lists are paged, and the count above the list tells you which components you are looking at, such as **1–25 of 60**.
+
+Your filters, sort, grouping, and page survive opening a component and coming back, so working through a long list does not reset your place each time.
+
 ### Editing Components
 
 Open a component in the **Items** tab to edit it.
-The editor lets you change a component's tags, essences, and salvage setup, and replace its linked source item from the right-hand inspector.
-When the system's recipe resolution mode is Progressive, the inspector also shows a **Progressive difficulty** card for setting the value spent against the crafting roll.
+The editor is a single scrolling page rather than a form with a side panel.
+**Back** sits next to **Save** at the top, so leaving and saving are in the same place.
+If you leave with unsaved changes, Fabricate asks you to confirm first.
+
+The page starts with an **Identity** strip carrying the component's icon, name, and description.
+When a component is backed by a Foundry item, its name, image, and description follow that item and cannot be typed here.
+The identity strip is also where you manage that link:
+
+- drop a Foundry item onto the source area to replace the linked item
+- click the source item's name to open its sheet
+- use the **Source actions** menu for **Copy source UUID** and **Unlink Source Item**
+
+Replacing or unlinking a source takes effect immediately and is not held until you press **Save**, unlike the rest of the page.
+
+Below the identity strip you set the component's **Category**, its tags, its essences, and its salvage setup.
+When the system's recipe resolution mode is Progressive, a **Progressive difficulty** card appears for setting the value spent against the crafting roll.
 See [Setting Component Difficulty]({% link recipes/progressive.md %}#setting-component-difficulty).
+For the salvage panel, see [Component Salvage]({% link salvage.md %}#component-salvage).
 
 ---
 
@@ -403,14 +486,24 @@ Systems can optionally require time or currency for crafting.
 
 ### Time Requirements
 
-When enabled, individual recipe steps can require an amount of time, given in minutes, hours, days, months, or years.
-The step is blocked until world time advances past the required duration.
+Time requirements let a recipe require an amount of time to craft, given in minutes, hours, days, months, or years.
+A single-step recipe carries one duration on its **Duration** card.
+Each step of a multi-step recipe can carry its own duration.
+While a duration is running, the step is blocked until world time advances past the required duration.
 
 Time gates are checked:
 
 - When a player tries to advance a step
 - Automatically when world time changes
 - On module startup
+
+Time requirements are on by default.
+You turn them on or off with the **Time requirements** toggle in the **Optional features** section of the system settings editor, next to the currency toggle.
+
+{: .note }
+> Fabricate shows the duration editors on a recipe only while time requirements are enabled for the system.
+> Turning them off later does not delete the durations you have already authored.
+> Each one stays visible as a read-only value, and a step no longer waits on time until you re-enable time requirements.
 
 ### Currency Requirements
 
@@ -419,6 +512,12 @@ Fabricate checks whether the crafting actor can afford the step before the craft
 If the actor cannot pay, the step is blocked and the craft is stopped before any ingredients are consumed.
 
 You configure currency in the system settings editor, in the **Currency units** card.
+
+{: .note }
+> The recipe editor offers to add a currency cost only while currency is enabled for the system and at least one unit is defined.
+> This keeps the editor from offering a cost the system cannot honour.
+> Turning currency off later does not delete the costs you have already authored.
+> Each one stays visible on its recipe, but becomes read-only and is marked **Currency off**, and it stays inactive until you re-enable currency.
 
 #### Choosing a spend strategy
 

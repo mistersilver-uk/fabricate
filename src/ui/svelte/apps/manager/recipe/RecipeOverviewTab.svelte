@@ -21,8 +21,10 @@
     normalizeRecipeCategory
   } from '../../../../../utils/recipeCategories.js';
   import { formatTimeRequirementCompact } from '../../../util/recipeDuration.js';
+  import ToggleCard from '../ToggleCard.svelte';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
+  import SegmentedControl from '../SegmentedControl.svelte';
 
   let {
     recipe = null,
@@ -57,6 +59,25 @@
     // unfinished.
     locked = false,
     onToggleLocked = () => {},
+    // Step mode, rehomed here from the deleted context rail (issue 676). Overview is
+    // where it belongs: the steps THEMSELVES are authored on this tab (RecipeStepsCard),
+    // and this control decides whether that card exists at all. `multiStepEnabled` is
+    // the SYSTEM feature (`features.multiStepRecipes`); the control also renders for a
+    // recipe that is ALREADY multi-step under a system whose feature was since turned
+    // off, which is the only way back to single-step.
+    multiStepEnabled = false,
+    // COLLAPSED chain (issue 710): the system's multi-step feature is off but this
+    // recipe still carries authored steps. Step authoring is gated read-only here (the
+    // steps are preserved, not editable and not reverted); the Results tab edits the
+    // chain's effective final-step results. Re-enabling the feature restores the full
+    // step editor with all data intact.
+    collapsed = false,
+    onEnterMultiStep = () => {},
+    onRevertToSingleStep = () => {},
+    // Whether the system applies time requirements (issue 714). When off, the
+    // single-step Duration card and the per-step duration editor are hidden.
+    // Defaults true so a caller that omits it keeps the pre-gate behaviour.
+    timeRequirementsEnabled = true,
     onUpdateRecipe = () => {},
     onAddStep = () => {},
     onReorderSteps = () => {},
@@ -67,6 +88,30 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  const STEP_MODE_OPTIONS = [
+    {
+      value: 'single',
+      icon: 'fas fa-square',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.SingleStep',
+      fallback: 'Single step'
+    },
+    {
+      value: 'multi',
+      icon: 'fas fa-list-ol',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.MultiStep',
+      fallback: 'Multi-step'
+    }
+  ];
+
+  // Reverting to single-step DISCARDS the per-step authoring, so the handler confirms
+  // before staging it — never call these unless the mode actually changes.
+  function selectStepMode(next) {
+    const multi = next === 'multi';
+    if (multi === isMultiStep) return;
+    if (multi) onEnterMultiStep();
+    else onRevertToSingleStep();
   }
 
   // Resolve the generic item-bag (an unset recipe icon) to the alchemical blueprint
@@ -187,56 +232,87 @@
        players but only a GM can craft it (recipe.locked) — it is unrelated to the image
        picker, which is always editable now that a recipe can belong to many books. -->
   <div class="manager-recipe-overview-status">
-    <div class={`manager-recipe-status-card is-enabled ${enabled ? 'is-on' : 'is-off'}`} data-recipe-section="enabled-status">
-      <span class="manager-recipe-status-icon" aria-hidden="true"><i class="fas fa-power-off"></i></span>
-      <div class="manager-recipe-status-copy">
-        <p class="manager-recipe-status-title">{text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}</p>
-        <p class="manager-recipe-status-sub manager-muted">{enableBlocked
-          ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedHint', 'Resolve the issues on the Validation tab before enabling.')
-          : text('FABRICATE.Admin.Manager.Recipe.EnabledSub', 'Craftable by players')}</p>
-      </div>
-      <button
-        type="button"
-        class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-        data-recipe-field="enabled"
-        aria-pressed={enabled}
-        disabled={saving || enableBlocked}
-        title={enableBlocked ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip', 'Resolve the issues on the Validation tab before enabling this recipe.') : undefined}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}
-        onclick={onToggleEnabled}
-      >
-        <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-      </button>
-    </div>
-    <div class={`manager-recipe-status-card is-locked ${locked ? 'is-on' : 'is-off'}`} data-recipe-section="locked-status">
-      <span class="manager-recipe-status-icon" aria-hidden="true"><i class="fas fa-lock"></i></span>
-      <div class="manager-recipe-status-copy">
-        <p class="manager-recipe-status-title">{text('FABRICATE.Admin.Manager.Recipe.Locked.Title', 'Locked')}</p>
-        <p class="manager-recipe-status-sub manager-muted" data-recipe-locked-state>{text('FABRICATE.Admin.Manager.Recipe.Locked.Sub', 'Visible but GM-only to craft')}</p>
-      </div>
-      <button
-        type="button"
-        class={`manager-status-toggle ${locked ? 'is-on' : 'is-off'}`}
-        data-recipe-field="locked"
-        aria-pressed={locked}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.Locked.Toggle', 'Lock this recipe')}
-        disabled={saving}
-        onclick={() => onToggleLocked(!locked)}
-      >
-        <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-      </button>
-    </div>
+    <ToggleCard
+      variant="is-enabled"
+      section="enabled-status"
+      field="enabled"
+      icon="fas fa-power-off"
+      title={text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}
+      sub={enableBlocked
+        ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedHint', 'Resolve the issues on the Validation tab before enabling.')
+        : text('FABRICATE.Admin.Manager.Recipe.EnabledSub', 'Craftable by players')}
+      on={enabled}
+      disabled={saving || enableBlocked}
+      toggleTitle={enableBlocked
+        ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip', 'Resolve the issues on the Validation tab before enabling this recipe.')
+        : ''}
+      onToggle={() => onToggleEnabled()}
+    />
+    <ToggleCard
+      variant="is-locked"
+      section="locked-status"
+      field="locked"
+      icon="fas fa-lock"
+      title={text('FABRICATE.Admin.Manager.Recipe.Locked.Title', 'Locked')}
+      sub={text('FABRICATE.Admin.Manager.Recipe.Locked.Sub', 'Visible but GM-only to craft')}
+      subAttr="data-recipe-locked-state"
+      on={locked}
+      disabled={saving}
+      toggleLabel={text('FABRICATE.Admin.Manager.Recipe.Locked.Toggle', 'Lock this recipe')}
+      onToggle={onToggleLocked}
+    />
   </div>
 
-  {#if isMultiStep}
+  {#if (multiStepEnabled || isMultiStep) && !collapsed}
+    <!-- Step mode (issue 676): rehomed from the deleted context rail, which was the ONLY
+         surface carrying it — `onEnterMultiStep`/`onRevertToSingleStep` had no other
+         consumer in `src/`, so deleting the rail without this would have made multi-step
+         recipes unreachable for every system with the feature on. It sits directly above
+         the surface it governs: the card below is either the steps list or the recipe's
+         single Duration. Hidden while collapsed (issue 710): a collapsed recipe is NOT
+         reverted — its steps are preserved and restored when the feature is re-enabled. -->
+    <section class="manager-recipe-step-mode-card" data-recipe-section="recipe-step-mode">
+      <div>
+        <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.StepModeHint', 'A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.')}</p>
+      </div>
+      <SegmentedControl
+        options={STEP_MODE_OPTIONS}
+        value={isMultiStep ? 'multi' : 'single'}
+        groupName="manager-recipe-step-mode"
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
+        optionDataAttr="data-recipe-step-mode-option"
+        onChange={selectStepMode}
+      />
+    </section>
+  {/if}
+
+  {#if collapsed}
+    <!-- Collapsed chain (issue 710): step authoring is gated read-only. The steps are
+         preserved verbatim and listed here for reference; the chain's effective output
+         is edited on the Results tab. Turning multi-step recipes back on for this
+         system restores the full step editor with every step intact. -->
+    <section class="manager-recipe-duration-card manager-recipe-collapsed-steps-card" data-recipe-section="collapsed-steps">
+      <div>
+        <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsTitle', 'Steps (multi-step disabled)')}</h3>
+        <p class="manager-muted" data-recipe-collapsed-note>{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote', 'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.')}</p>
+      </div>
+      <ol class="manager-recipe-collapsed-step-list">
+        {#each recipe?.steps || [] as step, index (step.id ?? index)}
+          <li class="manager-recipe-collapsed-step">{step.name || `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${index + 1}`}</li>
+        {/each}
+      </ol>
+    </section>
+  {:else if isMultiStep}
     <RecipeStepsCard
       steps={recipe?.steps || []}
+      {timeRequirementsEnabled}
       {onAddStep}
       {onReorderSteps}
       {onUpdateStep}
       {onDeleteStep}
     />
-  {:else}
+  {:else if timeRequirementsEnabled}
     <section class="manager-recipe-duration-card" data-recipe-section="duration">
       <div class="manager-recipe-duration-card-head">
         <div>

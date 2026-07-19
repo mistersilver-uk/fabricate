@@ -1,7 +1,7 @@
 name: "Foundry Integration Smoke Test"
 
 on:
-  workflow_call:                  # Reusable workflow (called by beta.yml, team-a-research.yml)
+  workflow_call:                  # Reusable workflow (called by beta.yml)
     inputs:
       require_credentials:
         # When true, the job FAILS (rather than skipping green) if Foundry credentials are unset.
@@ -43,7 +43,7 @@ permissions:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20           # Full pipeline: up + smoke + down
+    timeout-minutes: 29           # Full pipeline: up + smoke + down (22-min run watchdog + cold setup/teardown)
     env:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
@@ -56,6 +56,10 @@ jobs:
       # screenshot budget. Full screenshot regeneration runs in `full`
       # (local + the scheduled visual-regression workflow).
       FOUNDRY_SMOKE_PROFILE: rc
+      # Hosted-runner rc runs have been observed at ~1100s (phase-C settings persists
+      # dominate on slow runners); the 18-min script default watchdog fired on an
+      # otherwise-passing run. Keep CI headroom above observed peaks.
+      FOUNDRY_RUN_TIMEOUT_MS: '1320000'
 
     steps:
       - uses: actions/checkout@v6

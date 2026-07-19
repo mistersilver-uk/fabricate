@@ -55,7 +55,7 @@
         {#each items as item, index (item.name + index)}
           <li class="crafting-roll-award">
             <CraftingThumb src={item.img} alt="" size={24} />
-            <span>{item.name}</span>
+            <span class="crafting-roll-award-name">{item.name}</span>
             <span class="crafting-roll-award-qty">×{item.qty ?? 1}</span>
           </li>
         {/each}
@@ -128,6 +128,8 @@
   }
 
   .crafting-roll-award {
+    /* Cap to the column so a long name ellipsizes instead of widening/wrapping the pill. */
+    max-width: 100%;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -136,6 +138,18 @@
     border-radius: 999px;
     background: var(--fab-surface);
     font-size: 12px;
+  }
+
+  /* Every pill is one line tall regardless of name length: the 24px thumb never varies,
+     so the ONLY thing that changed a pill's height was a long name WRAPPING to a second
+     line. Pin the name to a single ellipsized line so all pills share the thumb-driven
+     height (mirrors the salvage summary fix, issue 687). `min-width:0` lets the flex item
+     shrink far enough for the ellipsis to engage. */
+  .crafting-roll-award-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .crafting-roll-award-qty {

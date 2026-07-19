@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import {
   migrateRecipeForModeChange,
   classifyModeChange,
-  chooseSeedProvider,
 } from '../src/migration/migrateRecipeForModeChange.js';
 
 const MODES = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
@@ -52,17 +51,6 @@ function multiStep(overrides = {}) {
 }
 
 const SYSTEM_NO_CHECK = { id: 'sys-1' };
-// alchemy's check provider routes by the SIMPLE check outcome, so a usable alchemy
-// seed needs `simple.rollFormula` authored.
-const SYSTEM_WITH_CHECK = {
-  id: 'sys-1',
-  features: { craftingChecks: true },
-  craftingCheck: {
-    enabled: true,
-    routed: { rollFormula: '1d20' },
-    simple: { rollFormula: '1d20' },
-  },
-};
 
 // --- Into a routed mode: never seeds a provider ------------------------------
 
@@ -263,26 +251,9 @@ test('every from→to mode pair returns a valid outcome', () => {
     for (const to of MODES) {
       const result = classifyModeChange(oneByOne(), from, to, SYSTEM_NO_CHECK);
       assert.ok(
-        ['lossless', 'seeded', 'cleared', 'carry', 'delete'].includes(result.outcome),
+        ['lossless', 'cleared', 'carry', 'delete'].includes(result.outcome),
         `unexpected outcome for ${from}→${to}: ${result.outcome}`
       );
     }
   }
-});
-
-// --- chooseSeedProvider (exported for the recipe editor's alchemy Complex seed) --
-
-test('chooseSeedProvider: alchemy keys on the simple formula', () => {
-  assert.equal(chooseSeedProvider(SYSTEM_WITH_CHECK, 'alchemy'), 'check');
-  assert.equal(
-    chooseSeedProvider({ craftingCheck: { simple: { rollFormula: '' } } }, 'alchemy'),
-    'ingredientSet'
-  );
-});
-
-test('chooseSeedProvider: alchemy with a routed-only formula returns ingredientSet', () => {
-  // alchemy's check provider routes by the SIMPLE outcome, so a routed-only formula
-  // is NOT usable for an alchemy seed.
-  const system = { craftingCheck: { routed: { rollFormula: '1d20' }, simple: { rollFormula: '' } } };
-  assert.equal(chooseSeedProvider(system, 'alchemy'), 'ingredientSet');
 });

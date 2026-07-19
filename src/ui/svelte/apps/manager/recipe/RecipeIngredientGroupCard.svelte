@@ -9,29 +9,19 @@
 
   The add-affordances diverge by shape (issue 643): a BARE single-alternative row
   keeps ONE compact "or…" popover inline at its right end, while a multi-alternative
-  BOX carries FOUR explicit dashed add-buttons at its foot (Add component / tag /
-  cost / essence). Both drive the same append semantics. The popover offers what
-  Fabricate can actually honour, under TWO headings — because the four choices do
-  not all mean the same thing:
+  BOX carries explicit dashed add-buttons at its foot (Add component / tag / cost /
+  essence). Both drive the same append semantics: every choice is a real OR
+  ALTERNATIVE appended to THIS requirement for the row's own picker to fill in — since
+  essence is now a first-class ingredient match type (issue 649), "component OR
+  essence" is genuinely authorable and the popover is a single flat "Accept instead"
+  list rather than the old two-heading Accept-instead / Require-as-well split.
 
-   - "Accept instead" — Component / Tag / Currency: the THREE real ingredient match
-     types (`src/models/match/matchTypes.js`), each appended to THIS requirement as a
-     new OR alternative for the row's own picker to fill in.
-   - "Require as well" — Essence: there is NO essence match type. An essence
-     requirement is a property of the ingredient SET (`IngredientSet.essences`), an
-     AND requirement, not an OR alternative — so it sits under its own heading and
-     bubbles up to the set rather than being mislabelled as an alternative. It is
-     offered only while the set can still take one (`addableEssenceOptions`): once the
-     set requires every essence the system defines, the choice would do nothing, and an
-     entry that no-ops on click is worse than an absent entry.
-
-  The split is an ACCESSIBILITY contract, not decoration: the trigger, dialog and
-  search field therefore carry a NEUTRAL accessible name. Naming the whole control
-  "Accept instead" and then handing a screen-reader user a control that adds an AND
-  requirement would be a lie in exactly the place the visible headings prevent one.
+  Currency appears only when the system ENABLES currency and configures units; Essence
+  appears only when the system enables essences at all (`essenceOptions.length > 0`) — an
+  OR essence may repeat across groups, so it is NOT gated on system-minus-already-required.
 
   The `data-recipe-add` token family (`alternative-component` / `alternative-tag` /
-  `alternative-essence` / `alternative-currency`) is PRESERVED on the four choices.
+  `alternative-essence` / `alternative-currency`) is PRESERVED on the choices.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -43,16 +33,16 @@
     componentOptions = [],
     itemTags = [],
     currencyUnits = [],
-    // The essences the owning SET can still be given — the system's essences MINUS the
-    // ones it already requires, computed by the set (which owns `essences`). Non-empty
-    // is what unlocks the popover's per-SET essence choice, which is bubbled up rather
-    // than appended here. Empty means the set already requires every essence the system
-    // has, so the choice would be a no-op and is not offered at all: a menu entry that
-    // does nothing when clicked is worse than an absent one.
-    addableEssenceOptions = [],
+    // Whether the system's currency feature is enabled. Preset units are seeded even for a
+    // disabled system, so the currency add-affordances gate on this flag too; existing
+    // currency alternatives still render (read-only) when it is false.
+    currencyEnabled = true,
+    // The system's essences ({ id, name, icon }). Non-empty unlocks the essence OR
+    // alternative (an essence match option appended to THIS requirement). Empty means
+    // the system has no essences, so the choice is not offered at all.
+    essenceOptions = [],
     onChange = () => {},
-    onRemove = () => {},
-    onAddEssenceRequirement = () => {}
+    onRemove = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -62,70 +52,50 @@
 
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
   const hasAlternatives = $derived(options.length >= 2);
+  const hasEssences = $derived((essenceOptions || []).length > 0);
+  // A currency alternative is authorable only when the feature is enabled AND units exist.
+  const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
 
-  // The NEUTRAL accessible name for the trigger, the dialog and its search field. The
-  // menu's two headings carry the meaning; naming the control after only one of them
-  // would tell a screen-reader user "Accept instead" and then hand them the essence
-  // choice, which adds an AND requirement to the set.
+  // The accessible name for the trigger, the dialog and its search field. The menu is a
+  // single flat "Accept instead" list of real OR alternatives (issue 649).
   const orMenuLabel = $derived(
-    text('FABRICATE.Admin.Manager.Recipe.OrMenuLabel', 'Add an alternative or an extra requirement')
+    text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
   );
 
-  // The two headings. `accept-instead` holds the real OR alternatives; `require-as-well`
-  // holds the one choice that is an AND requirement on the owning SET.
-  const orMenuGroups = $derived([
-    {
-      id: 'accept-instead',
-      label: text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
-    },
-    ...((addableEssenceOptions || []).length > 0
-      ? [
-          {
-            id: 'require-as-well',
-            label: text('FABRICATE.Admin.Manager.Recipe.RequireAsWell', 'Require as well')
-          }
-        ]
-      : [])
-  ]);
-
-  // The four choices, each carrying its own `data-recipe-add` token and its heading.
-  // Currency appears only when the system configures units, and Essence only while the
-  // owning set can still take one — so the menu never offers a choice that the system
-  // cannot honour or that would do nothing.
+  // The flat "Accept instead" choices, each carrying its own `data-recipe-add` token.
+  // No option groups — a single ungrouped bucket (optionGroups: []) so SearchablePopover
+  // renders no lone heading. Currency appears only when the system configures units;
+  // essence only when the system enables essences.
   const orMenuOptions = $derived([
     {
       id: 'component',
-      group: 'accept-instead',
       addMarker: 'alternative-component',
       icon: 'fas fa-cube',
       label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')
     },
     {
       id: 'tags',
-      group: 'accept-instead',
       addMarker: 'alternative-tag',
       icon: 'fas fa-tags',
       label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')
     },
-    ...((currencyUnits || []).length > 0
+    ...(canAddCost
       ? [
           {
             id: 'currency',
-            group: 'accept-instead',
             addMarker: 'alternative-currency',
             icon: 'fa-solid fa-coins',
             label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')
           }
         ]
       : []),
-    ...((addableEssenceOptions || []).length > 0
+    ...(hasEssences
       ? [
           {
             id: 'essence',
-            group: 'require-as-well',
             addMarker: 'alternative-essence',
             icon: 'fas fa-flask-vial',
-            label: text('FABRICATE.Admin.Manager.Recipe.AddSetEssenceRequirement', 'Require an essence on this set')
+            label: text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence')
           }
         ]
       : [])
@@ -146,10 +116,15 @@
   }
 
   // A new alternative is born EMPTY (the row's own picker fills it in); a currency
-  // alternative takes the first configured unit so its amount input is usable at once.
+  // alternative takes the first configured unit and an essence alternative the first
+  // configured essence so their amount input is usable at once.
   function appendAlternative(type) {
     if (type === 'essence') {
-      onAddEssenceRequirement();
+      const firstEssence = (essenceOptions || [])[0]?.id || '';
+      onChange({
+        ...group,
+        options: [...options, { quantity: 1, match: { type: 'essence', essenceId: firstEssence, amount: 1 } }]
+      });
       return;
     }
     if (type === 'tags') {
@@ -174,13 +149,13 @@
 {#snippet orMenu()}
   <SearchablePopover
     options={orMenuOptions}
-    optionGroups={orMenuGroups}
+    optionGroups={[]}
     pickerClass="manager-recipe-or-picker"
     triggerClass="manager-chip manager-recipe-or-trigger"
     triggerIcon="fas fa-code-branch"
     triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
     triggerAriaLabel={orMenuLabel}
-    triggerTitle={text('FABRICATE.Admin.Manager.Recipe.OrTriggerHint', 'Accept another kind of ingredient in place of this one, or require an essence on the whole set.')}
+    triggerTitle={text('FABRICATE.Admin.Manager.Recipe.OrTriggerHint', 'Accept another kind of ingredient in place of this one.')}
     dialogAriaLabel={orMenuLabel}
     searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder', 'Search options...')}
     searchAriaLabel={orMenuLabel}
@@ -222,19 +197,21 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
+          {currencyEnabled}
+          {essenceOptions}
           canRemove={true}
           onChange={(nextOption) => updateOption(index, nextOption)}
           onRemove={() => removeOption(index)}
         />
       {/each}
     </div>
-    <!-- The multi-alternative box uses FOUR explicit dashed add-buttons (issue 643),
+    <!-- The multi-alternative box uses explicit dashed add-buttons (issue 643),
          modelled on the set-level add row, instead of the compact "or…" popover the
-         bare rows keep. They reuse the same append semantics: component/tag append an
-         OR member to THIS requirement, cost appends a currency member, and essence is
-         an AND requirement that bubbles to the owning SET. Currency shows only when the
-         system configures units, essence only while the set can still take one, and the
-         `data-recipe-add` marker family is preserved on each button. -->
+         bare rows keep. They reuse the same append semantics: each button appends a real
+         OR alternative to THIS requirement (component / tag / currency / essence).
+         Currency shows only when the system configures units, essence only when the
+         system enables essences, and the `data-recipe-add` marker family is preserved on
+         each button. -->
     <div class="manager-recipe-requirement-adds">
       <button
         type="button"
@@ -254,7 +231,7 @@
         <i class="fas fa-tags" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
       </button>
-      {#if (currencyUnits || []).length > 0}
+      {#if canAddCost}
         <button
           type="button"
           class="manager-button is-dashed"
@@ -265,7 +242,7 @@
           <span>{text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}</span>
         </button>
       {/if}
-      {#if (addableEssenceOptions || []).length > 0}
+      {#if hasEssences}
         <button
           type="button"
           class="manager-button is-dashed"
@@ -273,7 +250,7 @@
           onclick={() => appendAlternative('essence')}
         >
           <i class="fas fa-flask-vial" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence')}</span>
         </button>
       {/if}
     </div>
@@ -287,6 +264,8 @@
           {componentOptions}
           {itemTags}
           {currencyUnits}
+          {currencyEnabled}
+          {essenceOptions}
           canRemove={true}
           showRequiredTag={true}
           orControl={orMenu}

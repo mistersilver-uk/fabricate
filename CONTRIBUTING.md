@@ -574,8 +574,9 @@ The run walks several phases in order; if an earlier phase fails, later phases a
 - **Phase C** — create a crafting system + sample recipes.
 - **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step).
   **This is where most drift shows up** when manager markup changes.
-  After the default-selection capture it also re-themes the real manager via the `data-fabricate-theme` attribute (exactly as the theme setting's `applyFabricateTheme` onChange does) and captures `manager-theme-<themeId>` for every Fabricate theme, then restores the default.
+  After the default-selection capture it can also re-theme the real manager via the `data-fabricate-theme` attribute (exactly as the theme setting's `applyFabricateTheme` onChange does) and capture `manager-theme-<themeId>` for every Fabricate theme, then restore the default.
   These are real, Foundry-rendered themed captures — theme fidelity is not validated via hand-authored mocks.
+  The theme sweep (and the matching player-alchemy `player-alchemy-theme-<themeId>` sweep in Phase E) is OFF by default because those 14 frames are unasserted and are not mapped to any PR view; set `FOUNDRY_SMOKE_THEMES=1` (or pass `--themes` to `node scripts/foundry-test-run.mjs`) to regenerate them when auditing theme fidelity.
 - **Phase E** — API-driven crafting flow, then open the unified Fabricate shell (`#fabricate-app`) from the Craft Item and Gathering sidebar buttons and assert the four-tab left nav (`fabricate-app-shell` screenshot).
   The shared actor-selection top bar mounts with the shell; the phase waits for it to flip `[data-actor-bar-state]` from `loading` to `ready` before capturing.
   The full profile also walks staged player gathering screenshots: environment list, event inspection, ready attempt detail, post-attempt refresh, missing-tool block, timed-run ready and active states, blind gathering, realm-locked listing, and stacked narrow-window layout.
@@ -583,18 +584,33 @@ The run walks several phases in order; if an earlier phase fails, later phases a
 
 The former standalone player-facing Crafting and Gathering app phases (D2/D3/E2) and standalone Recipe Editor were removed when those surfaces were retired; both sidebar buttons now open the unified Fabricate window.
 
+The `full` profile also captures seven demonstration frames whose purpose is to show an in-flight PR's fix once it rebases, not to satisfy the screenshot gate (issue 752).
+Each is full-profile only, leaves the world as it found it, and rides an existing manager or player session.
+
+- `manager-experimental-off` — the selected-system rail with `fabricate.experimentalFeatures` disabled (the world-scoped flag is restored afterward).
+- `manager-checks-crafting-consumption` — the Checks → Crafting tab scrolled to the failure-consumption controls.
+- `manager-alchemy-settings` — the Crafting → Settings surface of the minimal "Smoke Alchemy Bench" alchemy-mode system seeded in Phase C.
+- `fabricate-journal-craft-detail` — the Journal with a crafting history run selected so the run-detail requirements card is visible.
+- `player-crafting-roll-result` — the crafting run summary's roll-result box (awarded pills and outcome) after a UI craft.
+- `chat-craft-card` — the chat sidebar clipped to the crafting result card posted by the Phase E craft.
+- `manager-tags-categories-tags-tab` — the Tags & Categories screen's Item tags rows (the three seeded tags).
+
 ### Test artifacts
 
 After any run (success or failure), results are written to `test-results/`:
 
 | File | Description |
 |------|-------------|
-| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], phaseTimings[] }` — pass/fail result, smoke profile, timings, and list of errors |
+| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], phaseTimings[], viewTimings[] }` — pass/fail result, smoke profile, timings, and list of errors |
 | `console.log` | Full browser console output captured during the test |
 | `screenshot-*.png` | Per-step screenshots captured by the selected profile |
 | `screenshot-failure.png` | Captured only when a step throws (last DOM state) |
 
 When debugging a smoke failure, read `summary.json` first: the failing step's `error` field plus the surrounding successful steps usually point straight at the broken selector.
+
+At the end of every run the harness prints a phase-timings table followed by a "Slowest views" table.
+The per-view timings record the wall-clock spent reaching each captured frame (elapsed time between the previous captured frame, or the current phase start, and this frame) and are also persisted to `summary.json` as `viewTimings[]`.
+Use the slowest-views list to target future harness speedups at the views that actually cost time.
 
 ### What the smoke test checks
 
@@ -619,14 +635,15 @@ The profile is selected by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>` on `n
 
 | Profile | When | Phases | Target |
 |---------|------|--------|--------|
-| `rc` | Release-candidate CI | Phase B → C → E (unified shell, one Gathering success, Healing Potion craft) → console-error check | < 20 min including cold setup |
+| `rc` | Release-candidate CI | Phase B → C → E (unified shell, one Gathering success, Healing Potion craft) → console-error check | < 25 min including cold setup |
 | `ci` | Deprecated alias for `rc` (removed after one release) | same as `rc` | same |
 | `full` (default) | Local and visual-regression runs | + Phase D0 (manager screenshots), extended Gathering states, non-GM redaction, no-selectable actors, Phase F (cleanup) | ~10–15 min locally |
 
 The `rc` profile captures a pinned screenshot budget (`world-loaded`, `fabricate-app-shell`, `post-craft`, `alara-post-craft-inventory`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run.
 
-The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`, default 15 minutes).
-On overrun, the run process is sent `SIGTERM` and the orchestrator proceeds to Docker teardown + artifact upload, so the 20-minute Actions budget can never preempt cleanup.
+The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`, default 18 minutes).
+The default keeps headroom over the observed rc run duration (~870-930s across all phases) so ordinary hosted-runner variance no longer trips the watchdog on an otherwise-passing smoke.
+On overrun, the run process is sent `SIGTERM` and the orchestrator proceeds to Docker teardown + artifact upload, so the 25-minute Actions budget can never preempt cleanup.
 Override locally if you need a longer or shorter cap:
 
 ```bash
@@ -909,55 +926,18 @@ Automatic calls publish only a newly-minted tag and never overwrite an existing 
 Note that `isNewerVersion('1.3.0', '1.3.0-rc.85') === false`, so the first public `v1.3.0` is not offered to any client still installed from a legacy `-rc.N` prerelease — that is expected, and those clients rejoin the public line through Foundry's manifest-rewrite offer.
 For the same reason, **do not delete the 179 existing `v*-rc.*` prereleases**: each one's assets bake `releases/download/v<ver>/module.json`, so deleting a prerelease 404s every client installed from it.
 
-### Codex workflows
-
-Codex GitHub Actions workflows are manual-only in this repository.
-Codex does not run automatically on `push`, `pull_request`, `pull_request_target`, `issue_comment`, `schedule`, or any other automatic trigger.
-
-Files:
-
-- `.github/workflows/team-a-research.yml`
-- `.github/workflows/team-b-backlog.yml`
-- `.github/workflows/codex-code-review.yml`
-
-Requirements:
-
-- Repository secret: `OPENAI_API_KEY`
-- Repository secret: `WORKFLOW_GH_TOKEN` — a GitHub token used by `team-b-backlog.yml` (and other agent workflows) to push the implementation branch, create the PR, manage issue/PR labels and comments, delete the branch on cleanup, and patch the PR body when publishing UI screenshots.
-The default `GITHUB_TOKEN` is insufficient because org policy blocks Actions from creating PRs.
-A **fine-grained, repo-scoped** token needs these repository permissions:
-  - **Contents: Read and write** — push commits/branches and delete refs.
-  - **Pull requests: Read and write** — create PRs, apply PR labels, read and patch the PR body.
-  - **Issues: Read and write** — edit issue labels and post issue comments.
-  - **Metadata: Read** — mandatory baseline (auto-selected).
-  - **Workflows: Read and write** — *only* if agent implementations may modify files under `.github/workflows/`; without it, any push that touches a workflow file is rejected.
-
-  The labels it applies (`agent-created`, `in-progress`, `agent-failed`, `screenshots-exempt`) must already exist in the repo.
-  This token grants no AWS access — S3 screenshot uploads authenticate separately via OIDC (see below).
-- AWS for S3 screenshot publishing: in CI, **OIDC only** (never static keys), via a **dedicated, least-privilege role** distinct from the module-release role.
-Repository variable `AWS_SCREENSHOTS_ROLE_TO_ASSUME` (the role ARN) plus the shared `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` variables and `permissions: id-token: write`.
-Local runs use the AWS default provider chain.
-See [Screenshot publishing infrastructure](#screenshot-publishing-infrastructure) for the exact IAM and bucket policies.
-
-Behavior:
-
-- `team-a-research.yml`: manual research and audit workflow
-- `team-b-backlog.yml`: manual backlog implementation workflow, optionally scoped to `workflow_dispatch.issue_number`
-- `codex-code-review.yml`: manual PR review workflow, scoped to `workflow_dispatch.pr_number`
-
-Use these workflows only when you explicitly want a Codex run and have available usage for it.
-
 ### Screenshot publishing infrastructure
 
 `npm run screenshots:ui:publish` uploads UI-PR screenshots to S3 under `pr-screenshots/<pr-number>/` and embeds the public object URLs in the PR body.
-In CI (`team-b-backlog.yml`) this authenticates via GitHub OIDC using a **dedicated, least-privilege IAM role** — deliberately separate from the module-release role so agent-driven workflows can never write or overwrite real release artifacts.
+Publishing now runs only locally (via the AWS default provider chain) — the workflow that published from CI has been removed; `pr-screenshots-cleanup.yml` still deletes the objects afterwards and authenticates via GitHub OIDC.
+That cleanup uses a **dedicated, least-privilege IAM role** — deliberately separate from the module-release role, so a screenshot workflow can never write or overwrite real release artifacts.
 
 Repository variables (role ARNs and bucket names are not secrets):
 
 - `AWS_SCREENSHOTS_ROLE_TO_ASSUME` — ARN of the dedicated screenshot role (below).
 - `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` — shared with the release workflow.
 
-**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the team-b backlog and PR-screenshots-cleanup workflows in this repo may assume it:
+**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the PR-screenshots-cleanup workflow in this repo may assume it:
 
 ```json
 {
@@ -972,10 +952,7 @@ Repository variables (role ARNs and bucket names are not secrets):
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           "token.actions.githubusercontent.com:repository": "mistersilver-uk/fabricate",
           "token.actions.githubusercontent.com:ref": "refs/heads/main",
-          "token.actions.githubusercontent.com:workflow": [
-            "Team B: Codex Backlog Processing Manual Only",
-            "PR screenshots cleanup"
-          ]
+          "token.actions.githubusercontent.com:workflow": ["PR screenshots cleanup"]
         },
         "StringLike": {
           "token.actions.githubusercontent.com:sub": [
@@ -989,8 +966,8 @@ Repository variables (role ARNs and bucket names are not secrets):
 }
 ```
 
-Do not use `token.actions.githubusercontent.com:job_workflow_ref` for these jobs.
-GitHub emits that claim for reusable workflow jobs, while both screenshot workflows here are normal repository workflows.
+Do not use `token.actions.githubusercontent.com:job_workflow_ref` for this job.
+GitHub emits that claim for reusable workflow jobs, while the screenshot cleanup workflow here is a normal repository workflow.
 The cleanup workflow uses `pull_request_target`, so its default `sub` is the pull-request subject (`repo:mistersilver-uk/fabricate:pull_request`) rather than the branch subject.
 
 **IAM role permission policy** (`PublishPrScreenshots`) — `pr-screenshots/*` only, including delete for cleanup:
@@ -1034,7 +1011,7 @@ A bucket **lifecycle rule** expiring the `pr-screenshots/` prefix after N days i
 (Set N comfortably above how long PRs stay open, or the images break while a PR is still under review.)
 
 These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots).
-Until the role/variable/bucket policy exist, the team-b publish step warns and the required `check-screenshots` gate fails closed until a maintainer publishes manually or applies the `screenshots-exempt` label.
+The required `check-screenshots` gate fails closed until a maintainer publishes the screenshots manually or applies the `screenshots-exempt` label.
 
 ## Release pipeline
 

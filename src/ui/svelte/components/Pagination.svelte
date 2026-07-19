@@ -8,7 +8,15 @@
     pageIndex = 0,
     pageSizeOptions = [10, 25, 50],
     onPageChange = () => {},
-    onPageSizeChange = () => {}
+    onPageSizeChange = () => {},
+    // Issue 675, opt-in and DEFAULT OFF so every manager surface renders unchanged.
+    // The player Inventory's grid is a browse surface whose footer is part of its
+    // frame: it states the size of what you are looking at ("Showing 1–18 of 18"),
+    // which is information a player wants BEFORE there is enough to page, and a footer
+    // that appears only past a threshold reads as a layout glitch rather than a
+    // control. Under it the summary and the per-page selector are always present, and
+    // the nav renders its (disabled) arrows rather than vanishing.
+    persistent = false
   } = $props();
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
@@ -19,8 +27,8 @@
   // picking a size that fits everything on one page would hide the only control to change
   // it back. The prev/next nav still only appears when there is more than one page.
   const minPageSize = $derived(pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize);
-  const showPagination = $derived(totalCount > minPageSize);
-  const showNav = $derived(totalPages > 1);
+  const showPagination = $derived(persistent || totalCount > minPageSize);
+  const showNav = $derived(persistent || totalPages > 1);
 
   function text(key, fallback) {
     const translated = localize(key);

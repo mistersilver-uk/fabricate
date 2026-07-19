@@ -31,8 +31,10 @@ function normalizeInteractableRef(ref) {
 
 /**
  * The unified Fabricate window: a single shared application with a full-height
- * left navigation (Crafting, Gathering, Journal, Inventory). Tab content is an
- * empty placeholder shell for now.
+ * left navigation (Crafting, Gathering, Journal, Inventory, and the conditional
+ * Alchemy tab). Each tab renders its implemented consumer surface; this class owns
+ * the active tab and wires the crafting, inventory, salvage, alchemy, and gathering
+ * service seams the tab views call.
  *
  * The Alchemy tab is conditional: it appears only when an enabled alchemy
  * crafting system has at least one recipe (see {@link isAlchemyTabAvailable}),
@@ -207,6 +209,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       learnRecipeFromInventory: (opts = {}) =>
         game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      // Salvage one owned component (issue 675) — the Inventory tab's Salvage panel,
+      // and the first UI caller of the engine's salvage pipeline. Takes
+      // `{ actorId, systemId, componentId, interactive }`: an ACTOR ID, never a uuid,
+      // so the facade's `_resolveCraftingSources` gate — the only ownership check on
+      // this path — is not bypassed.
+      salvageComponent: (opts = {}) => game?.fabricate?.salvageComponent?.(opts) ?? null,
       // Fresh per-set craftability for an in-session ingredient-option override
       // (issue 552). Synchronous so the store's `selectedCraftability` $derived can
       // read it without an async round-trip; returns null when the facade is absent.
@@ -226,6 +234,17 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
       getFavouriteRecipeIds: () => game?.fabricate?.getFavouriteRecipeIds?.() ?? [],
       toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
+      // Progressive stage order (issue 651). Unlike the favourites seam directly above,
+      // the setter is ASYNC and its promise is RETURNED, not dropped: under `scope: user`
+      // this is a replicated document write that can reject, and the store's failure path
+      // (revert + announce) depends on seeing the rejection.
+      getProgressiveResultOrder: () => game?.fabricate?.getProgressiveResultOrder?.() ?? {},
+      setProgressiveResultOrder: (key, order) =>
+        game?.fabricate?.setProgressiveResultOrder?.(key, order),
+      // Announced through the stage list's live region when a write fails — a toast alone
+      // is insufficient, since a keyboard user reordering by chevron never sees one.
+      progressiveOrderRevertMessage: () =>
+        localize('FABRICATE.App.Crafting.Detail.StageOrderSaveFailed'),
       // Player-facing notification seam (a failed craft surfaces as a warning).
       notify: (message) => notifyWarn(message),
       // Localized generic craft-failure message for a thrown craft (the engine can
@@ -384,6 +403,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
+    // Commit any debounced progressive-order write before the window goes away
+    // (issue 651). Without this a player who reorders and immediately closes,
+    // refreshes, or logs out inside the debounce window loses the order silently.
+    this._flushPendingOrderWrite();
     const result = await super.close(options);
     // Fire the canvas re-prompt callback AFTER the window has fully closed (issue
     // 332) so the Interact prompt re-appears against a settled canvas. One-shot
@@ -399,11 +422,45 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._scopedTaskId = null;
     this._scopedActorId = null;
     this._scopedInteractableRef = null;
+    // Safety net mirroring close(): a forced teardown bypasses our close() override,
+    // and a pending order write must survive that too (issue 651).
+    this._flushPendingOrderWrite();
     super._onClose(options);
     // Safety net mirroring close(): if the window is torn down via the _onClose
     // lifecycle without our close() override (e.g. a forced teardown), still fire
     // the one-shot re-prompt callback.
     this._fireCloseCallback();
+  }
+
+  /**
+   * Commit a debounced progressive stage-order write immediately (issue 651).
+   *
+   * Reorder writes are debounced because each is a replicated document write, which
+   * leaves a window where the player's chosen order exists only in memory. Closing the
+   * window must not discard it. Safe to call from both `close()` and `_onClose()`: the
+   * store's flush is a no-op when no write is pending, so a double call writes once.
+   *
+   * Flushes BOTH progressive-order writers: the crafting store (issue 651) and the
+   * inventory store's salvage stage order (issue 675). This is the only teardown net
+   * either has.
+   *
+   * Deliberately NOT awaited and never throws — a rejected write is the store's business
+   * (it reverts and announces), and a teardown must not be blocked or broken by it.
+   *
+   * The `try/catch` below catches only SYNCHRONOUS throws, and `void` discards the
+   * promise, so a store flush that REJECTED would surface as an unhandled promise
+   * rejection here — a console error on a path with no user to see it. Both stores
+   * therefore report failure by return status rather than rejecting; the `.catch()`
+   * below is a second line of defence so this seam is safe regardless.
+   */
+  _flushPendingOrderWrite() {
+    try {
+      const noop = () => {};
+      void this._services?.crafting?.flushProgressiveOrder?.()?.catch?.(noop);
+      void this._services?.inventory?.flushSalvageOrder?.()?.catch?.(noop);
+    } catch {
+      // A failed order write must never break the window close.
+    }
   }
 
   /**

@@ -40,6 +40,7 @@ game.fabricate.getRecipeManager()          // Recipe CRUD and queries
 game.fabricate.getCraftingEngine()          // Execute crafting
 game.fabricate.getCraftingSystemManager()   // System and component CRUD
 game.fabricate.getCraftingRunManager()      // Multi-step run management
+game.fabricate.salvageComponent({ actorId, systemId, componentId, interactive }) // Salvage one owned component
 game.fabricate.getGatheringEnvironmentStore() // Gathering environment persistence
 game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
@@ -182,6 +183,62 @@ Hooks.once('fabricate.ready', async () => {
 - `setSelectedAlchemySystemId(id)` persists the selection to that same client setting.
 
 The `fabricate.lastAlchemySystem` setting is `scope: 'client'`, so the choice is remembered per client/device, not per user account.
+
+### Salvage Runtime Facade
+
+`salvageComponent({ actorId, systemId, componentId, interactive })` salvages one owned component.
+It backs the player Inventory tab's Salvage panel and is the supported entry point for macros and integrations.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const actorId = game.user.character?.id;
+  const systemId = game.fabricate.listCraftingSystems()[0]?.id;
+
+  const outcome = await game.fabricate.salvageComponent({
+    actorId,
+    systemId,
+    componentId: 'my-component-id'
+  });
+
+  if (outcome.cancelled) return;            // The player dismissed the roll prompt.
+  if (!outcome.success) {
+    console.log(`Salvage failed: ${outcome.message}`);
+  } else if (outcome.results === null) {
+    console.log(`Salvage started: ${outcome.message}`); // Time-gated run.
+  } else {
+    console.log(`Recovered: ${outcome.results.map((item) => item.name).join(', ')}`);
+  }
+});
+```
+
+**It takes an `actorId`, never an `actorUuid`.**
+The facade resolves that id through the same ownership gate as `craftRecipe`, and that gate is the only ownership check on the salvage path.
+`CraftingEngine.salvage` performs none of its own: it resolves the UUID it is handed and mutates that actor's items directly.
+Passing a uuid straight to the engine therefore bypasses the gate, and a stale or foreign uuid throws at the server rather than returning a message.
+`actorId` defaults to the persisted last-crafting selection, and an unresolved actor returns `{ success: false, results: null, message: 'No crafting actor selected' }`.
+
+`interactive` prompts the player to roll (with Advantage / Normal / Disadvantage where the formula allows it, a situational-bonus field, and a roll-mode picker) and posts the roll to chat so Dice So Nice animates it.
+It defaults to `false`, so macros and automation stay silent.
+The player Inventory tab passes `true`.
+
+The returned object has **four** shapes, and `cancelled` is distinct from a failure:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Outcome | Shape | Meaning |
+|:--------|:------|:--------|
+| Cancelled | `{ success: false, cancelled: true, results: null }` | The player dismissed the roll prompt. Nothing was consumed, no tool broke, and any run created by the call was discarded. Do not report this as an error. |
+| Started | `{ success: true, results: null, message }` | The component has a time requirement, so a run started and awarded nothing yet. It settles as world time advances. |
+| Awarded | `{ success: true, results: [...], salvageRun }` | The salvage resolved and created the result items. |
+| Failed | `{ success: false, message }` | An ordinary failure: actor, system or component not found, salvage disabled, validation failed, or the mode requires a roll formula the GM has not authored. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The engine returns these rather than throwing, so ordinary failures need no `try`/`catch`.
+
+Do not thread a result order into this call.
+For a progressive salvage, the engine captures the player's standing order (`salvage:<componentId>` in `fabricate.progressiveResultOrder`) onto the run record when the run starts, and reads it back at award time.
+A caller that wants a different order writes that setting first and lets the capture happen.
 
 ### Actor Selection
 
@@ -345,6 +402,8 @@ Hooks.once('fabricate.ready', () => {
 
 Fabricate stores data in Foundry's settings and flags:
 
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
 | Location | Key | Contents |
 |:---------|:----|:---------|
 | World setting | `fabricate.craftingSystems` | All crafting system configurations, including each system's gathering realms and realm settings |
@@ -354,15 +413,14 @@ Fabricate stores data in Foundry's settings and flags:
 | World setting | `fabricate.gatheringConfig` | Gathering library, rules, condition vocabularies, and per-system gathering configuration |
 | World setting | `fabricate.migrationVersion` | Last completed Fabricate data migration version |
 | World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default, with other presets `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` palette) |
-| World setting | `fabricate.experimentalFeatures` | Reserved future experimental feature switch, disabled by default |
+| World setting | `fabricate.experimentalFeatures` | Reveals in-development Fabricate surfaces, currently the unimplemented recipe Graph placeholder in the crafting manager, disabled by default |
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |
 | Client setting | `fabricate.lastManagedCraftingSystem` | Last viewed system in GM admin |
 | Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system (discipline) for the Alchemy Workbench tab |
 | Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
-| Client setting | `fabricate.recentlyCrafted` | Recently crafted recipe entries for the current client |
-| Client setting | `fabricate.progressiveResultOrder` | Per-recipe player reorder preferences for progressive mode results (Object, default `{}`) |
+| User setting | `fabricate.progressiveResultOrder` | Player progressive result-stage order, keyed `recipe:<recipeId>` / `salvage:<componentId>` to a list of result ids (Object, default `{}`). Registered with `scope: 'user'`, which is per user **within one world**. The same player in a second world reads the default. Writing it is an asynchronous, replicated document write that can reject, not a synchronous `localStorage` write, so a caller must `await` it. |
 | Client setting | `fabricate.gatheringHideUnavailableEnvironments` | Player "hide unavailable (locked) environments" toggle for the Gathering app Environments column (Boolean, default `false`, per client/device) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |
 | Actor flag | `fabricate.craftingRuns.history` | Completed crafting runs |
@@ -373,6 +431,8 @@ Fabricate stores data in Foundry's settings and flags:
 | Item flag | `fabricate.toolUsage` | `{ timesUsed }` for `limitedUses` tool tracking (falls back to legacy `fabricate.catalystItemUsage` when absent) |
 | Item flag | `fabricate.toolBroken` | `true` when a tool's `flagBroken` on-break action has fired |
 | Item flag | `fabricate.recipeItemUsage` | `{ timesUsed }` for recipe item tracking |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ## Hooks
 

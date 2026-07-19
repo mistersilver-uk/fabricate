@@ -1,27 +1,27 @@
-import {
-  getFabricateFlag,
-  setFabricateFlag,
-  deleteRemovedActiveRunFlags,
-} from '../config/flags.js';
+import { RunContainerManagerBase } from './runContainerStore.js';
 
 const HISTORY_LIMIT = 50;
 
 /**
- * Manages actor-scoped crafting runs (active + history).
+ * Manages actor-scoped crafting runs (active + history). The per-actor cache, baseline
+ * snapshots, document-coherent persistence, and run getters live in
+ * {@link RunContainerManagerBase}; this class adds the crafting-specific run lifecycle.
  */
-export class CraftingRunManager {
-  constructor() {
-    this._cache = new Map(); // actorId -> container
-  }
-
-  _normalizeContainer(raw = {}) {
-    const active = raw?.active && typeof raw.active === 'object' ? { ...raw.active } : {};
-    const history = Array.isArray(raw?.history) ? [...raw.history] : [];
-    return { active, history };
-  }
-
-  _nowWorldTime() {
-    return Number(game.time?.worldTime || 0);
+export class CraftingRunManager extends RunContainerManagerBase {
+  /**
+   * @param {object} [deps]
+   * @param {() => boolean} [deps.isPrimaryGM] Primary-GM gate for the timed
+   *   world-time resume path (issue 656). `processWorldTime` runs off the synced
+   *   `updateWorldTime` hook and flips a matured `waitingTime` step to `inProgress`,
+   *   then persists via `_persist` → `actor.setFlag(...)` — a broadcast document write
+   *   on every connected client (duplicate racing writes + player permission-denied
+   *   noise). The default `() => true` keeps unit fixtures (which build no `activeGM`)
+   *   resuming; because it fails OPEN, the real `game.users.activeGM?.id ===
+   *   game.user?.id` check is WIRED at construction in `main.js` (load-bearing).
+   */
+  constructor({ isPrimaryGM = () => true } = {}) {
+    super({ flagKey: 'craftingRuns' });
+    this._isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
   }
 
   /**
@@ -36,23 +36,31 @@ export class CraftingRunManager {
     return this._durationToSeconds(timeRequirement);
   }
 
-  _durationToSeconds(timeRequirement = null) {
-    if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
-    const minutes = Number(timeRequirement.minutes || 0);
-    const hours = Number(timeRequirement.hours || 0);
-    const days = Number(timeRequirement.days || 0);
-    const months = Number(timeRequirement.months || 0);
-    const years = Number(timeRequirement.years || 0);
-    const daySeconds = 24 * 60 * 60;
-
-    return Math.max(
-      0,
-      minutes * 60 +
-        hours * 60 * 60 +
-        days * daySeconds +
-        months * 30 * daySeconds +
-        years * 365 * daySeconds
-    );
+  /**
+   * Snapshot a step's authored ingredient requirements (component id + quantity)
+   * at run creation (issue 738). Persisting the requirements — rather than resolving
+   * them live from the recipe at Journal-projection time — keeps a history entry's
+   * requirements intact after the recipe is later edited or deleted (a deleted recipe
+   * otherwise redacts the whole run). Only component-backed ingredients are captured
+   * (tag / essence requirements carry no component id); the primary (first) ingredient
+   * set is used, mirroring how the crafting UI surfaces a step's requirements. Names
+   * and images are resolved at projection time from the still-live crafting system's
+   * components, so only the stable ids are stored here.
+   *
+   * @param {object} step An execution step (`recipe.getExecutionSteps()` entry).
+   * @returns {Array<{componentId: string, quantity: number}>}
+   * @private
+   */
+  _buildStepRequirements(step) {
+    const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
+    const primary = sets[0];
+    const ingredients = Array.isArray(primary?.ingredients) ? primary.ingredients : [];
+    return ingredients
+      .filter((ingredient) => ingredient?.componentId)
+      .map((ingredient) => ({
+        componentId: ingredient.componentId,
+        quantity: Number(ingredient.quantity) || 1,
+      }));
   }
 
   _buildStepStates(recipe) {
@@ -61,6 +69,7 @@ export class CraftingRunManager {
       stepId: step.id || foundry.utils.randomID(),
       stepName: step.name || `Step ${index + 1}`,
       index,
+      requirements: this._buildStepRequirements(step),
       status: index === 0 ? 'inProgress' : 'pending',
       startedAt: index === 0 ? this._nowWorldTime() : undefined,
       updatedAt: this._nowWorldTime(),
@@ -79,53 +88,6 @@ export class CraftingRunManager {
       createdResults: [],
       failureReason: undefined,
     }));
-  }
-
-  async _persist(actor, container) {
-    this._cache.set(actor.id, container);
-    // setFlag's recursive merge can't delete removed `active` keys; do it explicitly
-    // so completed/discarded runs don't resurrect on reload (see the shared helper).
-    await deleteRemovedActiveRunFlags(actor, 'craftingRuns', container);
-    await setFabricateFlag(actor, 'craftingRuns', container);
-  }
-
-  invalidateCache(actorId = null) {
-    if (actorId) {
-      this._cache.delete(actorId);
-    } else {
-      this._cache.clear();
-    }
-  }
-
-  _getContainer(actor) {
-    if (this._cache.has(actor.id)) {
-      return this._cache.get(actor.id);
-    }
-    return this._normalizeContainer(getFabricateFlag(actor, 'craftingRuns', null));
-  }
-
-  getActiveRuns(actor) {
-    const container = this._getContainer(actor);
-    return Object.values(container.active || {});
-  }
-
-  getActiveRun(actor, runId) {
-    const container = this._getContainer(actor);
-    return container.active?.[runId] || null;
-  }
-
-  getRunHistory(actor, limit = null) {
-    const container = this._getContainer(actor);
-    const history = Array.isArray(container.history) ? container.history : [];
-    if (!Number.isFinite(Number(limit)) || Number(limit) <= 0) return [...history];
-    return history.slice(0, Number(limit));
-  }
-
-  getRun(actor, runId) {
-    if (!runId) return null;
-    const container = this._getContainer(actor);
-    if (container.active?.[runId]) return container.active[runId];
-    return (container.history || []).find((run) => run?.id === runId) || null;
   }
 
   findActiveRunForRecipe(actor, recipeId) {
@@ -225,6 +187,45 @@ export class CraftingRunManager {
     };
     step.selectedIngredientSetId = prepared.selectedIngredientSetId ?? step.selectedIngredientSetId;
     step.updatedAt = this._nowWorldTime();
+    await this.updateRun(actor, run);
+    return run;
+  }
+
+  /**
+   * Arm the single summed time gate for a COLLAPSED multi-step chain (issue 710).
+   *
+   * When a system's multi-step feature is off, a recipe that still carries authored
+   * steps runs as one atomic action; instead of arming a gate per step, the engine
+   * sums every step's duration and arms ONE gate here, stored on step 0 (with
+   * `currentStepIndex` pinned to 0) so the generic `processWorldTime` resume path —
+   * which reads `run.steps[run.currentStepIndex].timeGate` — matures it exactly like
+   * any other timed run. Nothing is consumed at arm: the chain consumes each step's
+   * ingredients when it executes at maturity. Re-arming an already-armed gate is a
+   * no-op on the gate itself (idempotent), it only re-marks the waiting status.
+   *
+   * @param {Actor} actor
+   * @param {object} run
+   * @param {number} seconds Total summed duration in seconds (> 0).
+   * @returns {Promise<object>} the updated run
+   */
+  async armCollapsedChainGate(actor, run, seconds) {
+    const total = Number(seconds);
+    if (!Number.isFinite(total) || total <= 0) return run;
+    const worldTime = this._nowWorldTime();
+    const step = run.steps?.[0];
+    if (!step) return run;
+    if (!step.timeGate) {
+      step.timeGate = {
+        requiredSeconds: total,
+        initiatedAt: worldTime,
+        availableAt: worldTime + total,
+        collapsedChain: true,
+      };
+    }
+    run.status = 'waitingTime';
+    run.currentStepIndex = 0;
+    step.status = 'waitingTime';
+    step.updatedAt = worldTime;
     await this.updateRun(actor, run);
     return run;
   }
@@ -351,7 +352,53 @@ export class CraftingRunManager {
     return run;
   }
 
+  /**
+   * Record a no-signature alchemy fizzle as a failed, recipe-less run-history
+   * entry. A fizzle matches NO enabled recipe, so the entry carries
+   * `recipeId: null` and `isFizzle: true` and never enters the `active`
+   * container — it is archived straight to history. Recording is UNCONDITIONAL:
+   * the `alchemy.showAttemptHistoryToPlayers` flag governs player VISIBILITY at
+   * the Journal projection (see {@link RunJournalBuilder}), never whether the
+   * attempt is recorded. The entry holds no recipe or signature data, so it can
+   * never leak an undiscovered recipe.
+   *
+   * @param {Actor} actor
+   * @param {object} [details]
+   * @param {string|null} [details.craftingSystemId]
+   * @param {string|null} [details.userId]
+   * @returns {Promise<object>} the recorded fizzle history entry
+   */
+  async recordFizzle(actor, { craftingSystemId = null, userId = null } = {}) {
+    const container = this._getContainer(actor);
+    const now = this._nowWorldTime();
+    const entry = {
+      id: foundry.utils.randomID(),
+      actorUuid: actor.uuid,
+      userId: userId || game.user?.id || null,
+      craftingSystemId: craftingSystemId ?? null,
+      recipeId: null,
+      isFizzle: true,
+      status: 'failed',
+      startedAt: now,
+      updatedAt: now,
+      finishedAt: now,
+      currentStepIndex: null,
+      steps: [],
+    };
+    container.history.unshift(entry);
+    if (container.history.length > HISTORY_LIMIT) {
+      container.history = container.history.slice(0, HISTORY_LIMIT);
+    }
+    await this._persist(actor, container);
+    return entry;
+  }
+
   async processWorldTime(worldTime = this._nowWorldTime()) {
+    // Timed resume only (issue 656): driven from the synced updateWorldTime hook, and
+    // flipping waitingTime→inProgress triggers _persist → actor.setFlag, a broadcast
+    // document write. Gate to the primary GM so exactly one client performs the write
+    // and players don't emit swallowed permission-denied errors per actor per tick.
+    if (this._isPrimaryGM() !== true) return;
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);
       let dirty = false;
@@ -418,8 +465,11 @@ export class CraftingRunManager {
       }
 
       const nextHistory = (container.history || []).filter((run) => {
-        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
         const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
+        // A no-signature fizzle is recipe-less by design; keep it while its system
+        // is valid rather than pruning it as an unknown-recipe run.
+        if (run?.isFizzle) return systemValid;
+        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
         return recipeValid && systemValid;
       });
       if (nextHistory.length !== (container.history || []).length) {

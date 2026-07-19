@@ -20,6 +20,51 @@ async function defaultResolveExternalUuid(uuid) {
   return doc ? { uuid: doc.uuid ?? uuid } : null;
 }
 
+/**
+ * Upcast a component's pre-`1.16.0` source-reference field names to their
+ * renamed post-1.16.0 forms so a legacy-named component resolves, classifies, and
+ * persists per spec (`openspec/specs/import-export/spec.md:70`). Tool and
+ * recipe-item-definition import paths already accept the legacy names; components
+ * were the gap.
+ *
+ * The rename is DELETE-AND-RENAME, never an additive spread: `_normalizeComponent`
+ * prefers any present `aliasItemUuids` array, so leaving `fallbackItemIds` beside a
+ * new (or empty) `aliasItemUuids` reproduces exactly the shadowing bug this fixes.
+ * New names WIN when both are present (a post-rename export carries the new names).
+ * Scoped to component records only — the same field names denote unrelated persisted
+ * concepts elsewhere (RegionBehaviour schema field, essence `sourceItemUuid`,
+ * actor-flag provenance), so this must not be a codemod on the literal string.
+ *
+ * @param {object} component
+ * @returns {object} the component with legacy source fields renamed (a copy when a
+ *   rename happened, otherwise the original reference)
+ */
+function upcastComponentSourceFields(component) {
+  if (!component || typeof component !== 'object') return component;
+  if (
+    !('sourceUuid' in component) &&
+    !('sourceItemUuid' in component) &&
+    !('fallbackItemIds' in component)
+  ) {
+    return component;
+  }
+
+  const next = { ...component };
+  if ('sourceUuid' in next) {
+    if (!('registeredItemUuid' in next)) next.registeredItemUuid = next.sourceUuid;
+    delete next.sourceUuid;
+  }
+  if ('sourceItemUuid' in next) {
+    if (!('originItemUuid' in next)) next.originItemUuid = next.sourceItemUuid;
+    delete next.sourceItemUuid;
+  }
+  if ('fallbackItemIds' in next) {
+    if (!('aliasItemUuids' in next)) next.aliasItemUuids = next.fallbackItemIds;
+    delete next.fallbackItemIds;
+  }
+  return next;
+}
+
 export class CompendiumImporter {
   /**
    * @param {object} craftingSystemManager
@@ -381,7 +426,11 @@ export class CompendiumImporter {
     }
 
     const remapped = [];
-    for (const component of components) {
+    for (const rawComponent of components) {
+      // Upcast pre-1.16.0 source-reference field names before the originItemUuid
+      // read below, so a legacy-named component takes the resolution path instead
+      // of the id-less early exit that dropped its alias uuids (issue #700).
+      const component = upcastComponentSourceFields(rawComponent);
       const { id: compId, name: compName, originItemUuid } = component;
 
       // Collect fallback IDs: existing retained IDs + explicit additions + pack-provided fallbacks

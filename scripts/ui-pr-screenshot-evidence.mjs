@@ -16,11 +16,11 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
-// The recipe editor's five screenshot frames (overview/ingredients/validation/
-// multi-step/tools) share the same trigger files, so any recipe editor / context-rail
-// / sub-component change republishes all five. The rail (RecipeContextRail) lives
-// under `recipe/` and is covered by the glob below; the BROWSER inspector deliberately
-// does not (see the manager-recipes recipe).
+// The recipe editor's frames (overview/ingredients/validation/multi-step/tools/access/
+// results) share the same trigger files, so any recipe editor / tab / sub-component
+// change republishes all of them. Every editor tab lives under `recipe/` and is covered
+// by the glob below; the BROWSER inspector deliberately does not (see the
+// manager-recipes recipe).
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
@@ -61,38 +61,57 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/config\/currency(?:Presets|Providers)\.js$/,
     ],
   },
+  // The Component Studio (issue 676). Two dirs, deliberately distinct: `components/`
+  // is the BROWSER's, `component/` is the EDITOR's — mirroring the Recipe Studio's
+  // `recipes/` vs `recipe/` split.
   {
     id: 'manager-components',
     label: 'Manager components browser',
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+      /^src\/utils\/componentBrowserModel\.js$/,
+    ],
   },
   {
     id: 'manager-components-progressive',
-    label: 'Manager components browser — progressive difficulty column (value + None)',
+    label: 'Manager components browser — progressive difficulty badge (value + None)',
     smokeLabels: ['manager-components-progressive'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+    ],
   },
   {
     id: 'manager-component-edit',
-    label: 'Manager component editor (identity card + linked-source inspector)',
+    label: 'Manager component editor (single column: identity strip + category, no rail)',
     smokeLabels: ['manager-component-edit-normal'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentSourceInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/.+\.svelte$/,
     ],
   },
   {
     id: 'manager-component-edit-difficulty',
-    label: 'Manager component editor — staged progressive difficulty card',
+    label: 'Manager component editor — staged progressive difficulty control',
     smokeLabels: ['manager-component-edit-difficulty'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentDifficultyInspector\.svelte$/],
+    // The difficulty control rehomed from the deleted ComponentDifficultyInspector
+    // into ComponentEditView's body. This entry used to name ONLY that inspector — so
+    // after its deletion it would have matched nothing forever, silently, all green.
+    // That is the exact drift `every matches entry resolves to a real path` now pins.
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   },
   {
     id: 'manager-component-edit-salvage',
-    label: 'Manager component editor — salvage authoring (result groups, routing, DC override)',
-    smokeLabels: ['manager-component-edit-salvage'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    label: 'Manager component editor — salvage authoring (enable toggle, result groups, routing, DC presets)',
+    // `-off` photographs the collapsed/OFF salvage body: the state decision 6
+    // guarantees every existing world shows, and the one Ruling A governs.
+    smokeLabels: ['manager-component-edit-salvage', 'manager-component-edit-salvage-off'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/salvageDcPresets\.js$/,
+    ],
   },
   {
     id: 'manager-checks-gathering',
@@ -113,11 +132,38 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/checks\/checksReadiness\.js$/,
     ],
   },
+  // Issue 752: the Checks → Crafting tab scrolled to the failure-consumption
+  // controls (evidence for #736's #712 half). The routed crafting check editor
+  // (CraftingCheckEditor) renders those controls, so a change to it or the Checks
+  // shell republishes this frame.
+  {
+    id: 'manager-checks-crafting-consumption',
+    label: 'Manager Checks tab — crafting failure-consumption controls',
+    smokeLabels: ['manager-checks-crafting-consumption'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
+    ],
+  },
   {
     id: 'manager-tags-categories',
     label: 'Manager tags and categories',
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/],
+  },
+  // Issue 752: the Item tags vocabulary rows (evidence for #735's row rendering).
+  // Its OWN recipe, not a preferred label on manager-tags-categories: `collect`
+  // emits one file per recipe id, so a shared entry would publish only the
+  // alphabetically-first frame. The item-tags panel lives in VocabularyPanel, so a
+  // change to either the screen or the shared panel republishes this frame.
+  {
+    id: 'manager-tags-categories-tags-tab',
+    label: 'Manager tags and categories — Item tags rows',
+    smokeLabels: ['manager-tags-categories-tags-tab'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
+    ],
   },
   {
     id: 'manager-essences',
@@ -205,6 +251,24 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-crafting-settings'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
+  // Issue 752: the Crafting → Settings surface of an ALCHEMY-mode system (evidence
+  // for #736's #713 half). The surface is CraftingSettingsView, whose alchemy
+  // relabel is the load-bearing content, so a change to it republishes this frame.
+  {
+    id: 'manager-alchemy-settings',
+    label: 'Manager Crafting → Settings for an alchemy-mode system',
+    smokeLabels: ['manager-alchemy-settings'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSettingsView\.svelte$/],
+  },
+  // Issue 752: the selected-system rail with experimental features DISABLED
+  // (evidence for #746 — crafting group unconditional, graph absent). The rail is
+  // owned by CraftingSystemManagerRoot, so a change to it republishes this frame.
+  {
+    id: 'manager-experimental-off',
+    label: 'Manager rail — experimental features disabled',
+    smokeLabels: ['manager-experimental-off'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+  },
   // The recipe editor publishes TEN distinct frames (overview/identity, ingredients,
   // validation tab, multi-step durations, the four Results-tab modes — routed-by-check,
   // multi-step, progressive, alchemy — tools, and the restricted-visibility context
@@ -249,6 +313,24 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-results-multistep'],
     matches: RECIPE_EDIT_MATCHES,
   },
+  // Multi-step visibility gating (issue 710). The disable-confirm frame is the system
+  // settings view whose multi-step feature tile opens the confirm dialog (SystemEditView
+  // renders the tile; the adminStore toggle/confirm gate drives it — but adminStore is
+  // deliberately logic-only in this map, covered by the generic fallback, so the render
+  // file is the trigger). The collapsed-editor frame is the RecipeOverviewTab/
+  // RecipeEditView collapse presentation, covered by the recipe-edit glob.
+  {
+    id: 'manager-multistep-disable-confirm',
+    label: 'Manager system settings — disable multi-step recipes confirm',
+    smokeLabels: ['manager-multistep-disable-confirm'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+  },
+  {
+    id: 'manager-recipe-edit-collapsed',
+    label: 'Manager recipe editor — collapsed multi-step (feature off)',
+    smokeLabels: ['manager-recipe-edit-collapsed'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
   {
     id: 'manager-recipe-edit-results-progressive',
     label: 'Manager recipe editor — results (progressive ordered stages)',
@@ -268,12 +350,14 @@ export const VIEW_RECIPES = Object.freeze([
     matches: RECIPE_EDIT_MATCHES,
   },
   {
-    // The context rail is MODE-CONDITIONAL (issue 643 §4b). Every other recipe frame
-    // is captured against a system whose visibility mode drives the Books & Scrolls
-    // branch, so without this frame the restricted (access) branch would ship with no
-    // screenshot evidence at all.
+    // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
+    // rail). Every other recipe frame is captured against a system whose visibility mode
+    // drives the Books & Scrolls branch, so without this frame the restricted (access)
+    // branch would ship with no screenshot evidence at all. The frame ID keeps its
+    // `-access-rail` suffix: it is a stable identifier the published S3 keys and the
+    // smoke labels share, and renaming it would orphan existing evidence for no gain.
     id: 'manager-recipe-edit-access-rail',
-    label: 'Manager recipe editor — restricted-visibility context rail (players and characters with access)',
+    label: 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)',
     smokeLabels: ['manager-recipe-edit-access-rail'],
     matches: RECIPE_EDIT_MATCHES,
   },
@@ -327,6 +411,55 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
   },
+  // Issue 752: the roll-result box (awarded pills + outcome) after a craft
+  // (evidence for #727's pill fix). Scoped to the crafting DETAIL sources
+  // (RollResultBox lives there) so it does not collide with the broad
+  // player-crafting glob's ordinary states — a detail change maps to BOTH.
+  {
+    id: 'player-crafting-roll-result',
+    label: 'Player crafting — roll-result box (awarded pills + outcome)',
+    smokeLabels: ['player-crafting-roll-result'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\//],
+  },
+  // The progressive player stage list (issue 651). `collect` emits ONE file per view id
+  // (see below), so each state is its own view — a single `player-crafting` entry would
+  // publish only one frame and the other states would never reach the PR.
+  {
+    id: 'player-crafting-progressive',
+    label: 'Player crafting — progressive stage list, reorder allowed (default)',
+    smokeLabels: ['player-crafting-progressive'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    // Its OWN view, not a preferred label on the resting one. `collect` picks
+    // `candidates[0]` from an array sorted by FILENAME — it does NOT honour smokeLabels
+    // order — so listing this first alongside `player-crafting-progressive` silently
+    // published the resting frame instead (its screenshot index sorts lower). Verified by
+    // hash against the collected file.
+    //
+    // This is the frame the checks actually need. At rest the stored order is empty, so
+    // `applyPlayerResultOrder` returns by identity, the store short-circuits, and the
+    // authored thresholds ascend BY CONSTRUCTION — they would ascend with the
+    // carried-threshold defect fully reverted. `orderAnnouncement` is likewise `''`, so
+    // the live region is invisible whatever the CSS says. Only after a move do the
+    // thresholds have to have been recomputed and the region have text to hide.
+    id: 'player-crafting-progressive-reordered',
+    label: 'Player crafting — progressive stage list after a keyboard reorder (thresholds recomputed)',
+    smokeLabels: ['player-crafting-progressive-reordered'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-progressive-fixed',
+    label: 'Player crafting — progressive stage list, order fixed by the GM',
+    smokeLabels: ['player-crafting-progressive-fixed'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-progressive-stacked',
+    label: 'Player crafting — progressive stage list, narrow window',
+    smokeLabels: ['player-crafting-progressive-stacked'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
   // The player Alchemy workbench (issue 543) publishes three distinct frames — the
   // discipline chooser, the three-column workbench, and the narrow stacked layout.
   // `collect` emits one file per view id (first matching smoke label wins), so each
@@ -356,17 +489,59 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['fabricate-journal'],
     matches: [/^src\/ui\/svelte\/apps\/journal\//],
   },
+  // Issue 752: the Journal with a CRAFTING history run selected so the run-detail
+  // requirements card (RunDetail + StepDetails) is visible (evidence for #748, and
+  // future #738). Its OWN recipe — `collect` emits one file per recipe id, so a
+  // shared label on fabricate-journal would publish only one frame. Any journal
+  // detail change republishes both frames.
+  {
+    id: 'fabricate-journal-craft-detail',
+    label: 'Player Journal — crafting run detail (requirements card)',
+    smokeLabels: ['fabricate-journal-craft-detail'],
+    matches: [/^src\/ui\/svelte\/apps\/journal\//],
+  },
   {
     id: 'player-inventory',
     label: 'Player Inventory tab',
     smokeLabels: ['player-inventory'],
     matches: [/^src\/ui\/svelte\/apps\/inventory\//],
   },
+  // The player salvage surface (issue 675). Deliberately NARROW — the salvage tree and
+  // its panel only, NOT `apps/inventory/**`. A broad glob would return two ids for an
+  // ordinary inventory file, breaking the exact-equality mapping test above, and would
+  // force a salvage frame onto every future unrelated inventory touch. A salvage file
+  // legitimately maps to BOTH recipes: it is an inventory change and a salvage change.
+  {
+    id: 'player-salvage',
+    label: 'Player salvage panel',
+    // TWO frames, because neither can stand in for the other: the PROGRESSIVE body (the
+    // reorderable stage list — the headline feature) and the NO-CHECK body (Smoke
+    // Relic's real shape, and the shape most real worlds have).
+    smokeLabels: ['player-salvage', 'player-salvage-no-check'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\//,
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySalvagePanel\.svelte$/,
+    ],
+  },
   {
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],
     matches: [/^src\/ui\/SvelteFabricateApp\.svelte\.js$/, /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/],
+  },
+  // Issue 752: the crafting result card posted to chat after a craft (evidence for
+  // #727's roll-total fix). The card markup is built in CraftingChatCard.js and
+  // shared with SalvageChatCard.js — both live under src/systems (not a UI render
+  // path), so this frame is collected for a PR touching them even though the
+  // screenshot gate itself only trips on src/ui/styles/svelte/css changes.
+  {
+    id: 'chat-craft-card',
+    label: 'Chat — crafting result card',
+    smokeLabels: ['chat-craft-card'],
+    matches: [
+      /^src\/systems\/CraftingChatCard\.js$/,
+      /^src\/systems\/SalvageChatCard\.js$/,
+    ],
   },
   {
     id: 'interactable-config',

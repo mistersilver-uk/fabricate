@@ -70,6 +70,16 @@ Each ingredient option decides how it is matched against the items a player is c
 
 - Match a specific component managed by the crafting system.
 - Match any item that carries a given set of tags.
+- Match an essence amount, satisfied by any combination of items whose totalled essence reaches the amount.
+- Match a currency cost, paid from the crafter's coins rather than consumed items.
+
+An essence is a first-class option like any other, so it can sit inside a group as one of several **Accept instead** alternatives.
+For example, a group might accept either 2x Iron Ingot or 3 units of Fire essence, and either one satisfies the group.
+
+{: .note }
+> Earlier versions attached a separate essence requirement to the whole ingredient set.
+That per-set essence map is superseded: each former essence requirement is now a single-option essence group, kept required (AND) alongside the set's other groups.
+Fabricate migrates existing recipes automatically, so authored behaviour is preserved.
 
 ## Resolution Modes
 

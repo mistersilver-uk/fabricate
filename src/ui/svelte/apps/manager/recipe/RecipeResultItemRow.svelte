@@ -3,9 +3,9 @@
   One result item inside a result group — the component this recipe produces plus
   a quantity. Result items have no name/tags/currency (unlike ingredient
   alternatives), so this mirrors only the `component` branch of
-  RecipeIngredientOption: an image-only SearchablePopover trigger to pick/swap the
-  component, the resolved component name beside it, a capped quantity input, and a
-  remove control. Items have no id of their own, so the parent keys them by index
+  RecipeIngredientOption: one SearchablePopover trigger carrying the component's image
+  AND name (sized to the name — issue 676) to pick/swap it, a capped quantity stepper,
+  and a remove control. Items have no id of their own, so the parent keys them by index
   and owns the option list; this row emits the whole updated item via
   `onChange(nextItem)` (spreading the existing item so a normalized id and any
   unknown fields survive the first edit).
@@ -85,14 +85,23 @@
 <div class="manager-recipe-ingredient-option-row" data-recipe-option data-recipe-result-item>
   <div class="manager-recipe-option-target">
     <div class="manager-recipe-option-component">
+      <!-- The image AND the name live INSIDE one trigger, in EVERY mode (issue 676) —
+           the same shape the ingredient rows and the salvage yield picker now use. The
+           progressive row was migrated first and the flat row kept an image-only trigger
+           with the name as loose text beside it; that split meant the same picker had two
+           anatomies depending on a mode the picker itself has nothing to do with. The
+           trigger sizes to the name's length, so it never grows into the trailing cluster.
+           `manager-recipe-stage-trigger` remains as the STAGE-row marker only — the
+           trigger anatomy no longer depends on it. -->
       <SearchablePopover
         options={componentPickerOptions}
         value={componentId}
         pickerClass="manager-recipe-component-picker"
-        triggerClass="manager-button manager-recipe-component-trigger"
+        triggerClass={`manager-button manager-recipe-component-trigger${progressive ? ' manager-recipe-stage-trigger' : ''}`}
         triggerImg={selectedComponent?.img || ''}
         triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-        triggerLabel={selectedComponent ? '' : text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        valueClass={progressive ? 'manager-recipe-stage-trigger-name' : 'manager-recipe-component-name'}
         triggerTitle={selectedComponent?.name || ''}
         triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
         dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
@@ -101,32 +110,39 @@
         emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
         onChoose={(id) => chooseComponent(id)}
       />
-      {#if selectedComponent}
-        <span class="manager-recipe-component-name">{selectedComponent.name}</span>
-      {/if}
     </div>
   </div>
 
   <div class="manager-recipe-option-controls">
-    {#if progressive && selectedComponent}
-      <span class="manager-recipe-difficulty-label" aria-hidden="true">{text('FABRICATE.Admin.Manager.Recipe.DifficultyMicroLabel', 'Difficulty')}</span>
-      <!-- Read-only: `component.difficulty` has four consumers, and the component
-           editor's Difficulty card is the surface with the right save/discard
-           lifecycle. `ui-integration` already requires a read-only badge here. -->
-      <button
-        type="button"
-        class="manager-chip is-info manager-recipe-difficulty-badge"
+    {#if progressive}
+      <!-- READ-ONLY `DC n`, then a SEPARATE "Edit ↗" — the salvage stage row's shape
+           (issue 676). It was a "DIFFICULTY" micro-label plus one combined
+           `Difficulty 4 ↗` chip, which made a read-only FACT look like the control that
+           changes it. `component.difficulty` has four consumers and the component
+           editor's Difficulty card owns its save/discard lifecycle, so the fact is
+           read-only here and the link is the only route to changing it. The DC always
+           renders (it anchors the trailing cluster); the Edit link needs a chosen
+           component. -->
+      <span
+        class="manager-recipe-stage-dc"
         data-recipe-result-difficulty={difficulty === null ? '' : String(difficulty)}
-        aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${selectedComponent.name}`}
-        title={text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')}
-        onclick={() => onOpenComponent(componentId)}
-      >
-        <i class="fas fa-gauge-high" aria-hidden="true"></i>
-        <span>{difficulty === null
+      >{difficulty === null
           ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
-          : `${text('FABRICATE.Admin.Manager.Recipe.Difficulty', 'Difficulty')} ${difficulty}`}</span>
-        <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </button>
+          : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span>
+
+      {#if selectedComponent}
+        <button
+          type="button"
+          class="manager-recipe-stage-edit"
+          data-recipe-result-edit={componentId}
+          aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${selectedComponent.name}`}
+          title={text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')}
+          onclick={() => onOpenComponent(componentId)}
+        >
+          <span>{text('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}</span>
+          <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+        </button>
+      {/if}
     {/if}
 
     {#if !progressive}

@@ -67,7 +67,8 @@
     onSetCurrencyProvider = async () => {},
     onSetCurrencyMacro = async () => {},
     onClearCurrencyMacro = async () => {},
-    onToggleCurrency = async () => {}
+    onToggleCurrency = async () => {},
+    onToggleTime = async () => {}
   } = $props();
 
   // Settings is the default tab. A bumped `requestedTabNonce` re-applies the
@@ -178,9 +179,16 @@
 
   const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
   const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true);
+  // Time requirements default ON (issue 714): an absent flag reads as enabled, so only
+  // an explicit GM opt-out (`enabled === false`) turns the toggle off.
+  const timeRequirementsEnabled = $derived(selectedSystem?.requirements?.time?.enabled !== false);
 
   async function handleToggleCurrency() {
     await onToggleCurrency(!currencyEnabled);
+  }
+
+  async function handleToggleTime() {
+    await onToggleTime(!timeRequirementsEnabled);
   }
 
   // A system with no registered provider has nothing to drive the actorInventory strategy: the
@@ -445,6 +453,28 @@
               </div>
             </div>
           {/each}
+          <div class="manager-feature-tile" data-feature-key="time">
+            <span class={`manager-feature-tile-icon ${timeRequirementsEnabled ? 'is-on' : 'is-off'}`} aria-hidden="true"><i class="fas fa-clock"></i></span>
+            <div class="manager-feature-tile-body">
+              <div class="manager-feature-tile-head">
+                <strong>{text('FABRICATE.Admin.Manager.Feature.Time', 'Time requirements')}</strong>
+                <button
+                  type="button"
+                  class={`manager-status-toggle ${timeRequirementsEnabled ? 'is-on' : 'is-off'}`}
+                  aria-pressed={timeRequirementsEnabled}
+                  aria-label={text('FABRICATE.Admin.Manager.Feature.Time', 'Time requirements')}
+                  data-system-time-toggle
+                  onclick={handleToggleTime}
+                >
+                  <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                  <span class="manager-status-toggle-label">{timeRequirementsEnabled
+                    ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                    : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+                </button>
+              </div>
+              <small>{text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Time', 'Enables recipe and step duration (time requirement) authoring, and applies those durations when crafting.')}</small>
+            </div>
+          </div>
           <div class="manager-feature-tile" data-feature-key="currency">
             <span class={`manager-feature-tile-icon ${currencyEnabled ? 'is-on' : 'is-off'}`} aria-hidden="true"><i class="fas fa-coins"></i></span>
             <div class="manager-feature-tile-body">

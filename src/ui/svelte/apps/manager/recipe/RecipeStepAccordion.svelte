@@ -32,6 +32,11 @@
     // on those tabs, so the most mode-dependent surfaces shipped unseen. Overview keeps
     // the collapsing accordion (it is a reorder list), and Ingredients keeps it too.
     alwaysOpen = false,
+    // Whether the system applies time requirements (issue 714). When false the inline
+    // editable duration trigger is hidden and the header shows only the read-only
+    // duration chip. Defaults true so read-only callers (Ingredients/Results/Tools
+    // tabs, which never pass onUpdateStep) keep showing the chip unchanged.
+    timeRequirementsEnabled = true,
     onReorderSteps = () => {},
     onDeleteStep = () => {},
     onUpdateStep = null,
@@ -124,7 +129,7 @@
           </div>
         {/if}
         <div class="manager-recipe-steps-requirements">
-          {#if onUpdateStep}
+          {#if onUpdateStep && timeRequirementsEnabled}
             <RecipeDurationEditor
               timeRequirement={step.timeRequirement || null}
               onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}

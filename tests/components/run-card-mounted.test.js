@@ -52,9 +52,12 @@ describe('RunCard mounted behavior', () => {
     const progress = target.querySelector('[data-run-progress]');
     assert.equal(progress.getAttribute('data-run-progress'), '50', 'progress is 50% at the halfway point');
     assert.equal(progress.getAttribute('role'), 'progressbar', 'progress bar exposes the progressbar role');
-    assert.ok(
-      String(progress.getAttribute('aria-label')).includes('Progress.Label'),
-      'progress bar carries a localized aria-label'
+    // The reused Progress.Label key now resolves to run-neutral "Crafting progress"
+    // copy (issue 734); the bar tracks the time gate, not a step count.
+    assert.equal(
+      progress.getAttribute('aria-label'),
+      'FABRICATE.App.Journal.Progress.Label',
+      'progress bar carries the localized crafting-progress aria-label'
     );
   });
 

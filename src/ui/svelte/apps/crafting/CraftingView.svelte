@@ -43,20 +43,18 @@
   const craftability = $derived(store?.selectedCraftability ?? null);
   const craftInFlight = $derived(Boolean(store?.craftInFlight));
 
+  // Progressive stage list (issue 651). The ORDER is applied in the store, not here —
+  // this view only threads getters down and routes callbacks back.
+  const progressiveStages = $derived(store?.orderedProgressiveStages ?? []);
+  const canReorderStages = $derived(selectedRecipe?.allowPlayerResultReorder !== false);
+  const stageAnnouncement = $derived(store?.orderAnnouncement ?? '');
+
   // Resolve the per-recipe last roll outcome for the current selection.
   const rollResult = $derived(
     selectedRecipe?.id ? (store?.lastRollResult?.[selectedRecipe.id] ?? null) : null
   );
   const showRunSummary = $derived(
     Boolean(rollResult) && dismissedRunFor !== selectedRecipe?.id
-  );
-
-  // Recents: map the store's id list to display models from the current listing.
-  const recents = $derived(
-    (store?.recents ?? [])
-      .map((id) => recipes.find((recipe) => recipe?.id === id) ?? null)
-      .filter(Boolean)
-      .map((recipe) => ({ id: recipe.id, name: recipe.name, img: recipe.img }))
   );
 
   // Shopping-list entries enriched with display name/img from the listing.
@@ -101,6 +99,12 @@
   }
   function onChooseOption(groupId, choice) {
     store?.chooseIngredientOption(groupId, choice);
+  }
+  function onReorderStage(index, target, announcement) {
+    store?.reorderProgressiveStage(index, target, announcement);
+  }
+  function onReorderStageSettled() {
+    void store?.flushProgressiveOrder();
   }
   async function onCraft() {
     if (!selectedRecipe) return;
@@ -163,7 +167,6 @@
       <div class="crafting-view-column crafting-view-column-left">
         <RecipeBrowser
           recipes={store?.pageItems ?? []}
-          {recents}
           search={store?.search ?? ''}
           selectedRecipeId={selectedRecipe?.id ?? null}
           totalCount={store?.visibleRecipes?.length ?? 0}
@@ -199,6 +202,11 @@
           {onChoose}
           {onChooseOption}
           {onCraft}
+          {progressiveStages}
+          {canReorderStages}
+          {stageAnnouncement}
+          {onReorderStage}
+          {onReorderStageSettled}
         />
       </section>
 

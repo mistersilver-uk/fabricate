@@ -221,6 +221,7 @@ describe('CraftingListingBuilder — teaser redaction (non-leak)', () => {
     assert.deepEqual(recipe.result.items, [], 'no result items leak');
     assert.equal(recipe.check, null, 'no check leaks');
     assert.equal(recipe.outcomeTiers, null, 'no outcome tiers leak');
+    assert.deepEqual(recipe.progressiveStages, [], 'no progressive stages leak');
   });
 
   it('a GM sees the full recipe even when the access reason is teaser', () => {
@@ -710,5 +711,208 @@ describe('CraftingListingBuilder — per-option products', () => {
     for (const set of recipe.ingredientSets) {
       assert.deepEqual(set.products, [], 'a routed-by-check set advertises no per-option products');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Progressive stage list (issue 651) — the F1 fix + D12a thresholds + redaction
+// ---------------------------------------------------------------------------
+
+describe('CraftingListingBuilder — progressive stages (F1)', () => {
+  const PROGRESSIVE_SYSTEM = {
+    ...makeSystem(),
+    resolutionMode: 'progressive',
+    craftingCheck: {
+      simple: {},
+      routed: {},
+      progressive: { rollFormula: '2d6', awardMode: 'equal' },
+    },
+    components: [
+      { id: 'c1', name: 'Iron Sword', img: 'icons/sword.webp', difficulty: 3 },
+      { id: 'c2', name: 'Steel Sword', img: 'icons/steel.webp', difficulty: 5 },
+      { id: 'c3', name: 'Mythril Sword', img: 'icons/mythril.webp', difficulty: 4 },
+    ],
+  };
+
+  const PROGRESSIVE_GROUPS = [
+    {
+      id: 'g1',
+      name: 'Stages',
+      checkOutcomeIds: [],
+      results: [
+        { id: 'r1', componentId: 'c1', quantity: 1 },
+        { id: 'r2', componentId: 'c2', quantity: 1 },
+        { id: 'r3', componentId: 'c3', quantity: 1 },
+      ],
+    },
+  ];
+
+  const progressiveOpts = (recipeOverrides = {}, system = PROGRESSIVE_SYSTEM) => ({
+    system,
+    entries: [
+      {
+        recipe: makeRecipe({ resultGroups: PROGRESSIVE_GROUPS, ...recipeOverrides }),
+        access: { reason: 'ok' },
+      },
+    ],
+  });
+
+  it('F1: a progressive recipe surfaces its FULL authored stage list while browsing', () => {
+    // The bug this fixes: browsing has no roll, so `checkResult: null` made
+    // `initialRemaining` 0 and `awarded` always []. The player saw an empty output list.
+    const { recipe } = buildOne(progressiveOpts());
+    assert.equal(
+      recipe.progressiveStages.length,
+      3,
+      'every authored stage shows, not the zero-budget award'
+    );
+    assert.deepEqual(
+      recipe.progressiveStages.map((stage) => stage.id),
+      ['r1', 'r2', 'r3'],
+      'in authored order'
+    );
+  });
+
+  it('F1: stages carry the display fields the stage list renders', () => {
+    const { recipe } = buildOne(progressiveOpts());
+    assert.deepEqual(recipe.progressiveStages[0], {
+      id: 'r1',
+      componentId: 'c1',
+      name: 'Iron Sword',
+      img: 'icons/sword.webp',
+      difficulty: 3,
+      threshold: 3,
+    });
+  });
+
+  it('D12a: thresholds are CUMULATIVE, computed through the real difficulty lookup', () => {
+    // costFor parity: this harness wires a REAL ResolutionModeService, so this asserts
+    // the builder spends the same numbers the engine does — not just that the helper works.
+    const { recipe } = buildOne(progressiveOpts());
+    assert.deepEqual(
+      recipe.progressiveStages.map((stage) => stage.threshold),
+      [3, 8, 12],
+      'equal mode: 3, 3+5, 3+5+4'
+    );
+  });
+
+  it('D12a: the award mode changes the thresholds (exceed is strict)', () => {
+    const system = {
+      ...PROGRESSIVE_SYSTEM,
+      craftingCheck: {
+        ...PROGRESSIVE_SYSTEM.craftingCheck,
+        progressive: { rollFormula: '2d6', awardMode: 'exceed' },
+      },
+    };
+    const { recipe } = buildOne(progressiveOpts({}, system));
+    assert.deepEqual(
+      recipe.progressiveStages.map((stage) => stage.threshold),
+      [4, 9, 13],
+      'exceed: one above each cumulative sum'
+    );
+  });
+
+  it('D12a: a stage whose component has no difficulty omits the threshold', () => {
+    const system = {
+      ...PROGRESSIVE_SYSTEM,
+      components: [
+        { id: 'c1', name: 'Iron Sword', img: 'icons/sword.webp', difficulty: 3 },
+        { id: 'c2', name: 'Steel Sword', img: 'icons/steel.webp' },
+        { id: 'c3', name: 'Mythril Sword', img: 'icons/mythril.webp', difficulty: 4 },
+      ],
+    };
+    const { recipe } = buildOne(progressiveOpts({}, system));
+    assert.equal(recipe.progressiveStages[1].difficulty, null, 'no invented 0');
+    assert.equal(recipe.progressiveStages[1].threshold, null, 'and no invented threshold');
+    assert.equal(
+      recipe.progressiveStages[2].threshold,
+      7,
+      'the skipped stage consumes no budget, so the next is 3+4 and not 3+0+4'
+    );
+  });
+
+  it('a non-progressive recipe has no stage list', () => {
+    const { recipe } = buildOne();
+    assert.deepEqual(recipe.progressiveStages, []);
+  });
+
+  it('projects progressiveAwardMode so the store can RECOMPUTE thresholds after a reorder', () => {
+    // A threshold belongs to a stage's POSITION, so reordering invalidates the baked
+    // values and the store must recompute — which it cannot do without the mode.
+    // Mutation: drop `progressiveAwardMode` from the projection.
+    assert.equal(buildOne(progressiveOpts()).recipe.progressiveAwardMode, 'equal');
+    const system = {
+      ...PROGRESSIVE_SYSTEM,
+      craftingCheck: {
+        ...PROGRESSIVE_SYSTEM.craftingCheck,
+        progressive: { rollFormula: '2d6', awardMode: 'partial' },
+      },
+    };
+    assert.equal(buildOne(progressiveOpts({}, system)).recipe.progressiveAwardMode, 'partial');
+  });
+
+  it('progressiveAwardMode is null outside progressive mode', () => {
+    assert.equal(buildOne().recipe.progressiveAwardMode, null);
+  });
+
+  it('a teaser still carries progressiveAwardMode (a system rule, not a spoiler)', () => {
+    // The stage list is redacted to [], but the shape stays uniform so the store never
+    // branches on a missing key.
+    const { recipe } = buildOne({
+      system: PROGRESSIVE_SYSTEM,
+      entries: [
+        {
+          recipe: makeRecipe({ resultGroups: PROGRESSIVE_GROUPS }),
+          access: {
+            reason: 'teaser',
+            teaserState: { hiddenFields: ['ingredients', 'results', 'description'] },
+          },
+        },
+      ],
+    });
+    assert.deepEqual(recipe.progressiveStages, []);
+    assert.equal(recipe.progressiveAwardMode, 'equal');
+  });
+
+  it('projects allowPlayerResultReorder, defaulting true', () => {
+    assert.equal(buildOne(progressiveOpts()).recipe.allowPlayerResultReorder, true);
+    assert.equal(
+      buildOne(progressiveOpts({ allowPlayerResultReorder: false })).recipe
+        .allowPlayerResultReorder,
+      false,
+      'an authored false reaches the player model'
+    );
+  });
+
+  it('REDACTION: a DISCOVERY teaser leaks NO stages (mutation: delete the guard)', () => {
+    // The teaser is the surface whose entire purpose is not showing a player what the
+    // recipe makes. A missing guard leaks names, images, difficulties and thresholds.
+    const { recipe } = buildOne({
+      system: PROGRESSIVE_SYSTEM,
+      entries: [
+        {
+          recipe: makeRecipe({ resultGroups: PROGRESSIVE_GROUPS }),
+          access: {
+            reason: 'teaser',
+            teaserState: { hiddenFields: ['ingredients', 'results', 'description'] },
+          },
+        },
+      ],
+    });
+    assert.equal(recipe.browseStatus, CRAFTING_BROWSE_STATUS.DISCOVERY);
+    assert.deepEqual(recipe.progressiveStages, [], 'no stages leak to an undiscovered recipe');
+  });
+
+  it('REDACTION: a teaser that hides only ingredients still shows its stages', () => {
+    const { recipe } = buildOne({
+      system: PROGRESSIVE_SYSTEM,
+      entries: [
+        {
+          recipe: makeRecipe({ resultGroups: PROGRESSIVE_GROUPS }),
+          access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients'] } },
+        },
+      ],
+    });
+    assert.equal(recipe.progressiveStages.length, 3, 'the showResults true branch');
   });
 });

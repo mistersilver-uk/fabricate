@@ -1,28 +1,56 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Tab strip for the recipe editor (Overview / Ingredients / Results / Tools /
-  Validation),
+  Tab strip for the recipe editor (Overview / Ingredients / Results / Tools / Access /
+  Books & Scrolls / Validation),
   mirroring EnvironmentEditorTabs: roving tabindex, arrow-key navigation, and
   per-tab badge chips. Uses the shared generic `.manager-editor-tabs*` classes so
   it does not duplicate the environment editor's tab CSS.
+
+  Access and Books & Scrolls are MODE-CONDITIONAL (issue 676), driven by the system's
+  canonical `visibilityMode` through `craftingEffect(mode)` — the same single source of
+  truth the nav, Crafting Settings and the deleted context rail used:
+
+    restricted     (showAccess)       -> Access: who this recipe is granted to
+    item/knowledge (showBooksScrolls) -> Books & Scrolls: the books teaching it
+    global         (neither)          -> neither tab: a globally-visible system grants
+                                         no per-recipe access and uses no books.
+
+  The gate lives HERE rather than in the panels so the tab BUTTON disappears with its
+  content — a tab that opens an empty panel is worse than no tab. `TAB_IDS` in
+  RecipeEditView is derived from the same `visibilityEffect`, so a deep-link cannot
+  select a tab that does not exist.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'overview', badges = {}, onSelect = () => {} } = $props();
+  let {
+    activeTab = 'overview',
+    badges = {},
+    // The system's craftingEffect matrix row ({ showAccess, showBooksScrolls, ... }).
+    // NOT named `effect`: a variable of that name makes the compiler read `$effect(...)`
+    // as a store subscription (`$` + `effect`).
+    visibilityEffect = { showAccess: false, showBooksScrolls: true },
+    onSelect = () => {}
+  } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  const TABS = [
+  const TABS = $derived([
     { id: 'overview', icon: 'fas fa-circle-info', key: 'Overview', fallback: 'Overview' },
     { id: 'ingredients', icon: 'fas fa-flask', key: 'Ingredients', fallback: 'Ingredients' },
     { id: 'results', icon: 'fas fa-box-open', key: 'Results', fallback: 'Results' },
     { id: 'tools', icon: 'fas fa-screwdriver-wrench', key: 'Tools', fallback: 'Tools' },
+    ...(visibilityEffect?.showAccess
+      ? [{ id: 'access', icon: 'fas fa-user-shield', key: 'Access', fallback: 'Access' }]
+      : []),
+    ...(visibilityEffect?.showBooksScrolls
+      ? [{ id: 'books-scrolls', icon: 'fas fa-book', key: 'BooksScrolls', fallback: 'Books & Scrolls' }]
+      : []),
     { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
-  ];
+  ]);
 
   function badgeList(tab) {
     const value = badges?.[tab.id];

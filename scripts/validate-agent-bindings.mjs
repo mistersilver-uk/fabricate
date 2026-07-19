@@ -205,7 +205,6 @@ const harnessDocs = [
   }),
   ...listDir(".claude/agents", (f) => f.endsWith(".md")),
   ...listDir(".codex/agents", (f) => f.endsWith(".toml")),
-  ...listDir(".github/prompts", (f) => f.endsWith(".md")),
 ].filter((rel) => existsSync(join(root, rel)));
 
 // A backtick token is treated as a checkable repo path only when it is

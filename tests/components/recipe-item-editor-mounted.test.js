@@ -23,12 +23,36 @@ const harness = createMountedComponentHarness({
     // craftingImageDefaults (issue 544).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // NOTE: the progressive order/threshold leaves are deliberately NOT listed.
+    // `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); their real
+    // importer is `inventoryStore.svelte.js`, which no mounted suite loads.
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
+    // The salvage bodies render the house chip primitive. The preview never reaches them,
+    // but the compiled router imports them statically, so it is still in the graph.
+    'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/manager/ItemPickerModal.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+    // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
+    // preview only ever reaches the BOOK branch, but module resolution is not rendering:
+    // the compiled router imports every child statically, so the whole `detail/` tree
+    // must be compiled here too or this suite HANGS (`# cancelled`), never fails.
+    // The shell BOTH bodies render inside (header + shared body leaves).
+    'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    // The preview NEVER renders the salvage tree (a book is never salvageable), but the
+    // component branch statically imports it, so it must still be compiled here.
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
@@ -95,6 +119,34 @@ describe('RecipeItemEditor (mounted)', () => {
       'the player access badge renders'
     );
     assert.ok(root.querySelector('[data-recipe-item-rules]'), 'effective rules render');
+  });
+
+  // AC13 (issue 675). The preview renders the REAL player component, so the split that
+  // added the salvage surface had to leave it routing to the BOOK body. A book is never
+  // salvageable, so the salvage tree is in the module graph but never in the render.
+  it('AC13: the preview renders the real player book detail and NEVER a salvage tab', async () => {
+    const root = await harness.mount({
+      recipeItem: draft(),
+      linkedItem: LINKED_ITEM,
+      linkedRecipes: LINKED_RECIPES,
+      activeTab: 'overview',
+      visibilityMode: 'item',
+    });
+    const preview = root.querySelector('[data-recipe-item-preview]');
+    assert.ok(
+      preview.querySelector('[data-inventory-recipe-item]'),
+      'still the real player book detail, not a re-implementation'
+    );
+    assert.equal(
+      preview.querySelector('[data-inventory-detail-tab="salvage"]'),
+      null,
+      'no Info | Salvage strip'
+    );
+    assert.equal(
+      preview.querySelector('[data-inventory-salvage-panel]'),
+      null,
+      'and no salvage panel'
+    );
   });
 
   it('switches the rendered tab with the activeTab prop', async () => {

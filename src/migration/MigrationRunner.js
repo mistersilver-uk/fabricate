@@ -13,6 +13,8 @@ import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateDefaultOnTimeRequirements } from './migrateDefaultOnTimeRequirements.js';
+import { migrateEssencesToIngredientGroups } from './migrateEssencesToIngredientGroups.js';
 import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
 import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
@@ -29,6 +31,7 @@ import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
 import { migrateRenameSourceUuidFields } from './migrateRenameSourceUuidFields.js';
+import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgressiveAllowPlayerReorder.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
@@ -277,6 +280,45 @@ const MIGRATIONS = [
       'recipe-item definitions, and tools',
     migrate: (data) => migrateRenameSourceUuidFields(data.systems),
   },
+  {
+    version: '1.17.0',
+    label:
+      'Supersede the per-set IngredientSet.essences map with first-class essence ingredient ' +
+      'groups (single-option essence groups preserve AND semantics); reconcile alchemy signature ' +
+      'collisions by disabling both colliding recipes',
+    migrate(data) {
+      // Reads/returns `{ recipes }` (ingredient sets live under the recipes setting;
+      // data.systems holds zero sets and is read read-only for alchemy components).
+      // Surfaces the collision-disabled recipe names via the transient
+      // `_essenceCollisionDisabledRecipes` field (consumed by the runner for a
+      // one-time GM notice, then stripped — never persisted).
+      const { recipes, _essenceCollisionDisabledRecipes } = migrateEssencesToIngredientGroups(data);
+      return { recipes, _essenceCollisionDisabledRecipes };
+    },
+  },
+  {
+    version: '1.18.0',
+    label:
+      'Strip the retired system-level progressive allowPlayerReorder from the crafting, ' +
+      'salvage and gathering checks (the reorder permission now lives on the recipe and on salvage)',
+    // The last release before the flag was retired: a world downgraded to it still finds
+    // its own schema, since this migration only removes a key that release ignored.
+    // (1.17.0 is the essence-ingredient migration; this took 1.18.0 on rebase.)
+    downgradeTo: '1.17.0',
+    migrate: (data) => migrateRetireProgressiveAllowPlayerReorder(data.systems),
+  },
+  {
+    version: '1.19.0',
+    label:
+      'Default-on the recipe time requirement for upgraded worlds: delete a persisted ' +
+      'requirements.time.enabled === false (the pre-toggle normalizer coercion of an absent ' +
+      'flag), so the new default-on reader keeps existing timed recipes running',
+    // The last release before the toggle: a world downgraded to it re-coerces the deleted
+    // flag back to `false` via the pre-714 normalizer, landing on that release's own schema
+    // (time requirements ignored) — so the downgrade is lossless.
+    downgradeTo: '1.18.0',
+    migrate: (data) => migrateDefaultOnTimeRequirements(data.systems),
+  },
   // Future migrations added here in version order
 ];
 
@@ -332,6 +374,7 @@ export class MigrationRunner {
           droppedRollTableRecipes: [],
           strippedGatheringTasks: [],
         },
+        essenceCollisionDisabledRecipes: [],
       };
     }
 
@@ -410,6 +453,7 @@ export class MigrationRunner {
               droppedRollTableRecipes: [],
               strippedGatheringTasks: [],
             },
+            essenceCollisionDisabledRecipes: [],
           };
         }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
@@ -446,6 +490,15 @@ export class MigrationRunner {
     }
     delete data._removedResultSelectionProviders;
 
+    // The 1.17.0 essence-group migration reports the recipes it disabled to clear a
+    // newly-introduced alchemy signature collision. Capture the names for the GM
+    // notice and strip the transient field so it is never persisted.
+    let essenceCollisionDisabledRecipes = [];
+    if (Array.isArray(data._essenceCollisionDisabledRecipes)) {
+      essenceCollisionDisabledRecipes = data._essenceCollisionDisabledRecipes.map(String);
+    }
+    delete data._essenceCollisionDisabledRecipes;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -480,6 +533,7 @@ export class MigrationRunner {
       migratedCatalystCount,
       unifiedRegionSystems,
       removedResultSelectionProviders,
+      essenceCollisionDisabledRecipes,
     };
   }
 

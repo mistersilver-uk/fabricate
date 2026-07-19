@@ -74,13 +74,17 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
       'all three inspector actions are manager-button controls'
     );
     // The selectors chain `.manager-button` (0,3,0) so they beat the base
-    // `.manager-button` rule declared later in the sheet — issue 643.
+    // `.manager-button` rule declared later in the sheet — issue 643. Each rule is now
+    // SHARED with the component browser inspector's matching action (issue 676), so the
+    // recipe selector heads a list rather than standing alone: match it either way.
     for (const selector of [
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'
     ]) {
-      const cssBlock = css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)));
+      const start = css.indexOf(selector);
+      assert.ok(start >= 0, `${selector} should own a rule`);
+      const cssBlock = css.slice(start, css.indexOf('}', start));
       assert.ok(cssBlock.includes('width: 100%;'), `${selector} should be full width`);
     }
   });
@@ -100,7 +104,9 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
 
 describe('inspector action button layout', () => {
   it('stacks the inspector actions in a single non-wrapping column', () => {
-    const start = css.indexOf('.fabricate-manager .manager-recipe-browser-inspector-actions {');
+    // The COMPONENT browser inspector (issue 676) shares this rule rather than
+    // re-deriving a second copy, so the recipe selector is no longer the whole prelude.
+    const start = css.indexOf('.fabricate-manager .manager-recipe-browser-inspector-actions,');
     assert.ok(start >= 0, 'inspector actions rule should exist');
     const end = css.indexOf('}', start);
     const block = css.slice(start, end);
@@ -179,30 +185,41 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     );
   });
 
-  it('redirects recipe-edit like recipes (fallback to system-edit) in normalizedActiveView', () => {
+  it('no longer redirects crafting views on the experimental toggle in normalizedActiveView (issue 745)', () => {
     assert.ok(
-      rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable) return'),
-      'normalizedActiveView should treat every crafting view (including recipe-edit) alike and fall back to system-edit'
+      !rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable'),
+      'normalizedActiveView should not gate crafting views (including recipe-edit) on the experimental toggle any more'
     );
   });
 
-  it('never suppresses the inspector aside on recipe-edit (the context rail is always present)', () => {
-    // recipe-edit is absent from the two-column override list, so a hidden inspector
-    // rendered a 300px dead column. The always-present context rail fixes that
-    // (issue 643 §8), and the aside guard no longer names recipe-edit at all.
+  it('suppresses the inspector aside on recipe-edit, matching the released grid column', () => {
+    // Issue 676 deleted the context rail: recipe-edit is a TWO-column route now, and the
+    // 300px the rail held goes to the tab panel. Suppressing the aside here and adding
+    // recipe-edit to the two-column override list in styles/fabricate.css are ONE
+    // decision expressed twice — suppress without releasing and a 300px empty box still
+    // holds the strip open; release without suppressing and the (empty) aside wraps to
+    // an implicit grid row BELOW the editor. This pins both halves together.
     assert.equal(
       rootSource.includes('recipeInspectorVisible'),
       false,
-      'the conditional-hide gate is gone'
+      'no conditional-hide gate: the aside is unconditionally absent on this route'
     );
     const asideGuard = rootSource.slice(
       rootSource.indexOf("{#if currentView !== 'environment-edit' && currentView !== 'checks'"),
       rootSource.indexOf('<aside class="manager-inspector"')
     );
-    assert.equal(
+    assert.ok(
       asideGuard.includes("currentView !== 'recipe-edit'"),
-      false,
-      'the aside is never suppressed on recipe-edit'
+      'the aside is suppressed on recipe-edit'
+    );
+    const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    assert.ok(
+      css.includes('.fabricate-manager[data-manager-view="recipe-edit"] .manager-body'),
+      'and the grid column is released, or the suppressed aside leaves a dead 300px strip'
+    );
+    assert.ok(
+      css.includes('.fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed'),
+      'the collapsed-rail variant is released too'
     );
   });
 

@@ -42,6 +42,17 @@ import {
   normalizeRecipeCategory,
 } from '../../../utils/recipeCategories.js';
 import {
+  isGeneralComponentCategory,
+  normalizeCustomComponentCategories,
+} from '../../../utils/componentCategories.js';
+import { withCategoryIcon } from '../../../utils/categoryIcons.js';
+import {
+  planRecipeCategoryReassignments,
+  planComponentCategoryReassignments,
+  planTagRemovals,
+  planRecipeTagRemovals,
+} from '../../../utils/vocabularyCascade.js';
+import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets,
 } from '../../../config/gatheringCharacterModifierPresets.js';
@@ -503,6 +514,12 @@ function _buildManagedItemOptions(managedItems = []) {
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
     description: _plainTextDescription(item.description),
+    // Component category (issue 676). This is the PER-COMPONENT field, and is a
+    // different projection from the system-level `componentCategories` vocabulary
+    // in the `selectedSystem` viewState projection — both are required, for
+    // different things. Normalization guarantees the key, so it is projected
+    // unconditionally rather than through a hasOwnProperty guard.
+    category: item.category || 'general',
     ...(item.originItemUuid ? { originItemUuid: item.originItemUuid } : {}),
     ...(item.registeredItemUuid ? { registeredItemUuid: item.registeredItemUuid } : {}),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty')
@@ -529,7 +546,32 @@ function _buildComponentTagOptions(managedItems = []) {
     tags: Array.isArray(item.tags)
       ? item.tags.map((tag) => String(tag ?? '').trim()).filter(Boolean)
       : [],
+    // Numeric-positive essence quantities so an essence option's
+    // `expandToComponentIds` resolves the components carrying that essence during
+    // readiness/signature checks (without it, essence overlap detection no-ops).
+    essences: _normalizeComponentEssences(item.essences),
   }));
+}
+
+/**
+ * Numeric-positive essence quantities of a managed component, keyed by trimmed
+ * essence id. Mirrors `systemValidation.normalizeComponentEssences` so essence
+ * expansion agrees across the readiness/signature layers.
+ *
+ * @param {object} essences
+ * @returns {Record<string, number>}
+ */
+function _normalizeComponentEssences(essences) {
+  const out = {};
+  if (!essences || typeof essences !== 'object') return out;
+  for (const [rawId, rawQty] of Object.entries(essences)) {
+    const id = String(rawId ?? '').trim();
+    if (!id) continue;
+    const qty = Number(rawQty);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    out[id] = qty;
+  }
+  return out;
 }
 
 function _resolutionModeLabel(mode, localizeFn) {
@@ -1629,6 +1671,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       },
       locked: recipe.locked === true,
       enabled: recipe.enabled !== false,
+      // GM policy: may a player reorder this recipe's progressive result stages
+      // (issue 651)? This projection is a hand-built ALLOWLIST — an omitted field is
+      // invisible to the editor, so the Results tab's toggle card would seed from
+      // `undefined`, read default-true, and silently render ON for a recipe the GM had
+      // authored OFF. Default-true here mirrors the model's constructor.
+      allowPlayerResultReorder: recipe.allowPlayerResultReorder !== false,
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),
@@ -1700,13 +1748,49 @@ function _sourceOriginForUuid(uuid, sourceMissing = false) {
   };
 }
 
-async function _sourceMissingForUuid(uuid) {
-  if (!uuid || typeof globalThis.fromUuid !== 'function') return false;
+/**
+ * Resolve a component's linked source document ONCE, returning both the document and
+ * the `missing` verdict derived from the same lookup.
+ *
+ * The `missing` contract is preserved EXACTLY as `_sourceMissingForUuid` defined it,
+ * and the two clauses are load-bearing in opposite directions:
+ *  - no uuid, or no `fromUuid` (every non-Foundry test env): `missing: false`. Deriving
+ *    it as `Boolean(uuid) && !doc` instead would report EVERY component's source as
+ *    unresolved the moment `fromUuid` is absent.
+ *  - a throw: `missing: true`.
+ *
+ * Returning the doc as well is what lets the component card follow the LINKED ITEM for
+ * description (issue 676) without resolving the same uuid twice per component — which,
+ * for a compendium-linked library, is real async I/O per row.
+ *
+ * @param {string} uuid
+ * @returns {Promise<{doc: object|null, missing: boolean}>}
+ */
+async function _resolveSourceDocumentState(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return { doc: null, missing: false };
   try {
-    return !(await globalThis.fromUuid(uuid));
+    const doc = await globalThis.fromUuid(uuid);
+    return { doc: doc || null, missing: !doc };
   } catch (_) {
-    return true;
+    return { doc: null, missing: true };
   }
+}
+
+/**
+ * The linked document's description, in a SYSTEM-AGNOSTIC way.
+ *
+ * dnd5e keeps it at `system.description.value` as HTML; others use a bare
+ * `description`. Both are handed to `_plainTextDescription`, which recurses objects
+ * (`_descriptionTextCandidate`) and strips markup — so the `{value, chat}` shape and a
+ * plain string both resolve. `doc.system` is NEVER passed whole: the recursion would
+ * happily flatten every unrelated field on the sheet into the "description".
+ *
+ * @param {object|null} doc
+ * @returns {string}
+ */
+function _documentDescriptionCandidate(doc) {
+  if (!doc) return '';
+  return _plainTextDescription(doc.system?.description ?? doc.description ?? '');
 }
 
 // ---------------------------------------------------------------------------
@@ -1885,9 +1969,21 @@ async function _buildItemCards(
   const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
   return Promise.all(
     items.map(async (item) => {
-      const description = _plainTextDescription(item.description);
       const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
-      const sourceMissing = await _sourceMissingForUuid(registeredItemUuidDisplay);
+      // Resolve the LINKED DOCUMENT, not just its existence (issue 676). The editor's
+      // identity strip promises "name, image & description follow the linked item and
+      // can't be edited here" — and for description that promise was FALSE: this read
+      // `item.description` off the stored component record, which holds whatever was
+      // captured at registration. For a compendium-linked component that is routinely
+      // empty, so the strip rendered a bare "—" while the item's sheet showed prose.
+      //
+      // The stored value remains the FALLBACK, so an unresolvable source (and every
+      // environment without `fromUuid`) renders exactly what it rendered before.
+      // A genuinely description-less item still yields '' -> the strip's own "—".
+      const { doc: sourceDoc, missing: sourceMissing } =
+        await _resolveSourceDocumentState(registeredItemUuidDisplay);
+      const description =
+        _documentDescriptionCandidate(sourceDoc) || _plainTextDescription(item.description);
       const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
       return {
         ...item,
@@ -2132,6 +2228,18 @@ function _buildSelectedSystemViewData(
     },
 
     categories: selectedSystem.categories || [],
+    // The system-level COMPONENT category vocabulary (issue 676). This hand-built
+    // projection is an allowlist: without this line the Tags & Categories screen's
+    // component-categories section is permanently EMPTY, however correctly the
+    // normalizer and the write path behave. Distinct from `_buildManagedItemOptions`,
+    // which projects the per-component `category` field.
+    componentCategories: selectedSystem.componentCategories || [],
+    // Per-category icon maps (issue 689), parallel to the string vocabularies
+    // above. Like `componentCategories`, these are invisible to the Tags &
+    // Categories screen unless surfaced through this hand-built allowlist, however
+    // correctly the normalizer and write path behave.
+    categoryIcons: selectedSystem.categoryIcons || {},
+    componentCategoryIcons: selectedSystem.componentCategoryIcons || {},
     itemTags: selectedSystem.itemTags || selectedSystem.tags || [],
     essenceDefinitions,
     managedItemOptions,
@@ -2152,7 +2260,7 @@ function _buildSelectedSystemViewData(
     characterPrerequisites: normalizeCharacterPrerequisiteList(selectedSystem.characterPrerequisites),
 
     requirements: selectedSystem.requirements || {
-      time: { enabled: false },
+      time: { enabled: true },
       currency: { enabled: false, units: [] },
     },
 
@@ -2179,6 +2287,17 @@ function _buildSelectedSystemViewData(
       progressive: selectedSystem.craftingCheck?.progressive
         ? _clonePlain(selectedSystem.craftingCheck.progressive)
         : null,
+      // Failure consumption policy (issue 712). Unprojected before, so the checks
+      // editor could not read it back. Mirror the manager normalizer's defaults so
+      // a system authored with `consumeIngredientsOnFail: false` seeds OFF, not the
+      // default ON — a dropped default-true field is inverted, not merely absent.
+      consumption: {
+        consumeIngredientsOnFail:
+          selectedSystem.craftingCheck?.consumption?.consumeIngredientsOnFail !== false,
+        breakToolsOnFail:
+          (selectedSystem.craftingCheck?.consumption?.breakToolsOnFail ??
+            selectedSystem.craftingCheck?.consumption?.consumeCatalystsOnFail) === true,
+      },
     },
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -4895,6 +5014,22 @@ export function createAdminStore(services) {
 
   // --- System selection ---
 
+  // Every search term is scoped to ONE system's vocabulary: "iron" names a real
+  // component in the system it was typed into and nothing in the next one. Carrying a
+  // term across a system change filters the new system's browser down to nothing and
+  // reads as an empty library rather than an active filter.
+  //
+  // This clears at the STORE, not in each view, because all three terms are read back
+  // out of these stores by every consumer at once (`itemSearch` → `getItems(systemId,
+  // search)` → `itemCards` → the component browser; `recipeSearch` → the recipe
+  // browser; `graphSearch` → the graph). Clearing here covers each of them and holds
+  // for a system change triggered from anywhere.
+  function _clearSystemScopedSearches() {
+    recipeSearch.set('');
+    itemSearch.set('');
+    graphSearch.set('');
+  }
+
   async function selectSystem(systemId) {
     if (systemId === get(selectedSystemId)) {
       await refresh();
@@ -4903,6 +5038,7 @@ export function createAdminStore(services) {
     if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     selectedSystemId.set(systemId);
+    _clearSystemScopedSearches();
     selectedEnvironmentId.set('');
     selectedEnvironmentSystemId.set(systemId || '');
     _setEnvironmentDraftState(null, { persistedDraft: null });
@@ -4920,6 +5056,7 @@ export function createAdminStore(services) {
       'Configure categories, item tags, essences, and crafting behaviour for this system.';
     const system = await systemManager.createSystem({ name, description });
     selectedSystemId.set(system.id);
+    _clearSystemScopedSearches();
     activeTab.set('systems');
     await services.setSetting('lastManagedCraftingSystem', system.id);
     await refresh();
@@ -5713,6 +5850,47 @@ export function createAdminStore(services) {
 
   // --- Feature toggles ---
 
+  // Count a system's recipes that carry authored steps[] — the recipes that
+  // COLLAPSE to a single atomic action when the multi-step feature is turned off
+  // (issue 710). Used to decide whether disabling the feature needs the collapse
+  // warning and to report the count in it. Fails safe to 0 (no recipe manager → no
+  // warning) so a headless/store-only caller never blocks on a missing collaborator.
+  function _countMultiStepRecipes(sysId) {
+    const recipeManager = services.getRecipeManager?.();
+    if (!recipeManager?.getRecipes) return 0;
+    const recipes = recipeManager.getRecipes({ craftingSystemId: sysId }) || [];
+    return recipes.filter((recipe) => Array.isArray(recipe?.steps) && recipe.steps.length > 1)
+      .length;
+  }
+
+  // Warning/confirm gate for turning the multi-step feature OFF while multi-step
+  // recipes exist (issue 710). Disabling is NON-destructive — the steps are kept and
+  // restored on re-enable — but it changes behaviour: each multi-step recipe then
+  // runs as one combined atomic action and the GM edits only its final-step results.
+  // Mirror the house confirm pattern (services.confirmDialog → DialogV2.confirm); a
+  // system with no multi-step recipes skips the dialog. Returns true when the toggle
+  // may proceed. Enabling the feature never prompts.
+  async function _confirmDisableMultiStep(sysId) {
+    const count = _countMultiStepRecipes(sysId);
+    if (count === 0) return true;
+    const confirmed = await services.confirmDialog?.({
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Title') ||
+        'Disable multi-step recipes?',
+      content: `<p>${
+        services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Body') ||
+        'Existing multi-step recipes will run as one combined action and show only their final results for editing. Their steps are kept and restored if you turn multi-step recipes back on. No recipe data is deleted.'
+      }</p>`,
+      yes: {
+        label:
+          services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
+        callback: () => true,
+      },
+      no: () => false,
+    });
+    return confirmed === true;
+  }
+
   async function toggleFeature(feature, enabled) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -5720,6 +5898,8 @@ export function createAdminStore(services) {
     const key = FEATURE_MAP[feature];
     if (!key) return;
     if (key === 'gathering' && enabled !== true && !(await _proceedAfterDirtyEnvironmentConfirm()))
+      return false;
+    if (key === 'multiStepRecipes' && enabled !== true && !(await _confirmDisableMultiStep(sysId)))
       return false;
     await systemManager.updateSystem(sysId, { features: { [key]: enabled } });
     await refresh();
@@ -5760,7 +5940,7 @@ export function createAdminStore(services) {
     const requirements = JSON.parse(
       JSON.stringify(
         system.requirements || {
-          time: { enabled: false },
+          time: { enabled: true },
           currency: { enabled: false, units: [] },
         }
       )
@@ -5779,7 +5959,7 @@ export function createAdminStore(services) {
 
   // --- Category management ---
 
-  async function addCategory(value) {
+  async function addCategory(value, icon) {
     if (!value || !value.trim()) return;
     if (isGeneralRecipeCategory(value)) return;
     const systemManager = services.getCraftingSystemManager();
@@ -5787,25 +5967,108 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = normalizeCustomRecipeCategories([
-      ...(system.categories || []),
-      value.trim(),
-    ]);
-    await systemManager.updateSystem(sysId, { categories });
+    const name = value.trim();
+    const categories = normalizeCustomRecipeCategories([...(system.categories || []), name]);
+    const categoryIcons = withCategoryIcon(system.categoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { categories, categoryIcons });
     await refresh();
   }
 
+  // Deleting a referenced recipe category is a DESTRUCTIVE record rewrite (issue
+  // 689): every recipe carrying it is reassigned to `general` before the category
+  // (and its icon) is dropped from the vocabulary. Nothing is left dangling.
   async function removeCategory(category) {
     if (isGeneralRecipeCategory(category)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const recipeManager = services.getRecipeManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const recipes = recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || [];
+    for (const { id, category: reassigned } of planRecipeCategoryReassignments(recipes, category)) {
+      await recipeManager.updateRecipe(
+        id,
+        { category: reassigned },
+        { allowIncomplete: true, notify: false }
+      );
+    }
+    const categories = normalizeCustomRecipeCategories(
+      (system.categories || []).filter((c) => c !== category)
+    );
+    const categoryIcons = withCategoryIcon(system.categoryIcons, category, '');
+    await systemManager.updateSystem(sysId, { categories, categoryIcons });
+    await refresh();
+  }
+
+  async function setCategoryIcon(name, icon) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = normalizeCustomRecipeCategories(
-      (system.categories || []).filter((c) => c !== category)
+    const categoryIcons = withCategoryIcon(system.categoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { categoryIcons });
+    await refresh();
+  }
+
+  // --- Component category management (issue 676) ---
+  //
+  // Mirrors addCategory/removeCategory above, writing the SIBLING vocabulary
+  // `componentCategories` top-level via updateSystem. Deliberately does not touch
+  // `categories`: the two vocabularies are independent and must never cross-populate.
+  // Note updateSystem's whole-array replace semantics make removal persist without
+  // any `-=` deletion (unlike setFlag's deep merge).
+
+  async function addComponentCategory(value, icon) {
+    if (!value || !value.trim()) return;
+    if (isGeneralComponentCategory(value)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const name = value.trim();
+    const componentCategories = normalizeCustomComponentCategories([
+      ...(system.componentCategories || []),
+      name,
+    ]);
+    const componentCategoryIcons = withCategoryIcon(system.componentCategoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { componentCategories, componentCategoryIcons });
+    await refresh();
+  }
+
+  // Cascade sibling of removeCategory (issue 689): reassign every component carrying
+  // the deleted component category to `general`, then drop the category and its icon.
+  async function removeComponentCategory(category) {
+    if (isGeneralComponentCategory(category)) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    for (const { id, category: reassigned } of planComponentCategoryReassignments(
+      _getManagedItems(system),
+      category
+    )) {
+      await systemManager.updateItem(sysId, id, { category: reassigned });
+    }
+    const componentCategories = normalizeCustomComponentCategories(
+      (system.componentCategories || []).filter((c) => c !== category)
     );
-    await systemManager.updateSystem(sysId, { categories });
+    const componentCategoryIcons = withCategoryIcon(system.componentCategoryIcons, category, '');
+    await systemManager.updateSystem(sysId, { componentCategories, componentCategoryIcons });
+    await refresh();
+  }
+
+  async function setComponentCategoryIcon(name, icon) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const componentCategoryIcons = withCategoryIcon(system.componentCategoryIcons, name, icon);
+    await systemManager.updateSystem(sysId, { componentCategoryIcons });
     await refresh();
   }
 
@@ -5824,12 +6087,27 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Cascade delete (issue 689): strip the deleted tag from every component carrying
+  // it AND from every recipe tag-placeholder ingredient naming it before dropping it
+  // from the vocabulary. The recipe strip is what keeps the tag reference count (which
+  // credits those placeholders) honest — nothing is left referencing a tag that no
+  // longer exists. Placeholders emptied by the strip persist via allowIncomplete.
   async function removeTag(tag) {
     const systemManager = services.getCraftingSystemManager();
+    const recipeManager = services.getRecipeManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
+    for (const { id, tags: nextTags } of planTagRemovals(_getManagedItems(system), tag)) {
+      await systemManager.updateItem(sysId, id, { tags: nextTags });
+    }
+    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map((recipe) =>
+      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
+    );
+    for (const { id, updates } of planRecipeTagRemovals(recipes, tag)) {
+      await recipeManager.updateRecipe(id, updates, { allowIncomplete: true, notify: false });
+    }
     const tags = (system.itemTags || system.tags || []).filter((t) => t !== tag);
     await systemManager.updateSystem(sysId, { itemTags: tags });
     await refresh();
@@ -7077,6 +7355,28 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Live-persist a single failure-consumption policy flag (issue 712). MUST spread
+  // BOTH the existing craftingCheck block AND its nested `consumption` sub-object:
+  // updateSystem shallow-merges the top level, so a naive
+  // `{ craftingCheck: { consumption: { …patch } } }` would drop every sibling of
+  // craftingCheck AND the untouched consumption flag, which the normalizer then
+  // re-defaults (silent data loss). Callers pass a single-field patch.
+  async function saveCraftingCheckConsumption(patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: {
+        ...existing,
+        consumption: { ...(existing.consumption || {}), ...patch },
+      },
+    });
+    await refresh();
+  }
+
   // Shallow-merge a patch into the selected system's salvageCraftingCheck and
   // persist (the manager normalizes the whole check on write). Shared by every
   // salvage check saver below so the boilerplate lives in one place.
@@ -7130,7 +7430,7 @@ export function createAdminStore(services) {
     const requirements = JSON.parse(
       JSON.stringify(
         system.requirements || {
-          time: { enabled: false },
+          time: { enabled: true },
           currency: { enabled: false, units: [] },
         }
       )
@@ -7936,6 +8236,10 @@ export function createAdminStore(services) {
     toggleRequirement,
     addCategory,
     removeCategory,
+    setCategoryIcon,
+    addComponentCategory,
+    removeComponentCategory,
+    setComponentCategoryIcon,
     addTag,
     removeTag,
     addEssence,
@@ -8000,6 +8304,7 @@ export function createAdminStore(services) {
     saveCraftingCheckSimple,
     saveCraftingCheckProgressive,
     saveCraftingCheckActive,
+    saveCraftingCheckConsumption,
     saveSalvageCheckActive,
     saveSalvageCheckProgressive,
     saveSalvageCheckSimple,

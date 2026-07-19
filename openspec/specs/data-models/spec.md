@@ -1,4 +1,4 @@
-# Specification 002: Data Models
+# Data Models
 
 ## Purpose
 
@@ -8,11 +8,11 @@ All settings keys in this specification use the literal `fabricate.*` namespace.
 
 Behavioural semantics are defined in:
 
-- `004-resolution-modes.md`
-- `005-recipes-and-steps.md`
-- `006-recipe-visibility.md`
-- `007-destructive-changes-and-migrations.md`
-- `009-gathering-and-harvesting.md`
+- `resolution-modes/spec.md`
+- `recipes-and-steps/spec.md`
+- `recipe-visibility/spec.md`
+- `destructive-changes-and-migrations/spec.md`
+- `gathering-and-harvesting/spec.md`
 
 ## CraftingSystem
 
@@ -23,7 +23,7 @@ CraftingSystem = {
   description?: string,
 
   // System-level invariant for all recipes in this crafting system.
-  // Mode semantics and validation are defined in 004.
+  // Mode semantics and validation are defined in resolution-modes/spec.md.
   resolutionMode: "simple" | "routedByIngredients" | "routedByCheck" | "progressive" | "alchemy",
 
   // Tool-breakage authority for the whole system.
@@ -42,17 +42,24 @@ CraftingSystem = {
     itemTags: true, // compatibility alias; always enabled
     essences: boolean,
     propertyMacros: boolean,
+    craftingChecks: boolean, // default false
+    outcomeRouting: boolean, // default false
     effectTransfer: boolean,
     multiStepRecipes: boolean,
     gathering: boolean, // default false
-    salvage: boolean, // default false
+    salvage: boolean, // default true (absent key defaults on for backward compatibility; an explicit false is honoured)
+    chatOutput: boolean, // default true; gates the crafting, salvage, and gathering result chat cards
+    itemPiles: boolean, // default false; the Item Piles integration toggle referenced by integrations/spec.md
   },
 
   categories: string[], // custom recipe categories only; reserved "general" is implicit
+  componentCategories?: string[], // default []; custom COMPONENT categories only; reserved "general" is implicit; independent of `categories`
+  categoryIcons?: Record<string, string>, // default {}; optional per-recipe-category Font Awesome icon, keyed by lowercased category name (may include "general")
+  componentCategoryIcons?: Record<string, string>, // default {}; the same, for component categories
   itemTags: string[],
 
-  // Present only when features.essences is true.
-  essences?: Record<string, EssenceDefinition>,
+  // Emitted unconditionally by normalization (empty array when features.essences is off).
+  essenceDefinitions: EssenceDefinition[],
 
   components: Component[],
   recipeItemDefinitions: RecipeItemDefinition[],
@@ -84,7 +91,6 @@ CraftingSystem = {
     routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
-      allowPlayerReorder: boolean,
       rollFormula: string,             // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
@@ -98,7 +104,6 @@ CraftingSystem = {
     enabled: boolean,                  // default false
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
-      allowPlayerReorder: boolean,
       rollFormula: string,
       checkBreakage: CheckBreakage,
     },
@@ -145,7 +150,6 @@ CraftingSystem = {
     routed: RoutedCheck,
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
-      allowPlayerReorder: boolean, // default false
       rollFormula: string,         // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,
     },
@@ -251,7 +255,7 @@ CraftingSystem = {
 
   requirements: {
     time: {
-      enabled: boolean, // default false
+      enabled: boolean, // default true
     },
 
     currency: {
@@ -283,7 +287,21 @@ The reserved `general` category must not be persisted in that array.
 Legacy persisted `features.recipeCategories`, `features.categories`, and `enableCategories` values are compatibility inputs only; normalization must emit enabled category aliases.
 5. Item tags are always enabled.
 Legacy persisted `features.itemTags` and `enableTags` values are compatibility inputs only; normalization must emit enabled item-tag aliases.
-6. `categories` and `itemTags` should be normalized to unique, trimmed strings.
+6. `categories`, `componentCategories`, and `itemTags` should be normalized to unique, trimmed strings.
+6a.
+Every crafting system has a reserved effective component category named `general` (`General` in UI copy).
+It is always enabled, cannot be removed, and must not be persisted in `CraftingSystem.componentCategories`.
+6b.
+`CraftingSystem.componentCategories` stores only additional user-defined component categories.
+It is a sibling of, and independent from, `CraftingSystem.categories` (recipe categories): the two vocabularies must not be merged, aliased, or cross-populated.
+A component category is never offered as a recipe category and vice versa.
+6c.
+`CraftingSystem.categories` and `CraftingSystem.componentCategories` may each carry an optional per-category icon in a parallel name-keyed map (`categoryIcons` / `componentCategoryIcons`), keyed by the lowercased category name so the string vocabulary arrays stay backwards-compatible.
+The reserved `general` bucket may carry a default icon under the `general` key but is still never persisted in the string arrays.
+Each icon map is normalized to the categories that currently exist (plus `general`), so an icon for a category that no longer exists is dropped; the settings write replaces the whole map.
+6d.
+Deleting a referenced recipe or component category reassigns the affected records' `category` to `general` rather than leaving the value lingering.
+Deleting a referenced item tag strips it from the `tags` of every component carrying it.
 7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, or `"alchemy"`.
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
@@ -310,7 +328,7 @@ A startup migration derives `GatheringRealm` records from the legacy per-system 
 Realm records are scoped to the owning system, must not be shared by reference across systems, and ride along with crafting-system import/export (a pre-unification export is upgraded idempotently on the next migration run after import).
 A Realm maps to Foundry Scene Regions many-to-one through `sceneMappings[].sceneRegionUuid`; those Foundry-bridge fields keep their `sceneRegionUuid`/`sceneUuid` names.
 Record shapes and behavior are defined in `gathering-and-harvesting` (*Location-Aware Gathering*).
-Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (see *World Settings* below) and are excluded from system import/export.
+Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (world setting `fabricate.gatheringParties`; see the Gathering Party requirements in `gathering-and-harvesting`) and are excluded from system import/export.
 Beyond the `system` object and its realms, per-system gathering environments (the `gatheringEnvironments` world setting) and the per-system `gatheringConfig` slice (rules, conditions, vocabularies, economy, reusable tasks, reusable events, character modifiers) ride along with crafting-system import/export; the runtime-versus-authoring boundary, migration, reference reporting, and copy-mode rebinding rules are defined in `import-export` (Specification 010).
 The `gatheringParties` exclusion above still holds.
 15. `requirements.currency.units[]` defines Fabricate's built-in currency unit profile for currency requirements (salvage currency requirements today; recipe steps no longer carry a currency requirement).
@@ -505,7 +523,8 @@ Invalid or missing values default to `"global"`.
 6. The per-recipe-item use and learn caps are NOT on `recipeVisibility.knowledge`.
 They live on each recipe item definition (`RecipeItemDefinition.caps`, see that model), so two recipe items in one system may carry different caps.
 `caps.learn.limitRecipes` enables that item's learn cap; `caps.learn.maxRecipes` is normalized to a finite integer `> 0` and is retained only when `limitRecipes === true`, mirroring how `caps.item.maxUses` is retained only when `caps.item.limitUses === true`.
-A `limitRecipes === true` item with a missing or invalid `maxRecipes` is treated as uncapped at runtime (fails closed to the unlimited learn path), not as a zero budget.
+A `limitRecipes === true` item with a missing or invalid `maxRecipes` is normalized so that `learnsAllowed` (and its legacy `maxRecipes` mirror) seeds to `1` — the value the UI stepper displays — because a limit of "0/undefined" is meaningless and would wrongly read as uncapped downstream, hiding the learn-all CTA (issue 544).
+The observable behaviour for stored, normalized systems is a 1-learn budget; the surviving runtime uncapped fallback (`RecipeVisibilityService._getLearnCapForRecipe`) is a defensive dead path reachable only from raw, un-normalized test fixtures.
 7. `caps.learn.destroyWhenSpent` removes the recipe item once its learn budget is spent; default is `false`.
 It is deliberately distinct from the item craft-charge flag `caps.item.destroyWhenExhausted` and must not be normalized to a shared name.
 8. The `1.11.0` migration seeds every existing recipe item's `caps` from the system's old `knowledge.item` / `knowledge.learn` values and strips those fields from `recipeVisibility.knowledge`, so existing worlds keep their behaviour while new recipe items default uncapped.
@@ -681,12 +700,16 @@ Represent one curated item entry available to recipes and salvage operations.
     img: string,
     description?: string,
     originItemUuid: string | null,
+    category: string, // default "general"; single-valued grouping axis drawn from CraftingSystem.componentCategories
     tags: string[],
   essences: { [essenceId: string]: number },
   difficulty?: number, // only used in progressive mode
 
   salvage?: {
     enabled: boolean,              // default false
+    // GM-authored Result Order Permission for progressive salvage (issue 651). An absent
+    // key reads true, and the default is stated on BOTH _normalizeSalvage return paths.
+    allowPlayerResultReorder: boolean, // default true
     ingredientQuantity: number,    // default 1
     toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
@@ -702,7 +725,7 @@ Represent one curated item entry available to recipes and salvage operations.
 
 1. `difficulty` is only used in progressive mode.
 2. If set, `difficulty` must be an integer >= 1.
-3. Each essence key must exist in `CraftingSystem.essences` when essences are enabled.
+3. Each essence key must exist among the ids in `CraftingSystem.essenceDefinitions` when essences are enabled.
 4. `salvage` is only valid when `CraftingSystem.features.salvage` is true.
 5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
@@ -720,6 +743,17 @@ When the salvage check defines no outcome tiers, routing is impossible and the c
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
+13. `Component.category` defaults to `general`.
+Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
+A custom token is free text surfaced verbatim; only `general` is localized.
+14. `Component.salvage.enabled` is GM-authorable and defaults to `false`.
+It gates salvage at runtime.
+A component whose salvage config is invalidated by a system resolution-mode change is auto-disabled and must be re-enablable from the GM component editor.
+No migration seeds this field; an existing component with authored salvage results but no explicit `enabled` value reads as disabled.
+15. Requirement 5 is enforced by normalization, in both directions.
+Component normalization must clamp `salvage.enabled` to `false` whenever the normalized `salvage.resultGroups` is empty.
+The clamp applies to every writer that passes through normalization — GM edits, import, copy-mode, and migration — and only ever turns `enabled` off, never on.
+Enforcement must not rest on a UI control's disabled state: a GM surface that merely refuses to *enable* a zero-group component does not prevent a component from *becoming* zero-group while enabled.
 
 ## Recipe
 
@@ -736,6 +770,9 @@ Recipe = {
   description: string,
   craftingSystemId: string,
   enabled: boolean,
+  // GM-authored Result Order Permission: may a player reorder this recipe's progressive
+  // result stages? An absent key reads true, so no migration seeds it.
+  allowPlayerResultReorder: boolean, // default true
   category: string,
 
   // Multi-step mode
@@ -761,7 +798,7 @@ Recipe = {
   // success outcome tier. When set, a craft whose rolled tier ranks below it (fixed
   // tiers rank by `start`) fails outright. Null/unset = no override (outcome = the
   // rolled tier). Meaningful only for routedByCheck with a fixed-type check; ignored
-  // otherwise. Semantics in 004.
+  // otherwise. Semantics in resolution-modes/spec.md.
   minSuccessOutcomeId?: string | null,
 
   // Per-recipe access grants for the `restricted` visibility mode (issue 511, PR-B).
@@ -810,18 +847,19 @@ Recipe = {
    Issue 554 retired the per-recipe `resultSelection.provider`, so `Recipe._validateRoutedResultSelection` no longer governs alchemy name-uniqueness.
    `routedByCheck` `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, a per-mode reference-integrity check that always applies), independent of this persistence gate.
    Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
-3. Resolution-mode constraints are defined in `004-resolution-modes.md`.
+3. Resolution-mode constraints are defined in `resolution-modes/spec.md`.
 4. `resultSelection.provider` is RETIRED for alchemy (issue 554): alchemy routes on the SYSTEM-level `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`), not a per-recipe provider.
    The 1.14.0 migration strips `resultSelection` from every alchemy recipe.
    No live mode reads `resultSelection`: `routedByIngredients` routes by `IngredientSet.resultGroupId` and `routedByCheck` routes by `ResultGroup.name`/`checkOutcomeIds` against the system routed check, and alchemy routes per its `checkMode`.
-5. Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
+5. Result-group selection with a reserved `role: 'failure'` group applies to plain `simple` resolution mode (success group on a passed check, reserved failure group on a fail when authored) as well as alchemy.
+Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
    - `none`: one ingredient set + one result group; a matched brew always produces that group (no check).
    - `simple`: the success result group on a passed `craftingCheck.simple`, and the reserved `role: 'failure'` result group on a fail (produced only when non-empty).
    - `tiered`: identical to `routedByCheck` — each success outcome tier routes to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles.
 6. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
 7. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
-8. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
+8. If `transferEffects` is true and essences are enabled, transfer behaviour follows `recipes-and-steps/spec.md`.
 9. `access` is the canonical per-recipe grant for `restricted` visibility mode (issue 511, PR-B): `access.characterIds` grants named player-characters and `access.playerIds` grants named players.
 Each normalizes to a deduped list of non-empty id strings (non-string entries are dropped).
 When both lists are empty, the player grants are read-forward once from the legacy `visibility.allowedUserIds`, so a pre-`access` recipe keeps showing to the same players after the runtime switches to reading `access`.
@@ -832,7 +870,7 @@ The legacy `visibility` block is retained on read as the `access` read-forward s
 The legacy scalar `recipeItemId` requirements below still hold for un-migrated systems that resolve membership through the reverse-ref fallback.
 11. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
 12. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition.originItemUuid` is stale or no longer resolves, validation must warn.
-13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `004`); it defaults to `null`.
+13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
 It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
 An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
 
@@ -983,6 +1021,9 @@ IngredientSet = {
   id: string,
   name: string,
   ingredientGroups: IngredientGroup[],
+  // LEGACY read-only compatibility field (superseded by essence ingredient options).
+  // The 1.17.0 migration rewrites each positive entry into a single-option essence
+  // group; constructors keep reading it for one release, nothing new writes it.
   essences: { [essenceId: string]: number },
   toolIds: string[], // references library Tools required for this ingredient set
 
@@ -993,7 +1034,7 @@ IngredientSet = {
 
 ### Requirements
 
-1. `ingredientGroups` must contain at least one `IngredientGroup`, unless `essences` contains one or more positive requirements.
+1. `ingredientGroups` must contain at least one `IngredientGroup` (essence options included), unless the legacy `essences` map contains one or more positive requirements (back-compat read for one release).
 2. Ingredient-set evaluation is always OR-across-sets at recipe/step level.
 3. AND-across-ingredient-sets is not supported.
 4. `toolIds` normalizes to `[]` when absent; each id coerces to a trimmed string and empties are dropped.
@@ -1048,9 +1089,15 @@ Ingredient = {
     // type = "currency"
     unit?: string,    // a configured requirements.currency.units[].id
     amount?: number,  // positive cost in that unit
+
+    // type = "essence"
+    essenceId?: string, // a configured CraftingSystem.essences key
+    amount?: number,    // positive essence quantity (shared field name with currency)
   },
 }
 ```
+
+`match.type` is one of `"component" | "tags" | "currency" | "essence"`.
 
 ### Requirements
 
@@ -1062,6 +1109,9 @@ Ingredient = {
 6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
 7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured `requirements.currency.units[].id` and `amount` is a positive cost.
 A currency option matches no inventory item and contributes no alchemy signature.
+8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
+It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
+An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
 
 ### Currency-Alternative Spend (Craft-Time)
 
@@ -1079,6 +1129,16 @@ On a shortfall the craft aborts with an `Insufficient currency` message and zero
 Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
 
+### Essence-Alternative Consumption (Craft-Time)
+
+An essence option satisfies its ingredient group by consuming essence-carrying items until its `amount` is met, symmetric with component/tag alternatives:
+
+1. The per-item essence contribution is read through an injected bound `resolveItemEssences(item) => essenceMap` collaborator, keeping the pure model Foundry-free.
+The default resolver is **flag-only** (`fabricate.essences` item flag), so the no-probe `canBeCraftedWith`/display path stays byte-for-byte the legacy behaviour; callers (`RecipeManager`, `CraftingEngine`, the per-slot selector) bind a **component-aware** resolver that also credits component-defined essences — an intentional capability increase over the old flag-only per-set gate.
+2. Consumption reads the shared `remaining` map and commits through `_commitItemPlan` (keyed by `uuid || id`), so an item already claimed by a component/tag group in the same set is not recounted toward the essence group (anti-double-consume).
+3. Consumption is **unit-granular**: an indivisible item may over-consume past `amount` (e.g. one item worth 3 essence to meet `amount: 2`), acceptable and symmetric with tag/component options.
+4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and `system.quantity`-summed in standard craft, mirroring the existing documented divergence between the two matchers.
+
 ## Alchemy Signature Uniqueness (Validation Contract)
 
 ### Purpose
@@ -1088,14 +1148,17 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 ### Contract
 
 1. Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
-2. Scope is all recipes in the crafting system.
+2. Scope is the **enabled** recipes in the crafting system.
+`SignatureValidator.validateSystem` scans only enabled recipes — the exact complement of the runtime matcher's `if (!recipe.enabled) continue;` skip — so the scanned set equals the matchable set.
+The invariant is *"the set of **enabled** recipes is collision-free"*: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through `validateSystem`, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
 3. Signature overlap is based on satisfiable ingredient assignments, not just textual equality.
 4. Matching expansion must include:
    - direct component matches (`match.type === "component"`)
-   - tag matches (`match.type === "tags"`) expanded against current system components/tags.
+   - tag matches (`match.type === "tags"`) expanded against current system components/tags
+   - essence matches (`match.type === "essence"`) expanded to components carrying the essence, counted by AMOUNT (not occurrence) with `computeGroupOptions` capacity `min(amount, ids.size)`.
 5. Ingredient groups may resolve to the same component ID when inventory quantity is sufficient to satisfy the aggregate quantity across those groups.
 6. Any overlapping satisfiable signatures between ingredient sets in the same system are invalid.
-7. Save is blocked for any collision in the system, including when editing an unrelated recipe.
+7. Save is blocked for any collision among enabled recipes in the system, including when editing an unrelated recipe.
 8. Import behavior is partial:
    - non-conflicting recipes are imported,
    - conflicting recipes are rejected,
@@ -1249,11 +1312,11 @@ Group one or more results.
 ResultGroup = {
   id: string,
   name: string,
-  // Reserved role discriminator (issue 554). `'failure'` marks the alchemy Simple
-  // reserved failure result group; absent/other = a success group. Simple-only —
-  // forbidden on None/Tiered groups. The reserved failure group is undeletable in
-  // the editor and defaults to empty. Preserved verbatim by normalization so a
-  // settings-only mode flip round-trips it.
+  // Reserved role discriminator (issue 554). `'failure'` marks the reserved failure
+  // result group, valid on plain `simple` recipes and on alchemy `simple` checkMode;
+  // absent/other = a success group. Still forbidden on None/Tiered groups. The
+  // reserved failure group is undeletable in the editor and defaults to empty.
+  // Preserved verbatim by normalization so a settings-only mode flip round-trips it.
   role?: "failure",
   // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
   // alchemy tiered). Empty for non-tiered groups.
@@ -1353,6 +1416,17 @@ CraftingRunStepState = {
 
   selectedIngredientSetId?: string,
 
+  // Authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
+  // Component-backed ingredients of the step's primary (first) ingredient set only; tag /
+  // essence requirements carry no component id and are omitted. Persisting the stable ids
+  // keeps a history entry's requirements intact after the recipe is later edited or deleted.
+  // Absent on pre-snapshot historical records. Name/img resolve at projection time from the
+  // still-live crafting system's components.
+  requirements?: Array<{
+    componentId: string,
+    quantity: number,
+  }>,
+
   lastCheckResult?: {
     success: boolean,
     reason: string,   // user-friendly text returned by the macro explaining the result
@@ -1365,16 +1439,36 @@ CraftingRunStepState = {
     actorUuid: string,
     itemUuid: string,
     quantity: number,
+    name?: string | null, // captured at consume time; absent on pre-capture historical records
+    img?: string | null,  // captured at consume time; absent on pre-capture historical records
+    componentId?: string | null, // captured on the timed-step FINISH path (and legacy refs); a projection name/img fallback
   }>,
+  // Flattened tool-breakage evidence written by `_applyToolBreakage`. Each entry
+  // is one tool's usage/breakage record; `componentId` and `broken` are load-bearing
+  // consumer-side (the salvage chat card filters `broken === true` and resolves
+  // `componentId`, and the Run Journal reads them).
   usedTools?: Array<{
-    actorUuid: string,
-    itemUuid: string,
+    actorUuid: string | null,
+    itemUuid: string | null,
     quantity: number,
+    componentId: string | null,
+    broken: boolean,
+    // checkDriven-only evidence:
+    authority?: string,
+    reason?: string,
+    triggerId?: string,
+    checkId?: string,
+    // skip/marker fields:
+    virtual?: boolean,     // no owned item resolved
+    spared?: boolean,      // matched but not broken
+    skippedImmune?: boolean,
   }>,
   createdResults?: Array<{
     actorUuid: string,
     itemUuid: string,
     quantity: number,
+    name?: string | null, // captured at award time; absent on pre-capture historical records
+    img?: string | null,  // captured at award time; absent on pre-capture historical records
   }>,
 
   failureReason?: string,
@@ -1410,6 +1504,11 @@ Requirements:
 3. When a run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. History should be newest-first and capped by a configured or default limit.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
+6. Run-flag writes must be document-coherent.
+A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
+A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
+The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
 
 ### Gathering Runs Flag
 
@@ -1428,7 +1527,11 @@ Requirements:
 2. `history` contains only terminal gathering runs (`succeeded`, `failed`, `cancelled`).
 3. When a gathering run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. Within one actor's `gatheringRuns.active`, at most one active run may exist for a given `taskId`.
-5. Detailed `GatheringRun` shape and lifecycle semantics are defined in `009-gathering-and-harvesting.md`.
+5. Detailed `GatheringRun` shape and lifecycle semantics are defined in `gathering-and-harvesting/spec.md`.
+6. Run-flag writes must be document-coherent.
+A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
+A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
 
 ### Learned Recipes Flag
 
@@ -1496,7 +1599,7 @@ Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and ever
 
 ### Purpose
 
-Define the unified, UI-safe projection the player-facing Journal screen reads (see `003-ui-integration.md` *Journal App*).
+Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-integration/spec.md` *Journal App*).
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see *CraftingRun* / *CraftingRunStepState*), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
@@ -1572,7 +1675,14 @@ StepModel = {
     outcome: string | null,
     value: number | null,
     reason: string | null,
+    formula: string | null,          // resolved (else authored) roll formula from lastCheckResult.data
+    total: number | null,            // rolled total (data.total, else the bare value)
+    dc: number | null,               // resolved DC when the check has a static one
   } | null,
+  // The step's authored required ingredients (persisted snapshot) and the items it
+  // actually consumed, each a UI-safe result row. `[]` when absent or for a redacted run.
+  requirements: Array<{ componentId, itemUuid, quantity, name, img }>,
+  consumedIngredients: Array<{ componentId, itemUuid, quantity, name, img }>,
 }
 ```
 
@@ -1583,24 +1693,27 @@ StepModel = {
    For a non-terminal run, readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
    A non-terminal run with no armed gate is `inProgress`.
    The persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips to `inProgress` asynchronously off the same world-time hook) is NEVER consulted for the active-run derivation — only the gate's `availableAt` against `worldTime` — so the readiness read is race-free.
+   The `processWorldTime` write side (the salvage/crafting timed resume and its `_persist`/`setFlag` broadcast write) is **primary-GM-gated** (`game.users.activeGM?.id === game.user?.id`) so it fires exactly once even though `updateWorldTime` is a synced hook on every client — mirroring the gathering matured-run publication gate; a resume deferred while no GM is connected is caught up by the primary GM's startup `processWorldTime` pass.
 2. **Per-runType `timeGate` source.**
    For a crafting run, `timeGate` and the readiness derivation come from the ACTIVE step's gate (the step at `currentStepIndex`).
    For gathering and salvage runs, they come from the RUN-level `timeGate`.
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
-   A crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe for a non-GM viewer — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
-   A GM viewer and globally-visible recipes are never redacted; with no recipe-visibility service available no redaction occurs.
+   For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
+   The GM bypass precedes the missing-recipe guard: a GM viewer is never redacted, even for a run whose recipe no longer resolves, so the GM still sees the run's persisted step snapshots (requirements, roll, consumed items) rather than a redacted empty card.
+   Globally-visible recipes are likewise never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
    Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
 4. **Step projection is crafting-only.**
-   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, and each step's `detail.checkLabel` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
-   A redacted crafting run also projects `steps: []`.
+   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
+   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs; both resolve name/img via the same shared result mapper (consume-time capture, then the item-uuid and component-id fallbacks), so a deleted consumed item still labels from its captured or component name.
+   A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
    `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
 5. **`manualAdvance` is the Trigger Next Step gate.**
-   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `005-recipes-and-steps.md` (*Run Progression — Player-Initiated Advance*).
+   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `recipes-and-steps/spec.md` (*Run Progression — Player-Initiated Advance*).
 6. **`resolutionModeLabel` uses the player-facing label map.**
-   It resolves through the localized mode-label map defined in `004-resolution-modes.md` (*Player-Facing Mode Labels*) and never emits the raw `resolutionMode` token.
+   It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (*Player-Facing Mode Labels*) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**
    It is the count of active (non-terminal) runs the Journal navigation surfaces as its active-run count badge.
 
@@ -1740,7 +1853,8 @@ Requirements:
 
 1. `interactableType`, `sourceUuid`, and `systemId` are **required** (`blank:false`) but now carry **`initial`s** — `interactableType: "tool"`, `sourceUuid: "Fabricate.unconfigured.tool"`, `systemId: "unconfigured"` (the unconfigured sentinels) — so the DataModel always instantiates **valid** even when the native "+ Add Behavior" path supplies an empty `system` (no `DataModelValidationError`).
 A behaviour still carrying the sentinels (or missing the type-appropriate `toolId`/`taskId`) is **UNCONFIGURED** (`isUnconfiguredInteractable`, the single authority) and is **inert until configured** (concealed from players, never grants activation; see requirement 5). `toolId`/`taskId` and `environmentId` are scoped by `interactableType`.
-A **Tool** interactable opens the **Crafting** tab and injects a session-scoped `activeCanvasTool` (virtual-present) on activation (the Crafting tab is currently a placeholder, so the active-tool chip is the visible effect).
+A **Tool** interactable opens the unified window on the **Crafting** tab and injects the activated tool as a session-scoped `activeCanvasTool` (virtual-present) on activation.
+The Crafting tab is a shipped player surface (recipe browsing, detail, shopping list, craft execution, run summary), and the injected tool participates in tool-availability checks (`presentTools` derived from `_activeCanvasTool` in `src/ui/SvelteFabricateApp.svelte.js`).
 A **gathering-task** interactable opens the gathering app scoped to that environment + task, **auto-selecting both**.
 Its resource-node link is gated by `taskNodeLink`: by default (`linked`) it reads/decrements the **environment's `nodeRuntime[taskId]`** exactly like opening gathering directly (depletion and respawn follow the gathering task; the `node` field is null); when `taskNodeLink === "unlinked"` (issue 302) it reads/decrements its OWN independent pool stored in `node` (independent lifecycle — capacity, current, depletion timing, respawn policy).
 The read normalizes through `normalizeNodeConfig`; a link that claims `unlinked` but whose `node` does not normalize **downgrades** to `linked`.
@@ -1912,7 +2026,7 @@ The same outcome-name normalization the provider routing applies (engine-evaluat
    - miss-family compatibility aliases: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
    - hazard-family compatibility aliases: `hazard`, `danger`, `complication`, `trap`, `oops`
 4. If the normalized `outcome` matches a reserved failure keyword, it does not route to a result group and is treated as failure.
-5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules (explicit `checkOutcomeIds` tier assignment wins first; see `004-resolution-modes.md`).
+5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules (explicit `checkOutcomeIds` tier assignment wins first; see `resolution-modes/spec.md`).
 6. If a non-reserved `outcome` does not match any `ResultGroup.name`, classify as crafting-system misconfiguration error.
 
 ### Property Macro Contract
@@ -1951,10 +2065,10 @@ A step failure is handled entirely by the engine's failure-consumption policy; t
 
 ## Behavioural Ownership
 
-- Resolution mode semantics and mode validation: `004-resolution-modes.md`
-- Recipe and step execution semantics: `005-recipes-and-steps.md`
-- Recipe visibility and learning semantics: `006-recipe-visibility.md`
-- Destructive changes and clean-up semantics: `007-destructive-changes-and-migrations.md`
+- Resolution mode semantics and mode validation: `resolution-modes/spec.md`
+- Recipe and step execution semantics: `recipes-and-steps/spec.md`
+- Recipe visibility and learning semantics: `recipe-visibility/spec.md`
+- Destructive changes and clean-up semantics: `destructive-changes-and-migrations/spec.md`
 
 ## Canonical-Write and Legacy-Read Compatibility Policy
 
@@ -1978,6 +2092,7 @@ The following canonical field names must be used in all new writes:
 | Result | `componentId` | Produced item component reference |
 | CraftingSystem | `components` | Array of managed item entries |
 | CraftingSystem | `recipeItemDefinitions` | Array of managed recipe-item entries |
+| CraftingSystem | `essenceDefinitions` | Array of essence definitions, emitted unconditionally by normalization (empty when `features.essences` is off); supersedes the derived `essences` id-string alias |
 | CraftingSystem | `visibilityMode` | Canonical flat recipe-visibility strategy (`global`/`restricted`/`item`/`knowledge`); supersedes legacy `recipeVisibility.listMode` + `knowledge.mode` |
 | IngredientSet | `ingredientGroups` | Array of ingredient group objects |
 | Recipe | `resultGroups` | Array of result group objects |
@@ -2014,6 +2129,7 @@ The following legacy aliases are accepted by constructors and normalization func
 | `catalystItemUsage` / `catalystUses` (bare number) | `toolUsage.timesUsed` | Item flag | Runtime reads `toolUsage` first; when absent, falls back to `catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) so migrated `limitedUses` tools preserve in-flight usage. Legacy flag is never back-filled or cleared. |
 | `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` (pre-`1.16.0`) | `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` | Component, RecipeItemDefinition, Tool | Issue 560 rename: normalization reads the old names new-name-first, old-name-tolerant, and emits the new names |
 | `linkedRecipeItemUuid` | `recipeItemId` | Recipe | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `originItemUuid` within the recipe's crafting system |
+| `IngredientSet.essences` (map) | essence ingredient options (`match.type === "essence"`) | IngredientSet | The 1.17.0 migration rewrites each positive `essences[essenceId]` entry into a single-option essence group; constructors keep reading the map for one release |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2023,6 +2139,8 @@ The following aliases are currently emitted in `toJSON()` / normalization output
 These are transitional and will be removed in a future version once all dependent UI code paths have been updated:
 
 - `systemItemId` (emitted alongside `componentId` in Tool, Ingredient, Result)
+- `essences` (emitted by `IngredientSet.toJSON` as `essences: this.essences`, `{}` post-migration; superseded by essence ingredient options — one-release window)
+- `essences` (CraftingSystem: derived id-string array equal to `essenceDefinitions.map(def => def.id)`, emitted alongside canonical `essenceDefinitions`; stripped on export by `stripTransitionalAliases` and re-derived after component deletion — not a Record, never feature-gated)
 - `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
 - `results` (emitted alongside `resultGroups` in Recipe)
 - `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `originItemUuid` in Component)

@@ -99,6 +99,29 @@ test('uses the item-bag fallback image when an entry has no img', () => {
   assert.ok(content.includes('src="icons/svg/item-bag.svg"'), 'fallback image used');
 });
 
+test('renders the roll total row when a finite check value is present', () => {
+  const content = buildCraftingChatContent(successModel({ rollValue: 17 }));
+  assert.ok(content.includes('fabricate-craft-chat__roll'), 'roll row element');
+  assert.ok(content.includes('FABRICATE.Chat.Roll'), 'roll label key');
+  assert.ok(content.includes('fabricate-craft-chat__roll-value">17<'), 'roll value rendered');
+});
+
+test('shows the roll total on failure cards too', () => {
+  const content = buildCraftingChatContent(failureModel({ rollValue: 4 }));
+  assert.ok(content.includes('fabricate-craft-chat__roll-value">4<'), 'failure roll value rendered');
+});
+
+test('omits the roll row when no check ran (null / absent / non-finite value)', () => {
+  for (const rollValue of [null, undefined, NaN, Infinity]) {
+    const content = buildCraftingChatContent(successModel({ rollValue }));
+    assert.ok(!content.includes('fabricate-craft-chat__roll'), `no roll row for ${rollValue}`);
+  }
+  assert.ok(
+    !buildCraftingChatContent(successModel()).includes('fabricate-craft-chat__roll'),
+    'no roll row when the field is absent'
+  );
+});
+
 test('escapes HTML in user-authored names', () => {
   const content = buildCraftingChatContent(
     successModel({ results: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }] })

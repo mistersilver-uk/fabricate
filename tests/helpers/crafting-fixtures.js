@@ -82,7 +82,6 @@ export function fakeCraftingStore(overrides = {}) {
     shoppingEntries: [],
     craftInFlight: false,
     lastRollResult: {},
-    recents: [],
     worldTimeTick: 0,
     favouriteIds: overrides.favouriteIds ?? [],
     favouritesOnly: overrides.favouritesOnly ?? false,
@@ -114,7 +113,6 @@ export function fakeCraftingStore(overrides = {}) {
     clearShoppingList() {},
     craft() {},
     tickWorldTime() {},
-    markRecent() {},
     ...overrides
   };
 }

@@ -778,9 +778,10 @@ class InteractableManager {
       if (!activeCanvasTool) {
         return;
       }
-      // A Tool station belongs to crafting; open the Crafting tab with the active
-      // station tool (the Crafting tab is still a placeholder, so this shows the
-      // placeholder with the active-tool chip in the header).
+      // A Tool station belongs to crafting; open the functional Crafting tab with
+      // the active station tool injected as a virtual-present tool, so crafting
+      // prerequisite checks treat it as satisfied without the actor owning the item
+      // (see SvelteFabricateApp `_activeCanvasTool`).
       void AppClass.show('crafting', { activeCanvasTool, actorId });
       return;
     }

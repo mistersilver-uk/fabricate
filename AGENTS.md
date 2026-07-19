@@ -183,6 +183,12 @@ Note this is independent of the Svelte `<style>` blocks in `src/ui/svelte/`, whi
 - No literal colours in product code. `tests/components/theme-colour-contract.test.js` (under `npm test`) forbids colour literals — `#hex`, `rgb()/rgba()`, `hsl()/hsla()`, bare `white`/`black` — anywhere under `src/ui/` or `styles/` outside the approved `:root`/theme blocks, **including JS fallback constants** (a `'#888888'` default in a `.js` util fails the gate).
 Use a theme token (`var(--fab-…)`); when a util can't resolve a colour, return `''` and let CSS supply a themed default.
 A region/document's *own* runtime colour is fine inline via `style=` (it isn't a source literal).
+- **A UI control's constraint is never an invariant — the invariant belongs at the normalizer.**
+A disabled or absent control only refuses to *enter* a forbidden state through one surface.
+It cannot stop a record *becoming* forbidden by a removal path, and it is not on the path of the writers that have no UI at all — import (`CraftingSystemExporter.prepareForImport`), copy-mode, and migration.
+Enforce the rule where every writer passes instead: `_normalizeSystem` / `_normalizeComponent` / `_normalizeSalvage` in `src/systems/CraftingSystemManager.js` are that single chokepoint.
+Issue 676 is the worked example, and the claim "constraining the control makes the forbidden state unreachable by construction" was false in **both** directions: the sanctioned flow's exact reverse (enable at one result group, delete that group, save) persisted the forbidden state anyway, and then disabled the control that would have undone it.
+Keep the control constraint as UX, and **test the requirement** (normalizer input → output), never the control's `disabled` attribute — a control-shaped test reads green through every gap the control cannot close.
 - Localized strings belong in `lang/`; UI code should use the Foundry bridge/localization helpers instead of hard-coded copy.
 - Manager confirmation prompts (discard unsaved, destructive actions) MUST go through `services.confirmDialog` → `foundry.applications.api.DialogV2.confirm`.
 Never use `globalThis.confirm()`, not even as a fallback.
@@ -207,6 +213,8 @@ See [Travel: live current-realm sensing](#travel-live-current-realm-sensing).
 - `updateWorldTime` is a **synced** hook — it fires on every connected client off the server's broadcast.
 Any externally observable side effect driven from it (publishing public hooks, posting chat, writing documents) must be gated to the primary GM (`game.users.activeGM?.id === game.user?.id`, the `isPrimaryGM` seam in `GatheringEngine`) or it duplicates N times.
 Idempotent shared-state updates (stamina regen, node respawn) are already gated this way; the gathering completion-hook publication follows the same rule for matured timed runs.
+The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `main.js` (issue 656).
+Use `activeGM` (`game.users.activeGM?.id === game.user?.id`), NOT `game.user.isGM`: `User#isGM` is true for assistant GMs too (who hold `SETTINGS_MODIFY`), so an `isGM` gate lets the full GM AND every assistant race the write — `activeGM` fires on exactly one client (this is also why `_runMigrations` gates on `activeGM`, issue 657).
 - Directory entry context menus are extended through the `get<Directory>ContextOptions` hook family (`getCompendiumContextOptions`, introduced 13.344; confirmed against V14.361 source) — an **array-mutation** hook: `(app, contextOptions) => contextOptions.push(entry)`, mutate in place and return nothing.
 Two traps.
 (1) **Register early** (module top-level, or `init`/`setup` — NOT the `ready` body): the menu is built exactly once in the directory's `_onFirstRender`, which runs during the pre-`ready` sidebar force-render, so a `ready`-body listener can miss the one-time build (unlike `renderItemDirectory` header-button wiring, which legitimately re-runs on every render).
@@ -237,13 +245,53 @@ See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
 Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).
 - A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
+- **The player-path ownership gate lives in the `main.js` FACADE, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.
+`_resolveCraftingActor` / `_resolveCraftingSources` (`src/main.js`) are the whole gate, which is exactly why every player-facing facade (`craftRecipe`, `salvageComponent`, `listInventoryForActor`, the alchemy pair) takes an **`actorId`** and resolves it, and **never accepts an actor uuid**.
+A uuid-taking facade is a privilege hole, not a style choice: the uuid flows straight to `fromUuid` past the only gate that exists, and a stale, foreign, or console-supplied one reaches the server and surfaces as a **thrown exception**, not the `{ success: false, message }` every store is written to expect — so the failure is both a permission bypass and an unhandled shape.
+Keep new player entry points on `actorId`, and treat "the engine will check it" as false.
+Engine methods are the GM/API surface and are owner-scoped by their caller.
 - A Foundry `game.settings.register` **`scope: 'client'`** setting persists in that browser/device's `localStorage`, so it is **per device, not per user account** — the same user opening the world on a second machine sees the client default, and it never follows the account.
-`scope: 'user'` is the cross-device per-user account scope, and `scope: 'world'` is shared for the world.
-Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `PROGRESSIVE_RESULT_ORDER`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user" — a preference that must follow the account needs `scope: 'user'`.
+`scope: 'user'` is the cross-device per-user scope **within one world** (NOT a per-account-globally scope — see the next bullet), and `scope: 'world'` is shared for the world.
+Fabricate uses `scope: 'client'` for view preferences (`MANAGER_RAIL_COLLAPSED`, `GATHERING_HIDE_UNAVAILABLE`, the gathering view prefs in `src/config/settings.js`), so spec/docs copy for those must say "per client/device", not "per user".
+A preference that must follow the user across devices needs `scope: 'user'` — but say "per user, per world", never "follows the account".
+- **`scope: 'user'` is a replicated async DOCUMENT write, not localStorage** (`PROGRESSIVE_RESULT_ORDER` is the only one Fabricate registers; issue 651 flipped it from `client`).
+`ClientSettings#set` forks on scope: `client` is a synchronous `storage.setItem`, `user` is an `await`ed document create/update that **can reject** and **throws before `game.ready`**.
+So the fire-and-forget `setSetting(...)` idiom used for client-scoped settings (e.g. `toggleFavouriteRecipe`) is **unsafe** on a user-scoped one — `await` it and define the failure path, or the UI reports a write that never happened.
+Every write broadcasts `createSetting`/`updateSetting` to every client (the FIRST write is `createSetting`, not `updateSetting`), so a per-gesture write must be debounced.
+It is per-user **within a world**, not per-account globally — the same player in a second world gets the default.
+Despite being async and replicated, the write is **locally coherent**: the awaited create/update populates the same local collection `ClientSettings#get` reads, so a `get` issued after the `await` returns the new value without waiting on any broadcast.
+That is what makes **flush-before-read an honest ordering guarantee** rather than a hopeful one — `await` the pending write, then start the operation that captures it (issue 675's salvage panel flushes its debounced order write before `salvage()` captures it onto the run record).
+It also means the failure mode to design for is **rejection, not staleness**.
+- **Setting scope changes ORPHAN data; they never migrate it.** Foundry has no scope-migration facility (`ClientSettings#get` dispatches on scope at read time), so a pre-existing `localStorage` value is simply never read again — never deleted, never an error.
+When claiming "there is no data to migrate", prove it by showing **no writer has ever existed**, not that nothing reads it: "nothing reads it" does not imply absence.
+- **`BaseSetting.canUserCreate` is a UI helper, NOT authorization** — it requires `SETTINGS_MODIFY` (default ASSISTANT), which players lack, and reads like a blocker for user-scoped player writes.
+Real authz is `#canModify`, which passes any user writing their **own** user-scoped setting. `config: false` is orthogonal: only WORLD scope is GM-gated in the settings UI.
+- **A synced `updateWorldTime` handler runs on EVERY client**, so any per-user state read inside one reads the **executing** user, not the owner — and with no primary-GM gate or ownership filter, whichever client wins the race executes.
+Capture owner-scoped state onto the record at start instead of reading it at resume; that makes the invariant structural rather than documented.
+Issue 651's salvage `resultOrder` is the worked example (`SalvageRunManager.createRun` already stamps `userId`, so the capture is auditable); `SalvageRunManager.processWorldTime`'s unguarded actor loop is the open defect (#656).
+Contrast `GatheringEngine`, which gates timed completions on `isPrimaryGM()` explicitly.
+- **`MigrationRunner` has no GM gate** (#657): `initialize()` calls `_runMigrations()` unconditionally and the runner contains zero `isGM`/`game.user` references.
+Safety is emergent and racy — `run()` early-returns once `MIGRATION_VERSION` is bumped, but a player connecting before or concurrently with the GM reaches a world-scoped write that `#canModify` denies and throws.
+Every new migration re-opens that window for one session per world upgrade.
+- **The adminStore view-state projections are a FAMILY of hand-built allowlists** — the `selectedSystem` projection and the recipe-list projection (both in `src/ui/svelte/stores/adminStore.js`), plus `salvageComponentOptions` in `CraftingSystemManagerRoot.svelte` — and a new field is invisible to the UI unless added to each one it must reach.
+For a **default-true** field the failure is worse than absent, it is **inverted**: the editor seeds from `undefined`, reads its default-true, renders ON for an entity the GM authored OFF, and saves that wrong value back.
+Pin such a projection with a `false` fixture — a `true` fixture round-trips green through a dropped field.
+- **The mounted/store test harnesses have TWO separate module-copy mechanisms**, and adding one import to a module already in the graph can break either: `CRAFTING_APP_RAW_MODULES`/`compiledModules` in `tests/helpers/svelte-component-harness.js` (mounted components) and `compiler.copyPlain(...)` in `tests/helpers/compile-svelte-module.js` (runes `.svelte.js` store suites).
+A missing entry HANGS the suite (`# cancelled N`), never fails it — one import added to `CraftingListingBuilder` cancelled 36 tests across 8 files.
+**Membership is an explicit allowlist, so READ it — never infer it from a module's kind or its name.** That incident does **not** generalize to "builders are in the harness graph": its sibling `InventoryListingBuilder` is copied by **no** harness (its only importer is `src/main.js`), so the hazard does not apply to it at all — issue 675's delta inherited the opposite belief from this note and planned around a constraint that did not bind.
+Grep the allowlists for the module before reasoning about whether an import is safe to add.
+The mirror trap is **over-filling**: a speculative entry for a module the graph never reaches is silently **inert** and passes green, so an allowlist accretes cargo-cult entries that read as load-bearing and no gate distinguishes from real ones — confirm a new entry is needed (drop it; the suite should hang) rather than adding it defensively.
+What matters is the **transitive import graph, not the rendered tree**: the harness imports the compiled `.svelte.js`, whose **static** imports resolve at module time, so an `{#if}` branch that never renders a child does not keep it out of the graph.
 - Foundry custom module/system sockets carry a **server-attested sender user id** as the **2nd callback argument** (`game.socket.on('module.fabricate', (payload, senderId) => …)`).
 The server sets it from the authenticated session in `dist/server/sockets.mjs handleCustomSocket` (`this.user.id`), so it is non-forgeable; a payload `userId` field is client-supplied and spoofable.
 Authenticate socket senders via the 2nd arg (e.g. gate privileged edges on `game.users.get(senderId)?.isGM`), never via the payload — `socketlib` merely wraps this same mechanism and adds no stronger guarantee (so it is not needed for sender auth).
 The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `main.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.
+- **Foundry's `Localization#localize()` is a dotted-path WALK (`foundry.utils.getProperty`) over the nested `lang/` tree — not a flat-key lookup — and returns the key VERBATIM on any non-string result.** `lang/en.json` is a nested object, so every key segment is a real node.
+The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate's `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageList.svelte`) quietly renders its **hardcoded English fallback**.
+**Nothing fails.** The UI reads correctly in English, screenshots look right, and mounted tests pass — so the whole class is invisible until a translator ships a locale where the fallback is wrong-language.
+Every child key of the shadowing string is affected at once.
+`tests/ui-lang-keys-resolve.test.js` (PR #674) gates only the **reference direction** (a key the code reads must exist); it does **not** detect a shadowed namespace, and **orphaned keys stay invisible to it entirely**.
+So when adding a key, check no ancestor path is itself a string, and prefer a distinct leaf (`…Salvage.Label`) over reusing a container path as a value.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
@@ -361,6 +409,59 @@ It is unrelated to the registered-entry match ref and stays `sourceUuid`.
 
 The learned-recipe provenance record (`Actor.flags.fabricate.learnedRecipes[recipeId].sourceItemUuid`, written by `RecipeVisibilityService`) is a fourth, actor-flag family that is also NOT in the settings-payload rename scope.
 Classify every occurrence by the owning object before renaming.
+
+### Prototype-driven redesign and design-system migration
+
+Fabricate's UI is being redesigned surface-by-surface from standalone HTML prototypes.
+Issues 675 (player Inventory) and 676 (GM Component Studio) each passed a three-round plan gate, a two-round implementation review, and a docs loop — and the maintainer still found user-visible drift within minutes of opening them, plus two surfaces that were specified and never built.
+Every reviewer had checked the change against *rules* (tokens, geometry, type scale, a11y); none had put the new surface beside the shipped one it was supposed to match, and none had checked whether the CSS did anything.
+These notes are what that cost.
+
+- **The already-migrated side wins — identify it, do not assume it.**
+When a redesign lands one surface at a time, every prototype-vs-shipped disagreement has a side that is already the new design system.
+That side wins.
+The shipped sibling won for issue 676 (the Recipe Studio was itself built from a prototype and had already been corrected in use), and the **prototype** won for issue 675 (the Inventory leads the new player design; Crafting/Gathering/Journal are the old one and follow later).
+Neither "the mock is the source of truth" nor "match the neighbour" is safe as a blanket rule — applied blindly, the first re-introduces fixed defects and the second drags a leading surface backwards.
+
+- **"Where the brief is silent, X wins" does not fire where the brief speaks.**
+Issue 676's plan carried exactly that clause and drifted anyway: the brief spoke, the implementer followed it faithfully, and the result still diverged from its sibling — because the sibling had already fixed the thing the brief described.
+A sibling rule must read "the sibling wins wherever it has an opinion", and the check must be a control-by-control diff, not a tie-breaker invoked when someone happens to notice a gap.
+
+- **A shipped sibling's CSS comments are the record of what the prototype got wrong.**
+Read them before building from a mock.
+`.manager-recipe-row.is-selected { box-shadow: none; }` in `styles/fabricate.css` exists to opt the recipe row out of a shared rule, and says why: a ring plus a bar states the selection twice.
+Issue 676 was added to that shared rule's selector list, never got the opt-out, and shipped the bar.
+The same file documents deleting a duplicate page header, replacing a bordered count chip that "read as something to press", and cutting three row icons to one — all three of which issue 676 rebuilt.
+
+- **Implementing a brief's token NAMES is not implementing its design.**
+A brief describes a delta from the prototype's baseline, so the same declaration means different things against a different baseline.
+Issue 675's card selection shipped `--accent-border` + `--surface-soft` exactly as written, onto a resting card that was already `--surface-soft` — the rule compiled to a no-op and selection became invisible.
+Verify the change **renders**; a style that declares correctly and changes nothing passes every review we have.
+
+- **Duplicated scoped styles drift silently, and per-file review cannot see it.**
+Svelte scoping lets two components hand-roll the same class names with different values while each reads as perfectly self-consistent.
+Issue 675's `InventoryBookDetail.svelte` and `InventoryComponentDetail.svelte` did this across eleven classes, so the inspector rendered two design systems depending on what the player clicked.
+Extract the shared shell; matching the values by hand only resets the clock.
+
+- **A "verbatim" extraction during a redesign carries the OLD design forward.**
+Splitting a component is a structural refactor, and "I moved it unchanged" is the correct claim for the code and the wrong outcome for the pixels when everything around it is being restyled.
+
+- **A gate authored from the implementation enshrines the implementation.**
+`tests/components/component-studio-font-size.test.js` was written by measuring the shipped markup, so its fixture hardcoded the drifted controls and its own comments recorded the drift as expected values.
+It then defended the drift.
+Author a visual gate from the design source, and treat a gate whose fixture mirrors the component as measuring nothing.
+
+- **Hand-rolled markup where a primitive exists is a drift generator.**
+Both issues did this: `Medallion`, `StatusPill`, `DropZone`, `RollResultBox`, `CraftButton` and `CraftingThumb` all exist and were re-implemented locally, each copy landing on its own values.
+When reviewing a new surface, list the primitives its sibling uses and ask why each one is absent — "it's a valid manager surface" is not the bar, "it is the same surface" is.
+
+- **Borrowing vocabulary from the wrong neighbour is invisible to rule-based review.**
+Issue 676's editor was built from the Gathering vocabulary (`manager-task-core-card`, the environment scene widgets, `manager-availability-pill`) rather than the Recipe Studio's, so its tag pills inherited a **warning** ramp and rendered amber.
+Every token was a real `--fab-*` token and every gate passed.
+
+- **A mock's fixtures hide the states real data produces.**
+No item in issue 675's prototype was both a tool and salvageable, so its salvageable and tool badges could share one corner slot; in Fabricate those flags are independent and the broken salvageable tool is the headline case.
+The prototype is not authority on states it never had to survive — long names, missing art, both-flags-true, zero-length collections.
 
 ## Markdown & Prose Conventions
 

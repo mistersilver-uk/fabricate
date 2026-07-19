@@ -39,7 +39,7 @@ GM only.
 **Returns:** `Promise<object>`
 
 The `features` object controls which optional behaviours are active.
-Every key defaults to `false` when omitted.
+Every key defaults to `false` when omitted, except `salvage`, which defaults to `true` (see the table below).
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -51,7 +51,7 @@ Every key defaults to `false` when omitted.
 | `propertyMacros` | `boolean` | `false` | Allow result property macros |
 | `effectTransfer` | `boolean` | `false` | Copy active effects from ingredients to crafted results. Also requires `recipe.transferEffects: true` on each recipe. See [Effect Transfer]({% link effect-transfer.md %}). |
 | `multiStepRecipes` | `boolean` | `false` | Multi-step recipes |
-| `salvage` | `boolean` | `false` | Allow components to be broken down into constituent parts. When `true`, each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
+| `salvage` | `boolean` | `true` | Allow components to be broken down into constituent parts. Defaults on for backward compatibility; an explicit `false` is honoured. When enabled (the default), each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
 | `gathering` | `boolean` | `false` | Enable GM authoring for gathering environments and tasks. See [Gathering Environments]({% link gathering-environments.md %}). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -67,7 +67,7 @@ const system = await mgr.createSystem({
     essences: true,
     effectTransfer: true,
     multiStepRecipes: false,
-    salvage: false
+    salvage: false // opt out; salvage is on by default
   },
   essenceDefinitions: [
     {
@@ -111,7 +111,6 @@ The returned system object also includes the following top-level salvage fields,
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools even when the salvage check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback) |
 | `progressive.rollFormula` | `string` | `""` | Roll formula for the progressive salvage check (`progressive` salvage mode). The check is usable only when this is set. |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
-| `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -135,10 +134,15 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 | `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
-| `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+{: .note }
+> `progressive.allowPlayerReorder` is retired (issue 651) and is dropped from the crafting, salvage, and gathering progressive check blocks on every normalise, including on import of a legacy payload.
+> The 1.17.0 migration strips it from stored systems.
+> The permission it carried now lives on the recipe as `allowPlayerResultReorder` and on the component as `salvage.allowPlayerResultReorder`, and it defaults to `true` where it previously defaulted to `false`.
+> Gathering never had an ordered result-stage surface, so it has no replacement field.
 
 The `alchemy` field is present only when `resolutionMode` is `"alchemy"`.
 It carries the alchemy check mode and the discovery/consumption options.
@@ -415,7 +419,7 @@ Hooks.once('fabricate.ready', async () => {
 
 ### updateItem(systemId, itemId, updates)
 
-Updates a component's properties (tags, essences, difficulty, salvage).
+Updates a component's properties (category, tags, essences, difficulty, salvage).
 GM only.
 
 | Parameter | Type | Description |
@@ -429,9 +433,45 @@ GM only.
 If `updates` changes `registeredItemUuid`, `originItemUuid`, or `aliasItemUuids`, the manager enforces the same per-system uniqueness rule used by imports.
 An update that would make two components claim the same source-reference chain throws an `Error`.
 
+`updates` is shallow-merged over the stored component, so a field you omit is preserved.
+Note this merge is shallow: `updates.salvage` REPLACES the whole stored `salvage` sub-object rather than merging into it, so a partial patch such as `{ salvage: { enabled: true } }` drops `resultGroups`.
+Spread the existing sub-object when patching one of its keys.
+
+#### `category`
+
+`category` is the component's single-valued grouping axis, and it drives grouping and filtering in the GM component browser.
+It is normalised to a non-empty string on every write.
+Any unusable value (a non-string, an empty string, or an absent key) reads as the reserved `'general'` bucket, so every component has a category and there is no uncategorised state.
+This default is applied by normalisation rather than by a migration.
+
+`category` is distinct from `tags`, which is many-valued and is not a grouping axis.
+
+The system's authored vocabulary lives in the top-level `componentCategories` array on the system.
+It is a sibling of the recipe `categories` array and is deliberately independent of it: the two vocabularies are never merged or cross-populated, so a component category is never offered as a recipe category.
+The reserved `'general'` bucket is implied and is never stored in `componentCategories`.
+A `category` naming no entry in the vocabulary is still stored and shown verbatim.
+
+```javascript
+// Categorise a component. Existing fields are preserved by the shallow merge.
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.updateSystem('dragoncraft-system-id', { componentCategories: ['Reagent', 'Scale'] });
+  await mgr.updateItem('dragoncraft-system-id', 'dragon-scale-component-id', {
+    category: 'Scale'
+  });
+});
+```
+
+#### `salvage`
+
 When `features.salvage` is enabled on the system, you can set the `salvage` sub-object here.
 The shape is normalised on write.
-See [Component Salvage Configuration]({% link salvage.md %}#component-salvage-configuration) for the full field reference.
+See [Component Salvage]({% link salvage.md %}#component-salvage) for the GM-facing walkthrough.
+
+`salvage.enabled` gates salvageability per component and defaults to `false`.
+It is clamped to `false` whenever the normalised `salvage.resultGroups` is empty, because a component that is salvageable but yields nothing is a forbidden state.
+The clamp only ever turns `enabled` off, so it never enables salvage on a component that did not ask for it.
+This runs on every write, including imports, so `{ enabled: true, resultGroups: [] }` normalises to `{ enabled: false, resultGroups: [] }`.
 
 ```javascript
 // Configure salvage for a Dragon Scale component
@@ -533,8 +573,18 @@ A check becomes usable only when its resolution-mode sub-object carries an autho
 Normalises the `salvage` sub-object for a single component.
 Called by `_normalizeComponent` when `features.salvage` is `true` on the system.
 
-Applies defaults: `enabled: false`, `ingredientQuantity: 1`, `toolIds: []`, `resultGroups: []`.
+Applies defaults: `enabled: false`, `allowPlayerResultReorder: true`, `ingredientQuantity: 1`, `toolIds: []`, `resultGroups: []`.
 The optional fields `outcomeRouting`, `timeRequirement`, and `currencyRequirement` are included only when present and non-null in the input.
+
+`enabled` is normalised as `salvage.enabled === true && resultGroups.length > 0`, so it is clamped to `false` whenever the normalised `resultGroups` is empty.
+This enforces the `Component` invariant that an enabled salvage configuration has at least one result group.
+The normaliser is the single chokepoint every writer passes, so the clamp holds for API writes, imports, copy-mode, and migrations alike, not only for the GM editor.
+The clamp only ever turns `enabled` off, never on, so it seeds nothing and no migration accompanies it.
+
+`allowPlayerResultReorder` is the GM-authored permission for player re-ordering of this component's progressive salvage result stages (issue 651).
+It is normalised as `salvage.allowPlayerResultReorder !== false`, so an absent key reads as `true` and only an explicit `false` pins the authored order.
+The same default is applied when the component carries no `salvage` object at all.
+It is read in progressive salvage mode only, and it replaces the retired system-level `salvageCraftingCheck.progressive.allowPlayerReorder`.
 
 ### _normalizeToolIds(toolIds)
 

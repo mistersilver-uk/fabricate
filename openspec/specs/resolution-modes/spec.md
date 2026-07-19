@@ -1,4 +1,4 @@
-# Specification 004: Resolution Modes
+# Resolution Modes
 
 ## Purpose
 
@@ -10,7 +10,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - `CraftingSystem.resolutionMode` is system-wide.
 - Recipes cannot mix resolution modes inside one crafting system.
 - Mode changes are **migration-first** and governed by
-  `007-destructive-changes-and-migrations.md`:
+  `destructive-changes-and-migrations/spec.md`:
   recipes are migrated to fit the new mode wherever possible and a recipe is
   deleted only when a per-recipe *structural* constraint of the target mode cannot
   be satisfied by clearing the result selection or collapsing a multi-set recipe.
@@ -47,13 +47,13 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
   collapse to the first set, NOT a delete.
   `RI↔RC` never deletes (`carry`); it reconciles stale routing.
   Re-running a `carry` migration with no reconcile pending is a no-op (idempotent).
-- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `007-destructive-changes-and-migrations.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
+- Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `destructive-changes-and-migrations/spec.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
 
 ## Mode Matrix
 
 | Mode                  | Ingredient Sets | Result Groups               | Check Requirement  | Routing Basis                       |
 |-----------------------|-----------------|-----------------------------|--------------------|-------------------------------------|
-| `simple`              | exactly 1       | exactly 1                   | optional           | single result group                 |
+| `simple`              | exactly 1       | 1 success (+ optional reserved failure group) | optional | single result group                 |
 | `routedByIngredients` | one or more     | one or more                 | optional           | `IngredientSet.resultGroupId`       |
 | `routedByCheck`       | one or more     | one or more                 | required           | system routed-check outcome         |
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
@@ -70,7 +70,7 @@ The historical macro-as-check-source and the `checkSource: "builtIn"` game-syste
 ## Player-Facing Mode Labels
 
 The `resolutionMode` token is system-internal and must never surface raw in player UI.
-The player-facing Journal screen (see `003-ui-integration.md` *Journal App*) maps each mode to a localized display label through a frozen label-key map (`RunJournalBuilder.MODE_LABEL_KEYS`), resolved against the `FABRICATE.App.Journal.Mode.*` localization keys.
+The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) maps each mode to a localized display label through a frozen label-key map (`RunJournalBuilder.MODE_LABEL_KEYS`), resolved against the `FABRICATE.App.Journal.Mode.*` localization keys.
 
 | Mode                  | Localization key                                 | Player label          |
 |-----------------------|--------------------------------------------------|-----------------------|
@@ -88,16 +88,17 @@ The player-facing Journal screen (see `003-ui-integration.md` *Journal App*) map
 
 ### Semantics
 
-- One ingredient set and one result group.
+- One ingredient set and one success result group, plus an **optional reserved `role: 'failure'` result group** (mirroring alchemy's none/simple path).
 - Optional pass/fail crafting check.
-- On success, produce the single result group.
+- On success, produce the single success result group.
+- On a failed (enabled) check, produce the reserved `role: 'failure'` group when one is authored; otherwise nothing is produced.
 
 ### Validation
 
 - Exactly one `IngredientSet`.
-- Exactly one `ResultGroup`.
-- The crafting check is optional: it runs only when `craftingCheck.simple.rollFormula` is authored (the engine rolls the formula and resolves pass/fail against the DC).
-With no authored formula the attempt proceeds with no check; there is no macro-return contract.
+- Exactly one success `ResultGroup` (validation counts only non-`failure` groups); an optional reserved `role: 'failure'` group is tolerated, and a simple recipe carrying one still validates.
+- The crafting check is optional: it runs only when `craftingCheck.simple.rollFormula` is authored **AND crafting checks are enabled** (`features.craftingChecks === true` or `craftingCheck.enabled === true`; both default false).
+With no authored formula, or with checks disabled, the attempt proceeds with no check; there is no macro-return contract.
 
 ## Routed by Ingredients Mode (`routedByIngredients`)
 
@@ -108,7 +109,7 @@ With no authored formula the attempt proceeds with no check; there is no macro-r
 The mode carries no `resultSelection`.
 - **Single-selection semantics: exactly one result group is selected per craft attempt, determined by the chosen ingredient set.
 No other result groups are awarded.**
-- The crafting check is the SAME optional pass/fail check as `simple`/`alchemy` mode, stored in the shared **`craftingCheck.simple`** slot (which backs `simple`, `alchemy`, and `routedByIngredients` — it is not a simple-mode-only slot).
+- The crafting check uses the SAME shared **`craftingCheck.simple`** config slot as `simple`/`alchemy` mode (which backs `simple`, `alchemy`, and `routedByIngredients` — it is not a simple-mode-only slot), but its **run condition differs from simple mode**: routedByIngredients (like alchemy-Simple) rolls on an authored `craftingCheck.simple.rollFormula` alone, **ungated by the crafting-checks toggle**, whereas simple mode additionally requires crafting checks to be enabled (see §Simple Mode Validation).
 It runs only when `craftingCheck.simple.rollFormula` is authored; with no formula the attempt proceeds with no check.
 It is a pass/fail gate comparing the roll total against the DC (meet/exceed per `thresholdMode`), honouring per-recipe DC tiers (`checkTierId` → `craftingCheck.simple.tiers`), a dynamic-DC macro (`dcMode: 'dynamic'`), and the check's `checkBreakage` triggers.
 It never reads outcome tiers and never changes which result group is produced (routing stays `IngredientSet.resultGroupId`).
@@ -124,7 +125,8 @@ It never reads outcome tiers and never changes which result group is produced (r
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
 - Reference integrity (always applies): each `IngredientSet.resultGroupId` must point at a real `ResultGroup` in scope.
-- This mode never raises `routedCheckNoFormula`: a missing `craftingCheck.simple.rollFormula` simply means no check runs (its readiness is identical to its equally-optional `simple`/`alchemy` peers).
+- This mode never raises `routedCheckNoFormula`: a missing `craftingCheck.simple.rollFormula` simply means no check runs.
+It shares the `craftingCheck.simple` config slot with its `simple`/`alchemy` peers, but its run condition matches alchemy-Simple (an authored formula rolls on its own), not simple mode (which also requires the crafting-checks toggle enabled).
 
 ## Routed by Check Mode (`routedByCheck`)
 
@@ -151,12 +153,21 @@ The default (null/unset) imposes no override, so the outcome is the tier actuall
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
 The gate is fixed-type only; relative-type routed checks ignore it.
-It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected — only the crafting `routedByCheck` caller threads the recipe's minimum.
+It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected.
+Runtime scope: the minimum-success-tier gate is `routedByCheck`-only.
+The crafting dispatch threads `minOutcomeId: recipe.minSuccessOutcomeId` on the `routedByCheck` path alone; although **alchemy `checkMode: tiered`** is dispatched to the same `_runRoutedCheck` caller, that dispatch forces `minOutcomeId: null` (`applyMinSuccessOutcome: false`), so a `minSuccessOutcomeId` carried on an alchemy tiered brew — authored before a mode switch, or imported — has NO runtime effect.
+Alchemy tiered brews already gate success through each outcome tier's own `success` flag, so they need no per-recipe minimum.
+This matches the authoring control, which auto-hides outside `routedByCheck` (`resolveRecipeFixedOutcomeTierOptions`): the value the GM cannot see or clear is also the value the runtime ignores.
+A persisted alchemy `minSuccessOutcomeId` is left inert by the dispatch guard rather than migrated away.
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
+- **Routing is success-disposition-gated.**
+A check result whose matched tier has `success: false` takes the failure/consumption path regardless of the tier's name — the engine short-circuits on `!checkResult.success` before routing runs.
+Routing via `checkOutcomeIds` resolves only `success === true` tiers (a `success: false` tier must never produce a `disposition: 'success'` result), and validation/authoring offer success tiers only for assignment.
+So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a GM or import placed in a group's `checkOutcomeIds` never routes and never produces a success result.
 - Resolution rules (applied per step/scope; "exactly one result group" is evaluated per step for multi-step recipes):
-  1. Explicit tier assignment wins: when the outcome resolves to a routed-check outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
+  1. Explicit tier assignment wins: when a **success** outcome resolves to a routed-check success outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
   2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
   3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
   4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
@@ -181,9 +192,15 @@ A `routedByCheck` recipe is otherwise structurally valid regardless of the check
 
 - Exactly one ingredient set and one result group.
 - The result order is meaningful.
-- Result entries carry no quantity: awarding spends the budget against each entry once, so the same `Component` may appear multiple times and repetition is how a recipe asks for more of a result.
+- Result entries carry no quantity: awarding spends the budget against each entry once, so the same `Component` may appear multiple times and repetition is how a recipe or a salvage config asks for more of a result.
 Each awarded entry grants a single item (any legacy authored quantity is normalized to 1).
+This governs **every** progressive award surface, crafting and salvage alike — the rule follows from the award loop, which charges one entry's `difficulty` and awards that one entry, so honouring a count would grant N items for the price of one.
+The normalization is enforced at award time on both paths (`ResolutionModeService._resolveProgressive` for recipes, `CraftingEngine._resolveSalvageResultGroups` for salvage), never by a migration: `quantity` remains a stored, normalizer-clamped field and is simply inert in this mode.
+The salvage scope is stated explicitly because it was read as recipe-only once and the salvage path shipped honouring the authored count.
 - Each result references a `Component` with `difficulty >= 1`.
+This `difficulty` IS the component's **progressive DC** — the field the GM component editor labels verbatim "This component's Progressive DC" — and it is stable, per-component authored data.
+It is distinct from the progressive **check**, which has **no DC** of its own: the check produces the numeric budget (`value`), and each stage spends that budget against its component's progressive DC.
+Player-facing progressive surfaces therefore show both per stage — the component's progressive DC (`DC N`) and the cumulative budget that reaches the stage (`Reach ≥N`).
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
 - **All result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group.
@@ -202,8 +219,61 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 ### Player Reorder
 
-- If `allowPlayerReorder` is false, recipe-defined order is authoritative.
-- If true, player may reorder before execution; the reordered list is used for award evaluation.
+Progressive awarding spends the roll down an ordered list, so the order decides what the player actually receives.
+Two distinct concepts govern it and MUST NOT be collapsed: the GM-authored **Result Order Permission** (on the aggregate, exported) and the per-user **Player Result Order** (runtime preference, never exported).
+
+#### Result Order Permission (GM-authored)
+
+- The permission lives on the entity whose results are being ordered, and nowhere else: `Recipe.allowPlayerResultReorder` for crafting, `Component.salvage.allowPlayerResultReorder` for salvage.
+- Both default to `true`.
+- An absent key reads as `true`, so no migration seeds the field; only an explicit `false` pins the authored order.
+- The retired system-level `craftingCheck.progressive.allowPlayerReorder` is gone from all three progressive check blocks (crafting, salvage, gathering).
+- Gathering has no reorder feature: it exposes no ordered result-stage surface, so the retired flag was removed without replacement.
+- When the permission is `false` the authored order is authoritative and any stored player order is ignored.
+- `Component.salvage.allowPlayerResultReorder` has its **first UI consumer**: the player Inventory tab's salvage panel (`ui-integration` §Player Salvage Surface).
+It was previously modelled, normalized, GM-authorable, captured onto every salvage run, and read at award time — with no surface that let a player exercise it, so the permission a GM set had no observable effect.
+
+#### Player Result Order (per-user runtime state)
+
+- The order is stored as a list of **result ids**, not indices, so it survives a GM editing the recipe.
+- Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<componentId>`.
+- One key per recipe, not per step.
+- The order is a **standing preference**: it applies to every craft of that recipe until the player changes it, and is NOT a per-attempt gesture.
+- It is stored per-user **within a world**, not per-account globally: the same player in a second world starts from the authored order.
+
+#### Reconciliation contract
+
+Reconciling a stored order against the authored list MUST satisfy all of the following.
+
+- The result count is preserved exactly: reconciliation never drops a result, because the award loop spends budget down the list and a dropped result silently denies the player an award they were entitled to.
+- Ids in the stored order that match no authored result are skipped.
+- Authored results the stored order does not name are **tail-appended in authored order**, so an unranked stage can never displace a ranked one: a GM adding a stage cannot silently demote a player's ranked stage, and the new stage is awarded only if budget remains.
+- A result with **no id** is never reorderable and always retains its authored position (it matches nothing and tail-appends).
+- **Duplicate ids: first match wins.** The second copy tail-appends rather than vanishing or doubling.
+- An absent or empty stored order yields the authored list unchanged.
+
+#### Cross-step id uniqueness (assumption)
+
+- One flat id list reconciles every step of a multi-step progressive recipe.
+- This is correct only while result ids are **unique across a recipe's steps**, which nothing enforces — copy-mode import preserves result ids by design.
+- A result id colliding across two steps therefore ranks independently in each.
+- This is a recorded assumption, not a guarantee.
+
+#### Which user's order is read
+
+- **Crafting reads the order live, at resolve time, and it is the EXECUTING user's** — not the actor owner's.
+A GM invoking `craft` through the API resolves down the *GM's* order.
+This is deliberate: the recipe path resolves on the acting client.
+- **Salvage reads the order captured on its run record at start**, never from settings.
+- This asymmetry is deliberate and load-bearing, not drift.
+A world-time-resumed salvage is driven by the synced `updateWorldTime` hook, which fires on every client with no ownership filter, so whichever client wins the race executes the resume.
+Capturing the order at start makes the executing user irrelevant, which makes that class of defect structurally unreachable on the salvage path rather than merely documented.
+- A salvage with **no run record uses the authored order**, and there is deliberately **no settings fallback**; adding one would reintroduce the executing-user read the capture exists to prevent.
+- Salvage gates on the permission at **read time, not capture time**, so a GM toggling the permission off mid-run takes effect on that run's award.
+The captured order is retained but ignored.
+- The player-facing salvage surface writes only the **standing preference** under `salvage:<componentId>` and relies on the existing run-record capture; it MUST NOT thread an order into the salvage call.
+The "no settings fallback" rule above is unaffected by that surface existing and MUST NOT be relaxed.
+- A pending debounced order write MUST be **flushed before a salvage run starts**: the capture happens once, at start, so a run begun inside the debounce window captures the **stale** order.
 
 ### Validation
 
@@ -219,13 +289,14 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ### Semantics
 
 - Player submits ingredient combinations directly instead of selecting a visible recipe.
-- Recipe visibility is **reveal-not-gate** (see `006`): the system's `visibilityMode` selects which source REVEALS a recipe in a non-GM's Known list (`item` = a held book/scroll, `knowledge` = learned, Manual/`restricted` = a per-recipe access grant, `global` = brew-discovery), with brew-discovery unioned across all modes; brewing is NEVER gated by visibility (a matched ingredient signature is the sole brew gate, so a non-GM alchemy recipe is always `craftable`). `learnOnCraft` governs only whether a matched brew records the brew-discovery reveal, never craftability.
+- Recipe visibility is **reveal-not-gate** (see `recipe-visibility/spec.md`): the system's `visibilityMode` selects which source REVEALS a recipe in a non-GM's Known list (`item` = a held book/scroll, `knowledge` = learned, Manual/`restricted` = a per-recipe access grant, `global` = brew-discovery), with brew-discovery unioned across all modes; brewing is NEVER gated by visibility (a matched ingredient signature is the sole brew gate, so a non-GM alchemy recipe is always `craftable`). `learnOnCraft` governs only whether a matched brew records the brew-discovery reveal, never craftability.
 - An alchemy recipe always has EXACTLY ONE ingredient set and is never routed by ingredients.
 - Result-group selection and check-ness are driven by the SYSTEM-level `alchemy.checkMode` (`none` | `simple` | `tiered`), NOT a per-recipe `resultSelection.provider` (retired, issue 554; this supersedes the earlier "alchemy check optional" behaviour):
   - **None** — one ingredient set + one result group, no check; a matched brew always succeeds and produces that group.
   - **Simple** — the mandatory shared `craftingCheck.simple` pass/fail check (cannot be disabled).
 Pass → the success result group; fail → the reserved `role: 'failure'` result group (produced only when non-empty; a matched fail is a genuine outcome, not a fizzle).
 The failure group's absence is tolerated (a settings-only None→Simple flip runs no recipe migration).
+This reserved failure-group mechanism is **shared** with plain `simple` resolution mode (see §Simple Mode), which mirrors the same none/simple path; `role: 'failure'` is not alchemy-only.
   - **Tiered** — behaves EXACTLY like `routedByCheck`: the mandatory `craftingCheck.routed` check (cannot be disabled) routes each success outcome to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles before result creation.
 Tiered has NO `role: 'failure'` group.
 - Multi-step recipes are not supported.
@@ -281,7 +352,8 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 
 - The bench drives a five-mode status model that governs the status pill, the Produces panel, and the Brew affordance: `empty`; `assembling` (the bench is a strict subset of a selected known recipe's signature); `ready` (the bench equals a known signature); `untried` (the bench matches no known recipe AND is not a remembered fizzle); `no-reaction` (the bench matches no known recipe AND IS a remembered fizzle).
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
-- **Client mode is advisory; the engine is authoritative on brew.** The client fails safe to `untried` for any signature not reducible to a concrete plain-component multiset (single-option groups, no essence-only requirement; the single-ingredient-set condition is now guaranteed by the mode invariant) and NEVER emits a false `ready`/`assembling`.
+- **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
+It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
 - **Brew-result banner status enum.** A resolved brew reports one of four banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).
 The same caveat applies to select-to-load auto-fill.
@@ -312,7 +384,7 @@ Canonical text uses "alchemy (crafting) system"; "discipline" is reserved for pl
 - Includes: component inventory, workbench, and the known-recipes list.
 - Recorded run/attempt **history stays a Journal concern** — the tab has NO history panel and NO active-runs surface.
 Its only local memory is the internal fizzle dead-end set (which is not run history).
-- Excludes: shopping list, recipe browsing, recents, favourites.
+- Excludes: shopping list, recipe browsing, favourites.
 - This is a deliberate narrowing from the earlier "active runs, history" scope.
 
 ### Validation

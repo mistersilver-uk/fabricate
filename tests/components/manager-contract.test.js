@@ -20,6 +20,7 @@ const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/Recipes
 const recipeBrowserInspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+const componentRowPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/components/ComponentRow.svelte');
 const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
@@ -41,6 +42,7 @@ const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
 const recipeBrowserInspectorSource = readFileSync(recipeBrowserInspectorPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
+const componentRowSource = readFileSync(componentRowPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
@@ -307,13 +309,24 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
     }
-    for (const snippet of [
-      'class="manager-component-drop-zone"',
-      'class={componentTableClass}',
-      'manager-component-row',
-      'class="manager-component-identity"'
-    ]) {
+    // `class={componentTableClass}` is GONE (issue 676): the rebuilt browser is a LIST
+    // of rows, not a `role="table"` grid, so the table scaffolding and the class that
+    // toggled its column template are dropped rather than left orphaned on a non-table
+    // structure. `.manager-component-drop-zone` still lives here; the row's own classes
+    // moved into the extracted ComponentRow and are pinned there — both are probed by
+    // managerLayoutGuards and the smoke harness.
+    for (const snippet of ['class="manager-component-drop-zone"', 'ComponentRow']) {
       assert.ok(componentsBrowserSource.includes(snippet), `ComponentsBrowserView should include ${snippet}`);
+    }
+    for (const snippet of ['manager-component-row', 'class="manager-component-identity"']) {
+      assert.ok(componentRowSource.includes(snippet), `ComponentRow should include ${snippet}`);
+    }
+    // The dropped table scaffolding must not creep back in either file.
+    for (const snippet of ['role="table"', 'role="row"', 'role="columnheader"', 'role="cell"']) {
+      assert.ok(
+        !componentsBrowserSource.includes(snippet) && !componentRowSource.includes(snippet),
+        `the component browser must not reintroduce ${snippet}`
+      );
     }
     for (const snippet of [
       'manager-system-edit-form',
@@ -549,6 +562,10 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(
       rootSource.includes("store.toggleRequirement?.('currency', next)"),
       'root should thread onToggleCurrency to store.toggleRequirement'
+    );
+    assert.ok(
+      rootSource.includes("store.toggleRequirement?.('time', next)"),
+      'root should thread onToggleTime to store.toggleRequirement (issue 714)'
     );
     for (const snippet of [
       'class="manager-systems-table"',
@@ -929,13 +946,20 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('visiblePlaceholderViews'),
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
-    assert.ok(rootSource.includes('recipesRouteEnabled'), 'root should derive the recipes route from the experimental feature gate');
-    assert.ok(rootSource.includes('CRAFTING_VIEWS.includes(view) && !recipesAvailable'), 'route normalization should reject every crafting view while the experimental gate is disabled');
-    assert.ok(rootSource.includes("if ((view === 'recipes' || view === 'crafting-settings' || view === 'access' || view === 'books-scrolls' || view === 'recipe-item-edit') && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes/crafting navigation while disabled');
-    assert.ok(rootSource.includes("{#if recipesRouteEnabled}"), 'recipes should not be hard-wired as an always-active rail route');
+    // Issue 745: the Crafting group is unconditional (v1.3 headline); the experimental
+    // toggle now only gates the unimplemented Graph placeholder.
+    assert.ok(rootSource.includes('const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true)'), 'root should derive the experimental gate for the Graph placeholder');
+    assert.ok(!rootSource.includes('recipesRouteEnabled'), 'the recipes-route experimental gate should be gone');
+    assert.ok(!rootSource.includes('!recipesAvailable'), 'route normalization should no longer gate crafting views on the experimental toggle');
+    assert.ok(!rootSource.includes("{#if recipesRouteEnabled}"), 'the Crafting rail group should render unconditionally');
+    assert.ok(rootSource.includes("if (view.id === 'graph') return experimentalFeaturesEnabled;"), 'the Graph placeholder should be gated on the experimental toggle');
     assert.ok(
-      rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
-      'root should keep disabled Recipes in the planned placeholder list when experimental features are off'
+      !rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
+      'the disabled Recipes placeholder should be removed now that Crafting is always available'
+    );
+    assert.ok(
+      rootSource.includes("{ id: 'graph', icon: 'fas fa-project-diagram'"),
+      'the Graph placeholder should remain in the planned placeholder list'
     );
     assert.ok(rootSource.includes('selectSystemAndShowBrowser'), 'root should keep an explicit systems-browser route');
     assert.ok(rootSource.includes('manager-scope-card'), 'root should render the selected system in a rail card');
@@ -1068,12 +1092,20 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes("import TagsCategoriesView from './TagsCategoriesView.svelte';"),
       'root should import the focused tags/categories page'
     );
-    assert.ok(rootSource.includes('store.addCategory?.(value)'), 'category add should delegate to the admin store');
+    assert.ok(rootSource.includes('store.addCategory?.(value, icon)'), 'category add should delegate to the admin store with its icon');
     assert.ok(rootSource.includes('store.removeCategory?.(category)'), 'category remove should delegate to the admin store');
+    // Per-category icon persistence (issue 689) is a dedicated store seam.
+    assert.ok(rootSource.includes('store.setCategoryIcon?.(name, icon)'), 'category icon edits should delegate to the admin store');
+    // The COMPONENT category vocabulary (issue 676) — the sibling of the two above,
+    // and a SEPARATE store action: it must never be folded into addCategory.
+    assert.ok(rootSource.includes('store.addComponentCategory?.(value, icon)'), 'component category add should delegate to the admin store with its icon');
+    assert.ok(rootSource.includes('store.removeComponentCategory?.(category)'), 'component category remove should delegate to the admin store');
+    assert.ok(rootSource.includes('store.setComponentCategoryIcon?.(name, icon)'), 'component category icon edits should delegate to the admin store');
     assert.ok(rootSource.includes('store.addTag?.(value)'), 'tag add should delegate to the admin store');
     assert.ok(rootSource.includes('store.removeTag?.(tag)'), 'tag remove should delegate to the admin store');
-    assert.ok(rootSource.includes('confirmTagCategoryRemoval'), 'in-use removals should flow through a confirmation seam');
-    assert.ok(tagsCategoriesSource.includes('onConfirmRemove'), 'focused route should ask the root before removing in-use vocabulary');
+    // The destructive delete is now confirmed inline in the focused route (issue 689),
+    // then cascades through the store's remove ops — not an external confirm seam.
+    assert.ok(tagsCategoriesSource.includes('onRemoveCategory'), 'focused route should own the vocabulary remove wiring');
     assert.ok(tagsCategoriesSource.includes('GeneralReservedFeedback'), 'focused route should keep reserved General feedback visible');
     assert.ok(!/\b(?:game|ui|Hooks|CONFIG)\b/.test(tagsCategoriesSource), 'tags/categories route should not directly reference Foundry globals');
   });
@@ -1174,6 +1206,36 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes("activeView = view"), 'components should use the selected-system route state');
     assert.ok(!rootSource.includes('usageCount ='), 'components browser should not invent usage counts');
     assert.ok(!rootSource.includes('stale source'), 'components browser should not invent source freshness labels');
+  });
+
+  it('AC14: confirmComponentRouteExit retains NO component-edit bypass (issue 676)', () => {
+    // LOAD-BEARING ASYMMETRY. `confirmComponentRouteExit` deliberately LACKS the
+    // `|| nextView === '<kind>-edit'` bypass its recipe and environment siblings carry
+    // (`confirmRecipeRouteExit`: `if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;`).
+    //
+    // That omission is exactly what makes `editComponent` guard component -> component
+    // navigation — i.e. it is what makes the salvage "Edit ↗" deep link safe. An
+    // implementer told to "mirror the Recipe Studio" copies the bypass and silently
+    // discards a dirty draft on a deep-link jump, with nothing failing.
+    const guard = rootSource.slice(
+      rootSource.indexOf('function confirmComponentRouteExit'),
+      rootSource.indexOf('function confirmEnvironmentRouteExit')
+    );
+    assert.ok(guard.length > 0, 'expected to locate confirmComponentRouteExit');
+    assert.ok(
+      guard.includes("if (activeView !== 'component-edit') return true;"),
+      'the component route guard should short-circuit only on the ACTIVE view'
+    );
+    assert.ok(
+      !guard.includes("nextView === 'component-edit'"),
+      'the component route guard must NOT gain the recipe/environment nextView bypass'
+    );
+    // The sibling that DOES carry it, pinned so this test cannot pass vacuously by the
+    // bypass string simply having been renamed everywhere.
+    assert.ok(
+      rootSource.includes("if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;"),
+      'the recipe sibling still carries the bypass this one deliberately omits'
+    );
   });
 
   it('routes the components row Edit action through the in-manager component-edit view', () => {

@@ -50,10 +50,24 @@ function rewriteClientImports(code) {
 
 function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+  // Rendered by BOTH ComponentEditView (salvage) and RecipeResultsTab (issue 651).
+  // Omitting it here HANGS every mounted manager test rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ToggleCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentSourceInspector.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentDifficultyInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+  // The Component Studio EDITOR's own components (issue 676). They live under
+  // `component/` — NOT `components/`, which is the BROWSER's dir; the screenshot
+  // evidence map globs the two separately. ComponentSourceInspector and
+  // ComponentDifficultyInspector are gone: decision 4 removed the right rail, and both
+  // rehomed into the single scrolling column.
+  for (const componentEditorPart of ['ComponentEditorHeader', 'ComponentIdentityStrip']) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/component/${componentEditorPart}.svelte`);
+  }
+  // The library's row and its inspector, both extracted out of the browser / the root
+  // (issue 676). They live under `components/` — NOT `component/`, which the screenshot
+  // map globs for the EDITOR.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -106,6 +120,28 @@ function compileManagerRoot() {
   // InventoryDetail (which pulls in CraftingThumb → craftingImageDefaults) fed a
   // synthetic row from recipeItemPreviewRow.js (issue 544). Compile/copy them here too
   // or mounting the manager tree that renders the editor HANGS (# cancelled).
+  // InventoryDetail is a thin router (issue 675); its `{#if}` branches do NOT keep the
+  // bodies out of the module graph (the compiled `.svelte.js` imports them statically),
+  // so the whole `detail/` tree has to be compiled here as well.
+  // The shell BOTH bodies render inside (header + shared body leaves).
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte');
+  // The salvage tree is never RENDERED by the preview (a book is never salvageable),
+  // but the component branch imports it statically, so it is still in the module graph.
+  // That includes the shared stage list the progressive salvage body reuses.
+  writeCompiledSvelte('src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte');
+  for (const salvageComponent of [
+    'SalvageRollSummary',
+    'SalvageSimpleBody',
+    'SalvageRoutedBody',
+    'SalvageProgressiveBody',
+    'SalvageMisconfiguredBody',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/inventory/detail/salvage/${salvageComponent}.svelte`);
+  }
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');
   for (const recipeItemComponent of [
@@ -131,15 +167,17 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeStepsCard.svelte');
   for (const recipeComponent of [
     'RecipeEditorTabs',
-    // The editor's mode banner + context rail (issue 643). The rail REPLACED
-    // RecipeItemInspector and lives under `recipe/` so the screenshot map's
-    // RECIPE_EDIT_MATCHES glob republishes the editor frames when it changes.
+    // The editor's mode banner (issue 643). The former RecipeContextRail is DELETED
+    // (issue 676): its content became the Access / Books & Scrolls tabs below plus the
+    // Overview step-mode control. These live under `recipe/` so the screenshot map's
+    // RECIPE_EDIT_MATCHES glob republishes the editor frames when they change.
     'RecipeModeBanner',
-    'RecipeContextRail',
     'RecipeOverviewTab',
     'RecipeIngredientsTab',
     'RecipeResultsTab',
     'RecipeToolsTab',
+    'RecipeAccessTab',
+    'RecipeBooksScrollsTab',
     'RecipeValidationTab',
     'RecipeStepAccordion',
     'RecipeDurationEditor',
@@ -148,7 +186,6 @@ function compileManagerRoot() {
     'RecipeIngredientSetCard',
     'RecipeIngredientGroupCard',
     'RecipeIngredientOption',
-    'RecipeEssenceRequirements',
     'RecipeResultsSection',
     'RecipeResultGroupCard',
     'RecipeRoutingAssignment',
@@ -156,6 +193,16 @@ function compileManagerRoot() {
     'RecipeToolsSection',
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);
+  }
+  // Plain modules under `component/` — copied raw (NOT compiled), the same way
+  // recipe/recipeReadiness.js is (issue 676).
+  for (const componentModule of ['salvageDcPresets.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/component/${componentModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/component/${componentModule}`), 'utf8')
+    );
   }
   for (const recipeModule of ['recipeReadiness.js']) {
     const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`);
@@ -182,6 +229,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
+  // The one vocabulary section TagsCategoriesView renders three times (recipe
+  // categories, component categories, item tags — issue 676).
+  writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyPanel.svelte');
   for (const environmentComponent of [
     'EnvironmentEditorTabs',
     'EnvironmentOverviewTab',
@@ -255,9 +305,24 @@ function compileManagerRoot() {
     'src/models/Result.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
-    // The recipe library's pure list model (filter / group / sort / paginate + the
+    // The component category vocabulary (issue 676) — the SIBLING of the above, not a
+    // reuse of it. Imported by ComponentEditView and the component browser.
+    'src/utils/componentCategories.js',
+    // Per-category icons + vocabulary reference counting (issue 689). Imported by the
+    // root (icon lookup, usage roll-up); omitting either HANGS the mounted manager
+    // suite as `# cancelled`.
+    'src/utils/categoryIcons.js',
+    'src/utils/vocabularyUsage.js',
+    // The component library's pure list model — filter/group/sort/paginate (issue 676),
+    // the sibling of recipeBrowserModel below. Imported by ComponentsBrowserView AND by
+    // the root (which lifts the browser state).
+    'src/utils/componentBrowserModel.js',
+    // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
+    // The category totals both browser models group with (issue 676). Imported by BOTH
+    // of the two above, so omitting it HANGS every mounted manager test.
+    'src/utils/browserGroupCounts.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
@@ -268,8 +333,9 @@ function compileManagerRoot() {
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',
     'src/gatheringImageDefaults.js',
-    // CraftingSystemManagerRoot seeds a routing provider when a recipe enters
-    // Complex mode, reusing chooseSeedProvider from this pure migration module.
+    // adminStore imports classifyModeChange from this pure migration module to
+    // dry-run migrate/delete counts before a resolution-mode change; copy it so the
+    // mounted import resolves.
     'src/migration/migrateRecipeForModeChange.js',
     // RecipeValidationTab localizes a signature-collision blocker row via this pure
     // leaf (issue 549); copy it so the mounted import resolves.
@@ -296,6 +362,12 @@ function navButton(labelText) {
   );
 }
 
+// Set a control's value and fire the input event Svelte's bind:value listens for.
+function setInputValue(element, value) {
+  element.value = value;
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function gatheringSubitem(labelText) {
   return Array.from(target.querySelectorAll('.manager-nav-subitem')).find((button) =>
     button.textContent.includes(labelText)
@@ -303,7 +375,9 @@ function gatheringSubitem(labelText) {
 }
 
 function gatheringToggle() {
-  return target.querySelector('.manager-nav-toggle');
+  // Target the Gathering group's toggle specifically: the Crafting group (unconditional
+  // as of issue 745) also renders a `.manager-nav-toggle`, ahead of Gathering in the rail.
+  return target.querySelector('#manager-nav-gathering + .manager-nav-toggle');
 }
 
 // The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
@@ -401,6 +475,12 @@ function createStore(calls = [], options = {}) {
     recipeCategories: true,
     salvage: true,
   };
+  // Mirrors `adminStore._buildManagedItemOptions`, which is the source of the real
+  // `selectedSystem.managedItemOptions`. `category` (always) and `difficulty` (when
+  // authored) are part of that projection and are carried here deliberately: the salvage
+  // yield picker reads options from this list (issue 676), and its read-only difficulty
+  // badge reads "No difficulty" for a component whose `difficulty` was dropped in
+  // projection. A fixture omitting them would let that regression pass green.
   const alchemyManagedItemOptions = options.emptyComponents
     ? []
     : [
@@ -409,6 +489,8 @@ function createStore(calls = [], options = {}) {
           name: 'Iron Ore',
           img: 'icons/commodities/metal/ore-chunk-grey.webp',
           description: 'Unrefined metal.',
+          category: 'Reagent',
+          difficulty: 2,
           originItemUuid: 'Compendium.fabricate.items.iron-ore',
         },
         {
@@ -416,12 +498,15 @@ function createStore(calls = [], options = {}) {
           name: 'Glass Vial',
           img: 'icons/containers/kitchenware/vase-clay-blue.webp',
           description: '',
+          category: 'general',
+          difficulty: 5,
         },
         {
           id: 'c3',
           name: 'Nightshade With An Exceptionally Long Localized Component Name',
           img: 'icons/consumables/plants/nightshade.jpg',
           description: 'A dusky flowering herb used in careful doses.',
+          category: 'general',
           originItemUuid: 'Compendium.fabricate.items.nightshade-with-a-long-source-reference',
         },
         {
@@ -429,6 +514,8 @@ function createStore(calls = [], options = {}) {
           name: 'Coal',
           img: 'icons/commodities/materials/bowl-powder-black.webp',
           description: 'Fuel for a steady forge.',
+          category: 'general',
+          difficulty: 3,
         },
       ];
   const systemDetails = {
@@ -499,6 +586,10 @@ function createStore(calls = [], options = {}) {
       ],
       itemTags: ['herb', 'mineral', 'ore'],
       categories: ['potions'],
+      // The COMPONENT category vocabulary (issue 676) — a SIBLING of `categories`, kept
+      // deliberately disjoint from it here so a test asserting one can never pass on
+      // the other's data.
+      componentCategories: ['Reagent'],
       sceneOptions: [
         {
           uuid: 'Scene.forest',
@@ -543,6 +634,10 @@ function createStore(calls = [], options = {}) {
         img: 'icons/commodities/metal/ore-chunk-grey.webp',
         description: 'Unrefined metal.',
         tags: ['ore', 'metal'],
+        // Component category (issue 676) — the browser's grouping/filter axis. This one
+        // is deliberately a CUSTOM category that exists only in this system, so the
+        // system-switch facet-reset test has something real to hide.
+        category: 'Reagent',
         essences: [{ id: 'earth', name: 'Earth', icon: 'fas fa-mountain', quantity: 2 }],
         registeredItemUuidDisplay: 'Compendium.fabricate.items.iron-ore',
         hasRegisteredItemUuid: true,
@@ -910,7 +1005,7 @@ function createStore(calls = [], options = {}) {
       { name: 'potions', count: 1 },
     ],
     recipeSearchTerm: '',
-    itemSearchTerm: '',
+    itemSearchTerm: options.itemSearchTerm || '',
     experimentalFeaturesEnabled: options.experimentalFeaturesEnabled === true,
     itemCards: selectedSystem ? componentCardsFor(selectedSystem.id) : [],
     essenceCards: selectedSystem
@@ -1106,10 +1201,29 @@ function createStore(calls = [], options = {}) {
 
   function componentCardsFor(id) {
     if (options.emptyComponents) return [];
-    return (componentItems[id] || []).map((item) =>
+    const cards = (componentItems[id] || []).map((item) =>
       options.missingComponentSource && item.id === 'c1'
         ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
         : item
+    );
+    // `itemCards` is the SEARCH-FILTERED list. In production `_buildItemCards` calls
+    // `CraftingSystemManager.getItems(systemId, itemSearchTerm)`, which returns the whole
+    // managed list for an empty search and a name/description/uuid/tag-matched subset
+    // otherwise — while `selectedSystem.managedItemOptions` is built from the UNFILTERED
+    // managed items. That asymmetry is real and load-bearing (issue 676: it leaked the
+    // browser's search into the salvage yield picker), so the fixture reproduces it
+    // rather than pretending `itemCards` is always everything.
+    const search = String(options.itemSearchTerm || '')
+      .trim()
+      .toLowerCase();
+    if (!search) return cards;
+    return cards.filter(
+      (item) =>
+        String(item.name || '')
+          .toLowerCase()
+          .includes(search) ||
+        (Array.isArray(item.tags) &&
+          item.tags.some((tag) => String(tag || '').toLowerCase().includes(search)))
     );
   }
 
@@ -1261,12 +1375,22 @@ function createStore(calls = [], options = {}) {
       return options.updateEssenceResult ?? true;
     },
     removeEssence: (id) => calls.push(['removeEssence', id]),
-    addCategory: (value) => {
-      calls.push(['addCategory', value]);
+    addCategory: (value, icon) => {
+      calls.push(['addCategory', value, icon]);
       if (options.addCategoryReject) return Promise.reject(new Error('add category failed'));
       return options.addCategoryResult ?? true;
     },
     removeCategory: (value) => calls.push(['removeCategory', value]),
+    setCategoryIcon: (name, icon) => calls.push(['setCategoryIcon', name, icon]),
+    // The COMPONENT category vocabulary (issue 676). The root calls these
+    // optional-chained, so an absent store export no-ops SILENTLY — these stubs plus
+    // the call-site assertions below are what make that detectable at all.
+    addComponentCategory: (value, icon) => {
+      calls.push(['addComponentCategory', value, icon]);
+      return options.addComponentCategoryResult ?? true;
+    },
+    removeComponentCategory: (value) => calls.push(['removeComponentCategory', value]),
+    setComponentCategoryIcon: (name, icon) => calls.push(['setComponentCategoryIcon', name, icon]),
     addTag: (value) => {
       calls.push(['addTag', value]);
       if (options.addTagReject) return Promise.reject(new Error('add tag failed'));
@@ -1325,6 +1449,12 @@ function createStore(calls = [], options = {}) {
     },
     saveCraftingCheckActive: (enabled) => {
       calls.push(['saveCraftingCheckActive', enabled]);
+    },
+    saveCraftingCheckConsumption: (patch) => {
+      calls.push(['saveCraftingCheckConsumption', patch]);
+    },
+    saveAlchemyConfig: (config) => {
+      calls.push(['saveAlchemyConfig', config]);
     },
     saveSalvageCheckProgressive: (progressive) => {
       calls.push(['saveSalvageCheckProgressive', progressive]);
@@ -1722,14 +1852,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System Overview',
+        'Crafting',
         'Components',
         'Tags & Categories',
         'Essences',
         'Tools',
         'Checks',
         'Gathering',
-        'Recipes',
-        'Graph',
       ]
     );
     assert.equal(
@@ -1788,10 +1917,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('keeps experimental selected-system routes disabled by default', async () => {
+  it('keeps the Crafting group available and hides Graph with experimental features off (issue 745)', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
+    // No experimental flag: createStore defaults experimentalFeaturesEnabled to false,
+    // driving the real gating derivation (not a stubbed value).
     mounted = mount(Component, {
       target,
       props: {
@@ -1801,26 +1932,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
-    const plannedButtons = ['Recipes', 'Graph'].map((label) => navButton(label));
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
-    assert.deepEqual(
-      plannedButtons.map((button) => button?.disabled === true),
-      [true, true]
-    );
-    assert.deepEqual(
-      plannedButtons.map((button) =>
-        button?.querySelector('.manager-nav-count')?.textContent.trim()
-      ),
-      ['Soon', 'Soon']
-    );
+    // The Crafting group is unconditional now (v1.3 headline): a live parent route,
+    // never a disabled "Soon" placeholder.
+    const crafting = craftingParent();
+    assert.ok(crafting, 'the Crafting group renders with the experimental toggle off');
+    assert.equal(crafting.disabled, false, 'the Crafting parent is a live route, not a placeholder');
 
-    navButton('Recipes').click();
+    // The unimplemented Graph placeholder is hidden while experimental features are off.
+    assert.equal(navButton('Graph'), undefined, 'Graph placeholder is hidden with experimental features off');
+
+    // Routing to Recipes works end to end without the experimental toggle.
+    crafting.click();
     await tick();
     flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
-    assert.equal(target.querySelector('.manager-recipes-table'), null);
-    assert.deepEqual(calls, []);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
   });
 
   it('routes the Checks nav to a four-tab view with a tab-aware context menu', async () => {
@@ -2115,6 +2240,105 @@ describe('CraftingSystemManager mounted behavior', () => {
       [['setAlchemyCheckMode', 'tiered']],
       'choosing a mode routes through the store setAlchemyCheckMode action'
     );
+  });
+
+  it('Checks: alchemy behaviour flags render as toggles reflecting stored values and persist via saveAlchemyConfig (issue 713)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    const behaviour = target.querySelector(
+      '[data-checks-panel="crafting"] [data-alchemy-behaviour]'
+    );
+    assert.ok(behaviour, 'the alchemy behaviour card renders on the alchemy crafting tab');
+    const learn = behaviour.querySelector('[data-recipe-field="learnOnCraft"]');
+    const consume = behaviour.querySelector('[data-recipe-field="consumeOnFail"]');
+    const history = behaviour.querySelector('[data-recipe-field="showAttemptHistoryToPlayers"]');
+    assert.ok(learn && consume && history, 'all three behaviour toggles render');
+    // Default fixture: learnOnCraft true, consumeOnFail true, showAttemptHistoryToPlayers
+    // false — a stored non-default false must read back OFF, not the default ON.
+    assert.equal(learn.getAttribute('aria-pressed'), 'true');
+    assert.equal(consume.getAttribute('aria-pressed'), 'true');
+    assert.equal(history.getAttribute('aria-pressed'), 'false');
+    // The consumption-policy card is alchemy-exclusive-off: alchemy resolves consumption
+    // through its own consumeOnFail flag, so the craftingCheck.consumption card is hidden.
+    assert.equal(
+      target.querySelector('[data-checks-panel="crafting"] [data-failure-consumption]'),
+      null,
+      'the failure consumption policy card is not shown in alchemy mode'
+    );
+
+    // Toggling one flag sends the FULL config with only that field flipped, so a partial
+    // saveAlchemyConfig does not silently re-default the untouched flags.
+    history.click();
+    await tick();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'saveAlchemyConfig');
+    assert.ok(saved, 'toggling persists through saveAlchemyConfig');
+    assert.deepEqual(saved[1], {
+      checkMode: 'simple',
+      learnOnCraft: true,
+      consumeOnFail: true,
+      showAttemptHistoryToPlayers: true,
+    });
+  });
+
+  it('Checks: failure consumption policy renders two toggles reflecting stored values and persists via saveCraftingCheckConsumption (issue 712)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          alchemyResolutionMode: 'simple',
+          craftingCheck: {
+            consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    const policy = target.querySelector(
+      '[data-checks-panel="crafting"] [data-failure-consumption]'
+    );
+    assert.ok(policy, 'the failure consumption policy card renders on the non-alchemy crafting tab');
+    const consume = policy.querySelector('[data-recipe-field="consumeIngredientsOnFail"]');
+    const breakTools = policy.querySelector('[data-recipe-field="breakToolsOnFail"]');
+    assert.ok(consume && breakTools, 'both policy toggles render');
+    // Stored non-default fixture: consume OFF, break ON — the projection reads them back
+    // exactly (a dropped default-true field would invert consumeIngredientsOnFail to ON).
+    assert.equal(consume.getAttribute('aria-pressed'), 'false');
+    assert.equal(breakTools.getAttribute('aria-pressed'), 'true');
+    // The alchemy behaviour card is not shown outside alchemy mode.
+    assert.equal(
+      target.querySelector('[data-checks-panel="crafting"] [data-alchemy-behaviour]'),
+      null,
+      'the alchemy behaviour card is not shown in non-alchemy crafting mode'
+    );
+
+    consume.click();
+    await tick();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'saveCraftingCheckConsumption');
+    assert.ok(saved, 'toggling persists through saveCraftingCheckConsumption');
+    assert.deepEqual(saved[1], { consumeIngredientsOnFail: true });
   });
 
   it('points each Checks help card at the matching documentation page', () => {
@@ -2425,11 +2649,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     // The header Save routes to the SALVAGE seam (not crafting) because the salvage
-    // sub-tab is active, and carries the preserved allowPlayerReorder.
+    // sub-tab is active.
     const saved = calls.find((call) => call[0] === 'saveSalvageCheckProgressive');
     assert.ok(saved, 'Save persists the salvage progressive config through the store');
     assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
-    assert.equal(saved[1].allowPlayerReorder, true, 'allowPlayerReorder is preserved');
+    // Issue 651 retired the system-level reorder flag: the draft clone no longer
+    // carries it, so a legacy stored value is not written back on save.
+    assert.equal(
+      saved[1].allowPlayerReorder,
+      undefined,
+      'the retired allowPlayerReorder is not sent'
+    );
     assert.equal(
       calls.find((call) => call[0] === 'saveCraftingCheckProgressive'),
       undefined,
@@ -2547,7 +2777,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saved = calls.find((call) => call[0] === 'saveGatheringCheckProgressive');
     assert.ok(saved, 'Save persists the gathering progressive config through the store');
     assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
-    assert.equal(saved[1].allowPlayerReorder, true, 'allowPlayerReorder is preserved');
+    // Issue 651 retired the system-level reorder flag: the draft clone no longer
+    // carries it, so a legacy stored value is not written back on save.
+    assert.equal(
+      saved[1].allowPlayerReorder,
+      undefined,
+      'the retired allowPlayerReorder is not sent'
+    );
     assert.equal(
       calls.find((call) => call[0] === 'saveSalvageCheckProgressive'),
       undefined,
@@ -2915,7 +3151,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     const emitted = [];
     const value = {
       awardMode: 'equal',
-      allowPlayerReorder: false,
       rollFormula: '2d6',
       checkBreakage: {
         triggers: [
@@ -2988,7 +3223,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       'clicking a segment emits the new outcome'
     );
     assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on a trigger edit');
-    assert.equal(emitted.at(-1).allowPlayerReorder, false);
   });
 
   // Tool-breakage authority UI (issue 419 recombine). Each editor accepts a
@@ -3034,7 +3268,6 @@ describe('CraftingSystemManager mounted behavior', () => {
   };
   const progressiveBreakageValue = {
     awardMode: 'equal',
-    allowPlayerReorder: false,
     rollFormula: '2d6',
     checkBreakage: {
       triggers: [
@@ -3960,12 +4193,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         'System Overview',
+        'Crafting',
         'Components',
         'Tags & Categories',
         'Tools',
         'Checks',
-        'Recipes',
-        'Graph',
       ]
     );
 
@@ -4320,11 +4552,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'recipe-edit renders the identity card in the central main'
     );
     // The mock system carries no recipeVisibility.knowledge.mode, so the editor
-    // defaults to 'itemOrLearned' and the recipe-item card is shown in the global
-    // inspector aside (not a view-internal column).
+    // defaults to 'itemOrLearned' and the Books & Scrolls TAB is offered. Issue 676
+    // deleted the inspector rail that used to host this: recipe-edit is now a
+    // two-column route, so there is no `.manager-inspector` aside at all here.
+    assert.equal(
+      target.querySelector('.manager-inspector'),
+      null,
+      'recipe-edit renders no inspector aside — the rail is deleted and its column released'
+    );
+    const booksTab = target.querySelector('.manager-main [data-recipe-tab-button="books-scrolls"]');
+    assert.ok(booksTab, 'the Books & Scrolls tab is offered for the default knowledge mode');
+    booksTab.click();
+    await tick();
+    flushSync();
     assert.ok(
-      target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'),
-      'recipe-item card shows in the global inspector for the default knowledge mode'
+      target.querySelector('.manager-main [data-recipe-section="recipe-item"]'),
+      'the Books & Scrolls tab hosts the linked-book list'
     );
     // The recipe-edit header now follows the task/environment convention: Back to
     // recipes + Delete recipe + Save (no Cancel).
@@ -4505,16 +4748,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       'recipe-edit still renders the identity card in the central main'
     );
     // Learning a recipe requires it to link a recipe item (the book the player
-    // learns from), and this inspector is the only place that link is authored,
-    // so the recipe-item card must show for 'learned' too — otherwise a
-    // learned-only system has no way to make any recipe learnable.
+    // learns from), and this surface is the only place that link can be REMOVED,
+    // so the Books & Scrolls tab must show for 'learned' too — otherwise a
+    // learned-only system has no way to see or manage what teaches a recipe.
+    const booksTab = target.querySelector('.manager-main [data-recipe-tab-button="books-scrolls"]');
+    assert.ok(booksTab, 'the Books & Scrolls tab is offered for the learned knowledge mode');
+    booksTab.click();
+    await tick();
+    flushSync();
     assert.ok(
-      target.querySelector('.manager-inspector [data-recipe-section="recipe-item"]'),
-      'recipe-item card shows for the learned knowledge mode'
-    );
-    assert.ok(
-      target.querySelector('.manager-inspector'),
-      'the inspector aside is present for the learned knowledge mode'
+      target.querySelector('.manager-main [data-recipe-section="recipe-item"]'),
+      'the Books & Scrolls tab hosts the linked-book list for the learned knowledge mode'
     );
     assert.ok(
       !target.textContent.includes('Edit identity for this recipe.'),
@@ -4577,7 +4821,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     // It must carry an id up front: step-scoped edits route by step id, and an
     // id-less step (undefined == null) misroutes to the recipe scope — looking
     // like the per-step ingredient/result/tool/cost adds do nothing.
-    target.querySelector('.manager-inspector [data-recipe-step-mode-option="multi"]').click();
+    // Step mode lives on the Overview tab since issue 676 (it was in the deleted rail),
+    // beside the steps card it governs.
+    target.querySelector('.manager-main [data-recipe-step-mode-option="multi"]').click();
     await tick();
     flushSync();
 
@@ -4829,7 +5075,15 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
-    assert.ok(target.textContent.includes('Component directory'));
+    // The view renders NO page header of its own (issue 676): the shell already renders
+    // the breadcrumb / "Components" / subtitle block, and a second kicker + "Component
+    // directory" + subtitle under it was ~74px of duplicated chrome. The Recipe Studio
+    // deleted exactly this, and ruling 1 says it wins.
+    assert.equal(
+      target.querySelector('.manager-main .manager-section-header'),
+      null,
+      'the browser renders no second page header'
+    );
     assert.ok(target.textContent.includes('Drop items to add components'));
     assert.ok(target.textContent.includes('Iron Ore'));
     assert.ok(target.textContent.includes('Compendium'));
@@ -4855,98 +5109,80 @@ describe('CraftingSystemManager mounted behavior', () => {
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
+    // Issue 676: components group and filter by CATEGORY, not by tag. Tags are a
+    // many-valued field that was being asked to do a single-valued job; they are now
+    // edited only in the component editor and render nowhere in the browser.
     assert.equal(
       target.querySelector('[aria-label="Filter components by tag"]'),
       null,
-      'component tag filtering should use searchable pills, not the legacy dropdown'
+      'the legacy tag dropdown is gone'
+    );
+    assert.equal(
+      target.querySelector('[aria-label="Search component tags"]'),
+      null,
+      'the tag search facet is gone — category is the grouping axis now'
+    );
+    assert.equal(
+      target.querySelector('[data-component-tag-search]'),
+      null,
+      'no tag search control'
+    );
+    assert.equal(
+      target.querySelector('.manager-component-row .manager-chip-row .manager-chip:not(.manager-essence-compact-chip)'),
+      null,
+      'rows render no tag chips'
     );
 
-    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
-    assert.ok(tagSearch, 'component tag search should render when component tags are available');
-    tagSearch.value = 'con';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    const containerSuggestion = Array.from(target.querySelectorAll('.manager-tag-suggestion')).find(
-      (button) => button.textContent.includes('container')
-    );
-    assert.ok(containerSuggestion, 'tag search should show matching tags underneath');
-    containerSuggestion.click();
+    const categoryFilter = target.querySelector('[data-component-category-filter]');
+    assert.ok(categoryFilter, 'the browser filters by category');
+    categoryFilter.value = 'Reagent';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
-    assert.ok(target.textContent.includes('Glass Vial'));
-    const containerPill = target.querySelector('[data-component-tag-pill="container"]');
-    assert.ok(containerPill, 'selected tag should render as a removable pill');
-    const componentToolbar = target.querySelector('.manager-toolbar');
-    const primaryToolbarRow = target.querySelector('.manager-toolbar-primary');
-    const tagSearchControl = target.querySelector('[data-component-tag-search]');
-    const selectedTagRow = target.querySelector('.manager-toolbar-pills');
+    assert.ok(target.textContent.includes('Iron Ore'), 'the category filter narrows the list');
+
+    // `general` is suppressed as a BADGE (no redundant "General" chip on every row) but
+    // stays a selectable FILTER option, pinned last as the catch-all — the Recipe
+    // Studio's badge-vs-filter asymmetry.
     assert.ok(
-      primaryToolbarRow.contains(tagSearchControl),
-      'tag search control should stay in the primary toolbar row'
+      target.querySelector('[data-component-id="c1"] [data-component-category="Reagent"]'),
+      'a custom category renders as a row badge'
     );
+    categoryFilter.value = 'general';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
+    assert.ok(target.textContent.includes('Glass Vial'), 'the uncategorized component falls into general');
     assert.equal(
-      selectedTagRow?.parentElement,
-      componentToolbar,
-      'selected tag pills should render in a toolbar sibling row'
-    );
-    assert.equal(
-      tagSearchControl.contains(containerPill),
-      false,
-      'selected tag pills should not live inside the tag search control'
+      target.querySelector('[data-component-id="c2"] [data-component-category]'),
+      null,
+      'the general bucket renders no redundant badge'
     );
 
-    containerPill.querySelector('button').click();
+    // Filters clear through the dismissible CHIP run (issue 676), adopted from the Recipe
+    // Studio: the lone "Clear filters" button said that filters were on but never which
+    // ones. `data-clear-filters="components"` survives only on the filtered-to-nothing
+    // panel, which is not this state.
+    const categoryChip = target.querySelector('[data-component-filter-chip="category"]');
+    assert.ok(categoryChip, 'an active category filter announces itself as a chip');
+    assert.ok(
+      categoryChip.textContent.includes('General'),
+      'the chip names the LOCALIZED category, not the raw `general` token'
+    );
+    categoryChip.querySelector('button').click();
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
-
-    tagSearch.value = 'ore';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
-      .find((button) => button.textContent.includes('ore'))
-      .click();
-    await tick();
-    flushSync();
-    tagSearch.value = 'metal';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
-      .find((button) => button.textContent.includes('metal'))
-      .click();
-    await tick();
-    flushSync();
     assert.equal(
-      target.querySelectorAll('.manager-component-row').length,
-      1,
-      'multiple selected tags should require all tags'
-    );
-    assert.ok(target.textContent.includes('Iron Ore'));
-
-    target
-      .querySelector('[data-component-tag-pill="ore"]')
-      .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    await tick();
-    flushSync();
-    assert.equal(
-      target.querySelector('[data-component-tag-pill="ore"]'),
+      target.querySelector('[data-component-filter-chip="category"]'),
       null,
-      'right-clicking a tag pill should remove it'
+      'clearing the chip clears the filter it names'
     );
-
-    target.querySelector('[data-clear-filters="components"]').click();
-    await tick();
-    flushSync();
-    assert.equal(
-      target.querySelector('[data-component-tag-pill="metal"]'),
-      null,
-      'clear filters should remove selected tag pills'
-    );
-    assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
+    // The count reports the page WINDOW, not "2 of 2" — `paginateComponents` has computed
+    // the range since it was written and the view never read it.
+    assert.equal(target.querySelector('[data-component-count]').textContent.trim(), '1–2 of 2');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
@@ -4963,30 +5199,36 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(copySourceAction.getAttribute('title'), 'Compendium.fabricate.items.iron-ore');
     copySourceAction.click();
     flushSync();
-    assert.equal(
+    // Copy and Delete are HOSTED here (issue 676) — they were rehomed off the row, whose
+    // three ghost icons had turned it into a toolbar. The inspector is the reason the row
+    // can carry one action, so these must exist rather than be absent.
+    assert.ok(
       target.querySelector('[data-component-action="edit"]'),
-      null,
-      'component inspector should not duplicate row edit action'
-    );
-    assert.equal(
-      target.querySelector('[data-component-action="delete"]'),
-      null,
-      'component inspector should not duplicate row delete action'
+      'component inspector offers Edit'
     );
     assert.ok(
-      target.querySelector('[data-component-section="source"]'),
-      'component inspector should expose a Source section'
+      target.querySelector('[data-component-action="delete"]'),
+      'component inspector hosts the Delete rehomed off the row'
+    );
+    assert.ok(
+      target.querySelector('[data-component-action="unlink"]'),
+      'component inspector offers Unlink for a linked component'
     );
     assert.equal(
       target.querySelector('[data-component-source-missing]'),
       null,
       'resolved source should not show a missing-source warning'
     );
-    const componentHeroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
-    assert.ok(componentHeroRow, 'component inspector should use the prominent hero title row');
+    const componentInspector = target.querySelector('[data-component-inspector]');
+    assert.ok(componentInspector, 'the components route renders the browser inspector');
     assert.ok(
-      componentHeroRow.querySelector('.manager-component-preview'),
-      'component inspector hero should render the component preview image'
+      componentInspector.querySelector('.manager-component-browser-inspector-hero .fab-medallion'),
+      'the inspector hero renders the shared Medallion, not a bespoke preview img'
+    );
+    assert.equal(
+      componentInspector.querySelectorAll('[data-component-fact]').length,
+      2,
+      'the inspector reports the two stat tiles (tags / essences)'
     );
 
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
@@ -5015,7 +5257,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'components',
       'breadcrumb Components button should return to the components browser'
     );
-    target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]').click();
+    // Delete now fires from the INSPECTOR, not the row: the row carries one action.
+    assert.equal(
+      target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]'),
+      null,
+      'the row no longer carries a delete icon'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-component-id="c1"] .manager-action-group button').length,
+      1,
+      'the row carries exactly ONE action — three ghost icons made it a toolbar'
+    );
+    target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-component-action="delete"]').click();
+    flushSync();
 
     assert.deepEqual(dropped, [{ type: 'Item', uuid: 'Item.dropped' }]);
     assert.deepEqual(copied, ['Compendium.fabricate.items.iron-ore']);
@@ -5050,22 +5307,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Progressive difficulty'));
     assert.ok(target.textContent.includes('Missing'));
 
-    // A set difficulty renders as a plain, borderless value (not a chip); an
-    // unset one shows a centered "None".
-    const c1DifficultyCell = target.querySelector('[data-component-id="c1"] .manager-component-difficulty-cell');
-    assert.ok(c1DifficultyCell, 'difficulty cell renders for a progressive system');
-    assert.ok(
-      c1DifficultyCell.querySelector('.manager-component-difficulty-value'),
-      'a set difficulty renders as a plain value element'
-    );
-    assert.equal(
-      c1DifficultyCell.querySelector('.manager-chip'),
-      null,
-      'the difficulty value is not boxed in a chip'
-    );
-    assert.match(c1DifficultyCell.textContent, /2/, 'the set difficulty value is shown');
-    const c2DifficultyCell = target.querySelector('[data-component-id="c2"] .manager-component-difficulty-cell');
-    assert.match(c2DifficultyCell.textContent, /None/, 'an unset difficulty shows "None"');
+    // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
+    // COLUMN — it rides in the row's badge run. The read-only parity it gives the GM
+    // (issue 651) is preserved rather than dropped with the table scaffolding.
+    const c1Difficulty = target.querySelector('[data-component-id="c1"] [data-component-difficulty]');
+    assert.ok(c1Difficulty, 'a difficulty badge renders for a progressive system');
+    assert.match(c1Difficulty.textContent, /2/, 'the set difficulty value is shown');
+    const c2Difficulty = target.querySelector('[data-component-id="c2"] [data-component-difficulty]');
+    assert.match(c2Difficulty.textContent, /None/, 'an unset difficulty shows "None"');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
@@ -5120,19 +5369,54 @@ describe('CraftingSystemManager mounted behavior', () => {
       'component-edit',
       'row Edit should land on the component-edit route'
     );
+    // Issue 676, decision 4: the editor header is the COMPONENT's identity, matching the
+    // recipe editor's exactly — its image, its NAME as the h1, and a
+    // "<category> · Linked <source>" subline. This route used to fall through to the
+    // generic static "Edit component" heading, which the decision required it not to.
+    const editHeading = target.querySelector('[data-component-edit-heading]');
+    assert.ok(editHeading, 'the component editor renders its own identity heading');
+    assert.equal(
+      editHeading.querySelector('h1.manager-title').textContent.trim(),
+      'Iron Ore',
+      'the heading names the component, not the route'
+    );
     assert.ok(
-      target.textContent.includes('Edit component'),
-      'header should show the Edit component title'
+      editHeading.querySelector('.fab-medallion'),
+      'the heading leads with the shared Medallion, as the recipe editor does'
+    );
+    assert.equal(
+      editHeading.querySelector('[data-component-edit-subline]').textContent.trim(),
+      'Reagent · Linked Compendium',
+      'the subline reads "<category> · Linked <source>"'
+    );
+    // The breadcrumb names the component too — not the generic string the recipe
+    // breadcrumb's own comment rejects.
+    assert.ok(
+      Array.from(target.querySelectorAll('.manager-breadcrumbs span')).some(
+        (node) => node.textContent.trim() === 'Iron Ore'
+      ),
+      'the breadcrumb names the component'
     );
     assert.ok(
       target.querySelector('[data-component-edit-section="identity"]'),
       'Identity card should render in the editor'
     );
+    // Issue 676: there is NO right rail. Both hooks survive the rebuild inside the
+    // single scrolling column's identity strip — `scripts/foundry-test-run.mjs`
+    // hard-waits on each, and the "source" wait aborts Phase D0 before every
+    // downstream frame.
     assert.ok(
       target.querySelector('[data-component-edit-section="source"]'),
-      'Linked Source Item card should render in the right column'
+      'the source block renders inside the identity strip, not a rail inspector'
+    );
+    assert.equal(
+      target.querySelector('.manager-inspector .manager-inspector-card'),
+      null,
+      'the component editor renders no right-rail inspector card'
     );
 
+    // AC3: open-sheet stays ON THE SOURCE NAME — the common action keeps its
+    // affordance rather than being buried in the kebab.
     target.querySelector('[data-component-edit-action="open-source"]').click();
     flushSync();
     assert.deepEqual(
@@ -5141,7 +5425,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       'Open Source Item should call onOpenSource with the stored UUID'
     );
 
-    target.querySelector('[data-component-edit-action="unlink-source"]').click();
+    // AC3: unlink lives in the OVERFLOW (rare + destructive — what a kebab is for), so
+    // it must be opened first. The menu is portaled to the `.fabricate-manager` host to
+    // escape the scrolling column's `overflow: hidden`, so query from the root, not the
+    // strip. Options are addressed by their label: SearchablePopover is a shared
+    // component and gives options no per-caller data hook.
+    const overflowOption = (label) =>
+      Array.from(root.querySelectorAll('.manager-travel-option')).find((button) =>
+        button.textContent.includes(label)
+      );
+
+    target.querySelector('.manager-component-overflow-trigger').click();
+    await tick();
+    flushSync();
+    assert.ok(overflowOption('Copy source UUID'), 'the overflow carries Copy source UUID');
+    overflowOption('Unlink Source Item').click();
     flushSync();
     assert.deepEqual(
       unlinked,
@@ -5171,27 +5469,27 @@ describe('CraftingSystemManager mounted behavior', () => {
       'Essences section should render'
     );
 
-    // Tags are added from a dropdown (like the gathering weather/time-of-day fields),
-    // then appear underneath as removable pills.
+    // Tags are TOGGLE PILLS (issue 676): the system's whole tag vocabulary renders as
+    // pills and the pill IS the control, so the vocabulary and the answer are both
+    // visible without opening anything. This replaced an add-menu + removable-pill-row,
+    // which hid the vocabulary and cost two interactions per tag.
+    const mineral = target.querySelector('[data-component-edit-tag-toggle="mineral"]');
+    assert.ok(mineral, 'every system itemTag renders as a pill, selected or not');
     assert.equal(
-      target.querySelector('[data-component-edit-tag-pill="mineral"]'),
-      null,
-      'mineral should not be a selected pill yet'
+      mineral.getAttribute('aria-pressed'),
+      'false',
+      'mineral should not be applied yet'
     );
-    target.querySelector('[data-component-edit-tag-menu]').click();
-    flushSync();
-    await tick();
-    flushSync();
-    const mineralOption = target.querySelector('[data-component-edit-tag-option="mineral"]');
-    assert.ok(mineralOption, 'tag dropdown should list the unselected system itemTags');
-    mineralOption.click();
+
+    mineral.click();
     flushSync();
     await tick();
     flushSync();
 
-    assert.ok(
-      target.querySelector('[data-component-edit-tag-pill="mineral"]'),
-      'selected tag should appear as a removable pill'
+    assert.equal(
+      target.querySelector('[data-component-edit-tag-toggle="mineral"]').getAttribute('aria-pressed'),
+      'true',
+      'clicking the pill applies the tag'
     );
     assert.ok(
       target.textContent.includes('Unsaved'),
@@ -5248,6 +5546,90 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
+  // `component.difficulty` is ONE scalar consumed by several progressive surfaces
+  // (recipes via ResolutionModeService, salvage via CraftingEngine, gathering via
+  // GatheringEngine#difficultyForResult), each with its OWN resolution mode. The
+  // control gated on the RECIPE mode alone, so a system that resolved recipes by
+  // check but salvaged progressively read difficulty and could never author it —
+  // exactly the shape that shipped broken in issue 676, with no test to catch it.
+  const difficultyConsumerCases = [
+    {
+      name: 'progressive recipes',
+      options: { alchemyResolutionMode: 'progressive' },
+    },
+    {
+      name: 'routedByCheck recipes with progressive salvage (the issue 676 regression)',
+      options: { alchemyResolutionMode: 'routedByCheck', salvageResolutionMode: 'progressive' },
+    },
+    {
+      name: 'routedByCheck recipes with a progressive gathering economy',
+      options: {
+        alchemyResolutionMode: 'routedByCheck',
+        gatheringConfig: { systems: { alchemy: { economy: { resolutionMode: 'progressive' } } } },
+      },
+    },
+  ];
+
+  for (const { name, options } of difficultyConsumerCases) {
+    it(`shows the component difficulty control for ${name}`, async () => {
+      await openComponentEditor([], options);
+      const card = target.querySelector('[data-component-edit-section="difficulty"]');
+      assert.ok(card, `difficulty control should render for ${name}`);
+      assert.ok(card.querySelector('input'), 'the difficulty control should expose an input');
+    });
+  }
+
+  it('titles the difficulty card without stealing the browser badge label', async () => {
+    // The card title and the browser badge are DIFFERENT strings that both describe
+    // `component.difficulty`. The badge composes `${label} ${difficulty}`, so pointing
+    // the card's <h3> at the shared `Component.ProgressiveDifficulty` key would render
+    // "This component's Progressive DC 2" in the list. They must stay separate keys.
+    await openComponentEditor([], { alchemyResolutionMode: 'progressive' });
+    const card = target.querySelector('[data-component-edit-section="difficulty"]');
+    assert.equal(card.querySelector('h3').textContent.trim(), 'This component’s Progressive DC');
+    assert.ok(
+      card
+        .querySelector('p')
+        .textContent.includes('shown read-only wherever this component appears as a progressive result')
+    );
+  });
+
+  it('hides the component difficulty control when no progressive surface consumes it', async () => {
+    await openComponentEditor([], {
+      alchemyResolutionMode: 'routedByCheck',
+      salvageResolutionMode: 'simple',
+    });
+    assert.equal(
+      target.querySelector('[data-component-edit-section="difficulty"]'),
+      null,
+      'a difficulty control nothing reads is clutter and must stay hidden'
+    );
+  });
+
+  it('saves a staged difficulty when only salvage is progressive', async () => {
+    // Guards the half-fix: if dirtiness/save kept the old recipe-mode gate the field
+    // would render and then silently refuse to persist.
+    const calls = [];
+    await openComponentEditor(calls, {
+      alchemyResolutionMode: 'routedByCheck',
+      salvageResolutionMode: 'progressive',
+    });
+    const input = target.querySelector('[data-component-edit-section="difficulty"] input');
+    input.value = '9';
+    input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
+    assert.equal(saveButton.disabled, false, 'a staged difficulty change should enable Save');
+    saveButton.click();
+    await tick();
+    flushSync();
+    const saveCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(saveCall, 'Save should call store.updateComponent');
+    assert.equal(saveCall[2].difficulty, 9, 'the staged difficulty should persist on Save');
+  });
+
   it('stages progressive-difficulty edits into the component editor save flow', async () => {
     const calls = [];
     await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
@@ -5284,12 +5666,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(saveCall[2].difficulty, 5, 'the staged truncated integer should persist on Save');
   });
 
-  it('clears a staged progressive difficulty on Save when the input is blanked', async () => {
+  it('clears a staged progressive difficulty on Save when it is taken to zero', async () => {
+    // The CAPABILITY under test — "the GM can clear a difficulty back to null, and the
+    // clear persists" — is unchanged. The GESTURE changed in issue 676, when this control
+    // became the shared `Stepper`: the stepper's input deliberately ignores an empty
+    // string (so a half-typed value is never coerced to 0 mid-keystroke) and re-asserts
+    // the model value on blur, so blanking is structurally not expressible through it.
+    //
+    // Zero is the clear, and it is not a special case invented here: the root's
+    // `normalizeComponentDifficulty` ALREADY maps every value below 1 to null, so 0 has
+    // always meant "no difficulty" everywhere this value is read.
     const calls = [];
     await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
 
     const input = target.querySelector('[data-component-edit-section="difficulty"] input');
-    input.value = '';
+    input.value = '0';
     input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     await tick();
     flushSync();
@@ -5388,6 +5779,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       'add group should render an editable result group'
     );
 
+    // Issue 676: the per-component salvage gate now defaults OFF (decision 6), and the
+    // routing/DC chrome collapses while it is (Ruling A). This fixture's component has
+    // no authored salvage, so it opens disabled — walking the real GM path from zero
+    // groups to enabled here is also the end-to-end proof that the deadlock (AC12)
+    // cannot form in the assembled manager tree, not just in the isolated view.
+    const enableToggle = target.querySelector('[data-recipe-field="salvageEnabled"]');
+    assert.equal(enableToggle.disabled, false, 'one result group enables the salvage toggle');
+    enableToggle.click();
+    await tick();
+    flushSync();
+
     // One routing select per non-empty outcome name on the routed salvage check.
     const routes = target.querySelectorAll('[data-salvage-routing] [data-salvage-route]');
     assert.equal(routes.length, 3, 'one routing select per routed outcome tier name');
@@ -5398,7 +5800,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     assert.ok(
-      target.querySelector('[data-salvage-section] [data-salvage-dc-override] input'),
+      target.querySelector('[data-salvage-section] [data-salvage-dc-override] [data-salvage-dc-preset]'),
       'routed mode should render the DC-override field'
     );
   });
@@ -5463,6 +5865,73 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('the salvage yield picker is NOT filtered by the component browser search', async () => {
+    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`, and
+    // `itemCards` is the SEARCH-FILTERED list —
+    //   itemCards ← _buildItemCards(…, itemSearchTerm, …) ← getItems(systemId, search)
+    // with `itemSearchTerm: get(itemSearch)`, the component BROWSER's search store. So
+    // typing "iron" in the browser and then opening any component silently narrowed the
+    // salvage yield picker to components matching "iron". The GM was authoring yields
+    // from a list filtered by a search box that is not even on screen.
+    //
+    // The recipe editor never had this: it already reads `selectedSystem.managedItemOptions`,
+    // built from the UNFILTERED managed items. The fix makes salvage read the same list.
+    //
+    // No screenshot could have caught this — the smoke harness never types in the search
+    // box before opening an editor.
+    const calls = [];
+    await openComponentSalvageEditor(calls, {
+      // Matches ONLY "Iron Ore" (c1) — the component being edited — and excludes Glass
+      // Vial, Nightshade and Coal from `itemCards`.
+      itemSearchTerm: 'iron',
+      salvageResolutionMode: 'progressive',
+      componentSalvage: {
+        enabled: true,
+        resultGroups: [{ id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] }],
+      },
+    });
+
+    const root = target.querySelector('.fabricate-manager');
+    target.querySelector('.manager-salvage-component-trigger').click();
+    await tick();
+    flushSync();
+
+    const optionLabels = Array.from(root.querySelectorAll('.manager-travel-option')).map((button) =>
+      button.textContent.trim()
+    );
+    assert.ok(
+      optionLabels.some((label) => label.includes('Glass Vial')),
+      `the picker must offer every component, not just search matches (saw: ${optionLabels.join(' | ')})`
+    );
+    assert.ok(optionLabels.some((label) => label.includes('Coal')));
+    assert.ok(optionLabels.some((label) => label.includes('Nightshade')));
+  });
+
+  it('a yield row reads its DC from the picker source — difficulty survives the projection', async () => {
+    // The options list is an ALLOWLIST projection. `difficulty` reaching the editor as
+    // `undefined` is indistinguishable from a component that was never given one, so a
+    // dropped field renders "DC —" on every row instead of failing. This drives the badge
+    // through the ROOT (not by handing ComponentEditView props directly), which is the
+    // only way the projection itself is under test.
+    const calls = [];
+    await openComponentSalvageEditor(calls, {
+      itemSearchTerm: 'iron',
+      salvageResolutionMode: 'progressive',
+      componentSalvage: {
+        enabled: true,
+        resultGroups: [{ id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] }],
+      },
+    });
+
+    // c4 (Coal) has difficulty 3 and is EXCLUDED by the "iron" search — so this also
+    // proves the badge resolves through the unfiltered list rather than reading "DC —".
+    assert.equal(
+      target.querySelector('[data-salvage-result-difficulty]').getAttribute('data-salvage-result-difficulty'),
+      '3',
+      'the yield row reads the referenced component difficulty from the picker source'
+    );
+  });
+
   it('emits onDraftChange with updates.salvage carrying authored result-group edits', async () => {
     const calls = [];
     await openComponentSalvageEditor(calls, {
@@ -5511,22 +5980,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(salvage.toolIds, ['anvil'], 'toolIds should be preserved');
   });
 
-  it('routes to tags and categories with add feedback, usage warnings, and store delegation', async () => {
+  it('routes to the tabbed tags and categories screen with live validation, icons, and cascade-safe inline delete (issue 689)', async () => {
     const calls = [];
-    const confirmations = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
         store: createStore(calls),
-        services: {
-          openCurrentAdmin: () => {},
-          confirmVocabularyRemoval: (kind, row, message) => {
-            confirmations.push([kind, row.name, message]);
-            return false;
-          },
-        },
+        services: { openCurrentAdmin: () => {} },
       },
     });
     flushSync();
@@ -5539,94 +6001,252 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tags');
-    assert.ok(target.textContent.includes('Recipe categories'));
-    assert.ok(target.textContent.includes('Item tags'));
-    assert.ok(target.textContent.includes('General'));
-    assert.ok(target.textContent.includes('potions'));
-    assert.ok(target.textContent.includes('ore'));
-    assert.ok(target.textContent.includes('Vocabulary counts'));
+    // The three vocabularies are tabs; the recipe tab is shown first.
+    assert.ok(target.querySelector('[data-vocabulary-tab="recipe"]'));
+    assert.ok(target.querySelector('[data-vocabulary-tab="component"]'));
+    assert.ok(target.querySelector('[data-vocabulary-tab="tag"]'));
+    assert.ok(target.textContent.includes('potions'), 'recipe tab shows its custom category');
     assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
+    // A referenced category carries a per-category icon on its row.
+    assert.ok(target.querySelector('[data-category-id="potions"] .manager-vocabulary-icon i'));
 
-    const howItWorksCard = target.querySelector('[data-tags-evidence="how-it-works"]');
-    assert.ok(howItWorksCard, 'tags inspector should render a How-it-works evidence card');
-    assert.ok(
-      howItWorksCard.textContent.includes('flat'),
-      'How-it-works should explain that categories are flat'
-    );
-    assert.ok(
-      howItWorksCard.textContent.includes('General'),
-      'How-it-works should explain reserved General'
-    );
-    assert.ok(howItWorksCard.textContent.includes('tag'), 'How-it-works should mention item tags');
+    // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
+    assert.ok(target.querySelector('[data-tags-evidence="how-it-works"]'));
+    assert.ok(target.querySelector('[data-tags-evidence="at-a-glance"]'));
+    assert.ok(target.querySelector('[data-tags-category-fact="component-categories"]'));
+    assert.ok(target.querySelector('[data-tags-category-fact="references"]'));
+    assert.ok(target.querySelector('[data-tags-evidence="reference-safe"]'));
 
-    // The Examples and General-category evidence cards were removed; only the
-    // How-it-works card and Vocabulary counts remain in the tags inspector.
-    assert.equal(
-      target.querySelector('[data-tags-evidence="examples"]'),
-      null,
-      'the Examples evidence card is removed'
-    );
-
+    // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');
-    categoryInput.value = 'General';
-    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
-    target
-      .querySelector('[aria-label="Recipe categories"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    setInputValue(categoryInput, 'General');
     await tick();
     flushSync();
+    assert.ok(target.querySelector('.manager-vocabulary-hint.is-danger'));
     assert.ok(target.textContent.includes('General is already available as the base category.'));
-    assert.ok(!calls.some((call) => call[0] === 'addCategory'));
+    target
+      .querySelector('[aria-label="Recipe categories"] form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.ok(!calls.some((call) => call[0] === 'addCategory'), 'a blocked add never reaches the store');
 
-    categoryInput.value = 'Elixirs';
-    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    // A valid add shows a success hint and delegates with the authored icon.
+    setInputValue(categoryInput, 'Elixirs');
+    const iconInput = target.querySelector('#manager-category-add-icon');
+    setInputValue(iconInput, 'fas fa-flask');
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.manager-vocabulary-hint.is-success'));
     target
       .querySelector('[aria-label="Recipe categories"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();
     flushSync();
-    assert.ok(calls.some((call) => call[0] === 'addCategory' && call[1] === 'Elixirs'));
+    const addCall = calls.find((call) => call[0] === 'addCategory');
+    assert.deepEqual(addCall, ['addCategory', 'Elixirs', 'fas fa-flask']);
     assert.equal(categoryInput.value, '');
-    assert.equal(document.activeElement, categoryInput);
 
-    const tagInput = target.querySelector('#manager-tag-add');
-    tagInput.value = 'SPICE';
-    tagInput.dispatchEvent(new Event('input', { bubbles: true }));
+    // Per-tab search filters only the active vocabulary and shows an empty state.
+    const search = target.querySelector('.manager-vocabulary-search input[type="search"]');
+    setInputValue(search, 'zzzz');
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('No matches for "zzzz".'));
+    setInputValue(search, '');
+    await tick();
+    flushSync();
+
+    // Deleting a referenced category confirms inline, then cascades through the store.
+    target.querySelector('[aria-label="Remove category potions"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-vocabulary-confirm="potions"]'),
+      'a referenced delete opens an inline confirm strip'
+    );
+    assert.ok(!calls.some((call) => call[0] === 'removeCategory'), 'nothing is removed before confirming');
     target
-      .querySelector('[aria-label="Item tags"] form')
+      .querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger')
+      .click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'removeCategory' && call[1] === 'potions'));
+
+    // The tag tab lowercases as you type and delegates the normalized value.
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-tag-id="ore"]'), 'the tag tab lists item tags');
+    // Tag rows carry a fixed, non-editable decorative accent tile (issue 689 fidelity):
+    // the same leading 34x34 tile as the category tabs, but a span not an editable button.
+    const tagIconTile = target.querySelector(
+      '[data-tag-id="ore"] .manager-vocabulary-icon.is-decorative'
+    );
+    assert.ok(tagIconTile, 'each tag row renders a decorative accent icon tile');
+    assert.ok(
+      tagIconTile.querySelector('i.fa-tag'),
+      'the decorative tag tile uses the fa-tag glyph'
+    );
+    assert.ok(
+      !target.querySelector('[data-tag-id="ore"] .manager-vocabulary-icon.is-editable'),
+      'the tag tile is decorative, not click-to-edit'
+    );
+    const tagInput = target.querySelector('#manager-tag-add');
+    setInputValue(tagInput, 'SPICE');
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.manager-vocabulary-hint.is-info'));
+    assert.ok(target.textContent.includes('Will be added as "spice"'));
+    target
+      .querySelector('[aria-label="Component tags"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addTag' && call[1] === 'spice'));
-    assert.ok(target.textContent.includes('Tag added with cleaned-up lowercase text.'));
     assert.equal(tagInput.value, '');
-    assert.equal(document.activeElement, tagInput);
 
-    target.querySelector('[aria-label="Remove category potions"]').click();
+    // An UNUSED entry deletes in one click, matching the prototype: no confirm strip
+    // opens and the store's remove action fires immediately. `herb` carries zero
+    // references in this fixture, so it renders the Unused chip and skips confirmation.
+    assert.ok(
+      target.querySelector('[data-tag-id="herb"] .manager-vocabulary-chip-unused'),
+      'the unused tag row is flagged Unused'
+    );
+    target.querySelector('[aria-label="Remove tag herb"]').click();
     await tick();
     flushSync();
-    assert.deepEqual(confirmations[0]?.slice(0, 2), ['category', 'potions']);
-    assert.ok(!calls.some((call) => call[0] === 'removeCategory' && call[1] === 'potions'));
-
-    target.querySelector('[aria-label="Remove tag ore"]').click();
-    await tick();
-    flushSync();
-    assert.deepEqual(confirmations[1]?.slice(0, 2), ['tag', 'ore']);
-    assert.ok(!calls.some((call) => call[0] === 'removeTag' && call[1] === 'ore'));
-
-    const search = target.querySelector('.manager-toolbar input[type="search"]');
-    search.value = 'zzzz';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.ok(target.textContent.includes('No custom categories match this search.'));
-    assert.ok(target.textContent.includes('No item tags match this search.'));
-    assert.ok(target.textContent.includes('General'));
+    assert.equal(
+      target.querySelector('[data-vocabulary-confirm="herb"]'),
+      null,
+      'an unused delete never opens a confirm strip'
+    );
+    assert.ok(
+      calls.some((call) => call[0] === 'removeTag' && call[1] === 'herb'),
+      'an unused delete reaches the store directly in one click'
+    );
   });
 
-  it('keeps tags and categories add inputs when store add callbacks fail', async () => {
+  it('manages COMPONENT categories as an independent tab, distinct from recipe categories (issue 676, 689)', async () => {
+    // The three vocabularies are tabs (issue 689); the component tab renders its own
+    // VocabularyPanel over the SIBLING `componentCategories` vocabulary. The root calls
+    // the store's component handlers optional-chained, so without a real export an
+    // absent one no-ops silently — these call-site assertions are what catch that.
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Tags & Categories').click();
+    await tick();
+    flushSync();
+
+    // The recipe tab leads; the component vocabulary is not yet mounted.
+    assert.equal(target.querySelector('[data-component-category-id]'), null);
+    target.querySelector('[data-vocabulary-tab="component"]').click();
+    await tick();
+    flushSync();
+
+    const panel = target.querySelector('[aria-label="Component categories"]');
+    assert.ok(panel, 'the component-categories tab renders its panel');
+    // The seeded vocabulary reaches it through the selectedSystem viewState projection.
+    assert.ok(
+      target.querySelector('[data-component-category-id="reagent"]'),
+      'the authored component category renders as its own row'
+    );
+    assert.ok(
+      target.querySelector('[data-component-category-id="general"]'),
+      'the reserved General row renders, locked'
+    );
+    // The recipe vocabulary is a different tab, so it never leaks into this one.
+    assert.equal(
+      panel.querySelector('[data-category-id]'),
+      null,
+      'the recipe vocabulary never leaks into the component tab'
+    );
+
+    // The reserved bucket is refused before it can reach the store (live-blocked).
+    const input = target.querySelector('#manager-component-category-add');
+    setInputValue(input, 'General');
+    await tick();
+    flushSync();
+    panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.ok(!calls.some((call) => call[0] === 'addComponentCategory'));
+
+    // A real add reaches the store's COMPONENT action — not addCategory.
+    setInputValue(input, 'Metal');
+    await tick();
+    flushSync();
+    panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'addComponentCategory' && call[1] === 'Metal'));
+    assert.ok(
+      !calls.some((call) => call[0] === 'addCategory'),
+      'the recipe vocabulary is never written by the component tab'
+    );
+    assert.equal(input.value, '');
+
+    // Removal opens an inline confirm strip under its own kind; cancelling writes nothing.
+    target.querySelector('[aria-label="Remove component category Reagent"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-vocabulary-confirm="reagent"]'));
+    target
+      .querySelector('[data-vocabulary-confirm="reagent"] .manager-button:not(.is-danger)')
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-vocabulary-confirm="reagent"]'), null);
+    assert.ok(!calls.some((call) => call[0] === 'removeComponentCategory'));
+  });
+
+  it('edits a per-category icon inline and delegates it to the store (issue 689)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Tags & Categories').click();
+    await tick();
+    flushSync();
+
+    // The editable icon button on a custom category row opens an inline icon editor.
+    target.querySelector('[data-category-id="potions"] .manager-vocabulary-icon.is-editable').click();
+    await tick();
+    flushSync();
+    const edit = target.querySelector('[data-vocabulary-icon-edit="potions"]');
+    assert.ok(edit, 'the icon editor strip opens for the row');
+    setInputValue(edit.querySelector('input'), 'fas fa-vial');
+    await tick();
+    flushSync();
+    edit.querySelector('.manager-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.find((call) => call[0] === 'setCategoryIcon'),
+      ['setCategoryIcon', 'potions', 'fas fa-vial']
+    );
+  });
+
+  it('keeps tags and categories add inputs when store add callbacks fail (issue 689)', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -5647,8 +6267,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     const categoryInput = target.querySelector('#manager-category-add');
-    categoryInput.value = 'Elixirs';
-    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(categoryInput, 'Elixirs');
+    await tick();
+    flushSync();
     target
       .querySelector('[aria-label="Recipe categories"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -5660,17 +6281,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(document.activeElement, categoryInput);
     assert.ok(target.textContent.includes('Category could not be added.'));
 
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
     const tagInput = target.querySelector('#manager-tag-add');
-    tagInput.value = 'SPICE';
-    tagInput.dispatchEvent(new Event('input', { bubbles: true }));
+    setInputValue(tagInput, 'spice');
+    await tick();
+    flushSync();
     target
-      .querySelector('[aria-label="Item tags"] form')
+      .querySelector('[aria-label="Component tags"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addTag' && call[1] === 'spice'));
-    assert.equal(tagInput.value, 'SPICE');
+    assert.equal(tagInput.value, 'spice');
     assert.equal(document.activeElement, tagInput);
     assert.ok(target.textContent.includes('Tag could not be added.'));
   });
@@ -6269,8 +6894,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Save failed.'));
   });
 
-  it('renders the gated Crafting nav group only when experimental features are on', async () => {
-    // Experimental OFF: no Crafting group; Recipes shows as a disabled placeholder.
+  it('shows the Crafting group unconditionally and gates only Graph on experimental features (issue 745)', async () => {
+    // Experimental OFF (the shipped default): the Crafting group renders and the
+    // unimplemented Graph placeholder is hidden. Both assertions run through the real
+    // `experimentalFeaturesEnabled` gating derivation, not a stubbed value.
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -6281,8 +6908,29 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     flushSync();
-    assert.equal(target.querySelector('#manager-nav-crafting'), null, 'Crafting group hidden when experimental off');
-    assert.equal(Boolean(craftingParent()), false, 'no Crafting parent button when experimental off');
+    assert.ok(target.querySelector('#manager-nav-crafting'), 'Crafting group renders when experimental off');
+    assert.ok(craftingParent(), 'Crafting parent button present when experimental off');
+    assert.equal(navButton('Graph'), undefined, 'Graph placeholder hidden when experimental off');
+
+    // Experimental ON: the Crafting group is unchanged and the Graph placeholder
+    // appears as a disabled "Soon" item.
+    unmount(mounted);
+    target.remove();
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    assert.ok(target.querySelector('#manager-nav-crafting'), 'Crafting group still renders when experimental on');
+    const graph = navButton('Graph');
+    assert.ok(graph, 'Graph placeholder advertised when experimental on');
+    assert.equal(graph.disabled, true, 'Graph is a disabled placeholder');
+    assert.equal(graph.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
   });
 
   it('exposes the Crafting group with Gathering-parity a11y and nested Settings + Recipes', async () => {
@@ -6691,8 +7339,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const gatheringParent = target.querySelector('#manager-nav-gathering');
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
     assert.equal(gatheringParent.classList.contains('is-active'), false);
+    // The Crafting group also renders (unconditional as of issue 745), so target the
+    // Gathering group specifically rather than the first `.manager-nav-group`.
     assert.equal(
-      target.querySelector('.manager-nav-group').classList.contains('is-expanded'),
+      gatheringParent.closest('.manager-nav-group').classList.contains('is-expanded'),
       true
     );
     // The parent count is the sum of records (environments + tasks + events), not
@@ -6723,7 +7373,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true'
     );
     assert.equal(
-      target.querySelector('.manager-nav-group').classList.contains('is-expanded'),
+      target.querySelector('#manager-nav-gathering').closest('.manager-nav-group').classList.contains('is-expanded'),
       true
     );
 
@@ -11045,24 +11695,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
-    tagSearch.value = 'ore';
-    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
-      .find((button) => button.textContent.includes('ore'))
-      .click();
+    // Issue 676: the facet is CATEGORY now, not tag. `Reagent` exists only in this
+    // system's vocabulary, so carrying it across a system switch would hide every row
+    // of the new system behind a filter naming something it has never heard of.
+    const categoryFilter = target.querySelector('[data-component-category-filter]');
+    categoryFilter.value = 'Reagent';
+    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
+    assert.ok(target.textContent.includes('Iron Ore'));
 
     store.selectSystem('smithing');
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('[aria-label="Filter components by tag"]'), null);
-    assert.equal(target.querySelector('[aria-label="Search component tags"]'), null);
+    assert.equal(
+      target.querySelector('[data-component-category-filter]').value,
+      'all',
+      'a stale category facet is cleared when the selected system changes'
+    );
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
     assert.ok(target.textContent.includes('Coal'));
     assert.equal(target.textContent.includes('No components match these filters'), false);
@@ -11887,6 +12539,40 @@ describe('CraftingSystemManager mounted behavior', () => {
         (call) => call[0] === 'toggleRequirement' && call[1] === 'currency' && call[2] === true
       ),
       'clicking the toggle should enable currency through toggleRequirement'
+    );
+  });
+
+  it('renders the time-requirements feature toggle in Optional features and routes its change (issue 714)', async () => {
+    const { calls } = await mountCurrencyEditor({
+      selectedCurrency: {
+        enabled: false,
+        spendStrategy: 'actorProperty',
+        providerId: '',
+        macros: { canAfford: '', increment: '', decrement: '' },
+        units: [],
+      },
+    });
+
+    const tile = target.querySelector('[data-feature-key="time"]');
+    assert.ok(tile, 'time toggle tile should render in Optional features');
+    const toggle = tile.querySelector('[data-system-time-toggle]');
+    assert.ok(toggle, 'time toggle button should render');
+    // Time requirements default ON, so an absent flag reads as enabled.
+    assert.equal(
+      toggle.getAttribute('aria-pressed'),
+      'true',
+      'toggle reflects default-on time requirements'
+    );
+    assert.ok(tile.querySelector('small'), 'time tile should include a hint');
+
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(
+        (call) => call[0] === 'toggleRequirement' && call[1] === 'time' && call[2] === false
+      ),
+      'clicking the on toggle should disable time requirements through toggleRequirement'
     );
   });
 
