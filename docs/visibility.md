@@ -90,8 +90,8 @@ Other details, such as the ingredients, results, or description, stay hidden unt
 
 - Each recipe decides which details to hide and how much discovery progress is needed to fully unlock it.
 - Progress builds up through **fragments** (in-world items that grant progress automatically when a player acquires them), through **manual GM assignment**, or through both.
-- The planned Crafting UI will show players their progress toward unlocking a teaser recipe.
-- When progress reaches the required amount the recipe becomes fully visible and craftable.
+- When progress reaches the required amount the recipe becomes fully visible and craftable in the Crafting tab.
+- A player-facing presentation of teaser progress is planned and not yet available.
 
 See [Teaser Mode]({% link visibility-teaser.md %}) for full configuration details.
 
@@ -367,7 +367,7 @@ Locked recipes:
 
 - Are visible to all players, so they know the recipe exists
 - Cannot be crafted by anyone other than the GM
-- Are reported as locked to the rest of Fabricate (a "Locked" badge is planned)
+- Show a **Locked** state in the player Crafting tab, so players can see the recipe is held back by the GM
 
 ## Broken Systems and Recipes Are Hidden
 

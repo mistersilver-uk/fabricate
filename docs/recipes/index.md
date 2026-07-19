@@ -9,7 +9,7 @@ has_children: true
 
 A recipe defines what ingredients are needed and what results are produced.
 Recipes belong to a crafting system and follow that system's resolution mode.
-They can currently only be authored through the API.
+GMs author them in the Crafting Admin panel, and the public API can create them too.
 
 ---
 
@@ -113,18 +113,17 @@ A recipe can require tools for the whole recipe, for a single step, or for a par
 
 See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage modes, and usage tracking. (Tools replaced the retired Catalyst concept in version 0.6.0.)
 
-## Current Crafting Surface
+## Authoring and Crafting Surfaces
 
-Recipes are authored mainly through the API today.
-An early GM recipe editor is also available in the Crafting Admin panel.
-It can edit a recipe's identity (name, description, image, and whether it is on or off) and link a recipe item to it.
-When the system is in player mode, the editor's Overview tab can also restrict a recipe to specific players.
+GMs author recipes in the Crafting Admin panel.
+The recipe editor has dedicated tabs for the recipe's overview, ingredients, results, tools, access, and validation.
+The Overview tab edits identity (name, description, image, and whether it is on or off) and links a recipe item.
+When the system is in player mode, the Overview tab can also restrict a recipe to specific players.
 When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
 See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
-Full recipe authoring through the editor, including ingredients, steps, and results, is still in progress.
-Runtime crafting is available through the public API.
-See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
 
-{: .note }
-> A player-facing Crafting tab is planned and not yet available.
-Recipe crafting works through the API today.
+Players craft in the **Crafting** tab of the unified Fabricate window.
+They browse the recipes their character can see, choose which owned actors supply the materials, roll any crafting check, and craft.
+
+Recipe authoring and runtime crafting are also available through the public API.
+See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.

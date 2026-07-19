@@ -60,8 +60,9 @@ A three-step recipe for creating enchanted plate armour:
 A multi-step recipe is made up of an ordered list of steps.
 Each step has its own ingredient sets, result groups, optional required tools, and an optional time requirement.
 For the example above, the Forge step requires the Forge tool and a 4-hour time gate, the Assemble step consumes the unfinished plates plus leather straps, and the Enchant step combines the plate armour with an enchanting gem.
-Recipes can be authored through the API only.
-See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+You author each step on the Ingredients and Results tabs of the recipe editor in the Crafting Admin panel.
+The public API can create and configure recipes too.
+See the [API reference]({% link api/recipe-manager.md %}) for those methods.
 
 ## Time Gates
 
@@ -79,8 +80,9 @@ Time gates are checked:
 ## Managing Runs
 
 Multi-step run state is saved on the character.
-Multi-step runs are driven through the API today.
-A player-facing UI for resuming and cancelling active runs is planned and not yet available.
+Players continue a multi-step crafting run from the **Journal** tab, using **Trigger Next Step** to roll and advance each step in turn.
+See [Journal]({% link journal.md %}).
+Cancelling an active run from the UI is not yet available, though runs can still be managed through the API.
 
 {: .note }
 > Disabling the Multi-Step Recipes feature is not destructive.
