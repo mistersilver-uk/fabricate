@@ -6107,6 +6107,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addTag' && call[1] === 'spice'));
     assert.equal(tagInput.value, '');
+
+    // An UNUSED entry deletes in one click, matching the prototype: no confirm strip
+    // opens and the store's remove action fires immediately. `herb` carries zero
+    // references in this fixture, so it renders the Unused chip and skips confirmation.
+    assert.ok(
+      target.querySelector('[data-tag-id="herb"] .manager-vocabulary-chip-unused'),
+      'the unused tag row is flagged Unused'
+    );
+    target.querySelector('[aria-label="Remove tag herb"]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-vocabulary-confirm="herb"]'),
+      null,
+      'an unused delete never opens a confirm strip'
+    );
+    assert.ok(
+      calls.some((call) => call[0] === 'removeTag' && call[1] === 'herb'),
+      'an unused delete reaches the store directly in one click'
+    );
   });
 
   it('manages COMPONENT categories as an independent tab, distinct from recipe categories (issue 676, 689)', async () => {

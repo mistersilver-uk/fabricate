@@ -161,7 +161,14 @@
 
   function requestRemove(row) {
     if (!row || row.locked) return;
-    pendingRemovalId = row.id;
+    // Unused entries delete in one click, matching the prototype's affordance. Only
+    // referenced entries open the confirm strip — its copy reassigns the references,
+    // which is meaningless for a 0-reference row.
+    if ((row.totalUsage || 0) > 0) {
+      pendingRemovalId = row.id;
+    } else {
+      onRemove(row);
+    }
   }
 
   function cancelRemove() {
