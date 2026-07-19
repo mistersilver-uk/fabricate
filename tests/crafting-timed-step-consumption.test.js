@@ -443,7 +443,17 @@ test('timed step FINISH produces results without the components present and comp
   const history = runManager.getRunHistory(craftingActor);
   assert.equal(history.length, 1, 'the completed run is archived to history');
   assert.equal(history[0].status, 'succeeded');
-  assert.equal(history[0].steps[0].consumedIngredients.length, 1, 'run history records the consumed component');
+  const consumed = history[0].steps[0].consumedIngredients;
+  assert.equal(consumed.length, 1, 'run history records the consumed component');
+  // Issue 738: the timed FINISH path must persist the consume-time name/img/componentId
+  // (captured into the START snapshot before the source items were deleted), exactly like
+  // the immediate craft paths do via mapConsumedIngredientRef. Regression guard: this ref
+  // previously dropped to a bare {actorUuid,itemUuid,quantity}, blanking the history row.
+  assert.equal(consumed[0].name, 'Wood', 'the timed-step run persists the consume-time name');
+  assert.equal(consumed[0].img, 'icons/wood.png', 'the timed-step run persists the consume-time img');
+  assert.equal(consumed[0].componentId, 'wood', 'the timed-step run persists the componentId');
+  assert.equal(consumed[0].itemUuid, 'Item.wood');
+  assert.equal(consumed[0].quantity, 2);
 });
 
 // ---------------------------------------------------------------------------

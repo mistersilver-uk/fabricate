@@ -36,12 +36,40 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return this._durationToSeconds(timeRequirement);
   }
 
+  /**
+   * Snapshot a step's authored ingredient requirements (component id + quantity)
+   * at run creation (issue 738). Persisting the requirements — rather than resolving
+   * them live from the recipe at Journal-projection time — keeps a history entry's
+   * requirements intact after the recipe is later edited or deleted (a deleted recipe
+   * otherwise redacts the whole run). Only component-backed ingredients are captured
+   * (tag / essence requirements carry no component id); the primary (first) ingredient
+   * set is used, mirroring how the crafting UI surfaces a step's requirements. Names
+   * and images are resolved at projection time from the still-live crafting system's
+   * components, so only the stable ids are stored here.
+   *
+   * @param {object} step An execution step (`recipe.getExecutionSteps()` entry).
+   * @returns {Array<{componentId: string, quantity: number}>}
+   * @private
+   */
+  _buildStepRequirements(step) {
+    const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
+    const primary = sets[0];
+    const ingredients = Array.isArray(primary?.ingredients) ? primary.ingredients : [];
+    return ingredients
+      .filter((ingredient) => ingredient?.componentId)
+      .map((ingredient) => ({
+        componentId: ingredient.componentId,
+        quantity: Number(ingredient.quantity) || 1,
+      }));
+  }
+
   _buildStepStates(recipe) {
     const steps = recipe.getExecutionSteps();
     return steps.map((step, index) => ({
       stepId: step.id || foundry.utils.randomID(),
       stepName: step.name || `Step ${index + 1}`,
       index,
+      requirements: this._buildStepRequirements(step),
       status: index === 0 ? 'inProgress' : 'pending',
       startedAt: index === 0 ? this._nowWorldTime() : undefined,
       updatedAt: this._nowWorldTime(),

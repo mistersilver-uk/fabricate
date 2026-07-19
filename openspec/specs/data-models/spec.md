@@ -1407,6 +1407,17 @@ CraftingRunStepState = {
 
   selectedIngredientSetId?: string,
 
+  // Authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
+  // Component-backed ingredients of the step's primary (first) ingredient set only; tag /
+  // essence requirements carry no component id and are omitted. Persisting the stable ids
+  // keeps a history entry's requirements intact after the recipe is later edited or deleted.
+  // Absent on pre-snapshot historical records. Name/img resolve at projection time from the
+  // still-live crafting system's components.
+  requirements?: Array<{
+    componentId: string,
+    quantity: number,
+  }>,
+
   lastCheckResult?: {
     success: boolean,
     reason: string,   // user-friendly text returned by the macro explaining the result
@@ -1419,6 +1430,9 @@ CraftingRunStepState = {
     actorUuid: string,
     itemUuid: string,
     quantity: number,
+    name?: string | null, // captured at consume time; absent on pre-capture historical records
+    img?: string | null,  // captured at consume time; absent on pre-capture historical records
+    componentId?: string | null, // captured on the timed-step FINISH path (and legacy refs); a projection name/img fallback
   }>,
   // Flattened tool-breakage evidence written by `_applyToolBreakage`. Each entry
   // is one tool's usage/breakage record; `componentId` and `broken` are load-bearing
@@ -1652,7 +1666,14 @@ StepModel = {
     outcome: string | null,
     value: number | null,
     reason: string | null,
+    formula: string | null,          // resolved (else authored) roll formula from lastCheckResult.data
+    total: number | null,            // rolled total (data.total, else the bare value)
+    dc: number | null,               // resolved DC when the check has a static one
   } | null,
+  // The step's authored required ingredients (persisted snapshot) and the items it
+  // actually consumed, each a UI-safe result row. `[]` when absent or for a redacted run.
+  requirements: Array<{ componentId, itemUuid, quantity, name, img }>,
+  consumedIngredients: Array<{ componentId, itemUuid, quantity, name, img }>,
 }
 ```
 
@@ -1669,13 +1690,15 @@ StepModel = {
    For gathering and salvage runs, they come from the RUN-level `timeGate`.
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
-   A crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe for a non-GM viewer — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
-   A GM viewer and globally-visible recipes are never redacted; with no recipe-visibility service available no redaction occurs.
+   For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
+   The GM bypass precedes the missing-recipe guard: a GM viewer is never redacted, even for a run whose recipe no longer resolves, so the GM still sees the run's persisted step snapshots (requirements, roll, consumed items) rather than a redacted empty card.
+   Globally-visible recipes are likewise never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
    Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
 4. **Step projection is crafting-only.**
-   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, and each step's `detail.checkLabel` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
-   A redacted crafting run also projects `steps: []`.
+   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
+   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs; both resolve name/img via the same shared result mapper (consume-time capture, then the item-uuid and component-id fallbacks), so a deleted consumed item still labels from its captured or component name.
+   A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
    `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
 5. **`manualAdvance` is the Trigger Next Step gate.**

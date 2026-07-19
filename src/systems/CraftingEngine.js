@@ -64,6 +64,27 @@ export function rollTotalForCard(checkResult) {
 }
 
 /**
+ * Map one `_consumeIngredients` entry to the persisted run-record shape, capturing
+ * the item's `name`/`img` at consume time (issue 738). A consumed item is DELETED
+ * from the actor immediately, so a render-time uuid lookup returns null and yields a
+ * blank name in the Journal history detail — mirroring the `createdResults` capture,
+ * the name/img are snapshot here while the source item still exists. Pre-capture
+ * historical records simply carry no name/img and fall back to a render-time lookup.
+ *
+ * @param {{item: object, quantity: number}} consumed
+ * @returns {{actorUuid: string|null, itemUuid: string|null, quantity: number, name: string|null, img: string|null}}
+ */
+function mapConsumedIngredientRef({ item, quantity }) {
+  return {
+    actorUuid: item.parent?.uuid || null,
+    itemUuid: item.uuid,
+    quantity,
+    name: item.name ?? null,
+    img: item.img ?? null,
+  };
+}
+
+/**
  * Stamp the durable per-system component identity on a crafted OUTPUT item's data,
  * BEFORE creation, so the inventory matcher attributes it to its OWN component
  * regardless of naming collisions or Foundry's transitive `_stats.duplicateSource`
@@ -624,11 +645,7 @@ export class CraftingEngine {
                 value: checkResult.value ?? undefined,
                 data: checkResult.data || {},
               },
-              consumedIngredients: consumedOnFail.map(({ item, quantity }) => ({
-                actorUuid: item.parent?.uuid || null,
-                itemUuid: item.uuid,
-                quantity,
-              })),
+              consumedIngredients: consumedOnFail.map(mapConsumedIngredientRef),
               usedTools: usedToolsOnFail,
             }
           );
@@ -698,11 +715,7 @@ export class CraftingEngine {
               value: checkResult.value ?? undefined,
               data: checkResult.data || {},
             },
-            consumedIngredients: consumedOnValidationFail.map(({ item, quantity }) => ({
-              actorUuid: item.parent?.uuid || null,
-              itemUuid: item.uuid,
-              quantity,
-            })),
+            consumedIngredients: consumedOnValidationFail.map(mapConsumedIngredientRef),
             usedTools: usedToolsOnValidationFail,
           });
         }
@@ -840,11 +853,7 @@ export class CraftingEngine {
             value: checkResult.value ?? undefined,
             data: checkResult.data || {},
           },
-          consumedIngredients: consumedItems.map(({ item, quantity }) => ({
-            actorUuid: item.parent?.uuid || null,
-            itemUuid: item.uuid,
-            quantity,
-          })),
+          consumedIngredients: consumedItems.map(mapConsumedIngredientRef),
           usedTools,
           createdResults: (resultItems || []).map((item) => ({
             actorUuid: craftingActor.uuid,
@@ -1123,10 +1132,14 @@ export class CraftingEngine {
         ? { componentId: entry.componentId, systemItemId: entry.componentId }
         : null,
     }));
-    const consumedRunRefs = summary.map((entry) => ({
-      actorUuid: entry.actorUuid ?? null,
-      itemUuid: entry.itemUuid ?? null,
-      quantity: entry.quantity,
+    // Route the reconstructed snapshots through the same mapper the immediate craft
+    // paths use so the persisted run refs carry the consume-time name/img (captured
+    // into the summary at START, ~:1014). Preserve the summary's componentId too — the
+    // Journal projection falls back to it for the name/img when a live lookup fails
+    // (RunJournalBuilder._mapResult). Dropping these left timed-step history rows blank.
+    const consumedRunRefs = consumedItems.map((consumed) => ({
+      ...mapConsumedIngredientRef(consumed),
+      componentId: consumed.ingredient?.componentId ?? null,
     }));
 
     // Tools are reusable and were NOT consumed at START, so re-resolve them here
@@ -1608,11 +1621,7 @@ export class CraftingEngine {
       );
     }
 
-    const consumedRunRefs = consumedItems.map(({ item, quantity }) => ({
-      actorUuid: item.parent?.uuid || null,
-      itemUuid: item.uuid,
-      quantity,
-    }));
+    const consumedRunRefs = consumedItems.map(mapConsumedIngredientRef);
 
     // Build a tier-4-aware essence snapshot over the consumed items (issue 578) so the
     // reserved Simple-failure result group's essence-sourced effect transfer /
