@@ -5868,7 +5868,11 @@ export function createAdminStore(services) {
         services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Body') ||
         'Existing multi-step recipes will run as one combined action and show only their final results for editing. Their steps are kept and restored if you turn multi-step recipes back on. No recipe data is deleted.'
       }</p>`,
-      yes: () => true,
+      yes: {
+        label:
+          services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
+        callback: () => true,
+      },
       no: () => false,
     });
     return confirmed === true;
