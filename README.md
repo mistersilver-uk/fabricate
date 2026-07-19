@@ -21,7 +21,7 @@ A system-agnostic, flexible crafting and gathering module for Foundry Virtual Ta
 - **System-Agnostic** — Works with any Foundry game system, with no dependency on D&D 5e, Pathfinder, or any single ruleset.
 - **Crafting Systems** — Define independent crafting systems, each with their own managed items, essences, and feature toggles.
 - **Player Crafting** — Players browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab, with a built-in shopping list.
-- **Recipe Authoring** — Author complete recipes in the GM admin panel, with tabs for ingredients, results, tools, steps, access, and validation.
+- **Recipe Authoring** — Author complete recipes in the GM admin panel, with tabs for overview, ingredients, results, tools, access, and validation.
 - **Recipes** — Simple or multi-step recipes with ingredient sets, tools, and result groups.
 - **Resolution Modes** — Simple, routed by ingredients, routed by check, progressive, and alchemy crafting, with optional skill checks.
 - **Visibility and Knowledge** — Control which recipes players can see via player lists or knowledge-based discovery, with recipe books and scrolls that teach them.

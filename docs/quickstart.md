@@ -181,7 +181,7 @@ Timed tasks stay visible while the active run is in progress, and blind environm
 ![Fabricate player timed gathering run](img/screenshots/fabricate-player-gathering-timed-active.webp)
 ![Fabricate player blind gathering](img/screenshots/fabricate-player-gathering-blind.webp)
 
-The Crafting tab provides recipe browsing, actor and source selection, craft buttons, favourites, recent recipes, and shopping-list planning in the UI.
+The Crafting tab provides recipe browsing, actor and source selection, craft buttons, favourites, and shopping-list planning in the UI.
 
 ## See Also
 
