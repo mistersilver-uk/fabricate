@@ -18,17 +18,21 @@ A system-agnostic, flexible crafting and gathering module for Foundry Virtual Ta
 
 ## Features
 
+- **System-Agnostic** — Works with any Foundry game system, with no dependency on D&D 5e, Pathfinder, or any single ruleset.
 - **Crafting Systems** — Define independent crafting systems, each with their own managed items, essences, and feature toggles.
-- **Recipes** — Simple or multi-step recipes with ingredient sets, catalysts, and result groups.
-- **Resolution Modes** — Simple, mapped, tiered, and progressive crafting modes.
-- **Visibility and Knowledge** — Control which recipes players can see via player lists or knowledge-based discovery.
+- **Player Crafting** — Players browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab, with a built-in shopping list.
+- **Recipe Authoring** — Author complete recipes in the GM admin panel, with tabs for ingredients, results, tools, steps, access, and validation.
+- **Recipes** — Simple or multi-step recipes with ingredient sets, tools, and result groups.
+- **Resolution Modes** — Simple, routed by ingredients, routed by check, progressive, and alchemy crafting, with optional skill checks.
+- **Visibility and Knowledge** — Control which recipes players can see via player lists or knowledge-based discovery, with recipe books and scrolls that teach them.
 - **Essences** — Infuse items with abstract essences for flexible ingredient matching.
 - **Tools** — Tools and workstations with optional usage tracking and breakage mechanics.
 - **Active Effect Transfer** — Transfer effects from ingredients to crafted items.
 - **Macro Integration** — Hook into success and failure outcomes with custom macros.
 - **Time and Currency Requirements** — Optional time or currency costs per crafting system.
-- **Salvage** — Break down managed items into components.
+- **Salvage** — Players break down managed items into their component parts.
 - **Gathering** — Explore environments, attempt gathering tasks, avoid or encounter hazards and harvest resources.
+- **Journal** — Players monitor crafting, gathering, and salvage runs in one place, and continue multi-step crafting runs.
 
 ## Installation
 
