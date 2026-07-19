@@ -285,7 +285,14 @@ export class RunJournalBuilder {
       activeStep && Number.isFinite(currentStepIndex) ? (steps[currentStepIndex] ?? null) : null;
 
     const derivedStatus = this._deriveCraftingStatus({ status, activeStep, worldTime });
-    const multiStep = Array.isArray(recipe?.steps) && recipe.steps.length > 1;
+    // A recipe presents as multi-step only while its system's multi-step feature is
+    // ON. When the feature is OFF the recipe is COLLAPSED (issue 710): it ran as one
+    // atomic chain, so the Journal renders it as a single-step run even though the
+    // run record retains per-step detail. Re-enabling the feature restores the
+    // multi-step presentation from the same untouched record.
+    const multiStepFeatureEnabled = system?.features?.multiStepRecipes === true;
+    const multiStep =
+      multiStepFeatureEnabled && Array.isArray(recipe?.steps) && recipe.steps.length > 1;
     const failureReason = redacted ? null : this._craftingFailureReason(runSteps);
     // The step whose name annotates the label: the active step for a live run,
     // else the final step for a terminal run.

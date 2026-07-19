@@ -163,6 +163,45 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return run;
   }
 
+  /**
+   * Arm the single summed time gate for a COLLAPSED multi-step chain (issue 710).
+   *
+   * When a system's multi-step feature is off, a recipe that still carries authored
+   * steps runs as one atomic action; instead of arming a gate per step, the engine
+   * sums every step's duration and arms ONE gate here, stored on step 0 (with
+   * `currentStepIndex` pinned to 0) so the generic `processWorldTime` resume path —
+   * which reads `run.steps[run.currentStepIndex].timeGate` — matures it exactly like
+   * any other timed run. Nothing is consumed at arm: the chain consumes each step's
+   * ingredients when it executes at maturity. Re-arming an already-armed gate is a
+   * no-op on the gate itself (idempotent), it only re-marks the waiting status.
+   *
+   * @param {Actor} actor
+   * @param {object} run
+   * @param {number} seconds Total summed duration in seconds (> 0).
+   * @returns {Promise<object>} the updated run
+   */
+  async armCollapsedChainGate(actor, run, seconds) {
+    const total = Number(seconds);
+    if (!Number.isFinite(total) || total <= 0) return run;
+    const worldTime = this._nowWorldTime();
+    const step = run.steps?.[0];
+    if (!step) return run;
+    if (!step.timeGate) {
+      step.timeGate = {
+        requiredSeconds: total,
+        initiatedAt: worldTime,
+        availableAt: worldTime + total,
+        collapsedChain: true,
+      };
+    }
+    run.status = 'waitingTime';
+    run.currentStepIndex = 0;
+    step.status = 'waitingTime';
+    step.updatedAt = worldTime;
+    await this.updateRun(actor, run);
+    return run;
+  }
+
   canProceedTimeGate(run, stepIndex, worldTime = this._nowWorldTime()) {
     const step = run.steps?.[stepIndex];
     if (!step?.timeGate) return true;
