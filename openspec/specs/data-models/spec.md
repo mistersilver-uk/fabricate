@@ -54,6 +54,8 @@ CraftingSystem = {
 
   categories: string[], // custom recipe categories only; reserved "general" is implicit
   componentCategories?: string[], // default []; custom COMPONENT categories only; reserved "general" is implicit; independent of `categories`
+  categoryIcons?: Record<string, string>, // default {}; optional per-recipe-category Font Awesome icon, keyed by lowercased category name (may include "general")
+  componentCategoryIcons?: Record<string, string>, // default {}; the same, for component categories
   itemTags: string[],
 
   // Emitted unconditionally by normalization (empty array when features.essences is off).
@@ -293,6 +295,13 @@ It is always enabled, cannot be removed, and must not be persisted in `CraftingS
 `CraftingSystem.componentCategories` stores only additional user-defined component categories.
 It is a sibling of, and independent from, `CraftingSystem.categories` (recipe categories): the two vocabularies must not be merged, aliased, or cross-populated.
 A component category is never offered as a recipe category and vice versa.
+6c.
+`CraftingSystem.categories` and `CraftingSystem.componentCategories` may each carry an optional per-category icon in a parallel name-keyed map (`categoryIcons` / `componentCategoryIcons`), keyed by the lowercased category name so the string vocabulary arrays stay backwards-compatible.
+The reserved `general` bucket may carry a default icon under the `general` key but is still never persisted in the string arrays.
+Each icon map is normalized to the categories that currently exist (plus `general`), so an icon for a category that no longer exists is dropped; the settings write replaces the whole map.
+6d.
+Deleting a referenced recipe or component category reassigns the affected records' `category` to `general` rather than leaving the value lingering.
+Deleting a referenced item tag strips it from the `tags` of every component carrying it.
 7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, or `"alchemy"`.
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.

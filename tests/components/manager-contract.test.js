@@ -1092,16 +1092,20 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes("import TagsCategoriesView from './TagsCategoriesView.svelte';"),
       'root should import the focused tags/categories page'
     );
-    assert.ok(rootSource.includes('store.addCategory?.(value)'), 'category add should delegate to the admin store');
+    assert.ok(rootSource.includes('store.addCategory?.(value, icon)'), 'category add should delegate to the admin store with its icon');
     assert.ok(rootSource.includes('store.removeCategory?.(category)'), 'category remove should delegate to the admin store');
+    // Per-category icon persistence (issue 689) is a dedicated store seam.
+    assert.ok(rootSource.includes('store.setCategoryIcon?.(name, icon)'), 'category icon edits should delegate to the admin store');
     // The COMPONENT category vocabulary (issue 676) — the sibling of the two above,
     // and a SEPARATE store action: it must never be folded into addCategory.
-    assert.ok(rootSource.includes('store.addComponentCategory?.(value)'), 'component category add should delegate to the admin store');
+    assert.ok(rootSource.includes('store.addComponentCategory?.(value, icon)'), 'component category add should delegate to the admin store with its icon');
     assert.ok(rootSource.includes('store.removeComponentCategory?.(category)'), 'component category remove should delegate to the admin store');
+    assert.ok(rootSource.includes('store.setComponentCategoryIcon?.(name, icon)'), 'component category icon edits should delegate to the admin store');
     assert.ok(rootSource.includes('store.addTag?.(value)'), 'tag add should delegate to the admin store');
     assert.ok(rootSource.includes('store.removeTag?.(tag)'), 'tag remove should delegate to the admin store');
-    assert.ok(rootSource.includes('confirmTagCategoryRemoval'), 'in-use removals should flow through a confirmation seam');
-    assert.ok(tagsCategoriesSource.includes('onConfirmRemove'), 'focused route should ask the root before removing in-use vocabulary');
+    // The destructive delete is now confirmed inline in the focused route (issue 689),
+    // then cascades through the store's remove ops — not an external confirm seam.
+    assert.ok(tagsCategoriesSource.includes('onRemoveCategory'), 'focused route should own the vocabulary remove wiring');
     assert.ok(tagsCategoriesSource.includes('GeneralReservedFeedback'), 'focused route should keep reserved General feedback visible');
     assert.ok(!/\b(?:game|ui|Hooks|CONFIG)\b/.test(tagsCategoriesSource), 'tags/categories route should not directly reference Foundry globals');
   });

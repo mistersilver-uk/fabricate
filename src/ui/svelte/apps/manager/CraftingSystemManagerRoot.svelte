@@ -23,6 +23,8 @@
     getComponentCategoryLabel,
     normalizeComponentCategory
   } from '../../../../utils/componentCategories.js';
+  import { categoryIconFor } from '../../../../utils/categoryIcons.js';
+  import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
   import { createComponentBrowserState } from '../../../../utils/componentBrowserModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
@@ -739,10 +741,15 @@
     (toolsComponentPageIndex + 1) * toolsComponentPageSize
   ));
   const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
-  const categoryRows = $derived(buildCategoryRows(selectedSystem?.categories || [], tagCategoryUsage.categoryUsage));
+  const categoryRows = $derived(buildCategoryRows(
+    selectedSystem?.categories || [],
+    tagCategoryUsage.categoryUsage,
+    selectedSystem?.categoryIcons || {}
+  ));
   const componentCategoryRows = $derived(buildComponentCategoryRows(
     selectedSystem?.componentCategories || [],
-    tagCategoryUsage.componentCategoryUsage
+    tagCategoryUsage.componentCategoryUsage,
+    selectedSystem?.componentCategoryIcons || {}
   ));
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
   const tagCategoryCounts = $derived({
@@ -753,6 +760,40 @@
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
     componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount
+  });
+  // The Tags & Categories screen shows one vocabulary tab at a time; the active tab
+  // is owned here so the inspector's contextual help can follow it (the view is a
+  // controlled component over this state). Each help block is title + three bullets.
+  let tagsActiveTab = $state('recipe');
+  const tagsHelp = $derived.by(() => {
+    if (tagsActiveTab === 'component') {
+      return {
+        title: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle', 'How component categories work'),
+        items: [
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.')
+        ]
+      };
+    }
+    if (tagsActiveTab === 'tag') {
+      return {
+        title: text('FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle', 'How component tags work'),
+        items: [
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.')
+        ]
+      };
+    }
+    return {
+      title: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle', 'How recipe categories work'),
+      items: [
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.'),
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.'),
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.')
+      ]
+    };
   });
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
@@ -2923,9 +2964,9 @@
     store.deleteComponent?.(itemId);
   }
 
-  function addCategory(value) {
+  function addCategory(value, icon) {
     if (!selectedSystemId) return;
-    return store.addCategory?.(value);
+    return store.addCategory?.(value, icon);
   }
 
   function removeCategory(category) {
@@ -2933,14 +2974,24 @@
     return store.removeCategory?.(category);
   }
 
-  function addComponentCategory(value) {
+  function setCategoryIcon(name, icon) {
     if (!selectedSystemId) return;
-    return store.addComponentCategory?.(value);
+    return store.setCategoryIcon?.(name, icon);
+  }
+
+  function addComponentCategory(value, icon) {
+    if (!selectedSystemId) return;
+    return store.addComponentCategory?.(value, icon);
   }
 
   function removeComponentCategory(category) {
     if (!selectedSystemId) return;
     return store.removeComponentCategory?.(category);
+  }
+
+  function setComponentCategoryIcon(name, icon) {
+    if (!selectedSystemId) return;
+    return store.setComponentCategoryIcon?.(name, icon);
   }
 
   function addTag(value) {
@@ -2951,38 +3002,6 @@
   function removeTag(tag) {
     if (!selectedSystemId) return;
     return store.removeTag?.(tag);
-  }
-
-  function confirmTagCategoryRemoval(kind, row) {
-    if (!row || (row.totalUsage || 0) <= 0) return true;
-    // Three vocabularies, three messages (issue 676) — all saying the same true thing,
-    // because all three behave the same way: removing a vocabulary entry does NOT
-    // rewrite the records carrying it. `normalizeComponentCategory` surfaces a custom
-    // token VERBATIM, so a component keeps `category: 'Reagent'` after the entry is
-    // deleted and its row badge still reads "Reagent"; only the editor's <select> loses
-    // the option. An earlier draft promised a fall-back to General that the code does
-    // not perform — in a DESTRUCTIVE confirm.
-    const messages = {
-      category: [
-        'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirm',
-        'Remove {name}? {count} references may keep this category value until you update them.'
-      ],
-      'component-category': [
-        'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryConfirm',
-        'Remove {name}? {count} components may keep this category value until you update them.'
-      ],
-      tag: [
-        'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirm',
-        'Remove {name}? {count} references may keep this tag value until you update them.'
-      ]
-    };
-    const [messageKey, fallback] = messages[kind] || messages.tag;
-    const message = text(messageKey, fallback)
-      .replace('{name}', row.name)
-      .replace('{count}', row.totalUsage || 0);
-    if (services?.confirmVocabularyRemoval) return services.confirmVocabularyRemoval(kind, row, message) !== false;
-    if (typeof globalThis.confirm === 'function') return globalThis.confirm(message);
-    return false;
   }
 
   async function saveEssenceEdit(essenceId, updates) {
@@ -4281,39 +4300,15 @@
     return normalized || 'general';
   }
 
+  // Reference counting delegates to the pure `buildVocabularyUsage` helper (issue
+  // 689), which — unlike the pre-689 inline count — also credits a tag for every
+  // recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it, so a
+  // tag only ever used as an ingredient filter no longer reads as "Unused".
   function buildTagCategoryUsage(system, recipes, items) {
-    const categoryUsage = new Map();
-    const tagUsage = new Map();
-    // Component-category usage is counted SEPARATELY from recipe-category usage
-    // (issue 676): the two vocabularies are independent, so folding component
-    // counts into `categoryUsage` would misreport a recipe category as used.
-    const componentCategoryUsage = new Map();
-    for (const recipe of recipes || []) {
-      const categoryKey = normalizeVocabularyKey(recipe?.category);
-      categoryUsage.set(categoryKey, (categoryUsage.get(categoryKey) || 0) + 1);
-    }
-    for (const item of items || []) {
-      for (const tag of item?.tags || []) {
-        const tagKey = normalizeVocabularyKey(tag);
-        tagUsage.set(tagKey, (tagUsage.get(tagKey) || 0) + 1);
-      }
-      const componentCategoryKey = normalizeVocabularyKey(item?.category);
-      componentCategoryUsage.set(
-        componentCategoryKey,
-        (componentCategoryUsage.get(componentCategoryKey) || 0) + 1
-      );
-    }
-    return {
-      categoryUsage,
-      tagUsage,
-      componentCategoryUsage,
-      categoryReferenceCount: Array.from(categoryUsage.values()).reduce((sum, count) => sum + count, 0),
-      tagReferenceCount: Array.from(tagUsage.values()).reduce((sum, count) => sum + count, 0),
-      componentCategoryReferenceCount: Array.from(componentCategoryUsage.values()).reduce((sum, count) => sum + count, 0)
-    };
+    return buildVocabularyUsage(recipes, items);
   }
 
-  function buildCategoryRows(categories, usage) {
+  function buildCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Admin.Manager.Recipe.General', 'General');
     const customRows = uniqueSorted(categories || []).map(category => {
       const key = normalizeVocabularyKey(category);
@@ -4322,6 +4317,7 @@
         id: key,
         kind: 'category',
         name: category,
+        icon: categoryIconFor(icons, category),
         recipeUsageCount,
         totalUsage: recipeUsageCount,
         locked: false
@@ -4332,6 +4328,7 @@
         id: 'general',
         kind: 'category',
         name: generalName,
+        icon: categoryIconFor(icons, 'general'),
         recipeUsageCount: usage.get('general') || 0,
         totalUsage: usage.get('general') || 0,
         locked: true
@@ -4344,7 +4341,7 @@
   // Tags & Categories screen can render both sections through one row component, but
   // fed from its own vocabulary and its own usage map. `kind` distinguishes them for
   // the removal-confirmation copy.
-  function buildComponentCategoryRows(categories, usage) {
+  function buildComponentCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Common.General', 'General');
     const customRows = uniqueSorted(categories || []).map(category => {
       const key = normalizeVocabularyKey(category);
@@ -4353,6 +4350,7 @@
         id: key,
         kind: 'component-category',
         name: category,
+        icon: categoryIconFor(icons, category),
         componentUsageCount,
         totalUsage: componentUsageCount,
         locked: false
@@ -4363,6 +4361,7 @@
         id: 'general',
         kind: 'component-category',
         name: generalName,
+        icon: categoryIconFor(icons, 'general'),
         componentUsageCount: usage.get('general') || 0,
         totalUsage: usage.get('general') || 0,
         locked: true
@@ -5230,13 +5229,16 @@
         {componentCategoryRows}
         {tagRows}
         counts={tagCategoryCounts}
+        activeTab={tagsActiveTab}
+        onTabChange={(id) => (tagsActiveTab = id)}
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
         onAddComponentCategory={addComponentCategory}
         onRemoveComponentCategory={removeComponentCategory}
         onAddTag={addTag}
         onRemoveTag={removeTag}
-        onConfirmRemove={confirmTagCategoryRemoval}
+        onSetCategoryIcon={setCategoryIcon}
+        onSetComponentCategoryIcon={setComponentCategoryIcon}
       />
     {:else if currentView === 'component-edit' && selectedSystem}
       {#if componentForEdit}
@@ -5478,47 +5480,36 @@
     {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
-        <section class="manager-inspector-card">
-          <div class="manager-inspector-title-row">
-            <span class="manager-inspector-icon" aria-hidden="true">
-              <i class="fas fa-tags"></i>
-            </span>
-            <div class="manager-inspector-copy">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.TagsCategories.Selected', 'Selected vocabulary')}</p>
-              <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.TagsCategories.Library', 'Tags & Categories')}</h2>
-              <div class="manager-chip-row">
-                <span class="manager-chip is-active">{text('FABRICATE.Admin.Manager.TagsCategories.AlwaysOn', 'Always available')}</span>
-              </div>
+        <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
+          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}</h3>
+          <div class="manager-fact-grid">
+            <div class="manager-fact" data-tags-category-fact="recipe-categories">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.RecipeCategories', 'Recipe categories')}</span></span>
+            </div>
+            <div class="manager-fact" data-tags-category-fact="component-categories">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.customComponentCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ComponentCategories', 'Component categories')}</span></span>
+            </div>
+            <div class="manager-fact" data-tags-category-fact="item-tags">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags')}</span></span>
+            </div>
+            <div class="manager-fact" data-tags-category-fact="references">
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.componentCategoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.TotalReferences', 'Total references')}</span></span>
             </div>
           </div>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.InspectorHint', 'Define the vocabulary GMs use when assigning recipe categories and component tags.')}</p>
         </section>
 
         <section class="manager-inspector-card" data-tags-evidence="how-it-works">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksTitle', 'How it works')}</h3>
+          <h3 class="manager-card-title">{tagsHelp.title}</h3>
           <ul class="manager-evidence-list">
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksFlat', 'Categories are flat — each recipe picks one, with no parent or child folders.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksGeneral', 'General is the reserved fallback for recipes without a custom category.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksTags', 'Item tags appear on components and on tag-placeholder ingredients in recipes.')}</li>
+            {#each tagsHelp.items as tip (tip)}
+              <li>{tip}</li>
+            {/each}
           </ul>
         </section>
 
-        <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.Counts', 'Vocabulary counts')}</h3>
-          <div class="manager-fact-grid">
-            <div class="manager-fact" data-tags-category-fact="base-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.baseCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.BaseCategory', 'Base category')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="custom-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.CustomCategories', 'Custom categories')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="item-tags">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="references">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.References', 'References')}</span></span>
-            </div>
-          </div>
+        <section class="manager-inspector-card" data-tags-evidence="reference-safe">
+          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle', 'Reference-safe by default')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint', 'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.')}</p>
         </section>
       {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}

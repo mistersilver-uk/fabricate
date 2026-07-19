@@ -186,3 +186,43 @@ test('updateItem applies an explicitly authored category', async () => {
   const updated = await manager.updateItem('sys1', 'c1', { category: 'Reagent' });
   assert.equal(updated.category, 'Reagent');
 });
+
+// ---------------------------------------------------------------------------
+// Per-category icons (issue 689)
+// ---------------------------------------------------------------------------
+
+test('categoryIcons / componentCategoryIcons round-trip only for existing categories', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys1',
+    name: 'System One',
+    categories: ['Potions'],
+    categoryIcons: { Potions: 'fas fa-flask', gone: 'fas fa-ghost' },
+    componentCategories: ['Reagent'],
+    componentCategoryIcons: { reagent: 'fas fa-leaf', general: 'fas fa-folder' },
+  });
+  // Keyed by lowercased name; an icon for a category that no longer exists is dropped.
+  assert.deepEqual(system.categoryIcons, { potions: 'fas fa-flask' });
+  assert.deepEqual(system.componentCategoryIcons, {
+    reagent: 'fas fa-leaf',
+    general: 'fas fa-folder',
+  });
+});
+
+test('updateSystem REPLACES the whole icon map (removal persists without -=)', async () => {
+  const manager = makeLoadedManager([
+    {
+      id: 'sys1',
+      name: 'System One',
+      categories: ['Potions', 'Elixirs'],
+      categoryIcons: { potions: 'fas fa-flask', elixirs: 'fas fa-vial' },
+    },
+  ]);
+  await manager.updateSystem('sys1', {
+    categories: ['Elixirs'],
+    categoryIcons: { elixirs: 'fas fa-vial' },
+  });
+  const persisted = manager.getSystem('sys1');
+  assert.deepEqual(persisted.categories, ['Elixirs']);
+  assert.deepEqual(persisted.categoryIcons, { elixirs: 'fas fa-vial' });
+});

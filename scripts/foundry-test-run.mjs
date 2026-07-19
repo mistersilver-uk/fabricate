@@ -5745,8 +5745,18 @@ async function main() {
         // vocabulary renders three [data-tag-id] rows. Guarded so a hiccup records
         // a failed step rather than aborting the phase.
         try {
+          // The issue-689 redesign is TABBED (one vocabulary at a time) and renames
+          // the tab "Component tags"; the pre-redesign screen stacks all three
+          // panels with the old "Item tags" label. Activate the tab when the tab
+          // bar exists, then accept either label.
+          const tagsTabButton = page
+            .locator('.fabricate-manager [data-vocabulary-tab="tag"]')
+            .first();
+          if (await tagsTabButton.count() > 0) {
+            await tagsTabButton.click();
+          }
           const itemTagsPanel = page
-            .locator('.fabricate-manager .manager-vocabulary-panel[aria-label="Item tags"]')
+            .locator('.fabricate-manager .manager-vocabulary-panel[aria-label="Component tags"], .fabricate-manager .manager-vocabulary-panel[aria-label="Item tags"]')
             .first();
           await itemTagsPanel.waitFor({ state: 'visible', timeout: 5_000 });
           const tagRowCount = await itemTagsPanel.locator('[data-tag-id]').count();
