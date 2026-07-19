@@ -84,6 +84,7 @@ A player-facing UI for resuming and cancelling active runs is planned and not ye
 
 {: .note }
 > Disabling the Multi-Step Recipes feature is not destructive.
-> Your multi-step recipes are kept exactly as you authored them, they are only hidden from players and cannot be crafted while the feature is off.
-> As the GM you still see each hidden recipe, so you can turn the feature back on or revert the recipe to a single step.
-> Turning the feature back on restores every multi-step recipe with nothing lost, including any run a player had already started.
+> Your multi-step recipes are kept exactly as you authored them.
+> While the feature is off, each multi-step recipe collapses into a single combined action: crafting it runs all of its steps back-to-back in one go and produces the results of its final step, and any step time requirements are added together into a single wait.
+> In the editor the recipe shows as single-step — its steps are read-only, and you edit its final results directly.
+> Turning the feature off asks you to confirm this first; turning it back on restores the full multi-step recipe and editor with nothing lost.

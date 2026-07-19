@@ -55,24 +55,27 @@ When `CraftingSystem.resolutionMode` changes:
 
 ### Disable Multi-step Feature
 
-Disabling `features.multiStepRecipes` is a **non-destructive visibility/validation gate**, not a destructive migration.
-It mirrors the salvage-feature toggle: turning the feature off hides and gates the multi-step surfaces and treats the affected config as inert, but no persisted data is deleted or migrated, so turning it back on restores everything.
+Disabling `features.multiStepRecipes` is a **non-destructive collapse**, not a destructive migration and not an information-hiding gate.
+Turning the feature off does not hide multi-step recipes: each multi-step recipe instead **collapses to a single-step presentation** whose behaviour is that of an **atomic chain execution**, while its authored steps are preserved untouched so turning the feature back on restores everything.
 
-When `features.multiStepRecipes` is disabled for a system that has multi-step recipes (recipes carrying explicit `steps[]`):
+When `features.multiStepRecipes` is disabled for a system that has multi-step recipes (recipes carrying more than one explicit step in `steps[]`):
 
 1. Existing multi-step recipes are **retained verbatim** in persisted data.
-   No recipe is deleted, migrated, or rewritten, and no active run, learned flag, or per-user preference is cleaned up.
-2. Each retained multi-step recipe is surfaced as a system-validation issue that gates its craftable visibility per `recipe-visibility` (a `blocks: 'visibility'` issue, not a `blocks: 'system'` blocker and not a `blocks: 'enable'` invalid-recipe error).
-   The issue is a warning: the recipe is deliberately gated, not structurally broken.
-3. Multi-step authoring surfaces hide while the feature is off; the multi-step step-mode control still renders for a recipe that is already multi-step so a GM retains the single-step revert path.
-4. The player side does not list or offer multi-step runs for the gated recipes: the listing filter excludes them and the crafting guard rejects a non-GM craft targeting them (reason `visibility`).
-   A GM still sees the recipes (GM bypass) to re-enable the feature or revert a recipe to a single step.
-5. Disabling the feature is **non-destructive to run records**: no in-flight multi-step run — including a timed run whose ingredients were already consumed at its start step — is deleted, cleaned up, or rewritten, mirroring the salvage honour-existing behaviour.
-   The gate is enforced uniformly at the crafting guard, which runs on every `craft()` call including each resumed step, so while the feature is off a non-GM cannot advance or finish a gated recipe's run: its remaining steps are gated (reason `visibility`) until the feature is re-enabled, at which point the retained run resumes losslessly.
-   A GM bypasses the gate and can advance or finish such a run at any time.
-6. No GM confirmation is required, because the toggle is non-destructive; re-enabling the feature drops the validation issue and restores full visibility with zero data loss.
+   No recipe is deleted, migrated, reverted, or rewritten, and no active run, learned flag, or per-user preference is cleaned up.
+2. Each such recipe stays **listed and craftable** for every viewer — it is never hidden from the player listing and the crafting guard never rejects it on multi-step grounds.
+3. A collapsed recipe executes as an **atomic chain**: one craft action runs the authored steps sequentially, back-to-back, in a single call, with no step-triggering UX and no between-step waiting.
+   Each step keeps its own consumption, crafting check, tool, and result-creation behaviour, so the chain reuses the existing per-step machinery.
+4. **Time requirements sum into one gate.** When time requirements are enabled, the single atomic action waits behind one gate whose duration is the **sum** of every step's duration; the chain then executes all steps at maturity.
+   Per-step gates are not armed individually while collapsed.
+5. **Mid-chain failure follows the existing per-step failure policy.** A step that fails mid-chain records its failure per the run model and stops the chain; components consumed by already-completed prior steps stay consumed (no rollback).
+6. The run record **may keep per-step detail**, but the Journal renders a collapsed run as a **single-step run** (`multiStep` is `false` in the projection while collapsed); re-enabling the feature restores the multi-step projection from the same untouched record.
+7. **GM editing collapses too.** With the feature off, the recipe editor presents the recipe as single-step: step authoring (steps, per-step ingredients and tools) is shown read-only with an "enable multi-step recipes to edit steps" note, and the normal results surface edits the chain's **effective results — the final step's result groups — writing edits through to that final step**.
+   The per-step data is never touched, so re-enabling the feature restores the full step editor with all steps intact.
+8. **Toggling the feature off is gated by a warning/confirm dialog** when the system has multi-step recipes: the dialog states that existing multi-step recipes will run as one combined action and show only their final results for editing, that their steps are kept and restored on re-enable, and that no recipe data is deleted.
+   The toggle persists only on confirm; declining leaves everything untouched.
+   Turning the feature **on** needs no dialog.
 
-This gating is enforced at the system-validation / visibility seam (`computeSystemVisibility` / `evaluateSystemValidation`), not only at the UI toggle, so import, copy, and migration writers that never pass through the manager toggle are gated on the same invariant.
+The collapse behaviour is realized at the engine and editor seams (`CraftingEngine.craft` atomic-chain execution, the recipe editor's final-step results write-through, and the Journal projection), not only at the UI toggle, so every writer that produces a multi-step recipe under a feature-off system — including import, copy, and migration — collapses on the same invariant.
 
 ### Change Visibility Knowledge Mode
 
