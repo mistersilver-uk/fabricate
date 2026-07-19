@@ -441,6 +441,26 @@ async function captureRecipeResultsTab(page, recipeName, label, contentSelector)
 }
 
 /**
+ * Drive the manager's persistent nav rail to the selected system's Edit route and
+ * bring the multi-step-recipes feature tile into frame. The tile's toggle is the
+ * surface the issue-710 collapse captures exercise (turning multi-step recipes off
+ * opens the collapse confirm dialog when authored multi-step recipes exist). Returns
+ * the multiStepRecipes tile locator so the caller can read its toggle state.
+ * @param {import('playwright').Page} page
+ */
+async function openManagerMultiStepFeatureTile(page) {
+  await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
+  await page
+    .locator('.fabricate-manager[data-manager-view="system-edit"]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  const tile = page.locator('.fabricate-manager [data-feature-key="multiStepRecipes"]').first();
+  await tile.waitFor({ state: 'visible', timeout: 5_000 });
+  await tile.scrollIntoViewIfNeeded().catch(() => {});
+  return tile;
+}
+
+/**
  * Capture the currently-open player Alchemy workbench under every Fabricate
  * theme, then restore the default theme. `applyManagerTheme` stamps the theme
  * attribute on the document element AND every `.fabricate` root — which includes
@@ -5340,6 +5360,129 @@ async function main() {
           'manager-recipe-edit-results-multistep',
           '[data-recipe-section$="-results"]'
         );
+
+        // ── Multi-step visibility gating (issue 710) ────────────────────────────
+        // Two captures that demonstrate the collapse semantics of the feature: the
+        // confirm dialog that guards turning the multi-step feature OFF while multi-step
+        // recipes exist, and the COLLAPSED recipe editor the branch renders once it is
+        // off. Both toggle the multiStepRecipes feature on the current (Herbalist's
+        // Compendium) system, whose "Multi-Step Alloy" recipe carries authored steps.
+        //
+        // State restoration is MANDATORY: every earlier and later multistep capture
+        // asserts the ENABLED editor (steps accordion / per-step results), so the outer
+        // finally force-re-enables the feature through the API even if a UI step throws,
+        // and the whole span sits AFTER those enabled-state frames so a leaked disable
+        // can never rewrite them.
+        try {
+          // (1) Disable-confirm, CANCELLED. Open the system Edit route, confirm the
+          // multi-step tile reads ON, click it OFF — which opens the collapse confirm
+          // dialog (services.confirmDialog) because "Multi-Step Alloy" has steps — and
+          // capture WITH THE DIALOG OPEN. Then take the 'no' path so nothing persists.
+          const featureTile = await openManagerMultiStepFeatureTile(page);
+          await featureTile.locator('.manager-status-toggle.is-on').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await featureTile.locator('.manager-status-toggle').first().click();
+
+          const disableDialog = page
+            .locator('.application.dialog:has(button[data-action="yes"]):has(button[data-action="no"])')
+            .filter({ hasText: 'Existing multi-step recipes will run as one combined action' })
+            .first();
+          await disableDialog.waitFor({ state: 'visible', timeout: 10_000 });
+          // Load-bearing proof this is the branch's collapse confirm (not a generic
+          // prompt): its body copy AND its 'Disable' confirm button (issue 710's fix
+          // commit wired that label onto the yes action). DialogV2.confirm does NOT
+          // surface the service's top-level `title` in the window chrome (`.window-title`
+          // stays empty), so the identifying content asserted here is the warning body
+          // and the labelled action — exactly what a GM reads before confirming.
+          await disableDialog.getByText('Their steps are kept and restored').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await disableDialog.locator('button[data-action="yes"]:has-text("Disable")').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          // The dialog IS the intended overlay here (like the import-report capture), so
+          // clear stray toasts but deliberately skip assertNoScreenshotOverlays.
+          await dismissFoundryNotifications(page);
+          await screenshot(page, 'manager-multistep-disable-confirm');
+
+          // Cancel: the 'no' button leaves the toggle ON with zero persisted change.
+          await disableDialog.locator('button[data-action="no"]').first().click();
+          await disableDialog.waitFor({ state: 'detached', timeout: 10_000 });
+          await featureTile.locator('.manager-status-toggle.is-on').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          results.steps.push({ step: 'multistep-disable-confirm', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'multistep-disable-confirm', passed: false, error: err.message });
+          process.stderr.write(`Multi-step disable-confirm capture failed: ${err.message}\n`);
+          // Dismiss any lingering confirm dialog so the next capture starts clean.
+          await page.locator('.application.dialog button[data-action="no"]').first().click().catch(() => {});
+        }
+
+        try {
+          // (2) Collapsed editor. This time ACCEPT the confirm (the branch's 'Disable'
+          // button) so the feature actually turns off, then open "Multi-Step Alloy" and
+          // capture its Overview: the read-only collapsed-steps card + explanatory note
+          // that the branch renders in place of the editable steps accordion.
+          const featureTile = await openManagerMultiStepFeatureTile(page);
+          await featureTile.locator('.manager-status-toggle.is-on').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await featureTile.locator('.manager-status-toggle').first().click();
+          const confirmDialog = page
+            .locator('.application.dialog:has(button[data-action="yes"]):has(button[data-action="no"])')
+            .filter({ hasText: 'Existing multi-step recipes will run as one combined action' })
+            .first();
+          await confirmDialog.waitFor({ state: 'visible', timeout: 10_000 });
+          await confirmDialog.locator('button[data-action="yes"]').first().click();
+          await confirmDialog.waitFor({ state: 'detached', timeout: 10_000 });
+          // The store's toggleFeature refreshes after updateSystem; wait for the tile to
+          // flip OFF so the recipe editor below receives multiStepEnabled=false.
+          await featureTile.locator('.manager-status-toggle.is-off').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+
+          await openManagerRecipeEditor(page, 'Multi-Step Alloy');
+          await page.locator('.fabricate-manager [data-recipe-tab="overview"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          // Collapsed presentation: the read-only steps card + its note strip replace the
+          // editable accordion. Assert the collapsed card and note are present AND the
+          // editable steps accordion (data-recipe-section="steps") is GONE — the single
+          // combined-action presentation the branch renders while the feature is off.
+          await page.locator('.fabricate-manager [data-recipe-section="collapsed-steps"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager [data-recipe-collapsed-note]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          if (await page.locator('.fabricate-manager [data-recipe-section="steps"]').count() > 0) {
+            throw new Error('Collapsed editor still rendered the editable steps accordion.');
+          }
+          await assertManagerLayoutStable(page, 'recipe edit collapsed');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-recipe-edit-collapsed');
+          results.steps.push({ step: 'multistep-recipe-edit-collapsed', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'multistep-recipe-edit-collapsed', passed: false, error: err.message });
+          process.stderr.write(`Multi-step collapsed-editor capture failed: ${err.message}\n`);
+        } finally {
+          // MANDATORY restore: re-enable multi-step recipes (enabling never prompts) and
+          // verify the editable steps accordion is back so every later multistep frame —
+          // and every rerun — sees the enabled editor. Force it through the API too, so a
+          // failed UI step above still leaves the feature ON.
+          try {
+            const featureTile = await openManagerMultiStepFeatureTile(page);
+            if (await featureTile.locator('.manager-status-toggle.is-off').count() > 0) {
+              await featureTile.locator('.manager-status-toggle').first().click();
+            }
+            await featureTile.locator('.manager-status-toggle.is-on').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            await openManagerRecipeEditor(page, 'Multi-Step Alloy');
+            await page.locator('.fabricate-manager [data-recipe-section="steps"]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+          } catch (restoreErr) {
+            process.stderr.write(`Multi-step re-enable via UI failed, forcing via API: ${restoreErr.message}\n`);
+            await page.evaluate(async (sysId) => {
+              await game.fabricate.getCraftingSystemManager()?.updateSystem?.(sysId, {
+                features: { multiStepRecipes: true },
+              });
+              await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+            }, craftingSetup.systemId).catch(() => {});
+          }
+        }
 
         // Progressive: the ordered stage list + roll-budget info strip + read-only
         // difficulty badge + keyboard move chevrons. In its own system, so switch to it

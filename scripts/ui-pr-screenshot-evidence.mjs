@@ -313,6 +313,24 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-results-multistep'],
     matches: RECIPE_EDIT_MATCHES,
   },
+  // Multi-step visibility gating (issue 710). The disable-confirm frame is the system
+  // settings view whose multi-step feature tile opens the confirm dialog (SystemEditView
+  // renders the tile; the adminStore toggle/confirm gate drives it — but adminStore is
+  // deliberately logic-only in this map, covered by the generic fallback, so the render
+  // file is the trigger). The collapsed-editor frame is the RecipeOverviewTab/
+  // RecipeEditView collapse presentation, covered by the recipe-edit glob.
+  {
+    id: 'manager-multistep-disable-confirm',
+    label: 'Manager system settings — disable multi-step recipes confirm',
+    smokeLabels: ['manager-multistep-disable-confirm'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+  },
+  {
+    id: 'manager-recipe-edit-collapsed',
+    label: 'Manager recipe editor — collapsed multi-step (feature off)',
+    smokeLabels: ['manager-recipe-edit-collapsed'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
   {
     id: 'manager-recipe-edit-results-progressive',
     label: 'Manager recipe editor — results (progressive ordered stages)',
