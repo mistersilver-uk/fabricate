@@ -82,6 +82,8 @@ Treat the shipped canonical specs under `openspec/specs/` — and the issue delt
 - Do not edit files under `tests/`.
 - Do not invent API behavior.
 If the source is ambiguous, leave a TODO note in the doc.
+- Verify every capability claim against `src/` (and the shipped canonical spec), never against other documentation.
+Documentation is a claim under test, not a source of truth — a stale docs claim once led analysis to conclude a shipped flagship feature did not exist, so treat an existing doc as the thing to check, not the evidence.
 
 ## Screenshots
 

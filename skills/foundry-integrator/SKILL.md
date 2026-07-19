@@ -66,6 +66,8 @@ Check the branch diff's Foundry-facing code against the real Foundry behaviour y
 - `Hooks.on` / `Hooks.once` correctness and timing (`init`, `ready`, `updateWorldTime`, and the V13 `updateToken` move-animation trap where the placeable centre lags the document).
 - runtime globals `game` / `ui` / `Hooks` / `CONFIG` are referenced, never imported.
 - document, `ApplicationV2`, `DialogV2`, and sheet APIs, including `sheet.changeTab(tabName, groupName)` for tab switches.
+A `DialogV2.confirm` dialog renders no window-title chrome, so a test or harness must assert on the body copy or the button labels, never on a window title.
+Wire `yes: { label, callback }` when an action verb is wanted on the confirm button (for example "Disable"); a bare `yes: () => …` renders a generic "Yes".
 - UUID resolution, flags (e.g. preserving `flags.core.sourceId`), and settings registration under the `fabricate.*` namespace.
 - compatibility metadata in `module.json` when new Foundry API requirements appear.
 - version-sensitive behaviour, deprecations, and removed APIs across Foundry releases.
