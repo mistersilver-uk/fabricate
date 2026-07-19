@@ -693,6 +693,11 @@ Don't assume green PR CI means the full smoke walk passes.
 
 - Needs Docker Desktop running and `.env.foundry` with `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` (the `up` script loads it; CI sets the vars directly).
 The container is cached between runs, so re-runs boot in ~5s.
+- Running smoke from a disposable worktree needs a few extras the main checkout has already.
+Copy `.env.foundry` from the main checkout (a fresh worktree does not carry it).
+Run `docker rm -f fabricate-foundry-test` both before and after the run, because the container name collides across worktrees.
+Run `docker network prune -f` first: Compose in many worktrees exhausts Docker's address pool, and the exhaustion surfaces as a generic compose-up failure rather than a pool message.
+On a branch that predates the current workflow defaults, give the run `FOUNDRY_RUN_TIMEOUT_MS` headroom so the older default does not trip the watchdog on an otherwise-passing smoke.
 - The `run` phase **wipes `test-results/`** at startup.
 Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`.
 Tee to a path outside `test-results/` if you need a copy.
@@ -783,6 +788,18 @@ PR-scoped screenshots are temporary handoff files only.
    **Removing the S3 objects** (e.g. when the PR closes): `npm run screenshots:ui:clean -- --pr <number> --s3` deletes them best-effort (a missing-credentials/permission failure only warns).
 
    **Orphan prevention:** the S3 bucket has a lifecycle rule expiring the `pr-screenshots/` prefix after N days as a backstop, so PR screenshots never accumulate even if `--s3` cleanup is skipped.
+
+### Evidence and CI recovery runbook
+
+A few sharp edges recur when collecting, publishing, and reading back CI:
+
+- `screenshots:ui` and `screenshots:ui:plan` need `--base origin/main`.
+Without it, zero views are planned **silently** — the command exits 0 as if there were nothing to capture, and a later `publish` then reports nothing to upload.
+Pass `--base origin/main` every time rather than trusting an empty plan.
+- Publishing patches the PR body, which fires an `edited` workflow run whose payload SHAs are frozen at that moment.
+That `edited` run's `lint-commits` can fail with "Invalid revision range", and its skipped jobs pollute the status contexts.
+Never rerun the `edited` run: let it settle, then fully rerun the original PUSH run so a fresh green result lands **last** in every context.
+- Judge PR state by the newest result per context (`gh pr view --json statusCheckRollup`), not the flat `gh pr checks` listing, which mixes the stale `edited`-run rows in with the fresh push-run rows.
 
 ### Screenshot source
 
