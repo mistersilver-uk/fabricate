@@ -1091,6 +1091,7 @@ describe('RecipeEditView (mounted)', () => {
     const target = await editHarness.mount(
       identityProps({
         recipe: { ...RECIPE, steps: STEPS },
+        multiStepEnabled: true,
         timeRequirementsEnabled: false,
       })
     );
@@ -1114,6 +1115,7 @@ describe('RecipeEditView (mounted)', () => {
     const target = await editHarness.mount(
       identityProps({
         recipe: { ...RECIPE, steps: STEPS },
+        multiStepEnabled: true,
         timeRequirementsEnabled: true,
       })
     );
@@ -2052,6 +2054,7 @@ describe('RecipeEditView (mounted)', () => {
             { id: 'sb', name: 'Quench' },
           ],
         },
+        multiStepEnabled: true,
       })
     );
     clickTab(target, 'ingredients');
@@ -3282,6 +3285,7 @@ describe('RecipeEditView (mounted)', () => {
             { id: 'sb', name: 'Quench' },
           ],
         },
+        multiStepEnabled: true,
         toolsLibrary: TOOLS_LIBRARY,
         onReorderSteps: (from, to) => moves.push([from, to]),
       })
@@ -3727,6 +3731,105 @@ describe('RecipeEditView (mounted)', () => {
       'Primary',
       'the edited group keeps its routing name'
     );
+    editHarness.remount();
+  });
+
+  // Collapsed chain editor presentation (issue 710). With the system's multi-step
+  // feature OFF, a multi-step recipe presents as single-step: Overview shows the
+  // preserved steps read-only (no revert control), and the Results tab edits the
+  // chain's effective FINAL-step results, writing through to that step.
+  it('collapses the editor to single-step when the multi-step feature is off (issue 710)', async () => {
+    const recipe = {
+      ...RECIPE,
+      steps: [
+        {
+          id: 'step-1',
+          name: 'Prep',
+          ingredientSets: [],
+          resultGroups: [{ id: 'rg-1', results: [] }],
+        },
+        {
+          id: 'step-2',
+          name: 'Finish',
+          ingredientSets: [],
+          resultGroups: [{ id: 'rg-2', results: [] }],
+        },
+      ],
+    };
+    const target = await editHarness.mount(
+      identityProps({ recipe, multiStepEnabled: false, onUpdateStep: () => {} })
+    );
+    await flushRender();
+    assert.ok(
+      target.querySelector('[data-recipe-collapsed-note]'),
+      'the collapsed steps note renders on Overview'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-section="collapsed-steps"]'),
+      'the read-only collapsed steps card renders'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-section="recipe-step-mode"]'),
+      null,
+      'the step-mode revert control is hidden while collapsed'
+    );
+    assert.equal(
+      target.querySelectorAll('.manager-recipe-collapsed-step').length,
+      2,
+      'both preserved steps are listed read-only'
+    );
+    editHarness.remount();
+  });
+
+  it('writes results-tab edits through to the FINAL step while collapsed (issue 710)', async () => {
+    const stepPatches = [];
+    const recipe = {
+      ...RECIPE,
+      steps: [
+        {
+          id: 'step-1',
+          name: 'Prep',
+          ingredientSets: [],
+          resultGroups: [{ id: 'rg-1', name: 'A', results: [] }],
+        },
+        // The final step carries TWO result groups so the results section renders its
+        // complex branch (with the "add result set" affordance); those are the results
+        // the collapsed editor surfaces as the chain's effective output.
+        {
+          id: 'step-2',
+          name: 'Finish',
+          ingredientSets: [],
+          resultGroups: [
+            { id: 'rg-2a', name: 'X', results: [] },
+            { id: 'rg-2b', name: 'Y', results: [] },
+          ],
+        },
+      ],
+    };
+    const target = await editHarness.mount(
+      identityProps({
+        recipe,
+        multiStepEnabled: false,
+        onUpdateStep: (stepId, patch) => stepPatches.push({ stepId, patch }),
+      })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+    assert.ok(
+      target.querySelector('[data-recipe-collapsed-results-note]'),
+      'the collapsed results note renders'
+    );
+    const addSet = target.querySelector('[data-recipe-add="result-set"]');
+    assert.ok(
+      addSet,
+      'the results surface renders over the final step (its two groups → complex add-set control)'
+    );
+    addSet.click();
+    await flushRender();
+    const last = stepPatches.at(-1);
+    assert.ok(last, 'editing the collapsed results emits a STEP patch, not a recipe patch');
+    assert.equal(last.stepId, 'step-2', 'the write goes THROUGH to the FINAL step');
+    assert.equal(last.patch.resultGroups.length, 3, 'the final step gains the new result group');
     editHarness.remount();
   });
 });

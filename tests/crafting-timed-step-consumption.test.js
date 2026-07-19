@@ -717,3 +717,231 @@ test('non-timed step still consumes at finish and produces results (regression g
   assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run for a single-step instant craft');
   assert.equal(runManager.getRunHistory(craftingActor).length, 1, 'the completed run is archived');
 });
+
+// ---------------------------------------------------------------------------
+// Collapsed multi-step chain (issue 710)
+//
+// When a system's multi-step feature is OFF, a recipe that still carries authored
+// steps runs as ONE atomic craft action: its steps execute back-to-back in a
+// single craft() call, per-step time gates are summed into one gate, and mid-chain
+// failure follows the existing per-step failure policy. The steps are never
+// deleted; re-enabling the feature restores the normal step-by-step flow.
+// ---------------------------------------------------------------------------
+
+function collapsedStep({ id, ingredientSets, resultComponentId, timeRequirement = null }) {
+  return {
+    id,
+    name: `Step ${id}`,
+    ingredientSets,
+    resultGroups: [
+      { id: `rg-${id}`, results: [{ id: `r-${id}`, componentId: resultComponentId, quantity: 1 }] },
+    ],
+    toolIds: [],
+    outcomeRouting: null,
+    timeRequirement,
+  };
+}
+
+// A multi-step recipe (explicit `steps[]`, length > 1) whose system has the
+// multi-step feature OFF — the collapse trigger.
+function buildCollapsedRecipe({ craftingSystemId, set, stepTime = null }) {
+  const steps = [
+    collapsedStep({
+      id: 'a',
+      ingredientSets: [set],
+      resultComponentId: 'intermediate',
+      timeRequirement: stepTime,
+    }),
+    collapsedStep({
+      id: 'b',
+      ingredientSets: [set],
+      resultComponentId: 'final',
+      timeRequirement: stepTime,
+    }),
+  ];
+  return {
+    id: 'recipe-collapsed',
+    name: 'Collapsed Recipe',
+    craftingSystemId,
+    ingredientSets: [set],
+    resultGroups: [],
+    toolIds: [],
+    outcomeRouting: null,
+    resultSelection: null,
+    steps,
+    getExecutionSteps: () => steps,
+    validate() {
+      return { valid: true, errors: [] };
+    },
+    toJSON() {
+      return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId, steps };
+    },
+  };
+}
+
+function collapsedSystem(overrides = {}) {
+  return {
+    id: 'sys-collapsed',
+    resolutionMode: 'simple',
+    features: {
+      multiStepRecipes: false,
+      craftingChecks: false,
+      essences: false,
+      chatOutput: false,
+    },
+    craftingCheck: { enabled: false, consumption: { consumeIngredientsOnFail: false } },
+    components: [
+      { id: 'wood', name: 'Wood' },
+      { id: 'intermediate', name: 'Intermediate' },
+      { id: 'final', name: 'Final' },
+    ],
+    ...overrides,
+  };
+}
+
+// Deterministic per-step result: one item tagged with that step's result component
+// so the returned `results` can be asserted to be the FINAL step's output.
+function stubCollapsedEngine(engine, { checkFailsForStep = null } = {}) {
+  engine._runCraftingCheck = async (_execRecipe, _actor, _sources, _set, step) => ({
+    success: step?.id !== checkFailsForStep,
+    outcome: null,
+    value: null,
+    data: {},
+    message: step?.id === checkFailsForStep ? 'Check failed' : 'Success',
+  });
+  engine._createResultItems = async (_actor, _execRecipe, step) => {
+    const componentId = step?.resultGroups?.[0]?.results?.[0]?.componentId ?? 'unknown';
+    const item = new FakeItem(`result-${step.id}`, componentId, 1);
+    return { items: [item] };
+  };
+  engine._postCraftChatMessage = async () => {};
+}
+
+test('collapsed chain runs both steps back-to-back in one call and returns the final step results', async () => {
+  const system = collapsedSystem();
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 10);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const set = buildIngredientSet('set-shared', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildCollapsedRecipe({ craftingSystemId: system.id, set });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  stubCollapsedEngine(engine);
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, true, 'the whole chain resolves in a single craft action');
+  assert.equal(result.results.length, 1, 'the returned results are the final step output');
+  assert.equal(result.results[0].name, 'final', 'the effective result is the FINAL step result');
+  assert.equal(wood.system.quantity, 6, 'both steps consumed (10 -> 6, 2 per step)');
+  assert.equal(
+    runManager.getActiveRuns(craftingActor).length,
+    0,
+    'no active run lingers after the atomic chain'
+  );
+  const history = runManager.getRunHistory(craftingActor);
+  assert.equal(history.length, 1, 'the completed run is archived');
+  assert.equal(history[0].status, 'succeeded');
+  assert.equal(history[0].steps.length, 2, 'the run record retains per-step detail');
+  assert.ok(
+    history[0].steps.every((step) => step.status === 'succeeded'),
+    'every step succeeded'
+  );
+});
+
+test('collapsed chain mid-chain failure keeps prior-step consumption and fails the run', async () => {
+  const system = collapsedSystem();
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 10);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const set = buildIngredientSet('set-shared', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildCollapsedRecipe({ craftingSystemId: system.id, set });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  stubCollapsedEngine(engine, { checkFailsForStep: 'b' });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'the chain fails when a mid-chain step fails');
+  assert.equal(wood.system.quantity, 8, 'only the first step consumed (10 -> 8); it stays consumed');
+  const history = runManager.getRunHistory(craftingActor);
+  assert.equal(history.length, 1, 'the failed run is archived');
+  assert.equal(history[0].status, 'failed');
+  assert.equal(history[0].steps[0].status, 'succeeded', 'the first step is recorded succeeded');
+  assert.equal(history[0].steps[1].status, 'failed', 'the failing step is recorded failed');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run lingers');
+});
+
+test('collapsed chain sums step durations into ONE time gate for the single action', async () => {
+  const system = collapsedSystem();
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 10);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const set = buildIngredientSet('set-shared', [{ componentId: 'wood', quantity: 2 }]);
+  // Each step requires 1 hour; the summed gate is 2 hours (7200s).
+  const recipe = buildCollapsedRecipe({ craftingSystemId: system.id, set, stepTime: { hours: 1 } });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  stubCollapsedEngine(engine);
+
+  // First call ARMS the single summed gate and consumes NOTHING yet.
+  const armResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(armResult.success, false, 'the chain waits for its summed gate to mature');
+  assert.match(armResult.message, /in progress/i);
+  assert.equal(wood.system.quantity, 10, 'a collapsed chain consumes nothing when the gate is armed');
+
+  const active = runManager.getActiveRuns(craftingActor);
+  assert.equal(active.length, 1, 'one waiting run is kept active');
+  assert.equal(active[0].status, 'waitingTime');
+  const gate = active[0].steps[0].timeGate;
+  assert.ok(gate, 'the single summed gate is armed on step 0');
+  assert.equal(gate.requiredSeconds, 7200, 'the gate sums both step durations (3600 + 3600)');
+  assert.equal(gate.availableAt, 1000 + 7200, 'the gate matures after the summed duration');
+
+  // Advance world time past maturity and resume: both steps now execute back-to-back.
+  globalThis.game.time.worldTime = 1000 + 7200;
+  const finishResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(finishResult.success, true, 'the matured chain completes in one resume call');
+  assert.equal(finishResult.results[0].name, 'final', 'the final step output is returned');
+  assert.equal(wood.system.quantity, 6, 'both steps consumed at maturity (10 -> 6)');
+  assert.equal(
+    runManager.getActiveRuns(craftingActor).length,
+    0,
+    'no active run remains after the chain finishes'
+  );
+  assert.equal(runManager.getRunHistory(craftingActor)[0].status, 'succeeded');
+});
+
+test('multi-step feature ON is NOT collapsed: one craft call resolves a single step', async () => {
+  const system = collapsedSystem({
+    features: { multiStepRecipes: true, craftingChecks: false, essences: false, chatOutput: false },
+  });
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 10);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const set = buildIngredientSet('set-shared', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildCollapsedRecipe({ craftingSystemId: system.id, set });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  stubCollapsedEngine(engine);
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, true, 'the first step resolves');
+  assert.equal(wood.system.quantity, 8, 'only the first step consumed (10 -> 8) — no auto-advance');
+  const active = runManager.getActiveRuns(craftingActor);
+  assert.equal(active.length, 1, 'the run stays active for the next step (normal multi-step flow)');
+  assert.equal(active[0].currentStepIndex, 1, 'the run advanced to the second step, awaiting a new trigger');
+});
