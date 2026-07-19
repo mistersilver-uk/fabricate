@@ -84,6 +84,7 @@ They must not post verdicts (or other workflow notes) as GitHub issue or PR comm
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
 Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`), force-push, and let CI re-run, before merging it.
+Before rebasing any branch at all, check whether its own PR already merged (`gh pr view --json state`): a squash-merged branch is dead, so delete it rather than rebase it — rebasing a merged branch replays its already-landed commits into conflicts against the `main` that now carries them.
 Parallel (not stacked) PRs need the same care for a different reason: when two independent branches off `main` touch the SAME file or reference each other's paths, GitHub's `mergeable` flag only checks for a TEXTUAL conflict — a clean auto-merge can still leave a semantic duplicate (two copies of a rewritten section) or a dangling reference (one PR deletes a file a doc in the other still cites by path, which then fails `validate:agents`).
 Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
@@ -104,7 +105,11 @@ The script uses exact manifest keys and does not require `s3:ListBucket`.
 - For card grids, overlays, disabled states, menus, and icon-button workflows, plan real browser pointer hit-tests whenever the change adds or repositions such a control; the plan may skip them only when the rendered DOM and CSS stacking of the control are unchanged, and must say so.
 - For image-driven UI, plan at least one representative fixture that exercises the linked image path, not only fallback artwork.
 - For tasks centered on JavaScript structure or testability, use `javascript-structural-design` to make the handoff explicit about collaborator seams, boring constructors, and responsibility splits.
+- When a brief carries `file:line` references captured from an audit or an earlier pass, the tree has usually moved since it was written, so instruct the implementer to re-verify every cited ref against the current tree before editing, skip findings that no longer hold, and record each skip with its reason in the handoff.
 - If `gh` is unavailable or unauthenticated, return the delta block (and any blocker note) in your output for the driver/user instead of guessing issue state — there is no versioned change folder to fall back to.
+- When a loop hits its 3-revision cap, the report to the user must classify the outstanding findings as either DISPUTED (reviewer and implementer disagree on whether the finding holds) or CONVERGED-BUT-UNFINISHED (reviewers agree on what remains, it just is not done yet).
+A converged cap-hit can be closed with a single maintainer-authorized finisher round; a dispute needs a maintainer decision first, so naming which kind it is tells the user what to resolve.
+- When a maintainer decision supersedes an issue's delta, quote that decision VERBATIM as binding in every lane brief and append it to the issue body, so implementers and reviewers never relitigate it.
 - In Default collaboration mode, do not stop for extra user input unless the task is genuinely blocked.
 
 ## PR description template

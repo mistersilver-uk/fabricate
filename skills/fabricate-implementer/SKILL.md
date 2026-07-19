@@ -29,8 +29,11 @@ If implementation forces a justified departure from the proposed delta, note it 
 5. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
 6. Implement the minimum change that satisfies the plan.
 7. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
+The published evidence must DEMONSTRATE the fix, not merely satisfy the `check-screenshots` gate: at least one frame must show the changed state itself.
+When that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs`, add a capture state that reaches it in the same branch rather than publishing an unrelated frame that only clears the gate.
 8. For UI changes, run `npm run screenshots:ui:plan -- --base origin/main`, run `npm run test:foundry` (local default `full` profile), then once a PR number exists: `npm run screenshots:ui -- --base origin/main --pr <number>` to collect into `tmp/pr-screenshots/<number>/`, `npm run screenshots:ui:publish -- --pr <number>` to upload the collected files to S3 and embed the returned `![pr-<number> ...]` markdown in the PR body, then `npm run screenshots:ui:clean -- --pr <number>`.
 There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if capture is genuinely impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
+When `collect`, `publish`, worktree smoke, or an `edited`-run CI failure misbehaves, follow the evidence/CI recovery runbook in the "UI PR screenshot evidence" and "Foundry integration (smoke) tests" sections of `CONTRIBUTING.md` rather than improvising — the flags and rerun order there are load-bearing.
 9. If implementation reveals a durable product rule, update the relevant canonical spec under `openspec/specs/` (and flag it for the issue delta when it changes the planned contract).
 10. Run validation gates after each logical change set:
 
@@ -47,6 +50,8 @@ There is no `SCREENSHOTS_NEEDED:` bypass and an agent cannot skip the check; if 
 
 ## Implementation rules
 
+- When the brief carries `file:line` references from an audit or an earlier capture, the tree has usually moved since.
+Re-verify every cited ref against the current tree before editing, skip any finding that no longer holds, and record each skip with its reason in the handoff so the driver and reviewers can see what was dropped and why.
 - Follow existing patterns before inventing new ones.
 - Prefer JavaScript ES modules and Svelte 5 patterns already used in this repo.
 - Use `javascript-structural-design` as the default reference for dependency seams, cohesion, constructors, and behavior-first APIs.
@@ -66,6 +71,10 @@ Stay within your assigned file ownership; do not revert unrelated edits or touch
 - In mounted Svelte tests that synthesize DOM events directly, prefer explicit `value` plus `oninput`/`onchange` handlers for controls that need deterministic test updates.
 - New mounted-component tests must use `createMountedComponentHarness` (`tests/helpers/svelte-component-harness.js`), not inlined compile/mount boilerplate (`writeCompiledSvelte`/`rewriteClientImports`/DOM + `game` setup).
 That boilerplate is identical across the mount tests, so a fresh copy adds new duplicated lines and fails the SonarCloud new-code duplication gate (>3% on new code).
+- Keep the SonarCloud quality gate green on new code, not just ESLint.
+A changed function must stay under cognitive complexity 15: touching an already-complex function re-flags the WHOLE function as new code, so extract helpers before editing a giant rather than adding one more branch to it.
+New-code duplication over 3% fails the gate too, and near-identical per-manager or per-test blocks are the usual cause — extract a shared helper or factory instead of copying a block.
+When the duplication gate fails, query SonarCloud's `api/duplications/show` per changed file for the exact duplicated spans instead of guessing which blocks collide.
 - A mounted-component suite does NOT fail loudly when a rendered `.svelte` (or a module it transitively imports) is missing from the harness allowlist (`createMountedComponentHarness`'s compiled-component list / `RAW_MODULES`) — it **hangs**, and `node --test` reports the blocked tests as `# cancelled N`, never `# fail`.
 When you add a component, or make an existing tree render a new one, register it in EVERY harness that mounts that tree (e.g. both `tests/components/recipe-edit-mounted.test.js` and `tests/components/manager-mounted.test.js`), and after the change confirm the mounted suites report `# cancelled 0` — not just `# fail 0`.
 - A fresh git worktree starts with NO `node_modules`: pure-logic `node --test` files still pass (Node resolves the parent repo's modules by walking up), but mounted Svelte tests fail with `ERR_MODULE_NOT_FOUND` (e.g. `svelte/src/index-client.js`).
@@ -81,10 +90,15 @@ If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOU
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data so at least one screenshot proves the linked image path as well as fallback behavior; when no linked-image fixture exists, name that gap explicitly in the handoff.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.
+- Capture states co-evolve with the surfaces they capture.
+Renaming or restructuring any surface referenced by the `scripts/foundry-test-run.mjs` selectors or the `scripts/ui-pr-screenshot-evidence.mjs` view map requires updating the selector, the map, and its pinning test (`tests/ui-pr-screenshot-evidence.test.js`) in the same branch — the map is a hand-maintained mirror guarded by that test, so a stale entry fails at test time, not compile time.
 - When adding a capture to `scripts/foundry-test-run.mjs`, `waitFor` a stable container/section/tab marker (e.g. `[data-recipe-tab="results"] [data-recipe-section]`), not deep leaf content (`[data-recipe-result-item]`).
 An over-specific wait that times out fails the whole phase and can cascade into an unrelated-looking later-phase failure — one root cause reported as `N step(s) failed`.
 Diagnose the FIRST failing step before treating the rest as separate breakages; a partially-failing run still writes the screenshots it did capture to `test-results/`, so you can often publish those without a fully green run.
 - Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
+- A non-render change under `src/ui/**` — a store, a bridge, or a comment-only edit — still trips the `check-screenshots` gate even though it renders nothing capturable.
+The honest outcome is the maintainer's `screenshots-exempt` label, never a workaround that stages an unrelated frame to clear the gate.
+Report render versus non-render touches explicitly in the handoff so the driver routes the exemption correctly.
 - For release/latest-version lookups, reuse `node scripts/latest-module-versions.mjs --profile fabricate-beta`; do not hand-roll S3 listing code for the Fabricate module set, and substitute another `--profile <name>` when needed.
 The helper reads configured release manifests via exact `GetObject` keys and supports `--json` for downstream tooling.
 
@@ -135,6 +149,7 @@ Closes #<issue>
 Provide:
 
 - changed file list
+- a full diff artifact (`git diff origin/main...HEAD` written to the agreed artifact path) as a handoff deliverable, since the read-only reviewers cannot run git and treat that diff as their primary input alongside the working tree
 - test and build status
 - PR link or status
 - known limitations or deferred follow-ups

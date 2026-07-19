@@ -33,6 +33,8 @@ If it exists, read it fully and update it incrementally; never rewrite it from s
 - Modify only `COMPETITIVE_ANALYSIS.md` from this skill.
 - Never overwrite the report from scratch when an existing file is present.
 - Ground claims in the codebase, the docs, or an attributable external source.
+- Verify a Fabricate capability claim against `src/`, never against Fabricate's own documentation — docs are a claim under test, not a source of truth.
+A stale docs claim once led analysis to conclude a shipped flagship feature did not exist; confirm the shipped behavior in the code before recording a gap.
 - When current pricing or policy data cannot be verified, mark the section stale instead of guessing.
 
 ## Report sections

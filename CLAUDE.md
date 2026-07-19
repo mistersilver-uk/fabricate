@@ -46,6 +46,13 @@ Restack
 Use one valid type (`feat`/`fix`/`docs`/`refactor`/`test`/… — `i18n:`
   is not valid; use `feat(i18n):`), a lowercase subject, and remember to fix the PR title too.
 
+## Windows/MSYS gotchas
+
+- MSYS path conversion mangles a `git` argument that looks like a path with a colon: `git show origin/main:<path>` has its colon and slashes rewritten, so the ref fails to resolve.
+Prefix such commands with `MSYS2_ARG_CONV_EXCL='*'` to disable the rewrite.
+- Docker Compose in many worktrees exhausts Docker's address pool, and the failure surfaces as a generic compose-up error rather than a pool message.
+Run `docker network prune -f` to clear the accumulated worktree compose networks.
+
 ## OpenSpec
 
 For non-trivial work, use the OpenSpec workflow:

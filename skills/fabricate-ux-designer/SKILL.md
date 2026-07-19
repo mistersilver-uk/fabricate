@@ -28,6 +28,8 @@ Make behavior changes here, not in the bindings.
 7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main`, run or inspect `npm run test:foundry` smoke output, collect evidence with `npm run screenshots:ui -- --base origin/main --pr <number>` under `tmp/pr-screenshots/<number>/`, upload and embed it with `npm run screenshots:ui:publish -- --pr <number>` (uploads to S3 and embeds the images in the PR body), and require local cleanup with `npm run screenshots:ui:clean -- --pr <number>`.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label.
 8. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
+Verify the published evidence against the fix itself: at least one frame must show the changed state, and you judge that frame for both correctness (it does what the change claims) and polish.
+A frame that only satisfies the `check-screenshots` gate without depicting the changed state is missing evidence — call for a capture state that reaches it rather than approving on an unrelated frame.
 9. Compare the implementation against the spec and against Foundry-native interaction patterns.
 10. Turn confirmed problems into specific design guidance or backlog issues.
 11. Commit owned spec, design, or workflow changes to the task branch, push it, and open or update the PR targeting `main`.
