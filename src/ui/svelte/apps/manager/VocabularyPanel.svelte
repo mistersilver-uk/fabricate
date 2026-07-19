@@ -48,6 +48,10 @@
     onRemove = () => {},
     // Per-category icon (issue 689): opt-in for the two category tabs.
     showIcon = false,
+    // A fixed, non-editable accent tile for vocabularies that carry no persisted
+    // per-row icon (the tag tab). Rows still get the same 34x34 leading tile as the
+    // category tabs — decorative only, so no add-form icon field and no click-to-edit.
+    decorativeIcon = '',
     iconLabel = '',
     iconPlaceholder = '',
     defaultIcon = 'fas fa-folder',
@@ -297,6 +301,10 @@
             >
               <i class={row.icon || defaultIcon} aria-hidden="true"></i>
             </button>
+          {:else if decorativeIcon}
+            <span class="manager-vocabulary-icon is-decorative" aria-hidden="true">
+              <i class={decorativeIcon}></i>
+            </span>
           {/if}
           <div class="manager-vocabulary-main">
             <strong>{row.displayName || row.name}</strong>

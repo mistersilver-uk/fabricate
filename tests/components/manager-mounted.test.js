@@ -6079,6 +6079,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-tag-id="ore"]'), 'the tag tab lists item tags');
+    // Tag rows carry a fixed, non-editable decorative accent tile (issue 689 fidelity):
+    // the same leading 34x34 tile as the category tabs, but a span not an editable button.
+    const tagIconTile = target.querySelector(
+      '[data-tag-id="ore"] .manager-vocabulary-icon.is-decorative'
+    );
+    assert.ok(tagIconTile, 'each tag row renders a decorative accent icon tile');
+    assert.ok(
+      tagIconTile.querySelector('i.fa-tag'),
+      'the decorative tag tile uses the fa-tag glyph'
+    );
+    assert.ok(
+      !target.querySelector('[data-tag-id="ore"] .manager-vocabulary-icon.is-editable'),
+      'the tag tile is decorative, not click-to-edit'
+    );
     const tagInput = target.querySelector('#manager-tag-add');
     setInputValue(tagInput, 'SPICE');
     await tick();

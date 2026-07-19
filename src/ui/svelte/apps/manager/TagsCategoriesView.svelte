@@ -443,6 +443,7 @@
           'FABRICATE.Admin.Manager.TagsCategories.TagAddFailedFeedback',
           'Tag could not be added.'
         )}
+        decorativeIcon="fas fa-tag"
         onAdd={onAddTag}
         onRemove={(row) => onRemoveTag(row.name)}
       />
