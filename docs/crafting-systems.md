@@ -189,7 +189,7 @@ See [Effect Transfer]({% link effect-transfer.md %}) for how the feature is enab
 
 ### Recipe Visibility
 
-Recipe visibility controls which players can see and access recipes through the visibility service and planned player Crafting UI.
+Recipe visibility controls which players can see and access recipes in the player Crafting tab, backed by the visibility service.
 You configure this per crafting system in the **Recipe Visibility** card on the **Settings** page of the **Crafting** menu.
 The Crafting menu is always available for every crafting system.
 See [The Crafting Menu](#the-crafting-menu).

@@ -11,11 +11,14 @@ nav_order: 1
 A system-agnostic crafting and gathering module for Foundry Virtual Tabletop.
 {: .fs-6 .fw-300 }
 
-Fabricate lets GMs define crafting systems with recipes, ingredients, tools, essences, gathering environments, tasks, and events.
-Crafting recipes can currently be authored and executed through the public API.
-An early GM recipe editor in the Crafting Admin panel can edit a recipe's identity and link a recipe item, with full recipe authoring still in progress.
-Players brew alchemy from the Alchemy Workbench tab in the unified Fabricate window.
-The player-facing Crafting tab in that window is a planned UI surface.
+Fabricate works with any game system.
+It is not tied to D&D 5e, Pathfinder, or any single ruleset.
+GMs define one or more independent crafting systems with their own recipes, ingredients, tools, essences, gathering environments, tasks, and events.
+
+Players do the whole loop in the unified Fabricate window.
+They browse recipes in the **Crafting** tab, pick a character and where the materials come from, roll any required crafting check, and craft.
+They brew from the **Alchemy Workbench**, break items down for parts through **Salvage**, collect materials in the **Gathering** tab, and track every run in the **Journal**.
+GMs author complete recipes in the Crafting Admin panel, including ingredients, results, tools, steps, access, and validation.
 
 ---
 
@@ -25,21 +28,25 @@ The player-facing Crafting tab in that window is a planned UI surface.
 
 | Feature                    | Description                                                                                                       |
 |:---------------------------|:------------------------------------------------------------------------------------------------------------------|
+| **System-Agnostic**        | Works with any Foundry game system, with no dependency on a specific ruleset                                      |
 | **Crafting Systems**       | Define independent systems with their own item libraries, essences, and rules                                     |
-| **Resolution Modes**       | Simple, routed, progressive, and alchemy crafting with optional skill checks through the recipe and crafting APIs |
+| **Player Crafting**        | Browse recipes, choose an actor and component sources, roll checks, and craft from the Crafting tab               |
+| **Recipe Authoring**       | Author complete recipes in the GM admin panel, with tabs for ingredients, results, tools, steps, and access      |
+| **Resolution Modes**       | Simple, routed by ingredients, routed by check, progressive, and alchemy crafting with optional skill checks      |
 | **Multi-Step Recipes**     | Chain steps that must be completed in sequence, with optional time gates                                          |
 | **Tools**                  | Required-but-reusable, breakable prerequisites shared across crafting, gathering, and salvage                     |
+| **Salvage**                | Players break managed items back down into their component parts                                                  |
 | **Gathering Environments** | GM-authored places where actors can gather configured component results                                           |
-| **Journal**                | Player-facing tab to monitor crafting, gathering, and salvage runs and continue crafting runs                     |
+| **Shopping List**          | Queue recipes in the Crafting tab and see one consolidated list of the materials you still need                  |
+| **Journal**                | Player-facing tab to monitor crafting, gathering, and salvage runs and continue crafting runs                    |
 | **Canvas Interactables**   | Place Tools and Gathering Tasks as Scene Regions players activate by walking a token in                           |
 | **Essences**               | Abstract properties on items for flexible ingredient matching                                                     |
-| **Visibility & Knowledge** | Control which recipes players can see, learn, or unlock through the visibility service                            |
-| **Teaser Mode**            | Track discovery progress and return teaser visibility state through the API                                       |
-| **Shopping List**          | Planned player-facing UI. Aggregation support exists as internal utility code                                     |
+| **Visibility & Knowledge** | Control which recipes players can see, learn, or unlock, with recipe books and scrolls that teach them            |
+| **Teaser Mode**            | Track discovery progress so players see a recipe exists before they can fully read or craft it                    |
 | **Effect Transfer**        | Transfer active effects from ingredients to crafted items                                                         |
 | **Import & Export**        | Back up a whole crafting system or move it between worlds as a JSON file                                          |
 | **Macro Integration**      | Customise crafting checks, property generation, and success/failure hooks                                         |
-| **Alchemy Mode**           | Hide recipe names and let players discover formulas by experimentation                                            |
+| **Alchemy Workbench**      | Hide recipe names and let players discover formulas by experimentation                                            |
 | **Recipe Graph**           | Planned. Visualise recipe dependencies as an interactive graph in the GM admin panel                             |
 | **How-To Guides**          | Quick answers to common crafting tasks                                                                            |
 
@@ -51,6 +58,20 @@ The player-facing Crafting tab in that window is a planned UI surface.
 ## Quickstart
 
 Head to [Quickstart]({% link quickstart.md %}) for installation and your first Gathering Environment.
+
+## Crafting
+
+Players craft in the **Crafting** tab of the unified Fabricate window.
+They browse the recipes their character can see, choose which owned actors supply the materials, roll any crafting check, and craft.
+A built-in **Shopping List** lets players queue several recipes and see one consolidated list of the components, essences, and tools they still need.
+GMs author recipes end to end in the Crafting Admin panel, across dedicated tabs for ingredients, results, tools, steps, access, and validation.
+See [Recipes]({% link recipes/index.md %}).
+
+## Salvage
+
+Players can break a managed item back down into component parts from the **Salvage** flow.
+Salvage can be a straight breakdown or gated behind a crafting check, and it supports progressive results that a roll spends down.
+See [Salvage]({% link salvage.md %}).
 
 ## Tools
 

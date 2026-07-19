@@ -54,8 +54,7 @@ It is designed to sit closer to Foundry's default visual language, but it does n
 Open the **Items** sidebar on the left side of Foundry.
 You'll see three new header buttons:
 
-- **Craft Item** (all users): opens the unified Fabricate window.
-  The Crafting tab is currently a placeholder while the player crafting UI is rebuilt.
+- **Craft Item** (all users): opens the unified Fabricate window on the Crafting tab, where players browse recipes, pick an actor and component sources, and craft.
 - **Gathering** (all users): opens the unified Fabricate window on the Gathering tab.
 - **Manage Crafting Systems** (GM only): opens the Fabricate GM admin panel
 
@@ -182,11 +181,11 @@ Timed tasks stay visible while the active run is in progress, and blind environm
 ![Fabricate player timed gathering run](img/screenshots/fabricate-player-gathering-timed-active.webp)
 ![Fabricate player blind gathering](img/screenshots/fabricate-player-gathering-blind.webp)
 
-The planned Crafting tab will provide recipe browsing, actor/source selection, craft buttons, favourites, recent recipes, and shopping-list planning in the UI.
+The Crafting tab provides recipe browsing, actor and source selection, craft buttons, favourites, recent recipes, and shopping-list planning in the UI.
 
 ## See Also
 
 - [Crafting Systems]({% link crafting-systems.md %}) covers resolution modes, features, and system configuration
-- [Recipes]({% link recipes/index.md %}) covers ingredient sets, result groups, current API usage, and planned player UI
+- [Recipes]({% link recipes/index.md %}) covers ingredient sets, result groups, recipe authoring, and player crafting
 - [API Reference]({% link api/index.md %}) is the full developer documentation
 - [Troubleshooting]({% link troubleshooting.md %}) has solutions for common setup issues

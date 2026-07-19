@@ -20,8 +20,8 @@ Use alchemy mode for systems where recipes are secrets, such as a witch's grimoi
 
 ## Current State
 
-Alchemy recipes and systems are authored mainly through the API today.
-The Crafting Admin panel sets the system's Alchemy check and edits a recipe's identity, its result sets, and its linked recipe item, but full recipe authoring is still in progress.
+GMs author alchemy recipes and systems in the Crafting Admin panel, and the public API can create them too.
+The panel sets the system's Alchemy check, and the recipe editor authors a recipe's identity, its ingredients, its result sets, its tools, and its linked recipe item.
 Players craft alchemy from the Alchemy Workbench, a tab in the Fabricate window.
 See [The Alchemy Workbench](#the-alchemy-workbench) below.
 
