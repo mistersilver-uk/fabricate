@@ -43,7 +43,7 @@ permissions:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25           # Full pipeline: up + smoke + down (18-min run watchdog + cold setup/teardown)
+    timeout-minutes: 29           # Full pipeline: up + smoke + down (22-min run watchdog + cold setup/teardown)
     env:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
@@ -56,6 +56,10 @@ jobs:
       # screenshot budget. Full screenshot regeneration runs in `full`
       # (local + the scheduled visual-regression workflow).
       FOUNDRY_SMOKE_PROFILE: rc
+      # Hosted-runner rc runs have been observed at ~1100s (phase-C settings persists
+      # dominate on slow runners); the 18-min script default watchdog fired on an
+      # otherwise-passing run. Keep CI headroom above observed peaks.
+      FOUNDRY_RUN_TIMEOUT_MS: '1320000'
 
     steps:
       - uses: actions/checkout@v6
