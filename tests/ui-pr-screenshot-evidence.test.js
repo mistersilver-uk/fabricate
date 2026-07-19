@@ -243,7 +243,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
   });
 
-  it('maps a recipe editor file to all ten recipe-edit frame recipes', () => {
+  it('maps a recipe editor file to all eleven recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
@@ -254,6 +254,10 @@ describe('UI PR screenshot evidence', () => {
       // progressive ordered stages, and the alchemy two-slot shape.
       'manager-recipe-edit-results',
       'manager-recipe-edit-results-multistep',
+      // The collapsed multi-step editor (issue 710): the read-only steps card the
+      // editor renders when the system's multi-step feature is off. It is a recipe-edit
+      // frame (RecipeOverviewTab/RecipeEditView), so every editor file republishes it.
+      'manager-recipe-edit-collapsed',
       'manager-recipe-edit-results-progressive',
       'manager-recipe-edit-results-alchemy',
       'manager-recipe-edit-tools',
@@ -263,7 +267,7 @@ describe('UI PR screenshot evidence', () => {
       'manager-recipe-edit-access-rail',
     ];
 
-    // The top-level editor view and any recipe sub-component all republish all ten
+    // The top-level editor view and any recipe sub-component all republish all eleven
     // frames. Every editor tab lives under `recipe/` so the glob covers it; the BROWSER
     // inspector deliberately lives under `recipes/`.
     for (const file of [
@@ -273,7 +277,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all ten recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all eleven recipe-edit frames`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -285,6 +289,7 @@ describe('UI PR screenshot evidence', () => {
       ['manager-recipe-edit-multistep'],
       ['manager-recipe-edit-results'],
       ['manager-recipe-edit-results-multistep'],
+      ['manager-recipe-edit-collapsed'],
       ['manager-recipe-edit-results-progressive'],
       ['manager-recipe-edit-results-alchemy'],
       ['manager-recipe-edit-tools'],
@@ -292,7 +297,7 @@ describe('UI PR screenshot evidence', () => {
     ]);
   });
 
-  it('collects the ten recipe-edit frames into ten separate files', () => {
+  it('collects the eleven recipe-edit frames into eleven separate files', () => {
     withScreenshotFixtures(
       {
         'screenshot-01-manager-recipe-edit-normal.png': 'normal',
@@ -301,10 +306,11 @@ describe('UI PR screenshot evidence', () => {
         'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
         'screenshot-05-manager-recipe-edit-results.png': 'results',
         'screenshot-06-manager-recipe-edit-results-multistep.png': 'results-multistep',
-        'screenshot-07-manager-recipe-edit-results-progressive.png': 'results-progressive',
-        'screenshot-08-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
-        'screenshot-09-manager-recipe-edit-tools.png': 'tools',
-        'screenshot-10-manager-recipe-edit-access-rail.png': 'access-rail',
+        'screenshot-07-manager-recipe-edit-collapsed.png': 'collapsed',
+        'screenshot-08-manager-recipe-edit-results-progressive.png': 'results-progressive',
+        'screenshot-09-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
+        'screenshot-10-manager-recipe-edit-tools.png': 'tools',
+        'screenshot-11-manager-recipe-edit-access-rail.png': 'access-rail',
       },
       (root) => {
         const result = collectScreenshotEvidence({
@@ -312,7 +318,7 @@ describe('UI PR screenshot evidence', () => {
           prNumber: 654,
           root,
         });
-        assert.equal(result.copied.length, 10);
+        assert.equal(result.copied.length, 11);
         const byName = Object.fromEntries(
           result.copied.map(item => [
             item.destination.replaceAll('\\', '/').split('/').pop(),
@@ -326,6 +332,7 @@ describe('UI PR screenshot evidence', () => {
           'manager-recipe-edit-multistep.png': 'multistep',
           'manager-recipe-edit-results.png': 'results',
           'manager-recipe-edit-results-multistep.png': 'results-multistep',
+          'manager-recipe-edit-collapsed.png': 'collapsed',
           'manager-recipe-edit-results-progressive.png': 'results-progressive',
           'manager-recipe-edit-results-alchemy.png': 'results-alchemy',
           'manager-recipe-edit-tools.png': 'tools',

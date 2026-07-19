@@ -55,11 +55,27 @@ When `CraftingSystem.resolutionMode` changes:
 
 ### Disable Multi-step Feature
 
-If disabling `features.multiStepRecipes` for a system with multistep recipes:
+Disabling `features.multiStepRecipes` is a **non-destructive collapse**, not a destructive migration and not an information-hiding gate.
+Turning the feature off does not hide multi-step recipes: each multi-step recipe instead **collapses to a single-step presentation** whose behaviour is that of an **atomic chain execution**, while its authored steps are preserved untouched so turning the feature back on restores everything.
 
-1. Require explicit GM confirmation.
-2. Existing multistep recipes become invalid and must be deleted unless migrated.
-3. Any active runs for deleted recipes must be cleaned up.
+When `features.multiStepRecipes` is disabled for a system that has multi-step recipes (recipes carrying more than one explicit step in `steps[]`):
+
+1. Existing multi-step recipes are **retained verbatim** in persisted data.
+   No recipe is deleted, migrated, reverted, or rewritten, and no active run, learned flag, or per-user preference is cleaned up.
+2. Each such recipe stays **listed and craftable** for every viewer — it is never hidden from the player listing and the crafting guard never rejects it on multi-step grounds.
+3. A collapsed recipe executes as an **atomic chain**: one craft action runs the authored steps sequentially, back-to-back, in a single call, with no step-triggering UX and no between-step waiting.
+   Each step keeps its own consumption, crafting check, tool, and result-creation behaviour, so the chain reuses the existing per-step machinery.
+4. **Time requirements sum into one gate.** When time requirements are enabled, the single atomic action waits behind one gate whose duration is the **sum** of every step's duration; the chain then executes all steps at maturity.
+   Per-step gates are not armed individually while collapsed.
+5. **Mid-chain failure follows the existing per-step failure policy.** A step that fails mid-chain records its failure per the run model and stops the chain; components consumed by already-completed prior steps stay consumed (no rollback).
+6. The run record **may keep per-step detail**, but the Journal renders a collapsed run as a **single-step run** (`multiStep` is `false` in the projection while collapsed); re-enabling the feature restores the multi-step projection from the same untouched record.
+7. **GM editing collapses too.** With the feature off, the recipe editor presents the recipe as single-step: step authoring (steps, per-step ingredients and tools) is shown read-only with an "enable multi-step recipes to edit steps" note, and the normal results surface edits the chain's **effective results — the final step's result groups — writing edits through to that final step**.
+   The per-step data is never touched, so re-enabling the feature restores the full step editor with all steps intact.
+8. **Toggling the feature off is gated by a warning/confirm dialog** when the system has multi-step recipes: the dialog states that existing multi-step recipes will run as one combined action and show only their final results for editing, that their steps are kept and restored on re-enable, and that no recipe data is deleted.
+   The toggle persists only on confirm; declining leaves everything untouched.
+   Turning the feature **on** needs no dialog.
+
+The collapse behaviour is realized at the engine and editor seams (`CraftingEngine.craft` atomic-chain execution, the recipe editor's final-step results write-through, and the Journal projection), not only at the UI toggle, so every writer that produces a multi-step recipe under a feature-off system — including import, copy, and migration — collapses on the same invariant.
 
 ### Change Visibility Knowledge Mode
 

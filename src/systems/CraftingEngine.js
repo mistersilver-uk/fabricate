@@ -366,6 +366,33 @@ export class CraftingEngine {
         }
       }
 
+      // Collapsed multi-step chain (issue 710): when the system's multi-step
+      // feature is OFF but this recipe still carries authored steps, the whole
+      // recipe runs as ONE atomic craft action — its authored steps execute
+      // back-to-back within this single call, with no step-triggering UX and no
+      // between-step waiting (see the success-path recursion below). The steps are
+      // preserved untouched; re-enabling the feature restores the normal
+      // step-by-step flow. Per-step time gates do NOT arm individually here: the
+      // step durations are SUMMED into one gate for the single action, handled once
+      // at the chain's entry (stepIndex 0). Mid-chain failure follows the existing
+      // per-step failure policy — already-consumed prior steps stay consumed.
+      const collapsedChain = this._isCollapsedChain(recipe);
+      if (collapsedChain && stepIndex === 0) {
+        const gateOutcome = await this._handleCollapsedChainGate({
+          craftingActor,
+          recipe,
+          executionSteps,
+          runManager,
+          run,
+        });
+        run = gateOutcome.run || run;
+        if (gateOutcome.waiting) {
+          // The run legitimately waits for its summed gate to mature — not a phantom.
+          resolved = true;
+          return gateOutcome.result;
+        }
+      }
+
       // Time-gated step handling. A step whose time requirement resolves to > 0
       // seconds consumes its components (and currency) at START — the call that
       // ARMS the gate — then resumes at maturity (FINISH) to run the crafting
@@ -374,10 +401,13 @@ export class CraftingEngine {
       // The enabled flag gates only ARMING a new gate: an already-armed gate must
       // still resume even if the GM disabled time requirements mid-run, or the
       // finish path would re-consume components already spent at START.
+      // A collapsed chain skips this per-step gate entirely: its single summed gate
+      // was already handled above, and the chain then consumes at execution.
       const timeGateSeconds =
         runManager &&
         run &&
         step.timeRequirement &&
+        !collapsedChain &&
         (this._timeRequirementsEnabled(recipe) || !!run.steps?.[stepIndex]?.timeGate)
           ? runManager.durationToSeconds(step.timeRequirement)
           : 0;
@@ -888,6 +918,27 @@ export class CraftingEngine {
         createdResults: resultItems,
         rollValue: rollTotalForCard(checkResult),
       });
+
+      // Collapsed chain (issue 710): a non-final step just succeeded and the run is
+      // still active, so continue the atomic action immediately by executing the
+      // next step in the SAME craft call — no between-step waiting. Recurse with the
+      // run id (so the next step resolves against the same run) and a NULL ingredient
+      // set / cleared per-step overrides so each later step auto-resolves its own
+      // satisfiable set rather than reusing the step-0 selection. The returned result
+      // is the FINAL step's — the chain's effective outcome.
+      if (
+        collapsedChain &&
+        runManager &&
+        run?.status !== 'succeeded' &&
+        runManager.getActiveRun(craftingActor, run.id)
+      ) {
+        return this.craft(craftingActor, componentSourceActors, recipe, null, {
+          ...options,
+          runId: run.id,
+          ingredientOptionOverrides: null,
+          resultGroupId: null,
+        });
+      }
 
       return {
         success: true,
@@ -3252,6 +3303,94 @@ export class CraftingEngine {
    */
   _timeRequirementsEnabled(recipe) {
     return this._getRecipeSystem(recipe)?.requirements?.time?.enabled !== false;
+  }
+
+  /**
+   * True when a recipe must run as a COLLAPSED atomic chain (issue 710): it carries
+   * authored `steps[]` but its crafting system has the multi-step feature turned
+   * OFF. The authored steps are never deleted — disabling the feature only changes
+   * how the recipe executes (one atomic action instead of step-by-step) and how the
+   * GM edits it (single-step results surface); re-enabling restores the full flow.
+   * @private
+   * @param {object} recipe
+   * @returns {boolean}
+   */
+  _isCollapsedChain(recipe) {
+    // Only a genuine MULTI-step recipe (> 1 authored step) collapses; a single
+    // explicit step behaves exactly like a normal single-step recipe (including its
+    // consume-at-start timed path), so it is never treated as a chain.
+    if (!Array.isArray(recipe?.steps) || recipe.steps.length <= 1) return false;
+    return this._getRecipeSystem(recipe)?.features?.multiStepRecipes !== true;
+  }
+
+  /**
+   * The single summed time gate for a collapsed chain: the sum of every authored
+   * step's `timeRequirement` (in seconds), or 0 when time requirements are disabled
+   * for the system. The collapsed chain arms ONE gate for this total rather than
+   * arming a gate per step, so the whole atomic action waits once and then executes
+   * every step back-to-back at maturity.
+   * @private
+   * @param {object} recipe
+   * @param {object[]} executionSteps
+   * @param {object} runManager
+   * @returns {number}
+   */
+  _collapsedChainSeconds(recipe, executionSteps, runManager) {
+    if (!runManager || !Array.isArray(executionSteps)) return 0;
+    if (!this._timeRequirementsEnabled(recipe)) return 0;
+    return executionSteps.reduce(
+      (total, step) =>
+        total + (step?.timeRequirement ? runManager.durationToSeconds(step.timeRequirement) : 0),
+      0
+    );
+  }
+
+  /**
+   * Arm / resume / advance the collapsed chain's single summed time gate. Called
+   * once at the chain entry (stepIndex 0). Returns `{ waiting, run, result }`:
+   *  - `waiting: true` — the gate is not yet mature (just armed, or still counting
+   *    down); the caller returns `result` and leaves the run active to resume later.
+   *  - `waiting: false` — no time requirement, or the gate matured; the caller
+   *    proceeds to execute the chain's steps back-to-back.
+   *
+   * Unlike a per-step timed run, the collapsed chain consumes NOTHING when the gate
+   * is armed — every step consumes its own ingredients at execution (maturity), so
+   * there is no prepared-consumption snapshot to manage.
+   * @private
+   * @returns {Promise<{ waiting: boolean, run: object, result?: object }>}
+   */
+  async _handleCollapsedChainGate({ craftingActor, recipe, executionSteps, runManager, run }) {
+    const summedSeconds = this._collapsedChainSeconds(recipe, executionSteps, runManager);
+    if (summedSeconds <= 0) return { waiting: false, run };
+
+    const now = Number(game.time?.worldTime || 0);
+    const gate = run?.steps?.[0]?.timeGate;
+    if (!gate) {
+      const armed = await runManager.armCollapsedChainGate(craftingActor, run, summedSeconds);
+      return {
+        waiting: true,
+        run: armed,
+        result: {
+          success: false,
+          results: null,
+          message: `Crafting ${recipe.name} is in progress (${summedSeconds}s remaining)`,
+        },
+      };
+    }
+    if (!runManager.canProceedTimeGate(run, 0, now)) {
+      const remaining = Math.max(0, Math.ceil(Number(gate.availableAt || 0) - now));
+      return {
+        waiting: true,
+        run,
+        result: {
+          success: false,
+          results: null,
+          message: `Crafting ${recipe.name} is still in progress (${remaining}s remaining)`,
+        },
+      };
+    }
+    const resumed = await runManager.markStepInProgress(craftingActor, run, 0);
+    return { waiting: false, run: resumed };
   }
 
   /**

@@ -22,6 +22,10 @@ const SYSTEM = {
   id: 'sys-1',
   name: 'Blacksmithing',
   resolutionMode: 'simple',
+  // Multi-step feature ON: a multi-step recipe projects as a multi-step run. When
+  // the feature is off the run collapses to a single-step projection (issue 710) —
+  // see the dedicated collapse test below.
+  features: { multiStepRecipes: true },
   craftingCheck: { simple: { rollFormula: '1d20', dc: 15, tiers: [] } },
   tools: [{ id: 't1', label: 'Hammer', componentId: 'c1' }],
   components: [{ id: 'c1', name: 'Smith Hammer', img: 'icons/hammer.webp' }],
@@ -257,6 +261,24 @@ test('isFinalStep is false on a non-final step of a multi-step recipe', () => {
   }).activeRuns[0];
   assert.equal(run.multiStep, true);
   assert.equal(run.isFinalStep, false);
+});
+
+test('collapses a multi-step run to a single-step projection when the feature is off (issue 710)', () => {
+  // The run record still carries per-step detail, but with the system's multi-step
+  // feature OFF the recipe ran as one atomic chain, so the Journal presents it as a
+  // single-step run: multiStep false, a Single-Step structure label, and a blank
+  // "Step X of Y" label. Re-enabling the feature restores the multi-step projection.
+  const collapsedSystem = { ...SYSTEM, features: { multiStepRecipes: false } };
+  const run = makeBuilder({
+    active: [activeCraftingRun()],
+    system: collapsedSystem,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.multiStep, false, 'a collapsed multi-step run projects as single-step');
+  assert.equal(run.stepLabel, '', 'the "Step X of Y" label is blanked while collapsed');
+  assert.equal(run.structureLabel, 'FABRICATE.App.Journal.Structure.SingleStep');
+  // The per-step run record is untouched — both steps are still recorded.
+  assert.equal(run.steps.length, 2, 'the run record retains its per-step detail');
 });
 
 test('single-step recipe blanks the step label and marks the run final', () => {

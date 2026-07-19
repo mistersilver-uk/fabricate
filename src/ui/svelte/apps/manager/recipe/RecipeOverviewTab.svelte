@@ -66,6 +66,12 @@
     // recipe that is ALREADY multi-step under a system whose feature was since turned
     // off, which is the only way back to single-step.
     multiStepEnabled = false,
+    // COLLAPSED chain (issue 710): the system's multi-step feature is off but this
+    // recipe still carries authored steps. Step authoring is gated read-only here (the
+    // steps are preserved, not editable and not reverted); the Results tab edits the
+    // chain's effective final-step results. Re-enabling the feature restores the full
+    // step editor with all data intact.
+    collapsed = false,
     onEnterMultiStep = () => {},
     onRevertToSingleStep = () => {},
     // Whether the system applies time requirements (issue 714). When off, the
@@ -257,13 +263,14 @@
     />
   </div>
 
-  {#if multiStepEnabled || isMultiStep}
+  {#if (multiStepEnabled || isMultiStep) && !collapsed}
     <!-- Step mode (issue 676): rehomed from the deleted context rail, which was the ONLY
          surface carrying it — `onEnterMultiStep`/`onRevertToSingleStep` had no other
          consumer in `src/`, so deleting the rail without this would have made multi-step
          recipes unreachable for every system with the feature on. It sits directly above
          the surface it governs: the card below is either the steps list or the recipe's
-         single Duration. -->
+         single Duration. Hidden while collapsed (issue 710): a collapsed recipe is NOT
+         reverted — its steps are preserved and restored when the feature is re-enabled. -->
     <section class="manager-recipe-step-mode-card" data-recipe-section="recipe-step-mode">
       <div>
         <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
@@ -280,7 +287,23 @@
     </section>
   {/if}
 
-  {#if isMultiStep}
+  {#if collapsed}
+    <!-- Collapsed chain (issue 710): step authoring is gated read-only. The steps are
+         preserved verbatim and listed here for reference; the chain's effective output
+         is edited on the Results tab. Turning multi-step recipes back on for this
+         system restores the full step editor with every step intact. -->
+    <section class="manager-recipe-duration-card manager-recipe-collapsed-steps-card" data-recipe-section="collapsed-steps">
+      <div>
+        <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsTitle', 'Steps (multi-step disabled)')}</h3>
+        <p class="manager-muted" data-recipe-collapsed-note>{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote', 'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.')}</p>
+      </div>
+      <ol class="manager-recipe-collapsed-step-list">
+        {#each recipe?.steps || [] as step, index (step.id ?? index)}
+          <li class="manager-recipe-collapsed-step">{step.name || `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${index + 1}`}</li>
+        {/each}
+      </ol>
+    </section>
+  {:else if isMultiStep}
     <RecipeStepsCard
       steps={recipe?.steps || []}
       {timeRequirementsEnabled}

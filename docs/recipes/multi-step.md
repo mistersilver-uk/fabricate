@@ -82,6 +82,9 @@ Multi-step run state is saved on the character.
 Multi-step runs are driven through the API today.
 A player-facing UI for resuming and cancelling active runs is planned and not yet available.
 
-{: .warning }
-> Disabling the Multi-Step Recipes feature is destructive.
-> All existing multi-step recipes will be deleted.
+{: .note }
+> Disabling the Multi-Step Recipes feature is not destructive.
+> Your multi-step recipes are kept exactly as you authored them.
+> While the feature is off, each multi-step recipe collapses into a single combined action: crafting it runs all of its steps back-to-back in one go and produces the results of its final step, and any step time requirements are added together into a single wait.
+> In the editor the recipe shows as single-step — its steps are read-only, and you edit its final results directly.
+> Turning the feature off asks you to confirm this first; turning it back on restores the full multi-step recipe and editor with nothing lost.

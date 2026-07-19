@@ -142,6 +142,31 @@
   // toggle controls entering/leaving the mode).
   const isMultiStep = $derived(steps.length >= 1);
 
+  // COLLAPSED chain (issue 710): a recipe that still carries authored steps while
+  // its system's multi-step feature is OFF. It is neither deleted nor reverted — the
+  // steps are preserved untouched and restored when the feature is re-enabled. While
+  // collapsed the editor presents the recipe as single-step: step authoring
+  // (Overview / Ingredients / Tools) is gated read-only, and the Results tab surfaces
+  // the chain's EFFECTIVE output — its FINAL step's results — as editable.
+  const collapsed = $derived(!multiStepEnabled && steps.length > 1);
+  const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
+
+  // The recipe view the Results tab edits while collapsed: a single-step projection
+  // whose result groups / ingredient sets / routing come from the FINAL step, so the
+  // normal single-step results editor renders over the chain's effective output.
+  // Writes route back to that step (see updateResultGroups / assignIngredientSet).
+  const resultsRecipe = $derived(
+    collapsed && finalStep
+      ? {
+          ...recipe,
+          resultGroups: Array.isArray(finalStep.resultGroups) ? finalStep.resultGroups : [],
+          ingredientSets: Array.isArray(finalStep.ingredientSets) ? finalStep.ingredientSets : [],
+          resultSelection: finalStep.resultSelection ?? recipe?.resultSelection ?? null,
+          outcomeRouting: finalStep.outcomeRouting ?? recipe?.outcomeRouting ?? null,
+        }
+      : recipe
+  );
+
   // Check-mode routed recipes route by the crafting-check outcome, so ingredient
   // sets are nameless there; ingredient mode and non-routed systems keep names.
   const showSetName = $derived(routingProvider !== 'check');
@@ -156,11 +181,15 @@
   // unassigning clears it. Ignores assigning to a not-yet-saved (id-less) group.
   function assignIngredientSet(stepId, groupId, setId, assigned) {
     if (!setId || (assigned && !groupId)) return;
-    const scopeSets = stepId == null ? ingredientSets : stepById(stepId)?.ingredientSets || [];
+    // Collapsed chain (issue 710): the Results tab renders single-step (stepId null)
+    // over the FINAL step's data, so a routing assignment writes through to that step.
+    const scopeStepId = stepId == null && collapsed && finalStep ? finalStep.id : stepId;
+    const scopeSets =
+      scopeStepId == null ? ingredientSets : stepById(scopeStepId)?.ingredientSets || [];
     const nextSets = scopeSets.map((set) =>
       set.id === setId ? { ...set, resultGroupId: assigned ? groupId : null } : set
     );
-    updateIngredientSets(stepId, nextSets);
+    updateIngredientSets(scopeStepId, nextSets);
   }
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
@@ -188,12 +217,20 @@
   // each result) so nothing here hand-assigns ids; existing group ids/names (which
   // routing references) are preserved upstream in the section's edit paths.
   function updateResultGroups(stepId, nextGroups) {
-    if (stepId == null) {
+    // Collapsed chain WRITE-THROUGH (issue 710). While the multi-step feature is off
+    // the Results tab edits the collapsed recipe as single-step (a null stepId) but
+    // over the FINAL step's result groups, so a null stepId here must WRITE THROUGH to
+    // that final step rather than to the recipe-level `resultGroups`. This mirrors the
+    // engine's atomic chain, whose effective output is the final step's results; the
+    // recipe-level `resultGroups` stay empty and the per-step data is never touched, so
+    // re-enabling the feature restores the full multi-step editor losslessly.
+    const targetStepId = stepId == null && collapsed && finalStep ? finalStep.id : stepId;
+    if (targetStepId == null) {
       onUpdateRecipe({ resultGroups: nextGroups });
       return;
     }
-    if (!stepById(stepId)) return;
-    onUpdateStep(stepId, { resultGroups: nextGroups });
+    if (!stepById(targetStepId)) return;
+    onUpdateStep(targetStepId, { resultGroups: nextGroups });
   }
   // GM policy toggle (issue 651). Stages through the draft like every other authoring
   // edit — the Save button commits it — rather than persisting immediately the way
@@ -367,6 +404,7 @@
             {locked}
             {onToggleLocked}
             {multiStepEnabled}
+            {collapsed}
             {onEnterMultiStep}
             {onRevertToSingleStep}
             {timeRequirementsEnabled}
@@ -381,6 +419,7 @@
             {recipe}
             {canAddSet}
             {isMultiStep}
+            {collapsed}
             {currencyUnits}
             {currencyEnabled}
             {componentOptions}
@@ -393,10 +432,11 @@
           />
         {:else if activeTab === 'results'}
           <RecipeResultsTab
-            {recipe}
+            recipe={resultsRecipe}
             {alchemySimple}
             {simpleFailureSlot}
-            {isMultiStep}
+            isMultiStep={collapsed ? false : isMultiStep}
+            {collapsed}
             {componentOptions}
             {routingProvider}
             {progressive}
@@ -412,6 +452,7 @@
           <RecipeToolsTab
             {recipe}
             {isMultiStep}
+            {collapsed}
             {toolIds}
             {toolsLibrary}
             onAddTool={addTool}

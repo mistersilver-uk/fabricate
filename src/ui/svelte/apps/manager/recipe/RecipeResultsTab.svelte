@@ -27,6 +27,12 @@
     // (success + reserved failure); single-step only (issue 643).
     simpleFailureSlot = false,
     isMultiStep = false,
+    // COLLAPSED chain (issue 710): the system's multi-step feature is off but the
+    // recipe still carries authored steps, so the parent passes `isMultiStep={false}`
+    // AND a single-step projection of the recipe whose result groups are the FINAL
+    // step's. Edits write through to that step. This flag only drives the explanatory
+    // note — the editor surface is the normal single-step one.
+    collapsed = false,
     componentOptions = [],
     // Result routing (routed systems). Provider + the system's outcome tiers feed
     // the per-result-set assignment controls; ingredient-mode assignment writes
@@ -92,6 +98,13 @@
     <h2 class="manager-recipe-tab-title">{heading.title}</h2>
     <p class="manager-muted">{heading.intro}</p>
   </div>
+
+  {#if collapsed}
+    <div class="manager-recipe-info-strip" data-recipe-collapsed-results-note>
+      <i class="fas fa-layer-group" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote', 'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.')}</span>
+    </div>
+  {/if}
 
   {#if progressive}
     <!-- The strip and the reorder policy sit ABOVE the list, not after it (issue 676,
