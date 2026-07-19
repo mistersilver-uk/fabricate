@@ -5458,10 +5458,10 @@
   line-height: 1.35;
 }
 
+/* The active vocabulary panel fills the whole main column; the multi-column card
+   layout lives inside the row list, not by splitting the workspace (issue 689). */
 .fabricate-manager .manager-tags-categories-workspace {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fab-space-3);
+  display: block;
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -5471,43 +5471,47 @@
 .fabricate-manager .manager-vocabulary-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
 }
 
-/* Tag & Categories tab bar (issue 689). One vocabulary tab is shown at a time; the
-   count badge tracks the custom entries in that vocabulary. */
+.fabricate-manager .manager-vocabulary-desc {
+  margin: 0;
+  max-width: 760px;
+}
+
+/* Tag & Categories tab bar (issue 689). Underline tabs, one shown at a time; each
+   carries a leading icon and a count badge tracking that vocabulary's custom entries. */
 .fabricate-manager .manager-vocabulary-tabs {
   display: flex;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-4);
   flex-wrap: wrap;
   min-width: 0;
+  border-bottom: 1px solid var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-vocabulary-tabs .manager-tab {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-025);
+  padding: var(--fab-space-2) 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
   color: var(--fab-mv2-text-muted);
   font: inherit;
   line-height: 1.2;
   height: auto;
+  margin-bottom: -1px;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-vocabulary-tabs .manager-tab.is-active {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
-  color: var(--fab-mv2-text);
+  border-bottom-color: var(--fab-mv2-accent);
+  background: none;
+  color: var(--fab-mv2-accent);
 }
 
 .fabricate-manager .manager-vocabulary-tabs .manager-tab-count {
@@ -5521,8 +5525,30 @@
   font-size: var(--fab-font-size-xs, 0.75rem);
 }
 
-.fabricate-manager .manager-vocabulary-search {
+.fabricate-manager .manager-vocabulary-tabs .manager-tab.is-active .manager-tab-count {
+  background: var(--fab-accent-soft);
+  border: 1px solid var(--fab-accent-border);
+  color: var(--fab-mv2-accent);
+}
+
+/* Search sits inline with the entry count on one row; the search sizes to content
+   (not flex-grow) so the row list below it absorbs the panel's remaining height. */
+.fabricate-manager .manager-vocabulary-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
   min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-search {
+  flex: 1 1 auto;
+  max-width: 400px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-count {
+  flex: none;
+  margin-left: auto;
 }
 
 /* Live add-form hint (issue 689): tone-graded feedback as the GM types. */
@@ -5551,26 +5577,35 @@
   color: var(--fab-danger-text);
 }
 
-/* Per-category icon (issue 689). */
+/* Per-category icon tile (issue 689): custom rows lead with an accent tile, the
+   locked General row with a dashed lock tile. */
 .fabricate-manager .manager-vocabulary-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--fab-overlay-light-035);
-  color: var(--fab-mv2-text);
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+  color: var(--fab-mv2-accent);
 }
 
 .fabricate-manager button.manager-vocabulary-icon.is-editable {
-  border: 1px solid var(--fab-mv2-border);
   font: inherit;
   line-height: 1;
   cursor: pointer;
 }
 
+.fabricate-manager .manager-vocabulary-icon.is-locked-icon {
+  border: 1px dashed var(--fab-mv2-border-strong);
+  background: var(--fab-overlay-light-035);
+  color: var(--fab-mv2-text-muted);
+}
+
 .fabricate-manager .manager-vocabulary-icon-field {
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -5585,95 +5620,113 @@
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-top: 1px solid var(--fab-mv2-border);
   background: var(--fab-overlay-light-025);
   min-width: 0;
 }
 
 /* Inline delete-confirm strip (issue 689): the destructive cascade is confirmed in
-   place under the row rather than through an external dialog. */
+   place under the row (inside its card) rather than through an external dialog. */
 .fabricate-manager .manager-vocabulary-confirm {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-3);
   padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-danger-border);
-  border-radius: 8px;
+  border-top: 1px solid var(--fab-danger-border);
   background: var(--fab-danger-soft);
   min-width: 0;
 }
 
 .fabricate-manager .manager-vocabulary-confirm-copy {
-  display: grid;
-  gap: var(--fab-space-2xs);
+  flex: 1;
   min-width: 0;
+  color: var(--fab-mv2-text);
 }
 
-.fabricate-manager .manager-vocabulary-confirm-actions {
-  display: inline-flex;
-  gap: var(--fab-space-2);
+.fabricate-manager .manager-vocabulary-confirm > i {
+  flex: 0 0 auto;
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-vocabulary-confirm .manager-button {
   flex: none;
 }
 
-.fabricate-manager .manager-vocabulary-heading,
-.fabricate-manager .manager-vocabulary-form,
-.fabricate-manager .manager-vocabulary-row {
-  min-width: 0;
-}
-
 .fabricate-manager .manager-vocabulary-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--fab-space-2);
-  align-items: end;
-}
-
-.fabricate-manager .manager-vocabulary-list {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
   min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 11px;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager .manager-vocabulary-form-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-form-fields > .manager-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-vocabulary-form-fields > .manager-button {
+  flex: none;
+}
+
+/* The row list is the dense multi-column card grid the prototype anchors on; each
+   entry is a card that also carries its own icon-edit and delete-confirm strips. */
+.fabricate-manager .manager-vocabulary-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
   min-height: 0;
-  flex: 1;
-  overflow: auto;
+}
+
+.fabricate-manager .manager-vocabulary-card {
+  min-width: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 10px;
+  background: var(--fab-mv2-surface-2);
+  overflow: hidden;
 }
 
 .fabricate-manager .manager-vocabulary-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 32px;
-  gap: var(--fab-space-2);
+  display: flex;
   align-items: center;
-  min-height: 52px;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+.fabricate-manager .manager-vocabulary-row > .manager-chip {
+  flex: none;
+}
+
+.fabricate-manager .manager-vocabulary-row > .manager-icon-button {
+  flex: 0 0 34px;
+}
+
+.fabricate-manager .manager-vocabulary-chip-unused {
+  background: transparent;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-vocabulary-chip-locked {
   background: var(--fab-overlay-light-035);
-  overflow: visible;
-}
-
-/* A category row leads with its icon; the tag rows have no icon column. */
-.fabricate-manager .manager-vocabulary-row:has(.manager-vocabulary-icon) {
-  grid-template-columns: 32px minmax(0, 1fr) auto 32px;
-}
-
-.fabricate-manager .manager-vocabulary-row.is-locked {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-vocabulary-row.is-locked:has(.manager-vocabulary-icon) {
-  grid-template-columns: 32px minmax(0, 1fr) auto auto;
-}
-
-.fabricate-manager .manager-vocabulary-row.is-locked > .manager-chip {
-  align-self: center;
+  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager .manager-vocabulary-main {
+  flex: 1;
   display: grid;
   gap: var(--fab-space-2xs);
   min-width: 0;
@@ -5685,21 +5738,61 @@
   line-height: 1.25;
 }
 
+/* Empty (onboarding) and no-results states span the whole grid, centred. */
 .fabricate-manager .manager-vocabulary-empty {
-  display: grid;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: var(--fab-space-1);
   min-width: 0;
-  padding: var(--fab-space-4);
-  border: 1px dashed var(--fab-mv2-border);
-  border-radius: 8px;
+  padding: var(--fab-space-6) var(--fab-space-4);
+  border: 1px dashed var(--fab-mv2-border-strong);
+  border-radius: 11px;
   color: var(--fab-mv2-text-muted);
   background: var(--fab-overlay-light-025);
+}
+
+.fabricate-manager .manager-vocabulary-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  margin-bottom: var(--fab-space-1);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 14px;
+  background: var(--fab-overlay-light-06);
+  color: var(--fab-mv2-text-muted);
+  font-size: 1.2rem;
+}
+
+.fabricate-manager .manager-vocabulary-empty strong {
+  color: var(--fab-mv2-text);
+  font-size: 1rem;
 }
 
 .fabricate-manager .manager-vocabulary-empty strong,
 .fabricate-manager .manager-vocabulary-empty span {
   min-width: 0;
   overflow-wrap: break-word;
+}
+
+.fabricate-manager .manager-vocabulary-noresults {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-5) var(--fab-space-4);
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-vocabulary-noresults > i {
+  font-size: 1.15rem;
+  opacity: 0.6;
 }
 
 .fabricate-manager .manager-essence-identity {
@@ -13295,11 +13388,13 @@
   .fabricate-manager .manager-form-grid,
   .fabricate-manager .manager-essence-edit-grid,
   .fabricate-manager .manager-essence-source-summary,
-  .fabricate-manager .manager-vocabulary-form,
-  .fabricate-manager .manager-vocabulary-row,
-  .fabricate-manager .manager-vocabulary-row.is-locked,
   .fabricate-manager .environment-fields {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-vocabulary-form-fields {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .fabricate-manager .manager-essence-icon-panel {

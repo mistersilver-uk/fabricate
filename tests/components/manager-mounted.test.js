@@ -6053,7 +6053,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     setInputValue(search, 'zzzz');
     await tick();
     flushSync();
-    assert.ok(target.textContent.includes('No custom categories match this search.'));
+    assert.ok(target.textContent.includes('No matches for "zzzz".'));
     setInputValue(search, '');
     await tick();
     flushSync();
@@ -6086,7 +6086,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('.manager-vocabulary-hint.is-info'));
     assert.ok(target.textContent.includes('Will be added as "spice"'));
     target
-      .querySelector('[aria-label="Item tags"] form')
+      .querySelector('[aria-label="Component tags"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();
@@ -6255,7 +6255,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     target
-      .querySelector('[aria-label="Item tags"] form')
+      .querySelector('[aria-label="Component tags"] form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();

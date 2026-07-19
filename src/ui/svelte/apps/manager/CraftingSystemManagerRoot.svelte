@@ -761,6 +761,40 @@
     componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount
   });
+  // The Tags & Categories screen shows one vocabulary tab at a time; the active tab
+  // is owned here so the inspector's contextual help can follow it (the view is a
+  // controlled component over this state). Each help block is title + three bullets.
+  let tagsActiveTab = $state('recipe');
+  const tagsHelp = $derived.by(() => {
+    if (tagsActiveTab === 'component') {
+      return {
+        title: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle', 'How component categories work'),
+        items: [
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.')
+        ]
+      };
+    }
+    if (tagsActiveTab === 'tag') {
+      return {
+        title: text('FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle', 'How component tags work'),
+        items: [
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.'),
+          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.')
+        ]
+      };
+    }
+    return {
+      title: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle', 'How recipe categories work'),
+      items: [
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.'),
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.'),
+        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.')
+      ]
+    };
+  });
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
   const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
@@ -5189,6 +5223,8 @@
         {componentCategoryRows}
         {tagRows}
         counts={tagCategoryCounts}
+        activeTab={tagsActiveTab}
+        onTabChange={(id) => (tagsActiveTab = id)}
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
         onAddComponentCategory={addComponentCategory}
@@ -5436,31 +5472,6 @@
     {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
-        <section class="manager-inspector-card">
-          <div class="manager-inspector-title-row">
-            <span class="manager-inspector-icon" aria-hidden="true">
-              <i class="fas fa-tags"></i>
-            </span>
-            <div class="manager-inspector-copy">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.TagsCategories.Selected', 'Selected vocabulary')}</p>
-              <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.TagsCategories.Library', 'Tags & Categories')}</h2>
-              <div class="manager-chip-row">
-                <span class="manager-chip is-active">{text('FABRICATE.Admin.Manager.TagsCategories.AlwaysOn', 'Always available')}</span>
-              </div>
-            </div>
-          </div>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.InspectorHint', 'Define the vocabulary GMs use when assigning recipe categories and component tags.')}</p>
-        </section>
-
-        <section class="manager-inspector-card" data-tags-evidence="how-it-works">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksTitle', 'How it works')}</h3>
-          <ul class="manager-evidence-list">
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksFlat', 'Categories are flat — each recipe picks one, with no parent or child folders.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksGeneral', 'General is the reserved fallback for recipes without a custom category.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.TagsCategories.HowItWorksTags', 'Item tags appear on components and on tag-placeholder ingredients in recipes.')}</li>
-          </ul>
-        </section>
-
         <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}</h3>
           <div class="manager-fact-grid">
@@ -5471,12 +5482,21 @@
               <span class="manager-fact-line"><strong>{tagCategoryCounts.customComponentCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ComponentCategories', 'Component categories')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="item-tags">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}</span></span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="references">
               <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.componentCategoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.TotalReferences', 'Total references')}</span></span>
             </div>
           </div>
+        </section>
+
+        <section class="manager-inspector-card" data-tags-evidence="how-it-works">
+          <h3 class="manager-card-title">{tagsHelp.title}</h3>
+          <ul class="manager-evidence-list">
+            {#each tagsHelp.items as tip (tip)}
+              <li>{tip}</li>
+            {/each}
+          </ul>
         </section>
 
         <section class="manager-inspector-card" data-tags-evidence="reference-safe">

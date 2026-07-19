@@ -24,9 +24,11 @@
     onRemoveTag = () => {},
     onSetCategoryIcon = () => {},
     onSetComponentCategoryIcon = () => {},
+    // The active tab is owned by the root so the inspector's contextual help can
+    // track it; this view stays a controlled component over that one piece of state.
+    activeTab = 'recipe',
+    onTabChange = () => {},
   } = $props();
-
-  let activeTab = $state('recipe');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -50,11 +52,13 @@
   const tabs = $derived([
     {
       id: 'recipe',
+      icon: 'fas fa-scroll',
       label: text('FABRICATE.Admin.Manager.TagsCategories.Categories', 'Recipe categories'),
       count: counts.customCategories || 0,
     },
     {
       id: 'component',
+      icon: 'fas fa-cubes',
       label: text(
         'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
         'Component categories'
@@ -63,7 +67,8 @@
     },
     {
       id: 'tag',
-      label: text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags'),
+      icon: 'fas fa-tag',
+      label: text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags'),
       count: counts.itemTags || 0,
     },
   ]);
@@ -194,7 +199,7 @@
       <p class="manager-subtitle">
         {text(
           'FABRICATE.Admin.Manager.TagsCategories.LibraryHint',
-          'Define recipe categories, component categories and item tags before assigning them elsewhere.'
+          'Define the recipe categories, component categories and component tags the rest of the system references.'
         )}
       </p>
     </div>
@@ -212,8 +217,9 @@
         class={`manager-tab ${activeTab === tab.id ? 'is-active' : ''}`}
         aria-selected={activeTab === tab.id}
         data-vocabulary-tab={tab.id}
-        onclick={() => (activeTab = tab.id)}
+        onclick={() => onTabChange(tab.id)}
       >
+        <i class={tab.icon} aria-hidden="true"></i>
         <span>{tab.label}</span>
         <span class="manager-tab-count">{tab.count}</span>
       </button>
@@ -230,10 +236,9 @@
     {#if activeTab === 'recipe'}
       <VocabularyPanel
         label={text('FABRICATE.Admin.Manager.TagsCategories.Categories', 'Recipe categories')}
-        title={text('FABRICATE.Admin.Manager.TagsCategories.Categories', 'Recipe categories')}
         hint={text(
           'FABRICATE.Admin.Manager.TagsCategories.CategoriesHint',
-          'General is always available. Add custom categories for recipes that need clearer grouping.'
+          'General is always available. Add custom categories for recipes that need clearer grouping — categories are flat, and each recipe picks exactly one.'
         )}
         inputId="manager-category-add"
         inputLabel={text('FABRICATE.Admin.Manager.TagsCategories.CategoryName', 'Category name')}
@@ -255,15 +260,16 @@
         )}
         emptyTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneral',
-          'Only General is available.'
+          'No recipe categories yet'
         )}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralHint',
-          'Add a custom category when recipes need more specific grouping.'
+          'Every recipe falls under General until you add one. Group recipes that need clearer organisation by adding a category above.'
         )}
+        emptyIcon="fas fa-scroll"
         searchMissTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.NoCategoryMatches',
-          'No custom categories match this search.'
+          'No matches for "{query}".'
         )}
         removeLabel={text(
           'FABRICATE.Admin.Manager.TagsCategories.RemoveCategory',
@@ -273,13 +279,9 @@
           'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryNamed',
           'Remove category {name}'
         )}
-        removeConfirmTitle={text(
-          'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirmTitle',
-          'Remove {name}?'
-        )}
         removeConfirmHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirmHint',
-          '{count} recipes will be reassigned to General.'
+          '"{name}" is used by {count} recipes. Deleting reassigns them to General.'
         )}
         confirmRemoveLabel={text('FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove', 'Remove')}
         cancelRemoveLabel={text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
@@ -308,10 +310,6 @@
     {:else if activeTab === 'component'}
       <VocabularyPanel
         label={text(
-          'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
-          'Component categories'
-        )}
-        title={text(
           'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
           'Component categories'
         )}
@@ -345,15 +343,16 @@
         )}
         emptyTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralComponent',
-          'Only General is available.'
+          'No component categories yet'
         )}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralComponentHint',
-          'Add a custom category when components need more specific grouping.'
+          'Every component falls under General until you add one. Group your component directory by adding a category above.'
         )}
+        emptyIcon="fas fa-cubes-stacked"
         searchMissTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.NoComponentCategoryMatches',
-          'No component categories match this search.'
+          'No matches for "{query}".'
         )}
         removeLabel={text(
           'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategory',
@@ -363,13 +362,9 @@
           'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryNamed',
           'Remove component category {name}'
         )}
-        removeConfirmTitle={text(
-          'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryConfirmTitle',
-          'Remove {name}?'
-        )}
         removeConfirmHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryConfirmHint',
-          '{count} components will be reassigned to General.'
+          '"{name}" is used by {count} components. Deleting reassigns them to General.'
         )}
         confirmRemoveLabel={text('FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove', 'Remove')}
         cancelRemoveLabel={text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
@@ -397,11 +392,10 @@
       />
     {:else}
       <VocabularyPanel
-        label={text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}
-        title={text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Item tags')}
+        label={text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags')}
         hint={text(
           'FABRICATE.Admin.Manager.TagsCategories.ItemTagsHint',
-          'Use item tags for component organization and tag-based ingredient options.'
+          'Component tags organise components and power tag-based ingredient options in recipes. Tags are stored lowercase and can be reused across the whole system.'
         )}
         inputId="manager-tag-add"
         inputLabel={text('FABRICATE.Admin.Manager.TagsCategories.TagName', 'Tag name')}
@@ -420,28 +414,25 @@
         )}
         emptyTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.NoTags',
-          'No item tags defined yet.'
+          'No component tags yet'
         )}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.NoTagsHint',
-          'Add tags before using tag-based ingredient options.'
+          'Tags let a recipe require any component that carries them. Add a tag above, then apply it to components.'
         )}
+        emptyIcon="fas fa-tag"
         searchMissTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.NoTagMatches',
-          'No item tags match this search.'
+          'No matches for "{query}".'
         )}
         removeLabel={text('FABRICATE.Admin.Manager.TagsCategories.RemoveTag', 'Remove tag')}
         removeNamedLabel={text(
           'FABRICATE.Admin.Manager.TagsCategories.RemoveTagNamed',
           'Remove tag {name}'
         )}
-        removeConfirmTitle={text(
-          'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirmTitle',
-          'Remove #{name}?'
-        )}
         removeConfirmHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirmHint',
-          '{count} references will lose this tag.'
+          '"{name}" is on {count} components. Deleting removes the tag from them.'
         )}
         confirmRemoveLabel={text('FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove', 'Remove')}
         cancelRemoveLabel={text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
