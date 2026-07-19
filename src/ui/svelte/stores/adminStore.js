@@ -5837,6 +5837,43 @@ export function createAdminStore(services) {
 
   // --- Feature toggles ---
 
+  // Count a system's recipes that carry authored steps[] — the recipes that
+  // COLLAPSE to a single atomic action when the multi-step feature is turned off
+  // (issue 710). Used to decide whether disabling the feature needs the collapse
+  // warning and to report the count in it. Fails safe to 0 (no recipe manager → no
+  // warning) so a headless/store-only caller never blocks on a missing collaborator.
+  function _countMultiStepRecipes(sysId) {
+    const recipeManager = services.getRecipeManager?.();
+    if (!recipeManager?.getRecipes) return 0;
+    const recipes = recipeManager.getRecipes({ craftingSystemId: sysId }) || [];
+    return recipes.filter((recipe) => Array.isArray(recipe?.steps) && recipe.steps.length > 1)
+      .length;
+  }
+
+  // Warning/confirm gate for turning the multi-step feature OFF while multi-step
+  // recipes exist (issue 710). Disabling is NON-destructive — the steps are kept and
+  // restored on re-enable — but it changes behaviour: each multi-step recipe then
+  // runs as one combined atomic action and the GM edits only its final-step results.
+  // Mirror the house confirm pattern (services.confirmDialog → DialogV2.confirm); a
+  // system with no multi-step recipes skips the dialog. Returns true when the toggle
+  // may proceed. Enabling the feature never prompts.
+  async function _confirmDisableMultiStep(sysId) {
+    const count = _countMultiStepRecipes(sysId);
+    if (count === 0) return true;
+    const confirmed = await services.confirmDialog?.({
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Title') ||
+        'Disable multi-step recipes?',
+      content: `<p>${
+        services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Body') ||
+        'Existing multi-step recipes will run as one combined action and show only their final results for editing. Their steps are kept and restored if you turn multi-step recipes back on. No recipe data is deleted.'
+      }</p>`,
+      yes: () => true,
+      no: () => false,
+    });
+    return confirmed === true;
+  }
+
   async function toggleFeature(feature, enabled) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -5844,6 +5881,8 @@ export function createAdminStore(services) {
     const key = FEATURE_MAP[feature];
     if (!key) return;
     if (key === 'gathering' && enabled !== true && !(await _proceedAfterDirtyEnvironmentConfirm()))
+      return false;
+    if (key === 'multiStepRecipes' && enabled !== true && !(await _confirmDisableMultiStep(sysId)))
       return false;
     await systemManager.updateSystem(sysId, { features: { [key]: enabled } });
     await refresh();

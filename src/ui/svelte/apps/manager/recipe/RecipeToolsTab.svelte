@@ -18,6 +18,10 @@
   let {
     recipe = null,
     isMultiStep = false,
+    // COLLAPSED chain (issue 710): the system's multi-step feature is off but the
+    // recipe still carries authored steps. Step-level tool authoring is gated read-only
+    // behind a note; the preserved step data is restored on re-enable.
+    collapsed = false,
     toolIds = [],
     toolsLibrary = [],
     onAddTool = () => {},
@@ -45,7 +49,9 @@
     <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ToolsIntro', 'Required to craft but not consumed — a forge, a cauldron, a whetstone.')}</p>
   </div>
 
-  {#if isMultiStep && steps.length > 0}
+  {#if collapsed}
+    <p class="manager-muted" data-recipe-collapsed-note>{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote', 'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.')}</p>
+  {:else if isMultiStep && steps.length > 0}
     <!-- The recipe-level tools are GLOBAL — required for every step (§D2). -->
     <div class="manager-recipe-tools-global" data-recipe-tools-global>
       <div class="manager-recipe-tools-global-head">

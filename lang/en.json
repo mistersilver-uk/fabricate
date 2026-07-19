@@ -1266,6 +1266,11 @@
           "RemoveModifier": "Remove"
         },
         "StartupPending": "Fabricate is still loading. The crafting system manager will open when startup finishes.",
+        "DisableMultiStep": {
+          "Title": "Disable multi-step recipes?",
+          "Body": "Existing multi-step recipes will run as one combined action and show only their final results for editing. Their steps are kept and restored if you turn multi-step recipes back on. No recipe data is deleted.",
+          "Confirm": "Disable"
+        },
         "DiscardDirtyTitle": "Discard unsaved changes?",
         "DiscardDirtyConfirm": "Discard Changes",
         "DiscardDirtyCancel": "Keep Editing",
@@ -1502,7 +1507,6 @@
           "IssueProgressiveNoCheck": "Progressive mode requires a configured progressive crafting check.",
           "IssueProgressiveNoDifficulty": "Progressive mode requires at least one component with a difficulty of 1 or more.",
           "IssueMultiStepInAlchemy": "Multi-step recipes cannot be used while the system is in alchemy mode.",
-          "IssueMultiStepFeatureDisabled": "This recipe uses multiple steps, but the multi-step feature is disabled, so it is hidden until the feature is re-enabled or the recipe is reverted to a single step.",
           "IssueAlchemyCheckNoFormula": "The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.",
           "IssueAlchemySignatureCollision": "Two recipes share an ingredient signature, so alchemy attempts are ambiguous."
         },
@@ -1701,6 +1705,9 @@
           "MultiStep": "Multi-step",
           "StepMode": "Step mode",
           "StepModeHint": "A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.",
+          "CollapsedStepsTitle": "Steps (multi-step disabled)",
+          "CollapsedStepsNote": "This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.",
+          "CollapsedResultsNote": "Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.",
           "SingleStepHint": "The recipe is crafted in a single step.",
           "MultiStepHint": "Author an ordered list of named steps in the editor.",
           "Routing": "Result routing",
