@@ -123,7 +123,7 @@ new Ingredient({
     componentId,  // string (for component type)
     tags,         // string[] (for tags type)
     tagMatch,     // "any" | "all" (for tags type)
-    unit,         // string (currency unit abbreviation, for currency type)
+    unit,         // string (currency unit id, for currency type)
     essenceId,    // string (for essence type)
     amount        // number (currency cost or essence amount, for currency/essence types)
   },

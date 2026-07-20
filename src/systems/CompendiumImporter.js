@@ -8,6 +8,70 @@ import { resolveImportReferences, REFERENCE_KINDS } from './importReferenceResol
 /** World-setting key for the per-system gathering config (mirrors SETTING_KEYS.GATHERING_CONFIG). */
 const GATHERING_CONFIG_KEY = 'gatheringConfig';
 
+/** How often (in recipes processed) Phase 4 emits an interim progress tick. */
+const RECIPE_PROGRESS_INTERVAL = 10;
+
+/**
+ * Sentinel cached against a pack whose `getIndex` rejected, so a broken pack is
+ * skipped once per import run rather than retried for every unresolved component.
+ */
+const PACK_LOOKUP_SKIP = Symbol('pack-lookup-skip');
+
+/** Clamp a progress fraction into the Foundry-required `[0, 1]` range. */
+function clampProgressFraction(pct) {
+  const value = Number(pct);
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+/**
+ * Build the default V13 progress-notification reporter used when no `reportProgress`
+ * seam is injected. `ui.notifications.info(msg, { progress: true })` returns a handle
+ * whose `handle.update({ pct, message })` advances the bar (`pct` on `[0, 1]`); it
+ * superseded `SceneNavigation.displayProgressBar`.
+ *
+ * The returned reporter is stateful (it lazily opens ONE toast on first call and
+ * updates it thereafter) and carries the three required guards:
+ *   1. Undefined-handle / test-stub safety — when `info` is absent or returns a falsy
+ *      handle (or a handle without `.update`), it degrades to a no-op rather than
+ *      throwing (the test harness stubs `info` as `() => {}`, returning `undefined`).
+ *   2. update-before-render safety — a progress toast queued behind the visible-toast
+ *      cap may not be rendered when `.update()` is first called, which can throw; the
+ *      call is wrapped in try/catch and degrades silently.
+ *   3. Completion at `pct: 1` — a progress toast is exempt from the normal lifetime and
+ *      only self-dismisses when it reaches `pct: 1`, so callers MUST finish at `pct: 1`.
+ *
+ * @returns {(update: { pct?: number, message?: string, phase?: string }) => void}
+ */
+export function createDefaultProgressReporter() {
+  let handle = null;
+  let started = false;
+  return function reportProgress({ pct, message } = {}) {
+    const notifications = globalThis.ui?.notifications;
+    if (!notifications || typeof notifications.info !== 'function') return;
+
+    const fraction = clampProgressFraction(pct);
+    if (!started) {
+      started = true;
+      try {
+        handle = notifications.info(message ?? '', { progress: true });
+      } catch {
+        handle = null;
+      }
+    }
+
+    if (!handle || typeof handle.update !== 'function') return;
+    try {
+      handle.update({ pct: fraction, message });
+    } catch {
+      // Toast not yet rendered (queued behind the visible-toast cap): degrade to a
+      // no-op tick rather than throwing out of the import loop.
+    }
+  };
+}
+
 /**
  * Default external-reference resolver. Wraps the async `fromUuid` (NOT
  * `fromUuidSync`, which only reliably resolves cached world docs). Returns
@@ -75,6 +139,9 @@ export class CompendiumImporter {
    * @param {(key: string, value: *) => Promise<*>} [seams.setSetting] - World-setting writer
    * @param {() => boolean} [seams.isGM] - GM predicate (F3 fail-fast gate)
    * @param {(uuid: string) => Promise<null | { uuid: string }>} [seams.resolveExternalUuid]
+   * @param {(update: { pct?: number, message?: string, phase?: string }) => void} [seams.reportProgress]
+   *   Live-progress sink called at phase boundaries, every N recipes, and on completion.
+   *   Defaults to the Foundry V13 progress-notification factory so the caller wires nothing.
    */
   constructor(craftingSystemManager, recipeManager, seams = {}) {
     this._craftingSystemManager = craftingSystemManager;
@@ -91,6 +158,14 @@ export class CompendiumImporter {
         return g?.user ? g.user.isGM === true : true;
       });
     this._resolveExternalUuid = seams.resolveExternalUuid ?? defaultResolveExternalUuid;
+    // Store the injected seam (or null). The DEFAULT reporter is stateful — it opens
+    // and then drives a single toast — and this importer is a long-lived singleton in
+    // main.js reused across imports, so the default MUST be constructed per RUN (see
+    // importFromPackData) rather than once here; otherwise a second import would try to
+    // update the first run's already-dismissed toast. An injected seam is stateless and
+    // is reused as-is.
+    this._reportProgress = seams.reportProgress ?? null;
+    this._activeProgressReporter = null;
   }
 
   /**
@@ -136,6 +211,14 @@ export class CompendiumImporter {
       unresolvedReferences: [],
     };
 
+    // Fresh progress reporter per RUN: the default reporter carries per-toast state,
+    // and this importer instance is reused across imports (main.js singleton), so a new
+    // reporter is built here for each run. An injected seam is reused directly.
+    this._activeProgressReporter = this._reportProgress ?? createDefaultProgressReporter();
+
+    const systemLabel = summary.system.name || 'crafting system';
+    this._emitProgress({ pct: 0, phase: 'start', message: `Importing ${systemLabel}…` });
+
     // --- Phase 1: Resolve existing system ---
     const existingSystem = this._findExistingSystem(systemData);
 
@@ -149,12 +232,23 @@ export class CompendiumImporter {
         name: existingSystem.name,
         resolution: 'skipped',
       });
+      this._emitProgress({
+        pct: 1,
+        phase: 'complete',
+        message: `${existingSystem.name} already installed`,
+      });
       return summary;
     }
 
     // --- Phase 2: Remap component UUIDs ---
     const components = Array.isArray(systemData.components) ? systemData.components : [];
     summary.components.total = components.length;
+
+    this._emitProgress({
+      pct: 0.05,
+      phase: 'components',
+      message: `Resolving ${components.length} component references…`,
+    });
 
     const remappedComponents = await this._remapComponentUuids(
       components,
@@ -166,6 +260,7 @@ export class CompendiumImporter {
     );
 
     // --- Phase 3: Create or overwrite system ---
+    this._emitProgress({ pct: 0.2, phase: 'system', message: `Saving ${systemLabel}…` });
     const systemInput = { ...systemData, components: remappedComponents };
     await this._validateGatheringConfig(systemInput);
 
@@ -189,6 +284,13 @@ export class CompendiumImporter {
     }
 
     // --- Phase 4: Import recipes ---
+    // Each recipe mutates the in-memory recipe map only (persist:false); the whole
+    // batch is flushed with ONE `save()` after the loop, collapsing N growing
+    // whole-array `recipes` world writes to a single write. Per-recipe error
+    // isolation is unchanged (the try/catch still runs per recipe), and a caught
+    // failure leaves earlier successes in the map for the final `save()` to persist.
+    const totalRecipes = recipesData.length;
+    let processedRecipes = 0;
     for (const recipeData of recipesData) {
       const resolved = {
         ...recipeData,
@@ -207,6 +309,8 @@ export class CompendiumImporter {
           name: resolved.name || resolved.id,
           resolution: 'skipped',
         });
+        processedRecipes++;
+        this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
         continue;
       }
 
@@ -215,6 +319,7 @@ export class CompendiumImporter {
           await this._recipeManager.updateRecipe(resolved.id, resolved, {
             notify: false,
             emitChange: false,
+            persist: false,
           });
           summary.collisions.push({
             type: 'recipe',
@@ -223,7 +328,11 @@ export class CompendiumImporter {
             resolution: 'overwritten',
           });
         } else {
-          await this._recipeManager.createRecipe(resolved, { notify: false, emitChange: false });
+          await this._recipeManager.createRecipe(resolved, {
+            notify: false,
+            emitChange: false,
+            persist: false,
+          });
         }
         summary.recipes.imported++;
       } catch (error) {
@@ -233,6 +342,18 @@ export class CompendiumImporter {
           error: error.message || String(error),
         });
       }
+
+      processedRecipes++;
+      this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
+    }
+
+    // Single batched persist for the whole recipe phase (only when at least one
+    // recipe actually mutated the map — an empty or all-skipped run wrote nothing
+    // before and still writes nothing now). Optional-chained so a synchronous-storing
+    // mock recipe manager (which never needs a settings flush) is a no-op here; the
+    // real RecipeManager always defines `save`, so production still issues one write.
+    if (summary.recipes.imported > 0) {
+      await this._recipeManager.save?.();
     }
 
     this._recipeManager.notifyRecipesChanged?.({
@@ -244,12 +365,44 @@ export class CompendiumImporter {
     });
 
     // --- Phase 5: Gathering authoring (environments + config) ---
+    this._emitProgress({ pct: 0.95, phase: 'gathering', message: 'Saving gathering data…' });
     await this._importGatheringAuthoring(packData, system, recipesData, summary);
 
     // Fold the component source-item resolution into the unified reference report.
     this._foldComponentReferences(summary);
 
+    // Completion MUST reach pct:1 — a progress toast is lifetime-exempt and only
+    // self-dismisses at pct:1, so anything less leaves the bar on screen.
+    this._emitProgress({ pct: 1, phase: 'complete', message: `Imported ${systemLabel}` });
+
     return summary;
+  }
+
+  /**
+   * Emit a single progress update through the injected/defaulted `reportProgress`
+   * seam. Clamps `pct` into `[0, 1]` so the completion contract holds regardless of
+   * caller arithmetic.
+   * @private
+   */
+  _emitProgress({ pct, message, phase } = {}) {
+    this._activeProgressReporter?.({ pct: clampProgressFraction(pct), message, phase });
+  }
+
+  /**
+   * Emit an interim recipe-phase progress tick every `RECIPE_PROGRESS_INTERVAL`
+   * recipes (and on the final recipe), mapping recipe progress onto the `[0.25, 0.9]`
+   * span reserved for Phase 4.
+   * @private
+   */
+  _maybeEmitRecipeProgress(processed, total) {
+    if (total <= 0) return;
+    if (processed % RECIPE_PROGRESS_INTERVAL !== 0 && processed !== total) return;
+    const pct = 0.25 + 0.65 * (processed / total);
+    this._emitProgress({
+      pct,
+      phase: 'recipes',
+      message: `Importing recipes (${processed}/${total})…`,
+    });
   }
 
   /**
@@ -425,6 +578,13 @@ export class CompendiumImporter {
       }
     }
 
+    // Run-scoped name→entry lookup, built at most once per pack and reused across
+    // every component's miss-path search — this removes the per-component linear
+    // pack scan. It MUST stay method-local (never an instance field): a second
+    // import on the same importer instance re-derives it, so a stale index can't
+    // leak across runs.
+    const packLookupCache = new Map();
+
     const remapped = [];
     for (const rawComponent of components) {
       // Upcast pre-1.16.0 source-reference field names before the originItemUuid
@@ -483,7 +643,12 @@ export class CompendiumImporter {
       }
 
       // Source+name match
-      const foundUuid = await this._findBySourceAndName(originItemUuid, compName, targetPackIds);
+      const foundUuid = await this._findBySourceAndName(
+        originItemUuid,
+        compName,
+        targetPackIds,
+        packLookupCache
+      );
       if (foundUuid) {
         // Old UUID becomes a fallback
         if (!mergedFallbacks.includes(originItemUuid)) {
@@ -588,10 +753,14 @@ export class CompendiumImporter {
    * @param {string} registeredItemUuid - The source UUID from the pack data
    * @param {string} name - Component name (case-insensitive match)
    * @param {string[]} targetPackIds - Optional filter to specific pack IDs
+   * @param {Map<object, Map<string, object[]> | symbol>} packLookupCache - Run-scoped
+   *   per-pack name→entry lookup (or a SKIP sentinel for a pack whose index failed),
+   *   built once per import and reused across every component so the miss-path is an
+   *   O(1) name lookup instead of a per-component linear scan of every pack index.
    * @returns {Promise<string|null>}
    * @private
    */
-  async _findBySourceAndName(registeredItemUuid, name, targetPackIds) {
+  async _findBySourceAndName(registeredItemUuid, name, targetPackIds, packLookupCache) {
     if (!registeredItemUuid || !name) return null;
     const nameLower = name.trim().toLowerCase();
 
@@ -603,19 +772,13 @@ export class CompendiumImporter {
     });
 
     for (const pack of filteredPacks) {
-      let index;
-      try {
-        index = await pack.getIndex({
-          fields: ['name', '_stats.compendiumSource', 'flags.core.sourceId'],
-        });
-      } catch {
-        continue;
-      }
+      const lookup = await this._getPackNameLookup(pack, packLookupCache);
+      if (lookup === PACK_LOOKUP_SKIP) continue;
 
-      for (const entry of index) {
-        const entryName = (entry.name || '').trim().toLowerCase();
-        if (entryName !== nameLower) continue;
+      const candidates = lookup.get(nameLower);
+      if (!candidates) continue;
 
+      for (const entry of candidates) {
         const entrySource = entry._stats?.compendiumSource || entry.flags?.core?.sourceId || null;
         if (entrySource === registeredItemUuid) {
           return `Compendium.${pack.collection}.${entry._id}`;
@@ -624,6 +787,41 @@ export class CompendiumImporter {
     }
 
     return null;
+  }
+
+  /**
+   * Return (building on first request) the run-scoped name→entry lookup for a pack:
+   * a `Map<nameLower, entry[]>` over its index, or {@link PACK_LOOKUP_SKIP} when the
+   * pack's `getIndex` rejects (so a broken pack is skipped once, not retried per
+   * component). `getIndex` already self-caches per pack at the Foundry level; the win
+   * here is eliminating the per-component linear scan, and the cache is method-local
+   * so it re-derives on the next import run.
+   * @private
+   */
+  async _getPackNameLookup(pack, packLookupCache) {
+    if (packLookupCache.has(pack)) return packLookupCache.get(pack);
+
+    let index;
+    try {
+      index = await pack.getIndex({
+        fields: ['name', '_stats.compendiumSource', 'flags.core.sourceId'],
+      });
+    } catch {
+      packLookupCache.set(pack, PACK_LOOKUP_SKIP);
+      return PACK_LOOKUP_SKIP;
+    }
+
+    const lookup = new Map();
+    for (const entry of index) {
+      const entryName = (entry.name || '').trim().toLowerCase();
+      if (!entryName) continue;
+      const bucket = lookup.get(entryName);
+      if (bucket) bucket.push(entry);
+      else lookup.set(entryName, [entry]);
+    }
+
+    packLookupCache.set(pack, lookup);
+    return lookup;
   }
 
   /**
