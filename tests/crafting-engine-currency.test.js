@@ -131,16 +131,22 @@ test('canAddCurrencySubUnit still excludes self, already-contained, and cycles',
   assert.equal(canAddCurrencySubUnit(units, 'sp', 'gp'), false); // cycle (sp reaches cp, gp reaches sp,cp)
 });
 
-test('currencySubUnitOptions only offers conflict-free sub-units', () => {
+test('currencySubUnitOptions only offers conflict-free sub-units and labels an unauthored abbreviation', () => {
   const units = [
     ladderUnit('gp', [{ unitId: 'sp', amount: 10 }]),
     ladderUnit('sp', [{ unitId: 'cp', amount: 10 }]),
     ladderUnit('cp'),
-    ladderUnit('gem'),
+    // Unauthored abbreviation ('') with a label; must fall back to the label, never the id.
+    { id: 'gem', label: 'Gemstone', abbreviation: '', actorPath: 'system.currency.gem', contains: [] },
   ];
-  const options = currencySubUnitOptions(units, 'gp').map((option) => option.id);
+  const options = currencySubUnitOptions(units, 'gp');
   // gp already reaches sp and cp; gem is unrelated and eligible.
-  assert.deepEqual(options, ['gem']);
+  assert.deepEqual(
+    options.map((option) => option.id),
+    ['gem'],
+  );
+  // An unauthored abbreviation resolves to the unit's label, not the raw id.
+  assert.equal(options[0].abbreviation, 'Gemstone');
 });
 
 test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMode field', () => {

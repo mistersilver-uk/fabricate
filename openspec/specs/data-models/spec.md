@@ -1140,7 +1140,8 @@ On a shortfall the craft aborts with an `Insufficient currency` message and zero
 4. Currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
 Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
-6. A currency requirement or cost is displayed by resolving the unit `id` to a human label — the unit's `abbreviation` when authored, else its `label` — and never renders the raw unit `id`.
+6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored) → `label`, so a well-formed requirement never surfaces the raw unit `id`.
+The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the system's resolved currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
 This applies to the player crafting-app currency option cost row (`RecipeManager` resolves the recipe's currency units through `normalizeCurrencyUnit` so the abbreviation self-heal applies, then formats the row through `formatCurrencyRequirement`).
 
 ### Essence-Alternative Consumption (Craft-Time)
