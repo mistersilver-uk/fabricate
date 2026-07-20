@@ -345,6 +345,12 @@ In tests, `services.confirmDialog` is absent and the store helpers are stubbed d
 
 **Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/components/manager-mounted.test.js` (locate it with `grep -n confirmDiscardDirty`).
 
+**The `nextView === '<kind>-view'` same-view skip is NOT safe for a view with no `SCOPE_BROWSER_BY_VIEW` entry.** That map in `CraftingSystemManagerRoot.svelte` lists only `recipe-edit`, `recipe-item-edit`, `component-edit`, and `essence-edit`, and `browserViewForScopeChange` falls back to returning the view token unchanged for everything else.
+So a scope-select **system switch** from such a view calls `confirmRouteExit` with the view it is already on, the same-view skip returns `true`, and the guard silently never fires — even though the draft belongs to the outgoing system and is about to be abandoned.
+A view in that position needs a separate identity-change check invoked from `changeScopeSystem` before `confirmRouteExit`; `confirmSystemDetailsScopeChange` is the worked example (issue 767).
+`environment-edit` and `tools` also pair a same-view skip with no map entry, so check them against their own scope-change paths before assuming they are covered.
+Keep the same-view skip as well: a genuine same-view re-entry on the SAME system (the validation-blocker link) leaves the form mounted with its draft intact, so prompting there is a spurious dialog.
+
 **Anti-patterns:** adding `globalThis.confirm(message)` as a fallback (DialogV2 is always present in Foundry; missing-DialogV2 means a test environment that should stub the store helper); adding a `services?.confirmDiscard{Kind}Draft?.()` seam that nothing wires up in production; skipping the dirty check at the Svelte layer and relying solely on the store helper (the Svelte layer is the source of truth for which view is active and whether its draft is dirty; the store helper just asks the user).
 
 ### Gathering environment data model

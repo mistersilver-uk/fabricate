@@ -65,6 +65,26 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
   });
 
+  it('maps the issue-767 system-details dirty frame to its own view id', () => {
+    // The SystemEditView (chip) republishes BOTH the clean settings frames and the
+    // dedicated dirty frame; CraftingSystemManagerRoot (the guard + lifted draft)
+    // republishes only the dirty frame.
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-system-edit-dirty'], ['manager-system-edit-dirty']);
+
+    const editViewIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/SystemEditView.svelte',
+    ]).map(view => view.id);
+    assert.ok(editViewIds.includes('manager-system-edit'));
+    assert.ok(editViewIds.includes('manager-system-edit-dirty'));
+
+    const rootIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    ]).map(view => view.id);
+    assert.ok(rootIds.includes('manager-system-edit-dirty'));
+    assert.ok(!rootIds.includes('manager-system-edit'));
+  });
+
   it('maps player gathering app files to the player-gathering recipes (incl. the realm-lock frame)', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/gathering/GatheringView.svelte',

@@ -37,6 +37,20 @@
     onSelectIssue = () => {},
     onShowSystemOverview = () => {},
     onSaveDetails = () => {},
+    // Lift the identity draft (Name + Description) up to the root so the Manager
+    // route-exit guard can persist it on a Save-and-navigate. Emitted on every
+    // input, mirroring the essence/component `onDraftChange` → root draft pattern.
+    onDetailsChange = () => {},
+    // Report the local dirty state up so the root can gate the route-exit guard. This
+    // is the root's ONLY dirtiness signal: the comparison is against the live
+    // `selectedSystem` projection and only this view holds the typed inputs, so the
+    // root cannot re-derive it from the lifted draft alone.
+    onDirtyChange = () => {},
+    // Bumped by the root (discard branch of the guard) to force the local inputs to
+    // re-seed from the persisted system even when the system id is unchanged. A
+    // counter rather than a flag, so a second discard on the SAME system still
+    // registers as a change (the `requestedTabNonce` idiom above).
+    reseedNonce = 0,
     onToggleFeature = async () => true,
     characterModifierLibrary = [],
     characterModifierPresetsSupported = false,
@@ -333,9 +347,38 @@
   let systemNameValue = $state('');
   let systemDescriptionValue = $state('');
 
+  // Seed the local inputs from the persisted system on IDENTITY change only (or a
+  // root-driven `reseedNonce` bump on discard), never on every `selectedSystem`
+  // reference change. The admin store publishes `viewState` twice on refresh (a
+  // sync publish then an async-enriched publish with a NEW `selectedSystem` object
+  // of the same id); a reference-triggered reseed would overwrite the GM's
+  // un-saved keystrokes on that second publish (and on any unrelated mid-edit
+  // refresh, e.g. a feature toggle). Gating on id/nonce keeps the typed value and
+  // lets `detailsDirty` clear naturally after Save re-publishes the projection.
+  let lastSeededSystemId = $state(null);
+  let appliedReseedNonce = $state(0);
   $effect(() => {
-    systemNameValue = selectedSystem?.name ?? '';
-    systemDescriptionValue = selectedSystem?.description ?? '';
+    const currentId = selectedSystem?.id ?? null;
+    if (currentId !== lastSeededSystemId || reseedNonce !== appliedReseedNonce) {
+      lastSeededSystemId = currentId;
+      appliedReseedNonce = reseedNonce;
+      systemNameValue = selectedSystem?.name ?? '';
+      systemDescriptionValue = selectedSystem?.description ?? '';
+    }
+  });
+
+  const detailsDirty = $derived(
+    (systemNameValue ?? '') !== (selectedSystem?.name ?? '') ||
+      (systemDescriptionValue ?? '') !== (selectedSystem?.description ?? '')
+  );
+
+  // One-way up: mirror the typed values into the root draft and report dirtiness so
+  // the route-exit guard can Save (from the lifted draft) or Discard on navigate.
+  $effect(() => {
+    onDetailsChange(systemNameValue, systemDescriptionValue);
+  });
+  $effect(() => {
+    onDirtyChange(detailsDirty);
   });
 
   const featureDefinitions = [
@@ -407,10 +450,20 @@
       <section class="manager-edit-card">
         <div class="manager-edit-card-heading">
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Identity', 'Identity')}</h3>
-          <button type="submit" class="manager-button is-primary">
-            <i class="fas fa-save" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.SystemEdit.SaveDetails', 'Save details')}</span>
-          </button>
+          <!--
+            The heading is `justify-content: space-between`, so the chip must share a
+            flex-end action group with the Save button to hug it (the house idiom every
+            other dirty chip uses); a bare third child would float mid-heading.
+          -->
+          <div class="manager-action-group">
+            {#if detailsDirty}
+              <span class="manager-chip is-warning" data-system-details-dirty>{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</span>
+            {/if}
+            <button type="submit" class="manager-button is-primary">
+              <i class="fas fa-save" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.SystemEdit.SaveDetails', 'Save details')}</span>
+            </button>
+          </div>
         </div>
         <div class="manager-edit-grid">
           <label class="manager-field" for="manager-system-name">

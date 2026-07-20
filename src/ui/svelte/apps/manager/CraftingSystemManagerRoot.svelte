@@ -93,6 +93,13 @@
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
+  // The System Overview → Settings identity form (Name + Description) stages its
+  // typed values in `SystemEditView` locally; they are lifted here so the
+  // route-exit guard can Save on navigate. `systemDetailsReseedNonce` is bumped on
+  // Discard to force the view to re-seed its inputs from the persisted system.
+  let systemDetailsDraft = $state({ name: '', description: '' });
+  let systemDetailsDirty = $state(false);
+  let systemDetailsReseedNonce = $state(0);
   // Staged progressive-difficulty value for the component being edited (number or
   // null). Seeded on edit-entry; persisted with the rest of the draft on Save.
   let componentDifficultyDraft = $state(null);
@@ -2178,6 +2185,35 @@
     return true;
   }
 
+  // Apply the three-way discard choice for the identity sub-form and answer whether
+  // navigation may proceed (`true`) or must stay put (`false`). Save persists from the
+  // ROOT-LIFTED draft, not from `SystemEditView`'s local inputs: on a Save-and-navigate
+  // the view is still mounted but the root is the only holder the guard can read.
+  // Navigation is gated on `result !== false`, so only an explicit `false` from
+  // `saveSystemDetails` (its no-selected-system no-op) blocks the exit.
+  async function finishSystemDetailsRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      const result = await store.saveSystemDetails?.(
+        systemDetailsDraft.name,
+        systemDetailsDraft.description
+      );
+      return result !== false;
+    }
+    // Discard: clear the dirty flag and bump the reseed nonce so `SystemEditView`
+    // reverts its local inputs to the persisted values, then let navigation proceed.
+    //
+    // The nonce bump is intentional defence-in-depth and is currently REDUNDANT: every
+    // path that reaches this discard branch either navigates away (unmounting the view,
+    // which re-seeds on remount) or changes the system id (which the identity gate
+    // re-seeds on). It exists so a future in-place discard affordance — one that keeps
+    // the form mounted on the same system — reverts the inputs correctly. Do not delete
+    // it as dead code just because removing it leaves the tests green.
+    systemDetailsDirty = false;
+    systemDetailsReseedNonce += 1;
+    return true;
+  }
+
   async function finishRecipeRouteExit(action) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
@@ -2266,6 +2302,35 @@
     return finishEssenceRouteExit(confirmed);
   }
 
+  function runSystemDetailsDiscardPrompt() {
+    const confirmed = store.confirmDiscardDirtySystemDetailsDraft?.() ?? 'cancel';
+    if (isPromise(confirmed)) return confirmed.then(finishSystemDetailsRouteExit);
+    return finishSystemDetailsRouteExit(confirmed);
+  }
+
+  // Same-view navigation keeps the identity form mounted on the SAME system, so the
+  // lifted draft survives and must NOT prompt: `showSystemOverview` (the validation
+  // blocker link) and `editSystem` on the already-selected system both re-enter
+  // `system-edit`. Mirrors the `nextView` skip in `confirmRecipeRouteExit`.
+  //
+  // A scope-select SYSTEM swap also keeps the `system-edit` token (system-edit has no
+  // SCOPE_BROWSER_BY_VIEW entry), and there the draft genuinely is at risk — that case
+  // is guarded explicitly by `confirmSystemDetailsScopeChange`, not here.
+  function confirmSystemDetailsRouteExit(nextView) {
+    if (activeView !== 'system-edit' || nextView === 'system-edit') return true;
+    if (systemDetailsDirty !== true) return true;
+    return runSystemDetailsDiscardPrompt();
+  }
+
+  // Scope-select swaps the SYSTEM while keeping the view token, so the same-view skip
+  // above would let a dirty identity draft through. The draft belongs to the outgoing
+  // system, so a real switch must still prompt.
+  function confirmSystemDetailsScopeChange(systemId) {
+    if (activeView !== 'system-edit') return true;
+    if (systemId === selectedSystemId || systemDetailsDirty !== true) return true;
+    return runSystemDetailsDiscardPrompt();
+  }
+
   function confirmRecipeRouteExit(nextView) {
     if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;
     if (recipeEditDirty !== true) return true;
@@ -2352,10 +2417,23 @@
   function continueRouteExitAfterTask(nextView) {
     const eventResult = confirmGatheringEventRouteExit(nextView);
     if (isPromise(eventResult)) {
-      return eventResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
+      return eventResult.then(value => value === false ? false : continueRouteExitAfterTools(nextView));
     }
     if (eventResult === false) return false;
-    return confirmToolsRouteExit(nextView);
+    return continueRouteExitAfterTools(nextView);
+  }
+
+  // Tail of the route-exit cascade: tools, then system-details. `system-details` is
+  // evaluated LAST because it is the only kind whose "editor" is a sub-form of a page the
+  // GM may also be leaving for another reason, so a real editor draft gets first refusal
+  // on the exit. Same promise / `false`-short-circuit shape as the other links.
+  function continueRouteExitAfterTools(nextView) {
+    const toolsResult = confirmToolsRouteExit(nextView);
+    if (isPromise(toolsResult)) {
+      return toolsResult.then(value => value === false ? false : confirmSystemDetailsRouteExit(nextView));
+    }
+    if (toolsResult === false) return false;
+    return confirmSystemDetailsRouteExit(nextView);
   }
 
   // When a "Save all" is blocked by a tool that fails validation (after blank,
@@ -2448,10 +2526,14 @@
   function changeScopeSystem(systemId) {
     if (!systemId) return;
     const target = browserViewForScopeChange(currentView);
-    afterTruthyResult(confirmRouteExit(target), () => {
-      const selected = store.selectSystem?.(systemId);
-      const landed = isPromise(selected) ? selected.then((value) => value !== false) : selected !== false;
-      afterTruthyResult(landed, () => { activeView = target; });
+    // The system-details guard skips same-view exits, so a `system-edit` scope swap
+    // (same view token, different system) is guarded explicitly first.
+    afterTruthyResult(confirmSystemDetailsScopeChange(systemId), () => {
+      afterTruthyResult(confirmRouteExit(target), () => {
+        const selected = store.selectSystem?.(systemId);
+        const landed = isPromise(selected) ? selected.then((value) => value !== false) : selected !== false;
+        afterTruthyResult(landed, () => { activeView = target; });
+      });
     });
   }
 
@@ -5419,6 +5501,9 @@
         onSelectIssue={(issue) => selectOverviewIssue(issue)}
         onShowSystemOverview={showSystemOverview}
         onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
+        onDetailsChange={(name, description) => { systemDetailsDraft = { name, description }; }}
+        onDirtyChange={(dirty) => { systemDetailsDirty = dirty; }}
+        reseedNonce={systemDetailsReseedNonce}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         {characterModifierPresetsSupported}

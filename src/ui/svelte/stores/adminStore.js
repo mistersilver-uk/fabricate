@@ -2955,6 +2955,22 @@ export function createAdminStore(services) {
     );
   }
 
+  /**
+   * Route-exit prompt for the System Overview → Settings identity sub-form (Name +
+   * Description only — the optional-feature toggles and the modifier/prerequisite/currency
+   * cards on the same tab live-apply and stage no draft, so they never reach this prompt).
+   * Like the other Svelte-layer-dirty kinds it does NOT check dirtiness itself: the root
+   * gates on its lifted `systemDetailsDirty` before calling.
+   *
+   * @returns {Promise<'save'|'discard'|'cancel'>} the chosen action, never a boolean
+   */
+  function confirmDiscardDirtySystemDetailsDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.SystemEdit.DiscardDirtyContent',
+      'The system details have unsaved changes. Save them and continue, or discard them?'
+    );
+  }
+
   function confirmDiscardDirtyRecipeDraft() {
     return _confirmDiscardDirtyDraft(
       'FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent',
@@ -5086,12 +5102,27 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  /**
+   * Persist the crafting system's name and description, then refresh so the `selectedSystem`
+   * projection republishes the saved values (which is what clears the editor's `Unsaved` chip,
+   * since the chip compares the typed inputs against that projection rather than a baseline).
+   *
+   * The boolean return is a navigation contract, not decoration: the manager's `system-details`
+   * route-exit guard runs this on Save-and-navigate and proceeds only on a non-`false` result,
+   * so the no-selected-system no-op MUST report `false` and keep the GM on the form rather than
+   * letting navigation continue as if the edit had been stored.
+   *
+   * @param {string} name
+   * @param {string} description
+   * @returns {Promise<boolean>} `false` when there is no selected system to write to
+   */
   async function saveSystemDetails(name, description) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
-    if (!sysId) return;
+    if (!sysId) return false;
     await systemManager.updateSystem(sysId, { name, description });
     await refresh();
+    return true;
   }
 
   async function setResolutionMode(resolutionMode) {
@@ -8216,6 +8247,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtySystemDetailsDraft,
     confirmDiscardDirtyRecipeDraft,
     confirmRecipeAction,
     confirmDiscardDirtyGatheringTaskDraft,

@@ -5177,6 +5177,16 @@ async function main() {
         }
         await assertManagerLayoutStable(page, 'system edit normal');
         await assertNoScreenshotOverlays(page);
+        // The pointer-target pass typed a name without saving, so the identity form is
+        // dirty (issue 767 now lights an Unsaved chip). Persist it so the settled
+        // "normal"/"narrow" frames show the clean form; saveSystemDetails awaits a
+        // refresh internally.
+        const systemNameField = page.locator('.fabricate-manager #manager-system-name').first();
+        const saveDetailsButton = page
+          .locator('.fabricate-manager .manager-edit-card-heading button[type="submit"]')
+          .first();
+        await saveDetailsButton.click();
+        await page.waitForTimeout(400);
         // Scroll the optional-feature tiles fully into frame so the capture
         // shows the complete feature set (incl. the issue-714 time tile).
         const timeFeatureTile = page.locator('.fabricate-manager [data-feature-key="time"]').first();
@@ -5189,6 +5199,35 @@ async function main() {
         await assertManagerLayoutStable(page, 'system edit narrow');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-narrow');
+
+        // --- Dirty identity form (issue 767) ---
+        // Type an un-saved name change so the identity form is dirty, then frame the
+        // identity card so the lit "Unsaved" chip beside "Save details" is captured.
+        // Captured BEFORE any Save/blur that would persist, so the changed state
+        // itself (not the clean form) reaches the PR evidence.
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await systemNameField.fill('The Herbalist (unsaved edit)');
+        await page
+          .locator('.fabricate-manager [data-system-details-dirty]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        const identityHeading = page
+          .locator('.fabricate-manager .manager-edit-card-heading')
+          .first();
+        await identityHeading.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-system-edit-dirty');
+
+        // Restore the persisted name so the identity form is clean again before the
+        // walk navigates away — otherwise the new route-exit guard would raise a
+        // discard dialog and block the remaining captures. Re-typing the saved value
+        // clears the dirty flag with no further persistence (identity-gated seeding).
+        await systemNameField.fill('The Herbalist');
+        await page
+          .locator('.fabricate-manager [data-system-details-dirty]')
+          .first()
+          .waitFor({ state: 'detached', timeout: 5_000 })
+          .catch(() => {});
 
         // --- Currency configuration (#393) ---
         // Enable currency via the optional-features toggle, seed the dnd5e (actorProperty)

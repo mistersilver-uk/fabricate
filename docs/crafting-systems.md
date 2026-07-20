@@ -32,6 +32,19 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+The **Name** and **Description** you type are held until you click **Save details**.
+An **Unsaved** chip appears beside that button while either field differs from what is stored, and it clears once the save goes through.
+
+If you navigate away, or switch to another crafting system, while the **Unsaved** chip is showing, Fabricate asks what to do first.
+**Save** stores the pending name and description and then continues.
+**Discard Changes** puts both fields back to their stored values and then continues.
+**Keep Editing** cancels the move and leaves your typing intact.
+Moving between the tabs of the same system keeps what you typed and does not ask, because you have not left the form.
+
+While you have unsaved details open, a change made to the same system somewhere else is not merged into the fields you are editing.
+Saving replaces it with your values, so finish or discard your edit before picking up someone else's.
+The other cards on this screen, such as the feature toggles and the currency editor, apply as soon as you change them and are never part of this prompt.
+
 ### Tags And Categories
 
 The **Tags & Categories** screen holds three separate vocabularies for the selected system: recipe categories, component categories, and item tags.
