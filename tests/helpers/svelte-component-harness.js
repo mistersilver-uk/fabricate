@@ -127,6 +127,10 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
   'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
+  // SimpleRecipeBody renders this for an explicit multi-step recipe (issue 765).
+  // SimpleRecipeBody is already listed, so omitting this HANGS every mounted crafting
+  // test (# cancelled), not just the step-list one.
+  'src/ui/svelte/apps/crafting/detail/StepRequirementsList.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
   'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',

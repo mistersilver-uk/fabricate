@@ -49,6 +49,89 @@ export function recipe(overrides = {}) {
   };
 }
 
+// An explicit multi-step (`simple`-mode) recipe model as the CraftingListingBuilder
+// projects it (issue 765): a populated `steps[]` per-step requirement projection, the
+// first step's sets on `ingredientSets`, a terminal PRODUCES `result`, and no check
+// card. Steps carry INPUTS-only craftability; the emphasized product is `result`.
+export function multiStepRecipe(overrides = {}) {
+  const stepOne = {
+    id: 'step-1',
+    label: 'Cut',
+    ingredientSets: [
+      {
+        id: 'set-1',
+        label: 'Option A',
+        craftability: craftability({
+          ingredientStates: [
+            {
+              componentId: 'c-leather',
+              name: 'Rough Leather Scraps',
+              img: 'icons/commodities/leather/leather-scraps-tan.webp',
+              description: '5x Rough Leather Scraps',
+              need: 5,
+              have: 5,
+              satisfied: true
+            },
+            {
+              componentId: 'c-cloth',
+              name: 'Cloth Scrap',
+              img: 'icons/commodities/cloth/cloth-bolt-grey.webp',
+              description: '15x Cloth Scrap',
+              need: 15,
+              have: 15,
+              satisfied: true
+            }
+          ]
+        }),
+        products: []
+      }
+    ],
+    products: []
+  };
+  const stepTwo = {
+    id: 'step-2',
+    label: 'Raise',
+    ingredientSets: [
+      {
+        id: 'set-2',
+        label: 'Option A',
+        craftability: craftability({
+          ingredientStates: [
+            {
+              componentId: 'c-lumber',
+              name: 'Lumber',
+              img: 'icons/commodities/wood/lumber-stack.webp',
+              description: '1x Lumber',
+              need: 1,
+              have: 1,
+              satisfied: true
+            }
+          ]
+        }),
+        products: []
+      }
+    ],
+    products: []
+  };
+  return recipe({
+    id: 'recipe-tent',
+    name: 'Tent',
+    modeToken: 'simple',
+    modeLabel: 'Simple',
+    check: null,
+    ingredientSets: stepOne.ingredientSets,
+    defaultSetId: 'set-1',
+    steps: [stepOne, stepTwo],
+    result: {
+      items: [{ name: 'Tent', img: 'icons/environment/settlement/tent.webp', qty: 1 }],
+      time: null,
+      timeLabel: null,
+      xp: null
+    },
+    ...overrides
+  });
+}
+
 export function listing(recipes, overrides = {}) {
   return {
     selectedActorId: 'Actor.actor-1',

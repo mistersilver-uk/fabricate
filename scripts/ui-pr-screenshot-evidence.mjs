@@ -460,6 +460,17 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-progressive-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
   },
+  // The explicit multi-step simple recipe detail (issue 765): per-step material blocks,
+  // the multi-step hint strip, one terminal PRODUCES row, and no check card. Its OWN
+  // view — `collect` emits one file per view id, so this reaches the PR as a distinct
+  // frame proving the step-aware projection rather than folding into the resting simple
+  // frame (which shows a single-step recipe).
+  {
+    id: 'player-crafting-multistep',
+    label: 'Player crafting — explicit multi-step simple recipe detail',
+    smokeLabels: ['player-crafting-multistep'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
   // The player Alchemy workbench (issue 543) publishes three distinct frames — the
   // discipline chooser, the three-column workbench, and the narrow stacked layout.
   // `collect` emits one file per view id (first matching smoke label wins), so each

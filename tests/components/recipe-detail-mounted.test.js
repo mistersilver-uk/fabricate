@@ -8,7 +8,7 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { recipe, craftability } from '../helpers/crafting-fixtures.js';
+import { recipe, craftability, multiStepRecipe } from '../helpers/crafting-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -496,6 +496,80 @@ describe('RecipeDetail mounted behavior', () => {
       null,
       'no craft button on a teaser'
     );
+  });
+
+  it('renders an explicit multi-step simple recipe as per-step blocks + one terminal produces', async () => {
+    const fixture = multiStepRecipe();
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: fixture.steps
+    });
+
+    // The multi-step hint strip renders at the top of the step list.
+    assert.ok(
+      target.querySelector('[data-recipe-section="steps-hint"]'),
+      'multi-step hint strip rendered'
+    );
+
+    // One ordered list item per step, each carrying its own materials (INPUTS only).
+    const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
+    assert.equal(steps.length, 2, 'both step blocks rendered as list items');
+    assert.equal(
+      steps[0].querySelector('[data-recipe-step-label]').textContent.replace(/\s+/g, ' ').trim(),
+      '1 Cut',
+      'first step shows its ordinal + label'
+    );
+
+    // Step 1 lists BOTH of its required materials.
+    const stepOneTiles = steps[0].querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    assert.equal(stepOneTiles.length, 2, 'step 1 shows both required materials');
+    // Step 2 lists its single material.
+    const stepTwoTiles = steps[1].querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    assert.equal(stepTwoTiles.length, 1, 'step 2 shows its material');
+
+    // No per-step Output group leaks into a step block (inputs only).
+    assert.equal(
+      steps[0].querySelector('[data-io-group="outputs"]'),
+      null,
+      'step blocks render no per-step output'
+    );
+
+    // Exactly ONE emphasized terminal PRODUCES row — the final product (Tent).
+    const outputs = target.querySelectorAll('[data-io-group="outputs"] [data-io-output]');
+    assert.equal(outputs.length, 1, 'a single terminal produces row');
+    assert.equal(
+      outputs[0].querySelector('.crafting-io-output-name').textContent.trim(),
+      'Tent',
+      'produces the final product, not a step intermediate'
+    );
+
+    // A disabled, formula-less check surfaces no check card.
+    assert.equal(
+      target.querySelector('[data-recipe-section="check"]'),
+      null,
+      'no crafting-check card when the check is off'
+    );
+  });
+
+  it('falls back to a single IoTable when steps is empty (single-step parity)', async () => {
+    // The multi-step body is gated on steps.length > 1. With an empty steps prop the
+    // model renders unchanged: one IoTable, no ordered step list. This documents the
+    // single-step parity path the multi-step branch must not regress.
+    const fixture = multiStepRecipe({ steps: [] });
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: []
+    });
+    assert.equal(
+      target.querySelector('[data-recipe-section="steps"]'),
+      null,
+      'no ordered step list when steps is empty'
+    );
+    assert.ok(target.querySelector('[data-recipe-section="io"]'), 'the single IoTable renders');
   });
 
   it('shows a select-a-recipe hint when no recipe is provided', async () => {

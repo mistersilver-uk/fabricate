@@ -110,6 +110,9 @@ describe('UI PR screenshot evidence', () => {
         'player-crafting-progressive-reordered',
         'player-crafting-progressive-fixed',
         'player-crafting-progressive-stacked',
+        // The explicit multi-step simple recipe detail (issue 765) — its own view so the
+        // step-aware projection reaches the PR as a distinct frame.
+        'player-crafting-multistep',
       ]
     );
     assert.deepEqual(views[0].smokeLabels, [
@@ -131,6 +134,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[3].smokeLabels, ['player-crafting-progressive-reordered']);
     assert.deepEqual(views[4].smokeLabels, ['player-crafting-progressive-fixed']);
     assert.deepEqual(views[5].smokeLabels, ['player-crafting-progressive-stacked']);
+    assert.deepEqual(views[6].smokeLabels, ['player-crafting-multistep']);
   });
 
   it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {

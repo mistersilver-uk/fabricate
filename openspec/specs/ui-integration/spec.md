@@ -1225,6 +1225,9 @@ Alchemy is the only conditional entry; the others are always present.
   (resolved through the resolution-mode label keys — the raw `simple` token is
   never surfaced to the UI), `browseStatus`, per-set `ingredientSets[].craftability`,
   an optional `check` descriptor, `outcomeTiers`, and `result`.
+  `result` reflects the recipe's terminal execution step in `simple` mode, and a
+  `simple` multi-step model additionally carries a `steps[]` per-step requirement
+  projection (empty for single-step recipes and outside `simple` mode).
 - Each `RecipeListingModel` also carries `category` (the normalized category token;
   `general` for the reserved/default bucket) and a `categoryLabel` display string.
 - The label rule is exact: the reserved `general` token is localized to
@@ -1235,6 +1238,23 @@ Alchemy is the only conditional entry; the others are always present.
   present on Discovery-Mode teaser models too (category is GM-authored grouping
   metadata, not a redacted spoiler field).
 - The listing exposes `counts.available` / `counts.total` for header summaries.
+
+##### Multi-Step Recipe Presentation
+
+- The player recipe listing projects a recipe's ingredient sets, per-set craftability, and Craft-button craftability from the recipe's **first execution step** (`Recipe.getExecutionSteps()[0]`), not the raw top-level `ingredientSets`.
+Because an explicit multi-step recipe holds its sets on `steps[]` and leaves the top-level arrays empty, a stepped recipe therefore surfaces its first step's required materials and evaluates craftability against them (over the **union** of recipe-level and step-level tool ids), rather than degrading to an empty `missingMaterials` banner.
+A single-step recipe is unaffected: its implicit step shares the top-level arrays.
+- When a recipe resolves to more than one execution step in `simple` mode, the `RecipeListingModel` carries a `steps[]` array.
+Each entry surfaces the step's label (author name or 1-based position, never its id), its required materials with per-step craftability (Have / Need / Missing), and the components that step produces.
+The `simple`-mode detail body renders these as an ordered list of per-step requirement blocks — a static preview of the whole recipe, not a live run-progress tracker.
+Each block renders inputs only; intermediate step yields are not shown.
+A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
+A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
+- In `simple` mode the listing's top-level expected output (`result`) is resolved from the recipe's **terminal** execution step's result groups (against that step's own set), so a multi-step recipe's PRODUCES is its final product rather than the first step's intermediate output.
+Single-step recipes are unaffected (their only step is both first and terminal).
+`routedByCheck` continues to emit an empty top-level `result` (its output is per outcome tier); `routedByIngredients` and `progressive` multi-step PRODUCES is unchanged and must not be mis-routed.
+- The crafting-check descriptor is not surfaced (the projection yields `null`) when the mode's check is optional, has no authored roll formula, and checks are not enabled (`craftingCheck.enabled !== true` and `features.craftingChecks !== true`).
+A mandatory-by-mode check, an authored formula, or an enabled-but-unformulated check still surface (the last keeps the "no roll formula configured" GM misconfiguration note).
 
 ##### Progressive Stage List
 
