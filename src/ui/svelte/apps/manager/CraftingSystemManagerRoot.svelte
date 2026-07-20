@@ -2196,6 +2196,13 @@
     }
     // Discard: clear the dirty flag and bump the reseed nonce so `SystemEditView`
     // reverts its local inputs to the persisted values, then let navigation proceed.
+    //
+    // The nonce bump is intentional defence-in-depth and is currently REDUNDANT: every
+    // path that reaches this discard branch either navigates away (unmounting the view,
+    // which re-seeds on remount) or changes the system id (which the identity gate
+    // re-seeds on). It exists so a future in-place discard affordance — one that keeps
+    // the form mounted on the same system — reverts the inputs correctly. Do not delete
+    // it as dead code just because removing it leaves the tests green.
     systemDetailsDirty = false;
     systemDetailsReseedNonce += 1;
     return true;
@@ -2289,12 +2296,33 @@
     return finishEssenceRouteExit(confirmed);
   }
 
-  function confirmSystemDetailsRouteExit(nextView) {
-    if (activeView !== 'system-edit') return true;
-    if (systemDetailsDirty !== true) return true;
+  function runSystemDetailsDiscardPrompt() {
     const confirmed = store.confirmDiscardDirtySystemDetailsDraft?.() ?? 'cancel';
     if (isPromise(confirmed)) return confirmed.then(finishSystemDetailsRouteExit);
     return finishSystemDetailsRouteExit(confirmed);
+  }
+
+  // Same-view navigation keeps the identity form mounted on the SAME system, so the
+  // lifted draft survives and must NOT prompt: `showSystemOverview` (the validation
+  // blocker link) and `editSystem` on the already-selected system both re-enter
+  // `system-edit`. Mirrors the `nextView` skip in `confirmRecipeRouteExit`.
+  //
+  // A scope-select SYSTEM swap also keeps the `system-edit` token (system-edit has no
+  // SCOPE_BROWSER_BY_VIEW entry), and there the draft genuinely is at risk — that case
+  // is guarded explicitly by `confirmSystemDetailsScopeChange`, not here.
+  function confirmSystemDetailsRouteExit(nextView) {
+    if (activeView !== 'system-edit' || nextView === 'system-edit') return true;
+    if (systemDetailsDirty !== true) return true;
+    return runSystemDetailsDiscardPrompt();
+  }
+
+  // Scope-select swaps the SYSTEM while keeping the view token, so the same-view skip
+  // above would let a dirty identity draft through. The draft belongs to the outgoing
+  // system, so a real switch must still prompt.
+  function confirmSystemDetailsScopeChange(systemId) {
+    if (activeView !== 'system-edit') return true;
+    if (systemId === selectedSystemId || systemDetailsDirty !== true) return true;
+    return runSystemDetailsDiscardPrompt();
   }
 
   function confirmRecipeRouteExit(nextView) {
@@ -2488,10 +2516,14 @@
   function changeScopeSystem(systemId) {
     if (!systemId) return;
     const target = browserViewForScopeChange(currentView);
-    afterTruthyResult(confirmRouteExit(target), () => {
-      const selected = store.selectSystem?.(systemId);
-      const landed = isPromise(selected) ? selected.then((value) => value !== false) : selected !== false;
-      afterTruthyResult(landed, () => { activeView = target; });
+    // The system-details guard skips same-view exits, so a `system-edit` scope swap
+    // (same view token, different system) is guarded explicitly first.
+    afterTruthyResult(confirmSystemDetailsScopeChange(systemId), () => {
+      afterTruthyResult(confirmRouteExit(target), () => {
+        const selected = store.selectSystem?.(systemId);
+        const landed = isPromise(selected) ? selected.then((value) => value !== false) : selected !== false;
+        afterTruthyResult(landed, () => { activeView = target; });
+      });
     });
   }
 

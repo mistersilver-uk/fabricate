@@ -445,13 +445,20 @@
       <section class="manager-edit-card">
         <div class="manager-edit-card-heading">
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Identity', 'Identity')}</h3>
-          {#if detailsDirty}
-            <span class="manager-chip is-warning" data-system-details-dirty>{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</span>
-          {/if}
-          <button type="submit" class="manager-button is-primary">
-            <i class="fas fa-save" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.SystemEdit.SaveDetails', 'Save details')}</span>
-          </button>
+          <!--
+            The heading is `justify-content: space-between`, so the chip must share a
+            flex-end action group with the Save button to hug it (the house idiom every
+            other dirty chip uses); a bare third child would float mid-heading.
+          -->
+          <div class="manager-action-group">
+            {#if detailsDirty}
+              <span class="manager-chip is-warning" data-system-details-dirty>{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</span>
+            {/if}
+            <button type="submit" class="manager-button is-primary">
+              <i class="fas fa-save" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.SystemEdit.SaveDetails', 'Save details')}</span>
+            </button>
+          </div>
         </div>
         <div class="manager-edit-grid">
           <label class="manager-field" for="manager-system-name">

@@ -12093,6 +12093,58 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('does not prompt the discard guard when the blocker link re-enters the same view', async () => {
+    const { calls } = await mountSystemEditForDirtyGuard({
+      systemValidation: {
+        issues: [
+          {
+            kind: 'system',
+            entityId: null,
+            entityName: 'Alchemy',
+            severity: 'critical',
+            blocks: 'system',
+            code: 'progressiveNoCheck',
+            message: 'Progressive mode requires a configured progressive crafting check.',
+            nav: { view: 'system-overview' },
+          },
+        ],
+        counts: { critical: 1, warning: 0, info: 0, blockers: 1 },
+        blocksSystem: true,
+      },
+    });
+    typeSystemName('Greater Alchemy');
+    assert.ok(target.querySelector('[data-system-details-dirty]'), 'the form is dirty');
+
+    // The blocker link routes through confirmRouteExit('system-edit') — the SAME
+    // view — so the form stays mounted and its draft survives. Prompting here would
+    // put a spurious dialog in front of a GM who is not leaving the editor at all.
+    target.querySelector('[data-system-edit-blocker-link]').click();
+    await settle();
+
+    assert.ok(
+      !calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
+      'a same-view navigation does not raise the discard prompt'
+    );
+    assert.equal(
+      target.querySelector('[data-system-tab="validation"]').getAttribute('aria-selected'),
+      'true',
+      'the Validation tab opens'
+    );
+
+    // Back on Settings the typed value and the lit chip are still there.
+    target.querySelector('[data-system-tab="settings"]').click();
+    await settle();
+    assert.equal(
+      target.querySelector('#manager-system-name').value,
+      'Greater Alchemy',
+      'the typed name survives the same-view navigation'
+    );
+    assert.ok(
+      target.querySelector('[data-system-details-dirty]'),
+      'the chip is still lit after returning to Settings'
+    );
+  });
+
   // A report carrying a system blocker plus a deep-linkable recipe issue, so the
   // Validation tab's grouped list and deep-link wiring are both exercised.
   const overviewReport = {
