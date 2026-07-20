@@ -844,6 +844,14 @@ Recipe = {
     author: string,
     version: string,
   },
+
+  // Durable settings-payload provenance stamped by import (NOT a Foundry flag).
+  // Identifies the source pack (the payload's system.id when present, else the created
+  // system id) so a later reinstall can prune recipes the pack dropped without touching
+  // GM-authored recipes. Normalized to object-or-null by the Recipe constructor (a
+  // malformed value normalizes to null), emitted by toJSON(), null for hand-authored
+  // recipes, re-stamped on every import, and retained across GM edits.
+  importSource: { systemId: string, importedAt: number } | null,
 }
 ```
 
@@ -885,6 +893,10 @@ The legacy scalar `recipeItemId` requirements below still hold for un-migrated s
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
 It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
 An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
+14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
+The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
+A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
+It survives export/import (the importer re-stamps it) and is retained across GM edits (an edit that omits `importSource` inherits the stored value through the `{ ...recipe.toJSON(), ...updates }` merge in `updateRecipe`).
 
 ### Validation Guidance
 

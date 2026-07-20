@@ -309,6 +309,8 @@ An object flag written through `setFabricateFlag` is stored DOUBLY nested (`flag
 Never prune by rebuilding a filtered map and writing it back through `setFlag` as the sole write — that merge never removes keys.
 A same-`update` parent-delete + re-assert mix (`-=<map>` plus a fresh `<map>` in one payload) is ORDER-DEPENDENT in `mergeObject` (no delete-before-insert guarantee, so it can process the delete last and wipe the whole map); issue TWO sequential awaited updates instead — parent `-=<map>` first, then the retained-map write.
 See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `deleteRemovedActiveRunFlags` (`src/config/flags.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.
+- **The same merge-vs-replace split makes a dotted id SAFE as a settings-payload VALUE though it is a trap as a flag KEY.** `Recipe.importSource.systemId` (`importSource` in `src/models/Recipe.js`, stamped by `importFromPackData` in `src/systems/CompendiumImporter.js`) can hold a dotted pack id and round-trips intact because it rides inside the `recipes` world setting, which `game.settings.set` JSON-serializes whole — never through `mergeObject`/`expandObject` — so no dot is ever read as a path separator.
+That is why provenance-matched recipe pruning sidesteps the dotted-flag-key trap (where `setFlag`/`expandObject` split a dotted id on EVERY dot and nest it, so the reader silently misses the intended key): the identical dotted id that would degrade a flag key is inert-safe as a settings JSON value.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers

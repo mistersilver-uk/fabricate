@@ -96,25 +96,54 @@ function makeMockSystemManager({ systems = [], createdSystems = [], updatedSyste
   };
 }
 
+// STATEFUL recipe-manager double (issue 775): a real backing store so the prune
+// assertions are non-vacuous — `getRecipes({craftingSystemId})` returns the persisted
+// set and `deleteRecipe` actually removes from it. `createRecipe`/`updateRecipe` fold
+// their result into the store (matching the real map mutation), so provenance stamping
+// and gone-from-map/idempotence assertions reflect reality rather than a spy log.
 function makeMockRecipeManager({
   existingRecipes = {},
+  // Recipes already persisted in the store (with craftingSystemId + importSource), used
+  // by the prune tests to stage GM-authored / legacy / foreign / provenance-matched rows.
+  persistedRecipes = [],
   createdRecipes = [],
   updatedRecipes = [],
   createdRecipeOptions = [],
   updatedRecipeOptions = [],
+  deletedRecipeIds = [],
+  deleteRecipeOptions = [],
+  getRecipesCalls = [],
+  notifyDetails = [],
   saveCalls = [],
+  cleanupCalls = [],
   // Optionally make specific recipe ids throw on create/update to exercise the
   // per-recipe error-isolation path.
   throwOnRecipeIds = []
 } = {}) {
+  const store = new Map();
+  for (const [id, recipe] of Object.entries(existingRecipes)) {
+    store.set(id, { id, ...recipe });
+  }
+  for (const recipe of persistedRecipes) {
+    store.set(recipe.id, { ...recipe });
+  }
   return {
-    getRecipe: (id) => existingRecipes[id] || null,
+    getRecipe: (id) => store.get(id) ?? null,
+    getRecipes: (filters = {}) => {
+      getRecipesCalls.push(filters);
+      let recipes = [...store.values()];
+      if (filters.craftingSystemId !== undefined) {
+        recipes = recipes.filter((r) => r.craftingSystemId === filters.craftingSystemId);
+      }
+      return recipes;
+    },
     createRecipe: async (data, options) => {
       createdRecipes.push(data);
       createdRecipeOptions.push(options);
       if (throwOnRecipeIds.includes(data.id)) {
         throw new Error(`boom ${data.id}`);
       }
+      store.set(data.id, { ...data });
       return data;
     },
     updateRecipe: async (id, data, options) => {
@@ -123,7 +152,20 @@ function makeMockRecipeManager({
       if (throwOnRecipeIds.includes(id)) {
         throw new Error(`boom ${id}`);
       }
+      store.set(id, { ...data });
       return data;
+    },
+    deleteRecipe: async (id, options) => {
+      deletedRecipeIds.push(id);
+      deleteRecipeOptions.push(options);
+      store.delete(id);
+    },
+    // One bulk actor-flag cleanup pass the importer runs after a prune batch (F1).
+    cleanupOrphanedRecipeFlags: async () => {
+      cleanupCalls.push(Date.now());
+    },
+    notifyRecipesChanged: (details) => {
+      notifyDetails.push(details);
     },
     // The importer flushes the whole recipe batch with a SINGLE save() after the
     // loop; the spy records each call so tests can pin the save-once invariant.
@@ -1200,4 +1242,288 @@ test('#776: a nonzero run where every recipe is skipped writes nothing (imported
   assert.equal(summary.recipes.imported, 0, 'no recipe imported');
   assert.equal(summary.recipes.skipped, 2, 'both recipes skipped');
   assert.equal(saveCalls.length, 0, 'an all-skipped nonzero run issues no batch save');
+});
+
+// ---------------------------------------------------------------------------
+// #775 — provenance-aware pruning of recipes removed from import payloads
+// ---------------------------------------------------------------------------
+
+const PRUNE_DELETE_OPTIONS = { notify: false, emitChange: false, persist: false, cleanupFlags: false };
+
+// Shared overwrite scenario builder so the per-test setup does not repeat the
+// existing-system + stateful-manager wiring (keeps new-code duplication down).
+function makeOverwriteScenario({ systemId = 'test-system', persistedRecipes = [], payloadRecipeIds = [], throwOnRecipeIds = [] } = {}) {
+  const existingSystem = { id: systemId, name: 'Test System', components: [] };
+  const recorders = {
+    createdRecipes: [],
+    updatedRecipes: [],
+    deletedRecipeIds: [],
+    deleteRecipeOptions: [],
+    getRecipesCalls: [],
+    notifyDetails: [],
+    saveCalls: [],
+    cleanupCalls: []
+  };
+  const systemManager = makeMockSystemManager({ systems: [existingSystem] });
+  const recipeManager = makeMockRecipeManager({ persistedRecipes, throwOnRecipeIds, ...recorders });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+  const packData = makePackData({
+    system: { id: systemId, name: 'Test System', components: [] },
+    recipes: payloadRecipeIds.map((id) => makeImportRecipe(id))
+  });
+  return { importer, packData, recipeManager, recorders, systemId };
+}
+
+test('#775 Q1: unprovenanced and foreign-provenance orphans are reported, never deleted', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const systemId = 'test-system';
+  const { importer, packData, recipeManager, recorders } = makeOverwriteScenario({
+    systemId,
+    persistedRecipes: [
+      { id: 'gm-authored', name: 'GM Authored', craftingSystemId: systemId, importSource: null },
+      { id: 'from-other-pack', name: 'Other Pack', craftingSystemId: systemId, importSource: { systemId: 'other-pack', importedAt: 5 } }
+    ],
+    payloadRecipeIds: [] // the payload ships nothing: both persisted recipes are orphan candidates
+  });
+
+  const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
+
+  assert.equal(summary.recipes.pruned, 0, 'neither orphan is auto-pruned');
+  assert.equal(recorders.deletedRecipeIds.length, 0, 'deleteRecipe is never called');
+  assert.deepEqual(
+    summary.orphans.sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
+    [
+      { recipeId: 'from-other-pack', recipeName: 'Other Pack', disposition: 'reported', reason: 'foreignProvenance' },
+      { recipeId: 'gm-authored', recipeName: 'GM Authored', disposition: 'reported', reason: 'unprovenanced' }
+    ]
+  );
+  // Non-deletion asserted directly: both remain enumerable.
+  const remainingIds = recipeManager.getRecipes({ craftingSystemId: systemId }).map((r) => r.id).sort();
+  assert.deepEqual(remainingIds, ['from-other-pack', 'gm-authored']);
+});
+
+test('#775 Q2: pruning is idempotent — a second identical reinstall prunes nothing more', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const systemId = 'test-system';
+  const { importer, packData, recipeManager, recorders } = makeOverwriteScenario({
+    systemId,
+    persistedRecipes: [
+      { id: 'keep', name: 'Keep', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } },
+      { id: 'drop', name: 'Drop', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } }
+    ],
+    payloadRecipeIds: ['keep'] // 'drop' is a provenance-matched orphan on the first run
+  });
+
+  const first = await importer.importFromPackData(packData, { overwriteExisting: true });
+  assert.equal(first.recipes.pruned, 1, 'the provenance-matched dropped recipe is pruned once');
+  assert.deepEqual(first.orphans, [
+    { recipeId: 'drop', recipeName: 'Drop', disposition: 'pruned', reason: 'provenanceMatched' }
+  ]);
+  assert.deepEqual(recorders.deletedRecipeIds, ['drop']);
+  // F1 guard: the prune delete uses the batch-fold option shape.
+  assert.deepEqual(recorders.deleteRecipeOptions, [PRUNE_DELETE_OPTIONS]);
+  assert.equal(recipeManager.getRecipe('drop'), null, 'the pruned recipe is gone from the map');
+  assert.ok(recipeManager.getRecipe('keep'), 'the payload-present provenance-matched recipe survives');
+
+  const second = await importer.importFromPackData(packData, { overwriteExisting: true });
+  assert.equal(second.recipes.pruned, 0, 're-running the identical payload prunes nothing more');
+  assert.deepEqual(second.orphans, [], 'no orphan candidates remain');
+  assert.deepEqual(recorders.deletedRecipeIds, ['drop'], 'no further deleteRecipe calls');
+});
+
+test('#775 Q4: a payload recipe whose overwrite throws is never pruned (absent-set is ALL payload ids)', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const systemId = 'test-system';
+  const { importer, packData, recipeManager, recorders } = makeOverwriteScenario({
+    systemId,
+    // Provenance-MATCHED so it would be pruned if the absent-set were (wrongly) derived
+    // from the imported ids instead of ALL payload ids.
+    persistedRecipes: [
+      { id: 'r-throwme', name: 'Throws', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } }
+    ],
+    payloadRecipeIds: ['r-throwme'],
+    throwOnRecipeIds: ['r-throwme']
+  });
+
+  const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
+
+  assert.equal(summary.recipes.errors.length, 1, 'the overwrite failure is isolated into errors[]');
+  assert.equal(summary.recipes.errors[0].recipeId, 'r-throwme');
+  assert.equal(summary.recipes.pruned, 0, 'the throwing-but-shipped recipe is not pruned');
+  assert.deepEqual(summary.orphans, [], 'it is not an orphan candidate at all');
+  assert.equal(recorders.deletedRecipeIds.length, 0, 'deleteRecipe is never called for it');
+  assert.ok(recipeManager.getRecipe('r-throwme'), 'it remains persisted');
+});
+
+test('#775 Q6: the importer re-stamps a stale/foreign inbound importSource to the pack id', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const createdRecipes = [];
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({ createdRecipes });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(
+    makePackData({
+      recipes: [makeImportRecipe('r1', { importSource: { systemId: 'foreign-pack', importedAt: 999 } })]
+    })
+  );
+
+  assert.equal(summary.recipes.imported, 1);
+  assert.equal(createdRecipes.length, 1);
+  assert.equal(
+    createdRecipes[0].importSource.systemId,
+    'test-system',
+    'the inbound foreign provenance is overwritten to the pack id (a stamp-only-when-null impl fails here)'
+  );
+  assert.notEqual(createdRecipes[0].importSource.systemId, 'foreign-pack');
+  assert.equal(typeof createdRecipes[0].importSource.importedAt, 'number');
+});
+
+test('#775 Q8: a copy-mode / fresh-system import never enters the prune path (no existing system)', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const getRecipesCalls = [];
+  const deletedRecipeIds = [];
+  const systemManager = makeMockSystemManager({}); // no existing systems → existingSystem is null
+  const recipeManager = makeMockRecipeManager({ getRecipesCalls, deletedRecipeIds });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(makePackData(), { overwriteExisting: true });
+
+  assert.equal(summary.recipes.pruned, 0);
+  assert.deepEqual(summary.orphans, []);
+  assert.equal(getRecipesCalls.length, 0, 'no prune enumeration when there is no existing system to overwrite');
+  assert.equal(deletedRecipeIds.length, 0);
+});
+
+test('#775 Q8b: an existing system imported WITHOUT overwrite never enters the prune path (early skip)', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const getRecipesCalls = [];
+  const deletedRecipeIds = [];
+  const existingSystem = { id: 'test-system', name: 'Test System', items: [] };
+  const systemManager = makeMockSystemManager({ systems: [existingSystem] });
+  const recipeManager = makeMockRecipeManager({ getRecipesCalls, deletedRecipeIds });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(makePackData(), { overwriteExisting: false });
+
+  assert.equal(summary.system.skipped, true, 'the existing system is skipped before Phase 4');
+  assert.equal(summary.recipes.pruned, 0);
+  assert.equal(getRecipesCalls.length, 0, 'the other false-limb of the prune gate also never enumerates');
+  assert.equal(deletedRecipeIds.length, 0);
+});
+
+test('#775 Q10: an overwrite that imports nothing and prunes nothing issues zero saves', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const systemId = 'test-system';
+  const { importer, packData, recorders } = makeOverwriteScenario({
+    systemId,
+    persistedRecipes: [], // nothing to prune
+    payloadRecipeIds: [] // nothing to import
+  });
+
+  const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
+
+  assert.equal(summary.recipes.imported, 0);
+  assert.equal(summary.recipes.pruned, 0);
+  assert.equal(recorders.saveCalls.length, 0, 'the widened gate still writes nothing when nothing changed');
+  assert.equal(recorders.cleanupCalls.length, 0, 'no bulk flag cleanup when nothing was pruned');
+});
+
+test('#775 Q11 + prune-only reinstall: imported:0 & pruned>0 writes once, runs one bulk cleanup, and reports the pruned count', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const systemId = 'test-system';
+  const { importer, packData, recorders } = makeOverwriteScenario({
+    systemId,
+    persistedRecipes: [
+      { id: 'drop-1', name: 'Drop One', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } },
+      { id: 'drop-2', name: 'Drop Two', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } }
+    ],
+    payloadRecipeIds: [] // a prune-only reinstall: drops recipes, adds none
+  });
+
+  const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
+
+  assert.equal(summary.recipes.imported, 0, 'a prune-only reinstall imports nothing');
+  assert.equal(summary.recipes.pruned, 2, 'both provenance-matched dropped recipes are pruned');
+  assert.equal(recorders.saveCalls.length, 1, 'the widened gate persists the prune-only reinstall exactly once');
+  assert.equal(recorders.cleanupCalls.length, 1, 'exactly one bulk actor-flag cleanup pass for the whole prune batch');
+  // Q11: the change notification carries the pruned count.
+  assert.equal(recorders.notifyDetails.length, 1);
+  assert.equal(recorders.notifyDetails[0].pruned, 2, 'notifyRecipesChanged details carry the pruned count');
+});
+
+test('#775 Q5: the reporter’s stale Mythwright ids — reported-only while unprovenanced, auto-pruned once provenance-stamped', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const systemId = 'mythwright';
+  const existingSystem = { id: systemId, name: 'Mythwright', components: [] };
+  const deletedRecipeIds = [];
+  const systemManager = makeMockSystemManager({ systems: [existingSystem] });
+  // The two stale ids exist in the world as LEGACY unprovenanced recipes (imported
+  // before provenance existed) — the reporter's exact ids.
+  const recipeManager = makeMockRecipeManager({
+    deletedRecipeIds,
+    persistedRecipes: [
+      { id: 'myRcpSmeltIronIngot1', name: 'Smelt Iron Ingot', craftingSystemId: systemId, importSource: null },
+      { id: 'myRcpRefineSteelIngt', name: 'Refine Steel Ingot', craftingSystemId: systemId, importSource: null }
+    ]
+  });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const dropAllPack = makePackData({ system: { id: systemId, name: 'Mythwright', components: [] }, recipes: [] });
+  const shipBothPack = makePackData({
+    system: { id: systemId, name: 'Mythwright', components: [] },
+    recipes: [makeImportRecipe('myRcpSmeltIronIngot1'), makeImportRecipe('myRcpRefineSteelIngt')]
+  });
+
+  // Reinstall #1 (D2 report-only limb): the payload no longer ships the two ids, but
+  // they are still unprovenanced legacy rows, so they are reported-only, never removed.
+  const first = await importer.importFromPackData(dropAllPack, { overwriteExisting: true });
+  assert.equal(first.recipes.pruned, 0, 'reinstall #1 prunes nothing (the stale ids are unprovenanced)');
+  assert.deepEqual(
+    first.orphans.map((o) => ({ recipeId: o.recipeId, disposition: o.disposition, reason: o.reason })).sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
+    [
+      { recipeId: 'myRcpRefineSteelIngt', disposition: 'reported', reason: 'unprovenanced' },
+      { recipeId: 'myRcpSmeltIronIngot1', disposition: 'reported', reason: 'unprovenanced' }
+    ],
+    'both legacy ids are report-only on the first post-fix reinstall'
+  );
+  assert.equal(deletedRecipeIds.length, 0, 'reinstall #1 deletes nothing');
+
+  // A provenance-stamping reinstall re-ships the two ids: overwriting them stamps the
+  // pack provenance onto the persisted rows.
+  await importer.importFromPackData(shipBothPack, { overwriteExisting: true });
+  for (const recipe of recipeManager.getRecipes({ craftingSystemId: systemId })) {
+    assert.equal(recipe.importSource?.systemId, systemId, 'the re-ship stamps provenance');
+  }
+
+  // Reinstall #2 (post-dedupe): the payload drops the two now-provenanced ids → auto-prune.
+  const second = await importer.importFromPackData(dropAllPack, { overwriteExisting: true });
+  assert.equal(second.recipes.pruned, 2, 'the now-provenanced dropped ids are auto-pruned');
+  assert.deepEqual(
+    second.orphans.map((o) => ({ recipeId: o.recipeId, disposition: o.disposition, reason: o.reason })).sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
+    [
+      { recipeId: 'myRcpRefineSteelIngt', disposition: 'pruned', reason: 'provenanceMatched' },
+      { recipeId: 'myRcpSmeltIronIngot1', disposition: 'pruned', reason: 'provenanceMatched' }
+    ]
+  );
+  assert.deepEqual(deletedRecipeIds.sort(), ['myRcpRefineSteelIngt', 'myRcpSmeltIronIngot1']);
+  assert.equal(recipeManager.getRecipes({ craftingSystemId: systemId }).length, 0, 'both stale recipes are gone from the world');
 });

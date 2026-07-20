@@ -96,6 +96,26 @@ Recipe persistence on import MUST issue a single `recipes` world-setting write f
 The batched persistence MUST preserve the per-recipe import outcome: the same skip / overwrite / create classification, the same imported / skipped / error counts, the same `collisions[]` entries, and the same `errors[]` isolation of a per-recipe persistence failure as an unbatched per-recipe import.
 The single change hook the writing client emits after the batch is unchanged.
 Collapsing the per-recipe writes additionally reduces a replicated player's mid-import refreshes from one per recipe to one at completion, which is a strictly-better consequence and not a behavioural regression.
+The single batched write also carries any provenance-matched prune deletions (see Recipe import provenance and pruning), and it fires when at least one recipe was imported OR pruned; an overwrite that imports nothing and prunes nothing writes nothing.
+"Single write" scopes the `recipes` world setting only — the actor-flag cleanup following a prune is a separate concern, run as ONE bulk pass across affected actors (not once per pruned recipe), independent of the `recipes` write.
+
+### Recipe import provenance and pruning
+
+Import MUST stamp a durable provenance marker (`Recipe.importSource`, see `data-models/spec.md`) on every recipe it creates or overwrites, identifying the source pack: the payload's `system.id` when present (keep-mode, the pack's own stable identity preserved across reinstalls), else the created system id (copy-mode / id-less payloads).
+The marker MUST be re-stamped on each import, so a stale or foreign inbound marker is overwritten and provenance self-heals across re-export/re-import chains.
+The marker MUST be absent on GM-authored recipes so pack-shipped and hand-authored recipes are distinguishable.
+A GM edit to an imported recipe MUST retain the marker (an edit is still the pack's recipe, tweaked); a GM who wants a customization to survive a later pack drop MUST author a fresh (unprovenanced) recipe instead, which is never auto-pruned.
+
+Under `overwriteExisting`, after the recipe loop import MUST remove recipes that belong to the target system, carry provenance matching the incoming pack, and are absent from the incoming payload.
+The absent-set MUST be computed over ALL payload recipe ids, so a payload recipe whose overwrite failed is still "shipped" and is never pruned.
+Import MUST NOT auto-remove recipes lacking provenance (GM-authored, or imported before provenance existed) or carrying a different pack's provenance; these MUST be preserved and reported only.
+Auto-pruning therefore takes effect from the first provenance-stamping reinstall ONWARD: recipes imported before this feature are unprovenanced on their first post-fix reinstall and resolve via the report-only path.
+Pruning MUST persist in the same single batched `recipes` write as the import (a prune-only reinstall still writes once), and the actor-flag cleanup following the prune MUST run as ONE bulk pass across affected actors, not once per pruned recipe.
+A copy-mode / fresh-system import mints a new system id and has no persisted recipes to overwrite, so it never enters the prune path.
+
+### Orphan reporting
+
+The import summary MUST include an `orphans[]` collection, each entry carrying the recipe id and name and a `disposition` (`pruned` for auto-removed provenance-matched recipes, `reported` for preserved orphan candidates), plus a `recipes.pruned` count.
 
 ### Import progress feedback
 

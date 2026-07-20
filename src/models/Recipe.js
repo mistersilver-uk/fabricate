@@ -103,6 +103,33 @@ export class Recipe {
       author: game?.user?.name || 'Unknown',
       version: '1.0.0',
     };
+
+    // Durable settings-payload provenance stamped by the compendium importer (NOT a
+    // Foundry flag): identifies the source pack so a later reinstall can prune the
+    // recipes the pack dropped WITHOUT touching GM-authored recipes. Normalized to
+    // object-or-`null` — a malformed value (a string, or a partial object missing a
+    // `systemId`) becomes `null` — so a hand-authored recipe round-trips as `null` and
+    // the never-prune guard for GM-authored recipes is a structural absence enforced
+    // here at the normalizer, not at a UI control.
+    this.importSource = this._normalizeImportSource(data.importSource);
+  }
+
+  /**
+   * Normalize durable import provenance to `{ systemId, importedAt } | null`. Any
+   * malformed value — a non-object, or an object missing a non-empty string
+   * `systemId` — normalizes to `null`, so the never-prune guard for a GM-authored
+   * recipe is the structural absence of provenance. `importedAt` coerces to a finite
+   * number (0 when absent/invalid).
+   * @param {unknown} importSource
+   * @returns {{ systemId: string, importedAt: number } | null}
+   * @private
+   */
+  _normalizeImportSource(importSource) {
+    if (!importSource || typeof importSource !== 'object') return null;
+    const systemId = typeof importSource.systemId === 'string' ? importSource.systemId.trim() : '';
+    if (!systemId) return null;
+    const importedAt = Number(importSource.importedAt);
+    return { systemId, importedAt: Number.isFinite(importedAt) ? importedAt : 0 };
   }
 
   /**
@@ -492,6 +519,7 @@ export class Recipe {
       currencyCost: this.currencyCost,
       teaser: this.teaser,
       metadata: this.metadata,
+      importSource: this.importSource,
     };
   }
 
