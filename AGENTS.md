@@ -270,11 +270,14 @@ When claiming "there is no data to migrate", prove it by showing **no writer has
 Real authz is `#canModify`, which passes any user writing their **own** user-scoped setting. `config: false` is orthogonal: only WORLD scope is GM-gated in the settings UI.
 - **A synced `updateWorldTime` handler runs on EVERY client**, so any per-user state read inside one reads the **executing** user, not the owner — and with no primary-GM gate or ownership filter, whichever client wins the race executes.
 Capture owner-scoped state onto the record at start instead of reading it at resume; that makes the invariant structural rather than documented.
-Issue 651's salvage `resultOrder` is the worked example (`SalvageRunManager.createRun` already stamps `userId`, so the capture is auditable); `SalvageRunManager.processWorldTime`'s unguarded actor loop is the open defect (#656).
+Issue 651's salvage `resultOrder` is the worked example (`SalvageRunManager.createRun` already stamps `userId`, so the capture is auditable).
+`SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` were the unguarded case (#656, fixed): both now take an injected `isPrimaryGM` collaborator, defaulting fail-open to `() => true` so unit fixtures still resume, with the real `activeGM` check wired at construction in `src/main.js`.
 Contrast `GatheringEngine`, which gates timed completions on `isPrimaryGM()` explicitly.
-- **`MigrationRunner` has no GM gate** (#657): `initialize()` calls `_runMigrations()` unconditionally and the runner contains zero `isGM`/`game.user` references.
-Safety is emergent and racy — `run()` early-returns once `MIGRATION_VERSION` is bumped, but a player connecting before or concurrently with the GM reaches a world-scoped write that `#canModify` denies and throws.
-Every new migration re-opens that window for one session per world upgrade.
+- **The migration GM gate lives in the CALLER, not `MigrationRunner`** (#657, fixed).
+`MigrationRunner` contains zero `isGM`/`game.user` references, so grepping the runner alone reads as an unguarded world-scoped write path — the wrong conclusion.
+The gate is `_runMigrations` in `src/main.js`, which early-returns unless `game.users?.activeGM?.id === game.user?.id`, so exactly one client runs the pass and no player or assistant races the setting writes.
+Use `activeGM`, not `isGM`: `User#isGM` is true for assistant GMs too, so an `isGM` gate would let the full GM and every assistant transform-and-write concurrently (last-writer-wins).
+When planning a new migration, confirm the gate at the call site rather than inferring its absence from the runner — this note previously asserted that absence and was wrong for every migration added after the fix.
 - **The adminStore view-state projections are a FAMILY of hand-built allowlists** — the `selectedSystem` projection and the recipe-list projection (both in `src/ui/svelte/stores/adminStore.js`), plus `salvageComponentOptions` in `CraftingSystemManagerRoot.svelte` — and a new field is invisible to the UI unless added to each one it must reach.
 For a **default-true** field the failure is worse than absent, it is **inverted**: the editor seeds from `undefined`, reads its default-true, renders ON for an entity the GM authored OFF, and saves that wrong value back.
 Pin such a projection with a `false` fixture — a `true` fixture round-trips green through a dropped field.
