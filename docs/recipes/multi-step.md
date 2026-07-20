@@ -50,8 +50,8 @@ The **Craft** button reflects the first step.
 A later step showing missing materials never stops a player from starting the recipe, so players can gather what a later step needs before it comes up in the run.
 
 {: .note }
-> This step-by-step material preview is shown for multi-step recipes in Simple mode.
-> Recipes in the routed and progressive modes are not affected and display as before.
+> The step-by-step preview, with its numbered per-step blocks and single final Produces row, is shown only for multi-step recipes in Simple mode.
+> In the routed and progressive modes a multi-step recipe still lists its first step's required materials, it just isn't broken out into per-step blocks.
 
 If the crafting system has no crafting check turned on, a recipe no longer shows an empty crafting-check box in its detail.
 A crafting-check box still appears when the system has a check that always applies to the recipe, or when a roll formula has been configured for the check.
