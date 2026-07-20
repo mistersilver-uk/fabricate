@@ -26,7 +26,11 @@ import { getFabricateFlag } from '../config/flags.js';
 // AUTHORITATIVE presence-gate disqualifier, and a second copy of its tolerant
 // flag-shape handling would drift from the gate this projection has to agree with.
 // The module is deliberately import-free, so this adds no transitive edge.
-import { isToolBroken } from '../gatheringToolRuntime.js';
+import {
+  isToolBroken,
+  matchGatheringTools,
+  classifyGatheringToolStates,
+} from '../gatheringToolRuntime.js';
 // Dispatch each ingredient option's `match` through the registry so tag matchers
 // (and any future matcher type) expand to the component ids they consume, instead
 // of the builder re-reading `match.componentId` and missing every non-direct type.
@@ -420,6 +424,12 @@ export class InventoryListingBuilder {
     // which resolve each produced component id to a name/image/difficulty.
     const componentById = new Map(components.filter((entry) => entry?.id).map((c) => [c.id, c]));
 
+    // Source actor objects by id — the salvage projection scopes its required-tool
+    // availability to the TARGET salvage actor's items only (issue 777, the single actor
+    // the engine validates and the store salvages), NOT the party aggregate the crafting
+    // recipe surface uses.
+    const sourceActorsById = new Map(sources.map((actor) => [actorKey(actor), actor]));
+
     return {
       system,
       systemId,
@@ -434,6 +444,7 @@ export class InventoryListingBuilder {
       toolComponentIds,
       orderSources,
       componentById,
+      sourceActorsById,
     };
   }
 
@@ -465,6 +476,7 @@ export class InventoryListingBuilder {
       componentProducedBy,
       componentById,
       hiddenEntityIds,
+      sourceActorsById,
     } = context;
 
     const directUsedBy = componentUsedBy.get(component.id) ?? [];
@@ -496,6 +508,7 @@ export class InventoryListingBuilder {
         componentById,
         rowSources,
         hiddenEntityIds,
+        sourceActorsById,
       }),
       totalQuantity,
       sources: rowSources,
@@ -869,6 +882,8 @@ export class InventoryListingBuilder {
    * @param {object} args.component  The component definition.
    * @param {Map<string, object>} args.componentById  System components by id.
    * @param {Array<{actorId: string|null}>} args.rowSources  Owned sources, crafting-actor first.
+   * @param {Map<string, object>} [args.sourceActorsById]  Source actor objects by id, for
+   *   scoping required-tool availability to the target salvage actor (issue 777).
    * @returns {object|null}
    * @private
    */
@@ -878,6 +893,7 @@ export class InventoryListingBuilder {
     componentById,
     rowSources,
     hiddenEntityIds = NO_HIDDEN_ENTITIES,
+    sourceActorsById = null,
   }) {
     const salvage = component?.salvage ?? null;
     if (system?.features?.salvage !== true || salvage?.enabled !== true) return null;
@@ -921,6 +937,21 @@ export class InventoryListingBuilder {
     else if (progressiveNoFormula) misconfiguredReason = 'progressiveNoFormula';
     const routedType = mode === 'routed' ? (config?.type === 'fixed' ? 'fixed' : 'relative') : null;
 
+    // Required-tool disclosure (issue 777): resolve `salvage.toolIds` to library Tools and
+    // classify their availability against the TARGET salvage actor's items only — the same
+    // single actor `CraftingEngine.salvageComponent` validates and the store salvages
+    // (`rowSources[0]`), NOT the party aggregate the crafting recipe surface uses. When the
+    // target actor cannot be resolved, every tool reads unavailable (an empty item bag).
+    const targetActorId = rowSources[0]?.actorId ?? null;
+    const targetActor = sourceActorsById?.get?.(targetActorId) ?? null;
+    const toolStates = this._salvageToolStates({
+      system,
+      salvage,
+      componentById,
+      targetActor,
+    });
+    const toolsAvailable = toolStates.every((tool) => tool.available === true);
+
     return {
       enabled: true,
       mode,
@@ -928,6 +959,10 @@ export class InventoryListingBuilder {
       misconfigured,
       misconfiguredReason,
       routedType,
+      // Required tools + a derived convenience so the panel disables its action without
+      // re-deriving tool matching (issue 777).
+      toolStates,
+      toolsAvailable,
       // simple / routed+relative: the base DC, per-component override applied.
       // routed+FIXED and progressive: null — there is no DC to show. A fixed outcome
       // matches on an absolute [start, end] segment of the roll range and `checkRoll`
@@ -960,8 +995,82 @@ export class InventoryListingBuilder {
           : null,
       // Decision 8: the first OWNED actor holding it. Every listed source is already
       // owned (non-owned actors are filtered out before the listing is built).
-      targetActorId: rowSources[0]?.actorId ?? null,
+      targetActorId,
     };
+  }
+
+  /**
+   * Project a salvage component's required tools into per-tool availability states for
+   * the player salvage panel (issue 777), mirroring the crafting `toolStates` DATA shape
+   * (`RecipeManager._buildToolStates`) and additionally carrying an explicit `componentId`
+   * for stable keying. Resolution of `salvage.toolIds` mirrors
+   * `CraftingEngine._resolveSalvageTools` (dedupe, skip unknown ids), and availability is
+   * classified with the SAME shared matchers the crafting surface uses
+   * (`matchGatheringTools` + `classifyGatheringToolStates`), scoped to the target salvage
+   * actor's items only (Decision 3) with `presentTools: null` (the salvage path never
+   * injects canvas present-tools — parity with `salvageComponent`).
+   *
+   * A present-but-broken tool yields `{ available: false, needsRepair: true }`. The
+   * display name prefers the tool's user-authored `label`, then its display snapshot
+   * `name`, then the linked component's name, then the id (Decision 4); `img` prefers the
+   * tool's snapshot then the linked component's image.
+   *
+   * @param {object} args
+   * @param {object} args.system  The owning crafting system.
+   * @param {object} args.salvage  The component's salvage config.
+   * @param {Map<string, object>} args.componentById  System components by id.
+   * @param {object|null} args.targetActor  The actor whose items scope availability, or
+   *   null when unresolvable (every tool reads unavailable).
+   * @returns {Array<{componentId: string|null, name: string, img: string|null, available: boolean, needsRepair: boolean, virtual?: boolean}>}
+   * @private
+   */
+  _salvageToolStates({ system, salvage, componentById, targetActor }) {
+    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
+    if (ids.length === 0) return [];
+    const library = Array.isArray(system?.tools) ? system.tools : [];
+    const seen = new Set();
+    const tools = [];
+    for (const rawId of ids) {
+      const id = String(rawId ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const tool = library.find((entry) => entry?.id === id);
+      if (tool) tools.push(tool);
+    }
+    if (tools.length === 0) return [];
+
+    const systemId = stringOrNull(system?.id);
+    const matchArgs = {
+      // A null target actor yields an empty item bag, so every tool reads unavailable —
+      // the defensive "cannot resolve the salvage actor" case (Decision 3).
+      actor: { items: targetActor?.items ?? [] },
+      system: { id: systemId },
+      task: { id: null, craftingSystemId: systemId },
+      tools,
+      craftingSystemManager: { recipeManager: this.recipeManager },
+      presentTools: null,
+    };
+    const matchedByTool = new Map(
+      matchGatheringTools(matchArgs).items.map((entry) => [entry.tool, entry])
+    );
+    const stateByTool = new Map(
+      classifyGatheringToolStates(matchArgs).map((entry) => [entry.tool, entry.state])
+    );
+
+    return tools.map((tool) => {
+      const componentId = tool?.componentId ?? null;
+      const linked = componentId ? componentById.get(componentId) : null;
+      const entry = matchedByTool.get(tool) ?? null;
+      const state = {
+        componentId,
+        name: stringOrEmpty(tool?.label || tool?.name || linked?.name || componentId || tool?.id),
+        img: stringOrNull(tool?.img || linked?.img),
+        available: entry !== null,
+        needsRepair: stateByTool.get(tool) === 'damaged',
+      };
+      if (entry?.virtual === true) state.virtual = true;
+      return state;
+    });
   }
 
   /**

@@ -252,6 +252,20 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-salvage-misconfigured'], ['player-salvage-misconfigured']);
   });
 
+  // Issue 777: the required-tools disclosure frame is its own recipe (one file per id) so
+  // `collect` publishes it; appending its label to `player-salvage` would never publish it.
+  // Its narrow glob onto SalvageToolRequirements.svelte adds it alongside the broader
+  // inventory/salvage frames, without disturbing the player-salvage deep-equality above.
+  it('maps the issue-777 required-tools frame to its changed source', () => {
+    const ids = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
+    ]).map(v => v.id).sort();
+    assert.deepEqual(ids, ['player-inventory', 'player-salvage', 'player-salvage-tools']);
+
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['player-salvage-tools'], ['player-salvage-tools']);
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',

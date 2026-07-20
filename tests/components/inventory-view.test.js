@@ -48,6 +48,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
@@ -912,6 +913,8 @@ function salvageItem(salvage = {}, overrides = {}) {
       stages: [],
       awardMode: null,
       targetActorId: 'a1',
+      toolStates: [],
+      toolsAvailable: true,
       ...salvage,
     },
     ...overrides,
@@ -1163,6 +1166,84 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'the mode banner is suppressed when misconfigured'
     );
     assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
+  });
+
+  // issue 777: required-tool disclosure.
+  it('renders the Required tools section with a row per required tool', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        toolStates: [
+          { componentId: 'c9', name: "Leatherworker's Tools", img: null, available: true, needsRepair: false },
+          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+        ],
+        toolsAvailable: false,
+      })
+    );
+    const target = await openSalvage(services);
+
+    const section = target.querySelector('[data-inventory-salvage-tools]');
+    assert.ok(section, 'the required-tools section renders');
+    const rows = section.querySelectorAll('[data-inventory-salvage-tool]');
+    assert.equal(rows.length, 2, 'a row per required tool');
+    assert.match(section.textContent, /Leatherworker's Tools/, 'the human tool name, not a raw id');
+    assert.equal(rows[0].dataset.ioSatisfied, 'true', 'the held tool reads available');
+    assert.equal(rows[1].dataset.ioSatisfied, 'false', 'the missing tool reads unavailable');
+  });
+
+  it('disables the pre-roll action when a required tool is unavailable', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        checkUsable: true,
+        dc: 12,
+        toolStates: [
+          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+        ],
+        toolsAvailable: false,
+      })
+    );
+    const target = await openSalvage(services);
+
+    const action = target.querySelector('[data-inventory-salvage-action]');
+    assert.equal(action.disabled, true, 'a missing tool blocks the one-shot roll');
+    assert.equal(
+      action.getAttribute('aria-describedby'),
+      'salvage-footer-note',
+      'the disabled action points at the block note'
+    );
+  });
+
+  it('renders no tools section when no tool is required', async () => {
+    const { services } = salvageServices(salvageItem({ toolStates: [], toolsAvailable: true }));
+    const target = await openSalvage(services);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-tools]'),
+      null,
+      'no requirement, no section'
+    );
+  });
+
+  // Guards a later move of the section inside a non-misconfigured branch: a prerequisite is
+  // worth disclosing even when the salvage config is misconfigured.
+  it('renders the Required tools section even when the salvage is misconfigured', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: false,
+        misconfigured: true,
+        routedType: 'relative',
+        toolStates: [
+          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+        ],
+        toolsAvailable: false,
+      })
+    );
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-body="misconfigured"]'));
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-tools]'),
+      'the tools section renders independent of the misconfigured state'
+    );
   });
 
   it('the footer is one-shot: pressing it asks the store to salvage this component', async () => {

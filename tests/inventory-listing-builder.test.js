@@ -42,6 +42,16 @@ function makeSystem(overrides = {}) {
 function makeBuilder({ systems, recipes = [] } = {}) {
   const systemList = systems ?? [makeSystem()];
   const getRecipesCalls = [];
+  // A tool matches an owned item when the item's name equals the tool's linked
+  // component name — the salvage tool-state projection (issue 777) resolves availability
+  // through this fake matcher, mirroring the name-fallback ownership matching these fakes
+  // already use for components.
+  const componentsById = new Map();
+  for (const system of systemList) {
+    for (const component of system?.components ?? []) {
+      if (component?.id) componentsById.set(component.id, component);
+    }
+  }
   const recipeManager = {
     getRecipes: (filters) => {
       getRecipesCalls.push(filters);
@@ -49,6 +59,10 @@ function makeBuilder({ systems, recipes = [] } = {}) {
         (r) =>
           filters?.craftingSystemId === undefined || r.craftingSystemId === filters.craftingSystemId
       );
+    },
+    toolMatchesItem: (_recipe, tool, candidate) => {
+      const component = componentsById.get(tool?.componentId);
+      return !!component && candidate?.name === component.name;
     },
   };
   const craftingSystemManager = { getSystems: () => systemList };
@@ -1645,6 +1659,81 @@ describe('InventoryListingBuilder - salvage view-model', () => {
       componentSourceActors: [actor('a2', 'Camp Chest', [item('Iron', 3)])],
     });
     assert.equal(rowByComponent(listing, 'c1').salvage.targetActorId, 'a2');
+  });
+
+  // Required-tool disclosure (issue 777). The tool `tool-lw` links component `c3` (Slag),
+  // so an actor is deemed to hold it when it owns an item named "Slag".
+  const toolSystem = (extra = {}) =>
+    salvageSystem({
+      tools: [
+        { id: 'tool-lw', componentId: 'c3', label: "Leatherworker's Tools", img: 'icons/lw.webp' },
+      ],
+      salvage: { toolIds: ['tool-lw'] },
+      ...extra,
+    });
+
+  it('projects a required tool that the target actor holds as available', () => {
+    const salvage = salvageOf(toolSystem(), { items: [item('Iron', 1), item('Slag', 1)] });
+    assert.deepEqual(
+      salvage.toolStates.map((t) => [t.componentId, t.name, t.available, t.needsRepair]),
+      [['c3', "Leatherworker's Tools", true, false]]
+    );
+    assert.equal(salvage.toolStates[0].img, 'icons/lw.webp');
+    assert.equal(salvage.toolsAvailable, true);
+  });
+
+  it('projects a required tool the target actor lacks as unavailable and blocks the action', () => {
+    const salvage = salvageOf(toolSystem(), { items: [item('Iron', 1)] });
+    assert.deepEqual(
+      salvage.toolStates.map((t) => [t.name, t.available, t.needsRepair]),
+      [["Leatherworker's Tools", false, false]]
+    );
+    assert.equal(salvage.toolsAvailable, false);
+  });
+
+  it('projects a present-but-broken required tool as unavailable with needsRepair true', () => {
+    const broken = {
+      name: 'Slag',
+      system: {},
+      getFlag: (scope, key) => scope === 'fabricate' && key === 'toolBroken',
+    };
+    const salvage = salvageOf(toolSystem(), { items: [item('Iron', 1), broken] });
+    assert.deepEqual(
+      salvage.toolStates.map((t) => [t.available, t.needsRepair]),
+      [[false, true]]
+    );
+    assert.equal(salvage.toolsAvailable, false);
+  });
+
+  it('skips an unknown/disabled tool id when resolving required tools', () => {
+    const salvage = salvageOf(
+      toolSystem({ salvage: { toolIds: ['tool-lw', 'no-such-tool'] } }),
+      { items: [item('Iron', 1), item('Slag', 1)] }
+    );
+    assert.equal(salvage.toolStates.length, 1, 'the unresolvable id is skipped');
+    assert.equal(salvage.toolStates[0].componentId, 'c3');
+  });
+
+  it('has an empty toolStates and toolsAvailable true when no tools are required', () => {
+    const salvage = salvageOf(salvageSystem({}));
+    assert.deepEqual(salvage.toolStates, []);
+    assert.equal(salvage.toolsAvailable, true);
+  });
+
+  it('scopes tool availability to the target actor, not a non-target party member', () => {
+    // The target actor (crafting-actor-first) holds Iron but NOT the tool; only a
+    // non-target source actor holds it. The engine validates the target actor alone, so
+    // the panel must read the tool as UNAVAILABLE despite the party holding it.
+    const system = toolSystem();
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      componentSourceActors: [actor('a2', 'Camp Chest', [item('Slag', 1)])],
+    });
+    const salvage = rowByComponent(listing, 'c1').salvage;
+    assert.equal(salvage.targetActorId, 'a1');
+    assert.equal(salvage.toolStates[0].available, false);
+    assert.equal(salvage.toolsAvailable, false);
   });
 });
 

@@ -29,6 +29,7 @@
   import SalvageRollSummary from './salvage/SalvageRollSummary.svelte';
   import SalvageRoutedBody from './salvage/SalvageRoutedBody.svelte';
   import SalvageSimpleBody from './salvage/SalvageSimpleBody.svelte';
+  import SalvageToolRequirements from './salvage/SalvageToolRequirements.svelte';
 
   let {
     salvage = null,
@@ -48,6 +49,16 @@
   const mode = $derived(salvage?.mode ?? 'simple');
   const checkUsable = $derived(salvage?.checkUsable === true);
   const misconfigured = $derived(salvage?.misconfigured === true);
+  // Required-tool disclosure (issue 777). The states are decided builder-side (scoped to
+  // the target salvage actor); this component never re-derives tool matching. The section
+  // shows whenever any tool is required — independent of mode AND of `misconfigured`, a
+  // prerequisite is worth disclosing in every state.
+  const toolStates = $derived(Array.isArray(salvage?.toolStates) ? salvage.toolStates : []);
+  const hasToolRequirements = $derived(toolStates.length > 0);
+  // A missing required tool blocks the pre-roll action so the one-shot roll is never spent
+  // on an attempt the engine will reject. Threaded from the view-model, never re-derived.
+  const toolsAvailable = $derived(salvage?.toolsAvailable !== false);
+  const toolBlocked = $derived(hasToolRequirements && !toolsAvailable);
   // The builder's discriminator (issue 764): the misconfigured body dispatches on it, so
   // a Simple multi-group misconfig renders Simple-specific copy rather than routed copy.
   const misconfiguredReason = $derived(salvage?.misconfiguredReason ?? null);
@@ -136,11 +147,17 @@
   // both states: with a usable check the button is the roll — it commits, once, with no
   // reroll, which is the surprise worth warning about. Without one there is nothing to
   // roll and nothing to lose. One note for both said neither.
+  //
+  // A missing required tool SUPERSEDES the cost note (issue 777): the footer slot shows
+  // exactly one note, so when the action is blocked on a tool it explains WHY the button
+  // is off rather than what pressing it would cost — the block is the more actionable fact.
   const footerNote = $derived(
     localize(
-      checkUsable
-        ? 'FABRICATE.App.Inventory.Salvage.FooterNoteRoll'
-        : 'FABRICATE.App.Inventory.Salvage.FooterNote'
+      toolBlocked
+        ? 'FABRICATE.App.Inventory.Salvage.ToolBlockedNote'
+        : checkUsable
+          ? 'FABRICATE.App.Inventory.Salvage.FooterNoteRoll'
+          : 'FABRICATE.App.Inventory.Salvage.FooterNote'
     )
   );
 </script>
@@ -158,6 +175,13 @@
         <span class="salvage-banner-rule">{bannerRule}</span>
       </span>
     </p>
+  {/if}
+
+  <!-- Required-tool disclosure (issue 777), positioned after the banner and before the
+       roll summary. Rendered whenever a tool is required — independent of mode AND of
+       `misconfigured`: a prerequisite is worth disclosing in every state. -->
+  {#if hasToolRequirements}
+    <SalvageToolRequirements {toolStates} />
   {/if}
 
   <!-- Read-only, and only AFTER resolution. There is no pre-roll dice box: the prompt
@@ -217,14 +241,19 @@
     <!-- A ruled row, not a full-width slab: the note explains the gesture's cost on the
          left and the action sits right, at its own width. -->
     <div class="salvage-footer">
-      <p class="salvage-footer-note" data-inventory-salvage-footer-note>
+      <p
+        class="salvage-footer-note"
+        id="salvage-footer-note"
+        data-inventory-salvage-footer-note
+      >
         {footerNote}
       </p>
       <button
         type="button"
         class="salvage-action"
         data-inventory-salvage-action
-        disabled={busy || misconfigured || waiting || depleted}
+        disabled={busy || misconfigured || waiting || depleted || !toolsAvailable}
+        aria-describedby={toolBlocked ? 'salvage-footer-note' : undefined}
         aria-busy={busy}
         onclick={() => onSalvage?.()}
       >

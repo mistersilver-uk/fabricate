@@ -1669,6 +1669,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Bracket', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
       { name: 'Smoke Relic', img: 'icons/commodities/treasure/crown-gold-laurel-wreath.webp' },
       { name: 'Smoke Shard', img: 'icons/commodities/gems/gem-fragments-red.webp' },
+      // Issue 777: the required-tools salvage subject (see the salvage config below).
+      { name: 'Smoke Toolchest', img: 'icons/containers/chest/chest-wooden-tied-white.webp' },
       // simple system — multi-option ingredient recipe (issue #552): two
       // interchangeable coil components the crafter holds + the woven result.
       { name: 'Smoke Copper Coil', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
@@ -1738,6 +1740,10 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       'Smoke Plank', 'Smoke Crate', 'Smoke Mallet', 'Smoke Toy',
       'Smoke Chisel', 'Smoke Dowel', 'Smoke Anvil', 'Smoke Bracket',
       'Smoke Relic', 'Smoke Shard',
+      // Issue 777: the required-tools salvage subject — salvaging it needs the Mallet
+      // (which the crafter holds) and the Anvil (which it does not), so the player-salvage-
+      // tools frame shows one available and one unavailable required-tool row.
+      'Smoke Toolchest',
       // Multi-option ingredient recipe (issue #552) components.
       'Smoke Copper Coil', 'Smoke Bronze Coil', 'Smoke Filigree'
     ]);
@@ -1796,6 +1802,22 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
           id: 'smoke-relic-parts',
           name: 'Salvaged Parts',
           results: [{ id: 'smoke-shard-result', componentId: simpleMap['Smoke Shard'], quantity: 2 }]
+        }]
+      }
+    });
+    // Issue 777: required-tools salvage subject. Simple no-check salvage (same shape as
+    // Smoke Relic) with `toolIds` naming two library tools — the Mallet the crafter holds
+    // (available) and the Anvil it does not (unavailable) — so the player-salvage-tools
+    // frame shows both availability states and the disabled pre-roll action in one panel.
+    await csm.updateItem(simpleSystemId, simpleMap['Smoke Toolchest'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        toolIds: [malletToolId, anvilToolId],
+        resultGroups: [{
+          id: 'smoke-toolchest-parts',
+          name: 'Reclaimed Parts',
+          results: [{ id: 'smoke-toolchest-shard', componentId: simpleMap['Smoke Shard'], quantity: 1 }]
         }]
       }
     });
@@ -2173,6 +2195,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // copy is inert. The player-salvage capture below does NOT commit a salvage; if it
       // ever does, this must become 3.
       ...invCopies('Smoke Relic', 2),                 // salvageable component
+      ...invCopies('Smoke Toolchest', 1),             // issue 777: required-tools salvage subject
       ...invCopies('Smoke Copper Coil', 1),           // multi-option recipe alternative A (#552)
       ...invCopies('Smoke Bronze Coil', 1),           // multi-option recipe alternative B (#552)
       ...invCopies('Smoke Ingot A', 1),               // routedByIngredients set A
@@ -6957,6 +6980,27 @@ async function main() {
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage-no-check');
+
+        // Issue 777: the pre-roll required-tools disclosure. Smoke Toolchest's salvage
+        // names two library tools — the Mallet the crafter holds (available, green) and the
+        // Anvil it does not (unavailable, red) — so this single frame proves the section is
+        // visible before any roll, the available/unavailable StatusPill treatment reads by
+        // icon+label (not colour alone), the human tool name shows (not a raw componentId),
+        // and the pre-roll action is disabled while a required tool is missing. Fails
+        // loudly on the `[data-inventory-salvage-tools]` waitFor, for the same reason as the
+        // frames above; does NOT commit a salvage.
+        await salvageSearch.fill('Smoke Toolchest');
+        await page.waitForTimeout(200);
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        const toolchestSalvageTab = appShell.locator('[data-inventory-detail-tab="salvage"]').first();
+        await toolchestSalvageTab.waitFor({ state: 'visible', timeout: 10_000 });
+        await toolchestSalvageTab.click();
+        await appShell.locator('[data-inventory-salvage-tools]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-salvage-tools');
 
         // Issue 764: the GM-facing Simple-mode MISCONFIGURED salvage cue. A stored Simple
         // config with more than one success result group is invalid (the engine awards only

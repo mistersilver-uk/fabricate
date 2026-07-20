@@ -51,6 +51,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',

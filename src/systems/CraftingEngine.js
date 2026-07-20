@@ -33,19 +33,30 @@ import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 /**
- * A human-readable reference for a Tool in a missing-tool diagnostic (issue 561). A tool
- * with a managed-component link keeps the historical `componentId: X` form; an item-sourced
- * tool (`componentId: null`) falls back to its user-authored `label`, then its display-
- * snapshot `name`, then its `id`, so the message never reads `componentId: null`. Display
- * read only — no snapshot is written.
+ * A human-readable reference for a Tool in a missing-tool diagnostic (issue 777). The
+ * message names the tool by its human-readable `label`/`name` first, then the resolved
+ * managed-component name, and only falls back to the raw component id (or tool id) when
+ * no name is resolvable. This reverses the issue-561 behaviour that preferred the
+ * `componentId: X` form for component-linked tools: `Tool.name` is a null-by-default
+ * registration snapshot, so a component-linked tool with no snapshot used to leak its raw
+ * `componentId` while the salvage panel showed a clean name. `resolveComponentName` never
+ * returns the raw id (it yields the localized "Unknown Component" for an orphaned
+ * component-linked tool), so the bare-id tail is reached only when no
+ * `recipeManager`/`resolveComponentName` is wired (legacy/test managers). Display read
+ * only — no snapshot is written.
  *
  * @param {object|null} tool
+ * @param {object|null} recipe  The recipe/task in scope, for component-name resolution.
+ * @param {object|null} recipeManager  Resolves a component-linked tool's display name.
  * @returns {string}
  */
-function toolDisplayReference(tool) {
+function toolDisplayReference(tool, recipe = null, recipeManager = null) {
+  const name = tool?.label || tool?.name;
+  if (name) return name;
   const componentId = tool?.componentId || tool?.systemItemId;
-  if (componentId) return `componentId: ${componentId}`;
-  return tool?.label || tool?.name || tool?.id || 'unknown';
+  const resolved = recipeManager?.resolveComponentName?.(recipe, componentId);
+  if (resolved) return resolved;
+  return componentId || tool?.id || 'unknown';
 }
 
 /**
@@ -2302,7 +2313,7 @@ export class CraftingEngine {
       } else {
         return {
           valid: false,
-          message: `Missing required tool (${toolDisplayReference(tool)})`,
+          message: `Missing required tool (${toolDisplayReference(tool, recipe, this.recipeManager)})`,
         };
       }
     }
@@ -3839,7 +3850,7 @@ export class CraftingEngine {
     }
 
     for (const tool of missing.tools || []) {
-      lines.push(`Tool (${toolDisplayReference(tool)}): missing`);
+      lines.push(`Tool (${toolDisplayReference(tool, recipe, this.recipeManager)}): missing`);
     }
 
     return lines.join('\n');
