@@ -52,6 +52,20 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   },
   {
+    // Issue 767: the unsaved-changes chip + dirty-draft guard for the identity
+    // form. This needs its OWN view id (not an appended smokeLabel on
+    // `manager-system-edit`): `collect` publishes only `candidates[0]` from a
+    // filename-sorted list, so appending the dirty label there would publish the
+    // clean `-narrow` frame forever and the changed state would never reach the PR.
+    id: 'manager-system-edit-dirty',
+    label: 'Manager system settings — unsaved-changes chip',
+    smokeLabels: ['manager-system-edit-dirty'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+    ],
+  },
+  {
     id: 'manager-currency',
     label: 'Manager currency configuration (spend strategy, units, macros)',
     smokeLabels: ['currency-actor-property', 'currency-macro', 'currency-actor-inventory'],

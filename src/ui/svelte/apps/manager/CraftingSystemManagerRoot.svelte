@@ -93,6 +93,13 @@
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
+  // The System Overview → Settings identity form (Name + Description) stages its
+  // typed values in `SystemEditView` locally; they are lifted here so the
+  // route-exit guard can Save on navigate. `systemDetailsReseedNonce` is bumped on
+  // Discard to force the view to re-seed its inputs from the persisted system.
+  let systemDetailsDraft = $state({ name: '', description: '' });
+  let systemDetailsDirty = $state(false);
+  let systemDetailsReseedNonce = $state(0);
   // Staged progressive-difficulty value for the component being edited (number or
   // null). Seeded on edit-entry; persisted with the rest of the draft on Save.
   let componentDifficultyDraft = $state(null);
@@ -2178,6 +2185,22 @@
     return true;
   }
 
+  async function finishSystemDetailsRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      const result = await store.saveSystemDetails?.(
+        systemDetailsDraft.name,
+        systemDetailsDraft.description
+      );
+      return result !== false;
+    }
+    // Discard: clear the dirty flag and bump the reseed nonce so `SystemEditView`
+    // reverts its local inputs to the persisted values, then let navigation proceed.
+    systemDetailsDirty = false;
+    systemDetailsReseedNonce += 1;
+    return true;
+  }
+
   async function finishRecipeRouteExit(action) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
@@ -2266,6 +2289,14 @@
     return finishEssenceRouteExit(confirmed);
   }
 
+  function confirmSystemDetailsRouteExit(nextView) {
+    if (activeView !== 'system-edit') return true;
+    if (systemDetailsDirty !== true) return true;
+    const confirmed = store.confirmDiscardDirtySystemDetailsDraft?.() ?? 'cancel';
+    if (isPromise(confirmed)) return confirmed.then(finishSystemDetailsRouteExit);
+    return finishSystemDetailsRouteExit(confirmed);
+  }
+
   function confirmRecipeRouteExit(nextView) {
     if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;
     if (recipeEditDirty !== true) return true;
@@ -2352,10 +2383,19 @@
   function continueRouteExitAfterTask(nextView) {
     const eventResult = confirmGatheringEventRouteExit(nextView);
     if (isPromise(eventResult)) {
-      return eventResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
+      return eventResult.then(value => value === false ? false : continueRouteExitAfterTools(nextView));
     }
     if (eventResult === false) return false;
-    return confirmToolsRouteExit(nextView);
+    return continueRouteExitAfterTools(nextView);
+  }
+
+  function continueRouteExitAfterTools(nextView) {
+    const toolsResult = confirmToolsRouteExit(nextView);
+    if (isPromise(toolsResult)) {
+      return toolsResult.then(value => value === false ? false : confirmSystemDetailsRouteExit(nextView));
+    }
+    if (toolsResult === false) return false;
+    return confirmSystemDetailsRouteExit(nextView);
   }
 
   // When a "Save all" is blocked by a tool that fails validation (after blank,
@@ -5419,6 +5459,9 @@
         onSelectIssue={(issue) => selectOverviewIssue(issue)}
         onShowSystemOverview={showSystemOverview}
         onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
+        onDetailsChange={(name, description) => { systemDetailsDraft = { name, description }; }}
+        onDirtyChange={(dirty) => { systemDetailsDirty = dirty; }}
+        reseedNonce={systemDetailsReseedNonce}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         {characterModifierPresetsSupported}

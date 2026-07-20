@@ -2955,6 +2955,13 @@ export function createAdminStore(services) {
     );
   }
 
+  function confirmDiscardDirtySystemDetailsDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.SystemEdit.DiscardDirtyContent',
+      'The system details have unsaved changes. Save them and continue, or discard them?'
+    );
+  }
+
   function confirmDiscardDirtyRecipeDraft() {
     return _confirmDiscardDirtyDraft(
       'FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent',
@@ -5089,9 +5096,10 @@ export function createAdminStore(services) {
   async function saveSystemDetails(name, description) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
-    if (!sysId) return;
+    if (!sysId) return false;
     await systemManager.updateSystem(sysId, { name, description });
     await refresh();
+    return true;
   }
 
   async function setResolutionMode(resolutionMode) {
@@ -8216,6 +8224,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtySystemDetailsDraft,
     confirmDiscardDirtyRecipeDraft,
     confirmRecipeAction,
     confirmDiscardDirtyGatheringTaskDraft,

@@ -1416,6 +1416,8 @@
           "EditBaseSettingsHint": "Changes use the existing admin store persistence and confirmation flows.",
           "Identity": "Identity",
           "SaveDetails": "Save details",
+          "Dirty": "Unsaved",
+          "DiscardDirtyContent": "The system details have unsaved changes. Save them and continue, or discard them?",
           "BlockerTitle": "This system has a blocker",
           "BlockerBody": "Players cannot see or use any of this system's recipes until the blocker is resolved. Open the system overview to review and fix it.",
           "BlockerLink": "Open system overview",

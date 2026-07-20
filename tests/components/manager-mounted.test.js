@@ -1257,7 +1257,19 @@ function createStore(calls = [], options = {}) {
       calls.push(['toggleSystemEnabled', id, enabled]);
       applySystemEnabled(id, enabled);
     },
-    saveSystemDetails: (name, description) => calls.push(['saveSystemDetails', name, description]),
+    saveSystemDetails: (name, description) => {
+      calls.push(['saveSystemDetails', name, description]);
+      if (options.saveSystemDetailsResult === false) return false;
+      // Mirror the real store: persist then refresh, republishing a NEW
+      // selectedSystem object (same id) carrying the saved name/description.
+      viewState.update((state) => ({
+        ...state,
+        selectedSystem: state.selectedSystem
+          ? { ...state.selectedSystem, name, description }
+          : state.selectedSystem,
+      }));
+      return true;
+    },
     updateRecipeItemCaps: (recipeItemId, patch) => {
       calls.push(['updateRecipeItemCaps', recipeItemId, patch]);
       return options.updateRecipeItemCapsResult ?? true;
@@ -1401,6 +1413,10 @@ function createStore(calls = [], options = {}) {
     confirmDiscardDirtyEssenceDraft: () => {
       calls.push(['confirmDiscardDirtyEssenceDraft']);
       return options.confirmDiscardEssenceResult ?? true;
+    },
+    confirmDiscardDirtySystemDetailsDraft: () => {
+      calls.push(['confirmDiscardDirtySystemDetailsDraft']);
+      return options.confirmDiscardSystemDetailsResult ?? 'discard';
     },
     confirmDiscardDirtyComponentDraft: () => {
       calls.push(['confirmDiscardDirtyComponentDraft']);
@@ -11807,9 +11823,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     name.dispatchEvent(new Event('input', { bubbles: true }));
     description.value = 'Updated potion work';
     description.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+
+    // The Unsaved chip lights while the identity form differs from the persisted
+    // system and renders BEFORE the Save details button in DOM order.
+    const heading = target.querySelector('.manager-edit-card-heading');
+    const dirtyChip = heading.querySelector('[data-system-details-dirty]');
+    assert.ok(dirtyChip, 'the Unsaved chip lights while the identity form is dirty');
+    assert.ok(
+      dirtyChip.compareDocumentPosition(heading.querySelector('button[type="submit"]')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      'the chip precedes the Save details button'
+    );
+
     target
       .querySelector('.manager-system-edit-form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    flushSync();
 
     // Resolution mode moved to the gated Crafting > Settings page (issue 511), so
     // System Overview no longer carries the resolution-mode card. Identity save and
@@ -11830,10 +11860,236 @@ describe('CraftingSystemManager mounted behavior', () => {
           call[2] === 'Updated potion work'
       )
     );
+    // Save re-publishes the projection, so the chip clears naturally (no reseed).
+    assert.equal(
+      target.querySelector('[data-system-details-dirty]'),
+      null,
+      'the Unsaved chip clears after Save persists'
+    );
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false
       )
+    );
+  });
+
+  // Mount the manager, capture its store, and open the System Overview → Settings
+  // tab so the identity form and its dirty-draft route-exit guard are live. Returns
+  // the store so a test can push a fresh `selectedSystem` through `viewState` (the
+  // admin store's two-phase re-publish) or read the recorded `calls`.
+  async function mountSystemEditForDirtyGuard(options = {}) {
+    const calls = [];
+    const store = createStore(calls, options);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    target.querySelector('[aria-label="Edit Alchemy"]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    return { calls, store };
+  }
+
+  function typeSystemName(value) {
+    const name = target.querySelector('#manager-system-name');
+    name.value = value;
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    return name;
+  }
+
+  async function settle() {
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+  }
+
+  it('keeps the dirty system details chip lit when the same system re-publishes', async () => {
+    const { store } = await mountSystemEditForDirtyGuard();
+    typeSystemName('Greater Alchemy');
+    assert.ok(target.querySelector('[data-system-details-dirty]'), 'the chip lights when dirty');
+
+    // The admin store's async phase-2 publish hands down a NEW selectedSystem
+    // object with the SAME id and same persisted values; identity-gated seeding
+    // must not clobber the in-progress edit.
+    store.viewState.update((state) => ({
+      ...state,
+      selectedSystem: { ...state.selectedSystem },
+    }));
+    flushSync();
+
+    assert.equal(
+      target.querySelector('#manager-system-name').value,
+      'Greater Alchemy',
+      'the typed name survives the same-id re-publish'
+    );
+    assert.ok(
+      target.querySelector('[data-system-details-dirty]'),
+      'the chip stays lit after the re-publish'
+    );
+  });
+
+  it('reseeds the system details inputs and clears the chip on a system-identity change', async () => {
+    const { store } = await mountSystemEditForDirtyGuard();
+    typeSystemName('Greater Alchemy');
+    assert.ok(target.querySelector('[data-system-details-dirty]'), 'dirty before the switch');
+
+    // A DIFFERENT system id (mirrors selecting another system) must reseed.
+    store.viewState.update((state) => ({
+      ...state,
+      selectedSystem: {
+        ...state.selectedSystem,
+        id: 'smithing',
+        name: 'Smithing',
+        description: 'Heavy equipment work',
+      },
+    }));
+    flushSync();
+
+    assert.equal(
+      target.querySelector('#manager-system-name').value,
+      'Smithing',
+      'the inputs reseed to the new system'
+    );
+    assert.equal(
+      target.querySelector('[data-system-details-dirty]'),
+      null,
+      'the chip clears on the identity change'
+    );
+  });
+
+  it('does not prompt when navigating away from a clean system details form', async () => {
+    const { calls } = await mountSystemEditForDirtyGuard();
+    navButton('Components').click();
+    await settle();
+    assert.ok(
+      !calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
+      'a clean form does not raise the discard prompt'
+    );
+    assert.equal(
+      target.querySelector('.manager-system-edit-form'),
+      null,
+      'navigation proceeds off the settings form'
+    );
+  });
+
+  it('prompts and stays put when navigating away from a dirty system details form is cancelled', async () => {
+    const { calls } = await mountSystemEditForDirtyGuard({
+      confirmDiscardSystemDetailsResult: 'cancel',
+    });
+    typeSystemName('Greater Alchemy');
+    navButton('Components').click();
+    await settle();
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
+      'the discard guard prompts'
+    );
+    assert.ok(
+      target.querySelector('.manager-system-edit-form'),
+      'Keep editing leaves the GM on the settings form'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'saveSystemDetails'),
+      'Keep editing does not save'
+    );
+  });
+
+  it('saves the lifted system details draft when navigation chooses save', async () => {
+    const { calls } = await mountSystemEditForDirtyGuard({
+      confirmDiscardSystemDetailsResult: 'save',
+    });
+    typeSystemName('Greater Alchemy');
+    navButton('Components').click();
+    await settle();
+    assert.ok(
+      calls.some(
+        (call) =>
+          call[0] === 'saveSystemDetails' &&
+          call[1] === 'Greater Alchemy' &&
+          call[2] === 'Potion and essence work'
+      ),
+      'Save persists the typed name/description from the lifted draft'
+    );
+    assert.equal(
+      target.querySelector('.manager-system-edit-form'),
+      null,
+      'navigation proceeds after a successful save'
+    );
+  });
+
+  it('stays on the system details form when a Save-on-navigate fails', async () => {
+    const { calls } = await mountSystemEditForDirtyGuard({
+      confirmDiscardSystemDetailsResult: 'save',
+      saveSystemDetailsResult: false,
+    });
+    typeSystemName('Greater Alchemy');
+    navButton('Components').click();
+    await settle();
+    assert.ok(
+      calls.some((call) => call[0] === 'saveSystemDetails'),
+      'a save is attempted'
+    );
+    assert.ok(
+      target.querySelector('.manager-system-edit-form'),
+      'a failed save keeps the GM on the settings form (result !== false gate)'
+    );
+  });
+
+  it('reverts the system details inputs on discard-and-navigate', async () => {
+    const { calls } = await mountSystemEditForDirtyGuard({
+      confirmDiscardSystemDetailsResult: 'discard',
+    });
+    typeSystemName('Greater Alchemy');
+    navButton('Components').click();
+    await settle();
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
+      'discard prompts'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'saveSystemDetails'),
+      'discard does not save'
+    );
+    assert.equal(
+      target.querySelector('.manager-system-edit-form'),
+      null,
+      'navigation proceeds after discard'
+    );
+
+    // Re-open the settings form: the inputs show the persisted value again and the
+    // chip is clear (the discard bumped the reseed nonce and cleared dirty).
+    navButton('System Overview').click();
+    await settle();
+    assert.equal(
+      target.querySelector('#manager-system-name').value,
+      'Alchemy',
+      'the inputs revert to the persisted value'
+    );
+    assert.equal(
+      target.querySelector('[data-system-details-dirty]'),
+      null,
+      'the chip is clear on re-entry'
+    );
+  });
+
+  it('prompts the discard guard when switching systems on a dirty details form', async () => {
+    const { calls } = await mountSystemEditForDirtyGuard({
+      confirmDiscardSystemDetailsResult: 'cancel',
+    });
+    typeSystemName('Greater Alchemy');
+    const scope = target.querySelector('[data-manager-scope-select]');
+    scope.value = 'smithing';
+    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
+      'switching systems on a dirty form raises the same prompt'
     );
   });
 
