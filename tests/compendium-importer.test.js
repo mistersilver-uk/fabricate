@@ -1173,3 +1173,31 @@ test('#776: the default progress reporter opens a FRESH toast on each run of a r
     globalThis.ui = savedUi;
   }
 });
+
+test('#776: a nonzero run where every recipe is skipped writes nothing (imported=0 gate)', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  // A NEW system (so the run reaches Phase 4) but both recipes already exist and
+  // overwriteExisting is false — every recipe is skipped, so imported stays 0 and the
+  // `imported > 0` gate must suppress the batch save exactly as the unbatched path did.
+  const saveCalls = [];
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({
+    saveCalls,
+    existingRecipes: {
+      'r-a': { id: 'r-a', name: 'A' },
+      'r-b': { id: 'r-b', name: 'B' }
+    }
+  });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(
+    makePackData({ recipes: [makeImportRecipe('r-a'), makeImportRecipe('r-b')] }),
+    { overwriteExisting: false }
+  );
+
+  assert.equal(summary.recipes.imported, 0, 'no recipe imported');
+  assert.equal(summary.recipes.skipped, 2, 'both recipes skipped');
+  assert.equal(saveCalls.length, 0, 'an all-skipped nonzero run issues no batch save');
+});
