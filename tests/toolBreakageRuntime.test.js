@@ -27,8 +27,10 @@ const {
   evaluateToolBreakagePlan,
   plannedToolBreakageOutcome,
   applyToolUsageAndBreakage,
-  createToolBreakageRuntime
+  createToolBreakageRuntime,
+  stampReplacementComponentIdentity
 } = await import('../src/toolBreakageRuntime.js');
+const { resolveToolForItem, itemIsToolByDurableIdentity } = await import('../src/utils/sourceUuid.js');
 
 // ---------------------------------------------------------------------------
 // FakeItem — getFlag('fabricate', 'fabricate.<key>') dot-path resolution,
@@ -310,6 +312,157 @@ test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage ex
   const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 5 }, catalystItemUsage: { timesUsed: 2 } } });
   await tool.applyUsage(item);
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 6 });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 780: the broken-tool REPLACEMENT grant stamps the replacement's durable
+// per-system identity onto the CREATED item's payload. Driven through the REAL
+// createToolBreakageRuntime apply() → makeCreateReplacement path, asserting on the
+// captured createEmbeddedDocuments payload (never a read-back).
+// ---------------------------------------------------------------------------
+
+const REPLACEMENT_COMPONENT_ID = 'comp-replacement';
+const REPLACEMENT_SOURCE = {
+  uuid: 'Item.replacement-src',
+  toObject: () => ({ name: 'Whetstone', type: 'loot', system: { quantity: 1 }, flags: {} }),
+};
+
+// Wrap a captured create payload in a getFlag reader mirroring Foundry's Document#getFlag,
+// so the durable-identity matchers in sourceUuid.js can read its roles map.
+function asOwnedItem(itemData) {
+  return {
+    ...itemData,
+    getFlag(scope, key) {
+      if (scope !== 'fabricate') return undefined;
+      return getPath(itemData.flags?.fabricate, key);
+    },
+  };
+}
+
+// Run the REAL replacement path for a broken replaceWith tool and return the captured
+// createEmbeddedDocuments payload array.
+async function runReplacement({ system, resolveReplacementSource }) {
+  const captured = [];
+  const actor = {
+    uuid: 'Actor.a',
+    createEmbeddedDocuments: async (_type, data) => {
+      captured.push(...data);
+      return data;
+    },
+  };
+  const item = new FakeItem({}, { uuid: 'Item.broken-tool' });
+  const toolData = {
+    componentId: 'c-tool',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: { mode: 'replaceWith', replacementComponentId: REPLACEMENT_COMPONENT_ID },
+  };
+  const runtime = createToolBreakageRuntime({
+    matchTools: () => ({ items: [{ tool: toolData, item }], missing: [] }),
+    buildItemRef: (_a, i) => ({ actorUuid: 'Actor.a', itemUuid: i.uuid, quantity: 1 }),
+    resolveReplacementSource,
+  });
+  await runtime.apply({ actor, system, task: { id: 't' }, tools: [toolData] });
+  return captured;
+}
+
+const resolveToReplacementSource = () => REPLACEMENT_SOURCE;
+
+test('780 replacement: always stamps roles[systemId].componentId = replacementComponentId', async () => {
+  const system = { id: 'sys-1', tools: [] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(captured.length, 1, 'the replacement item is created');
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
+    REPLACEMENT_COMPONENT_ID
+  );
+});
+
+test('780 replacement: co-stamps toolId when EXACTLY ONE first-class tool links the component', async () => {
+  const linkingTool = {
+    id: 'tool-link',
+    componentId: REPLACEMENT_COMPONENT_ID,
+    name: 'Whetstone Tool',
+    // Source ref that does NOT intersect the created item, so only the toolId claim can match.
+    registeredItemUuid: 'Item.unrelated-tool-src',
+  };
+  const system = { id: 'sys-1', tools: [linkingTool] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, 'tool-link');
+
+  // Round-trip: the stamped replacement resolves to that exact tool by durable identity,
+  // with the name and source-ref tiers disregarded (a componentId-only stamp would fail this).
+  const owned = asOwnedItem(captured[0]);
+  assert.equal(
+    resolveToolForItem(owned, system.tools, 'sys-1')?.id,
+    'tool-link',
+    'resolveToolForItem resolves the replacement to the linking tool via roles.toolId'
+  );
+  assert.equal(
+    itemIsToolByDurableIdentity(owned, linkingTool, system.tools, 'sys-1'),
+    true,
+    'itemIsToolByDurableIdentity confirms the replacement IS that tool'
+  );
+});
+
+test('780 replacement: skips toolId when NO first-class tool links the component', async () => {
+  const system = { id: 'sys-1', tools: [{ id: 't-other', componentId: 'comp-unrelated' }] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
+    REPLACEMENT_COMPONENT_ID
+  );
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId,
+    undefined,
+    'zero linking tools ⇒ no toolId co-stamp'
+  );
+});
+
+test('780 replacement: skips toolId when MULTIPLE first-class tools link the component (ambiguous)', async () => {
+  const system = {
+    id: 'sys-1',
+    tools: [
+      { id: 't1', componentId: REPLACEMENT_COMPONENT_ID },
+      { id: 't2', componentId: REPLACEMENT_COMPONENT_ID },
+    ],
+  };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
+    REPLACEMENT_COMPONENT_ID
+  );
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId,
+    undefined,
+    'multiple linking tools ⇒ ambiguous ⇒ no toolId co-stamp'
+  );
+});
+
+test('780 replacement: an unresolvable replacement stamps nothing (no item created)', async () => {
+  const system = { id: 'sys-1', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
+  const captured = await runReplacement({ system, resolveReplacementSource: () => null });
+  assert.equal(captured.length, 0, 'no replacement item is created when the component does not resolve');
+});
+
+test('780 replacement: a dotted systemId stamps nothing', async () => {
+  const system = { id: 'sys.with.dots', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(captured.length, 1);
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles,
+    undefined,
+    'a dotted system id can never be a roles map key'
+  );
+});
+
+test('780 replacement: the shared helper is faithful when called directly (componentId + single toolId)', () => {
+  const itemData = {};
+  const system = { id: 'sys-1', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
+  stampReplacementComponentIdentity(itemData, system, REPLACEMENT_COMPONENT_ID);
+  assert.deepEqual(itemData.flags.fabricate.fabricate.roles['sys-1'], {
+    componentId: REPLACEMENT_COMPONENT_ID,
+    toolId: 'tool-link',
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,40 @@
+import { stampItemDataRoleIdentity } from './config/flags.js';
 import { Tool } from './models/Tool.js';
+
+/**
+ * Stamp a broken-tool REPLACEMENT grant's durable identity onto its item-data payload
+ * BEFORE creation (issue 780). ALWAYS stamps the replacement component id at
+ * `flags.fabricate.roles[system.id].componentId` — the replacement IS that component — so
+ * every downstream component consumer (inventory display, salvage, crafting ingredient
+ * matching, the gathering stack-guard) resolves it by durable identity once #601 removes
+ * the name-fallback tier.
+ *
+ * ADDITIONALLY co-stamps `roles[system.id].toolId` with the linking tool's id ONLY when
+ * EXACTLY ONE first-class tool in `system.tools` links the replacement component
+ * (`tool.componentId === componentId`) — the componentId-linked "whetstone" case the `Tool`
+ * model documents. The tool matcher (`resolveToolForItem` / `itemIsToolByDurableIdentity`)
+ * reads `roles[systemId].toolId`, NOT `componentId`, so a componentId-only stamp would not
+ * keep a replacement that is itself a working tool matchable once the name tier is gone. On
+ * ZERO or MULTIPLE linking tools the `toolId` co-stamp is skipped (ambiguous); when the
+ * component does not resolve `componentId` is nullish and the shared writer stamps nothing.
+ *
+ * Shared by BOTH replacement creators — `CraftingEngine._makeToolReplacementCreator` and
+ * {@link makeCreateReplacement} below — so their stamping logic cannot drift.
+ *
+ * @param {object} itemData - the plain replacement item-data about to be created
+ * @param {{ id?: string, tools?: Array<object> }|null|undefined} system
+ * @param {string|null|undefined} componentId - the resolved replacement component id
+ */
+export function stampReplacementComponentIdentity(itemData, system, componentId) {
+  const systemId = system?.id;
+  stampItemDataRoleIdentity(itemData, systemId, 'componentId', componentId);
+  const linkingTools = (Array.isArray(system?.tools) ? system.tools : []).filter(
+    (tool) => tool?.componentId === componentId
+  );
+  if (linkingTools.length === 1) {
+    stampItemDataRoleIdentity(itemData, systemId, 'toolId', linkingTools[0].id);
+  }
+}
 
 /**
  * Shared Tool breakage PLAN/APPLY runtime.
@@ -355,6 +391,10 @@ export function createToolBreakageRuntime({
       if (source.uuid) {
         globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
       }
+      // Stamp the replacement's durable per-system identity (issue 780) so it resolves to
+      // its own component — and, when it is itself a single linking first-class tool, stays
+      // durably breakable — once #601 removes the name-fallback tier.
+      stampReplacementComponentIdentity(itemData, system, componentId);
       await replacementActor.createEmbeddedDocuments('Item', [itemData]);
     };
   }
