@@ -229,31 +229,102 @@ function scrubVisibilityGatedContent(root) {
   }
 }
 
+// Core's broken-link placeholder key MOVED between generations: `COMMON.Unknown` in
+// V14, a bare `Unknown` in V13 (whose `en.json` carries a top-level "Unknown" and has no
+// COMMON namespace at all). Fallback only — the probe below cannot drift.
+const BROKEN_LINK_PLACEHOLDER_KEYS = Object.freeze(['COMMON.Unknown', 'Unknown']);
+
+/**
+ * Every string this Foundry generation might use for a broken link with no name.
+ *
+ * Asking a single hardcoded key is what broke on V13: `Localization#localize` ECHOES a
+ * missing key, so `localize('COMMON.Unknown')` returned the literal `"COMMON.Unknown"`,
+ * which never equalled the anchor's `"Unknown"` — so EVERY broken anchor took the unwrap
+ * branch and leaked the placeholder into stored, player-visible text.
+ *
+ * @returns {Set<string>}
+ */
+function brokenLinkPlaceholders() {
+  const placeholders = new Set();
+
+  // Preferred: ask core for its own placeholder. `createAnchor` with no `name`
+  // localizes it using the key THAT version uses, so this cannot drift as the key
+  // moves again — and it routes through a system's registered subclass for free. The
+  // signature is identical on 13.351 and 14.361, so a no-arg call is valid on both.
+  // It also emits no console output, which matters: probing a wrong key logs
+  // `Localization | Key "…" is not defined` under `CONFIG.debug.i18n`, and the smoke
+  // harness fails on a non-zero console-error count.
+  try {
+    const impl =
+      globalThis.foundry?.applications?.ux?.TextEditor?.implementation ??
+      globalThis.foundry?.applications?.ux?.TextEditor;
+    const probe = impl?.createAnchor?.({});
+    const text = String(probe?.textContent ?? '')
+      .replaceAll(/\s+/g, ' ')
+      .trim();
+    if (text) placeholders.add(text);
+  } catch {
+    // Fall through to the key list.
+  }
+
+  // Fallback: localize both known keys. A NAMESPACED key that echoes itself means this
+  // version does not define it, so it is discarded. The bare `Unknown` echo is kept
+  // deliberately — it equals V13's own English value, so the echo is the right answer.
+  for (const key of BROKEN_LINK_PLACEHOLDER_KEYS) {
+    const value = String(globalThis.game?.i18n?.localize?.(key) ?? '').trim();
+    if (!value) continue;
+    if (value === key && key.includes('.')) continue;
+    placeholders.add(value);
+  }
+
+  return placeholders;
+}
+
 /**
  * STEP 2 of the post-enrichment DOM pass — the broken-reference decision, run on
  * whatever the privacy scrub left behind.
  *
  * `_createContentLink` sets the anchor's name from the match BEFORE deciding
  * brokenness, so `@UUID[bad]{Alchemist's Fire}` emits an anchor whose text is the
- * AUTHOR'S label while `@UUID[bad]` emits the localized `COMMON.Unknown`
- * placeholder. Removing both would delete author-supplied text; keeping both
- * would render the word "Unknown" as if it were prose. So:
+ * AUTHOR'S label while `@UUID[bad]` emits core's localized placeholder. Removing both
+ * would delete author-supplied text; keeping both would render the word "Unknown" as if
+ * it were prose. So:
  *
- * - text equal to the localized placeholder → the anchor is REMOVED;
+ * - text equal to a placeholder core would have produced → the anchor is REMOVED;
  * - anything else → the anchor is UNWRAPPED and its authored label kept.
  *
- * The placeholder is resolved at RUNTIME through `game.i18n`, never compared
- * against a hardcoded English string. The `a.` selector prefix is load-bearing:
- * `_embedContent` also emits `p.broken.content-embed`, which must not be touched.
+ * There is NO structural signal to key off instead: both cases come from the same
+ * `createAnchor` call with the same data object and identical classes, dataset, and
+ * icon. The only difference is whether `data.name` was undefined on entry, and nothing
+ * records that. Hence the text comparison, and hence {@link brokenLinkPlaceholders}
+ * asking core rather than assuming a key.
+ *
+ * The `a.` selector prefix is load-bearing: `_embedContent` also emits
+ * `p.broken.content-embed`, which must not be touched.
+ *
+ * ACCEPTED CONSEQUENCE — placeholder-vs-label is NOT exhaustive. A broken LEGACY link
+ * (`@Item[nonexistent-id]`, `@Compendium[pack.badid]`) goes through
+ * `#createLegacyContentLink`, which sets `data.name = data.name || (broken ? target :
+ * document.name)` — so its text is the raw TARGET ID, not a placeholder. It therefore
+ * takes the unwrap branch and writes a document id into stored, player-visible text.
+ * `dataset.uuid` is undefined on that branch, so there is no reliable way to detect it.
+ * Named here so it is explicit rather than an unnoticed hole in the rule.
  *
  * @param {ParentNode} root
  */
 function resolveBrokenAnchors(root) {
-  const unknown = globalThis.game?.i18n?.localize?.('COMMON.Unknown') ?? '';
+  // Deliberately NOT memoized at module scope: the set would need invalidating on a
+  // language change, and it would leak across tests using different mocked `game.i18n`.
+  // One `createElement` per description is negligible beside the `await enrichHTML`
+  // this same path already performs.
+  const placeholders = brokenLinkPlaceholders();
   for (const anchor of root.querySelectorAll('a.broken')) {
     const parent = anchor.parentNode;
     if (!parent) continue;
-    if (!unknown || String(anchor.textContent ?? '').trim() !== unknown) {
+    const label = String(anchor.textContent ?? '')
+      .replaceAll(/\s+/g, ' ')
+      .trim();
+    if (!placeholders.has(label)) {
       // Unwrap: promote the authored label into the anchor's own parent chain, so a
       // gated ancestor stays an ancestor and the privacy scrub can never be escaped.
       while (anchor.firstChild) parent.insertBefore(anchor.firstChild, anchor);

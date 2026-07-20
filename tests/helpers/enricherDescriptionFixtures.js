@@ -87,20 +87,63 @@ export function makeFakeEnricher(names = FIXTURE_DOCUMENT_NAMES) {
 }
 
 /**
- * Install a minimal `game.i18n` so the broken-anchor pass can compare against the
- * RUNTIME-localized `COMMON.Unknown` rather than a hardcoded string. Returns a
- * restore function.
+ * Install a minimal `game.i18n` matching a given Foundry generation's broken-link
+ * placeholder key, so the broken-anchor pass is exercised against RUNTIME localization
+ * rather than a hardcoded string.
  *
- * @returns {() => void}
+ * The key MOVED between generations, and mocking only one shape is exactly how the V13
+ * leak reached the smoke harness:
+ *
+ * - **V13** — `en.json` carries a TOP-LEVEL `"Unknown"`; there is no COMMON namespace at
+ *   all, so `localize('COMMON.Unknown')` ECHOES the key back.
+ * - **V14** — `COMMON.Unknown` resolves; a bare `Unknown` echoes.
+ *
+ * `Localization#localize` echoes any missing key in both versions, which is what makes a
+ * single-key comparison silently wrong rather than loudly broken.
+ *
+ * @param {{generation?: 13|14}} [options]
+ * @returns {() => void} restore function
  */
-export function withUnknownPlaceholder() {
+export function withUnknownPlaceholder({ generation = 14 } = {}) {
   const previous = globalThis.game;
+  const resolvedKey = generation === 13 ? 'Unknown' : 'COMMON.Unknown';
   globalThis.game = {
     ...(previous ?? {}),
-    i18n: { localize: (key) => (key === 'COMMON.Unknown' ? UNKNOWN_PLACEHOLDER : key) },
+    i18n: { localize: (key) => (key === resolvedKey ? UNKNOWN_PLACEHOLDER : key) },
   };
   return () => {
     if (previous === undefined) delete globalThis.game;
     else globalThis.game = previous;
+  };
+}
+
+/**
+ * Install a `TextEditor.createAnchor` that reports a localized placeholder directly —
+ * the PREFERRED path, since it asks core for its own answer instead of guessing a key,
+ * and so keeps working in a non-English world and through a system's own subclass.
+ *
+ * @param {string} placeholder - what core's no-name anchor renders
+ * @returns {() => void} restore function
+ */
+export function withCoreAnchorProbe(placeholder) {
+  const previous = globalThis.foundry;
+  globalThis.foundry = {
+    ...(previous ?? {}),
+    applications: {
+      ...(previous?.applications ?? {}),
+      ux: {
+        TextEditor: {
+          createAnchor: () => {
+            const anchor = globalThis.document.createElement('a');
+            anchor.textContent = placeholder;
+            return anchor;
+          },
+        },
+      },
+    },
+  };
+  return () => {
+    if (previous === undefined) delete globalThis.foundry;
+    else globalThis.foundry = previous;
   };
 }

@@ -15,7 +15,10 @@ import {
   hasUnresolvedDirectives,
   descriptionTextCandidate,
 } from '../src/utils/plainTextDescription.js';
-import { withUnknownPlaceholder } from './helpers/enricherDescriptionFixtures.js';
+import {
+  withUnknownPlaceholder,
+  withCoreAnchorProbe,
+} from './helpers/enricherDescriptionFixtures.js';
 
 // ---------------------------------------------------------------------------
 // Roll expressions — flattened, NEVER evaluated
@@ -93,6 +96,71 @@ test('broken anchor: an AUTHORED LABEL is preserved and the PLACEHOLDER is remov
     plainTextDescription('<p class="broken content-embed">Unknown</p>'),
     'Unknown',
     'the `a.` selector prefix is load-bearing: _embedContent also emits p.broken.content-embed'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Broken anchors ACROSS FOUNDRY GENERATIONS.
+//
+// Core's placeholder key moved: V13 localizes a bare `Unknown` (its en.json has a
+// top-level "Unknown" and no COMMON namespace); V14 localizes `COMMON.Unknown`.
+// `Localization#localize` ECHOES a missing key in BOTH, so asking for one key only
+// returns the literal key string on the other generation, never matches the anchor
+// text, and sends EVERY broken anchor down the unwrap branch — leaking the placeholder
+// into stored, player-visible text.
+//
+// The suite previously mocked only V14 semantics, which is precisely why that reached
+// the smoke harness. Both generations are pinned here.
+// ---------------------------------------------------------------------------
+
+for (const generation of [13, 14]) {
+  test(`broken anchor: the placeholder is REMOVED under V${generation} localization semantics`, async (t) => {
+    setupDOM();
+    const restore = withUnknownPlaceholder({ generation });
+    t.after(() => {
+      restore();
+      teardownDOM();
+    });
+
+    assert.equal(
+      plainTextDescription('Contains <a class="content-link broken">Unknown</a> reagents'),
+      'Contains reagents',
+      `V${generation}: core's own placeholder must never be rendered as prose`
+    );
+  });
+
+  test(`broken anchor: an AUTHORED LABEL survives under V${generation} localization semantics`, async (t) => {
+    setupDOM();
+    const restore = withUnknownPlaceholder({ generation });
+    t.after(() => {
+      restore();
+      teardownDOM();
+    });
+
+    assert.equal(
+      plainTextDescription('<a class="content-link broken">Alchemist\'s Fire</a>'),
+      "Alchemist's Fire",
+      `V${generation}: an author-supplied label must be kept, not swept up with the placeholder`
+    );
+  });
+}
+
+test('broken anchor: core\'s own createAnchor probe wins over the key list', async (t) => {
+  setupDOM();
+  // A non-English world, where NEITHER known key's English value would match. Asking
+  // core for its own placeholder is what makes this work — and what keeps working when
+  // the key moves again, or when a system subclass supplies its own.
+  const restoreI18n = withUnknownPlaceholder({ generation: 14 });
+  const restoreProbe = withCoreAnchorProbe('Unbekannt');
+  t.after(() => {
+    restoreProbe();
+    restoreI18n();
+    teardownDOM();
+  });
+
+  assert.equal(
+    plainTextDescription('Enthält <a class="content-link broken">Unbekannt</a> Reagenzien'),
+    'Enthält Reagenzien'
   );
 });
 
