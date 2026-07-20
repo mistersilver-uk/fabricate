@@ -41,7 +41,8 @@ Before creating read-only planning or plan-review lanes, the driver:
 5. creates each planner or plan reviewer in a detached worktree pinned to that immutable baseline.
 
 An approved delta is not required for this read-only phase because its purpose is to produce and review the delta.
-When the proposed paths or signals change, the driver recomputes the preliminary roster and creates fresh detached review lanes at the current planning target.
+When the proposed paths or signals change, the driver recomputes the preliminary roster and repeats affected plan review only when the change materially alters a reviewer's owned concern or leaves a finding unresolved.
+When repeat plan review is required, the driver creates a fresh detached lane at the exact current planning target and supplies an immutable artifact.
 
 ## Before mutable implementation fan-out
 
@@ -110,8 +111,9 @@ The lane stays available until the driver has integrated and verified its commit
 ## Read-only lanes and artifacts
 
 Create planners and reviewers in detached worktrees pinned to the exact commit they must evaluate.
-Create a fresh detached lane whenever the integration commit changes, even for the same reviewer and stage.
-Never reuse a detached checkout after the evaluated commit changes.
+An approval survives issue or PR metadata edits and a patch-equivalent rebase when the reviewer's owned concern and findings remain unchanged.
+Repeat review only when the owned concern materially changes or a finding remains unresolved.
+When repeat review is required, create a fresh detached lane pinned to the exact new target and never reuse a detached checkout from another commit.
 
 The driver writes the immutable base-relative diff to `.worktrees/<issue>/artifacts/` before review and supplies its path in the brief.
 The reviewer treats the assigned base, target SHA, artifact, issue delta, and working tree as its complete review target rather than inspecting an ambient active branch.
@@ -164,7 +166,8 @@ Checks observed while the PR is draft are preflight evidence only because a requ
 2. Fetch `origin/main`, capture the expected remote SHA for the PR branch, and require a clean coordinator checkout with no active mutable lane.
 3. Rebase the integration branch onto current `origin/main`.
 4. Run every required authoritative local gate from the rebased coordinator plus `npx commitlint --from origin/main --to HEAD`.
-5. Create a fresh detached implementation-review worktree pinned to the rebased commit and supply a newly generated immutable diff artifact.
+5. Compare the rebased patch and unresolved findings with the approved review target to determine whether any reviewer's owned concern materially changed.
+Preserve valid approval for a patch-equivalent rebase; when repeat review is required, create a fresh detached implementation-review worktree pinned to the exact rebased commit and supply a newly generated immutable diff artifact.
 Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical specification, or documentation content.
 6. Push rewritten history only with `git push --force-with-lease=<branch>:<expected-sha>`.
 If the explicit lease is rejected, stop and investigate the remote change; never retry with `--force` or an unqualified force push.
@@ -172,9 +175,10 @@ If the explicit lease is rejected, stop and investigate the remote change; never
 Both SonarCloud checks, Automatic Analysis and Quality Gate, must report success.
 Pending, skipped when required, cancelled, stale-head, and failing results do not satisfy the gate.
 8. If any check fails, return the PR to draft before gathering evidence, reconciling the issue, and routing fixes through isolated implementation and review lanes.
-Repeat rebase, local validation, detached review, explicit-lease push, ready transition, and exact-head CI after a fix.
+Repeat rebase, local validation, explicit-lease push, ready transition, and exact-head CI after a fix.
+Repeat detached review only when the fix or rebase materially changes the reviewer's owned concern or an unresolved finding remains.
 9. After the check rollup succeeds, fetch `origin/main` again and verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
-If main advanced, the PR head changed, or the PR is draft, return it to draft and repeat the complete loop.
+If main advanced, the PR head changed, or the PR is draft, return it to draft and repeat the mandatory delivery steps, preserving approval when the resulting rebase is patch-equivalent and repeating review only when the material-change rule requires it.
 
 The maintainer handoff is valid only when current-main ancestry, exact remote-head identity, ready state, and every required post-undraft check are mechanically true at the same time.
 

@@ -37,7 +37,7 @@ Spawned role agents execute their scoped role and do not nest — no role agent 
 
 The workflow driver uses the shortest workflow that satisfies mandatory repository gates and the actual risk, prioritizing the earliest honestly reviewable PR while preserving mandatory safety, review, and exact-head delivery gates.
 One mechanically valid evidence run satisfies every gate it directly covers, so agents do not repeat equivalent checks or reviews ceremonially.
-A reviewer repeats only when its target or owned concern materially changed or an unresolved finding remains; issue or PR metadata edits alone do not invalidate approval.
+A reviewer repeats only when its owned concern materially changed or an unresolved finding remains; issue or PR metadata edits and patch-equivalent rebases do not invalidate approval.
 The driver front-loads cheap checks for branch and base freshness, affected paths and roster, PR title and commitlint, existing CI state, and screenshot scope.
 The driver timeboxes delegated lanes: after about 60 seconds without observable progress it requests status once, and after another about 60 seconds it interrupts and reassigns the work or continues locally within driver authority.
 
@@ -102,7 +102,8 @@ Draft-head checks are preflight evidence only because some CI workflows may run 
 1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
 2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
 3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.
-4. Create a fresh detached implementation-review lane for the rebased commit.
+4. Determine mechanically whether the rebase materially changed the implementation reviewer's owned concern or left an unresolved finding.
+Reuse the valid approval for a patch-equivalent rebase; when repeat review is required, create a fresh detached implementation-review lane pinned to the exact rebased commit and supply an immutable diff artifact.
 Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical spec, or documentation content.
 5. Update the remote branch only with `git push --force-with-lease=<branch>:<expected-sha>`.
 A rejected lease stops the loop for investigation; never retry with `--force` or an unqualified force push.
@@ -110,9 +111,9 @@ A rejected lease stops the loop for investigation; never retry with `--force` or
 Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
 Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
 7. On any failure, return the PR to draft before gathering evidence and routing fixes through the normal isolated implementation and review loops.
-After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks.
+After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks, repeating review only for a materially changed owned concern or unresolved finding.
 8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
-If main advanced, the head changed, or the PR returned to draft, repeat the complete delivery loop.
+If main advanced, the head changed, or the PR returned to draft, repeat the mandatory delivery steps and apply step 4's material-change review rule.
 
 Only hand the PR to the maintainer after all final-delivery conditions are true on the same commit.
 
@@ -552,8 +553,8 @@ Re-check after any integration or merge because the expected branch or SHA may h
 - When a spawned agent completes work, it commits only owned paths locally and returns the commits to the driver without pushing or opening a PR.
 The driver verifies and integrates lane commits, then pushes the integration branch and opens or updates the PR targeting `main`.
 - Respond to review feedback through a valid retained lane or a fresh revision lane, then update the same integration branch and PR; do not open replacement PRs unless the user asks.
-- Review-only agents inspect fresh detached snapshots of the assigned integration commit and must not commit, push, merge, or mutate GitHub state.
-- Before maintainer handoff, complete the final delivery loop: rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, obtain fresh detached review, explicit-lease push, mark ready, require all exact-head checks including both SonarCloud checks, then re-fetch main and reverify ancestry, head identity, and ready state.
+- When review is required, review-only agents inspect fresh detached snapshots of the exact assigned integration commit against an immutable artifact and must not commit, push, merge, or mutate GitHub state.
+- Before maintainer handoff, complete the final delivery loop: rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across a patch-equivalent rebase or obtain fresh detached review when the owned concern materially changed, explicit-lease push, mark ready, require all exact-head checks including both SonarCloud checks, then re-fetch main and reverify ancestry, head identity, and ready state.
 - Treat draft checks as preflight only; a required workflow may be triggered by `ready_for_review` and must pass after the PR is undrafted.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.

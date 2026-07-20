@@ -54,8 +54,9 @@ One mechanically valid evidence run MUST satisfy every gate it directly covers w
 
 - **WHEN** a mechanically valid check or review already covers an unchanged target and concern
 - **THEN** the driver reuses that evidence instead of repeating an equivalent check or review ceremonially
-- **AND** a reviewer repeats only when its target or owned concern materially changed or an unresolved finding remains
-- **AND** issue or PR metadata edits alone do not invalidate approval
+- **AND** a reviewer repeats only when its owned concern materially changed or an unresolved finding remains
+- **AND** issue or PR metadata edits and patch-equivalent rebases do not invalidate approval
+- **AND** when repeat review is required, the driver uses a fresh detached lane pinned to the exact target and supplies an immutable artifact
 
 #### Scenario: timeboxing a delegated lane
 
@@ -65,7 +66,7 @@ One mechanically valid evidence run MUST satisfy every gate it directly covers w
 
 #### Scenario: preserving mandatory gates
 
-- **WHEN** reused evidence is stale or ambiguous, its target changed, or repository policy requires an exact-head result
+- **WHEN** check evidence is stale or ambiguous, its target changed, repository policy requires an exact-head result, or a reviewer's owned concern materially changed or retains an unresolved finding
 - **THEN** the driver reruns the applicable check or review before maintainer handoff
 
 ### Requirement: Branch and PR workflow
@@ -99,7 +100,8 @@ The release automation's forward-port merge from `release` into `main` is not ag
 
 - **WHEN** a review-only agent evaluates work
 - **THEN** it reviews a fresh detached worktree pinned to the exact assigned integration commit against the supplied base and immutable diff artifact
-- **AND** it must not commit, push, merge, mutate GitHub state, or reuse the lane after the integration commit changes
+- **AND** it must not commit, push, merge, or mutate GitHub state
+- **AND** if repeat review is later required at another commit, the driver creates another fresh detached lane instead of reusing that checkout
 
 #### Scenario: working near the release branch
 
@@ -110,7 +112,7 @@ The release automation's forward-port merge from `release` into `main` is not ag
 
 ### Requirement: Ready-for-review delivery gate
 
-Before maintainer handoff, the workflow driver MUST deliver a PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and fresh detached review, is ready for review, and has every required post-undraft GitHub and external check successful.
+Before maintainer handoff, the workflow driver MUST deliver a PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and required implementation review, is ready for review, and has every required post-undraft GitHub and external check successful.
 Draft-head checks MUST be treated only as preflight evidence because required workflows may use the `ready_for_review` trigger.
 
 #### Scenario: preparing the final remote head
@@ -120,7 +122,8 @@ Draft-head checks MUST be treated only as preflight evidence because required wo
 - **AND** it fetches `origin/main`, captures the expected remote PR-head SHA, and requires a clean coordinator with no active mutable lane
 - **AND** it rebases the integration branch onto current `origin/main`
 - **AND** it reruns every required authoritative local gate plus `npx commitlint --from origin/main --to HEAD`
-- **AND** it obtains fresh detached implementation review at the rebased commit
+- **AND** it preserves valid implementation approval when the rebase is patch-equivalent for the reviewer's owned concern and no finding remains unresolved
+- **AND** when repeat review is required, it obtains that review from a fresh detached lane pinned to the exact rebased commit with an immutable diff artifact
 - **AND** it repeats domain and documentation reconciliation if conflict resolution or later fixes change workflow, canonical specification, or documentation content
 
 #### Scenario: publishing rewritten history
@@ -142,7 +145,8 @@ Draft-head checks MUST be treated only as preflight evidence because required wo
 
 - **WHEN** a required check fails, current `origin/main` advances, the remote PR head changes, or the PR is draft
 - **THEN** the driver returns the PR to draft before evidence gathering, issue reconciliation, or isolated fix work
-- **AND** it repeats rebase, authoritative validation, fresh detached review, explicit-lease push, ready transition, and exact-head checks
+- **AND** it repeats rebase, authoritative validation, explicit-lease push, ready transition, and exact-head checks
+- **AND** it repeats review only when the resulting target materially changes the reviewer's owned concern or an unresolved finding remains
 - **AND** after a successful rollup it fetches `origin/main` again and verifies current-main ancestry, unchanged remote-head identity, and ready state before maintainer handoff
 
 ### Requirement: Isolated agent worktrees
@@ -208,8 +212,9 @@ Spawned agents MUST return local work products to the driver and MUST NOT exerci
 
 #### Scenario: reviewing a changed integration target
 
-- **WHEN** implementation, plan, or documentation integration produces a new target commit
-- **THEN** the driver creates fresh detached reviewer lanes at that commit and supplies the immutable base-relative artifact
+- **WHEN** implementation, plan, or documentation integration materially changes a reviewer's owned concern or leaves a finding unresolved
+- **THEN** the driver creates a fresh detached reviewer lane pinned to that exact target and supplies the immutable base-relative artifact
+- **AND** metadata-only edits and patch-equivalent rebases preserve the prior approval without another review
 - **AND** domain or canonical-spec reconciliation integrates before dependent documentation authoring
 - **AND** domain and documentation cross-review may run concurrently only after both outputs integrate
 

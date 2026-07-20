@@ -39,10 +39,11 @@ It prioritizes the earliest honestly reviewable PR while preserving mandatory sa
 - Front-load cheap checks before expensive or delegated work: branch and base freshness, affected paths and resolved roster, PR title and commitlint compliance, existing CI and external-check state, and screenshot scope.
 - Treat one mechanically valid evidence run as satisfying every gate it directly covers, and record or retain that evidence instead of repeating equivalent checks ceremonially.
 - Repeat a reviewer only when the commit or artifact it reviews materially changes within its owned concern, or when one of its findings remains unresolved.
-- Do not invalidate an approval merely because issue or PR metadata changed when the reviewed code, specification, documentation, and relevant acceptance evidence did not.
+- Do not invalidate an approval merely because issue or PR metadata changed or a rebase is patch-equivalent for the reviewed concern.
+- When repeat review is required, use a fresh detached lane pinned to the exact target and supply an immutable base-relative artifact.
 - Monitor each delegated lane for observable progress, such as tool output, a status report, a diff, or a commit.
 - After about 60 seconds without observable progress, request status once; after another about 60 seconds without progress, interrupt and reassign the lane or continue locally when that work is within driver authority.
-- Reuse valid evidence only for the unchanged target and concern it proves; rerun a gate when its target changed, its evidence is stale or ambiguous, or repository policy explicitly requires an exact-head result.
+- Reuse valid evidence only for the unchanged target and concern it proves, including a patch-equivalent reviewed concern; rerun a gate when its target changed, its evidence is stale or ambiguous, or repository policy explicitly requires an exact-head result.
 
 1. Read the repo guidance and the current task context first.
 2. The driver verifies mutable work will happen on a non-`main` task branch.
@@ -93,9 +94,10 @@ Hard cap: 3 docs revisions.
 
 1. Ensure the driver has integrated the completed lane commits into the coordinator branch and represented them with a draft PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.
 2. Run the final maintainer-handoff loop in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
-Finalize PR metadata before the final run, rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, obtain fresh detached review, push with the exact expected-head lease, mark the PR ready, and require all post-undraft exact-head checks including both SonarCloud checks.
-Return the PR to draft and repeat the loop after any failure or movement of main or the PR head.
-3. Surface a final summary including the resolved roster, every loop's iteration count, exact-head CI result, PR ready state, and any escalations to the user.
+Finalize PR metadata before the final run, rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across metadata-only edits or a patch-equivalent rebase, push with the exact expected-head lease, mark the PR ready, and require all post-undraft exact-head checks including both SonarCloud checks.
+When the reviewed concern materially changed or a finding remains unresolved, obtain repeat review from a fresh detached lane pinned to the exact target with an immutable artifact before pushing.
+Return the PR to draft and repeat the mandatory delivery steps after any failure or movement of main or the PR head, repeating review only when its material-change rule applies.
+3. Surface a final summary including the resolved roster, completed loop iteration counts, reused approvals and their evidence basis, any repeated reviews, exact-head CI result, PR ready state, and any escalations to the user.
 
 ## Coordination rules
 
@@ -107,6 +109,7 @@ They must not post verdicts (or other workflow notes) as GitHub issue or PR comm
 - Do not let spawned agents share the coordinator checkout or another lane, push, mutate GitHub state, integrate commits, or manage worktrees.
 - Require the full assignment and handoff contract from `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for every spawned role.
 - Parallelize only disjoint lanes with integrated dependencies, and serialize resource-heavy and authoritative gates in the coordinator checkout.
+- Preserve a valid approval across issue or PR metadata edits and patch-equivalent rebases; repeat a reviewer only for a materially changed owned concern or unresolved finding, using a fresh exact-target detached lane and immutable artifact when repetition is required.
 - Treat draft CI as preflight only and never hand a PR to the maintainer until post-undraft checks, both SonarCloud checks, exact-head identity, current-main ancestry, and ready state are simultaneously verified.
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
