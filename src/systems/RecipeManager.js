@@ -122,10 +122,15 @@ export class RecipeManager {
   /**
    * Create a new recipe
    * @param {Object} recipeData - Recipe configuration
-   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
-   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
-   *   valid but incomplete authoring shell (missing ingredient sets / result groups); such a
-   *   shell stays non-craftable because the engine gates on the full completeness contract.
+   * @param {{notify?: boolean, allowIncomplete?: boolean, persist?: boolean}} [options] - Set
+   *   notify=false for batch callers that emit their own summary. Set allowIncomplete=true to
+   *   persist a structurally valid but incomplete authoring shell (missing ingredient sets /
+   *   result groups); such a shell stays non-craftable because the engine gates on the full
+   *   completeness contract. Set persist=false for batch callers (e.g. the compendium importer)
+   *   that mutate the in-memory map per recipe and then issue a SINGLE `save()` after the whole
+   *   batch; validation, map mutation, and notify/emitChange gating are unchanged, only the
+   *   per-recipe `save()` (one whole-array `recipes` world write) is skipped. Default `true`
+   *   keeps every single-recipe caller issuing its one write.
    * @returns {Promise<Recipe>}
    */
   async createRecipe(recipeData, options = {}) {
@@ -158,7 +163,9 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipe.id, recipe);
-    await this.save();
+    if (options.persist !== false) {
+      await this.save();
+    }
     console.debug(`Fabricate | Created recipe "${recipe.name}" (${recipe.id})`);
 
     if (options.notify !== false) {
@@ -174,10 +181,15 @@ export class RecipeManager {
    * Update an existing recipe
    * @param {string} recipeId - Recipe ID to update
    * @param {Object} updates - Properties to update
-   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
-   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
-   *   valid but incomplete authoring shell (e.g. identity-only edits to a recipe whose
-   *   ingredients/results are still empty); such a shell stays non-craftable.
+   * @param {{notify?: boolean, allowIncomplete?: boolean, persist?: boolean}} [options] - Set
+   *   notify=false for batch callers that emit their own summary. Set allowIncomplete=true to
+   *   persist a structurally valid but incomplete authoring shell (e.g. identity-only edits to a
+   *   recipe whose ingredients/results are still empty); such a shell stays non-craftable. Set
+   *   persist=false for batch callers (e.g. the compendium importer) that mutate the in-memory
+   *   map per recipe and then issue a SINGLE `save()` after the whole batch; validation, map
+   *   mutation, and notify/emitChange gating are unchanged, only the per-recipe `save()` (one
+   *   whole-array `recipes` world write) is skipped. Default `true` keeps every single-recipe
+   *   caller issuing its one write.
    * @returns {Promise<Recipe>}
    */
   async updateRecipe(recipeId, updates, options = {}) {
@@ -216,7 +228,9 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipeId, updatedRecipe);
-    await this.save();
+    if (options.persist !== false) {
+      await this.save();
+    }
     console.debug(`Fabricate | Updated recipe "${updatedRecipe.name}" (${updatedRecipe.id})`);
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${updatedRecipe.name}" updated`);

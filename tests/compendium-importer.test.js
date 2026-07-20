@@ -40,7 +40,9 @@ globalThis.fromUuid = async () => null; // default: uuid not found
 // Module import
 // ---------------------------------------------------------------------------
 
-const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
+const { CompendiumImporter, createDefaultProgressReporter } = await import(
+  '../src/systems/CompendiumImporter.js'
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -99,19 +101,34 @@ function makeMockRecipeManager({
   createdRecipes = [],
   updatedRecipes = [],
   createdRecipeOptions = [],
-  updatedRecipeOptions = []
+  updatedRecipeOptions = [],
+  saveCalls = [],
+  // Optionally make specific recipe ids throw on create/update to exercise the
+  // per-recipe error-isolation path.
+  throwOnRecipeIds = []
 } = {}) {
   return {
     getRecipe: (id) => existingRecipes[id] || null,
     createRecipe: async (data, options) => {
       createdRecipes.push(data);
       createdRecipeOptions.push(options);
+      if (throwOnRecipeIds.includes(data.id)) {
+        throw new Error(`boom ${data.id}`);
+      }
       return data;
     },
     updateRecipe: async (id, data, options) => {
       updatedRecipes.push(data);
       updatedRecipeOptions.push(options);
+      if (throwOnRecipeIds.includes(id)) {
+        throw new Error(`boom ${id}`);
+      }
       return data;
+    },
+    // The importer flushes the whole recipe batch with a SINGLE save() after the
+    // loop; the spy records each call so tests can pin the save-once invariant.
+    save: async () => {
+      saveCalls.push(Date.now());
     }
   };
 }
@@ -138,7 +155,7 @@ test('T-097: successful import creates system and recipes', async () => {
   assert.equal(summary.system.skipped, false, 'System should not be skipped');
   assert.equal(createdSystems.length, 1, 'One system should be created');
   assert.equal(summary.recipes.imported, 1, 'One recipe should be imported');
-  assert.deepEqual(createdRecipeOptions, [{ notify: false, emitChange: false }], 'Batch import should suppress per-recipe create notifications and change hooks');
+  assert.deepEqual(createdRecipeOptions, [{ notify: false, emitChange: false, persist: false }], 'Batch import should suppress per-recipe create notifications and change hooks, and defer persistence to a single batch save');
   assert.equal(summary.recipes.errors.length, 0, 'No recipe errors');
 });
 
@@ -452,7 +469,7 @@ test('batch import suppresses per-recipe update notifications when overwriting r
   const summary = await importer.importFromPackData(makePackData(), { overwriteExisting: true });
 
   assert.equal(summary.recipes.imported, 1);
-  assert.deepEqual(updatedRecipeOptions, [{ notify: false, emitChange: false }]);
+  assert.deepEqual(updatedRecipeOptions, [{ notify: false, emitChange: false, persist: false }]);
   assert.equal(
     summary.collisions.some(c => c.type === 'recipe' && c.resolution === 'overwritten'),
     true
@@ -797,4 +814,323 @@ test('#700: new names win when both legacy and renamed source fields are present
   assert.ok(!('fallbackItemIds' in comp));
   assert.ok(!('sourceItemUuid' in comp));
   assert.ok(!('sourceUuid' in comp));
+});
+
+// ---------------------------------------------------------------------------
+// #776 — batched import persistence + progress feedback
+// ---------------------------------------------------------------------------
+
+function resetGame(overrides = {}) {
+  globalThis.game = { packs: [], fabricate: null, user: { isGM: true }, ...overrides };
+}
+
+function makeImportRecipe(id, overrides = {}) {
+  return {
+    id,
+    name: overrides.name || id.toUpperCase(),
+    craftingSystemId: '__SYSTEM_ID__',
+    ingredientSets: [],
+    resultGroups: [],
+    enabled: true,
+    ...overrides
+  };
+}
+
+test('#776: batched import flushes exactly one recipeManager.save() for a multi-recipe import', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const saveCalls = [];
+  const createdRecipeOptions = [];
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({ saveCalls, createdRecipeOptions });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(
+    makePackData({ recipes: [makeImportRecipe('r1'), makeImportRecipe('r2'), makeImportRecipe('r3')] })
+  );
+
+  assert.equal(summary.recipes.imported, 3, 'all three recipes imported');
+  assert.equal(saveCalls.length, 1, 'exactly one batched save for the whole recipe phase');
+  assert.equal(createdRecipeOptions.length, 3);
+  for (const options of createdRecipeOptions) {
+    assert.equal(options.persist, false, 'each per-recipe create defers persistence to the batch save');
+  }
+});
+
+test('#776: an all-skipped / empty recipe phase writes nothing (no batch save)', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const saveCalls = [];
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({ saveCalls });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  await importer.importFromPackData(makePackData({ recipes: [] }));
+
+  assert.equal(saveCalls.length, 0, 'zero recipes persisted means zero writes, matching the unbatched behaviour');
+});
+
+test('#776: composite overwrite=true fixture preserves counts and ordered collisions', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  // overwriteExisting is a run-global flag, so a single run cannot mix skip and
+  // overwrite outcomes; this fixture pins the overwrite branch (new + overwrite +
+  // validation-error recipe) with an existing system so the system collision is
+  // emitted BEFORE the recipe collision.
+  const existingSystem = { id: 'test-system', name: 'Test System', components: [] };
+  const updatedSystems = [];
+  const saveCalls = [];
+  const systemManager = makeMockSystemManager({ systems: [existingSystem], updatedSystems });
+  const recipeManager = makeMockRecipeManager({
+    saveCalls,
+    existingRecipes: { 'r-exist': { id: 'r-exist', name: 'Existing Recipe' } },
+    throwOnRecipeIds: ['r-bad']
+  });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(
+    makePackData({
+      recipes: [
+        makeImportRecipe('r-new', { name: 'New Recipe' }),
+        makeImportRecipe('r-exist', { name: 'Existing Recipe' }),
+        makeImportRecipe('r-bad', { name: 'Broken Recipe' })
+      ]
+    }),
+    { overwriteExisting: true }
+  );
+
+  assert.equal(summary.recipes.imported, 2, 'new create + existing overwrite counted as imported');
+  assert.equal(summary.recipes.skipped, 0);
+  assert.equal(summary.recipes.errors.length, 1, 'the validation-error recipe is isolated into errors[]');
+  assert.equal(summary.recipes.errors[0].recipeId, 'r-bad');
+  assert.deepEqual(summary.collisions, [
+    { type: 'system', id: 'test-system', name: 'Test System', resolution: 'overwritten' },
+    { type: 'recipe', id: 'r-exist', name: 'Existing Recipe', resolution: 'overwritten' }
+  ]);
+  assert.equal(saveCalls.length, 1, 'the batch still flushes once');
+});
+
+test('#776: composite overwrite=false fixture skips the existing recipe and reports the collision', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  // Mutually exclusive with the overwrite=true fixture above: overwriteExisting is a
+  // single run-global flag. A NEW system is used so the run reaches Phase 4 rather
+  // than the existing-system early-skip return.
+  const saveCalls = [];
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({
+    saveCalls,
+    existingRecipes: { 'r-exist': { id: 'r-exist', name: 'Existing Recipe' } }
+  });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(
+    makePackData({
+      recipes: [makeImportRecipe('r-new', { name: 'New Recipe' }), makeImportRecipe('r-exist', { name: 'Existing Recipe' })]
+    }),
+    { overwriteExisting: false }
+  );
+
+  assert.equal(summary.recipes.imported, 1, 'only the new recipe imports');
+  assert.equal(summary.recipes.skipped, 1, 'the existing recipe is skipped');
+  assert.deepEqual(
+    summary.collisions.filter((c) => c.type === 'recipe'),
+    [{ type: 'recipe', id: 'r-exist', name: 'Existing Recipe', resolution: 'skipped' }]
+  );
+  assert.equal(saveCalls.length, 1, 'the one new recipe is persisted by the single batch save');
+});
+
+test('#776: a mid-loop recipe throw still yields exactly one save and isolates the failure', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const saveCalls = [];
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({ saveCalls, throwOnRecipeIds: ['r-bad'] });
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(
+    makePackData({
+      recipes: [makeImportRecipe('r-ok1'), makeImportRecipe('r-bad'), makeImportRecipe('r-ok2')]
+    })
+  );
+
+  assert.equal(summary.recipes.imported, 2, 'both flanking successes are imported');
+  assert.deepEqual(
+    summary.recipes.errors.map((e) => e.recipeId),
+    ['r-bad'],
+    'only the throwing recipe lands in errors[]'
+  );
+  assert.equal(saveCalls.length, 1, 'the loop always reaches the single batch save despite the mid-loop throw');
+});
+
+test('#776: the per-run pack lookup is method-local and re-derived on a second import (no stale cache)', async () => {
+  let getIndexCalls = 0;
+  const pack = {
+    documentName: 'Item',
+    collection: 'world.items',
+    getIndex: async () => {
+      getIndexCalls += 1;
+      return []; // no matching entry: component stays unresolved, exercising the scan path
+    }
+  };
+  resetGame({ packs: [pack] });
+  globalThis.fromUuid = async () => null; // exact miss: source+name search runs
+
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({});
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  await importer.importFromPackData(makePackData({ recipes: [] }));
+  assert.equal(getIndexCalls, 1, 'run 1 builds the pack lookup once');
+
+  await importer.importFromPackData(makePackData({ recipes: [] }));
+  assert.equal(getIndexCalls, 2, 'run 2 re-invokes getIndex, so the lookup did not leak across runs');
+});
+
+test('#776: the pack lookup resolves a source+name match with a single getIndex per pack', async () => {
+  let getIndexCalls = 0;
+  const pack = {
+    documentName: 'Item',
+    collection: 'world.items',
+    getIndex: async () => {
+      getIndexCalls += 1;
+      return [
+        { _id: 'abc', name: 'Iron Ore', _stats: { compendiumSource: 'Compendium.source.items.iron-ore' } }
+      ];
+    }
+  };
+  resetGame({ packs: [pack] });
+  globalThis.fromUuid = async () => null;
+
+  const createdSystems = [];
+  const systemManager = makeMockSystemManager({ createdSystems });
+  const recipeManager = makeMockRecipeManager({});
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+
+  const summary = await importer.importFromPackData(
+    makePackData({
+      recipes: [],
+      system: {
+        id: 'test-system',
+        name: 'Test System',
+        components: [makeComponent(), makeComponent({ id: 'comp2', name: 'Iron Ore' })]
+      }
+    })
+  );
+
+  assert.equal(getIndexCalls, 1, 'the pack index is built once and reused across both components');
+  assert.equal(summary.components.remapped.length, 2, 'both components resolved via the source+name lookup');
+  for (const remap of summary.components.remapped) {
+    assert.equal(remap.method, 'sourceName');
+    assert.equal(remap.newUuid, 'Compendium.world.items.abc');
+  }
+});
+
+test('#776: default progress reporter degrades safely for stub / undefined / throwing handles', () => {
+  const savedUi = globalThis.ui;
+  try {
+    // 1. info returns undefined (the existing test-stub shape).
+    globalThis.ui = { notifications: { info: () => undefined } };
+    const r1 = createDefaultProgressReporter();
+    assert.doesNotThrow(() => {
+      r1({ pct: 0, message: 'start' });
+      r1({ pct: 0.5 });
+      r1({ pct: 1, message: 'done' });
+    });
+
+    // 2. handle present but without .update.
+    globalThis.ui = { notifications: { info: () => ({}) } };
+    const r2 = createDefaultProgressReporter();
+    assert.doesNotThrow(() => {
+      r2({ pct: 0 });
+      r2({ pct: 1 });
+    });
+
+    // 3. handle.update throws (queued-before-render): degrade silently.
+    globalThis.ui = {
+      notifications: {
+        info: () => ({
+          update: () => {
+            throw new Error('not yet rendered');
+          }
+        })
+      }
+    };
+    const r3 = createDefaultProgressReporter();
+    assert.doesNotThrow(() => {
+      r3({ pct: 0 });
+      r3({ pct: 1 });
+    });
+
+    // 4. no notifications surface at all.
+    globalThis.ui = {};
+    const r4 = createDefaultProgressReporter();
+    assert.doesNotThrow(() => r4({ pct: 1 }));
+  } finally {
+    globalThis.ui = savedUi;
+  }
+});
+
+test('#776: default progress reporter opens one toast and drives it to pct:1', () => {
+  const savedUi = globalThis.ui;
+  try {
+    const infoCalls = [];
+    const updates = [];
+    const handle = { update: (u) => updates.push(u) };
+    globalThis.ui = {
+      notifications: {
+        info: (msg, opts) => {
+          infoCalls.push({ msg, opts });
+          return handle;
+        }
+      }
+    };
+
+    const report = createDefaultProgressReporter();
+    report({ pct: 0, message: 'a' });
+    report({ pct: 2, message: 'b' }); // out-of-range pct is clamped
+    report({ pct: 1, message: 'c' });
+
+    assert.equal(infoCalls.length, 1, 'exactly one progress toast is opened');
+    assert.deepEqual(infoCalls[0].opts, { progress: true });
+    assert.equal(updates.length, 3);
+    assert.equal(updates[1].pct, 1, 'pct above 1 is clamped to 1');
+    assert.equal(updates.at(-1).pct, 1, 'completion drives the bar to pct:1');
+  } finally {
+    globalThis.ui = savedUi;
+  }
+});
+
+test('#776: import emits progress at phase boundaries, ticks through recipes, and completes at pct:1', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const updates = [];
+  const saveCalls = [];
+  const systemManager = makeMockSystemManager({});
+  const recipeManager = makeMockRecipeManager({ saveCalls });
+  const importer = new CompendiumImporter(systemManager, recipeManager, {
+    reportProgress: (u) => updates.push(u)
+  });
+
+  const recipes = Array.from({ length: 12 }, (_, i) => makeImportRecipe(`r${i}`));
+  await importer.importFromPackData(makePackData({ recipes }));
+
+  assert.ok(updates.length >= 3, 'multiple progress emissions across the run');
+  assert.equal(updates[0].pct, 0, 'the first emission starts at pct:0');
+  assert.equal(updates.at(-1).pct, 1, 'the final emission completes at pct:1');
+  assert.ok(
+    updates.every((u) => u.pct >= 0 && u.pct <= 1),
+    'every emitted pct stays within [0, 1]'
+  );
+  assert.ok(
+    updates.some((u) => u.phase === 'recipes' && /Importing recipes/.test(u.message)),
+    'the recipe phase emits at least one interim tick'
+  );
+  assert.equal(saveCalls.length, 1, 'the recipe batch is flushed once');
 });
