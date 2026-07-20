@@ -244,9 +244,13 @@ Salvage has exactly one ingredient, so ingredient-set routing is meaningless and
 The card SHALL render with the system's persisted `salvageResolutionMode` selected, defaulting to `simple` when the value is `simple` or absent.
 Persistence happens only on an explicit GM selection through `setSalvageResolutionMode`.
 
-Changing salvage resolution mode is non-destructive:
-it reversibly disables salvage on components incompatible with the new mode and deletes no recipes or runs,
-so the confirmation copy is salvage-accurate and not the recipe-deletion warning.
+Changing salvage resolution mode is non-destructive for recipes and runs (it deletes none), but switching into `simple` mode drops surplus result groups on incompatible components via the normalizer's success-first retain-one clamp (see `data-models/spec.md` Component Requirement 5) and reversibly disables salvage on components that still cannot satisfy the new mode.
+A switch into `simple` that drops a component's surplus success groups SHALL emit a `ui.notifications.warn` naming the affected component(s).
+The confirmation/warn copy is salvage-accurate — it discloses the group deletion and is not the recipe-deletion warning.
+
+In `simple` salvage mode the component salvage editor is capped at one success result group: the Add group affordance is removed and a required visible hint ("Simple mode uses a single result group") is shown, matching the recipe editor's `data-recipe-result-simple` single-group treatment.
+The cap counts success groups (`role !== 'failure'`) and does not filter, blank, or destroy a legacy reserved failure group's stored data.
+Routed keeps its multi-group list and Add group; progressive is unchanged.
 
 #### Feature Toggles
 
@@ -1541,6 +1545,10 @@ Both normally exist and are normally authored, so reading the wrong one renders 
 - A check is **usable** iff its mode's roll formula is authored; that is the only gate the engine applies.
 "No check" and "pass/fail" are therefore **one `simple` mode at two usability states**, not two modes.
 - A routed or progressive salvage with **no authored formula** renders a GM-config state, not its authored tiers or stages: the engine aborts such an attempt with zero mutation, so showing the contract would put it under an action that always fails.
+- **Simple multi-group misconfigured state.** A stored-but-not-yet-re-normalized `simple`-mode component with more than one success result group is misconfigured (the engine only ever awards the first group).
+The builder projects it with `misconfigured: true` and a `misconfiguredReason` discriminator (`'simpleMultiGroup' | 'routedNoFormula' | 'progressiveNoFormula'`); the misconfigured body dispatches on that discriminator — not a binary mode dispatch — so the Simple case renders Simple-specific copy ("more than one salvage result group; Simple mode uses a single group — fix it in the component editor"), and the mode banner is suppressed when misconfigured so a green recycle banner never sits above a "this is broken" body.
+The GM-facing inventory renders this cue; the non-GM visibility gate retains the hard-hide for a still-invalid stored config (justified: the config self-heals on the next system normalize, and the GM gets the cue in two surfaces — the manager overview critical and this body).
+Both surfaces show the working salvage panel once the config re-normalizes to a single success group.
 - **`dcOverride` shifts the simple DC and routed RELATIVE thresholds only.**
 A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
 A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.

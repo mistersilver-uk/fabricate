@@ -377,10 +377,18 @@ export class ResolutionModeService {
       ? component.salvage.resultGroups
       : [];
 
-    if (mode === 'simple' && groups.length !== 1) {
-      errors.push(
-        `Salvage for "${componentLabel}" must have exactly 1 result group in simple mode`
-      );
+    if (mode === 'simple') {
+      // Count SUCCESS groups (issue 764): exactly one `role !== 'failure'` group is
+      // required, and at most one reserved `role: 'failure'` group is tolerated (it is
+      // meaningful only when the Simple check slot has a formula, and is never awarded).
+      // This mirrors the recipe/alchemy Simple rule already in this service and must not
+      // fault a valid `[success, reserved-failure]` config the clamp emits.
+      const successGroups = groups.filter((group) => group?.role !== 'failure');
+      if (successGroups.length !== 1) {
+        errors.push(
+          `Salvage for "${componentLabel}" must have exactly 1 result group in simple mode`
+        );
+      }
     }
 
     if (mode === 'routed') {

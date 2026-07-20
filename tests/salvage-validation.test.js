@@ -160,6 +160,53 @@ test('simple mode — 2 result groups → invalid', () => {
   );
 });
 
+test('simple mode — one success + one reserved failure group → valid (issue 764)', () => {
+  // The Simple clamp emits `[success, reserved-failure]` when the Simple check slot has a
+  // formula; validation must never reject a clamp-emitted shape. It counts SUCCESS groups
+  // (`role !== 'failure'`), so exactly one success + a tolerated reserved failure is valid.
+  const service = buildService();
+  const component = buildComponent({
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      resultGroups: [
+        { id: 'rg-ok', results: [] },
+        { id: 'rg-fail', role: 'failure', results: [] },
+      ],
+    },
+  });
+  const system = buildSystem({ salvageResolutionMode: 'simple' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.errors.length, 0);
+});
+
+test('simple mode — two SUCCESS groups still invalid even with a reserved failure group (issue 764)', () => {
+  const service = buildService();
+  const component = buildComponent({
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      resultGroups: [
+        { id: 'rg-1', results: [] },
+        { id: 'rg-2', results: [] },
+        { id: 'rg-fail', role: 'failure', results: [] },
+      ],
+    },
+  });
+  const system = buildSystem({ salvageResolutionMode: 'simple' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /result group/i.test(e) && /simple/i.test(e)),
+    `expected error about result groups in simple mode, got: ${JSON.stringify(result.errors)}`
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Group 3: Routed mode
 //

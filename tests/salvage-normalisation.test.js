@@ -14,13 +14,28 @@ globalThis.foundry = {
     getProperty: () => undefined
   }
 };
-globalThis.game = {};
+// Public write methods (`createItem`/`updateItem`/`replaceItemSource`) assert GM.
+globalThis.game = { user: { isGM: true } };
+globalThis.ui = { notifications: { warn: () => {}, info: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 function makeManager() {
   const recipeManagerStub = { getRecipes: () => [] };
   return new CraftingSystemManager(recipeManagerStub);
+}
+
+// A manager holding real, normalized systems with `save()` stubbed, so the REAL public
+// writer paths (createItem/updateItem/replaceItemSource) can be exercised — the house
+// pattern (see component-category-normalization.test.js).
+function makeLoadedManager(systems = []) {
+  const manager = makeManager();
+  for (const system of systems) {
+    manager.systems.set(system.id, manager._normalizeSystem(system));
+  }
+  manager.initialized = true;
+  manager.save = async () => {};
+  return manager;
 }
 
 // ---------------------------------------------------------------------------
@@ -419,4 +434,183 @@ test('normalization prefers the new breakToolsOnFail key when both are present',
     },
   });
   assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
+});
+
+// ---------------------------------------------------------------------------
+// Issue 764: the Simple-mode SUCCESS-FIRST retain-one clamp.
+// ---------------------------------------------------------------------------
+
+const successGroup = (id, componentId = 'scrap') => ({
+  id,
+  name: id,
+  results: [{ id: `r-${id}`, componentId, quantity: 1 }],
+});
+const failureGroup = (id) => ({ ...successGroup(id), role: 'failure' });
+
+function simpleContext(hasFormula = false) {
+  return { salvageResolutionMode: 'simple', salvageSimpleCheckHasFormula: hasFormula };
+}
+
+test('_normalizeSalvage (simple): N>1 success groups clamp to one, preserved at index 0', () => {
+  const manager = makeManager();
+  const salvage = manager._normalizeSalvage(
+    {
+      enabled: true,
+      resultGroups: [successGroup('grp-a'), successGroup('grp-b'), successGroup('grp-c')],
+    },
+    simpleContext()
+  );
+  assert.equal(salvage.enabled, true);
+  assert.equal(salvage.resultGroups.length, 1);
+  assert.equal(salvage.resultGroups[0].id, 'grp-a', 'the FIRST success group is retained');
+  assert.equal(salvage.resultGroups[0].results.length, 1, 'its results are preserved');
+});
+
+test('_normalizeSalvage (simple): a reserved failure group is retained ONLY with a Simple formula', () => {
+  const manager = makeManager();
+  const input = { enabled: true, resultGroups: [successGroup('grp-ok'), failureGroup('grp-bad')] };
+
+  const withFormula = manager._normalizeSalvage(input, simpleContext(true));
+  assert.deepEqual(
+    withFormula.resultGroups.map((g) => g.id),
+    ['grp-ok', 'grp-bad'],
+    'the reserved failure group survives when the Simple slot has a formula'
+  );
+  assert.equal(withFormula.resultGroups[1].role, 'failure', 'and keeps its role');
+  assert.equal(withFormula.enabled, true);
+
+  const noFormula = manager._normalizeSalvage(input, simpleContext(false));
+  assert.deepEqual(
+    noFormula.resultGroups.map((g) => g.id),
+    ['grp-ok'],
+    'the reserved failure group is dropped with no Simple formula'
+  );
+  assert.equal(noFormula.enabled, true);
+});
+
+test('_normalizeSalvage (simple): a failure-FIRST input re-orders so the success group is index 0', () => {
+  const manager = makeManager();
+  const salvage = manager._normalizeSalvage(
+    { enabled: true, resultGroups: [failureGroup('grp-fail'), successGroup('grp-win')] },
+    simpleContext(true)
+  );
+  assert.equal(salvage.resultGroups[0].id, 'grp-win', 'success-first: the engine awards slice(0,1)');
+  assert.equal(salvage.resultGroups[0].role, undefined, 'index 0 is not a failure group');
+  assert.equal(salvage.resultGroups[1].id, 'grp-fail');
+});
+
+test('_normalizeSalvage (simple): a failure-ONLY config clamps to enabled:false either way', () => {
+  const manager = makeManager();
+  for (const hasFormula of [true, false]) {
+    const salvage = manager._normalizeSalvage(
+      { enabled: true, resultGroups: [failureGroup('grp-fail')] },
+      simpleContext(hasFormula)
+    );
+    assert.equal(
+      salvage.enabled,
+      false,
+      `a failure-only Simple config cannot be enabled (formula=${hasFormula})`
+    );
+  }
+});
+
+test('_normalizeSalvage (routed/progressive): group counts are UNTOUCHED by the clamp', () => {
+  const manager = makeManager();
+  for (const mode of ['routed', 'progressive']) {
+    const salvage = manager._normalizeSalvage(
+      { enabled: true, resultGroups: [successGroup('grp-a'), successGroup('grp-b')] },
+      { salvageResolutionMode: mode, salvageSimpleCheckHasFormula: false }
+    );
+    assert.equal(salvage.resultGroups.length, 2, `${mode} keeps every group`);
+    assert.equal(salvage.enabled, true);
+  }
+});
+
+test('_normalizeSalvage (no context): groups are left unchanged (no-clamp default)', () => {
+  const manager = makeManager();
+  const salvage = manager._normalizeSalvage({
+    enabled: true,
+    resultGroups: [successGroup('grp-a'), successGroup('grp-b')],
+  });
+  assert.equal(salvage.resultGroups.length, 2, 'a bare call (no system context) never clamps');
+  assert.equal(salvage.enabled, true);
+});
+
+// --- Per-writer-path input→output (finding 10): each threaded writer clamps. -------
+
+const SIMPLE_SYSTEM = (components) => ({
+  id: 'sys-simple',
+  name: 'Simple Salvage',
+  features: { salvage: true },
+  salvageResolutionMode: 'simple',
+  components,
+});
+
+test('writer path — system map (_normalizeSystem / steady-state save) clamps Simple groups', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem(
+    SIMPLE_SYSTEM([
+      {
+        id: 'comp-1',
+        name: 'Dragon Scale',
+        salvage: { enabled: true, resultGroups: [successGroup('grp-a'), successGroup('grp-b')] },
+      },
+    ])
+  );
+  const { salvage } = system.components[0];
+  assert.equal(salvage.resultGroups.length, 1);
+  assert.equal(salvage.resultGroups[0].id, 'grp-a');
+  assert.equal(salvage.enabled, true);
+});
+
+test('writer path — createItem clamps Simple groups', async () => {
+  const manager = makeLoadedManager([SIMPLE_SYSTEM([])]);
+  const item = await manager.createItem('sys-simple', {
+    id: 'comp-new',
+    name: 'New Scale',
+    salvage: { enabled: true, resultGroups: [successGroup('grp-a'), successGroup('grp-b')] },
+  });
+  assert.equal(item.salvage.resultGroups.length, 1, 'createItem threads the Simple context');
+  assert.equal(item.salvage.resultGroups[0].id, 'grp-a');
+  assert.equal(item.salvage.enabled, true);
+});
+
+test('writer path — updateItem clamps Simple groups', async () => {
+  const manager = makeLoadedManager([
+    SIMPLE_SYSTEM([{ id: 'comp-1', name: 'Scale', salvage: { enabled: true, resultGroups: [successGroup('grp-a')] } }]),
+  ]);
+  const updated = await manager.updateItem('sys-simple', 'comp-1', {
+    salvage: { enabled: true, resultGroups: [successGroup('grp-a'), successGroup('grp-b')] },
+  });
+  assert.equal(updated.salvage.resultGroups.length, 1, 'updateItem threads the Simple context');
+  assert.equal(updated.salvage.resultGroups[0].id, 'grp-a');
+});
+
+test('writer path — replaceItemSource clamps the existing Simple groups', async () => {
+  const manager = makeLoadedManager([
+    SIMPLE_SYSTEM([
+      {
+        id: 'comp-1',
+        name: 'Scale',
+        salvage: { enabled: true, resultGroups: [successGroup('grp-a'), successGroup('grp-b')] },
+      },
+    ]),
+  ]);
+  // Stub the source-resolution collaborators so `replaceItemSource` reaches its
+  // `_normalizeComponent` call with the existing (multi-group) salvage carried through.
+  globalThis.fromUuid = async () => ({ documentName: 'Item', name: 'Scale', img: 'icons/svg/item-bag.svg' });
+  manager._buildComponentSourceSnapshot = async () => ({
+    name: 'Scale',
+    img: 'icons/svg/item-bag.svg',
+    description: '',
+    registeredItemUuid: 'Item.new',
+    originItemUuid: 'Item.new',
+    aliasItemUuids: [],
+    sourceFallbacks: [],
+    references: ['Item.new'],
+  });
+  const { item } = await manager.replaceItemSource('sys-simple', 'comp-1', 'Item.new');
+  assert.equal(item.salvage.resultGroups.length, 1, 'replaceItemSource threads the Simple context');
+  assert.equal(item.salvage.resultGroups[0].id, 'grp-a');
+  delete globalThis.fromUuid;
 });

@@ -61,7 +61,7 @@ test('canonical docs keep harvesting modeled through recipes or component salvag
   assert.match(domain, /\*\*Harvesting\*\*[\s\S]*recipe or a component salvage definition/);
 
   assert.match(systemManager, /features\.salvage/);
-  assert.match(systemManager, /_normalizeSalvage\(salvage = \{\}\)/);
+  assert.match(systemManager, /_normalizeSalvage\(salvage = \{\}, options = \{\}\)/);
   assert.match(systemManager, /salvage\.resultGroups/);
 });
 
