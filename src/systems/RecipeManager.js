@@ -245,12 +245,17 @@ export class RecipeManager {
   /**
    * Delete a recipe
    * @param {string} recipeId - Recipe ID to delete
-   * @param {{notify?: boolean, emitChange?: boolean, cleanupFlags?: boolean}} [options]
+   * @param {{notify?: boolean, emitChange?: boolean, cleanupFlags?: boolean, persist?: boolean}} [options]
    *   Set `notify=false` for batch callers that emit their own summary. Set
-   *   `cleanupFlags=false` when a batch caller (e.g. `CraftingSystemManager.deleteSystem`)
-   *   deletes many recipes and then runs its OWN single bulk actor-flag cleanup pass,
+   *   `cleanupFlags=false` when a batch caller (e.g. `CraftingSystemManager.deleteSystem`
+   *   or the compendium importer's prune phase) deletes many recipes and then runs its
+   *   OWN single bulk actor-flag cleanup pass (see {@link cleanupOrphanedRecipeFlags}),
    *   so the per-recipe `_cleanupFlagsAfterRecipeMutation` fan-out (N recipes × M actors
-   *   flag scans) is not repeated once per recipe.
+   *   flag scans) is not repeated once per recipe. Set `persist=false` (symmetric with
+   *   `createRecipe`/`updateRecipe`) for a batch caller that mutates the in-memory map
+   *   per recipe and then issues a SINGLE `save()` after the whole batch; only the
+   *   per-recipe `save()` (one whole-array `recipes` world write) is skipped. Default
+   *   `true` keeps every single-recipe caller issuing its one write.
    */
   async deleteRecipe(recipeId, options = {}) {
     this._assertGM('delete recipe');
@@ -261,7 +266,9 @@ export class RecipeManager {
     }
 
     this.recipes.delete(recipeId);
-    await this.save();
+    if (options.persist !== false) {
+      await this.save();
+    }
     if (options.cleanupFlags !== false) {
       await this._cleanupFlagsAfterRecipeMutation();
     }
@@ -271,6 +278,18 @@ export class RecipeManager {
     if (options.emitChange !== false) {
       this._notifyRecipesChanged('delete', { recipeId });
     }
+  }
+
+  /**
+   * Run ONE bulk actor-flag cleanup pass after a batch of recipe deletions (the
+   * `deleteSystem` precedent). A batch caller — e.g. the compendium importer's prune
+   * phase — deletes many recipes with `cleanupFlags:false` to suppress the per-recipe
+   * fan-out, then calls this once so invalid-run and learned-recipe flags reconcile
+   * against the post-deletion map in a single O(affected actors) pass rather than
+   * O(pruned × actors). Public thin wrapper over `_cleanupFlagsAfterRecipeMutation`.
+   */
+  async cleanupOrphanedRecipeFlags() {
+    await this._cleanupFlagsAfterRecipeMutation();
   }
 
   /**

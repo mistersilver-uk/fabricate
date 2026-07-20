@@ -204,8 +204,13 @@ export class CompendiumImporter {
     const summary = {
       system: { id: null, name: systemData.name || '', created: false, skipped: false },
       components: { total: 0, remapped: [], retained: [], unresolved: [] },
-      recipes: { total: recipesData.length, imported: 0, skipped: 0, errors: [] },
+      recipes: { total: recipesData.length, imported: 0, skipped: 0, pruned: 0, errors: [] },
       collisions: [],
+      // Orphan candidates surfaced under overwrite: recipes belonging to the target
+      // system that are absent from the incoming payload. Each carries a `disposition`
+      // (`pruned` for auto-removed provenance-matched recipes, `reported` for preserved
+      // GM-authored / legacy / foreign-provenance candidates).
+      orphans: [],
       // Structured cross-reference report surfaced to the GM (source items,
       // scenes, scene-regions, macros, drop-row items, broken internal links).
       unresolvedReferences: [],
@@ -283,6 +288,13 @@ export class CompendiumImporter {
       summary.system.created = true;
     }
 
+    // Provenance key for recipe import stamping (issue 775): the pack's own stable
+    // identity when the payload carries one (keep-mode — preserved across reinstalls of
+    // the same pack, which is what makes provenance-matched pruning correct on the NEXT
+    // reinstall), else the freshly-created system id (copy-mode / id-less payloads,
+    // where the stamp is inert because copy never overwrites an existing system).
+    const packSystemId = systemData.id || system.id;
+
     // --- Phase 4: Import recipes ---
     // Each recipe mutates the in-memory recipe map only (persist:false); the whole
     // batch is flushed with ONE `save()` after the loop, collapsing N growing
@@ -298,6 +310,10 @@ export class CompendiumImporter {
           recipeData.craftingSystemId === '__SYSTEM_ID__'
             ? system.id
             : recipeData.craftingSystemId || system.id,
+        // ALWAYS re-stamp provenance (issue 775), discarding any inbound `importSource`,
+        // so it self-heals across re-export/re-import chains and across a stale/foreign
+        // inbound value. A "stamp only when null" shortcut would be wrong.
+        importSource: { systemId: packSystemId, importedAt: Date.now() },
       };
 
       const existing = this._recipeManager.getRecipe(resolved.id);
@@ -347,19 +363,43 @@ export class CompendiumImporter {
       this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
     }
 
-    // Single batched persist for the whole recipe phase (only when at least one
-    // recipe actually mutated the map — an empty or all-skipped run wrote nothing
-    // before and still writes nothing now). Optional-chained so a synchronous-storing
-    // mock recipe manager (which never needs a settings flush) is a no-op here; the
-    // real RecipeManager always defines `save`, so production still issues one write.
-    if (summary.recipes.imported > 0) {
+    // --- Phase 4b: Prune provenance-matched orphans (overwrite of an existing system) ---
+    // Only ever runs in the `existingSystem && overwriteExisting` path: a copy-mode /
+    // fresh-system import mints a new id and has no persisted recipes to overwrite, so
+    // there is never an orphan to prune. Deletes mutate the in-memory map only
+    // (persist:false), folding into the single post-loop save below.
+    if (existingSystem && overwriteExisting) {
+      this._emitProgress({
+        pct: 0.92,
+        phase: 'prune',
+        message: 'Removing recipes dropped from the pack…',
+      });
+      await this._pruneOrphanedRecipes(system, recipesData, packSystemId, summary);
+    }
+
+    // Single batched persist for the whole recipe phase. Widened from `imported > 0` so
+    // a prune-only reinstall (payload drops recipes but adds none, imported === 0) still
+    // writes; an overwrite that imports and prunes NOTHING still writes nothing.
+    // Optional-chained so a synchronous-storing mock recipe manager (which never needs a
+    // settings flush) is a no-op here; the real RecipeManager always defines `save`, so
+    // production still issues one write.
+    if (summary.recipes.imported > 0 || summary.recipes.pruned > 0) {
       await this._recipeManager.save?.();
+    }
+
+    // ONE bulk actor-flag cleanup pass after the prune batch (F1, the deleteSystem
+    // precedent): reconciles invalid-run and learned-recipe flags against the
+    // post-deletion map in O(affected actors), not O(pruned × actors). Independent of
+    // the `recipes` write above, so it runs after the single save.
+    if (summary.recipes.pruned > 0) {
+      await this._recipeManager.cleanupOrphanedRecipeFlags?.();
     }
 
     this._recipeManager.notifyRecipesChanged?.({
       action: 'importFromPack',
       imported: summary.recipes.imported,
       skipped: summary.recipes.skipped,
+      pruned: summary.recipes.pruned,
       errors: summary.recipes.errors.length,
       systemId: system.id,
     });
@@ -403,6 +443,57 @@ export class CompendiumImporter {
       phase: 'recipes',
       message: `Importing recipes (${processed}/${total})…`,
     });
+  }
+
+  /**
+   * Prune provenance-matched orphans after an overwrite import (issue 775). Enumerate
+   * the target system's persisted recipes that are ABSENT from the incoming payload,
+   * partition them by provenance, auto-delete the ones stamped by THIS pack (mutating
+   * the in-memory map only, so the deletions fold into the single post-loop save), and
+   * record every candidate in `summary.orphans` with its disposition:
+   *   - provenance-matched (`importSource.systemId === packSystemId`) → auto-pruned;
+   *   - unprovenanced (`importSource == null`, GM-authored or pre-provenance legacy) → kept + reported;
+   *   - foreign-provenance (`importSource.systemId` set but ≠ packSystemId) → kept + reported.
+   *
+   * The absent-set is derived from ALL payload recipe ids — NOT the successfully
+   * imported ids — so a payload recipe whose overwrite THREW (per-recipe error
+   * isolation) is still "shipped" and is never pruned (data-loss guard).
+   * @private
+   */
+  async _pruneOrphanedRecipes(system, recipesData, packSystemId, summary) {
+    const payloadIds = new Set(
+      recipesData.map((recipeData) => recipeData?.id).filter((id) => id != null)
+    );
+
+    const persistedRecipes =
+      this._recipeManager.getRecipes?.({ craftingSystemId: system.id }) ?? [];
+    const orphanCandidates = persistedRecipes.filter((recipe) => !payloadIds.has(recipe.id));
+
+    for (const orphan of orphanCandidates) {
+      const provenanceSystemId = orphan.importSource?.systemId ?? null;
+      if (provenanceSystemId === packSystemId) {
+        await this._recipeManager.deleteRecipe(orphan.id, {
+          notify: false,
+          emitChange: false,
+          persist: false,
+          cleanupFlags: false,
+        });
+        summary.recipes.pruned++;
+        summary.orphans.push({
+          recipeId: orphan.id,
+          recipeName: orphan.name || orphan.id,
+          disposition: 'pruned',
+          reason: 'provenanceMatched',
+        });
+      } else {
+        summary.orphans.push({
+          recipeId: orphan.id,
+          recipeName: orphan.name || orphan.id,
+          disposition: 'reported',
+          reason: provenanceSystemId == null ? 'unprovenanced' : 'foreignProvenance',
+        });
+      }
+    }
   }
 
   /**
