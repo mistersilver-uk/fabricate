@@ -13,6 +13,9 @@ An export round-trips the whole GM-authored model of a system, so you can back u
 > Only GMs can import a crafting system.
 > Import writes world-scoped settings and fails immediately for a non-GM before any change is made.
 
+Importing a large system shows a live progress bar so you can follow a long import as it runs.
+Fabricate saves all of a system's recipes together in a single write at the end of the import, which is much faster for systems with many recipes.
+
 ## What is included
 
 A system export carries every supported GM-authored record type for that system:
