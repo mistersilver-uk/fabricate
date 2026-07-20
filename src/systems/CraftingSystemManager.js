@@ -3462,6 +3462,17 @@ export class CraftingSystemManager {
    * @returns {Promise<boolean>} whether any stored description changed
    * @private
    */
+  /**
+   * Record one skipped description against BOTH the split reason counter and the flat
+   * `skipped` total. The split exists so a GM can tell a broken source link (their
+   * problem to fix) from a source that simply has no description (nothing to do).
+   * @private
+   */
+  _countSkippedDescription(summary, reason) {
+    summary.descriptions[reason] += 1;
+    summary.descriptions.skipped += 1;
+  }
+
   async _refreshDefinitionDescriptions(summary) {
     const targets = [];
     for (const system of this.getSystems()) {
@@ -3481,7 +3492,7 @@ export class CraftingSystemManager {
     for (const definition of targets) {
       const uuid = this._definitionSourceUuid(definition);
       if (!uuid) {
-        summary.descriptions.skipped += 1;
+        this._countSkippedDescription(summary, 'skippedUnresolved');
         continue;
       }
       let source;
@@ -3491,7 +3502,9 @@ export class CraftingSystemManager {
         source = null;
       }
       if (!source) {
-        summary.descriptions.skipped += 1;
+        // The item, its pack, or the module that provided it is gone. Distinct from a
+        // blank source below, because THIS one is actionable by the GM.
+        this._countSkippedDescription(summary, 'skippedUnresolved');
         continue;
       }
       resolved.push({ definition, source });
@@ -3511,9 +3524,10 @@ export class CraftingSystemManager {
         continue;
       }
       // Never let a source with no description at all WIPE text a definition already
-      // carries — that would be data loss dressed up as a repair.
+      // carries — that would be data loss dressed up as a repair. Pinned by
+      // `tests/repair-item-data.test.js`; deleting this guard must fail that test.
       if (!next) {
-        summary.descriptions.skipped += 1;
+        this._countSkippedDescription(summary, 'skippedEmpty');
         continue;
       }
       definition.description = next;
@@ -3620,7 +3634,16 @@ export class CraftingSystemManager {
       // Description refresh outcomes (issue 800), deliberately a bucket of its own so
       // the identity counts above keep their existing meaning. Components and
       // recipe-item definitions only — tools carry no description.
-      descriptions: { refreshed: 0, unchanged: 0, skipped: 0 },
+      // `skipped` is the flat total; `skippedUnresolved` (source item/pack/module gone
+      // — actionable) and `skippedEmpty` (source resolved but carries no description —
+      // nothing to do) split it by cause so the GM notice can name one.
+      descriptions: {
+        refreshed: 0,
+        unchanged: 0,
+        skipped: 0,
+        skippedUnresolved: 0,
+        skippedEmpty: 0,
+      },
       repointLog: [],
     };
 
@@ -3865,6 +3888,14 @@ export class CraftingSystemManager {
     const documents = await pack.getDocuments();
     const items = documents.filter((d) => d.documentName === 'Item');
 
+    // DECISION (issue 800): no `_primeEnricherCache` call here, deliberately.
+    // This loops `addItemFromUuid`, so each item pays core's own per-`enrichHTML`
+    // priming — but the `getDocuments()` above has already loaded THIS pack into the
+    // document cache, and an intra-pack reference is the common case, so those primes
+    // are cache hits. The batched prime exists for the repair, which sweeps every
+    // definition in the world across arbitrarily many packs; here the same call would
+    // add a full extra pass over N descriptions to save round-trips that mostly are not
+    // happening. Revisit if a cross-pack-heavy import ever measures slow.
     let added = 0;
     let updated = 0;
     let skipped = 0;

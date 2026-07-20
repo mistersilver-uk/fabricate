@@ -1,6 +1,6 @@
 /**
  * Tests for CraftingSystemManager.repairItemData — the GM maintenance
- * action behind the settings-menu "Repair Component Sources" button.
+ * action behind the settings-menu "Repair Item Data" button.
  *
  *  1. A world item that IS a component source (matched by identity) is stripped of a
  *     transitive duplicateSource and stamped with flags.fabricate.roles[sys].componentId.
@@ -189,7 +189,10 @@ const SUPPLIES = {
  * A manager whose only definition is sourced from a LOCKED pack, wired with a fake
  * enricher that resolves that reference to the referenced document's name.
  */
-function buildDescriptionRepairManager({ includeCompendiums = true } = {}) {
+function buildDescriptionRepairManager({
+  includeCompendiums = true,
+  sourceDescription = SUPPLIES.description,
+} = {}) {
   const primeCalls = [];
   const mgr = new CraftingSystemManager(makeRecipeManager(), {
     enrichToHtml: async (raw) =>
@@ -214,7 +217,7 @@ function buildDescriptionRepairManager({ includeCompendiums = true } = {}) {
   };
   globalThis.fromUuid = async (uuid) =>
     uuid === LOCKED_PACK_UUID
-      ? { uuid, name: "Alchemist's Supplies", system: { description: { value: SUPPLIES.description } } }
+      ? { uuid, name: "Alchemist's Supplies", system: { description: { value: sourceDescription } } }
       : null;
   return { mgr, component, primeCalls, run: () => mgr.repairItemData({ includeCompendiums }) };
 }
@@ -259,6 +262,26 @@ test('repair — is idempotent: a second run reports unchanged', async () => {
   assert.equal(second.descriptions.unchanged, 1);
 });
 
+test('repair — a source that RESOLVES but is BLANK never wipes the stored description', async () => {
+  // The data-loss guard, pinned. This is the only thing between a GM's Repair click and
+  // the silent destruction of every description whose source item happens to carry no
+  // prose of its own — and deleting the guard leaves the rest of the suite green,
+  // because the neighbouring "no resolvable source" test short-circuits in sweep 1 and
+  // never reaches the write. This one resolves a real document with an EMPTY
+  // description, so it exercises sweep 2's compare-and-store.
+  const { component, run } = buildDescriptionRepairManager({ sourceDescription: '' });
+  const original = component.description;
+  assert.ok(original, 'precondition: the definition starts with text worth losing');
+
+  const summary = await run();
+
+  assert.equal(component.description, original, 'a blank source must never WIPE stored text');
+  assert.equal(summary.descriptions.refreshed, 0);
+  assert.equal(summary.descriptions.skipped, 1);
+  assert.equal(summary.descriptions.skippedEmpty, 1, 'attributed to the blank-source cause');
+  assert.equal(summary.descriptions.skippedUnresolved, 0);
+});
+
 test('repair — counts a definition with no resolvable source as skipped, and never wipes text', async () => {
   const { mgr, component, run } = buildDescriptionRepairManager();
   component.registeredItemUuid = 'Item.gone';
@@ -269,5 +292,11 @@ test('repair — counts a definition with no resolvable source as skipped, and n
   const summary = await run();
 
   assert.equal(summary.descriptions.skipped, 1);
+  assert.equal(
+    summary.descriptions.skippedUnresolved,
+    1,
+    'a broken source link is ACTIONABLE by the GM and must be distinguishable from a blank source'
+  );
+  assert.equal(summary.descriptions.skippedEmpty, 0);
   assert.equal(component.description, SUPPLIES.description, 'text is never wiped by a repair');
 });

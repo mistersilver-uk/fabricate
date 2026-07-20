@@ -6313,6 +6313,63 @@ describe('createAdminStore', () => {
       );
     });
 
+    it('read surfaces DIVERGE on an un-repaired labelled directive, and that is the real contract (issue 800)', async () => {
+      // The test above passes for a resolved string, but a resolved string is already
+      // plain text — so normalization is a no-op there and it would pass identically if
+      // the surfaces diverged wildly. This case uses a LABELLED directive, where they
+      // genuinely differ, so the contract is pinned rather than merely asserted.
+      //
+      // `adminStore` and the manager's sync normalizer both run `plainTextDescription`,
+      // whose retained mop-up renders the label; `InventoryListingBuilder` forwards the
+      // stored string untouched. The consequence is real and worth seeing: until a GM
+      // runs Repair Item Data, the SAME component reads "Acid" in the manager and
+      // "@UUID[…]{Acid}" in a player's inventory. Repair converges them, which is why
+      // it — not a wider read-side rewrite — is the fix.
+      const labelled = '@UUID[Compendium.dnd5e.items.Item.acid00]{Acid}';
+
+      const { card } = await itemCardFor({
+        id: 'comp-labelled',
+        name: 'Alchemist’s Supplies',
+        description: labelled,
+      });
+      assert.equal(card.description, 'Acid', 'adminStore normalizes: the mop-up renders the label');
+
+      const manager = new CraftingSystemManager({ getRecipes: () => [] });
+      assert.equal(
+        manager._normalizeComponentDescription(labelled),
+        'Acid',
+        'the manager normalizer agrees with adminStore'
+      );
+
+      const builder = new InventoryListingBuilder({
+        recipeManager: { getRecipes: () => [], toolMatchesItem: () => false },
+        craftingSystemManager: {
+          getSystems: () => [
+            {
+              id: 'sys-x',
+              name: 'Alchemy',
+              components: [{ id: 'cx', name: 'Supplies', description: labelled }],
+            },
+          ],
+        },
+        localize: (key) => key,
+        nowWorldTime: () => 0,
+      });
+      const listing = builder.buildListing({
+        craftingActor: {
+          id: 'a1',
+          name: 'Akra',
+          img: 'icons/a1.webp',
+          items: [{ name: 'Supplies', system: { quantity: 1 } }],
+        },
+      });
+      assert.equal(
+        listing.rows.find((row) => row.componentId === 'cx' && !row.isEssenceSource)?.description,
+        labelled,
+        'the inventory listing forwards the stored string VERBATIM and resolves nothing'
+      );
+    });
+
     it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {
       // AC6 clause 3. This hand-built projection is an ALLOWLIST, and its failure mode
       // is silent: without the line, the Tags & Categories screen's component-categories

@@ -191,6 +191,42 @@ test('tidies separators and brackets orphaned by a removed reference', async (t)
   );
 });
 
+test('a separator stranded against sentence punctuation is absorbed, not left as ",."', async (t) => {
+  setupDOM();
+  const restore = withUnknownPlaceholder();
+  t.after(() => {
+    restore();
+    teardownDOM();
+  });
+
+  // The COMMON shape, not an edge case: an authored list whose last entry is a
+  // reference ends `<ref>.`, which is exactly what both the reporter's string and the
+  // smoke fixture look like.
+  assert.equal(plainTextDescription('Acid, <a class="content-link broken">Unknown</a>.'), 'Acid.');
+  assert.equal(
+    plainTextDescription('Contains: <a class="content-link broken">Unknown</a>. Then mix.'),
+    'Contains. Then mix.'
+  );
+  // And via the privacy scrub, which is NEW in this change — so an ordinary authored
+  // list with a GM-only last entry hits this in the PLAYER-visible inspector.
+  assert.equal(plainTextDescription('Acid, <span data-visibility="gm">Poison</span>.'), 'Acid.');
+  assert.equal(
+    plainTextDescription('Mix well<span data-visibility="gm">, and add poison</span>!'),
+    'Mix well!'
+  );
+});
+
+test('ACCEPTED: an authored trailing colon or dash is trimmed even with no references', () => {
+  // Named explicitly rather than left as a surprise. The trailing-edge trim cannot
+  // distinguish an authored lead-in from one whose list a removal emptied, and a
+  // dangling "Contains:" is the worse of the two outputs. If this ever stops being an
+  // acceptable trade, the fix is to track removals structurally, not to widen a regex.
+  assert.equal(plainTextDescription('Ingredients:'), 'Ingredients');
+  assert.equal(plainTextDescription('Aged —'), 'Aged');
+  // A colon INSIDE the text is untouched; only the string edge is trimmed.
+  assert.equal(plainTextDescription('Note: keep dry.'), 'Note: keep dry.');
+});
+
 test('leaves legitimate author punctuation in prose untouched', () => {
   assert.equal(
     plainTextDescription('Mix acid, oil, and water; then rest.'),
@@ -204,10 +240,26 @@ test('leaves legitimate author punctuation in prose untouched', () => {
 // hasUnresolvedDirectives — the DETECTOR predicate
 // ---------------------------------------------------------------------------
 
-test('hasUnresolvedDirectives detects raw directive text and nothing else', () => {
+test('hasUnresolvedDirectives detects only what a reader actually sees raw', () => {
+  // LABEL-LESS: nothing renders it, so the reader sees the directive. Repairable.
   assert.equal(hasUnresolvedDirectives('@UUID[Compendium.dnd5e.items.Item.abc123]'), true);
-  assert.equal(hasUnresolvedDirectives('@UUID[x]{Acid}'), true);
-  assert.equal(hasUnresolvedDirectives('&Reference[prone]{Prone}'), true);
+  assert.equal(hasUnresolvedDirectives('&Reference[prone]'), true);
+  assert.equal(hasUnresolvedDirectives('@UUID[x]{}'), true, 'an empty label renders nothing');
+
+  // LABELLED: the mop-up already renders it as "Acid" at every read with no repair, so
+  // counting it would tell the GM their descriptions "show raw link text" while every
+  // surface reads clean — and `@UUID[…]{Acid}` is the maintainer's REPORTED shape, so
+  // the wide predicate cried wolf on the motivating case, at every login.
+  assert.equal(hasUnresolvedDirectives('@UUID[x]{Acid}'), false);
+  assert.equal(hasUnresolvedDirectives('&Reference[prone]{Prone}'), false);
+  assert.equal(
+    hasUnresolvedDirectives('@UUID[a]{Acid}, @UUID[b]{Oil}'),
+    false,
+    'a fully labelled list needs no repair to read cleanly'
+  );
+  // A mixed description IS repairable — one label-less entry is enough.
+  assert.equal(hasUnresolvedDirectives('@UUID[a]{Acid}, @UUID[b]'), true);
+
   assert.equal(hasUnresolvedDirectives('Acid, Oil, Paper'), false);
   // Rolls are flattened deterministically at every read, so they are not a
   // repairable defect and must not trigger the GM notice.

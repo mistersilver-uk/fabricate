@@ -74,7 +74,12 @@ export async function promptCheckRoll({
   // Headless / no dialog API (tests): do not block the roll.
   if (!DialogV2?.wait) return { confirmed: true };
 
-  const defaultRollMode = globalThis.game?.settings?.get?.('core', 'rollMode');
+  // `?? ''` so this types as a string rather than possibly-undefined: SonarCloud's
+  // inference otherwise reads the `value === defaultRollMode` comparison below as
+  // always-false (S3403) because the value is reached through optional chaining on an
+  // untyped Foundry global. Behaviour is unchanged — the one consumer is
+  // `rollModeValue || defaultRollMode || undefined`, where '' and undefined are equivalent.
+  const defaultRollMode = globalThis.game?.settings?.get?.('core', 'rollMode') ?? '';
   const displayFormula = resolvedFormula || formula || '';
   const activityLabel = activity || 'Roll';
 

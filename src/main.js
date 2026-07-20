@@ -2617,7 +2617,7 @@ Hooks.once('ready', async () => {
     try {
       routeEventSceneSocketMessage(payload, {
         currentUserId: () => game.user?.id,
-        isActiveGM: () => game.user === game.users?.activeGM,
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
         showPrompt: showEventScenePrompt,
         viewSceneForSelf: (uuid) => viewScene(uuid)
       });
@@ -2818,7 +2818,7 @@ async function runInteractableMarkerSync() {
     const environmentStore = fabricate?.getGatheringEnvironmentStore?.() ?? null;
     await syncInteractableMarkers({
       scenes: game.scenes,
-      isActiveGM: () => game.user === game.users?.activeGM,
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
       resolveEnvironment: (environmentId) => environmentStore?.get?.(environmentId) ?? null,
       resolveTask: (systemId, taskId) => {
         const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);

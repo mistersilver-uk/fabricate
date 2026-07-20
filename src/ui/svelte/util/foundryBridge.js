@@ -365,9 +365,13 @@ export function notifyError(msg) {
 /**
  * The V13 `TextEditor` implementation. `foundry.applications.ux.TextEditor` is the
  * base class and `.implementation` is the system-registered subclass (dnd5e/PF2e
- * install their own). Core's base `enrichHTML` self-dispatches to
- * `TextEditor.implementation`, so the `?? base` fallback is EQUIVALENT, not
- * degraded, and no `compatibility.minimum` raise is needed for it.
+ * install their own). From 13.340 core's base `enrichHTML` self-dispatches to
+ * `TextEditor.implementation`, so on such a client the `?? base` fallback is equivalent
+ * rather than degraded, and no `compatibility.minimum` raise is needed for it. Below
+ * 13.340 it would call the base directly and skip the system subclass — harmless here,
+ * because that subclass carries only secrets/visibility behaviour while system and
+ * module enrichers live on `CONFIG.TextEditor.enrichers`, which the base runs too.
+ * Stated conditionally on purpose: do not read "equivalent" as unconditional.
  *
  * Always reached through `globalThis.foundry?.…` — a bare `foundry.` throws a
  * ReferenceError in Node instead of yielding `undefined`, which would defeat this

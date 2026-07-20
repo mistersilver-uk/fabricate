@@ -35,6 +35,27 @@ function localize(key, data = null) {
  * Run the repair and toast the result. Returns the summary (or null when the
  * crafting system manager is unavailable).
  */
+/**
+ * Toast the description leg's outcome. Silent only when nothing was attempted.
+ *
+ * @param {{refreshed:number, unchanged:number, skipped:number, skippedUnresolved:number, skippedEmpty:number}|undefined} descriptions
+ */
+function reportDescriptionOutcome(descriptions) {
+  if (!descriptions) return;
+  const { refreshed = 0, skipped = 0 } = descriptions;
+  if (refreshed > 0) {
+    globalThis.ui?.notifications?.info?.(
+      localize('FABRICATE.Settings.RepairItemData.DescriptionsRefreshed', descriptions)
+    );
+    return;
+  }
+  if (skipped > 0) {
+    globalThis.ui?.notifications?.warn?.(
+      localize('FABRICATE.Settings.RepairItemData.DescriptionsNoneRefreshed', descriptions)
+    );
+  }
+}
+
 export async function runItemDataRepair() {
   const manager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
   if (!manager || typeof manager.repairItemData !== 'function') {
@@ -68,11 +89,12 @@ export async function runItemDataRepair() {
     // counts. The GM's consent for it is obtained up front in the Hint and the
     // confirmation Body — this line reports what happened, it does not stand in for
     // asking.
-    if (summary?.descriptions?.refreshed > 0) {
-      globalThis.ui?.notifications?.info?.(
-        localize('FABRICATE.Settings.RepairItemData.DescriptionsRefreshed', summary.descriptions)
-      );
-    }
+    //
+    // Reported whenever ANYTHING was attempted, not only on success. A GM sent here by
+    // the startup notice whose definitions all land in `skipped` would otherwise learn
+    // nothing, run it again next login, and be told the same thing forever — a nag loop
+    // with no exit. The failure branch names the cause so the loop can actually end.
+    reportDescriptionOutcome(summary?.descriptions);
     return summary;
   } catch (error) {
     console.error('Fabricate | Item data repair failed', error);
@@ -96,7 +118,12 @@ export async function openRepairItemDataDialog() {
 
   const confirmed = await DialogV2.wait({
     window: { title: localize('FABRICATE.Settings.RepairItemData.Title') },
-    content: `<p>${localize('FABRICATE.Settings.RepairItemData.Body')}</p>`,
+    // Two paragraphs, not one: the consent-bearing half ("REPLACES … will be
+    // overwritten") is its own visual unit rather than a clause buried at the end of a
+    // ninety-word block the GM has already stopped reading.
+    content:
+      `<p>${localize('FABRICATE.Settings.RepairItemData.BodyIdentity')}</p>` +
+      `<p>${localize('FABRICATE.Settings.RepairItemData.BodyDescriptions')}</p>`,
     rejectClose: false,
     buttons: [
       {

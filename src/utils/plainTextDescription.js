@@ -121,22 +121,33 @@ function flattenLabelledDirectives(text) {
 }
 
 /**
- * Predicate: does this text still carry an unresolved enricher directive?
+ * Predicate: does this text carry a directive that is VISIBLY broken to a reader?
  *
  * Pure and synchronous — no Foundry calls, no document resolution. Backs the
  * GM-only startup DETECTOR that points at the Repair Item Data action for worlds
  * whose descriptions were captured before write-time resolution existed. It never
  * rewrites anything.
  *
- * Roll expressions are excluded on purpose: they are flattened deterministically
- * at every read, so their presence in stored text is not a repairable defect.
+ * Deliberately narrower than "carries any directive", on two grounds:
+ *
+ * - a LABELLED directive is already rendered as its label by the mop-up in
+ *   {@link plainTextDescription} at every read, with no repair needed. Counting it
+ *   would tell the GM that descriptions "show raw link text" while every surface in
+ *   front of them reads clean — a claim they can disprove by looking, repeated at
+ *   every login. `@UUID[…]{Acid}` is precisely the maintainer's reported shape, so
+ *   the wide predicate would have cried wolf on the motivating case;
+ * - roll expressions are flattened deterministically at every read, so their
+ *   presence is not a repairable defect either.
+ *
+ * What remains — a LABEL-LESS (or empty-labelled) directive — is exactly the text a
+ * reader sees raw, and exactly what resolution fixes.
  *
  * @param {unknown} text
  * @returns {boolean}
  */
 export function hasUnresolvedDirectives(text) {
   if (typeof text !== 'string' || text.length === 0) return false;
-  return /[@&][A-Za-z]{1,32}\[[^\]]{0,2048}\]/.test(text);
+  return /[@&][A-Za-z]{1,32}\[[^\]]{0,2048}\](?!\{[^}]{1,2048}\})/.test(text);
 }
 
 /**
@@ -201,6 +212,12 @@ export function descriptionTextCandidate(value, seen = new Set()) {
  * `secrets: false`, because core strips secret markup from the INPUT before the
  * enrichers run — secret markup PRODUCED BY an enricher is only reachable at the
  * end of the pipeline. Neither half subsumes the other.
+ *
+ * CAVEAT on `owner`. Because we pass `relativeTo`, PF2e's own visibility post-pass runs
+ * before we ever see the markup, and it DELETES the `data-visibility` attribute from an
+ * `owner` node when the enriching user owns the document — which a GM generally does.
+ * So the `owner` arm of this selector is a belt-and-braces catch for markup PF2e did not
+ * process, not a guarantee: rely on it for `gm` and `none`, not for `owner`.
  *
  * @param {ParentNode} root
  */
@@ -291,14 +308,25 @@ function stripHtml(raw) {
  *
  * - collapses a run of separators into a single separator;
  * - strips a dangling separator immediately after a `:` label lead-in;
+ * - absorbs a separator or lead-in colon left stranded against sentence-ending
+ *   punctuation, so `"Acid, <dropped>."` renders `"Acid."` and not `"Acid,."`.
+ *   This is the COMMON shape, not an edge case: an authored list whose last entry
+ *   is a reference ends in `<ref>.`, and since visibility-gated removal is new, an
+ *   ordinary list ending `"Acid, <gm-only>."` hits it in the player-visible view;
  * - drops a parenthetical emptied by a removal, and tidies the space a removal
  *   leaves against a bracket, so `"(see <dropped>)"` never renders as `"(see )"`;
  * - trims separators, a trailing `:`, and space at the string edges, so
  *   `"Contains: <dropped>"` never renders as `"Contains:"`.
  *
  * Legitimately author-adjacent punctuation in prose is untouched: a lone
- * separator between two words is not a run, follows no colon, and sits at no
- * edge.
+ * separator between two words is not a run, follows no colon, is not adjacent to a
+ * full stop, and sits at no edge.
+ *
+ * ACCEPTED CONSEQUENCE: a description whose authored text genuinely ends in `:` or a
+ * dash (`"Ingredients:"`) loses that character on every normalize pass, references or
+ * not. The trailing-edge trim cannot distinguish an authored lead-in from one whose
+ * list a removal emptied, and a dangling lead-in is the worse of the two outputs.
+ * `tests/plain-text-description.test.js` names this case explicitly.
  *
  * @param {string} text
  * @returns {string}
@@ -307,6 +335,7 @@ function tidySeparators(text) {
   return text
     .replaceAll(new RegExp(`([${SEPARATOR_CLASS}])(?: ?[${SEPARATOR_CLASS}])+`, 'g'), '$1')
     .replaceAll(new RegExp(`([:：]) ?[${SEPARATOR_CLASS}] ?`, 'g'), '$1 ')
+    .replaceAll(new RegExp(String.raw`[${EDGE_SEPARATOR_CLASS}]+\s*([.!?])`, 'g'), '$1')
     .replaceAll(/\(\s*\)\s?/g, '')
     .replaceAll(/\(\s+/g, '(')
     .replaceAll(/\s+\)/g, ')')

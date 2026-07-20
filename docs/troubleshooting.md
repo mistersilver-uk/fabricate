@@ -298,21 +298,34 @@ This is the **Repair Item Data** maintenance action.
 Click **Repair Item Data** and confirm.
 The action is available to GMs only.
 
-**What it does:**
+It does two jobs, because both are projections of the same thing — the source item behind a component or recipe item.
+
+**What it does — item identity:**
 
 - It scans your world items, your unlocked compendiums, and every actor's inventory.
 - It tags each component and each recipe item (book or scroll) source with a durable identity link, so future copies always resolve to the right one.
 - It clears misleading duplicate-source metadata that a copied item inherited from the item it was copied from.
 - It re-points an owned copy that a duplicate mislabelled, but only when the copy's name clearly identifies a single book or scroll.
-- Locked (system and module) compendiums are skipped, because Fabricate cannot write to them.
+- Locked (system and module) compendiums are skipped by **this** scan, because Fabricate cannot write to them.
 - It never teaches or removes a recipe.
-  It only repairs how items are identified.
 
-After it runs, Fabricate reports how many items were tagged, cleaned, unlinked, and re-pointed.
+**What it does — descriptions:**
+
+- It rewrites the stored description of every component and recipe item from that entry's own source item.
+- Content links in the source description are resolved, so `@UUID[...]` renders as the linked item's name instead of raw link text.
+- Unlike the identity scan above, this **does** reach locked system and module compendiums, because it only reads those items rather than writing to them.
+- Any description you edited by hand for a component or recipe item will be replaced by the source item's text.
+- Tools are not affected; they carry no description.
+
+After it runs, Fabricate reports how many items were tagged, cleaned, unlinked, and re-pointed, and separately how many descriptions were refreshed, were already current, or were skipped.
 When a copy's name matched more than one book or scroll, it is left as-is and counted separately, with a note to fix it by hand.
+A description is skipped rather than refreshed when its source item cannot be read — the item, its compendium, or the module that provided it may have been removed — or when that source item has no description of its own.
+A skipped description is never emptied; the text you already had is kept.
 
 **When to run it:**
 
+- When a description shows raw link text such as `@UUID[Compendium...]` instead of the linked item's name, or Fabricate tells you at startup that some descriptions do.
+- After a game system or module ships new content, if you want components linked to its compendium items to pick up the revised descriptions.
 - After updating to a version of Fabricate that added durable item identity, if players hold copies that were duplicated in an older world.
 - When a player's duplicated copy of a book or scroll shows the wrong title in their inventory, or auto-learned the wrong recipes when it was dropped on the actor.
 - When a duplicated component is confused with the item it was copied from.
@@ -328,6 +341,13 @@ When a copy's name matched more than one book or scroll, it is left as-is and co
   In older versions, registering a duplicate of a compendium-linked item could overwrite the original entry's own name, image, and description with the duplicate's.
   Those original details are gone and cannot be reconstructed.
   The repair flags the affected entry so you can spot it, but you must restore its name, image, description, and linked recipes by hand, or re-import it from a backup or its compendium.
+- **A link to a document that is no longer installed.**
+  A description is resolved once, when it is stored — not every time it is displayed.
+  If it references an item from a module you have since disabled, the reference is dropped from the text rather than resolved, and re-enabling the module does not bring it back on its own.
+  Run the repair again after re-enabling it.
+- **A referenced item that was renamed later.**
+  A stored description holds the names the referenced items had when it was resolved.
+  Renaming one of those items does not update the descriptions that quote it; run the repair to bring them back into line.
 
 The repair scans the actors in your world's Actors directory.
 It does not reach unlinked token copies that were never saved as world actors, or actors stored inside a compendium.
