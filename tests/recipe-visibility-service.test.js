@@ -83,6 +83,12 @@ function setPathValue(object, path, value) {
 class FakeDocument {
   constructor(flagsArg = {}) {
     this._flags = { fabricate: flagsArg };
+    // Spies (issue 773): payload-level assertions against the deletion primitive.
+    // The fake's setFlag REPLACES via setPathValue and is merge-blind, so a getFlag
+    // read-back cannot distinguish a reload-safe `-=` delete from a resurrecting
+    // setFlag-merge rebuild — the tests must assert what update()/setFlag() RECEIVE.
+    this.updateCalls = [];
+    this.setFlagCalls = [];
   }
 
   getFlag(scope, key) {
@@ -91,6 +97,7 @@ class FakeDocument {
   }
 
   async setFlag(scope, key, value) {
+    this.setFlagCalls.push({ scope, key, value });
     if (!this._flags[scope]) this._flags[scope] = {};
     setPathValue(this._flags[scope], key, value);
     return value;
@@ -103,6 +110,35 @@ class FakeDocument {
     if (parent && typeof parent === 'object') {
       delete parent[last];
     }
+  }
+
+  // Minimal `Actor#update` fake honouring Foundry's `-=<key>` deletion syntax so a
+  // reload (re-read via getFlag) reflects a real key removal. A leading `flags.`
+  // segment maps onto this._flags (where getFlag reads). Records every payload for
+  // payload-level assertions.
+  async update(changes = {}) {
+    this.updateCalls.push(changes);
+    for (const [rawPath, value] of Object.entries(changes)) {
+      const parts = String(rawPath).split('.');
+      let root = this;
+      if (parts[0] === 'flags') {
+        root = this._flags;
+        parts.shift();
+      }
+      const last = parts.pop();
+      let target = root;
+      for (const part of parts) {
+        if (!target[part] || typeof target[part] !== 'object') target[part] = {};
+        target = target[part];
+      }
+      if (last.startsWith('-=')) {
+        const key = last.slice(2);
+        if (target && typeof target === 'object') delete target[key];
+      } else {
+        target[last] = value;
+      }
+    }
+    return this;
   }
 }
 
@@ -203,7 +239,9 @@ function buildMockSystem(overrides = {}) {
 
 function buildService({ system = null, systems = null, recipes = [] } = {}) {
   const recipeManager = {
-    getRecipes: () => recipes
+    getRecipes: () => recipes,
+    // issue 773: per-system reset scopes learned ids via getRecipe(id).craftingSystemId.
+    getRecipe: (id) => recipes.find((recipe) => String(recipe?.id) === String(id)) || null
   };
   const craftingSystemManager = {
     getSystem: (id) => {
@@ -1669,19 +1707,37 @@ test('AC7.5 - locked recipe remains visible but not craftable in knowledge mode'
 });
 
 test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones', async () => {
+  // A held book with a non-zero learn budget backs the stale entry, so a regression
+  // that flipped the cleanup wiring to freeLearnBudget:true would silently refund it.
+  const book = new FakeItem({
+    uuid: 'Actor.actor-a.Item.book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 2 } } }
+  });
   const service = buildService();
   const actorA = new FakeActor({
     id: 'actor-a',
+    items: [book],
     flagsArg: {
       fabricate: {
         learnedRecipes: {
           'recipe-a': { learnedAt: 1 },
-          'recipe-b': { learnedAt: 2 },
+          'recipe-b': { learnedAt: 2, sourceItemUuid: 'Actor.actor-a.Item.book' },
           'recipe-c': { learnedAt: 3 }
         }
       }
     }
   });
+
+  // Bind the cleanup call site's freeLearnBudget flag directly by capturing the
+  // options object every forgetLearnedRecipes call receives (issue 773 — recipe
+  // deletion is content management, never an in-fiction un-learn, so it must NOT
+  // refund budget; a flip to true would ship green without this spy).
+  const forgetOptions = [];
+  const originalForget = service.forgetLearnedRecipes.bind(service);
+  service.forgetLearnedRecipes = (actor, ids, options) => {
+    forgetOptions.push(options);
+    return originalForget(actor, ids, options);
+  };
 
   // Override game.actors for this test
   const originalActors = globalThis.game.actors;
@@ -1690,6 +1746,42 @@ test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones
   try {
     const validRecipeIds = new Set(['recipe-a', 'recipe-c']);
     await service.cleanupLearnedRecipes(validRecipeIds);
+
+    // The cleanup wiring must pass freeLearnBudget:false...
+    assert.ok(forgetOptions.length > 0, 'cleanup routed through forgetLearnedRecipes');
+    assert.ok(
+      forgetOptions.every((options) => options?.freeLearnBudget === false),
+      'recipe-deletion cleanup must never refund learn budget'
+    );
+    // ...and the held book's budget is consequently UNCHANGED (no silent refund).
+    assert.equal(
+      service._getRecipeItemLearnCount(book),
+      2,
+      'the held book budget is not refunded on recipe deletion'
+    );
+
+    // issue 773: cleanup routes through forgetLearnedRecipes, so the stale key is
+    // removed with an explicit reload-safe `-=` deletion — asserted at the update
+    // PAYLOAD level, not a merge-blind read-back, and NOT via a whole-map _setLearnedMap
+    // rebuild (the prior filtered-map setFlag merge never actually deleted keys).
+    const payload = Object.assign({}, ...actorA.updateCalls);
+    assert.equal(
+      payload['flags.fabricate.fabricate.learnedRecipes.-=recipe-b'],
+      null,
+      'stale recipe-b is removed with an explicit -= deletion'
+    );
+    assert.ok(
+      !('flags.fabricate.fabricate.learnedRecipes.-=recipe-a' in payload),
+      'a retained recipe is never targeted for deletion'
+    );
+    assert.ok(
+      !('flags.fabricate.fabricate.learnedRecipes.-=recipe-c' in payload),
+      'a retained recipe is never targeted for deletion'
+    );
+    assert.ok(
+      !actorA.setFlagCalls.some((call) => call.key === 'fabricate.learnedRecipes'),
+      'cleanup must not rebuild the whole learned map through setFlag'
+    );
 
     const learned = actorA.getFlag('fabricate', 'fabricate.learnedRecipes');
     assert.ok('recipe-a' in learned, 'recipe-a should be retained');
@@ -3361,4 +3453,316 @@ test('706d - the normalized system config carries no legacy consumeOnLearn, yet 
 
   await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
   assert.equal(item.deleted, true, 'consumption is driven by the definition caps');
+});
+
+// ---------------------------------------------------------------------------
+// Issue 773 — the crafting-knowledge deletion primitive (erase one / reset one
+// system / reset all) with reload-safe `-=` deletion, the dotted-id two-step
+// fallback, and learn-budget freeing.
+// ---------------------------------------------------------------------------
+
+// A fake party pool that records decrements (issue 773 — symmetric with increment).
+function makeDecrementablePartyPool(initial = {}) {
+  const store = { ...initial };
+  const decrements = [];
+  return {
+    store,
+    decrements,
+    get: (key) => Number(store[key] || 0),
+    increment: async (key) => {
+      store[key] = Number(store[key] || 0) + 1;
+      return true;
+    },
+    decrement: async (key) => {
+      decrements.push(key);
+      store[key] = Math.max(0, Number(store[key] || 0) - 1);
+      return true;
+    }
+  };
+}
+
+function seedLearnedActor(learned = {}, discovery = {}, items = []) {
+  const fabricate = {};
+  if (learned) fabricate.learnedRecipes = learned;
+  if (discovery) fabricate.discoveryProgress = discovery;
+  return new FakeActor({ id: 'actor-773', items, flagsArg: { fabricate } });
+}
+
+test('773 erase-one removes only the learned entry via an explicit -= deletion (payload-level)', async () => {
+  const service = buildService();
+  const actor = seedLearnedActor(
+    { 'recipe-a': { learnedAt: 1, sourceItemUuid: null }, 'recipe-b': { learnedAt: 2, sourceItemUuid: null } },
+    { 'recipe-a': { progress: 40 } }
+  );
+
+  const result = await service.forgetLearnedRecipes(actor, ['recipe-a']);
+
+  assert.equal(result.success, true);
+  assert.equal(result.count, 1);
+  const payload = Object.assign({}, ...actor.updateCalls);
+  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=recipe-a'], null);
+  // Negative pin (a): erase-one leaves discoveryProgress untouched (default clearDiscovery: false).
+  assert.ok(
+    !('flags.fabricate.fabricate.discoveryProgress.-=recipe-a' in payload),
+    'erase-one must not clear discoveryProgress by default'
+  );
+  assert.ok(
+    !actor.setFlagCalls.some((call) => call.key === 'fabricate.learnedRecipes'),
+    'the safe-id path must never rebuild the whole learned map through setFlag'
+  );
+  // Reload-safe: re-reading reflects the removal; recipe-b + discovery survive.
+  const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.ok(!('recipe-a' in learned));
+  assert.ok('recipe-b' in learned);
+  const discovery = actor.getFlag('fabricate', 'fabricate.discoveryProgress');
+  assert.deepEqual(discovery['recipe-a'], { progress: 40 }, 'discovery entry is intact');
+});
+
+test('773 erase-one with clearDiscovery: true ALSO clears the discovery entry (opt-in, exposed)', async () => {
+  const service = buildService();
+  const actor = seedLearnedActor(
+    { 'recipe-a': { learnedAt: 1, sourceItemUuid: null } },
+    { 'recipe-a': { progress: 40 } }
+  );
+
+  await service.forgetLearnedRecipes(actor, ['recipe-a'], { clearDiscovery: true });
+
+  const payload = Object.assign({}, ...actor.updateCalls);
+  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=recipe-a'], null);
+  assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=recipe-a'], null);
+  assert.ok(!('recipe-a' in actor.getFlag('fabricate', 'fabricate.discoveryProgress')));
+});
+
+test('773 per-system reset clears only that system\'s entries and leaves an orphan in place', async () => {
+  const recipes = [
+    buildMockRecipe({ id: 'r-sys1', craftingSystemId: 'system-1' }),
+    buildMockRecipe({ id: 'r-sys2', craftingSystemId: 'system-2' })
+    // 'r-orphan' intentionally has no recipe (unresolvable).
+  ];
+  const service = buildService({ recipes });
+  const actor = seedLearnedActor(
+    {
+      'r-sys1': { learnedAt: 1, sourceItemUuid: null },
+      'r-sys2': { learnedAt: 2, sourceItemUuid: null },
+      'r-orphan': { learnedAt: 3, sourceItemUuid: null }
+    },
+    { 'r-sys1': { progress: 50 } }
+  );
+
+  const result = await service.forgetSystemLearnedRecipes(actor, 'system-1');
+
+  assert.equal(result.count, 1);
+  const payload = Object.assign({}, ...actor.updateCalls);
+  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-sys1'], null);
+  assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=r-sys1'], null);
+  const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.ok(!('r-sys1' in learned), 'the targeted system entry is removed');
+  assert.ok('r-sys2' in learned, 'another system is untouched');
+  // Negative pin (b, direction 1): the orphan learned key is left in place.
+  assert.ok('r-orphan' in learned, 'an orphan (unresolvable recipe) is left in place per-system');
+});
+
+test('773 reset-all clears every learned key INCLUDING the orphan, plus discovery', async () => {
+  const recipes = [buildMockRecipe({ id: 'r-sys1', craftingSystemId: 'system-1' })];
+  const service = buildService({ recipes });
+  const actor = seedLearnedActor(
+    {
+      'r-sys1': { learnedAt: 1, sourceItemUuid: null },
+      'r-orphan': { learnedAt: 3, sourceItemUuid: null }
+    },
+    { 'r-sys1': { progress: 50 }, 'discovery-only': { progress: 10 } }
+  );
+
+  const result = await service.forgetAllLearnedRecipes(actor);
+
+  assert.equal(result.count, 2);
+  const payload = Object.assign({}, ...actor.updateCalls);
+  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-sys1'], null);
+  // Negative pin (b, direction 2): reset-all DOES delete the same orphan per-system left in place.
+  assert.equal(payload['flags.fabricate.fabricate.learnedRecipes.-=r-orphan'], null);
+  // A discovery-only id (never learned) is still cleared by reset-all.
+  assert.equal(payload['flags.fabricate.fabricate.discoveryProgress.-=discovery-only'], null);
+  const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.deepEqual(learned, {}, 'every learned key is gone after reset-all');
+  const discovery = actor.getFlag('fabricate', 'fabricate.discoveryProgress');
+  assert.deepEqual(discovery, {}, 'every discovery entry is gone after reset-all');
+});
+
+test('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resident safe entry survives byte-faithfully', async () => {
+  const service = buildService();
+  const dottedId = 'imported.recipe.id';
+  const safeEntry = { learnedAt: 7, sourceItemUuid: 'Actor.x.Item.book' };
+  const actor = seedLearnedActor({
+    [dottedId]: { learnedAt: 1, sourceItemUuid: null },
+    'safe-retained': safeEntry
+  });
+
+  await service.forgetLearnedRecipes(actor, [dottedId], { freeLearnBudget: false });
+
+  // Ordered payload assertion — call 1 is EXACTLY the parent delete...
+  assert.equal(actor.updateCalls.length, 1, 'exactly one update (the parent delete)');
+  assert.deepEqual(actor.updateCalls[0], { 'flags.fabricate.fabricate.-=learnedRecipes': null });
+  // ...call 2 is the retained-map write through setFlag (never folded into one update).
+  const learnedWrites = actor.setFlagCalls.filter((call) => call.key === 'fabricate.learnedRecipes');
+  assert.equal(learnedWrites.length, 1, 'the retained map is re-written once');
+  assert.ok(!(dottedId in learnedWrites[0].value), 'the dotted id is excluded from the retained map');
+  assert.deepEqual(
+    learnedWrites[0].value['safe-retained'],
+    safeEntry,
+    'the co-resident safe entry is retained byte-faithfully in the write payload'
+  );
+  // Post-reload (re-read): the retained entry survives byte-faithfully, dotted is gone.
+  const reloaded = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.deepEqual(reloaded['safe-retained'], safeEntry, 'retained entry survives post-reload');
+  assert.ok(!(dottedId in reloaded), 'the dotted entry is removed post-reload');
+});
+
+test('773 freeing budget decrements a still-held perInstance book learnedCount (floored at 0)', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'once', learnScope: 'perInstance', learnsAllowed: 1 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const book = new FakeItem({
+    uuid: 'Actor.a1.Item.book',
+    sourceId: 'Compendium.world.items.book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 1 } } }
+  });
+  const service = buildService({ system, recipes: [recipe] });
+  const actor = seedLearnedActor(
+    { 'r-a': { learnedAt: 1, sourceItemUuid: 'Actor.a1.Item.book' } },
+    {},
+    [book]
+  );
+
+  await service.forgetLearnedRecipes(actor, ['r-a']);
+
+  assert.equal(service._getRecipeItemLearnCount(book), 0, 'the per-copy learn count is freed');
+});
+
+test('773 freeing budget decrements the total party-pool key (GM-authoritative), still-held only', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnScope: 'total', learnsAllowed: 2 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const book = new FakeItem({ uuid: 'Actor.a1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const pool = makeDecrementablePartyPool({ 'system-1::book': 2 });
+  const recipeManager = { getRecipes: () => [recipe], getRecipe: (id) => (id === 'r-a' ? recipe : null) };
+  const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, pool);
+  const actor = seedLearnedActor(
+    { 'r-a': { learnedAt: 1, sourceItemUuid: 'Actor.a1.Item.book' } },
+    {},
+    [book]
+  );
+
+  await service.forgetLearnedRecipes(actor, ['r-a']);
+
+  assert.deepEqual(pool.decrements, ['system-1::book'], 'the total-scope pool key is decremented');
+  assert.equal(pool.get('system-1::book'), 1, 'the pool floors correctly on decrement');
+});
+
+test('773 an orphan entry frees NOTHING — no wrong-key decrement and no per-copy math', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnScope: 'total', learnsAllowed: 2 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const pool = makeDecrementablePartyPool({ 'system-1::book': 1 });
+  const recipeManager = { getRecipes: () => [recipe], getRecipe: (id) => (id === 'r-a' ? recipe : null) };
+  const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, pool);
+  // The learned entry names a source book the actor NO LONGER holds (no items).
+  const actor = seedLearnedActor(
+    { 'r-a': { learnedAt: 1, sourceItemUuid: 'Actor.gone.Item.book' } },
+    {},
+    []
+  );
+
+  await service.forgetLearnedRecipes(actor, ['r-a']);
+
+  assert.deepEqual(pool.decrements, [], 'no pool decrement for an unheld source');
+  assert.equal(pool.get('system-1::book'), 1, 'the shared budget is untouched for an orphan');
+});
+
+test('773 a HELD book whose recipe was deleted frees NOTHING (unresolvable-recipe orphan)', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnScope: 'total', learnsAllowed: 2 });
+  // The learned entry's recipe no longer resolves (recipe deleted) even though the
+  // source book is STILL HELD — the `if (!recipe) return` orphan path. It must free
+  // neither the party pool (an unreconstructable key) nor the per-copy count.
+  const pool = makeDecrementablePartyPool({ 'system-1::book': 1 });
+  const recipeManager = { getRecipes: () => [], getRecipe: () => null };
+  const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, pool);
+  const book = new FakeItem({
+    uuid: 'Actor.a1.Item.book',
+    sourceId: 'Compendium.world.items.book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 2 } } }
+  });
+  const actor = seedLearnedActor(
+    { 'deleted-recipe': { learnedAt: 1, sourceItemUuid: 'Actor.a1.Item.book' } },
+    {},
+    [book]
+  );
+
+  await service.forgetAllLearnedRecipes(actor);
+
+  assert.deepEqual(pool.decrements, [], 'no pool decrement for an unresolvable recipe');
+  assert.equal(pool.get('system-1::book'), 1, 'the shared budget is untouched');
+  assert.equal(
+    service._getRecipeItemLearnCount(book),
+    2,
+    'the held book per-copy count is untouched for an unresolvable-recipe orphan'
+  );
+  // The orphan learned key is still deleted (reset-all clears orphans).
+  assert.ok(!('deleted-recipe' in actor.getFlag('fabricate', 'fabricate.learnedRecipes')));
+});
+
+test('773 freeLearnBudget: false never touches the party pool (recipe-deletion cleanup path)', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnScope: 'total', learnsAllowed: 2 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const book = new FakeItem({ uuid: 'Actor.a1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const pool = makeDecrementablePartyPool({ 'system-1::book': 2 });
+  const recipeManager = { getRecipes: () => [recipe], getRecipe: (id) => (id === 'r-a' ? recipe : null) };
+  const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, pool);
+  const actor = seedLearnedActor(
+    { 'r-a': { learnedAt: 1, sourceItemUuid: 'Actor.a1.Item.book' } },
+    {},
+    [book]
+  );
+
+  await service.forgetLearnedRecipes(actor, ['r-a'], { freeLearnBudget: false });
+
+  assert.deepEqual(pool.decrements, [], 'freeLearnBudget: false frees no shared budget');
+});
+
+test('773 a degraded (non-GM) pool decrement is awaited without throwing', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnScope: 'total', learnsAllowed: 2 });
+  const recipe = buildCappedRecipe({ id: 'r-a' });
+  const book = new FakeItem({ uuid: 'Actor.a1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const degradedPool = { get: () => 2, increment: async () => false, decrement: async () => false };
+  const recipeManager = { getRecipes: () => [recipe], getRecipe: (id) => (id === 'r-a' ? recipe : null) };
+  const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, degradedPool);
+  const actor = seedLearnedActor(
+    { 'r-a': { learnedAt: 1, sourceItemUuid: 'Actor.a1.Item.book' } },
+    {},
+    [book]
+  );
+
+  const result = await service.forgetLearnedRecipes(actor, ['r-a']);
+  assert.equal(result.success, true, 'a degraded pool decrement fails closed, not throws');
+});
+
+test('773 auto-learn does not re-fire on a read path after a reset', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned' } }
+  });
+  const recipe = buildMockRecipe({ id: 'r-a' });
+  const service = buildService({ system, recipes: [recipe] });
+  const actor = seedLearnedActor({ 'r-a': { learnedAt: 1, sourceItemUuid: null } });
+
+  await service.forgetLearnedRecipes(actor, ['r-a']);
+
+  // Re-evaluating access (the reopen/refresh read path) must NOT re-learn — auto-learn
+  // only fires from the createItem hook, never from a render/read.
+  const before = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  service.evaluateRecipeAccess({ recipe, viewer: { isGM: false, id: 'u1' }, craftingActor: actor });
+  const after = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.deepEqual(after, before, 'no read-path re-learn after reset');
+  assert.ok(!('r-a' in after), 'the recipe stays forgotten');
+});
+
+test('773 forgetLearnedRecipes no-ops for an actor without update()', async () => {
+  const service = buildService();
+  const result = await service.forgetLearnedRecipes({ getFlag: () => ({}) }, ['r-a']);
+  assert.deepEqual(result, { success: false, count: 0 });
 });

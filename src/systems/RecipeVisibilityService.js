@@ -1,4 +1,9 @@
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import {
+  FABRICATE_FLAG_NAMESPACE,
+  getFabricateFlag,
+  isSafeFlagKeySegment,
+  setFabricateFlag,
+} from '../config/flags.js';
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
@@ -239,6 +244,26 @@ export class RecipeVisibilityService {
 
   async _setLearnedMap(actor, learned) {
     return await setFabricateFlag(actor, 'learnedRecipes', learned);
+  }
+
+  _getDiscoveryProgressMap(actor) {
+    const map = getFabricateFlag(actor, 'discoveryProgress', {});
+    return map && typeof map === 'object' ? map : {};
+  }
+
+  async _setDiscoveryMap(actor, discovery) {
+    return await setFabricateFlag(actor, 'discoveryProgress', discovery);
+  }
+
+  // Resolve a recipe by id — prefers the manager's `getRecipe` (constant-time) and
+  // falls back to scanning `getRecipes()`. Returns null for an orphan id whose recipe
+  // no longer exists (so per-system scoping and budget-freeing can skip it).
+  _getRecipeById(id) {
+    if (typeof this.recipeManager?.getRecipe === 'function') {
+      return this.recipeManager.getRecipe(id) || null;
+    }
+    const all = this.recipeManager?.getRecipes?.() || [];
+    return all.find((recipe) => String(recipe?.id) === String(id)) || null;
   }
 
   _getRecipeItemUsage(item) {
@@ -1696,19 +1721,194 @@ export class RecipeVisibilityService {
   async cleanupLearnedRecipes(validRecipeIds = new Set()) {
     for (const actor of game.actors || []) {
       const learned = this._getLearnedMap(actor);
-      const next = {};
-      let changed = false;
-      for (const [recipeId, value] of Object.entries(learned || {})) {
-        if (!validRecipeIds.has(recipeId)) {
-          changed = true;
-          continue;
-        }
-        next[recipeId] = value;
-      }
+      const staleIds = Object.keys(learned || {}).filter((id) => !validRecipeIds.has(id));
+      if (staleIds.length === 0) continue;
+      // Route through the shared deletion primitive so pruned keys are actually
+      // removed with explicit `-=` deletions (the prior filtered-map `_setLearnedMap`
+      // rebuild MERGED, so stale keys were never deleted and resurrected on reload).
+      // `freeLearnBudget: false` — recipe deletion is content management, not an
+      // in-fiction un-learn, so it must not refund any consumed learn budget.
+      await this.forgetLearnedRecipes(actor, staleIds, { freeLearnBudget: false });
+    }
+  }
 
-      if (changed) {
-        await this._setLearnedMap(actor, next);
+  /**
+   * The shared crafting-knowledge deletion primitive (issue 773) — the single path
+   * behind erase-one / reset-one-system / reset-all-systems. Removes each supplied
+   * recipe id from the actor's learned-knowledge store with explicit, reload-safe
+   * `-=` flag-key deletions at the full doubly-nested path
+   * `flags.fabricate.fabricate.learnedRecipes.-=<recipeId>` (and, when `clearDiscovery`,
+   * `flags.fabricate.fabricate.discoveryProgress.-=<recipeId>`), batched into ONE
+   * `Actor#update`. It NEVER prunes by rebuilding a filtered map through `setFlag`
+   * as the sole write — that merge never removes keys and the entry resurrects on
+   * reload (the `deleteRemovedActiveRunFlags` doctrine).
+   *
+   * Dotted (imported) recipe ids that `expandObject` would mis-split on `.` cannot be
+   * removed by a `-=<id>` key, so they route to a two-step delete-then-write fallback:
+   * the parent key is dropped (`flags.fabricate.fabricate.-=learnedRecipes`) and the
+   * retained map re-written — two SEQUENTIAL awaited operations, never a same-update
+   * mix (which `mergeObject` may process delete-after-insert and wipe the whole map).
+   *
+   * When `freeLearnBudget` (default true — reset/erase are respec/amnesia, so the
+   * actor must be able to re-learn), each cleared entry frees one consumed learn slot
+   * against a STILL-HELD source copy at its CURRENT `learnScope`: `perInstance`
+   * decrements the held item's `recipeItemLearning.learnedCount`; `total` decrements
+   * the GM-authoritative party-pool key. Orphan entries (no `sourceItemUuid`, an
+   * unheld source, or an unresolvable recipe) free NOTHING — a `total` pool key is
+   * unreconstructable once the recipe/definition is gone, so it is deliberately left
+   * as-is rather than risk a wrong-key decrement.
+   *
+   * @param {object} actor The actor document whose learned knowledge is mutated.
+   * @param {string[]} recipeIds Recipe ids to forget.
+   * @param {object} [options]
+   * @param {boolean} [options.freeLearnBudget=true] Free the consumed learn budget.
+   * @param {boolean} [options.clearDiscovery=false] Also clear each id's
+   *   `discoveryProgress` entry (the reset grains pass true; erase-one defaults off).
+   * @returns {Promise<{ success: boolean, count: number }>}
+   */
+  async forgetLearnedRecipes(
+    actor,
+    recipeIds,
+    { freeLearnBudget = true, clearDiscovery = false } = {}
+  ) {
+    if (!actor || typeof actor.update !== 'function') {
+      return { success: false, count: 0 };
+    }
+
+    const learnedMap = this._getLearnedMap(actor);
+    const discoveryMap = clearDiscovery ? this._getDiscoveryProgressMap(actor) : {};
+    const requested = [...new Set((recipeIds || []).map(String))];
+
+    // Split the request against what actually exists in each store, since a caller may
+    // pass discovery-only ids (reset-all) or ids absent from both.
+    const learnedIds = requested.filter((id) =>
+      Object.prototype.hasOwnProperty.call(learnedMap, id)
+    );
+    const discoveryIds = clearDiscovery
+      ? requested.filter((id) => Object.prototype.hasOwnProperty.call(discoveryMap, id))
+      : [];
+    if (learnedIds.length === 0 && discoveryIds.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // Capture budget context BEFORE any deletion (the entry's `sourceItemUuid` is
+    // needed to resolve the held copy) — budget only exists for LEARNED entries.
+    const budgetEntries = freeLearnBudget
+      ? learnedIds.map((id) => ({ recipeId: id, entry: learnedMap[id] }))
+      : [];
+
+    const learnedUnsafe = learnedIds.filter((id) => !isSafeFlagKeySegment(id));
+    const discoveryUnsafe = discoveryIds.filter((id) => !isSafeFlagKeySegment(id));
+    const nested = `flags.${FABRICATE_FLAG_NAMESPACE}.${FABRICATE_FLAG_NAMESPACE}`;
+
+    // Common (generated-id) case: batch per-key `-=` deletions for both stores into
+    // ONE update. A store with a dotted id is excluded here and handled by the
+    // two-step fallback below instead.
+    const updates = {};
+    if (learnedUnsafe.length === 0) {
+      for (const id of learnedIds) {
+        updates[`${nested}.learnedRecipes.-=${id}`] = null;
       }
     }
+    if (clearDiscovery && discoveryUnsafe.length === 0) {
+      for (const id of discoveryIds) {
+        updates[`${nested}.discoveryProgress.-=${id}`] = null;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await actor.update(updates);
+    }
+
+    // Two-step delete-then-write fallback for dotted learned ids: drop the parent key
+    // FIRST, then re-write the retained map so the merge lands on an absent key and is
+    // reload-safe. Ordering is load-bearing — never fold both into one update.
+    if (learnedUnsafe.length > 0) {
+      await actor.update({ [`${nested}.-=learnedRecipes`]: null });
+      const clearedLearned = new Set(learnedIds);
+      const retained = {};
+      for (const [id, value] of Object.entries(learnedMap)) {
+        if (!clearedLearned.has(id)) retained[id] = value;
+      }
+      await this._setLearnedMap(actor, retained);
+    }
+    if (clearDiscovery && discoveryUnsafe.length > 0) {
+      await actor.update({ [`${nested}.-=discoveryProgress`]: null });
+      const clearedDiscovery = new Set(discoveryIds);
+      const retainedDiscovery = {};
+      for (const [id, value] of Object.entries(discoveryMap)) {
+        if (!clearedDiscovery.has(id)) retainedDiscovery[id] = value;
+      }
+      await this._setDiscoveryMap(actor, retainedDiscovery);
+    }
+
+    for (const { recipeId, entry } of budgetEntries) {
+      await this._freeLearnBudgetForEntry(actor, recipeId, entry);
+    }
+
+    return { success: true, count: learnedIds.length };
+  }
+
+  // Free one consumed learn slot for a cleared learned entry, against the CURRENT
+  // learn scope of a STILL-HELD source copy. No-ops (frees nothing) for an auto-learn
+  // entry (no `sourceItemUuid`), a source book the actor no longer carries, or an
+  // orphan recipe id that no longer resolves — in particular a `total` pool key is
+  // unreconstructable once the recipe/definition is gone, so no pool math runs.
+  async _freeLearnBudgetForEntry(actor, recipeId, entry) {
+    const sourceItemUuid = entry?.sourceItemUuid;
+    if (!sourceItemUuid) return;
+    const heldItem = [...(actor.items || [])].find((item) => item?.uuid === sourceItemUuid);
+    if (!heldItem) return;
+    const recipe = this._getRecipeById(recipeId);
+    if (!recipe) return;
+    const definition = this._matchDefinitionForItem(recipe, heldItem);
+    if (this._getRecipeItemLearnScope(recipe, definition) === 'total') {
+      await this._partyLearnPool.decrement(this._partyLearnPoolKey(recipe, definition));
+      return;
+    }
+    const current = this._getRecipeItemLearnCount(heldItem);
+    await this._setRecipeItemLearnCount(heldItem, current - 1);
+  }
+
+  /**
+   * Reset one crafting system's learned knowledge for one actor (issue 773). Clears
+   * every learned entry whose recipe belongs to `systemId` (resolved via
+   * `getRecipe(id).craftingSystemId`) plus their scoped `discoveryProgress`. Orphan
+   * learned keys whose recipe no longer resolves are LEFT IN PLACE — they cannot be
+   * attributed to a system.
+   *
+   * @param {object} actor
+   * @param {string} systemId
+   * @param {object} [options]
+   * @param {boolean} [options.freeLearnBudget=true]
+   * @returns {Promise<{ success: boolean, count: number }>}
+   */
+  async forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget = true } = {}) {
+    if (!actor || typeof actor.update !== 'function') {
+      return { success: false, count: 0 };
+    }
+    const learnedMap = this._getLearnedMap(actor);
+    const ids = Object.keys(learnedMap).filter(
+      (id) => this._getRecipeById(id)?.craftingSystemId === systemId
+    );
+    return this.forgetLearnedRecipes(actor, ids, { freeLearnBudget, clearDiscovery: true });
+  }
+
+  /**
+   * Reset ALL learned knowledge for one actor across every crafting system (issue
+   * 773) — every learned key INCLUDING orphans, plus every `discoveryProgress` entry.
+   *
+   * @param {object} actor
+   * @param {object} [options]
+   * @param {boolean} [options.freeLearnBudget=true]
+   * @returns {Promise<{ success: boolean, count: number }>}
+   */
+  async forgetAllLearnedRecipes(actor, { freeLearnBudget = true } = {}) {
+    if (!actor || typeof actor.update !== 'function') {
+      return { success: false, count: 0 };
+    }
+    const learnedMap = this._getLearnedMap(actor);
+    const discoveryMap = this._getDiscoveryProgressMap(actor);
+    const ids = [...new Set([...Object.keys(learnedMap), ...Object.keys(discoveryMap)])];
+    return this.forgetLearnedRecipes(actor, ids, { freeLearnBudget, clearDiscovery: true });
   }
 }

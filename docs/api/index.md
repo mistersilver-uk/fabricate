@@ -73,6 +73,7 @@ game.fabricate.hideGatheringRealmForActor({ actor, systemId, realmId }) // GM-on
 game.fabricate.getGatheringEconomy({ systemId }) // Gathering economy block
 game.fabricate.setGatheringEconomy({ systemId, economy }) // GM-only economy update
 game.fabricate.getRecipeVisibilityService() // Visibility and knowledge
+game.fabricate.resetActorKnowledge({ actorId, systemId, freeLearnBudget }) // GM-only reset of one actor's learned recipes (one system, or all systems when systemId is null)
 game.fabricate.getResolutionModeService()   // Mode validation and resolution
 ```
 

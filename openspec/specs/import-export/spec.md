@@ -90,6 +90,18 @@ Keep-mode import MUST NOT regenerate component identifiers or any reference.
 Environment persistence on import MUST replace only the imported system's environments.
 It MUST NOT clobber other systems' environments, and a repeated overwrite MUST NOT accumulate or duplicate stale environments.
 
+### Import persistence batching
+
+Recipe persistence on import MUST issue a single `recipes` world-setting write for the whole imported batch, not one write per recipe.
+The batched persistence MUST preserve the per-recipe import outcome: the same skip / overwrite / create classification, the same imported / skipped / error counts, the same `collisions[]` entries, and the same `errors[]` isolation of a per-recipe persistence failure as an unbatched per-recipe import.
+The single change hook the writing client emits after the batch is unchanged.
+Collapsing the per-recipe writes additionally reduces a replicated player's mid-import refreshes from one per recipe to one at completion, which is a strictly-better consequence and not a behavioural regression.
+
+### Import progress feedback
+
+A system import MUST surface live progress to the GM while it runs, advancing at phase boundaries and periodically through the recipe phase, so a large import is not indistinguishable from a frozen client.
+Progress reporting MUST NOT alter the import's final state, summary counts, or reference reporting.
+
 ### Round-trip integrity
 
 For supported authoring data, a single-store keep-mode `export → import → export` MUST be equivalent modulo the volatile envelope fields `exportedAt` and `fabricateVersion`.

@@ -16,7 +16,8 @@ import {
   itemIsToolByDurableIdentity,
 } from '../utils/sourceUuid.js';
 
-import { buildCurrencyAffordProbe } from './currencyAffordance.js';
+import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
+import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -122,10 +123,15 @@ export class RecipeManager {
   /**
    * Create a new recipe
    * @param {Object} recipeData - Recipe configuration
-   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
-   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
-   *   valid but incomplete authoring shell (missing ingredient sets / result groups); such a
-   *   shell stays non-craftable because the engine gates on the full completeness contract.
+   * @param {{notify?: boolean, allowIncomplete?: boolean, persist?: boolean}} [options] - Set
+   *   notify=false for batch callers that emit their own summary. Set allowIncomplete=true to
+   *   persist a structurally valid but incomplete authoring shell (missing ingredient sets /
+   *   result groups); such a shell stays non-craftable because the engine gates on the full
+   *   completeness contract. Set persist=false for batch callers (e.g. the compendium importer)
+   *   that mutate the in-memory map per recipe and then issue a SINGLE `save()` after the whole
+   *   batch; validation, map mutation, and notify/emitChange gating are unchanged, only the
+   *   per-recipe `save()` (one whole-array `recipes` world write) is skipped. Default `true`
+   *   keeps every single-recipe caller issuing its one write.
    * @returns {Promise<Recipe>}
    */
   async createRecipe(recipeData, options = {}) {
@@ -158,7 +164,9 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipe.id, recipe);
-    await this.save();
+    if (options.persist !== false) {
+      await this.save();
+    }
     console.debug(`Fabricate | Created recipe "${recipe.name}" (${recipe.id})`);
 
     if (options.notify !== false) {
@@ -174,10 +182,15 @@ export class RecipeManager {
    * Update an existing recipe
    * @param {string} recipeId - Recipe ID to update
    * @param {Object} updates - Properties to update
-   * @param {{notify?: boolean, allowIncomplete?: boolean}} [options] - Set notify=false for batch
-   *   callers that emit their own summary. Set allowIncomplete=true to persist a structurally
-   *   valid but incomplete authoring shell (e.g. identity-only edits to a recipe whose
-   *   ingredients/results are still empty); such a shell stays non-craftable.
+   * @param {{notify?: boolean, allowIncomplete?: boolean, persist?: boolean}} [options] - Set
+   *   notify=false for batch callers that emit their own summary. Set allowIncomplete=true to
+   *   persist a structurally valid but incomplete authoring shell (e.g. identity-only edits to a
+   *   recipe whose ingredients/results are still empty); such a shell stays non-craftable. Set
+   *   persist=false for batch callers (e.g. the compendium importer) that mutate the in-memory
+   *   map per recipe and then issue a SINGLE `save()` after the whole batch; validation, map
+   *   mutation, and notify/emitChange gating are unchanged, only the per-recipe `save()` (one
+   *   whole-array `recipes` world write) is skipped. Default `true` keeps every single-recipe
+   *   caller issuing its one write.
    * @returns {Promise<Recipe>}
    */
   async updateRecipe(recipeId, updates, options = {}) {
@@ -216,7 +229,9 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipeId, updatedRecipe);
-    await this.save();
+    if (options.persist !== false) {
+      await this.save();
+    }
     console.debug(`Fabricate | Updated recipe "${updatedRecipe.name}" (${updatedRecipe.id})`);
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${updatedRecipe.name}" updated`);
@@ -463,6 +478,12 @@ export class RecipeManager {
     // it. A null actor yields a probe that is always false (currency shows missing).
     const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
 
+    // Resolve the recipe's currency units once so a currency option's cost row can
+    // render a human label (abbreviation, else label) instead of the raw unit id.
+    // Normalizing here (not the raw config units) applies the abbreviation self-heal
+    // and works even when currency is disabled/invalid.
+    const currencyUnits = this._resolveNormalizedCurrencyUnits(recipe);
+
     // Bind the component-aware essence resolver so an essence GROUP option can draw
     // down items carrying that essence (issue 649). Byte-for-byte for recipes with no
     // essence options; a capability increase for those that do.
@@ -559,7 +580,8 @@ export class RecipeManager {
       displaySelection,
       availableItems,
       optionOverrides,
-      affordCurrency
+      affordCurrency,
+      currencyUnits
     );
     // Tag each ingredient state with whether its group has a choice + how many
     // alternatives, so the tile can show a discoverability badge next to it.
@@ -916,6 +938,19 @@ export class RecipeManager {
   }
 
   /**
+   * Resolve the recipe's configured currency units into normalized units so a currency
+   * option's cost row renders a human label. Normalizing (rather than reading the raw
+   * config units) applies the abbreviation self-heal, so a legacy unit whose stored
+   * abbreviation is its own generated id still resolves to its label.
+   * @private
+   * @returns {object[]}
+   */
+  _resolveNormalizedCurrencyUnits(recipe) {
+    const units = getCurrencyRequirementConfig(recipe)?.units || [];
+    return units.map((unit) => normalizeCurrencyUnit(unit)).filter(Boolean);
+  }
+
+  /**
    * Build the player-facing per-group option/stack choices (issue 552). Only groups
    * that offer a real choice appear: a MULTI-option group emits an `option`
    * radiogroup, and when the currently-chosen option is a tag matching MORE THAN ONE
@@ -937,7 +972,8 @@ export class RecipeManager {
     selection,
     availableItems,
     optionOverrides,
-    affordCurrency
+    affordCurrency,
+    currencyUnits = []
   ) {
     const groups = Array.isArray(ingredientSet?.ingredientGroups)
       ? ingredientSet.ingredientGroups
@@ -964,7 +1000,14 @@ export class RecipeManager {
           groupName,
           selectedOptionIndex,
           options: options.map((option, idx) =>
-            this._buildOptionChoice(recipe, option, idx, availableItems, affordCurrency)
+            this._buildOptionChoice(
+              recipe,
+              option,
+              idx,
+              availableItems,
+              affordCurrency,
+              currencyUnits
+            )
           ),
         });
       }
@@ -1005,7 +1048,14 @@ export class RecipeManager {
    * indicator per alternative, independent of the shared remaining-quantity pool).
    * @private
    */
-  _buildOptionChoice(recipe, option, optionIndex, availableItems, affordCurrency) {
+  _buildOptionChoice(
+    recipe,
+    option,
+    optionIndex,
+    availableItems,
+    affordCurrency,
+    currencyUnits = []
+  ) {
     const visual = this._resolveIngredientVisual(recipe, option, availableItems);
     const isCurrency = option?.match?.type === 'currency';
     if (isCurrency) {
@@ -1022,7 +1072,7 @@ export class RecipeManager {
         have: 0,
         satisfied: affordable,
         isCurrency: true,
-        costLabel: spend ? `${spend.amount} ${spend.unit}` : '',
+        costLabel: spend ? formatCurrencyRequirement(spend, currencyUnits) : '',
         affordable,
       };
     }
