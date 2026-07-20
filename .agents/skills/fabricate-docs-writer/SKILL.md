@@ -64,7 +64,7 @@ A dangling `{% link %}` fails the Jekyll build.
 
 1. Read the diff first.
 2. Verify the assigned worktree path, branch or detached target, base SHA, owned paths, and clean state before acting.
-Stop and return `DOCS NEEDS_CHANGES` when the assignment does not match the worktree.
+Stop and return `BLOCKED` when the assignment does not match the worktree.
 3. Read the changed source files before writing docs.
 4. Read the corresponding docs pages.
 5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language.
