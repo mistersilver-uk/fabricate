@@ -1134,3 +1134,42 @@ test('#776: import emits progress at phase boundaries, ticks through recipes, an
   );
   assert.equal(saveCalls.length, 1, 'the recipe batch is flushed once');
 });
+
+test('#776: the default progress reporter opens a FRESH toast on each run of a reused importer', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const savedUi = globalThis.ui;
+  const infoCalls = [];
+  globalThis.ui = {
+    notifications: {
+      info: (...args) => {
+        infoCalls.push(args);
+        return undefined; // stub handle: exercises the undefined-handle guard too
+      },
+      warn() {},
+      error() {}
+    }
+  };
+
+  try {
+    const systemManager = makeMockSystemManager({});
+    const recipeManager = makeMockRecipeManager({});
+    // No reportProgress seam injected: the stateful default reporter path is exercised.
+    const importer = new CompendiumImporter(systemManager, recipeManager);
+
+    await importer.importFromPackData(makePackData({ recipes: [makeImportRecipe('r1')] }));
+    const afterRun1 = infoCalls.length;
+    assert.ok(afterRun1 >= 1, 'run 1 opens a progress toast via ui.notifications.info');
+
+    // A per-INSTANCE default reporter would already be `started` here and update the
+    // (dismissed) run-1 toast without opening a new one, leaving zero new info() calls.
+    await importer.importFromPackData(makePackData({ recipes: [makeImportRecipe('r2')] }));
+    assert.ok(
+      infoCalls.length > afterRun1,
+      'run 2 opens a fresh progress toast on the reused importer (per-run reporter)'
+    );
+  } finally {
+    globalThis.ui = savedUi;
+  }
+});

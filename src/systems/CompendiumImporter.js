@@ -158,7 +158,14 @@ export class CompendiumImporter {
         return g?.user ? g.user.isGM === true : true;
       });
     this._resolveExternalUuid = seams.resolveExternalUuid ?? defaultResolveExternalUuid;
-    this._reportProgress = seams.reportProgress ?? createDefaultProgressReporter();
+    // Store the injected seam (or null). The DEFAULT reporter is stateful — it opens
+    // and then drives a single toast — and this importer is a long-lived singleton in
+    // main.js reused across imports, so the default MUST be constructed per RUN (see
+    // importFromPackData) rather than once here; otherwise a second import would try to
+    // update the first run's already-dismissed toast. An injected seam is stateless and
+    // is reused as-is.
+    this._reportProgress = seams.reportProgress ?? null;
+    this._activeProgressReporter = null;
   }
 
   /**
@@ -203,6 +210,11 @@ export class CompendiumImporter {
       // scenes, scene-regions, macros, drop-row items, broken internal links).
       unresolvedReferences: [],
     };
+
+    // Fresh progress reporter per RUN: the default reporter carries per-toast state,
+    // and this importer instance is reused across imports (main.js singleton), so a new
+    // reporter is built here for each run. An injected seam is reused directly.
+    this._activeProgressReporter = this._reportProgress ?? createDefaultProgressReporter();
 
     const systemLabel = summary.system.name || 'crafting system';
     this._emitProgress({ pct: 0, phase: 'start', message: `Importing ${systemLabel}…` });
@@ -373,7 +385,7 @@ export class CompendiumImporter {
    * @private
    */
   _emitProgress({ pct, message, phase } = {}) {
-    this._reportProgress?.({ pct: clampProgressFraction(pct), message, phase });
+    this._activeProgressReporter?.({ pct: clampProgressFraction(pct), message, phase });
   }
 
   /**
