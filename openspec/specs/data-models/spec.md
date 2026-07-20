@@ -494,6 +494,8 @@ type CurrencyUnit = {
 
 1. `id` is stable after creation and is the value stored by salvage currency requirements.
 2. `label`, `abbreviation`, `icon`, `actorPath`, `denomination`, and `contains[]` are GM-editable.
+`abbreviation` is **optional** and defaults to the empty string when unauthored.
+It is **never** defaulted to, or persisted as, the unit `id`.
 3. A unit must not contain itself directly or indirectly, and a single unit's decomposition must reach each descendant by exactly one path.
 A sub-unit `S` is eligible for parent `P` only when the set of units reachable from `P` (inclusive, through `contains[]`) and the set reachable from `S` are disjoint; this subsumes self-containment, an already-direct child, a cycle back to `P`, and the descendant/diamond cases where `P` would gain two conversion paths to the same node.
 A profile where any unit reaches the same descendant by more than one distinct path is a validation error (conflicting conversion paths).
@@ -505,6 +507,10 @@ A unit legitimately shared as a child of two different parents (e.g. `gp -> sp` 
    - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
    - Under `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination`/`actorPath` are not required.
 Additionally, the config-level `canAfford` and `decrement` macros must be set (the `increment` macro is optional).
+The `"macro"` requirement is unchanged by the abbreviation default: an empty `abbreviation` (the new default for an unauthored unit) still produces the missing-abbreviation validation error under `"macro"`.
+7. When a stored `abbreviation` strictly equals the unit `id` **and** the id has the generated-id shape (`/^[A-Za-z0-9]{10,}$/`, matching `foundry.utils.randomID()` or the crypto fallback), normalization treats the abbreviation as unauthored and resets it to the empty string (legacy self-heal).
+Short or non-alphanumeric semantic ids are **deliberately left un-healed** even when `abbreviation === id`: they fail the generated-id shape guard, so a hand-authored abbreviation that intentionally equals a semantic id (e.g. the seeded preset coin keys `cp`/`sp`/`ep`/`gp`/`pp`, the only such ids in practice) is preserved.
+The self-heal only ever fires on the accidental, machine-generated bake.
 
 ### Recipe Visibility Requirements
 
@@ -1134,6 +1140,9 @@ On a shortfall the craft aborts with an `Insufficient currency` message and zero
 4. Currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
 Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
+6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored) → `label`, so a well-formed requirement never surfaces the raw unit `id`.
+The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the system's resolved currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
+This applies to the player crafting-app currency option cost row (`RecipeManager` resolves the recipe's currency units through `normalizeCurrencyUnit` so the abbreviation self-heal applies, then formats the row through `formatCurrencyRequirement`).
 
 ### Essence-Alternative Consumption (Craft-Time)
 
