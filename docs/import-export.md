@@ -67,3 +67,19 @@ Recipe book membership is carried across to the regenerated recipe identifiers, 
 > Fabricate generates a valid identifier for every system you create, so any system you authored in Fabricate and exported imports cleanly.
 > If you hand-edit an export file and give a system an identifier that contains a dot or a space, importing it in Skip or Overwrite mode fails with an error that names the offending identifier, because those modes keep the original identifier.
 > Either fix the identifier in the file, or import it in Copy mode, which assigns a fresh valid identifier.
+
+## Recipes removed by a reinstall
+
+When you Overwrite an existing system with a newer version of the same pack, Fabricate removes the recipes that the pack used to ship and no longer includes.
+It only removes recipes that came from that pack.
+A recipe you authored yourself in an imported system is never removed automatically by a reinstall.
+
+If you edited a recipe that came from the pack, that recipe still counts as the pack's recipe, so it is removed when a newer version of the pack no longer ships it.
+To keep a customization through a pack update, author a fresh recipe of your own rather than editing the pack's recipe.
+Recipes you author are never removed automatically, so a fresh recipe survives every reinstall.
+
+Recipes that were imported before this behavior existed carry no record of the pack they came from, so a reinstall reports them instead of removing them.
+The next time you reinstall the pack, those recipes gain that record, and a later reinstall can then remove them if the pack has dropped them.
+
+Fabricate keeps a record of which recipes a reinstall removed and which it kept, but the import report shown in Foundry does not display that list yet.
+Showing it in the import dialog is a planned follow-up.
