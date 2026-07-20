@@ -1748,6 +1748,9 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     await csm.updateSystem(simpleSystemId, {
       resolutionMode: 'simple',
       salvageResolutionMode: 'simple',
+      // Issue 765: unlock explicit multi-step authoring so the simple system can host
+      // a stepped recipe (the player-crafting-multistep screenshot subject).
+      features: { multiStepRecipes: true },
       tools: [
         {
           // Always breaks (rng()*100 ∈ [0,100) < 100) → deterministic breakageChance break.
@@ -1880,6 +1883,46 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         name: 'Filigree',
         results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }]
       }]
+    });
+
+    // Explicit multi-step simple recipe (issue 765): the reported defect. Its sets
+    // live on steps[] with empty top-level arrays, so the step-aware listing
+    // projection must surface each step's materials, evaluate the first step's
+    // craftability, and resolve PRODUCES from the TERMINAL step. Checks stay off
+    // (the simple system has no authored formula), so no check card renders — the
+    // player-crafting-multistep screenshot subject. Additive: no execution assert
+    // consumes it. Step 1 consumes held planks (craftable/available); step 2's
+    // dowel is the intermediate, and the final product is the crate.
+    const multiStepRecipe = await rm.createRecipe({
+      name: 'Smoke Raise Tent',
+      description:
+        'Simple-mode multi-step craft (issue #765): step 1 cuts planks, step 2 raises the frame.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/environment/settlement/tent-white.webp',
+      ingredientSets: [],
+      resultGroups: [],
+      steps: [
+        {
+          name: 'Cut Planks',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Plank',
+              options: [{ quantity: 2, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+            }]
+          }],
+          resultGroups: [{ name: 'Dowel', results: [{ componentId: simpleMap['Smoke Dowel'], quantity: 1 }] }]
+        },
+        {
+          name: 'Raise Frame',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Dowel',
+              options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Dowel'] } }]
+            }]
+          }],
+          resultGroups: [{ name: 'Crate', results: [{ componentId: simpleMap['Smoke Crate'], quantity: 1 }] }]
+        }
+      ]
     });
 
     // ── 3. ROUTED-BY-INGREDIENTS system (multi-set → differing groups) ──────
@@ -7203,6 +7246,49 @@ async function main() {
               error: String(altError?.message ?? altError)
             });
             process.stdout.write(`  Player Crafting alternatives capture skipped: ${altError?.message ?? altError}\n`);
+          }
+
+          // ── Explicit multi-step simple recipe (issue 765) ─────────────────
+          // Select the seeded 'Smoke Raise Tent' recipe (a simple-mode recipe whose
+          // sets live on steps[]). The step-aware projection must render an ordered
+          // per-step requirement list (data-recipe-section="steps") with the hint
+          // strip, one terminal PRODUCES row (the crate, not step 1's dowel), and no
+          // check card. Defensive: a missing recipe records a failed step rather than
+          // aborting the phase.
+          try {
+            const recipeSearch = appShell.locator('.crafting-browser-search input').first();
+            await recipeSearch.fill('Smoke Raise Tent');
+            await page.waitForTimeout(350);
+            const tentRow = appShell
+              .locator('[data-recipe-id]:has-text("Smoke Raise Tent")')
+              .first();
+            await tentRow.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await tentRow.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
+            // Wait for the ordered step list (a stable section marker, not leaf content).
+            await appShell.locator('[data-recipe-section="steps"]').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            const stepBlocks = await appShell.locator('[data-recipe-section="steps"] [data-recipe-step]').count();
+            const hasHint = await appShell.locator('[data-recipe-section="steps-hint"]').count();
+            const hasCheck = await appShell.locator('[data-recipe-section="check"]').count();
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-multistep');
+            // Restore the unfiltered recipe list for the subsequent frames.
+            await recipeSearch.fill('').catch(() => {});
+            await page.waitForTimeout(200);
+            results.steps.push({
+              step: 'player-crafting-multistep',
+              passed: stepBlocks >= 2 && hasHint > 0 && hasCheck === 0,
+              stepBlocks,
+              hasHint: hasHint > 0,
+              checkCardShown: hasCheck > 0
+            });
+          } catch (multiStepError) {
+            results.steps.push({
+              step: 'player-crafting-multistep',
+              passed: false,
+              error: String(multiStepError?.message ?? multiStepError)
+            });
+            process.stdout.write(`  Player Crafting multi-step capture skipped: ${multiStepError?.message ?? multiStepError}\n`);
           }
 
           // ── Progressive player stage list (issue 651) ─────────────────────
