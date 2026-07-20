@@ -297,6 +297,11 @@ The consequence: **a string occupying a namespace slot silently shadows every ke
 Every child key of the shadowing string is affected at once.
 `tests/ui-lang-keys-resolve.test.js` (PR #674) gates only the **reference direction** (a key the code reads must exist); it does **not** detect a shadowed namespace, and **orphaned keys stay invisible to it entirely**.
 So when adding a key, check no ancestor path is itself a string, and prefer a distinct leaf (`…Salvage.Label`) over reusing a container path as a value.
+- **`setFlag` / `Document#update` OBJECT flags DEEP-MERGE, so removing a key needs an explicit `-=` deletion — whereas `game.settings.set` REPLACES the whole value and needs no deletion key.** This merge-vs-replace split is load-bearing across three subsystems: active-run containers, learned knowledge, and the party learn pool.
+An object flag written through `setFabricateFlag` is stored DOUBLY nested (`flags.fabricate.fabricate.<key>`) because the helper prefixes `fabricate.` and `expandObject` nests it again under the scope, so the deletion key is `flags.fabricate.fabricate.<map>.-=<id>` — a shallow `flags.fabricate.<map>.-=<id>` silently no-ops and the entry resurrects on reload.
+Never prune by rebuilding a filtered map and writing it back through `setFlag` as the sole write — that merge never removes keys.
+A same-`update` parent-delete + re-assert mix (`-=<map>` plus a fresh `<map>` in one payload) is ORDER-DEPENDENT in `mergeObject` (no delete-before-insert guarantee, so it can process the delete last and wipe the whole map); issue TWO sequential awaited updates instead — parent `-=<map>` first, then the retained-map write.
+See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `deleteRemovedActiveRunFlags` (`src/config/flags.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
