@@ -331,7 +331,7 @@ export class CraftingListingBuilder {
       blockingReasons,
       ingredientSets,
       defaultSetId,
-      check: this._buildCheck(system, mode, craftingActor),
+      check: this._buildCheck(system, mode, recipe, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
       result: this._buildResult({ recipe, system, mode, defaultSet }),
       // Per-step requirement projection (`simple` multi-step only; [] otherwise). Each
@@ -382,7 +382,7 @@ export class CraftingListingBuilder {
       defaultSetId: null,
       // A teaser surfaces no step data, redacted exactly as `result`/`outcomeTiers`.
       steps: [],
-      check: showResults ? this._buildCheck(system, mode) : null,
+      check: showResults ? this._buildCheck(system, mode, recipe) : null,
       outcomeTiers: showResults ? this._buildOutcomeTiers({ recipe, system, mode }) : null,
       result: showResults
         ? this._buildResult({
@@ -519,9 +519,29 @@ export class CraftingListingBuilder {
    * The crafting-check descriptor for the recipe's resolution mode, or null when
    * the system configures no check block for that mode. `usable` is true iff an
    * authored, non-empty roll formula exists — NOT the legacy `enabled` flag.
+   *
+   * The displayed `dc` is resolved per-recipe (not per-system) with the same
+   * precedence the engine (`CraftingEngine._resolveSimpleCheckDc`) and the GM
+   * manager (`_buildRecipeCheckSummary`) use: the recipe's selected difficulty tier
+   * (`recipe.checkTierId` → the matching `config.tiers[].dc`) wins, falling back to
+   * the slot's static `config.dc`; both the tier DC and a finite static DC are
+   * truncated to an integer. A routed-fixed check and a dynamic (macro-resolved) DC
+   * both report `dc: null` (no chip): a fixed check matches by value range, and a
+   * dynamic DC is resolved at craft time — this read-only builder never runs the
+   * macro. Unlike the engine/GM row, a slot with a `rollFormula` but no finite
+   * static `dc` reports `null` rather than the hardcoded `15` fallback — a
+   * deliberate display-only divergence so the listing never surfaces a DC chip
+   * where none is authored.
+   *
+   * @param {object} system - The resolved crafting system.
+   * @param {string} mode - The system's resolution mode.
+   * @param {object} recipe - The recipe being projected (drives tier-DC selection).
+   * @param {object|null} [craftingActor] - The acting character, for @-placeholder
+   *   resolution of the display formula. Omitted (null) for a teaser projection so
+   *   formula resolution stays suppressed.
    * @private
    */
-  _buildCheck(system, mode, craftingActor = null) {
+  _buildCheck(system, mode, recipe, craftingActor = null) {
     const checks = system?.craftingCheck ?? {};
     // Alchemy selects its check slot from the SYSTEM-level `alchemy.checkMode`:
     // none → no check card, simple → the pass/fail slot, tiered → the routed slot.
@@ -598,8 +618,14 @@ export class CraftingListingBuilder {
     const routedFixed =
       (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
       config.type === 'fixed';
+    // Resolve the displayed DC AFTER the #765 suppression guard above (never
+    // reorder it there): routed-fixed and dynamic-DC checks surface no chip
+    // (`null`); otherwise the recipe's tier DC wins over the static fallback. See
+    // the method JSDoc and `_resolveDisplayDc`.
+    const dc =
+      routedFixed || config.dcMode === 'dynamic' ? null : this._resolveDisplayDc(config, recipe);
     return {
-      dc: routedFixed ? null : (config.dc ?? null),
+      dc,
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
       resolvedFormula: resolution?.display ?? null,
       formulaResolved: resolution ? resolution.resolved === true : null,
@@ -608,6 +634,28 @@ export class CraftingListingBuilder {
       mandatory,
       usable,
     };
+  }
+
+  /**
+   * The DC to display for a resolved check `config`, mirroring the engine's
+   * `_resolveSimpleCheckDc` tier/static precedence for the tier and integer-static
+   * cases: the recipe's selected difficulty tier (`recipe.checkTierId` → matching
+   * `config.tiers[].dc`, truncated) wins, else the finite static `config.dc`
+   * (truncated). Unlike the engine/GM row, a slot with no finite static `dc`
+   * returns `null` (no chip) rather than the hardcoded `15` — a deliberate
+   * display-only divergence. Callers resolve the routed-fixed and dynamic-DC
+   * `null` cases before this.
+   * @private
+   */
+  _resolveDisplayDc(config, recipe) {
+    const tierId = recipe?.checkTierId;
+    if (tierId) {
+      const tiers = Array.isArray(config.tiers) ? config.tiers : [];
+      const tier = tiers.find((entry) => entry?.id === tierId);
+      const tierDc = Number(tier?.dc);
+      if (tier && Number.isFinite(tierDc)) return Math.trunc(tierDc);
+    }
+    return Number.isFinite(Number(config.dc)) ? Math.trunc(Number(config.dc)) : (config.dc ?? null);
   }
 
   /**

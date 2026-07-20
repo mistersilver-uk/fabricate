@@ -6,7 +6,17 @@ import {
   CRAFTING_BROWSE_STATUS,
 } from '../src/systems/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
+
+// A minimal CraftingEngine used ONLY to pin the player-listing DC to the number the
+// engine actually rolls against (`_resolveSimpleCheckDc`), so the parity assertions
+// bind to real engine behaviour rather than a hard-coded literal. The non-dynamic
+// tier/static resolution path touches no Foundry global (no macro, no Roll), so a
+// bare engine over a stub recipe manager is sufficient.
+const parityEngine = new CraftingEngine({});
+const engineDc = (system, config, recipe) =>
+  parityEngine._resolveSimpleCheckDc(system, config, recipe, null, null);
 
 const PLAYER = { id: 'user-1', isGM: false };
 const GM = { id: 'gm-1', isGM: true };
@@ -512,6 +522,171 @@ describe('CraftingListingBuilder — crafting check', () => {
     const { recipe } = buildOne();
     assert.equal(recipe.check.resolvedFormula, null);
     assert.equal(recipe.check.formulaResolved, null);
+  });
+});
+
+describe('CraftingListingBuilder — check DC resolution (issue 778)', () => {
+  it('simple: the recipe difficulty tier DC wins over the static default (engine parity)', async () => {
+    const system = makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 15, tiers: [{ id: 'common', name: 'Common', dc: 13 }] },
+        routed: {},
+        progressive: {},
+      },
+    });
+    const tieredRecipe = makeRecipe({ checkTierId: 'common' });
+    const { recipe } = buildOne({
+      system,
+      entries: [{ recipe: tieredRecipe, access: { reason: 'ok' } }],
+    });
+    assert.equal(recipe.check.dc, 13, 'the tier DC, not the system default of 15');
+    assert.equal(
+      recipe.check.dc,
+      await engineDc(system, system.craftingCheck.simple, tieredRecipe),
+      'the displayed DC equals the DC the engine rolls against'
+    );
+  });
+
+  it('simple: a fractional tier DC is truncated to match the engine', async () => {
+    const system = makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 15, tiers: [{ id: 'common', dc: 13.7 }] },
+        routed: {},
+        progressive: {},
+      },
+    });
+    const tieredRecipe = makeRecipe({ checkTierId: 'common' });
+    const { recipe } = buildOne({
+      system,
+      entries: [{ recipe: tieredRecipe, access: { reason: 'ok' } }],
+    });
+    assert.equal(recipe.check.dc, 13, 'Math.trunc(13.7)');
+    assert.equal(recipe.check.dc, await engineDc(system, system.craftingCheck.simple, tieredRecipe));
+  });
+
+  it('simple: no checkTierId falls back to the truncated static DC', () => {
+    const system = makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 15, tiers: [{ id: 'common', dc: 13 }] },
+        routed: {},
+        progressive: {},
+      },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, 15, 'the static default when no tier is selected');
+  });
+
+  it('simple: an unmatched checkTierId falls back to the static DC (distinct engine branch)', async () => {
+    const system = makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 15, tiers: [{ id: 'common', dc: 13 }] },
+        routed: {},
+        progressive: {},
+      },
+    });
+    const unmatchedRecipe = makeRecipe({ checkTierId: 'nope' });
+    const { recipe } = buildOne({
+      system,
+      entries: [{ recipe: unmatchedRecipe, access: { reason: 'ok' } }],
+    });
+    assert.equal(recipe.check.dc, 15, 'an id that matches no tier falls back to the static DC');
+    assert.equal(
+      recipe.check.dc,
+      await engineDc(system, system.craftingCheck.simple, unmatchedRecipe)
+    );
+  });
+
+  it('simple: a dynamic (macro) DC shows no chip (null), not the static fallback', () => {
+    // The non-null static dc is load-bearing: it makes `=== null` provably reject the
+    // old `config.dc`-shown behaviour. Deliberately NOT bound to the engine — the
+    // engine returns the static/macro value there; the builder suppresses the chip.
+    const system = makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 15, dcMode: 'dynamic', macroUuid: 'Macro.abc' },
+        routed: {},
+        progressive: {},
+      },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, null, 'a browse-time listing never runs the macro');
+  });
+
+  it('routedByCheck + relative: the tier DC wins over the static routed DC (engine parity)', async () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      craftingCheck: {
+        simple: {},
+        routed: {
+          rollFormula: '1d20',
+          dc: 12,
+          type: 'relative',
+          tiers: [{ id: 'hard', dc: 18 }],
+        },
+        progressive: {},
+      },
+    });
+    const tieredRecipe = makeRecipe({ checkTierId: 'hard' });
+    const { recipe } = buildOne({
+      system,
+      entries: [{ recipe: tieredRecipe, access: { reason: 'ok' } }],
+    });
+    assert.equal(recipe.check.dc, 18, 'the tier DC, not the static routed.dc of 12');
+    assert.notEqual(recipe.check.dc, 12);
+    assert.equal(
+      recipe.check.dc,
+      await engineDc(system, system.craftingCheck.routed, tieredRecipe),
+      'the routed-relative display DC equals the engine-resolved DC'
+    );
+  });
+
+  it('a rollFormula slot with no finite static DC shows no chip (deliberate divergence from the engine 15)', async () => {
+    const system = makeSystem({
+      craftingCheck: { simple: { rollFormula: '1d20' }, routed: {}, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.equal(recipe.check.dc, null, 'no chip where no DC is authored, unlike the engine 15');
+    assert.equal(
+      await engineDc(system, system.craftingCheck.simple, makeRecipe()),
+      15,
+      'the engine falls back to 15 — the builder intentionally does not chase it'
+    );
+  });
+
+  it('teaser: a shown-results teaser surfaces the tier DC; a hidden-results teaser hides the check', () => {
+    // Uses a tiered fixture (tier DC 13 ≠ static 15) so the actor-less
+    // `_buildCheck(system, mode, recipe)` call site actually threads the recipe.
+    const system = makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 15, tiers: [{ id: 'common', dc: 13 }] },
+        routed: {},
+        progressive: {},
+      },
+    });
+    const shown = buildOne({
+      system,
+      entries: [
+        {
+          recipe: makeRecipe({ checkTierId: 'common', description: 'SECRET.' }),
+          access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients'] } },
+        },
+      ],
+    }).recipe;
+    assert.equal(shown.redaction.redacted, true);
+    assert.equal(shown.check.dc, 13, 'the shown-results teaser reports the tier DC, not the static default');
+
+    const hidden = buildOne({
+      system,
+      entries: [
+        {
+          recipe: makeRecipe({ checkTierId: 'common', description: 'SECRET.' }),
+          access: {
+            reason: 'teaser',
+            teaserState: { hiddenFields: ['ingredients', 'results', 'description'] },
+          },
+        },
+      ],
+    }).recipe;
+    assert.equal(hidden.check, null, 'a hidden-results teaser leaks no check');
   });
 });
 
