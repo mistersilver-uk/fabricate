@@ -23,6 +23,46 @@ export function isSafeFlagKeySegment(segment) {
   return typeof segment === 'string' && FABRICATE_FLAG_KEY_SEGMENT_PATTERN.test(segment);
 }
 
+/**
+ * Stamp a durable per-system ROLE identity on a plain item-data payload's flags,
+ * BEFORE creation, so the inventory/tool matchers attribute the created item to its OWN
+ * definition regardless of naming collisions or Foundry's transitive
+ * `_stats.duplicateSource` chain. This is the single shared write-side stamp behind every
+ * creation site that needs a durable identity leaf — the crafted-output stamp
+ * (`stampCraftedComponentIdentity`, issue 539), gathering awards, and the two
+ * tool-replacement grant creators (issue 780).
+ *
+ * The stamp keys the SAME location the canonical readers in `src/utils/sourceUuid.js` read
+ * FIRST for an owned item — its tier-1 durable-flag identity
+ * (`claimedRoleId` → `flags.fabricate.roles[systemId][roleKey]`) — so a freshly created
+ * item resolves to its own definition by identity and never reaches the source-ref tier.
+ * Mirrors the source-side stamp `CraftingSystemManager` writes via
+ * `setFabricateFlag(source, 'roles.<systemId>.<roleKey>', id)`: the roles map lives at the
+ * doubly-nested `flags.fabricate.fabricate.roles` path (`normalizeFlagKey` prefixes
+ * `fabricate.`, then `expandObject` nests it under the `fabricate` scope), so on a plain
+ * item-data object that same path is written directly. The container is built with
+ * sibling-preserving `||=` so any existing flags and any `roles` leaves for OTHER systems
+ * survive.
+ *
+ * A dotted/unsafe `systemId` can never be a `roles` map key (every stamp/repair site skips
+ * it via {@link isSafeFlagKeySegment}), so it is skipped here too and the item degrades to
+ * raw-reference resolution.
+ *
+ * @param {object} itemData - The plain item-data object about to be created.
+ * @param {string|null|undefined} systemId - The crafting system's id (the map key).
+ * @param {string|null|undefined} roleKey - The role leaf (`'componentId'`, `'toolId'`, …).
+ * @param {string|null|undefined} id - The definition id to stamp.
+ */
+export function stampItemDataRoleIdentity(itemData, systemId, roleKey, id) {
+  if (!itemData || !id || !roleKey || !isSafeFlagKeySegment(systemId)) return;
+  const flags = (itemData.flags ||= {});
+  const namespace = (flags[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const nested = (namespace[FABRICATE_FLAG_NAMESPACE] ||= {});
+  const roles = (nested.roles ||= {});
+  const perSystem = (roles[systemId] ||= {});
+  perSystem[roleKey] = id;
+}
+
 function normalizeFlagKey(key) {
   const rawKey = String(key || '');
   if (!rawKey) return 'fabricate';
