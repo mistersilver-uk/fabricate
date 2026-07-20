@@ -232,6 +232,26 @@ describe('UI PR screenshot evidence', () => {
     );
   });
 
+  // Issue 764: the two demonstration frames — the Simple-mode editor cap and the GM
+  // misconfigured inventory cue — each their own recipe (one file per id) so `collect`
+  // publishes both, mapped narrowly to a source THIS PR changed.
+  it('maps the issue-764 demonstration frames to their changed sources', () => {
+    const editorViews = mapChangedFilesToViews(['src/ui/svelte/apps/manager/ComponentEditView.svelte']).map(v => v.id);
+    assert.ok(editorViews.includes('manager-component-edit-salvage-simple'));
+
+    // The misconfigured body maps to its own frame PLUS the broader inventory/salvage
+    // frames — it lives under both globs — but must not disturb the player-salvage
+    // deep-equality above (which tests other salvage files).
+    const bodyViews = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    ]).map(v => v.id).sort();
+    assert.deepEqual(bodyViews, ['player-inventory', 'player-salvage', 'player-salvage-misconfigured']);
+
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-component-edit-salvage-simple'], ['manager-component-edit-salvage-simple']);
+    assert.deepEqual(byId['player-salvage-misconfigured'], ['player-salvage-misconfigured']);
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',

@@ -78,7 +78,7 @@ This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
 
 When the system's salvage resolution mode is Simple, a component uses a single result group.
-Once you have added that group, the **Add group** control is hidden and the panel shows the hint **Simple mode uses a single result group**, so it is clear why no more can be added.
+In Simple mode the panel shows the hint **Simple mode uses a single result group**, so it is clear why only one is allowed; once you have added the one group, the **Add group** control is hidden.
 Routed and Progressive modes keep the full list, where each result group maps to an outcome or a stage.
 
 {: .note }
