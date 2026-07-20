@@ -479,6 +479,51 @@ function matchRoutedOutcome({
 }
 
 /**
+ * The natural d20 face for nat-stepping: the ACTIVE raw face of the first d20
+ * dice group, provided exactly one face is active — which covers both a plain
+ * `1d20` and an advantage/disadvantage pool (`2d20kh1`/`2d20kl1`, whose dropped
+ * die is filtered out of `results` by {@link rolledDiceGroups}). Returns null
+ * when the roll has no d20 group or the group keeps multiple faces (a genuinely
+ * multi-die d20 pool has no single "natural" roll to step on).
+ *
+ * @param {Array<{group: string, results: number[]}>} diceGroups
+ * @returns {number|null}
+ */
+function naturalD20Result(diceGroups) {
+  const groups = Array.isArray(diceGroups) ? diceGroups : [];
+  const d20Group = groups.find((entry) => /^\d+d20$/.test(String(entry?.group)));
+  if (!d20Group || !Array.isArray(d20Group.results) || d20Group.results.length !== 1) return null;
+  const face = Number(d20Group.results[0]);
+  return Number.isFinite(face) ? face : null;
+}
+
+/**
+ * Step a matched RELATIVE outcome tier up or down one tier along the
+ * threshold-ordered ladder (nat-20 → +1, nat-1 → -1), capped at the best tier
+ * and floored at the worst. Returns the stepped tier (the SAME tier when
+ * already at the ladder's end, or when the matched tier cannot be located).
+ *
+ * @param {object} params
+ * @param {object} params.matched The naturally-matched relative tier.
+ * @param {Array<object>} params.relativeOutcomes The routed check's relative tiers.
+ * @param {number} params.dc Base DC (thresholds are `dc + outcome.dc`).
+ * @param {1|-1} params.direction +1 steps up (better), -1 steps down (worse).
+ * @returns {object}
+ */
+function stepRelativeOutcome({ matched, relativeOutcomes, dc, direction }) {
+  const ladder = (Array.isArray(relativeOutcomes) ? relativeOutcomes : [])
+    .filter((outcome) => outcome && Number.isFinite(Number(outcome.dc)))
+    .map((outcome) => ({ outcome, threshold: dc + Number(outcome.dc) }))
+    .sort((a, b) => a.threshold - b.threshold);
+  const index = ladder.findIndex(
+    (entry) => entry.outcome === matched || (matched?.id != null && entry.outcome.id === matched.id)
+  );
+  if (index === -1) return matched;
+  const target = Math.min(Math.max(index + direction, 0), ladder.length - 1);
+  return ladder[target].outcome;
+}
+
+/**
  * Route a forced-crit disposition to a tier of the matching success flag. A forced
  * FAILURE (`forcedSuccess === false`) routes to the LOWEST-threshold failing tier
  * (relative: smallest `dc`; fixed: smallest `start`); a forced SUCCESS routes to
@@ -536,6 +581,14 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  *   tier threshold, route to the lowest (closest) tier instead of returning a null
  *   outcome. Opted into by the crafting + salvage callers; gathering leaves it off to
  *   preserve its "no tier name → failure" path.
+ * @param {boolean} [params.natStepping] RELATIVE-type only: when true, a natural 20
+ *   on the check's d20 group steps the matched tier UP one tier (capped at best)
+ *   and a natural 1 steps it DOWN one (floored at worst). Precedence: a forced
+ *   (crit-trigger) outcome wins — stepping applies ONLY when no forced outcome
+ *   fired. A step is surfaced as `data.natStep` (`{ natural, direction,
+ *   fromOutcomeId, toOutcomeId }`) so chat/journal can announce it. Off by
+ *   default; threaded from `craftingCheck.routed.natStepping` /
+ *   `salvageCraftingCheck.routed.natStepping`.
  * @param {?string} [params.minOutcomeId] FIXED-type only: a recipe's minimum success
  *   tier id. When the naturally-rolled tier ranks below it (by `start`) — or the
  *   total lands outside every fixed range, so no tier matched at all — the check
@@ -558,6 +611,7 @@ export async function runFormulaRouted({
   label = 'Crafting',
   rollOptions = null,
   clampToNearest = false,
+  natStepping = false,
   minOutcomeId = null,
 }) {
   const formula = String(rawFormula || '').trim();
@@ -635,6 +689,31 @@ export async function runFormulaRouted({
     });
   }
 
+  // Nat-20/nat-1 tier stepping (relative type only). Precedence: a forced (crit
+  // trigger) outcome already jumped to an extreme tier above, so stepping applies
+  // ONLY when no forced outcome fired — the two never compound. The natural face
+  // comes from the shared diceGroup aggregates (active-only raw faces), so an
+  // advantage/disadvantage pool steps on its KEPT die.
+  let natStep = null;
+  if (natStepping && !forced && type !== 'fixed' && matched) {
+    const natural = naturalD20Result(diceGroups);
+    if (natural === 20 || natural === 1) {
+      const direction = natural === 20 ? 1 : -1;
+      const stepped = stepRelativeOutcome({ matched, relativeOutcomes, dc, direction });
+      // Only an actual tier change is surfaced: at the ladder's cap/floor the
+      // matched tier stands and no step is announced.
+      if (stepped && stepped !== matched) {
+        natStep = {
+          natural,
+          direction: natural === 20 ? 'up' : 'down',
+          fromOutcomeId: matched?.id ?? null,
+          toOutcomeId: stepped?.id ?? null,
+        };
+        matched = stepped;
+      }
+    }
+  }
+
   // Recipe minimum-success-tier gate (FIXED type only): when the naturally-rolled
   // tier ranks below the recipe's required tier (by `start`), the craft fails
   // outright. A forced (crit) outcome BYPASSES the gate — a natural crit must not be
@@ -687,6 +766,9 @@ export async function runFormulaRouted({
       // Additive on a min-tier failure only: the tier that WAS rolled, for a richer
       // chat/journal explanation later. Absent on a normal route.
       ...(minTierFailed && { minTierFailed: true, rolledOutcomeId: matched?.id ?? null }),
+      // Additive when nat-stepping changed the routed tier: the natural face, the
+      // step direction, and the from/to tier ids (chat card + journal note).
+      ...(natStep && { natStep }),
     },
     message: success ? null : `${label} check failed`,
   };

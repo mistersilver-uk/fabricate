@@ -93,6 +93,7 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     rollFormula: '',
     dc: 15,
     thresholdMode: 'meet',
+    natStepping: false,
     tiers: [],
     relativeOutcomes: [],
     fixedOutcomes: [],

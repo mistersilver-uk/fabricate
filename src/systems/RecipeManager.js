@@ -21,6 +21,7 @@ import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { isToolUsabilityBlocked } from './toolCheckBonus.js';
 
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
@@ -529,7 +530,13 @@ export class RecipeManager {
     // per-system library via `toolIds`.
     const displaySet = satisfiableSet || firstSet;
     const toolsForSet = this.getToolsForSet(recipe, displaySet);
-    const toolStates = this._buildToolStates(recipe, toolsForSet, availableItems, presentTools);
+    const toolStates = this._buildToolStates(
+      recipe,
+      toolsForSet,
+      availableItems,
+      presentTools,
+      craftingActor
+    );
     const missingTools = toolsForSet.filter((_tool, idx) => !toolStates[idx].available);
 
     // Final craftability: ingredients satisfied AND tools present.
@@ -727,13 +734,22 @@ export class RecipeManager {
    * supplied items satisfies the tool's component reference (and is not broken),
    * using the same matcher gathering attempt validation uses.
    *
+   * Usability gating (per-tool check bonuses): a tool with `gateMode:
+   * 'usability'` whose character prerequisites fail against the CRAFTING actor's
+   * roll data reads unavailable (`prereqBlocked: true`) even when a matching item
+   * is owned, mirroring the engine's `_validateTools` gate so the display and the
+   * craft attempt agree. With no `craftingActor` (e.g. the shopping aggregator)
+   * the gate is skipped.
+   *
    * @private
    * @param {Recipe} recipe
    * @param {Array<object>} tools - resolved library Tool objects
    * @param {Array<Item>} availableItems - aggregated source-actor items
+   * @param {object|null} [presentTools]
+   * @param {object|null} [craftingActor] - roll-data source for usability gating
    * @returns {Array<{ name: string, available: boolean }>}
    */
-  _buildToolStates(recipe, tools, availableItems, presentTools = null) {
+  _buildToolStates(recipe, tools, availableItems, presentTools = null, craftingActor = null) {
     if (!Array.isArray(tools) || tools.length === 0) return [];
     // `matchGatheringTools` scopes the virtual-present set to the system passed
     // here (the recipe's crafting system), so a present tool from a different
@@ -760,12 +776,16 @@ export class RecipeManager {
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
       const toolId = tool?.componentId || tool?.systemItemId;
+      // Usability gate: a 'usability'-gated tool with failing prerequisites does
+      // not count as present, matching the engine's `_validateTools`.
+      const prereqBlocked = craftingActor ? isToolUsabilityBlocked(tool, craftingActor) : false;
       const state = {
         name: this.resolveComponentName(recipe, toolId),
         img: this.resolveComponentImg(recipe, toolId),
-        available: entry !== null,
+        available: entry !== null && !prereqBlocked,
         needsRepair: stateByTool.get(tool) === 'damaged',
       };
+      if (prereqBlocked) state.prereqBlocked = true;
       if (entry?.virtual === true) state.virtual = true;
       return state;
     });

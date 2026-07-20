@@ -1088,6 +1088,8 @@
       "Tools": "Tools Used",
       "Results": "Created",
       "Roll": "Roll",
+      "NatStepUp": "Natural 20 — quality stepped up",
+      "NatStepDown": "Natural 1 — quality stepped down",
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure",
       "GatherSuccess": "Gathering Successful",

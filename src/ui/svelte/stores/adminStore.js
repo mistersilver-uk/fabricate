@@ -64,6 +64,7 @@ import {
   normalizeCharacterPrerequisite,
   normalizeCharacterPrerequisiteList,
 } from '../../../systems/characterPrerequisites.js';
+import { normalizeToolGateMode } from '../../../systems/toolCheckBonus.js';
 import {
   getCurrencyPresetsForFoundrySystem,
   seedCurrencyPresets,
@@ -962,9 +963,17 @@ function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID)
   // `registeredItemUuid`/`originItemUuid`/`aliasItemUuids` and the pre-rename (issue 560)
   // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`, emitting the new names.
   const originItemUuid =
-    tool.originItemUuid || tool.registeredItemUuid || tool.sourceItemUuid || tool.sourceUuid || null;
+    tool.originItemUuid ||
+    tool.registeredItemUuid ||
+    tool.sourceItemUuid ||
+    tool.sourceUuid ||
+    null;
   const registeredItemUuid =
-    tool.registeredItemUuid || tool.originItemUuid || tool.sourceUuid || tool.sourceItemUuid || null;
+    tool.registeredItemUuid ||
+    tool.originItemUuid ||
+    tool.sourceUuid ||
+    tool.sourceItemUuid ||
+    null;
   const primaryRefs = new Set(
     [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
   );
@@ -996,6 +1005,12 @@ function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID)
     requirement: _normalizeToolRequirement(tool.requirement),
     breakage: _normalizeToolBreakage(tool.breakage),
     onBreak: _normalizeToolOnBreak(tool.onBreak),
+    // Per-tool check bonus fields (prepared-crafter tools): MUST be retained here
+    // (the draft-path twin of CraftingSystemManager._normalizeTool) or a Manager
+    // edit strips them (the normalizer-strips-unknown-fields trap).
+    bonusExpression: typeof tool.bonusExpression === 'string' ? tool.bonusExpression.trim() : '',
+    prerequisites: normalizeCharacterPrerequisiteList(tool.prerequisites, randomID),
+    gateMode: normalizeToolGateMode(tool.gateMode),
   };
 }
 
@@ -1666,7 +1681,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
         playerIds: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds : [],
       },
       accessSummary: {
-        characterCount: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds.length : 0,
+        characterCount: Array.isArray(raw.access?.characterIds)
+          ? raw.access.characterIds.length
+          : 0,
         playerCount: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds.length : 0,
       },
       locked: recipe.locked === true,
@@ -1937,7 +1954,10 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
     const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
     const linkedRecipes =
       memberIds.length > 0
-        ? memberIds.map((id) => recipeById.get(String(id))).filter(Boolean).map(toRecipeRef)
+        ? memberIds
+            .map((id) => recipeById.get(String(id)))
+            .filter(Boolean)
+            .map(toRecipeRef)
         : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
     const learnedActors = new Set();
     for (const recipe of linkedRecipes) {
@@ -2257,7 +2277,9 @@ function _buildSelectedSystemViewData(
     // System-owned character prerequisite library (issue 544). Surfaced through
     // the allowlist projection (like `tools`) so the System Settings accordion
     // and the recipe-item learning-gate picker read them.
-    characterPrerequisites: normalizeCharacterPrerequisiteList(selectedSystem.characterPrerequisites),
+    characterPrerequisites: normalizeCharacterPrerequisiteList(
+      selectedSystem.characterPrerequisites
+    ),
 
     requirements: selectedSystem.requirements || {
       time: { enabled: true },
@@ -2605,9 +2627,7 @@ export function createAdminStore(services) {
     if (typeof systemManager?.addToolFromUuid !== 'function') return false;
     try {
       const result = await systemManager.addToolFromUuid(systemId, uuid);
-      const created = result?.item
-        ? _normalizeGatheringLibraryTool(result.item, _randomID)
-        : null;
+      const created = result?.item ? _normalizeGatheringLibraryTool(result.item, _randomID) : null;
       if (!created) return false;
       const current = Array.isArray(get(toolsDraft)) ? get(toolsDraft) : [];
       const baseline = Array.isArray(get(toolsDraftBaseline)) ? get(toolsDraftBaseline) : [];
@@ -5882,8 +5902,7 @@ export function createAdminStore(services) {
         'Existing multi-step recipes will run as one combined action and show only their final results for editing. Their steps are kept and restored if you turn multi-step recipes back on. No recipe data is deleted.'
       }</p>`,
       yes: {
-        label:
-          services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
+        label: services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
         callback: () => true,
       },
       no: () => false,
@@ -6102,8 +6121,8 @@ export function createAdminStore(services) {
     for (const { id, tags: nextTags } of planTagRemovals(_getManagedItems(system), tag)) {
       await systemManager.updateItem(sysId, id, { tags: nextTags });
     }
-    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map((recipe) =>
-      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
+    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map(
+      (recipe) => (typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe)
     );
     for (const { id, updates } of planRecipeTagRemovals(recipes, tag)) {
       await recipeManager.updateRecipe(id, updates, { allowIncomplete: true, notify: false });
@@ -7416,7 +7435,8 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  const saveGatheringCheckActive = (enabled) => _saveGatheringCheckPatch({ enabled: enabled === true });
+  const saveGatheringCheckActive = (enabled) =>
+    _saveGatheringCheckPatch({ enabled: enabled === true });
   const saveGatheringCheckProgressive = (progressive) => _saveGatheringCheckPatch({ progressive });
   const saveGatheringCheckRouted = (routed) => _saveGatheringCheckPatch({ routed });
 
@@ -7704,11 +7724,15 @@ export function createAdminStore(services) {
       : [];
     let changed = false;
     for (const def of definitions) {
-      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) => String(id));
+      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) =>
+        String(id)
+      );
       const has = currentIds.includes(rid);
       const want = wanted.has(String(def.id));
       if (has === want) continue;
-      const next = want ? [...new Set([...currentIds, rid])] : currentIds.filter((id) => id !== rid);
+      const next = want
+        ? [...new Set([...currentIds, rid])]
+        : currentIds.filter((id) => id !== rid);
       await systemManager.updateRecipeItemDefinition(sysId, def.id, { recipeIds: next });
       changed = true;
     }
@@ -7722,7 +7746,9 @@ export function createAdminStore(services) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId || !recipeItemId) return;
-    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, { enabled: enabled !== false });
+    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, {
+      enabled: enabled !== false,
+    });
     await refresh();
   }
 
@@ -7752,7 +7778,9 @@ export function createAdminStore(services) {
     const sysId = get(selectedSystemId);
     if (!sysId || !recipeItemId) return false;
     const confirmed = await services.confirmDialog?.({
-      title: services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') || 'Delete recipe item?',
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') ||
+        'Delete recipe item?',
       content: `<p>${services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteContent') || 'Delete this recipe item? Recipes linked to it will be unlinked.'}</p>`,
       yes: () => true,
       no: () => false,
@@ -7881,7 +7909,11 @@ export function createAdminStore(services) {
     try {
       // notify:false — the toggle is the GM's own explicit editor action with immediate
       // visual feedback, so the "Recipe updated" toast is noise.
-      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true, notify: false });
+      await recipeManager.updateRecipe(
+        recipeId,
+        { enabled },
+        { allowIncomplete: true, notify: false }
+      );
       await refresh();
       return true;
     } catch (err) {
@@ -7921,7 +7953,11 @@ export function createAdminStore(services) {
     try {
       // notify:false — same as the enabled toggle: an explicit editor action with
       // immediate visual feedback needs no "Recipe updated" toast.
-      await recipeManager.updateRecipe(recipeId, { locked: locked === true }, { allowIncomplete: true, notify: false });
+      await recipeManager.updateRecipe(
+        recipeId,
+        { locked: locked === true },
+        { allowIncomplete: true, notify: false }
+      );
       await refresh();
       return true;
     } catch (err) {

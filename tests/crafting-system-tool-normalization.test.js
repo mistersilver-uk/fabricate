@@ -46,7 +46,10 @@ test('_normalizeTool produces the canonical Tool shape with defaults for a spars
     aliasItemUuids: [],
     requirement: null,
     breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' }
+    onBreak: { mode: 'destroy' },
+    bonusExpression: '',
+    prerequisites: [],
+    gateMode: 'bonus'
   });
 });
 
@@ -158,7 +161,10 @@ test('_normalizeSystem populates a normalized tools array', () => {
     aliasItemUuids: [],
     requirement: null,
     breakage: { mode: 'limitedUses', maxUses: 5 },
-    onBreak: { mode: 'destroy' }
+    onBreak: { mode: 'destroy' },
+    bonusExpression: '',
+    prerequisites: [],
+    gateMode: 'bonus'
   });
   assert.equal(system.tools[1].breakage.mode, 'breakageChance');
   assert.equal(system.tools[1].onBreak.mode, 'flagBroken');

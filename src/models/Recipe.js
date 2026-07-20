@@ -1,3 +1,4 @@
+import { normalizeToolBonusModes } from '../systems/toolCheckBonus.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
@@ -64,6 +65,13 @@ export class Recipe {
 
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
+
+    // Per-catalyst bonus modes for the per-tool check bonus, keyed by Tool id
+    // (`toolId → 'always'|'never'|'highestOnly'`; missing entries default to
+    // 'always'). One recipe-level map covers recipe-, set-, and step-level toolIds
+    // uniformly — the bonus is composed at check time over the union of present
+    // tools, so a per-scope split would add nothing but ambiguity.
+    this.toolBonusModes = normalizeToolBonusModes(data.toolBonusModes);
 
     // Recipe-level duration for the implicit (single) step. Multi-step recipes
     // carry their own per-step `timeRequirement`; this feeds the implicit step
@@ -480,6 +488,7 @@ export class Recipe {
         results: group.results.map((r) => r.toJSON()),
       })),
       toolIds: [...this.toolIds],
+      toolBonusModes: { ...this.toolBonusModes },
       timeRequirement: this.timeRequirement,
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map((r) => r.toJSON()),

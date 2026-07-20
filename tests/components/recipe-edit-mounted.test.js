@@ -34,6 +34,11 @@ const RAW_MODULES = [
   'src/utils/recipeCategories.js',
   'src/utils/routedOutcomeKeywords.js',
   'src/config/flags.js',
+  // The Recipe model imports the per-tool check-bonus helpers (toolBonusModes
+  // normalization), which in turn import the pure prerequisite engine; a missing
+  // raw module HANGS the suite (`# cancelled`).
+  'src/systems/toolCheckBonus.js',
+  'src/systems/characterPrerequisites.js',
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
   // The validation tab consumes the pure readiness evaluator.

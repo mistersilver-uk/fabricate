@@ -288,6 +288,34 @@ test('Tool.validate accepts a source-refs-only tool with componentId null (issue
   assert.equal(replaceOnItemSourced.valid, true);
 });
 
+test('Tool: check-bonus fields default and round-trip through toJSON/fromJSON', () => {
+  // Defaults: a legacy tool with none of the new fields normalizes to the
+  // backward-compatible no-bonus shape.
+  const legacy = new Tool({ componentId: 'comp-axe' });
+  assert.equal(legacy.bonusExpression, '');
+  assert.deepEqual(legacy.prerequisites, []);
+  assert.equal(legacy.gateMode, 'bonus');
+
+  const original = new Tool({
+    componentId: 'comp-axe',
+    bonusExpression: ' @prof ',
+    prerequisites: [{ id: 'p1', name: 'Trained', path: 'skills.smi.rank', op: 'gte', value: 2 }],
+    gateMode: 'usability',
+  });
+  assert.equal(original.bonusExpression, '@prof'); // trimmed
+  assert.equal(original.gateMode, 'usability');
+  assert.equal(original.prerequisites.length, 1);
+  assert.equal(original.prerequisites[0].path, 'skills.smi.rank');
+
+  const json = original.toJSON();
+  const round = Tool.fromJSON(json);
+  assert.deepEqual(round.toJSON(), json);
+  assert.equal(round.gateMode, 'usability');
+
+  // An unknown gateMode collapses to the safe default.
+  assert.equal(new Tool({ componentId: 'c', gateMode: 'weird' }).gateMode, 'bonus');
+});
+
 test('Tool.fromJSON ignores unknown fields', () => {
   const tool = Tool.fromJSON({
     componentId: 'comp-axe',

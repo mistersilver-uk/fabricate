@@ -71,7 +71,11 @@ function normalizeToolShape(tool = {}) {
       : [],
     requirement,
     breakage,
-    onBreak
+    onBreak,
+    // Per-tool check-bonus fields, mirroring the real _normalizeTool.
+    bonusExpression: typeof t.bonusExpression === 'string' ? t.bonusExpression.trim() : '',
+    prerequisites: Array.isArray(t.prerequisites) ? t.prerequisites : [],
+    gateMode: t.gateMode === 'usability' ? 'usability' : 'bonus'
   };
 }
 
@@ -181,7 +185,10 @@ describe('adminStore library tools (system-owned)', () => {
         aliasItemUuids: [],
         requirement: null,
         breakage: { mode: 'limitedUses', maxUses: null },
-        onBreak: { mode: 'destroy' }
+        onBreak: { mode: 'destroy' },
+        bonusExpression: '',
+        prerequisites: [],
+        gateMode: 'bonus'
       });
     });
 

@@ -15979,6 +15979,14 @@
   opacity: 0.95;
 }
 
+/* Check annotation (nat-20/nat-1 tier stepping) — a one-line note under the roll
+   row, italic so it reads as commentary on the roll rather than a section. */
+.fabricate-craft-chat__note {
+  font-size: 0.85em;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 /* Crafting failure reason — a short notice above the forfeited-items section. */
 .fabricate-craft-chat__notice {
   font-size: 0.85em;

@@ -16,6 +16,16 @@
  *   requirement:       null | {               - optional truthy-expression gate
  *     formula:         string                   // dice/roll expression
  *   }
+ *   bonusExpression:   string                  - optional check-bonus Roll expression, evaluated
+ *                                               against the crafting actor's getRollData() at
+ *                                               crafting/salvage check time; '' = no bonus
+ *   prerequisites:     Array<prerequisite>     - optional character prerequisites (the shared
+ *                                               characterPrerequisites {id,name,icon,path,op,value}
+ *                                               shape) gating the bonus (and, under gateMode
+ *                                               'usability', the tool's presence)
+ *   gateMode:          'bonus' | 'usability'   - failed prerequisites: 'bonus' (default) keeps the
+ *                                               tool usable but contributes no bonus; 'usability'
+ *                                               means the tool does not count as present at all
  *   breakage:          { mode, ...mode-specific fields }
  *     mode === 'limitedUses':     maxUses:        number | null     (null = unlimited; usage tracked on the item)
  *     mode === 'breakageChance':  breakageChance: number (integer 0..100)
@@ -43,6 +53,8 @@
  * restore the original name to regain damaged-tier recognition.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { normalizeCharacterPrerequisiteList } from '../systems/characterPrerequisites.js';
+import { normalizeToolGateMode } from '../systems/toolCheckBonus.js';
 
 const BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression', 'immune']);
 const ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
@@ -167,6 +179,30 @@ export class Tool {
 
     /** @type {{mode: string, [key: string]: any}} On-break action configuration */
     this.onBreak = normalizeOnBreak(data.onBreak);
+
+    /**
+     * @type {string} Optional check-bonus Roll expression, evaluated against the
+     * crafting actor's `getRollData()` at crafting/salvage check time; '' = no bonus.
+     */
+    this.bonusExpression =
+      typeof data.bonusExpression === 'string' ? data.bonusExpression.trim() : '';
+
+    /**
+     * @type {Array<object>} Optional character prerequisites (shared
+     * characterPrerequisites shape) gating the bonus and, under gateMode
+     * 'usability', the tool's presence.
+     */
+    this.prerequisites = normalizeCharacterPrerequisiteList(
+      data.prerequisites,
+      () =>
+        // Prerequisites authored without an id get a lightweight one; Foundry's
+        // randomID is preferred when present (runtime), with a Foundry-free fallback
+        // so the model stays headless-testable.
+        globalThis.foundry?.utils?.randomID?.() ?? Math.random().toString(36).slice(2, 12)
+    );
+
+    /** @type {'bonus'|'usability'} Failed-prerequisite gate mode (default 'bonus'). */
+    this.gateMode = normalizeToolGateMode(data.gateMode);
   }
 
   /**
@@ -260,6 +296,9 @@ export class Tool {
       requirement: this.requirement ? { ...this.requirement } : null,
       breakage: { ...this.breakage },
       onBreak: { ...this.onBreak },
+      bonusExpression: this.bonusExpression,
+      prerequisites: this.prerequisites.map((prereq) => ({ ...prereq })),
+      gateMode: this.gateMode,
     };
   }
 

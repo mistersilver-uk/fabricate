@@ -41,6 +41,7 @@ import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js'
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { normalizeToolGateMode } from './toolCheckBonus.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
@@ -399,6 +400,19 @@ export class CraftingSystemManager {
       requirement: this._normalizeToolRequirement(normalizedTool.requirement),
       breakage: this._normalizeToolBreakage(normalizedTool.breakage),
       onBreak: this._normalizeToolOnBreak(normalizedTool.onBreak),
+      // Per-tool check bonus (prepared-crafter tools): an optional Roll expression
+      // evaluated against the crafting actor's roll data at check time, optional
+      // character prerequisites (shared characterPrerequisites shape) gating it,
+      // and the gate mode — 'bonus' (default: usable, no bonus on failed prereqs)
+      // or 'usability' (failed prereqs → the tool does not count as present).
+      bonusExpression:
+        typeof normalizedTool.bonusExpression === 'string'
+          ? normalizedTool.bonusExpression.trim()
+          : '',
+      prerequisites: normalizeCharacterPrerequisiteList(normalizedTool.prerequisites, () =>
+        foundry.utils.randomID()
+      ),
+      gateMode: normalizeToolGateMode(normalizedTool.gateMode),
     };
   }
 
@@ -696,6 +710,11 @@ export class CraftingSystemManager {
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      // Nat-20/nat-1 tier stepping (relative type only, default OFF): a natural 20
+      // on the check's d20 group steps the matched tier up one (capped at best), a
+      // natural 1 steps it down one (floored at worst). Forced (crit-trigger)
+      // outcomes take precedence — stepping applies only when none fired.
+      natStepping: source.natStepping === true,
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       relativeOutcomes: relative
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))

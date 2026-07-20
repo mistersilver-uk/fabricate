@@ -329,6 +329,9 @@ function compileManagerRoot() {
     'src/config/flags.js',
     // CharacterPrerequisitesCard imports the pure prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',
+    // The Recipe model imports the per-tool check-bonus helpers (toolBonusModes
+    // normalization); omitting it fails the whole suite's before hook.
+    'src/systems/toolCheckBonus.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',

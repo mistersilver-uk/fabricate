@@ -111,6 +111,8 @@ function renderSection({ heading, entries, modifier }) {
  * @param {Array<{name:string,img:string}>}                 [model.tools]
  * @param {number}  [model.rollValue] - The rolled check total; rendered only when
  *   finite (a no-check "Guaranteed" craft/salvage omits it).
+ * @param {string}  [model.checkNote] - Optional one-line check annotation rendered
+ *   under the roll row (e.g. the nat-20/nat-1 "quality stepped up/down" notice).
  * @param {string}  [model.failureReason]
  * @param {object}  keys - The label-key map (e.g. {@link CRAFTING_CHAT_KEYS}).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
@@ -128,6 +130,12 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
   }
 
   const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
+
+  // Optional check annotation (e.g. nat-20/nat-1 tier stepping): a one-line note
+  // under the roll row, omitted when absent.
+  const checkNote = model.checkNote
+    ? `<div class="fabricate-craft-chat__note">${esc(model.checkNote)}</div>`
+    : '';
 
   const notice =
     !succeeded && model.failureReason
@@ -168,6 +176,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
     rollTotal,
+    checkNote,
     notice,
     ...sections,
     '</div>',
@@ -196,6 +205,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       consumed: model.consumed,
       tools: model.tools,
       rollValue: model.rollValue,
+      checkNote: model.checkNote,
       failureReason: model.failureReason,
     },
     CRAFTING_CHAT_KEYS,
