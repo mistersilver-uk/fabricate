@@ -636,6 +636,72 @@ test('RecipeManager.evaluateCraftability: an affordable actor flips a currency-o
   assert.equal(manager.evaluateCraftability([rich], recipe, { craftingActor: null }).canCraft, false);
 });
 
+test('RecipeManager.evaluateCraftability: currency option costLabel resolves the unit to a human label, never the id', () => {
+  // The reporter's repro (issue 763): a currency unit whose stored abbreviation was baked
+  // to its own generated id must render its LABEL in the player crafting-app cost row, not
+  // the id. A multi-option group (currency + item) is required so an option choice is
+  // emitted (options.length > 1).
+  const generatedUnitId = 'K9grZcOMgO9Xbm41';
+  const system = makeCurrencySystem({
+    units: [
+      {
+        id: generatedUnitId,
+        label: 'Platinum',
+        // baked id-as-abbreviation, exactly as persisted before the fix
+        abbreviation: generatedUnitId,
+        actorPath: 'system.currency.pp',
+        contains: [],
+      },
+    ],
+  });
+  setupGame(system);
+  globalThis.game.fabricate.getActorPropertyCoinSpender = () => new ActorPropertyCoinSpender();
+  const manager = new RecipeManager();
+  const recipe = {
+    craftingSystemId: 'sys-cur',
+    ingredientSets: [makeSet([[currencyOption(generatedUnitId, 100), itemOption('comp-a')]])],
+  };
+  const actor = makeDnd5eActor({ id: 'a', items: [makeItem({ id: 'a', componentId: 'comp-a' })] });
+
+  const result = manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
+  const optionChoice = result.ingredientChoices.find((choice) => choice.kind === 'option');
+  assert.ok(optionChoice, 'a multi-option group emits an option choice');
+  const currencyOption_ = optionChoice.options.find((option) => option.isCurrency);
+  assert.equal(currencyOption_.costLabel, '100 Platinum');
+  assert.ok(
+    !currencyOption_.costLabel.includes(generatedUnitId),
+    'the raw generated unit id must never leak into the cost row'
+  );
+});
+
+test('RecipeManager.evaluateCraftability: currency option costLabel prefers an authored abbreviation', () => {
+  const generatedUnitId = 'K9grZcOMgO9Xbm41';
+  const system = makeCurrencySystem({
+    units: [
+      {
+        id: generatedUnitId,
+        label: 'Platinum',
+        abbreviation: 'PP',
+        actorPath: 'system.currency.pp',
+        contains: [],
+      },
+    ],
+  });
+  setupGame(system);
+  globalThis.game.fabricate.getActorPropertyCoinSpender = () => new ActorPropertyCoinSpender();
+  const manager = new RecipeManager();
+  const recipe = {
+    craftingSystemId: 'sys-cur',
+    ingredientSets: [makeSet([[currencyOption(generatedUnitId, 100), itemOption('comp-a')]])],
+  };
+  const actor = makeDnd5eActor({ id: 'a', items: [makeItem({ id: 'a', componentId: 'comp-a' })] });
+
+  const result = manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
+  const optionChoice = result.ingredientChoices.find((choice) => choice.kind === 'option');
+  const currencyOption_ = optionChoice.options.find((option) => option.isCurrency);
+  assert.equal(currencyOption_.costLabel, '100 PP');
+});
+
 test('engine: async-gate failure (macro) does not fall back to an unselected item plan', async () => {
   // A macro strategy whose canAfford macro reports failure must abort with zero mutation —
   // never silently item-craft. Here the group is currency-only so there is no item plan at all,

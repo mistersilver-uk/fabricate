@@ -12,6 +12,7 @@ import {
   buildCurrencySpendUpdates,
   canAddCurrencySubUnit,
   currencySubUnitOptions,
+  formatCurrencyRequirement,
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
   readCurrencyBalances,
@@ -394,6 +395,99 @@ test('normalizeCurrencyConfig normalizes spendStrategy and unit denomination', (
 
   const noDenom = normalizeCurrencyUnit({ id: 'gp', actorPath: 'system.currency.gp' });
   assert.equal('denomination' in noDenom, false);
+});
+
+test('normalizeCurrencyUnit defaults an unauthored abbreviation to empty, never the id', () => {
+  const unit = normalizeCurrencyUnit({ id: 'K9grZcOMgO9Xbm41', label: 'Platinum Pieces' });
+  assert.equal(unit.abbreviation, '');
+});
+
+test('normalizeCurrencyUnit self-heals a generated-id abbreviation back to empty', () => {
+  // The reporter's case: a unit saved before an abbreviation was typed baked the raw
+  // generated id in as the abbreviation. It must self-heal to empty on normalize.
+  const unit = normalizeCurrencyUnit({
+    id: 'K9grZcOMgO9Xbm41',
+    label: 'Platinum Pieces',
+    abbreviation: 'K9grZcOMgO9Xbm41',
+  });
+  assert.equal(unit.abbreviation, '');
+});
+
+test('normalizeCurrencyUnit preserves a generated-shape abbreviation that is not the id', () => {
+  // Guards against a mis-implementation that tests isGeneratedUnitId(abbreviation)
+  // instead of abbreviation === id: an authored generated-shape abbreviation stays.
+  const unit = normalizeCurrencyUnit({ id: 'someOtherId', abbreviation: 'ABCDEFGHIJ' });
+  assert.equal(unit.abbreviation, 'ABCDEFGHIJ');
+});
+
+test('normalizeCurrencyUnit pins the generated-id length boundary at 10 characters', () => {
+  // A 9-char id === abbreviation is too short to be generated and is preserved.
+  const shortId = normalizeCurrencyUnit({ id: 'abcdefghi', abbreviation: 'abcdefghi' });
+  assert.equal(shortId.abbreviation, 'abcdefghi');
+  // A 10-char generated-shape id === abbreviation heals.
+  const boundaryId = normalizeCurrencyUnit({ id: 'abcdefghij', abbreviation: 'abcdefghij' });
+  assert.equal(boundaryId.abbreviation, '');
+});
+
+test('normalizeCurrencyUnit preserves a preset coin abbreviation equal to its short id', () => {
+  const unit = normalizeCurrencyUnit({ id: 'gp', label: 'Gold', abbreviation: 'gp' });
+  assert.equal(unit.abbreviation, 'gp');
+});
+
+test('normalizeCurrencyUnit leaves a real authored abbreviation unchanged', () => {
+  const unit = normalizeCurrencyUnit({ id: 'K9grZcOMgO9Xbm41', abbreviation: 'PP' });
+  assert.equal(unit.abbreviation, 'PP');
+});
+
+test('normalizeCurrencyConfig self-heals a baked-id abbreviation through the unit map', () => {
+  // Composition binding: fails if the config layer drops or bypasses the per-unit
+  // normalizer that the pure-normalizeCurrencyUnit tests cannot catch.
+  const config = normalizeCurrencyConfig({
+    enabled: true,
+    units: [
+      {
+        id: 'K9grZcOMgO9Xbm41',
+        label: 'Platinum Pieces',
+        abbreviation: 'K9grZcOMgO9Xbm41',
+        actorPath: 'system.currency.pp',
+      },
+    ],
+  });
+  assert.equal(config.units[0].abbreviation, '');
+});
+
+test('formatCurrencyRequirement falls back to the label when the abbreviation is empty', () => {
+  const units = [normalizeCurrencyUnit({ id: 'K9grZcOMgO9Xbm41', label: 'Platinum' })];
+  assert.equal(units[0].abbreviation, '');
+  assert.equal(
+    formatCurrencyRequirement({ unit: 'K9grZcOMgO9Xbm41', amount: 100 }, units),
+    '100 Platinum'
+  );
+});
+
+test('validateCurrencyProfile under macro rejects an empty abbreviation and accepts a real one', () => {
+  // With the abbreviation default now '' (no longer the id), a genuinely-unauthored
+  // unit correctly fails macro validation (macros key coins by abbreviation).
+  const missing = validateCurrencyProfile([{ id: 'K9grZcOMgO9Xbm41', label: 'Platinum' }], {
+    spendStrategy: 'macro',
+    macros: { canAfford: 'Macro.a', decrement: 'Macro.d' },
+  });
+  assert.equal(missing.valid, false);
+  assert.ok(missing.errors.some((error) => error.includes('missing an abbreviation')));
+
+  const authored = validateCurrencyProfile(
+    [{ id: 'K9grZcOMgO9Xbm41', label: 'Platinum', abbreviation: 'PP' }],
+    { spendStrategy: 'macro', macros: { canAfford: 'Macro.a', decrement: 'Macro.d' } }
+  );
+  assert.equal(authored.valid, true);
+});
+
+test('currency presets survive normalization with their abbreviations intact', () => {
+  // Drift guard: a future shape-guard tweak must not silently strip preset coin keys.
+  for (const preset of [...DND5E_CURRENCY_PRESETS, ...PF2E_CURRENCY_PRESETS]) {
+    const normalized = normalizeCurrencyUnit(preset);
+    assert.equal(normalized.abbreviation, preset.abbreviation);
+  }
 });
 
 test('CraftingSystemManager normalizes legacy pf2e adapter to actorInventory units', () => {

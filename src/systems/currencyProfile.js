@@ -5,6 +5,15 @@ function defaultRandomID() {
   );
 }
 
+// A generated unit id has the shape produced by `defaultRandomID`: `foundry.utils.randomID()`
+// returns 16 alphanumeric chars and the crypto fallback returns 10 hex chars, so any id of 10+
+// alphanumeric characters is treated as machine-generated. Short, semantic ids (e.g. the preset
+// coin keys `cp`/`sp`/`ep`/`gp`/`pp`) deliberately fail this guard so a hand-authored abbreviation
+// that intentionally equals such an id is preserved.
+function isGeneratedUnitId(value) {
+  return /^[A-Za-z0-9]{10,}$/.test(value);
+}
+
 /**
  * Normalize one raw currency-unit entry into the canonical
  * `{ id, label, abbreviation, icon, actorPath, denomination?, contains[] }` shape.
@@ -15,6 +24,12 @@ function defaultRandomID() {
  * deduplicated by child id and drops any entry without a positive integer amount. Returns `null`
  * for a non-object entry or one that resolves to an empty id.
  *
+ * `abbreviation` is optional and defaults to the empty string when unauthored — it is never
+ * defaulted to, or persisted as, the unit `id`. A stored `abbreviation` that strictly equals the
+ * unit `id` is self-healed back to `''` when the id has the generated shape (see
+ * {@link isGeneratedUnitId}); a hand-authored abbreviation that equals a short semantic id (e.g. a
+ * preset coin key) is left intact.
+ *
  * @param {object} [entry]
  * @param {() => string} [randomID] - id factory used when the entry has no id.
  * @returns {object|null}
@@ -24,7 +39,9 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
   const id = String(entry.id || randomID()).trim();
   if (!id) return null;
   const label = String(entry.label || entry.name || id).trim() || id;
-  const abbreviation = String(entry.abbreviation || entry.abbr || id).trim() || id;
+  const rawAbbreviation = String(entry.abbreviation || entry.abbr || '').trim();
+  const abbreviation =
+    rawAbbreviation && !(rawAbbreviation === id && isGeneratedUnitId(id)) ? rawAbbreviation : '';
   const actorPath = String(entry.actorPath || entry.path || '').trim();
   const denomination = String(entry.denomination || '').trim();
   const contains = Array.isArray(entry.contains)
@@ -622,7 +639,7 @@ export function currencySubUnitOptions(units = [], parentUnitId = '') {
     .map((unit) => ({
       id: unit.id,
       label: unit.label || unit.id,
-      abbreviation: unit.abbreviation || unit.id,
+      abbreviation: unit.abbreviation || unit.label || unit.id,
     }));
 }
 
