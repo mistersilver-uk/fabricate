@@ -1898,7 +1898,9 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       description:
         'Simple-mode multi-step craft (issue #765): step 1 cuts planks, step 2 raises the frame.',
       craftingSystemId: simpleSystemId,
-      img: 'icons/environment/settlement/tent-white.webp',
+      // A Foundry core raster already exercised by this fixture (the crate world item)
+      // so the recipe thumbnail never 404s in the capture.
+      img: 'icons/containers/boxes/box-gift-white.webp',
       ingredientSets: [],
       resultGroups: [],
       steps: [
