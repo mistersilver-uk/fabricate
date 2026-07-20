@@ -903,6 +903,7 @@ function salvageItem(salvage = {}, overrides = {}) {
       mode: 'simple',
       checkUsable: false,
       misconfigured: false,
+      misconfiguredReason: null,
       routedType: null,
       dc: null,
       allowPlayerResultReorder: true,
@@ -1130,6 +1131,37 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     assert.ok(target.querySelector('[data-inventory-salvage-body="misconfigured"]'));
     assert.equal(target.querySelector('[data-inventory-salvage-outcomes]'), null);
+    assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
+  });
+
+  it('issue 764: a Simple multi-group misconfig renders Simple-specific copy and suppresses the banner', async () => {
+    // Threaded end-to-end THROUGH InventoryComponentDetail (prop-threading doctrine): the
+    // `misconfiguredReason` discriminator must reach SalvageMisconfiguredBody so it renders
+    // the Simple copy, NOT the routed "needs a check formula" copy. The green recycle
+    // banner that a Simple no-check config would otherwise show is suppressed.
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'simple',
+        checkUsable: false,
+        misconfigured: true,
+        misconfiguredReason: 'simpleMultiGroup',
+      })
+    );
+    const target = await openSalvage(services);
+
+    const body = target.querySelector('[data-inventory-salvage-body="misconfigured"]');
+    assert.ok(body, 'the misconfigured body renders on the GM path');
+    // The harness localizer echoes keys, so the Simple discriminator selects the Simple key.
+    assert.match(body.textContent, /MisconfiguredSimple/, 'Simple-specific copy, not routed');
+    assert.ok(
+      !body.textContent.includes('MisconfiguredRouted'),
+      'the routed copy is not rendered for a Simple misconfig'
+    );
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-banner]'),
+      null,
+      'the mode banner is suppressed when misconfigured'
+    );
     assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
   });
 

@@ -48,6 +48,9 @@
   const mode = $derived(salvage?.mode ?? 'simple');
   const checkUsable = $derived(salvage?.checkUsable === true);
   const misconfigured = $derived(salvage?.misconfigured === true);
+  // The builder's discriminator (issue 764): the misconfigured body dispatches on it, so
+  // a Simple multi-group misconfig renders Simple-specific copy rather than routed copy.
+  const misconfiguredReason = $derived(salvage?.misconfiguredReason ?? null);
   // The ribbon is up: the attempt resolved and awarded. "Salvage again" resets.
   const committed = $derived(result?.state === 'success');
   // Salvaging the last copy leaves nothing to break down again. The ribbon still
@@ -143,13 +146,19 @@
 </script>
 
 <div class="salvage-panel" data-inventory-salvage-panel={mode}>
-  <p class="salvage-banner is-{banner.tone}" data-inventory-salvage-banner={mode}>
-    <i class={banner.icon} aria-hidden="true"></i>
-    <span class="salvage-banner-text">
-      <span class="salvage-banner-title">{bannerTitle}</span>
-      <span class="salvage-banner-rule">{bannerRule}</span>
-    </span>
-  </p>
+  <!-- SUPPRESSED when misconfigured (issue 764). The banner derives a mode/usability
+       tone — for a Simple no-check config that is the green "you'll recover this" ramp —
+       which contradicts the misconfigured body sitting directly beneath it. The
+       misconfigured body IS the banner in that state. -->
+  {#if !misconfigured}
+    <p class="salvage-banner is-{banner.tone}" data-inventory-salvage-banner={mode}>
+      <i class={banner.icon} aria-hidden="true"></i>
+      <span class="salvage-banner-text">
+        <span class="salvage-banner-title">{bannerTitle}</span>
+        <span class="salvage-banner-rule">{bannerRule}</span>
+      </span>
+    </p>
+  {/if}
 
   <!-- Read-only, and only AFTER resolution. There is no pre-roll dice box: the prompt
        is the roll step. -->
@@ -160,7 +169,7 @@
        chipped "Awaiting roll" directly beneath a success ribbon is a contradiction the
        player has to resolve for us. -->
   {#if misconfigured}
-    <SalvageMisconfiguredBody {mode} />
+    <SalvageMisconfiguredBody {mode} reason={misconfiguredReason} />
   {:else if mode === 'progressive'}
     <SalvageProgressiveBody
       {stages}

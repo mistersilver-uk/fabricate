@@ -899,10 +899,26 @@ export class InventoryListingBuilder {
     // two usability states, and the body dispatches on the PAIR (mode, checkUsable).
     const rollFormula = typeof config?.rollFormula === 'string' ? config.rollFormula.trim() : '';
     const checkUsable = rollFormula.length > 0;
+    // Simple mode admits exactly one SUCCESS group (issue 764). A stored-but-not-yet-
+    // re-normalized legacy config with more than one success group is misconfigured: the
+    // engine awards `slice(0, 1)`, so the surplus is silently ignored. The GM sees this
+    // cue on the GM inventory path (the non-GM path hard-hides via `hiddenEntityIds`),
+    // and the config self-heals on the next system save.
+    const salvageGroups = Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : [];
+    const successGroupCount = salvageGroups.filter((group) => group?.role !== 'failure').length;
+    const simpleMultiGroup = mode === 'simple' && successGroupCount > 1;
     // Routed and progressive REQUIRE a formula to produce an outcome; without one the
     // engine aborts with `{ success: false, misconfigured: true }` and zero mutation. So
     // there are no tiers or stages to show — only a GM-config state.
-    const misconfigured = (mode === 'routed' || mode === 'progressive') && !checkUsable;
+    const routedNoFormula = mode === 'routed' && !checkUsable;
+    const progressiveNoFormula = mode === 'progressive' && !checkUsable;
+    const misconfigured = simpleMultiGroup || routedNoFormula || progressiveNoFormula;
+    // A DISCRIMINATOR, not a binary mode dispatch (issue 764): the body renders
+    // mode-specific copy, so a Simple misconfig must not fall through to the routed copy.
+    let misconfiguredReason = null;
+    if (simpleMultiGroup) misconfiguredReason = 'simpleMultiGroup';
+    else if (routedNoFormula) misconfiguredReason = 'routedNoFormula';
+    else if (progressiveNoFormula) misconfiguredReason = 'progressiveNoFormula';
     const routedType = mode === 'routed' ? (config?.type === 'fixed' ? 'fixed' : 'relative') : null;
 
     return {
@@ -910,6 +926,7 @@ export class InventoryListingBuilder {
       mode,
       checkUsable,
       misconfigured,
+      misconfiguredReason,
       routedType,
       // simple / routed+relative: the base DC, per-component override applied.
       // routed+FIXED and progressive: null — there is no DC to show. A fixed outcome

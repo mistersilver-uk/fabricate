@@ -114,6 +114,16 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add
+    // group control HIDDEN and the required hint shown. Its own recipe (one file per id,
+    // per the issue-752 demonstration pattern) so `collect` publishes it as its own frame
+    // rather than collapsing it into the routed authoring frame above.
+    id: 'manager-component-edit-salvage-simple',
+    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add group, required hint)',
+    smokeLabels: ['manager-component-edit-salvage-simple'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  },
+  {
     id: 'manager-checks-gathering',
     label: 'Manager Checks tab — gathering check editor (routed)',
     smokeLabels: ['manager-checks-gathering'],
@@ -533,6 +543,17 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\//,
       /^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySalvagePanel\.svelte$/,
     ],
+  },
+  {
+    // Issue 764: the GM-facing Simple-mode MISCONFIGURED salvage cue — the
+    // `SalvageMisconfiguredBody` with Simple-specific copy and the mode banner suppressed,
+    // for a stored multi-success-group Simple config. Narrowly matched to the misconfigured
+    // body ONLY, so the two `player-salvage` deep-equality assertions (which test
+    // `SalvageSimpleBody`/`InventorySalvagePanel`) are unaffected.
+    id: 'player-salvage-misconfigured',
+    label: 'Player salvage panel — Simple misconfigured cue (GM inventory)',
+    smokeLabels: ['player-salvage-misconfigured'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageMisconfiguredBody\.svelte$/],
   },
   {
     id: 'fabricate-app-shell',

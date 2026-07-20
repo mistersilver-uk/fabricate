@@ -131,8 +131,14 @@ test('Changing salvageResolutionMode from simple to routed disables components w
   assert.equal(comp.salvage.enabled, false, 'Component without outcomeRouting should be disabled in routed mode');
 });
 
-test('Changing salvageResolutionMode from routed to simple disables components with multiple result groups', async () => {
-  // Simple mode requires exactly 1 result group. A component with 2 groups is invalid.
+test('Changing salvageResolutionMode from routed to simple clamps to one success group and stays enabled (issue 764)', async () => {
+  // Issue 764: routed→simple no longer DISABLES a multi-group component — the
+  // success-first retain-one clamp keeps its first success group at index 0 and salvage
+  // stays enabled, so the player's Salvage tab is restored automatically. A naming warn
+  // discloses the dropped surplus group.
+  const warnMessages = [];
+  globalThis.ui.notifications.warn = (msg) => warnMessages.push(msg);
+
   const system = {
     id: 'sys-2',
     name: 'Test',
@@ -167,7 +173,11 @@ test('Changing salvageResolutionMode from routed to simple disables components w
 
   const updated = mgr.getSystem(normalized.id);
   const comp = updated.components.find(c => c.id === 'comp-1');
-  assert.equal(comp.salvage.enabled, false, 'Component with 2 result groups should be disabled in simple mode');
+  assert.equal(comp.salvage.enabled, true, 'salvage stays enabled after the clamp');
+  assert.equal(comp.salvage.resultGroups.length, 1, 'clamped to a single result group');
+  assert.equal(comp.salvage.resultGroups[0].id, 'rg-pass', 'the first success group is retained at index 0');
+  const combined = warnMessages.join('\n');
+  assert.ok(/Dragon Scale/.test(combined), `the drop warn names the affected component. Got: ${combined}`);
 });
 
 test('Mode change does not disable components that are already valid for the new mode', async () => {

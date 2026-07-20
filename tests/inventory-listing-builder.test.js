@@ -1354,6 +1354,69 @@ describe('InventoryListingBuilder - salvage view-model', () => {
     );
   });
 
+  it('flags a Simple multi-success-group config as misconfigured for the GM (issue 764)', () => {
+    // A stored-but-not-yet-re-normalized legacy config: two SUCCESS groups in Simple mode.
+    // The GM path (salvageOf uses a GM viewer) surfaces the misconfigured cue with the
+    // `simpleMultiGroup` discriminator so the body renders Simple-specific copy.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        salvage: {
+          resultGroups: [
+            { id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] },
+            { id: 'g2', results: [{ id: 'r2', componentId: 'c3', quantity: 1 }] },
+          ],
+        },
+      })
+    );
+    assert.equal(salvage.enabled, true);
+    assert.equal(salvage.misconfigured, true);
+    assert.equal(salvage.misconfiguredReason, 'simpleMultiGroup');
+  });
+
+  it('a Simple config with ONE success + reserved failure group is not misconfigured (issue 764)', () => {
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        check: { simple: { rollFormula: '1d20', dc: 12 } },
+        salvage: {
+          resultGroups: [
+            { id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] },
+            { id: 'g-fail', role: 'failure', results: [{ id: 'r2', componentId: 'c3', quantity: 1 }] },
+          ],
+        },
+      })
+    );
+    assert.equal(salvage.misconfigured, false);
+    assert.equal(salvage.misconfiguredReason, null);
+  });
+
+  it('routed/progressive no-formula misconfig carries its own discriminator (issue 764)', () => {
+    const routed = salvageOf(salvageSystem({ mode: 'routed', check: {} }));
+    assert.equal(routed.misconfigured, true);
+    assert.equal(routed.misconfiguredReason, 'routedNoFormula');
+
+    const progressive = salvageOf(salvageSystem({ mode: 'progressive', check: {} }));
+    assert.equal(progressive.misconfigured, true);
+    assert.equal(progressive.misconfiguredReason, 'progressiveNoFormula');
+  });
+
+  it('a normalized failure-only Simple config (enabled:false) yields no panel (issue 764)', () => {
+    // Option a: a failure-only Simple config normalizes to `enabled: false`, so the
+    // builder returns null (no panel). The GM is cued by the manager invalidSalvage
+    // critical instead — asserted here so the outcome is pinned end-to-end.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        salvage: {
+          enabled: false,
+          resultGroups: [{ id: 'g-fail', role: 'failure', results: [{ id: 'r1', componentId: 'c2' }] }],
+        },
+      })
+    );
+    assert.equal(salvage, null);
+  });
+
   it('routed + RELATIVE renders effective, dcOverride-shifted thresholds', () => {
     const check = {
       routed: {
@@ -1760,7 +1823,11 @@ describe('InventoryListingBuilder - salvage entity-tier visibility gate (#703)',
       craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
       viewer: { isGM: true, id: 'gm' },
     });
-    assert.notEqual(rowByComponent(listing, 'c1').salvage, null);
+    const salvage = rowByComponent(listing, 'c1').salvage;
+    assert.notEqual(salvage, null);
+    // Issue 764: the GM cue is the misconfigured body with the Simple discriminator.
+    assert.equal(salvage.misconfigured, true);
+    assert.equal(salvage.misconfiguredReason, 'simpleMultiGroup');
     assert.equal(system.components[0].salvage.enabled, true);
   });
 });

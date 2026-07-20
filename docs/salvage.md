@@ -34,7 +34,11 @@ It is set at the system level.
 The salvage resolution mode is set on the system's **Salvage resolution mode** card in the Crafting Admin panel.
 The card offers Simple, Progressive, and Routed by check, with Simple selected by default.
 A salvaged component has a single ingredient, so it cannot route by ingredient set, which is why ingredient-set routing (and Alchemy) is not offered here.
-Changing the mode is not destructive, but any component whose salvage setup is incompatible with the new mode has its salvage disabled until you reconfigure it.
+Changing the mode is not destructive to recipes or runs, but any component whose salvage setup is incompatible with the new mode has its salvage disabled until you reconfigure it.
+
+Simple mode awards a single result group.
+When you switch a system into Simple mode, any component that has more than one result group is trimmed back to its first.
+Fabricate warns you by name when this happens, listing every component it trimmed, so you always know which setups changed.
 
 You can also set the salvage resolution mode through the API.
 See the [CraftingSystemManager API]({% link api/system-manager.md %}).
@@ -72,6 +76,10 @@ The panel tells you which of the two states you are in, so you are never left gu
 Removing a component's last result group turns salvage back off for that component.
 This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
+
+When the system's salvage resolution mode is Simple, a component uses a single result group.
+In Simple mode the panel shows the hint **Simple mode uses a single result group**, so it is clear why only one is allowed; once you have added the one group, the **Add group** control is hidden.
+Routed and Progressive modes keep the full list, where each result group maps to an outcome or a stage.
 
 {: .note }
 > **Existing components show this toggle turned off, and that is correct.**
@@ -123,6 +131,7 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
 | Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
+| Simple, with a component left holding more than one result group | **Salvage isn't ready**, with a line saying the component has more than one result group and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single group and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra groups and clears the cue. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 

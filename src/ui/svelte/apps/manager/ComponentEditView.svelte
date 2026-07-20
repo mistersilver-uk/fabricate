@@ -365,6 +365,16 @@
   const salvageHasGroups = $derived(salvageDraft.resultGroups.length > 0);
   const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
   const salvageRouted = $derived(salvageResolutionMode === 'routed');
+  // Simple mode caps authoring at ONE success result group (issue 764), mirroring the
+  // recipe editor's Simple treatment. The cap counts SUCCESS groups (`role !== 'failure'`)
+  // so a legacy-loaded reserved failure group neither wedges the editor nor hides the Add
+  // control while there is still no success group — and its stored data is never blanked.
+  // The invariant itself lives at the `_normalizeSalvage` clamp; this is UX only.
+  const salvageSimpleMode = $derived(salvageResolutionMode === 'simple');
+  const salvageSuccessGroupCount = $derived(
+    salvageDraft.resultGroups.filter((group) => group?.role !== 'failure').length
+  );
+  const salvageHideAddGroup = $derived(salvageSimpleMode && salvageSuccessGroupCount >= 1);
   // The DC control belongs to modes that compare a roll against a DC. `progressive`
   // spends a roll down a list instead, so it shows read-only per-result DC chips.
   const salvageShowDcOverride = $derived(
@@ -1160,6 +1170,15 @@
           <span class="manager-component-readonly-label">
             <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.ResultGroups', 'Result groups')}</span>
           </span>
+          {#if salvageSimpleMode}
+            <!-- REQUIRED visible hint (issue 764), never a `title`: this editor's own
+                 doctrine (the `salvageDisabledNotice` precedent) is that a tooltip on a
+                 hidden/absent control never fires and no mounted test would notice. It
+                 explains why the Add group control is gone at the one-group cap. -->
+            <p class="manager-muted" data-salvage-simple-hint>
+              {text('FABRICATE.Admin.Manager.Component.SalvageEditor.SimpleSingleGroupHint', 'Simple mode uses a single result group.')}
+            </p>
+          {/if}
           {#if salvageDraft.resultGroups.length > 0}
             <ul class="manager-recipe-ingredient-sets">
               {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
@@ -1239,16 +1258,21 @@
           {:else}
             <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.NoGroups', 'No result groups yet.')}</p>
           {/if}
-          <button
-            type="button"
-            class="manager-button"
-            data-add-salvage-group
-            onclick={() => addSalvageGroup()}
-            disabled={saving}
-          >
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.AddGroup', 'Add group')}</span>
-          </button>
+          <!-- HIDDEN at the Simple one-success-group cap (issue 764). Routed keeps the
+               multi-group list and this Add control; Simple with no success group yet
+               still shows it so the GM can author the one group. -->
+          {#if !salvageHideAddGroup}
+            <button
+              type="button"
+              class="manager-button"
+              data-add-salvage-group
+              onclick={() => addSalvageGroup()}
+              disabled={saving}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.AddGroup', 'Add group')}</span>
+            </button>
+          {/if}
         {/if}
         </div>
 

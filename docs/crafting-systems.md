@@ -137,10 +137,14 @@ Fabricate also re-checks recipe ingredient signatures so any overlap that would 
 
 After the change, Fabricate shows a summary of how many recipes were migrated, and a separate warning listing any recipes it had to delete.
 
-Changing the **salvage resolution mode** is not destructive.
+Changing the **salvage resolution mode** is not destructive to recipes or runs.
 No recipes or runs are deleted.
 Any component whose salvage setup is incompatible with the new mode simply has its salvage disabled, and can be re-enabled once it is reconfigured.
 You will be asked to confirm.
+
+Switching a system **into** Simple mode is the one case that changes component setups.
+Simple mode awards a single result group, so any component that has more than one is trimmed back to its first when you switch.
+Fabricate warns you by name when this happens, listing every component it trimmed, so nothing is dropped silently.
 
 The **Salvage resolution mode** card offers Simple (the default), Progressive, and Routed by check.
 A salvaged component has a single ingredient, so ingredient-set routing (and Alchemy) does not apply and is not offered.

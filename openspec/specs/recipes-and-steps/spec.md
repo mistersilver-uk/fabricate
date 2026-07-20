@@ -329,9 +329,10 @@ If it is present, the run must resume automatically when world time reaches the 
 
 ### Resolution Mode Application
 
-- **Simple**: One result group.
+- **Simple**: Exactly one success result group, plus a tolerated but inert reserved `role: 'failure'` group when a Simple salvage check formula (`salvageCraftingCheck.simple.rollFormula`) exists.
+Additional groups are invalid and are dropped by normalization (see `data-models/spec.md` Component Requirement 5).
 Optional pass/fail check.
-On success, produce the single result group.
+The engine awards `slice(0, 1)` — the first success result group — and does not route to a failure group; salvage does not adopt the recipe/alchemy failure-award semantics.
 - **Routed**: Check is mandatory and requires an authored `salvageCraftingCheck.routed.rollFormula`.
   The engine-evaluated routed salvage check rolls the configured formula and maps the total onto
   an outcome tier whose NAME is the `outcome`; with no authored formula the salvage fails loudly
