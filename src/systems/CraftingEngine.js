@@ -1,13 +1,12 @@
-import {
-  FABRICATE_FLAG_NAMESPACE,
-  getFabricateFlag,
-  isSafeFlagKeySegment,
-  setFabricateFlag,
-} from '../config/flags.js';
+import { getFabricateFlag, setFabricateFlag, stampItemDataRoleIdentity } from '../config/flags.js';
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
 import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
-import { applyToolUsageAndBreakage, evaluateCheckBreakage } from '../toolBreakageRuntime.js';
+import {
+  applyToolUsageAndBreakage,
+  evaluateCheckBreakage,
+  stampReplacementComponentIdentity,
+} from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
@@ -108,32 +107,21 @@ function mapConsumedIngredientRef({ item, quantity }) {
  * FIRST for an owned item — its tier-1 durable-flag identity
  * (`durableClaimedComponent` → `claimedRoleId` → `flags.fabricate.roles[systemId].componentId`
  * in `src/utils/sourceUuid.js`) — so a freshly crafted item resolves to its own component
- * by identity and never reaches the source-ref tier. Mirrors the source-side stamp
- * {@link CraftingSystemManager#autoStampComponentSources} writes via
- * `setFabricateFlag(source, 'roles.<systemId>.componentId', id)`: the roles map lives at
- * the doubly-nested `flags.fabricate.fabricate.roles` path (`normalizeFlagKey` prefixes
- * `fabricate.`, then `expandObject` nests it under the `fabricate` scope), so on a plain
- * item-data object that same path is written directly.
+ * by identity and never reaches the source-ref tier.
  *
- * A dotted/unsafe `systemId` can never be a `roles` map key (every stamp/repair site skips
- * it), so it is skipped here too and the item resolves via the raw-reference fall-through.
+ * The doubly-nested `flags.fabricate.fabricate.roles[systemId].componentId` container-build,
+ * the `isSafeFlagKeySegment` dotted-systemId guard, and the sibling-preserving `||=` write
+ * now live in the shared {@link stampItemDataRoleIdentity} writer in `src/config/flags.js`
+ * (issue 780), which the gathering-award and tool-replacement creators also call, so the
+ * four creation sites cannot drift. This is a one-line delegate at the `componentId` role,
+ * preserving the crafted-output behaviour byte-for-byte.
  *
  * @param {object} itemData - The plain item-data object about to be created.
  * @param {string|null|undefined} systemId - The crafting system's id.
  * @param {string|null|undefined} componentId - The result component's id.
  */
 function stampCraftedComponentIdentity(itemData, systemId, componentId) {
-  if (!itemData || !componentId || !isSafeFlagKeySegment(systemId)) return;
-  // Build the doubly-nested `flags.fabricate.fabricate.roles[systemId]` container in
-  // place without depending on `foundry.utils.setProperty` (the source-side stamp goes
-  // through `setFlag`; here the item is unsaved data), preserving any sibling flags and
-  // any existing `roles` leaves for other systems.
-  const flags = (itemData.flags ||= {});
-  const namespace = (flags[FABRICATE_FLAG_NAMESPACE] ||= {});
-  const nested = (namespace[FABRICATE_FLAG_NAMESPACE] ||= {});
-  const roles = (nested.roles ||= {});
-  const perSystem = (roles[systemId] ||= {});
-  perSystem.componentId = componentId;
+  stampItemDataRoleIdentity(itemData, systemId, 'componentId', componentId);
 }
 
 /**
@@ -2498,6 +2486,10 @@ export class CraftingEngine {
       if (source.uuid) {
         globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
       }
+      // Stamp the replacement's durable per-system identity (issue 780) so it resolves to
+      // its own component — and, when it is itself a single linking first-class tool, stays
+      // durably breakable — once #601 removes the name-fallback tier.
+      stampReplacementComponentIdentity(itemData, system, componentId);
       await actor.createEmbeddedDocuments('Item', [itemData]);
     };
   }

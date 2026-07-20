@@ -12,6 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { resolveToolForItem, itemIsToolByDurableIdentity } from '../src/utils/sourceUuid.js';
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -257,6 +258,82 @@ test('_applyToolBreakage: replaceWith deletes and creates the replacement compon
   assert.equal(used[0].broken, true);
   assert.equal(created.length, 1);
   assert.equal(created[0].name, 'Broken Axe');
+});
+
+// ---------------------------------------------------------------------------
+// Issue 780: the crafting-engine tool-replacement creator stamps the replacement's
+// durable per-system identity onto the created item's payload (parity with the
+// gathering-surface makeCreateReplacement). Asserts on the captured
+// createEmbeddedDocuments payload.
+// ---------------------------------------------------------------------------
+
+function asOwnedItem(itemData) {
+  return {
+    ...itemData,
+    getFlag(scope, key) {
+      if (scope !== 'fabricate') return undefined;
+      return getPath(itemData.flags?.fabricate, key);
+    },
+  };
+}
+
+async function runReplacementCreator({ tools = [] } = {}) {
+  const replacementComponent = { id: 'c-axe-broken', name: 'Broken Axe', type: 'loot', system: { quantity: 1 } };
+  const system = installSystem({ components: [replacementComponent] });
+  system.tools = tools;
+  const engine = new CraftingEngine(toolMatcherManager());
+  const created = [];
+  const actorRef = { uuid: 'Actor.a', createEmbeddedDocuments: async (_type, data) => { created.push(...data); } };
+  const axe = new FakeItem('c-axe', { parent: actorRef });
+  const tool = {
+    componentId: 'c-axe',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' }
+  };
+  await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
+  return { created, system };
+}
+
+test('780 replacement (crafting): stamps roles[systemId].componentId = replacementComponentId', async () => {
+  const { created } = await runReplacementCreator();
+  assert.equal(created.length, 1);
+  assert.equal(created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId, 'c-axe-broken');
+});
+
+test('780 replacement (crafting): co-stamps toolId + round-trips when exactly one tool links the component', async () => {
+  const linkingTool = { id: 'tool-broken', componentId: 'c-axe-broken', name: 'Broken Axe Tool', registeredItemUuid: 'Item.unrelated' };
+  const { created, system } = await runReplacementCreator({ tools: [linkingTool] });
+  assert.equal(created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, 'tool-broken');
+
+  const owned = asOwnedItem(created[0]);
+  assert.equal(resolveToolForItem(owned, system.tools, 'sys-1')?.id, 'tool-broken');
+  assert.equal(itemIsToolByDurableIdentity(owned, linkingTool, system.tools, 'sys-1'), true);
+});
+
+test('780 replacement (crafting): skips toolId on zero or multiple linking tools', async () => {
+  const none = await runReplacementCreator({ tools: [{ id: 't-x', componentId: 'other' }] });
+  assert.equal(none.created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, undefined);
+
+  const many = await runReplacementCreator({
+    tools: [
+      { id: 't1', componentId: 'c-axe-broken' },
+      { id: 't2', componentId: 'c-axe-broken' },
+    ],
+  });
+  assert.equal(many.created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId, 'c-axe-broken');
+  assert.equal(many.created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, undefined);
+});
+
+test('780 replacement (crafting): an unresolvable replacement component stamps nothing (no item created)', async () => {
+  const system = installSystem({ components: [] }); // no c-axe-broken component to resolve
+  system.tools = [];
+  const engine = new CraftingEngine(toolMatcherManager());
+  const created = [];
+  const actorRef = { uuid: 'Actor.a', createEmbeddedDocuments: async (_type, data) => { created.push(...data); } };
+  const axe = new FakeItem('c-axe', { parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' } };
+  await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
+  assert.equal(created.length, 0, 'no replacement created when the component does not resolve');
 });
 
 // ---------------------------------------------------------------------------

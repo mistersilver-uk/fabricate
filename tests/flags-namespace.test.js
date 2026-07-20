@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getFabricateFlag, setFabricateFlag } from '../src/config/flags.js';
+import {
+  getFabricateFlag,
+  setFabricateFlag,
+  stampItemDataRoleIdentity,
+} from '../src/config/flags.js';
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -84,4 +88,69 @@ test('getFabricateFlag and setFabricateFlag fail closed when scope is invalid', 
   assert.equal(getFabricateFlag(doc, 'craftingRuns', 'fallback'), 'fallback');
   const result = await setFabricateFlag(doc, 'craftingRuns', { active: {}, history: [] });
   assert.equal(result, null);
+});
+
+// ---------------------------------------------------------------------------
+// stampItemDataRoleIdentity (issue 780): the shared write-side stamp behind every
+// creation site that needs a durable per-system identity leaf. Builds the
+// doubly-nested `flags.fabricate.fabricate.roles[systemId][roleKey]` path with a
+// dotted-systemId guard and sibling-preserving `||=`.
+// ---------------------------------------------------------------------------
+
+test('stampItemDataRoleIdentity builds the doubly-nested roles path', () => {
+  const itemData = {};
+  stampItemDataRoleIdentity(itemData, 'sysA', 'componentId', 'comp-1');
+  assert.equal(itemData.flags.fabricate.fabricate.roles.sysA.componentId, 'comp-1');
+});
+
+test('stampItemDataRoleIdentity stamps an arbitrary role leaf (toolId)', () => {
+  const itemData = {};
+  stampItemDataRoleIdentity(itemData, 'sysA', 'toolId', 'tool-9');
+  assert.equal(itemData.flags.fabricate.fabricate.roles.sysA.toolId, 'tool-9');
+});
+
+test('stampItemDataRoleIdentity rejects a dotted (unsafe) systemId — no mis-nested path', () => {
+  const itemData = {};
+  stampItemDataRoleIdentity(itemData, 'sys.with.dots', 'componentId', 'comp-1');
+  assert.equal(itemData.flags, undefined, 'an unsafe system id writes nothing at all');
+});
+
+test('stampItemDataRoleIdentity rejects a missing id or roleKey', () => {
+  const noId = {};
+  stampItemDataRoleIdentity(noId, 'sysA', 'componentId', null);
+  assert.equal(noId.flags, undefined, 'a nullish id stamps nothing');
+
+  const noRole = {};
+  stampItemDataRoleIdentity(noRole, 'sysA', null, 'comp-1');
+  assert.equal(noRole.flags, undefined, 'a nullish roleKey stamps nothing');
+
+  const noItem = stampItemDataRoleIdentity(null, 'sysA', 'componentId', 'comp-1');
+  assert.equal(noItem, undefined, 'a nullish itemData is a safe no-op');
+});
+
+test('stampItemDataRoleIdentity preserves sibling flags and sibling-system roles leaves', () => {
+  const itemData = {
+    flags: {
+      core: { sourceId: 'Item.src' },
+      fabricate: { fabricate: { roles: { sysB: { componentId: 'other' } } } },
+    },
+  };
+  stampItemDataRoleIdentity(itemData, 'sysA', 'componentId', 'comp-1');
+  assert.equal(itemData.flags.core.sourceId, 'Item.src', 'unrelated sibling flags survive');
+  assert.equal(
+    itemData.flags.fabricate.fabricate.roles.sysB.componentId,
+    'other',
+    'a roles leaf for a DIFFERENT system survives'
+  );
+  assert.equal(itemData.flags.fabricate.fabricate.roles.sysA.componentId, 'comp-1');
+});
+
+test('stampItemDataRoleIdentity co-stamps componentId and toolId under one system leaf', () => {
+  const itemData = {};
+  stampItemDataRoleIdentity(itemData, 'sysA', 'componentId', 'comp-1');
+  stampItemDataRoleIdentity(itemData, 'sysA', 'toolId', 'tool-1');
+  assert.deepEqual(itemData.flags.fabricate.fabricate.roles.sysA, {
+    componentId: 'comp-1',
+    toolId: 'tool-1',
+  });
 });

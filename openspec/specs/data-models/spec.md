@@ -844,6 +844,14 @@ Recipe = {
     author: string,
     version: string,
   },
+
+  // Durable settings-payload provenance stamped by import (NOT a Foundry flag).
+  // Identifies the source pack (the payload's system.id when present, else the created
+  // system id) so a later reinstall can prune recipes the pack dropped without touching
+  // GM-authored recipes. Normalized to object-or-null by the Recipe constructor (a
+  // malformed value normalizes to null), emitted by toJSON(), null for hand-authored
+  // recipes, re-stamped on every import, and retained across GM edits.
+  importSource: { systemId: string, importedAt: number } | null,
 }
 ```
 
@@ -885,6 +893,10 @@ The legacy scalar `recipeItemId` requirements below still hold for un-migrated s
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
 It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
 An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
+14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
+The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
+A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
+It survives export/import (the importer re-stamps it) and is retained across GM edits (an edit that omits `importSource` inherits the stored value through the `{ ...recipe.toJSON(), ...updates }` merge in `updateRecipe`).
 
 ### Validation Guidance
 
@@ -940,6 +952,9 @@ Every kind's durable identity-of-record is a per-system leaf under `flags.fabric
 A legacy scalar `flags.fabricate.componentId` (components) or `flags.fabricate.recipeItemDefinitionId` (recipe items) is still honored at match time as a claimed id — a transitional read-only fallback tier — until the one-shot restamp backfills the map; tools never had a legacy scalar.
 Registration stamps only the owning system's `roles[system.id]` leaf for the kind, and clears only that per-system leaf on re-point or repair, never the whole `roles` flag nor the whole `roles[systemId]` object (which would destroy the sibling leaves).
 A CRAFTED OUTPUT item carries the durable component identity of its result component: crafting stamps `flags.fabricate.roles[craftingSystemId].componentId` on the output item at creation, so a freshly crafted product resolves to its OWN component through the identity tier and never through the transitive `_stats.duplicateSource` it inherits from a source item duplicated off a sibling component (a result with no managed component, or a system id that is not a durable-flag-key segment, is left unstamped and degrades to raw-reference resolution).
+A GATHERED AWARD item carries the durable component identity of its awarded component: the gathering award creation path stamps `flags.fabricate.roles[systemId].componentId` (the awarding system's id) on the created item at creation, so a gathered part resolves to its OWN component through the identity tier; an award with no managed component (a bare `itemUuid` source), or a system id that is not a durable-flag-key segment, is left unstamped and degrades to raw-reference resolution.
+A TOOL-REPLACEMENT grant item (created when a broken tool's `onBreak.replaceWith` resolves its `replacementComponentId`) carries that replacement component's durable identity: the replacement creation path stamps `flags.fabricate.roles[systemId].componentId = replacementComponentId`, and ADDITIONALLY stamps `flags.fabricate.roles[systemId].toolId` with the linking tool's id when exactly one first-class tool in `system.tools` links the replacement component (`tool.componentId === replacementComponentId`), so a replacement that is itself a working tool stays durably matchable and breakable; on zero or multiple linking tools only `componentId` is stamped, and when the replacement component does not resolve, nothing is stamped.
+These creation-time stamps write the same `roles[systemId]` leaves the one-shot component restamp and the **Repair item data** action write, with the same values, so they are idempotent-compatible; they add no migration and fix only items created after the one-shot back-fill has run.
 
 - A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
 A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
