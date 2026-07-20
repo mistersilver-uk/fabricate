@@ -128,7 +128,7 @@ Draft-head checks MUST be treated only as preflight evidence because required wo
 
 #### Scenario: publishing rewritten history
 
-- **WHEN** the rebased head has passed its required local gates and detached review
+- **WHEN** the rebased head has passed its required local gates and has valid required implementation-review evidence
 - **THEN** the driver updates the remote only with `--force-with-lease=<branch>:<expected-sha>` using the previously captured remote SHA
 - **AND** a rejected lease stops for investigation
 - **AND** the driver MUST NOT retry with `--force` or an unqualified force push

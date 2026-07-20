@@ -43,7 +43,7 @@ It prioritizes the earliest honestly reviewable PR while preserving mandatory sa
 - When repeat review is required, use a fresh detached lane pinned to the exact target and supply an immutable base-relative artifact.
 - Monitor each delegated lane for observable progress, such as tool output, a status report, a diff, or a commit.
 - After about 60 seconds without observable progress, request status once; after another about 60 seconds without progress, interrupt and reassign the lane or continue locally when that work is within driver authority.
-- Reuse valid evidence only for the unchanged target and concern it proves, including a patch-equivalent reviewed concern; rerun a gate when its target changed, its evidence is stale or ambiguous, or repository policy explicitly requires an exact-head result.
+- Reuse review evidence when the reviewed concern is unchanged, including across a patch-equivalent rebase; rerun exact-head mechanical gates when the head changes, and rerun any gate when its evidence is stale or ambiguous or repository policy explicitly requires it.
 
 1. Read the repo guidance and the current task context first.
 2. The driver verifies mutable work will happen on a non-`main` task branch.
