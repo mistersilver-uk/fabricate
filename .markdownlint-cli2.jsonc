@@ -7,7 +7,12 @@
     "docs/_site",
     "docs/.jekyll-cache",
     "dist",
+    ".worktrees",
+    ".claude/worktrees",
     "tmp",
+    "COMPETITIVE_ANALYSIS.md",
+    "CONTENT_PACKS.md",
+    "PLAN.md",
     "CHANGELOG.md"
   ],
   // One-sentence-per-line rule (markdownlint-sentences-per-line, parser: "none").

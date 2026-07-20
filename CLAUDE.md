@@ -14,11 +14,16 @@ subagents are registered in `.claude/agents/`; for the read-only `fabricate_pr_e
 use the built-in `Explore` agent.
 Run plan-review reviewers in parallel, honor the 3-revision
 caps, and surface any `BLOCKED` verdict to the user.
+The main loop is the workflow driver and creates a unique isolated worktree for every spawned role by default; mutable roles use exclusive lane branches and read-only roles use fresh detached snapshots for each reviewed commit.
+The driver alone mutates the coordinator checkout, GitHub or remote state, integrates local lane commits, runs authoritative gates, and performs guarded cleanup.
+Use the provider-neutral lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; do not create a Claude-specific worktree convention.
+Before maintainer handoff, the driver finalizes PR metadata, rebases onto fetched `origin/main`, reruns authoritative gates and commitlint, preserves valid approval across a patch-equivalent rebase or obtains fresh detached exact-target review when the owned concern materially changed or a finding remains unresolved, pushes only with an explicit expected-head lease, marks the PR ready, and requires all post-undraft exact-head checks including both SonarCloud checks.
+Draft checks are preflight only; on failure or a moved main/head, return the PR to draft and repeat the delivery loop.
 
 ## Skills
 
-Shared project skills live in `skills/` (the canonical persona definition for each role lives in
-`skills/<role>/SKILL.md`).
+Shared project skills live in `.agents/skills/` (the canonical persona definition for each role lives in
+`.agents/skills/<role>/SKILL.md`).
 Each subagent reads its own skill by path on demand — they are not
 invocable as `/slash` commands in the main loop.
 Use those shared skills instead of creating
@@ -28,7 +33,7 @@ provider-local copies or provider-specific mirrors; see the bindings table in `A
 
 Before any multi-PR or git-history operation — stacking PRs, rebasing a branch after its base
 merges, force-pushing, or rewording commits — read the stacked-PR guidance in
-`skills/fabricate-orchestrator/SKILL.md` and the commit/PR-title rules in `AGENTS.md` first.
+`.agents/skills/fabricate-orchestrator/SKILL.md` and the commit/PR-title rules in `AGENTS.md` first.
 This
 applies in the main loop, not just to spawned sub-agents.
 Key traps they cover:

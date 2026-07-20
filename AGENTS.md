@@ -33,6 +33,24 @@ It enacts the orchestrator role: it owns routing and the iteration loops and per
 The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec delta in the issue; it returns its plan to the driver.
 Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
 
+### Proportionality and momentum
+
+The workflow driver uses the shortest workflow that satisfies mandatory repository gates and the actual risk, prioritizing the earliest honestly reviewable PR while preserving mandatory safety, review, and exact-head delivery gates.
+One mechanically valid evidence run satisfies every gate it directly covers, so agents do not repeat equivalent checks or reviews ceremonially.
+A reviewer repeats only when its owned concern materially changed or an unresolved finding remains; issue or PR metadata edits and patch-equivalent rebases do not invalidate approval.
+The driver front-loads cheap checks for branch and base freshness, affected paths and roster, PR title and commitlint, existing CI state, and screenshot scope.
+The driver timeboxes delegated lanes: after about 60 seconds without observable progress it requests status once, and after another about 60 seconds it interrupts and reassigns the work or continues locally within driver authority.
+
+### Isolated worktree execution
+
+Every spawned role works in its own Git worktree by default so independent workstreams do not share a mutable checkout.
+The workflow driver owns the clean coordinator checkout and integration branch, GitHub and remote mutations, lane lifecycle, integration, authoritative gates, and guarded cleanup.
+Mutable lanes use unique `agent/<issue>-<stage>-<role>-r<revision>` branches and exclusive path ownership; read-only lanes use fresh detached worktrees pinned to the exact commit under review.
+Spawned agents verify their assigned path, branch or detached SHA, base, and clean state before acting, then return local commits, base-relative diffs, or verdicts without pushing or mutating issue or PR state.
+Parallel mutable lanes require disjoint owned paths and no dependency on unintegrated output.
+The driver serializes dependency installation and complete test, build, lint, Foundry/Docker, and screenshot gates from the fully integrated coordinator branch.
+Follow the canonical mechanics in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for assignment briefs, review artifacts, integration mapping, feedback revisions, conflicts, and cleanup.
+
 ### Auto-spawn routing
 
 Resolve the roster with this procedure — it is mechanical, not a judgment call:
@@ -75,6 +93,29 @@ The implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
 The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating it and its `Deviations` note when implementation justifiably diverged) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site to match the shipped canonical spec).
 Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`.
 Loop until both approve.
+
+### Final maintainer handoff
+
+Before asking the maintainer to review a PR, the workflow driver completes a final delivery loop from the coordinator checkout.
+Draft-head checks are preflight evidence only because some CI workflows may run only on the `ready_for_review` event.
+
+1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
+2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
+3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.
+4. Determine mechanically whether the rebase materially changed the implementation reviewer's owned concern or left an unresolved finding.
+Reuse the valid approval for a patch-equivalent rebase; when repeat review is required, create a fresh detached implementation-review lane pinned to the exact rebased commit and supply an immutable diff artifact.
+Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical spec, or documentation content.
+5. Update the remote branch only with `git push --force-with-lease=<branch>:<expected-sha>`.
+A rejected lease stops the loop for investigation; never retry with `--force` or an unqualified force push.
+6. Mark the PR ready for review, then wait for every required GitHub Actions and external check triggered for that exact head.
+Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
+Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
+7. On any failure, return the PR to draft before gathering evidence and routing fixes through the normal isolated implementation and review loops.
+After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks, repeating review only for a materially changed owned concern or unresolved finding.
+8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
+If main advanced, the head changed, or the PR returned to draft, repeat the mandatory delivery steps and apply step 4's material-change review rule.
+
+Only hand the PR to the maintainer after all final-delivery conditions are true on the same commit.
 
 ### Stop conditions
 
@@ -505,13 +546,16 @@ Apply them to new content and to any section you are already editing.
 
 ## Git Conventions
 
-- All implementation, documentation, and workflow-file changes must happen on a non-`main` branch.
-- Before editing, verify the current branch (`git branch --show-current`).
-If it is `main`, create or switch to a task branch first.
-Re-check after any merge — merging a PR can move the local checkout to `main`, so a branch you were on earlier may no longer be current.
-- When the work is complete, commit to that branch, push it, and open a PR targeting `main`.
-- Respond to review feedback by updating the same branch and PR; do not open replacement PRs unless the user asks.
-- Review-only agents inspect the active branch and PR, and must not merge to `main`.
+- All implementation, documentation, and workflow-file changes must happen on a non-`main` integration or lane branch.
+- Before editing, the driver verifies the coordinator branch, and every mutable spawned agent verifies the branch and base in its assignment (`git branch --show-current` and `git rev-parse HEAD`).
+If the coordinator is on `main`, the driver creates or switches to a task branch before fan-out; a spawned agent treats any lane identity mismatch as blocked.
+Re-check after any integration or merge because the expected branch or SHA may have changed.
+- When a spawned agent completes work, it commits only owned paths locally and returns the commits to the driver without pushing or opening a PR.
+The driver verifies and integrates lane commits, then pushes the integration branch and opens or updates the PR targeting `main`.
+- Respond to review feedback through a valid retained lane or a fresh revision lane, then update the same integration branch and PR; do not open replacement PRs unless the user asks.
+- When review is required, review-only agents inspect fresh detached snapshots of the exact assigned integration commit against an immutable artifact and must not commit, push, merge, or mutate GitHub state.
+- Before maintainer handoff, complete the final delivery loop: rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across a patch-equivalent rebase or obtain fresh detached review when the owned concern materially changed or a finding remains unresolved, explicit-lease push, mark ready, require all exact-head checks including both SonarCloud checks, then re-fetch main and reverify ancestry, head identity, and ready state.
+- Treat draft checks as preflight only; a required workflow may be triggered by `ready_for_review` and must pass after the PR is undrafted.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 - PR descriptions must include a GitHub closing keyword for the issue the PR resolves: put `Closes #<issue>` (or `Fixes #<issue>` / `Resolves #<issue>`) on its own line in the `Description` section so merging the PR auto-closes the issue.
@@ -539,7 +583,7 @@ Bundling is acceptable when changes overlap on the same files such that hunk-spl
 
 ## Agent Roles & Bindings
 
-Each role is defined **once** in its shared `skills/<role>/SKILL.md` (the canonical persona).
+Each role is defined **once** in its shared `.agents/skills/<role>/SKILL.md` (the canonical persona and Codex repository-discovery location).
 Both provider agents are **thin bindings** that point at that skill — change behavior in the
 skill, not in the bindings.
 The default workflow above auto-spawns these roles based on change
@@ -547,15 +591,15 @@ signals; explicit requests are only required for roles the routing table does no
 
 | Routing token                  | Canonical skill (persona)                  | Codex binding                                | Claude `subagent_type`        |
 |---------------------------------|--------------------------------------------|----------------------------------------------|-------------------------------|
-| `fabricate_orchestrator`        | `skills/fabricate-orchestrator/SKILL.md`   | `.codex/agents/fabricate-orchestrator.toml`  | `fabricate-orchestrator`      |
-| `fabricate_implementer`         | `skills/fabricate-implementer/SKILL.md`    | `.codex/agents/fabricate-implementer.toml`   | `fabricate-implementer`       |
-| `fabricate_reviewer`            | `skills/fabricate-reviewer/SKILL.md`       | `.codex/agents/fabricate-reviewer.toml`      | `fabricate-reviewer`          |
-| `fabricate_domain_expert`       | `skills/fabricate-domain-expert/SKILL.md`  | `.codex/agents/fabricate-domain-expert.toml` | `fabricate-domain-expert`     |
-| `fabricate_docs_writer`         | `skills/fabricate-docs-writer/SKILL.md`    | `.codex/agents/fabricate-docs-writer.toml`   | `fabricate-docs-writer`       |
-| `fabricate_ux_designer`         | `skills/fabricate-ux-designer/SKILL.md`    | `.codex/agents/fabricate-ux-designer.toml`   | `fabricate-ux-designer`       |
-| `fabricate_quality_engineer`    | `skills/fabricate-quality-engineer/SKILL.md` | `.codex/agents/fabricate-quality-engineer.toml` | `fabricate-quality-engineer` |
-| `foundry_integrator`            | `skills/foundry-integrator/SKILL.md`       | `.codex/agents/foundry-integrator.toml`      | `foundry-integrator`          |
-| `fabricate_competitive_analyst` | `skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml` | `fabricate-competitive-analyst` |
+| `fabricate_orchestrator`        | `.agents/skills/fabricate-orchestrator/SKILL.md`   | `.codex/agents/fabricate-orchestrator.toml`  | `fabricate-orchestrator`      |
+| `fabricate_implementer`         | `.agents/skills/fabricate-implementer/SKILL.md`    | `.codex/agents/fabricate-implementer.toml`   | `fabricate-implementer`       |
+| `fabricate_reviewer`            | `.agents/skills/fabricate-reviewer/SKILL.md`       | `.codex/agents/fabricate-reviewer.toml`      | `fabricate-reviewer`          |
+| `fabricate_domain_expert`       | `.agents/skills/fabricate-domain-expert/SKILL.md`  | `.codex/agents/fabricate-domain-expert.toml` | `fabricate-domain-expert`     |
+| `fabricate_docs_writer`         | `.agents/skills/fabricate-docs-writer/SKILL.md`    | `.codex/agents/fabricate-docs-writer.toml`   | `fabricate-docs-writer`       |
+| `fabricate_ux_designer`         | `.agents/skills/fabricate-ux-designer/SKILL.md`    | `.codex/agents/fabricate-ux-designer.toml`   | `fabricate-ux-designer`       |
+| `fabricate_quality_engineer`    | `.agents/skills/fabricate-quality-engineer/SKILL.md` | `.codex/agents/fabricate-quality-engineer.toml` | `fabricate-quality-engineer` |
+| `foundry_integrator`            | `.agents/skills/foundry-integrator/SKILL.md`       | `.codex/agents/foundry-integrator.toml`      | `foundry-integrator`          |
+| `fabricate_competitive_analyst` | `.agents/skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml` | `fabricate-competitive-analyst` |
 | `fabricate_pr_explorer`         | — (no shared skill; read-only mapping)     | `.codex/agents/fabricate-pr-explorer.toml`   | `Explore` (built-in)          |
 
 `fabricate_pr_explorer` is read-only codebase mapping; Claude uses its built-in `Explore` agent
@@ -563,11 +607,10 @@ for the same role rather than a dedicated binding.
 
 ### Shared skills with no persona binding
 
-These are loaded on demand (by path) from the role skills that reference them — not auto-spawned
-as agents:
+These are discoverable by Codex as repository skills and loaded on demand by roles that reference them; they are not auto-spawned as agents:
 
-- `skills/javascript-structural-design/SKILL.md`
-- `skills/review-implementing/SKILL.md`
+- `.agents/skills/javascript-structural-design/SKILL.md`
+- `.agents/skills/review-implementing/SKILL.md`
 
 ## What Agents Must Not Do
 

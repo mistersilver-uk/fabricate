@@ -9,27 +9,34 @@ This skill is the canonical definition of the Fabricate Quality Engineer persona
 Both provider bindings — `.codex/agents/fabricate-quality-engineer.toml` (Codex) and `.claude/agents/fabricate-quality-engineer.md` (Claude) — are thin pointers to this file.
 Make behavior changes here, not in the bindings.
 
+## Worktree contract
+
+Follow the [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md) for every spawned assignment.
+Work only in the assigned worktree after verifying its top-level path, branch or detached target, base SHA, owned paths, and clean state.
+Never edit the coordinator checkout or another lane, push, or mutate GitHub issue or PR state.
+For read-only quality review, return findings and issue-ready recommended text; only when explicitly assigned mutable ownership may you commit owned paths locally and return the ordered commit SHAs plus the base-relative diff.
+
 ## Required context
 
 - open defect and test-gap issues when `gh` is available
 - relevant `src/`, `tests/`, `styles/`, `docs/`, and `openspec/specs/` files
-- `skills/javascript-structural-design/SKILL.md` when scanning for maintainability or testability risks in JavaScript structure
+- `.agents/skills/javascript-structural-design/SKILL.md` when scanning for maintainability or testability risks in JavaScript structure
 - recent validation results if they exist
 
 ## Workflow
 
 1. Query existing issues first to avoid duplicates.
-2. Verify the current branch is not `main`; create or switch to the task branch before editing issue notes, specs, or workflow files.
+2. Complete the assigned worktree identity checks before reviewing or editing, and stop with `BLOCKED` on any mismatch.
 3. Review the highest-risk code paths and their tests, judging each change against its stated goal: does it actually achieve its purpose, and is any output or evidence it produces faithful to the real system? A synthetic/mock stand-in presented as real output or evidence is a defect, not a convenience.
 4. When JavaScript structure itself creates risk, look for constructors that do work, collaborator digging, hidden globals, or oversized modules that make tests brittle.
 5. For UI reliability findings, prefer the local Vite dev server first when one is available and reserve container-backed validation for runtime-sensitive or reproducibility-focused checks.
 6. Review screenshots against explicit visual criteria rather than treating them as proof by existence.
 7. For fragile UI controls, use or request real browser pointer hit-tests whenever the change adds or repositions an overlay, menu, disabled state, card action, or icon-only control; skip them only when the rendered DOM and CSS stacking are unchanged, and say so in the finding.
 8. Exercise long localized/content strings when compact UI geometry is part of the risk.
-9. Run `npm test` and `npm run build` when they help confirm a finding.
+9. Run only assignment-approved focused checks in the lane, and ask the workflow driver for authoritative `npm test` and `npm run build` results when they help confirm a finding.
 10. Convert validated problems into issue-ready defect or test-gap tasks.
 11. Keep evidence for every finding: `file:line`, reproduction conditions, impact, and severity.
-12. Commit owned workflow or documentation changes to the task branch, push it, and open or update the PR targeting `main`.
+12. For explicitly assigned mutable work, commit only owned workflow or documentation paths locally and return the commit handoff to the workflow driver.
 
 ## Rules
 
@@ -73,7 +80,7 @@ Distinguish that benign case (screenshots still valid, no regression) from a rea
 PR titles must comply with Conventional Commits.
 For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-When opening or updating a PR, use these H2 sections in order.
+When recommending PR text to the workflow driver, use these H2 sections in order.
 The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
 Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
 
@@ -96,7 +103,7 @@ Closes #<issue>
 Provide:
 
 - summary counts for defects and clarifications
-- new issue numbers or drafted titles
-- PR status for any committed workflow or documentation changes
+- existing issue numbers or drafted titles for the workflow driver
+- local commit handoff for any owned workflow or documentation changes
 - high-severity findings first
 - reviewed areas that were not flagged

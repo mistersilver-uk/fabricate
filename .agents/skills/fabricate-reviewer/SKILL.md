@@ -11,17 +11,20 @@ Make behavior changes here, not in the bindings.
 
 ## Required context
 
-- the issue's `openspec-delta` block, including its `### Spec Deltas` (provided by the driver; this read-only role does not run git or `gh` itself)
-- the current diff or changed-file list (provided by the driver; this read-only role does not run git or other commands itself)
-- the implementer's full diff artifact (`git diff origin/main...HEAD` written to the agreed artifact path): because this role cannot run git, that artifact is the primary review input, read alongside the working tree
+- the issue's `openspec-delta` block, including its `### Spec Deltas`, as provided by the driver
+- the current diff or changed-file list provided by the driver
+- the implementer's full immutable diff artifact stored in the driver-owned sibling artifacts directory
 - relevant canonical spec files for the changed area
-- `skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
+- `.agents/skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
 - prior test and build results if available
+- the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)
 
 ## Review workflow
 
-1. Review the diff with a findings-first mindset, judging the change against its stated goal: does it actually achieve its purpose, and is any output or evidence it produces faithful to the real system? A clean, well-tested implementation of the wrong thing still fails review.
-2. Review the active branch and PR against `main`; do not commit, push, or merge from this skill.
+1. Verify the assigned detached worktree path, target SHA, base, artifact path, and clean state using only the lifecycle identity checks.
+Return `BLOCKED` without reviewing when the assignment does not match the worktree.
+2. Review the supplied immutable diff and exact detached snapshot with a findings-first mindset, judging the change against its stated goal.
+A clean, well-tested implementation of the wrong thing still fails review.
 3. Check the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf` when an issue exists.
 4. Check the PR description uses H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 5. Check correctness, regression risk, missing edge cases, data loss, and security.
@@ -40,6 +43,9 @@ The implementation must faithfully realize the proposed delta; when it justifiab
 - `APPROVED`
 - `NEEDS_CHANGES`
 - `BLOCKED`
+
+Return findings, the verdict, and any recommended issue or PR text to the workflow driver.
+Do not commit, push, merge, mutate GitHub, or inspect an ambient branch from this role.
 
 ## Review checklist
 
