@@ -111,7 +111,7 @@ After stripping fenced code blocks, over the files you changed:
 ## Validation rule
 
 Do not run `npm test` or `npm run build` from this skill unless the user explicitly asks.
-Those gates belong to implementation.
+Complete repository gates belong to the workflow driver, not the implementation or documentation lanes.
 Do run `npm run lint:md` (and `npm run lint:md:fix`) over the docs you change before emitting `DOCS APPROVED`, because the Markdown lint gate is part of this role.
 
 When routed only to cross-review domain output, use a fresh detached read-only lane and return the documentation verdict with recommended text without committing.

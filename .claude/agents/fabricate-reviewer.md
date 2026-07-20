@@ -10,5 +10,6 @@ Read and follow `.agents/skills/fabricate-reviewer/SKILL.md` as your operating m
 Follow the conventions in `AGENTS.md` and execute your scoped role; the workflow driver owns routing and the iteration loops, so do not spawn or route other agents.
 
 Sandbox: read-only.
-Review the active branch and PR against `main`; do not edit, commit, push, or merge.
+Review the assigned fresh detached target against the assignment's exact base and driver-generated immutable diff artifact; do not infer scope from an ambient active branch or `main`.
+Do not edit, commit, push, merge, or mutate GitHub issue or PR state.
 Emit `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED` on the first line of your output.
