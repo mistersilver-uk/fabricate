@@ -142,6 +142,24 @@ The progressive salvage check itself has no DC, because its roll is a budget spe
 Each component still carries its own progressive DC, and that DC is shown on its stage beside the reach value.
 See [Relative and fixed tiers]({% link crafting-checks.md %}#relative-and-fixed-tiers).
 
+### Required Tools
+
+Some components need a tool in hand before they can be broken down.
+When a component requires one, the Salvage tab lists it under a **Required tools** heading before any roll is made.
+Each required tool shows its name and image alongside a marker reading **Available** or **Unavailable**, so the player knows what they need before the attempt.
+
+Availability is judged against the character doing the salvaging, not the party as a whole.
+A tool that only another party member is carrying still reads **Unavailable**, because this character cannot reach it during the salvage.
+A tool the salvaging character holds but which is broken also reads **Unavailable**, because a broken tool cannot be used.
+
+While any required tool reads **Unavailable**, the **Salvage** button stays disabled.
+The footer then carries a note explaining that a required tool is missing, in place of the footer's usual one-shot reminder.
+Bringing the tool onto the salvaging character clears the block and makes the button usable.
+
+This is separate from salvaging a broken tool, covered in [Broken Tools](#broken-tools).
+There, the broken tool is itself the thing being recycled.
+Here, a working tool is a prerequisite for recycling something else.
+
 ### Making the Attempt
 
 The footer holds a single button that rolls and commits in one press.
