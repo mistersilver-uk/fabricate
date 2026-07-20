@@ -153,7 +153,7 @@ A tool that only another party member is carrying still reads **Unavailable**, b
 A tool the salvaging character holds but which is broken also reads **Unavailable**, because a broken tool cannot be used.
 
 While any required tool reads **Unavailable**, the **Salvage** button stays disabled.
-The footer then carries a note explaining that a required tool is missing, in place of the usual reminder about the cost of a failed roll.
+The footer then carries a note explaining that a required tool is missing, in place of the footer's usual one-shot reminder.
 Bringing the tool onto the salvaging character clears the block and makes the button usable.
 
 This is separate from salvaging a broken tool, covered in [Broken Tools](#broken-tools).
