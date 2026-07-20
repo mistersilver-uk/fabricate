@@ -349,12 +349,16 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.mandatory, false);
   });
 
-  it('simple mode: an empty roll formula is not usable', () => {
+  it('simple mode: a disabled, formula-less optional check surfaces no card (null)', () => {
     const system = makeSystem({
       craftingCheck: { simple: { rollFormula: '   ' }, routed: {}, progressive: {} },
     });
     const { recipe } = buildOne({ system });
-    assert.equal(recipe.check.usable, false);
+    assert.equal(
+      recipe.check,
+      null,
+      'no empty DC-only card when the check is off, formula-less, and optional'
+    );
   });
 
   it('routedByCheck mode: check is mandatory', () => {
@@ -398,12 +402,27 @@ describe('CraftingListingBuilder — crafting check', () => {
     assert.equal(recipe.check.dc, 12);
   });
 
-  it('routedByIngredients: no simple formula → optional (no check runs)', () => {
+  it('routedByIngredients: no simple formula + checks off → no card (null)', () => {
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',
       craftingCheck: { simple: {}, routed: {}, progressive: {} },
     });
     const { recipe } = buildOne({ system });
+    assert.equal(
+      recipe.check,
+      null,
+      'an ingredient-routed recipe with no authored check and checks off shows no card'
+    );
+  });
+
+  it('routedByIngredients: no formula but checks enabled → keeps the GM misconfig note', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByIngredients',
+      features: { craftingChecks: true },
+      craftingCheck: { simple: {}, routed: {}, progressive: {} },
+    });
+    const { recipe } = buildOne({ system });
+    assert.notEqual(recipe.check, null, 'checksEnabled keeps the card so the GM sees the note');
     assert.equal(recipe.check.usable, false);
     assert.equal(recipe.check.optional, true);
   });

@@ -33,7 +33,12 @@
     canReorderStages = true,
     stageAnnouncement = '',
     onReorderStage = null,
-    onReorderStageSettled = null
+    onReorderStageSettled = null,
+    // Per-step requirement projection (issue 765). Like the progressive props above,
+    // this single prop set is passed to all four bodies; only SimpleRecipeBody reads
+    // it. It MUST be declared and forwarded here — a prop that skips this dispatcher
+    // silently drops to its default and the step blocks never render.
+    steps = []
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -83,6 +88,7 @@
           {stageAnnouncement}
           {onReorderStage}
           {onReorderStageSettled}
+          {steps}
         />
       </div>
       <div class="crafting-detail-footer">
