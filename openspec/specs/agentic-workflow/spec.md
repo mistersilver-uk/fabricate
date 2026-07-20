@@ -24,9 +24,10 @@ The delta is NOT versioned as files in the repository; it lives in a managed blo
 #### Scenario: planning issue work
 
 - **WHEN** work is non-trivial or spans multiple files, validations, or decisions
-- **THEN** the orchestrator captures the change delta in the issue's managed `openspec-delta` block before code changes begin
+- **THEN** the workflow driver captures the change delta in the issue's managed `openspec-delta` block before code changes begin
 - **AND** when the work originates from an existing issue it appends the block, preserving the reporter's original text, and when the work originates from a prompt with no issue it creates an issue from the `OpenSpec Change Delta` template
 - **AND** it rewrites the block in place across plan-review iterations rather than appending duplicate blocks, and never edits outside the markers
+- **AND** a spawned orchestrator helper remains read-only and returns draft or replacement managed-block text for the driver to apply
 
 #### Scenario: implementing the delta into canonical specs
 
@@ -84,13 +85,21 @@ The release automation's forward-port merge from `release` into `main` is not ag
 Every spawned agent MUST work from a unique repository-local Git worktree by default.
 Mutable lanes MUST use exclusive branches, and read-only lanes MUST use detached snapshots pinned to the exact commit being evaluated.
 
-#### Scenario: preparing agent lanes
+#### Scenario: preparing planning and plan-review lanes
+
+- **WHEN** the workflow driver needs a delta drafted or reviewed before approval
+- **THEN** it requires a clean coordinator checkout and a committed shared baseline
+- **AND** it derives a preliminary roster mechanically from the current request and proposed affected paths
+- **AND** it creates fresh detached planner or plan-review worktrees beneath `.worktrees/<issue>/`, pinned to that baseline without requiring an approved delta
+- **AND** it keeps immutable review artifacts in the driver-owned sibling directory `.worktrees/<issue>/artifacts/` rather than inside a detached checkout
+- **AND** it recomputes the preliminary roster when proposed paths or content signals change
+
+#### Scenario: preparing mutable implementation lanes
 
 - **WHEN** the workflow driver is ready to fan out approved work
-- **THEN** it requires a clean coordinator checkout and a committed shared baseline
+- **THEN** it requires the approved issue delta, final resolved roster, dependency order, exclusive path ownership, and a clean committed coordinator baseline
 - **AND** it creates each lane beneath `.worktrees/<issue>/` with a unique directory
-- **AND** it assigns mutable branches named `agent/<issue>-<stage>-<role>-r<revision>` or an exact detached target SHA for read-only work
-- **AND** it keeps immutable review artifacts in the driver-owned sibling directory `.worktrees/<issue>/artifacts/` rather than inside a detached checkout
+- **AND** it assigns mutable branches named `agent/<issue>-<stage>-<role>-r<revision>`
 
 #### Scenario: briefing a spawned agent
 
@@ -194,11 +203,13 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 
 - **WHEN** role agents are spawned for a change
 - **THEN** the workflow driver (the provider's top-level loop — Codex's depth-0 prompt agent or Claude's main loop) owns routing and the plan, implementation, and docs iteration loops
+- **AND** the workflow driver alone mutates issue, PR, or workflow state
+- **AND** a spawned orchestrator helper performs read-only planning and returns draft managed-block text rather than applying it
 - **AND** scoped role agents execute their role and return without spawning or routing further agents
 
 ### Requirement: Harness reference integrity
 
-Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `.agents/skills/README.md`, `.agents/skills/*/SKILL.md`, `.agents/skills/*/references/*.md`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
+Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `.agents/skills/README.md`, `.agents/skills/*/SKILL.md`, every Markdown file recursively beneath `.agents/skills/*/references/`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
 
 #### Scenario: validating harness references
 
@@ -208,14 +219,14 @@ Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/REA
 - **AND** it verifies every skill-backed role's Claude binding declares a `model:` and its Codex binding declares a `model =`
 - **AND** it verifies every `.agents/skills/<name>/SKILL.md` has only single-line string `name` and `description` frontmatter fields
 - **AND** the `name` matches its directory, contains at most 64 lowercase letters, digits, and hyphens, and the `description` contains 1-1024 characters without angle brackets
-- **AND** it verifies every Markdown file under a skill's `references/` directory is cited directly by that skill's `SKILL.md`
+- **AND** it recursively enumerates every Markdown file beneath a skill's `references/` directory, validates paths cited by those nested documents, and requires the owning `SKILL.md` to cite each one directly by its full relative `references/...` path
 - **AND** it verifies the AGENTS.md shared-skills list equals the set of `.agents/skills/` subdirectories containing a `SKILL.md` minus the role directories derived from the bindings table
 - **AND** it exits non-zero on any violation
 
 #### Scenario: consistent local and CI validation
 
 - **WHEN** a developer runs `npm run validate:agents` locally or the `validate-agents` CI job runs it on Ubuntu
-- **THEN** the same dependency-free Node validator enforces the same discovery, metadata, reference, and binding requirements
+- **THEN** the identical dependency-free Node validator behavior enforces the same discovery, metadata, recursive-reference, and binding requirements in both environments
 - **AND** neither path requires network access or a provider-specific fallback
 
 #### Scenario: citing code from harness documents

@@ -189,6 +189,18 @@ const listDir = (rel, filter) => {
   if (!existsSync(abs)) return [];
   return readdirSync(abs).filter(filter).map((f) => `${rel}/${f}`);
 };
+const listTree = (rel, filter) => {
+  const abs = join(root, rel);
+  if (!existsSync(abs)) return [];
+
+  return readdirSync(abs, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => {
+      const child = `${rel}/${entry.name}`;
+      if (entry.isDirectory()) return listTree(child, filter);
+      return entry.isFile() && filter(entry.name) ? [child] : [];
+    });
+};
 const skillDirs = () => {
   const abs = join(root, SKILLS_ROOT);
   if (!existsSync(abs)) return [];
@@ -203,7 +215,7 @@ const harnessDocs = [
   ...skillDirs().flatMap((d) => {
     const docs = [];
     if (existsSync(join(root, SKILLS_ROOT, d, "SKILL.md"))) docs.push(`${SKILLS_ROOT}/${d}/SKILL.md`);
-    docs.push(...listDir(`${SKILLS_ROOT}/${d}/references`, (f) => f.endsWith(".md")));
+    docs.push(...listTree(`${SKILLS_ROOT}/${d}/references`, (f) => f.endsWith(".md")));
     return docs;
   }),
   ...listDir(".claude/agents", (f) => f.endsWith(".md")),
@@ -346,9 +358,11 @@ for (const dir of skillDirs()) {
     require_(description && !/[<>]/.test(description), `${skillPath} frontmatter description must not contain angle brackets`);
   }
 
-  for (const reference of listDir(`${SKILLS_ROOT}/${dir}/references`, (file) => file.endsWith(".md"))) {
-    const filename = reference.slice(reference.lastIndexOf("/") + 1);
-    require_(skill.includes(`references/${filename}`), `${reference} is not cited directly by its owning ${skillPath}`);
+  const citedPaths = [...skill.matchAll(/`([^`\n]+)`/g)].map((match) => match[1].replaceAll("\\", "/"));
+  for (const reference of listTree(`${SKILLS_ROOT}/${dir}/references`, (file) => file.endsWith(".md"))) {
+    const skillRelativeReference = reference.slice(`${SKILLS_ROOT}/${dir}/`.length);
+    const isDirectlyCited = citedPaths.some((path) => path === skillRelativeReference || path.endsWith(`/${skillRelativeReference}`));
+    require_(isDirectlyCited, `${reference} is not cited directly by its owning ${skillPath} with full relative path \`${skillRelativeReference}\``);
   }
 }
 

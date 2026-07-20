@@ -30,16 +30,28 @@ Use a distinct directory for every lane, including every revision and every deta
 The coordinator checkout is not a lane.
 It stays on the non-protected integration branch that the driver will push and use for the PR.
 
-## Before fan-out
+## Before planning and plan review
 
-Before creating any lane, the driver:
+Before creating read-only planning or plan-review lanes, the driver:
 
 1. verifies the coordinator branch is not `main`, `release`, or a hotfix line;
 2. requires a clean coordinator worktree, including tracked and meaningful untracked state;
 3. commits the complete shared baseline so every assignment has an immutable base SHA;
-4. resolves the roster and dependency order from the approved issue delta;
-5. gives every mutable path exactly one owner for the current revision; and
-6. identifies lockfiles and shared configuration as single-owner paths.
+4. derives a preliminary roster mechanically from the current request and proposed affected paths; and
+5. creates each planner or plan reviewer in a detached worktree pinned to that immutable baseline.
+
+An approved delta is not required for this read-only phase because its purpose is to produce and review the delta.
+When the proposed paths or signals change, the driver recomputes the preliminary roster and creates fresh detached review lanes at the current planning target.
+
+## Before mutable implementation fan-out
+
+Before creating any mutable lane, the driver:
+
+1. requires an approved issue delta and its final resolved roster;
+2. requires a clean coordinator worktree and committed integration `HEAD`;
+3. resolves the dependency order from the approved delta;
+4. gives every mutable path exactly one owner for the current revision; and
+5. identifies lockfiles and shared configuration as single-owner paths.
 
 Mutable lanes may run in parallel only when their owned paths are disjoint and none depends on output that has not integrated.
 Start dependent work only after its prerequisite commits are integrated and assign the new integration `HEAD` as its base.
@@ -141,6 +153,7 @@ Acceptance results are authoritative only when run from the fully integrated coo
 
 CI does not create agent worktrees.
 It runs the repository's unchanged gates against the pushed integrated commit.
+`npm run validate:agents` invokes the same dependency-free validator with identical behavior in local development and CI; neither environment uses a provider-specific fallback.
 
 ## Guarded cleanup
 
