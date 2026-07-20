@@ -67,6 +67,7 @@ This is the same difficulty source a simple check uses.
 The recipe tier or dynamic difficulty shifts every tier threshold together, so a harder recipe makes every outcome harder to reach.
 A roll that falls below every relative tier still maps to the lowest tier, so a higher difficulty never produces a craft with no outcome.
 The check editor shows the **DC** and the meet-or-exceed comparison for relative tiers, because both take part in matching.
+The player's check card shows this resolved difficulty-tier DC, the same number the interactive roll prompt uses and the chat card reports.
 
 **Fixed** tiers own non-overlapping segments of the roll value range instead.
 Each tier covers a fixed span of possible roll totals, and the roll is matched to whichever tier's range contains its total.

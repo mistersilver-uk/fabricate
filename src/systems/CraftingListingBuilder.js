@@ -643,7 +643,11 @@ export class CraftingListingBuilder {
    * `config.tiers[].dc`, truncated) wins, else the finite static `config.dc`
    * (truncated). Unlike the engine/GM row, a slot with no finite static `dc`
    * returns `null` (no chip) rather than the hardcoded `15` — a deliberate
-   * display-only divergence. Callers resolve the routed-fixed and dynamic-DC
+   * display-only divergence. An absent (`undefined`/`null`) static `dc` yields
+   * `null`, but a non-finite yet PRESENT `config.dc` (e.g. a stray authored
+   * string) surfaces verbatim through the `?? null` tail rather than becoming
+   * `15` — the accepted residual, since the builder never invents a DC the
+   * recipe never declared. Callers resolve the routed-fixed and dynamic-DC
    * `null` cases before this.
    * @private
    */
