@@ -34,6 +34,28 @@ A crafting run tracks the in-progress state of a multi-step recipe:
 
 Runs are saved on the crafting character and persist across sessions.
 
+## In the Crafting Tab
+
+When a player opens a multi-step recipe in the **Crafting** tab, its required materials are shown step by step.
+
+Each step appears as a numbered block, in order, and each block lists that step's own required materials.
+A block shows what the player has, what the step needs, and what is still missing.
+A short hint at the top of the list reminds players that the recipe is made in several steps and that each one is crafted in order.
+
+The intermediate items a step produces along the way are not listed as separate results.
+Only the recipe's final product is shown, as a single **Produces** row beneath the steps.
+This keeps the focus on what the whole recipe makes rather than on the parts made on the way there.
+
+The **Craft** button reflects the first step.
+A later step showing missing materials never stops a player from starting the recipe, so players can gather what a later step needs before it comes up in the run.
+
+{: .note }
+> This step-by-step material preview is shown for multi-step recipes in Simple mode.
+> Recipes in the routed and progressive modes are not affected and display as before.
+
+If the crafting system has no crafting check turned on, a recipe no longer shows an empty crafting-check box in its detail.
+A crafting-check box still appears when the system has a check that always applies to the recipe, or when a roll formula has been configured for the check.
+
 ## Example: Enchanted Armour
 
 A three-step recipe for creating enchanted plate armour:
