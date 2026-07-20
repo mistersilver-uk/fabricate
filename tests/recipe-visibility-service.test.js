@@ -1707,19 +1707,37 @@ test('AC7.5 - locked recipe remains visible but not craftable in knowledge mode'
 });
 
 test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones', async () => {
+  // A held book with a non-zero learn budget backs the stale entry, so a regression
+  // that flipped the cleanup wiring to freeLearnBudget:true would silently refund it.
+  const book = new FakeItem({
+    uuid: 'Actor.actor-a.Item.book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 2 } } }
+  });
   const service = buildService();
   const actorA = new FakeActor({
     id: 'actor-a',
+    items: [book],
     flagsArg: {
       fabricate: {
         learnedRecipes: {
           'recipe-a': { learnedAt: 1 },
-          'recipe-b': { learnedAt: 2 },
+          'recipe-b': { learnedAt: 2, sourceItemUuid: 'Actor.actor-a.Item.book' },
           'recipe-c': { learnedAt: 3 }
         }
       }
     }
   });
+
+  // Bind the cleanup call site's freeLearnBudget flag directly by capturing the
+  // options object every forgetLearnedRecipes call receives (issue 773 — recipe
+  // deletion is content management, never an in-fiction un-learn, so it must NOT
+  // refund budget; a flip to true would ship green without this spy).
+  const forgetOptions = [];
+  const originalForget = service.forgetLearnedRecipes.bind(service);
+  service.forgetLearnedRecipes = (actor, ids, options) => {
+    forgetOptions.push(options);
+    return originalForget(actor, ids, options);
+  };
 
   // Override game.actors for this test
   const originalActors = globalThis.game.actors;
@@ -1728,6 +1746,19 @@ test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones
   try {
     const validRecipeIds = new Set(['recipe-a', 'recipe-c']);
     await service.cleanupLearnedRecipes(validRecipeIds);
+
+    // The cleanup wiring must pass freeLearnBudget:false...
+    assert.ok(forgetOptions.length > 0, 'cleanup routed through forgetLearnedRecipes');
+    assert.ok(
+      forgetOptions.every((options) => options?.freeLearnBudget === false),
+      'recipe-deletion cleanup must never refund learn budget'
+    );
+    // ...and the held book's budget is consequently UNCHANGED (no silent refund).
+    assert.equal(
+      service._getRecipeItemLearnCount(book),
+      2,
+      'the held book budget is not refunded on recipe deletion'
+    );
 
     // issue 773: cleanup routes through forgetLearnedRecipes, so the stale key is
     // removed with an explicit reload-safe `-=` deletion — asserted at the update
@@ -3642,6 +3673,38 @@ test('773 an orphan entry frees NOTHING — no wrong-key decrement and no per-co
 
   assert.deepEqual(pool.decrements, [], 'no pool decrement for an unheld source');
   assert.equal(pool.get('system-1::book'), 1, 'the shared budget is untouched for an orphan');
+});
+
+test('773 a HELD book whose recipe was deleted frees NOTHING (unresolvable-recipe orphan)', async () => {
+  const system = buildLearnModeSystem({ learningMode: 'party', learnScope: 'total', learnsAllowed: 2 });
+  // The learned entry's recipe no longer resolves (recipe deleted) even though the
+  // source book is STILL HELD — the `if (!recipe) return` orphan path. It must free
+  // neither the party pool (an unreconstructable key) nor the per-copy count.
+  const pool = makeDecrementablePartyPool({ 'system-1::book': 1 });
+  const recipeManager = { getRecipes: () => [], getRecipe: () => null };
+  const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, pool);
+  const book = new FakeItem({
+    uuid: 'Actor.a1.Item.book',
+    sourceId: 'Compendium.world.items.book',
+    flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 2 } } }
+  });
+  const actor = seedLearnedActor(
+    { 'deleted-recipe': { learnedAt: 1, sourceItemUuid: 'Actor.a1.Item.book' } },
+    {},
+    [book]
+  );
+
+  await service.forgetAllLearnedRecipes(actor);
+
+  assert.deepEqual(pool.decrements, [], 'no pool decrement for an unresolvable recipe');
+  assert.equal(pool.get('system-1::book'), 1, 'the shared budget is untouched');
+  assert.equal(
+    service._getRecipeItemLearnCount(book),
+    2,
+    'the held book per-copy count is untouched for an unresolvable-recipe orphan'
+  );
+  // The orphan learned key is still deleted (reset-all clears orphans).
+  assert.ok(!('deleted-recipe' in actor.getFlag('fabricate', 'fabricate.learnedRecipes')));
 });
 
 test('773 freeLearnBudget: false never touches the party pool (recipe-deletion cleanup path)', async () => {
