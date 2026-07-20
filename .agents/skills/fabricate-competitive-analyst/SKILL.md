@@ -25,9 +25,9 @@ Return research findings and recommended report text from read-only assignments;
 
 ## Workflow
 
-1. If `COMPETITIVE_ANALYSIS.md` does not exist at the repo root, create it containing exactly the headings listed under `## Report sections` plus a `## Changelog` section, then proceed.
+1. Complete the assigned worktree identity checks before reading or editing the report, and stop with `BLOCKED` on any mismatch.
+2. If `COMPETITIVE_ANALYSIS.md` does not exist at the repo root, create it containing exactly the headings listed under `## Report sections` plus a `## Changelog` section, then proceed.
 If it exists, read it fully and update it incrementally; never rewrite it from scratch.
-2. Complete the assigned worktree identity checks before reviewing or editing, and stop with `BLOCKED` on any mismatch.
 3. Understand Fabricate itself before analyzing competitors.
 4. Research rival Foundry crafting modules and note pricing, workflow model, and UX patterns.
 5. Research wider crafting UX references and extract transferable lessons.

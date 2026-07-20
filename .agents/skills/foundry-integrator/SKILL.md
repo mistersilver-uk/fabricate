@@ -28,7 +28,7 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 
 ## Required context
 
-- the change under review — the issue's `openspec-delta` block at design time, and the branch diff against `main` at implementation review.
+- the change under review — the issue's `openspec-delta` block at design time, and the assigned target's diff against the supplied base SHA at implementation review.
 - the Foundry-facing code involved: `src/integrations/`, `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
 - the `FoundryVTT Notes` section of `AGENTS.md` and the Foundry deep-dives now consolidated in `AGENTS.md` and `CONTRIBUTING.md`.
 - the target Foundry version declared in `module.json` (currently V13) — every finding is pinned to that version.
@@ -61,7 +61,7 @@ Audit the issue's `openspec-delta` for Foundry-integration soundness:
 
 ## Implementation-review duty
 
-Check the branch diff's Foundry-facing code against the real Foundry behaviour you researched:
+Check the assigned target's base-relative Foundry-facing diff against the real Foundry behaviour you researched:
 
 - API calls use correct signatures and return shapes; hooks are registered and timed correctly; runtime globals are used, never imported; V13 document/collection shapes are honoured (e.g. `game.documentTypes.Item` is a `Set`).
 - `module.json` compatibility metadata is updated when a new Foundry API requirement is introduced.
