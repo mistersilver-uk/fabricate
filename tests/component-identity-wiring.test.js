@@ -194,7 +194,7 @@ test('A5 - repair writes roles[sysB].componentId for a source owned by system B 
     const mgr = buildManager(ordered);
     globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [worldItem], packs: [] };
 
-    const summary = await mgr.repairComponentSourceFlags({ includeCompendiums: false });
+    const summary = await mgr.repairItemData({ includeCompendiums: false });
 
     assert.equal(
       worldItem.getFlag('fabricate', 'fabricate.roles.sysB.componentId'),

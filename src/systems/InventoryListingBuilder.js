@@ -42,7 +42,6 @@ import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 // The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
 // A deliberately import-free leaf.
-import { plainTextDescription } from '../utils/plainTextDescription.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
@@ -493,9 +492,7 @@ export class InventoryListingBuilder {
       name: stringOrEmpty(component.name),
       img: stringOrNull(component.img),
       icon: null,
-      // Read-side flatten so pre-existing stored descriptions carrying Foundry
-      // enricher syntax render as human-readable labels without a re-save (issue 800).
-      description: plainTextDescription(component.description),
+      description: stringOrEmpty(component.description),
       tags: Array.isArray(component.tags) ? component.tags.map(stringOrEmpty) : [],
       tier: component.tier ?? null,
       isEssenceSource: false,
@@ -784,9 +781,7 @@ export class InventoryListingBuilder {
         name: stringOrEmpty(def?.name),
         img: stringOrNull(def?.img),
         icon: null,
-        // Read-side flatten of the item-derived recipe-item description (issue 800);
-        // the recipe flavor above (recipe.description) is Fabricate-authored and left as-is.
-        description: plainTextDescription(def?.description),
+        description: stringOrEmpty(def?.description),
         tags: [],
         tier: null,
         isEssenceSource: false,

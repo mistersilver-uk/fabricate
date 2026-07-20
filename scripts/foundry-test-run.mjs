@@ -5685,42 +5685,143 @@ async function main() {
         await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
-        // Issue 800: prove the component browser inspector flattens Foundry enricher
-        // syntax at PROJECTION/read time. Inject a raw enricher-bearing description
-        // straight onto the in-memory stored component (bypassing the persist-time
-        // normalizer, mirroring pre-existing imported data like the reported Mythwright
-        // world), refresh the projection, select the component, and capture the inspector
-        // rendering human-readable labels — a labelled link list, a labelled roll, a bare
-        // roll, and a tidied dropped-separator, all in one frame.
-        const enricherComponentId = await page.evaluate(async (sysId) => {
+        // ---------------------------------------------------------------------
+        // Issue 800 — write-time RESOLUTION of source descriptions, in three frames.
+        //
+        // The source item is created inside a world compendium that is then LOCKED,
+        // because the locked case is the reported one and the one an item-driven walk
+        // cannot reach: `repairItemData`'s identity leg skips locked packs (it writes
+        // flags INTO pack items) while its description leg resolves them through
+        // `fromUuid`. A world-item fixture would pass green while the reported bug
+        // stayed broken, so it is deliberately not used here.
+        //
+        // Frames: BEFORE (raw stored text, as an un-repaired world renders it),
+        // AFTER-Repair (the same component after the GM action), and AFTER-ingestion
+        // (a component registered fresh through the write path).
+        // ---------------------------------------------------------------------
+        const enricher800 = await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           const system = csm.getSystem(sysId);
           const component = system?.components?.find((c) => c.name === 'Mystic Herb');
           if (!component) {
-            throw new Error('issue 800: Mystic Herb component not found for enricher fixture');
+            throw new Error('issue 800: Mystic Herb component not found for the enricher fixture');
           }
-          component.description =
-            'Craft: @UUID[Compendium.dnd5e.items.Item.acid00]{Acid}, '
-            + '@UUID[Compendium.dnd5e.items.Item.nolabel00], '
-            + '@UUID[Compendium.dnd5e.items.Item.oil000]{Oil}, '
-            + '@UUID[Compendium.dnd5e.items.Item.paper0]{Paper}. '
-            + 'Burns for [[/r 1d4]]{1d4 rounds} dealing [[/roll 2d6]] fire damage.';
+
+          // Two REAL dnd5e items to reference, so resolution produces genuine document
+          // names rather than anything this fixture could have supplied itself.
+          const referencePack = game.packs.get('dnd5e.items');
+          if (!referencePack) throw new Error('issue 800: dnd5e.items pack not found');
+          const index = await referencePack.getIndex();
+          const entries = [...index]
+            .filter((entry) => entry?._id && entry?.name)
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+          if (entries.length < 2) throw new Error('issue 800: dnd5e.items index too small');
+          const [first, second] = entries;
+
+          const raw =
+            `Craft: @UUID[Compendium.dnd5e.items.Item.${first._id}], `
+            + `@UUID[Compendium.dnd5e.items.Item.${second._id}]{${second.name}}, `
+            + '@UUID[Compendium.dnd5e.items.Item.doesnotexist0000]. '
+            + 'Burns for [[/r 1d4]]{1d4 rounds} dealing [[2d6]] fire damage.';
+
+          // A world compendium we own, holding the source item, LOCKED afterwards.
+          const CompendiumCollectionClass =
+            foundry.documents?.collections?.CompendiumCollection ?? globalThis.CompendiumCollection;
+          const packName = 'fabricate-smoke-800';
+          let sourcePack = game.packs.get(`world.${packName}`);
+          if (!sourcePack) {
+            sourcePack = await CompendiumCollectionClass.createCompendium({
+              label: 'Fabricate Smoke 800',
+              type: 'Item',
+              name: packName,
+            });
+          }
+          await sourcePack.configure({ locked: false });
+          const existing = (await sourcePack.getDocuments()).find((doc) => doc.name === 'Smoke Supplies');
+          const sourceDoc = existing
+            ?? (await Item.createDocuments(
+              [{ name: 'Smoke Supplies', type: 'loot', system: { description: { value: raw } } }],
+              { pack: sourcePack.collection }
+            ))[0];
+          await sourceDoc.update({ 'system.description.value': raw });
+          await sourcePack.configure({ locked: true });
+          if (!game.packs.get(`world.${packName}`)?.locked) {
+            throw new Error('issue 800: the fixture pack must be LOCKED — that is the case under test');
+          }
+
+          // Point the component at that locked source and seed the RAW stored text,
+          // which is exactly the state a world upgraded from an earlier version is in.
+          component.registeredItemUuid = sourceDoc.uuid;
+          component.originItemUuid = sourceDoc.uuid;
+          component.aliasItemUuids = [];
+          component.description = raw;
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
-          return component.id;
+          return {
+            componentId: component.id,
+            sourceUuid: sourceDoc.uuid,
+            firstName: first.name,
+            secondName: second.name,
+          };
         }, craftingSetup.systemId);
-        await page.locator(`.fabricate-manager .manager-component-row[data-component-id="${enricherComponentId}"] .manager-component-identity`).first().click();
-        const enricherFlavour = page.locator('.fabricate-manager [data-component-inspector] .manager-component-browser-inspector-flavour').first();
-        await enricherFlavour.waitFor({ state: 'visible', timeout: 5_000 });
-        const enricherText = (await enricherFlavour.textContent() ?? '').trim();
-        if (/@[A-Za-z]+\[|&[A-Za-z]+\[|\[\[/.test(enricherText)) {
-          throw new Error(`issue 800: raw enricher syntax survived in the inspector: ${enricherText}`);
-        }
-        if (!enricherText.includes('Acid') || !enricherText.includes('1d4 rounds') || !enricherText.includes('2d6')) {
-          throw new Error(`issue 800: expected flattened labels + formulas in the inspector, got: ${enricherText}`);
+
+        const inspectorFlavour = () =>
+          page.locator('.fabricate-manager [data-component-inspector] .manager-component-browser-inspector-flavour').first();
+        const selectComponent = async (componentId) => {
+          await page.locator(`.fabricate-manager .manager-component-row[data-component-id="${componentId}"] .manager-component-identity`).first().click();
+          await inspectorFlavour().waitFor({ state: 'visible', timeout: 5_000 });
+          return (await inspectorFlavour().textContent() ?? '').trim();
+        };
+        const assertResolved = (text, frame) => {
+          if (/@[A-Za-z]+\[|&[A-Za-z]+\[/.test(text)) {
+            throw new Error(`issue 800 (${frame}): raw directive text survived: ${text}`);
+          }
+          for (const expected of [enricher800.firstName, enricher800.secondName, '1d4 rounds', '2d6']) {
+            if (!text.includes(expected)) {
+              throw new Error(`issue 800 (${frame}): expected "${expected}" in: ${text}`);
+            }
+          }
+          if (text.includes('Unknown')) {
+            throw new Error(`issue 800 (${frame}): the broken-reference placeholder leaked: ${text}`);
+          }
+        };
+
+        // Frame 1 — BEFORE. The un-repaired world, raw directives visible.
+        const beforeText = await selectComponent(enricher800.componentId);
+        if (!beforeText.includes('@UUID[')) {
+          throw new Error(`issue 800 (before): expected the un-repaired raw text, got: ${beforeText}`);
         }
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-components-enricher');
-        process.stdout.write('  D0: components enricher inspector screenshotted\n');
+        await screenshot(page, 'manager-components-description-before');
+        process.stdout.write('  D0: components description BEFORE screenshotted\n');
+
+        // Frame 2 — AFTER the GM Repair Item Data action, which reaches the locked pack.
+        await page.evaluate(async () => {
+          const summary = await game.fabricate.getCraftingSystemManager().repairItemData();
+          if (!(summary?.descriptions?.refreshed > 0)) {
+            throw new Error(`issue 800: repair refreshed no descriptions: ${JSON.stringify(summary?.descriptions)}`);
+          }
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
+        const repairedText = await selectComponent(enricher800.componentId);
+        assertResolved(repairedText, 'after repair');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-repaired');
+        process.stdout.write('  D0: components description AFTER-REPAIR screenshotted\n');
+
+        // Frame 3 — AFTER ingestion. Registering the same locked-pack item as a NEW
+        // component drives the async write path (`_buildComponentSourceSnapshot`).
+        const ingestedComponentId = await page.evaluate(async ({ sysId, sourceUuid }) => {
+          const result = await game.fabricate.getCraftingSystemManager().addItemFromUuid(sysId, sourceUuid);
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          return result?.item?.id ?? null;
+        }, { sysId: craftingSetup.systemId, sourceUuid: enricher800.sourceUuid });
+        if (ingestedComponentId && ingestedComponentId !== enricher800.componentId) {
+          const ingestedText = await selectComponent(ingestedComponentId);
+          assertResolved(ingestedText, 'after ingestion');
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-ingested');
+        process.stdout.write('  D0: components description AFTER-INGESTION screenshotted\n');
 
         // Components → open the editor so the identity card (central column) and the
         // linked-source inspector (right context panel) are captured (#398).

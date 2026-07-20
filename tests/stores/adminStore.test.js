@@ -11,10 +11,9 @@ import {
 } from '../../src/gatheringImageDefaults.js';
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
 import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
-import { plainTextDescription } from '../../src/utils/plainTextDescription.js';
 import {
   REPORTER_ENRICHER_DESCRIPTION,
-  REPORTER_ENRICHER_EXPECTED,
+  REPORTER_RESOLVED_EXPECTED,
 } from '../helpers/enricherDescriptionFixtures.js';
 
 // ---------------------------------------------------------------------------
@@ -6185,61 +6184,104 @@ describe('createAdminStore', () => {
       assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
     });
 
-    it('viewState.itemCards flatten Foundry enricher directives to labels (issue 800)', async () => {
+    // -----------------------------------------------------------------------
+    // Issue 800 — read-side precedence. Descriptions are RESOLVED at write time,
+    // so the store reads the STORED value first and only falls back to the live
+    // document (enriching it) when the stored value is empty.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Seed `sys1` with a single component and drive a refresh, with `fromUuid` and the
+     * `enrichToHtml` seam stubbed. Returns the projected card plus the enrich calls.
+     */
+    async function itemCardFor(component, { liveDoc = null } = {}) {
       const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.components = [
-          makeItem({
-            id: 'comp-enricher',
-            name: 'Alchemist’s Supplies',
-            // The reporter's raw description reaches the projection unflattened; the
-            // adminStore read/projection surface must render labels only, no raw
-            // @UUID[...]{...} text.
-            description: REPORTER_ENRICHER_DESCRIPTION,
-          }),
-        ];
-        delete sys.items;
+      const enrichCalls = [];
+      services.enrichToHtml = async (raw, options) => {
+        enrichCalls.push({ raw, options });
+        return `<a class="content-link">Component Pouch</a>`;
+      };
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = [makeItem(component)];
+      delete sys.items;
+
+      const originalFromUuid = globalThis.fromUuid;
+      globalThis.fromUuid = async () => liveDoc;
+      try {
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        return { card: get(store.viewState).itemCards[0], enrichCalls };
+      } finally {
+        globalThis.fromUuid = originalFromUuid;
       }
+    }
 
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      const vs = get(store.viewState);
+    it('itemCards prefer a NON-EMPTY stored description over a differing live document (issue 800)', async () => {
+      const { card, enrichCalls } = await itemCardFor(
+        {
+          id: 'comp-stored',
+          name: 'Alchemist’s Supplies',
+          registeredItemUuid: 'Compendium.dnd5e.equipment24.Item.supplies',
+          description: REPORTER_RESOLVED_EXPECTED,
+        },
+        { liveDoc: { system: { description: { value: 'Something else entirely.' } } } }
+      );
 
-      assert.equal(vs.itemCards[0].description, REPORTER_ENRICHER_EXPECTED);
-      assert.ok(!/@[A-Za-z]+\[/.test(vs.itemCards[0].description), 'no raw enricher directive');
+      assert.equal(card.description, REPORTER_RESOLVED_EXPECTED);
+      assert.equal(
+        enrichCalls.length,
+        0,
+        'statement form is load-bearing: `(await enriched) || stored` would re-introduce ' +
+          'the per-component enrichHTML call this flip exists to avoid'
+      );
     });
 
-    it('adminStore, CraftingSystemManager, and buildListing produce identical flattened output (issue 800)', async () => {
-      // Cross-caller equivalence: all three item-derived description surfaces share
-      // one Foundry-free implementation, so a revert-to-local-copy or one-sided
-      // drift diverges here.
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.components = [
-          makeItem({
-            id: 'comp-xcaller',
-            name: 'Alchemist’s Supplies',
-            description: REPORTER_ENRICHER_DESCRIPTION,
-          }),
-        ];
-        delete sys.items;
-      }
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      const adminOutput = get(store.viewState).itemCards[0].description;
+    it('itemCards fall back to the ENRICHED live document when the stored description is empty (issue 800)', async () => {
+      // The issue 676 population — a compendium-linked component with no stored
+      // description — is exactly the population whose live text carries raw
+      // directives, so a non-enriching fallback would leave the reported bug visible
+      // here until a GM ran Repair.
+      const { card, enrichCalls } = await itemCardFor(
+        {
+          id: 'comp-empty',
+          name: 'Alchemist’s Supplies',
+          registeredItemUuid: 'Compendium.dnd5e.equipment24.Item.supplies',
+          description: '',
+        },
+        { liveDoc: { system: { description: { value: REPORTER_ENRICHER_DESCRIPTION } } } }
+      );
 
-      const expected = plainTextDescription(REPORTER_ENRICHER_DESCRIPTION);
-      assert.equal(adminOutput, expected, 'adminStore projection');
+      assert.equal(card.description, 'Component Pouch');
+      // A refresh publishes view state in two phases, so the projection may be built
+      // more than once; what matters is that the fallback resolves at all (the
+      // stored-first test above pins the ZERO-call case).
+      assert.ok(enrichCalls.length >= 1, 'the live fallback resolves');
+      assert.equal(enrichCalls[0].raw, REPORTER_ENRICHER_DESCRIPTION);
+      assert.ok(
+        enrichCalls[0].options?.relativeTo,
+        'relativeTo must be passed on the live path too, or a description that resolved ' +
+          'at ingestion goes broken on this fallback'
+      );
+    });
+
+    it('every read surface forwards the STORED string unchanged (issue 800 cross-caller invariant)', async () => {
+      // The cross-caller invariant in its new form. Its old form asserted that three
+      // surfaces produced identical FLATTENED output; the flatten is gone, so what must
+      // now hold across surfaces is that a STORED (already-resolved) description is
+      // forwarded byte-for-byte, with no surface resolving or rewriting it.
+      const stored = REPORTER_RESOLVED_EXPECTED;
+      const { card } = await itemCardFor({
+        id: 'comp-forward',
+        name: 'Alchemist’s Supplies',
+        description: stored,
+      });
+      assert.equal(card.description, stored, 'adminStore projection');
 
       const manager = new CraftingSystemManager({ getRecipes: () => [] });
       assert.equal(
-        manager._normalizeComponentDescription(REPORTER_ENRICHER_DESCRIPTION),
-        expected,
-        'CraftingSystemManager'
+        manager._normalizeComponentDescription(stored),
+        stored,
+        'CraftingSystemManager sync normalizer'
       );
 
       const builder = new InventoryListingBuilder({
@@ -6249,9 +6291,7 @@ describe('createAdminStore', () => {
             {
               id: 'sys-x',
               name: 'Alchemy',
-              components: [
-                { id: 'cx', name: 'Supplies', description: REPORTER_ENRICHER_DESCRIPTION },
-              ],
+              components: [{ id: 'cx', name: 'Supplies', description: stored }],
             },
           ],
         },
@@ -6266,10 +6306,11 @@ describe('createAdminStore', () => {
           items: [{ name: 'Supplies', system: { quantity: 1 } }],
         },
       });
-      const builderOutput = listing.rows.find(
-        (row) => row.componentId === 'cx' && !row.isEssenceSource
-      )?.description;
-      assert.equal(builderOutput, expected, 'InventoryListingBuilder buildListing row');
+      assert.equal(
+        listing.rows.find((row) => row.componentId === 'cx' && !row.isEssenceSource)?.description,
+        stored,
+        'InventoryListingBuilder buildListing row'
+      );
     });
 
     it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {

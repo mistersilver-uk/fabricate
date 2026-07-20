@@ -332,7 +332,7 @@ test('A8 - a dropped item-sourced Tool (no component) resolves through firstTool
 // A9 — tool repair reconciles the tools bucket via resolveToolForItem
 // ---------------------------------------------------------------------------
 
-test('A9 - repairComponentSourceFlags stamps an owned tool copy via the TOOL resolver', async () => {
+test('A9 - repairItemData stamps an owned tool copy via the TOOL resolver', async () => {
   const mgr = buildManager();
   mgr.systems.set('sysA', {
     id: 'sysA',
@@ -359,7 +359,7 @@ test('A9 - repairComponentSourceFlags stamps an owned tool copy via the TOOL res
     fabricate: { getCraftingSystemManager: () => mgr },
   };
 
-  const summary = await mgr.repairComponentSourceFlags({ includeCompendiums: false });
+  const summary = await mgr.repairItemData({ includeCompendiums: false });
   assert.equal(
     ownedCopy.getFlag('fabricate', 'fabricate.roles.sysA.toolId'),
     'tool-axe',

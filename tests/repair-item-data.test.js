@@ -1,5 +1,5 @@
 /**
- * Tests for CraftingSystemManager.repairComponentSourceFlags — the GM maintenance
+ * Tests for CraftingSystemManager.repairItemData — the GM maintenance
  * action behind the settings-menu "Repair Component Sources" button.
  *
  *  1. A world item that IS a component source (matched by identity) is stripped of a
@@ -99,7 +99,7 @@ test('repair — strips a transitive duplicateSource and stamps the component id
   });
   const mgr = buildManager([EMBERCAP], { items: [item] });
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
 
   assert.equal(summary.stamped, 1);
   assert.equal(summary.stripped, 1);
@@ -113,7 +113,7 @@ test('repair — does NOT mis-stamp an item whose duplicateSource merely points 
   const item = makeItem({ uuid: 'Item.other', duplicateSource: 'Item.embercap-src' });
   const mgr = buildManager([EMBERCAP], { items: [item] });
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
 
   assert.equal(summary.stamped, 0, 'identity-based attribution ignores duplicateSource');
   assert.equal(item.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), undefined);
@@ -123,7 +123,7 @@ test('repair — clears a stale componentId flag on a non-source item', async ()
   const item = makeItem({ uuid: 'Item.stale', componentFlag: 'comp-gone' });
   const mgr = buildManager([EMBERCAP], { items: [item] });
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
 
   assert.equal(summary.cleared, 1);
   assert.equal(item.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), undefined);
@@ -133,7 +133,7 @@ test('repair — an already-correct source item is a no-op', async () => {
   const item = makeItem({ uuid: 'Item.embercap-src', componentFlag: 'comp-embercap' });
   const mgr = buildManager([EMBERCAP], { items: [item] });
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
 
   assert.equal(summary.stamped, 0);
   assert.equal(summary.stripped, 0);
@@ -152,7 +152,7 @@ test('repair — skips locked packs and processes unlocked packs', async () => {
 
   const mgr = buildManager([EMBERCAP], { items: [], packs: [lockedPack, openPack] });
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
 
   assert.equal(summary.skippedLocked, 1, 'the locked pack is skipped');
   assert.equal(summary.stamped, 1, 'the unlocked pack item is stamped');
@@ -162,5 +162,112 @@ test('repair — skips locked packs and processes unlocked packs', async () => {
 test('repair — requires GM', async () => {
   const mgr = buildManager([EMBERCAP], { items: [] });
   globalThis.game.user.isGM = false;
-  await assert.rejects(() => mgr.repairComponentSourceFlags(), /GM/);
+  await assert.rejects(() => mgr.repairItemData(), /GM/);
+});
+
+// ---------------------------------------------------------------------------
+// Description backfill (issue 800) — DEFINITION-driven, not item-driven.
+//
+// The identity leg above walks ITEMS and skips locked packs, because it writes flags
+// INTO pack items. Descriptions only READ, through fromUuid, which resolves a locked
+// pack fine — and a locked system pack is exactly where the reported
+// `@UUID[Compendium.dnd5e.equipment24.…]` lives. So this leg must NOT ride that walk.
+// ---------------------------------------------------------------------------
+
+const LOCKED_PACK_UUID = 'Compendium.dnd5e.equipment24.Item.supplies';
+
+const SUPPLIES = {
+  id: 'comp-supplies',
+  name: "Alchemist's Supplies",
+  registeredItemUuid: LOCKED_PACK_UUID,
+  originItemUuid: LOCKED_PACK_UUID,
+  aliasItemUuids: [],
+  description: '@UUID[Compendium.dnd5e.equipment24.Item.componentpouch]',
+};
+
+/**
+ * A manager whose only definition is sourced from a LOCKED pack, wired with a fake
+ * enricher that resolves that reference to the referenced document's name.
+ */
+function buildDescriptionRepairManager({ includeCompendiums = true } = {}) {
+  const primeCalls = [];
+  const mgr = new CraftingSystemManager(makeRecipeManager(), {
+    enrichToHtml: async (raw) =>
+      raw.replaceAll(
+        '@UUID[Compendium.dnd5e.equipment24.Item.componentpouch]',
+        '<a class="content-link">Component Pouch</a>'
+      ),
+    primeEnricherCache: async (rawTexts) => {
+      primeCalls.push([...rawTexts]);
+    },
+  });
+  mgr.initialized = true;
+  mgr.save = async () => {};
+  mgr._notifySystemsChanged = () => {};
+  const component = { ...SUPPLIES };
+  mgr.systems = new Map([['sys1', { id: 'sys1', name: 'S1', components: [component], recipes: [] }]]);
+  // The only pack in the world is LOCKED — the item walk skips it entirely.
+  globalThis.game = {
+    user: { isGM: true },
+    items: [],
+    packs: [{ documentName: 'Item', locked: true, getDocuments: async () => [] }],
+  };
+  globalThis.fromUuid = async (uuid) =>
+    uuid === LOCKED_PACK_UUID
+      ? { uuid, name: "Alchemist's Supplies", system: { description: { value: SUPPLIES.description } } }
+      : null;
+  return { mgr, component, primeCalls, run: () => mgr.repairItemData({ includeCompendiums }) };
+}
+
+test('repair — refreshes a description whose source lives in a LOCKED pack', async () => {
+  const { component, primeCalls, run } = buildDescriptionRepairManager();
+
+  const summary = await run();
+
+  assert.equal(
+    component.description,
+    'Component Pouch',
+    'the reported case: a locked system pack is unreachable by the item walk but ' +
+      'resolves fine through fromUuid'
+  );
+  assert.equal(summary.skippedLocked, 1, 'the identity leg still skips the locked pack');
+  assert.equal(summary.descriptions.refreshed, 1);
+  assert.equal(summary.descriptions.unchanged, 0);
+  assert.equal(primeCalls.length, 1, 'exactly ONE priming call per repair run');
+  assert.deepEqual(primeCalls[0], [SUPPLIES.description], 'fed by the single definition sweep');
+});
+
+test('repair — refreshes descriptions even with includeCompendiums:false', async () => {
+  // That flag gates WRITES into packs; the description leg only reads.
+  const { component, run } = buildDescriptionRepairManager({ includeCompendiums: false });
+
+  const summary = await run();
+
+  assert.equal(component.description, 'Component Pouch');
+  assert.equal(summary.descriptions.refreshed, 1);
+  assert.equal(summary.skippedLocked, 0, 'no pack was visited by the identity leg at all');
+});
+
+test('repair — is idempotent: a second run reports unchanged', async () => {
+  const { component, run } = buildDescriptionRepairManager();
+
+  await run();
+  const second = await run();
+
+  assert.equal(component.description, 'Component Pouch');
+  assert.equal(second.descriptions.refreshed, 0);
+  assert.equal(second.descriptions.unchanged, 1);
+});
+
+test('repair — counts a definition with no resolvable source as skipped, and never wipes text', async () => {
+  const { mgr, component, run } = buildDescriptionRepairManager();
+  component.registeredItemUuid = 'Item.gone';
+  component.originItemUuid = 'Item.gone';
+  component.aliasItemUuids = [];
+  mgr.systems.get('sys1').components = [component];
+
+  const summary = await run();
+
+  assert.equal(summary.descriptions.skipped, 1);
+  assert.equal(component.description, SUPPLIES.description, 'text is never wiped by a repair');
 });

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
 import {
-  BROAD_ENRICHER_DESCRIPTION,
-  BROAD_ENRICHER_EXPECTED,
+  REPORTER_ENRICHER_DESCRIPTION,
+  REPORTER_RESOLVED_EXPECTED,
 } from './helpers/enricherDescriptionFixtures.js';
 
 // Components are matched to actor items by name fallback (no source flags in these
@@ -147,20 +147,25 @@ describe('InventoryListingBuilder — ownership aggregation', () => {
     assert.equal(listing.counts.total, 3);
   });
 
-  it('flattens Foundry enricher syntax in the component row description read-side (issue 800)', () => {
-    // A pre-existing stored description carrying raw enricher directives must
-    // render flat on the player inventory read path without a re-save.
+  it('forwards the STORED component description unchanged, resolving nothing (issue 800)', () => {
+    // Inverted from the rejected read-side flatten. Descriptions are RESOLVED at write
+    // time, so a read surface that rewrote what it was handed would be a second,
+    // divergent implementation of the grammar. What it must do is forward the stored
+    // string byte-for-byte — including an un-repaired legacy one, which stays visibly
+    // raw until the GM runs Repair Item Data rather than being silently half-fixed here.
     const system = makeSystem({
       components: [
-        { id: 'c1', name: 'Iron', img: 'icons/iron.webp', description: BROAD_ENRICHER_DESCRIPTION },
+        { id: 'c1', name: 'Iron', img: 'icons/iron.webp', description: REPORTER_RESOLVED_EXPECTED },
+        { id: 'c2', name: 'Coal', img: 'icons/coal.webp', description: REPORTER_ENRICHER_DESCRIPTION },
       ],
       tools: [],
     });
     const { builder } = makeBuilder({ systems: [system] });
     const listing = builder.buildListing({
-      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
     });
-    assert.equal(rowByComponent(listing, 'c1').description, BROAD_ENRICHER_EXPECTED);
+    assert.equal(rowByComponent(listing, 'c1').description, REPORTER_RESOLVED_EXPECTED);
+    assert.equal(rowByComponent(listing, 'c2').description, REPORTER_ENRICHER_DESCRIPTION);
   });
 });
 
@@ -846,11 +851,11 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
   }
 
-  it('flattens the recipe-item description but leaves recipe flavor untouched (issue 800)', () => {
+  it('forwards the STORED recipe-item description and the recipe flavor unchanged (issue 800)', () => {
     const system = bookSystem();
-    system.recipeItemDefinitions[0].description = BROAD_ENRICHER_DESCRIPTION;
-    // Recipe flavor is Fabricate-authored free text — an out-of-scope surface that
-    // stays verbatim, proving the read-side flatten is scoped to item-derived reads.
+    system.recipeItemDefinitions[0].description = REPORTER_RESOLVED_EXPECTED;
+    // Recipe flavor is Fabricate-authored free text and is explicitly out of scope —
+    // it is never resolved and never rewritten.
     const recipes = [
       {
         id: 'r1',
@@ -866,7 +871,7 @@ describe('InventoryListingBuilder — recipe-item books', () => {
       viewer: { isGM: true },
     });
     const row = bookRow(listing);
-    assert.equal(row.description, BROAD_ENRICHER_EXPECTED);
+    assert.equal(row.description, REPORTER_RESOLVED_EXPECTED);
     assert.equal(row.recipes[0].description, 'Deals @Damage[8d6]{8d6 fire} damage.');
   });
 

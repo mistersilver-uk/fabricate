@@ -97,6 +97,44 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
     ],
   },
+  // Issue 800: write-time RESOLUTION of source descriptions. Three DEDICATED view ids,
+  // not extra smokeLabels on `manager-components`: `collect` publishes only
+  // `candidates[0]` from a filename-sorted list, so appending them there would publish
+  // one arbitrary frame and the BEFORE/AFTER pair — the whole point of the evidence —
+  // would never reach the PR.
+  {
+    id: 'manager-components-description-before',
+    label: 'Component description — BEFORE (un-repaired world, raw directive text)',
+    smokeLabels: ['manager-components-description-before'],
+    matches: [
+      /^src\/utils\/plainTextDescription\.js$/,
+      /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+    ],
+  },
+  {
+    id: 'manager-components-description-repaired',
+    label: 'Component description — AFTER Repair Item Data (locked-pack source resolved)',
+    smokeLabels: ['manager-components-description-repaired'],
+    matches: [
+      /^src\/utils\/plainTextDescription\.js$/,
+      /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+      /^src\/systems\/CraftingSystemManager\.js$/,
+      /^src\/config\/repairItemData\.js$/,
+    ],
+  },
+  {
+    id: 'manager-components-description-ingested',
+    label: 'Component description — AFTER ingestion (resolved on the write path)',
+    smokeLabels: ['manager-components-description-ingested'],
+    matches: [
+      /^src\/utils\/plainTextDescription\.js$/,
+      /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+      /^src\/systems\/CraftingSystemManager\.js$/,
+    ],
+  },
   {
     id: 'manager-component-edit',
     label: 'Manager component editor (single column: identity strip + category, no rail)',

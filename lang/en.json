@@ -1058,15 +1058,17 @@
         "Name": "Experimental Features",
         "Hint": "Shows experimental Fabricate surfaces that are still in development for this world — currently the recipe graph in the crafting manager. The crafting authoring tools are always available and are not gated by this switch. Disabled by default."
       },
-      "RepairComponentSources": {
+      "RepairItemData": {
         "Name": "Repair Item Data",
         "Label": "Repair Item Data",
-        "Hint": "Reconcile the source items behind your crafting components and recipe items (books and scrolls) so inventory copies match reliably. Fixes items that were built by duplicating another item as a template.",
+        "Hint": "Reconcile the source items behind your crafting components and recipe items (books and scrolls) so inventory copies match reliably, and refresh their stored descriptions from those same source items. Fixes items built by duplicating another item as a template, and descriptions that show raw link text instead of the linked item's name.",
         "Title": "Repair Item Data",
-        "Body": "This scans your world items, unlocked compendiums, and actor inventories, tags each component and recipe-item source with a durable identity link, clears misleading duplicate-source metadata, and re-points owned copies that a duplicate mislabelled. Locked (system/module) compendiums are skipped. Continue?",
+        "Body": "This scans your world items, unlocked compendiums, and actor inventories, tags each component and recipe-item source with a durable identity link, clears misleading duplicate-source metadata, and re-points owned copies that a duplicate mislabelled. Locked (system/module) compendiums are skipped by that scan. It then rewrites each component and recipe-item description from its own source item, resolving content links so they read as the linked item's name — this part does reach locked compendiums, and it will replace the descriptions currently stored for those entries. Continue?",
         "Confirm": "Repair",
         "Cancel": "Cancel",
         "Success": "Item data repaired: {stamped} tagged, {stripped} cleaned, {cleared} unlinked, {repointed} re-pointed ({scanned} scanned, {skippedLocked} locked packs skipped).",
+        "DescriptionsRefreshed": "{refreshed} descriptions refreshed from their source items ({unchanged} already up to date, {skipped} skipped).",
+        "UnresolvedDetected": "{count} Fabricate descriptions still show raw content-link text instead of the linked item's name. Refresh them from their source items with Settings → Fabricate → Repair Item Data.",
         "Ambiguous": "{skippedAmbiguous} owned copies were left as-is because their name matched more than one book or scroll — re-point them by deleting and re-dragging the correct source item.",
         "Repointed": "{repointed} owned copies were re-pointed to the book or scroll their name matches. See the console log for the reversible details.",
         "Failed": "Item data repair failed. See the console for details.",

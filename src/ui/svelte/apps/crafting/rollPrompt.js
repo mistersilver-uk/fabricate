@@ -15,7 +15,7 @@
  *
  * Built on Foundry V13 `foundry.applications.api.DialogV2` (matching the
  * `DialogV2.wait` button-callback style used elsewhere in the repo — see
- * `src/config/repairComponentSources.js`). When DialogV2 is unavailable
+ * `src/config/repairItemData.js`). When DialogV2 is unavailable
  * (headless/tests) it resolves `{ confirmed: true }` so nothing blocks.
  */
 

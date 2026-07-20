@@ -7,7 +7,7 @@ import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
-import { localize, subscribeSceneChange, subscribeTravelMarkerMove } from './svelte/util/foundryBridge.js';
+import { localize, subscribeSceneChange, subscribeTravelMarkerMove, enrichToHtml } from './svelte/util/foundryBridge.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
@@ -371,6 +371,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       localize: (key, data) => localize(key, data),
       confirmDialog: (options) => confirmDialog(options),
       choiceDialog: (options) => choiceDialog(options),
+      // Issue 800: the component-browser live-description FALLBACK resolves through
+      // Foundry's enricher, so a compendium-linked component with no stored
+      // description renders the referenced items' names rather than raw `@UUID[…]`.
+      // Absent in tests, where the store falls back to the raw text.
+      enrichToHtml: (raw, options) => enrichToHtml(raw, options),
       renderImportDialog: async (systemId) => {
         if (!systemId) {
           ui.notifications.warn('Create or select a crafting system first.');

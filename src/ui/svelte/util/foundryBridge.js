@@ -362,6 +362,175 @@ export function notifyError(msg) {
   globalThis.ui?.notifications?.error(msg);
 }
 
+/**
+ * The V13 `TextEditor` implementation. `foundry.applications.ux.TextEditor` is the
+ * base class and `.implementation` is the system-registered subclass (dnd5e/PF2e
+ * install their own). Core's base `enrichHTML` self-dispatches to
+ * `TextEditor.implementation`, so the `?? base` fallback is EQUIVALENT, not
+ * degraded, and no `compatibility.minimum` raise is needed for it.
+ *
+ * Always reached through `globalThis.foundry?.…` — a bare `foundry.` throws a
+ * ReferenceError in Node instead of yielding `undefined`, which would defeat this
+ * module's stated "works in both Foundry and Node" contract.
+ *
+ * @returns {object|null}
+ */
+function textEditorImplementation() {
+  return (
+    globalThis.foundry?.applications?.ux?.TextEditor?.implementation ??
+    globalThis.foundry?.applications?.ux?.TextEditor ??
+    null
+  );
+}
+
+/**
+ * RESOLVE a raw description through Foundry's own enricher and return the enriched
+ * HTML. A label-less `@UUID[…]` comes back as an anchor whose text is the
+ * referenced document's real NAME — which is the whole point of resolving at write
+ * time instead of flattening directives to whatever label the author happened to
+ * type.
+ *
+ * The caller is expected to normalize the returned HTML to plain text with
+ * `plainTextDescription` (`src/utils/plainTextDescription.js`), whose broken-anchor
+ * and privacy passes need the MARKUP, not `textContent`. That is why this is named
+ * `enrichToHtml` rather than `enrichText`.
+ *
+ * Option bag — every value here is load-bearing:
+ * - `documents: true` — the point; turns a reference into a named anchor.
+ * - `custom: true` — runs `CONFIG.TextEditor.enrichers`, i.e. the system's and
+ *   modules' own enrichers (`@Check`, `@Damage`, `&Reference`, …).
+ * - `secrets: false`, EXPLICITLY — PF2e's `TextEditorPF2e.enrichHTML` does
+ *   `options.secrets ??= game.user.isGM`, and we enrich AS GM but store the result
+ *   for PLAYERS, so an omitted key would bake a GM-only secret block into
+ *   player-visible text. The explicit `false` defeats the `??=`.
+ * - `rolls: false` — a command-LESS `[[1d6]]` is EAGERLY evaluated by the enricher
+ *   and would freeze as a literal `"4"` in the stored description forever. The
+ *   deferred `[[/roll 1d6]]` form cannot be had without the eager one, so rolls are
+ *   flattened deterministically downstream instead.
+ * - `embeds: false` — `@Embed[uuid]` inlines an entire journal page into what is
+ *   meant to be a one-line description; its authored label is recovered by the
+ *   label mop-up in `plainTextDescription`.
+ * - `links: false` — raw hyperlink auto-linking adds nothing to plain text.
+ * - `relativeTo` — resolves relative UUIDs against the source document.
+ *
+ * `processVisibility` is **deliberately ABSENT**, and re-adding it is pinned as a
+ * failing test. Passing `false` is wrong in DIRECTION: PF2e's `UserVisibilityPF2e`
+ * removes `[data-visibility="gm"]` content only when the current user is NOT a GM,
+ * and we enrich as a GM — so `false` never closes the GM leak it looks like it
+ * closes, while additionally re-opening the unconditional `[data-visibility="none"]`
+ * removal the default performs for free. The frame of reference is the mismatch: the
+ * flag filters for the user DOING the enriching, whereas the result is stored for a
+ * different, broader audience. The leak is closed by an audience-independent
+ * attribute scrub in `plainTextDescription` instead.
+ *
+ * Falls back to the raw text (never throws) when no enricher is reachable, so the
+ * headless/test path degrades to today's behaviour rather than losing the text.
+ *
+ * @param {string} raw - the source description text
+ * @param {{ relativeTo?: object|null }} [options]
+ * @returns {Promise<string>} enriched HTML
+ */
+export async function enrichToHtml(raw, { relativeTo = null } = {}) {
+  const text = typeof raw === 'string' ? raw : '';
+  if (!text) return '';
+  const impl = textEditorImplementation();
+  if (typeof impl?.enrichHTML !== 'function') return text;
+  try {
+    const enriched = await impl.enrichHTML(text, {
+      secrets: false,
+      documents: true,
+      links: false,
+      rolls: false,
+      embeds: false,
+      custom: true,
+      relativeTo,
+    });
+    return typeof enriched === 'string' ? enriched : text;
+  } catch (_error) {
+    return text;
+  }
+}
+
+// Compendium-shaped UUID candidates inside directive text. Deliberately GENEROUS —
+// every candidate is handed to `foundry.utils.parseUuid`, which is the authoritative
+// parser, so over-matching costs one cheap parse while under-matching would silently
+// revert priming to one round-trip per description while every call-count test still
+// passed. Bounded quantifiers only (Sonar S5852): an unterminated run of `@Word[`
+// must stay linear, which the adversarial-length test pins.
+const COMPENDIUM_UUID_CANDIDATE =
+  /@[A-Za-z]{1,32}\[([^\]]{0,2048})\]|(?<![\w.])(Compendium\.[\w.-]{1,512})/g;
+
+// Foundry documents no cap on `_id__in`; chunked defensively so a world with
+// hundreds of references from one pack cannot build a pathological query.
+const PRIME_CHUNK_SIZE = 250;
+
+/**
+ * Group the compendium documents referenced by `rawTexts` by pack.
+ * Ids already resident in a pack's document cache are skipped — priming them
+ * again would be a wasted round-trip.
+ *
+ * @param {Iterable<string>} rawTexts
+ * @returns {Map<object, string[]>} pack → ids to fetch
+ */
+function groupUncachedCompendiumIds(rawTexts) {
+  const parseUuid = globalThis.foundry?.utils?.parseUuid;
+  const byPack = new Map();
+  if (typeof parseUuid !== 'function') return byPack;
+
+  for (const raw of rawTexts ?? []) {
+    if (typeof raw !== 'string' || raw.length === 0) continue;
+    for (const match of raw.matchAll(COMPENDIUM_UUID_CANDIDATE)) {
+      const candidate = String(match[1] ?? match[2] ?? '').split('#')[0].trim();
+      if (!candidate.startsWith('Compendium.')) continue;
+      let parsed = null;
+      try {
+        parsed = parseUuid(candidate);
+      } catch (_error) {
+        parsed = null;
+      }
+      const pack = parsed?.collection;
+      const id = parsed?.primaryId ?? parsed?.documentId;
+      if (!pack || !id || typeof pack.getDocuments !== 'function') continue;
+      if (pack.get?.(id)) continue;
+      const ids = byPack.get(pack);
+      if (ids) {
+        if (!ids.includes(id)) ids.push(id);
+      } else {
+        byPack.set(pack, [id]);
+      }
+    }
+  }
+
+  return byPack;
+}
+
+/**
+ * Warm the compendium document cache for every reference in `rawTexts`, ONCE, up
+ * front.
+ *
+ * Core's enricher primes compendiums per `enrichHTML` call, so resolving 400
+ * descriptions one at a time costs up to 400 round-trips. Priming from a single
+ * sweep collapses that to one query per PACK. The fetched documents are retained
+ * for the session (Foundry evicts nothing here), which is what makes the
+ * subsequent per-description `enrichHTML` calls cache hits.
+ *
+ * No-ops safely when Foundry's UUID parser is absent (headless tests).
+ *
+ * @param {Iterable<string>} rawTexts
+ * @returns {Promise<void>}
+ */
+export async function primeEnricherCache(rawTexts) {
+  const byPack = groupUncachedCompendiumIds(rawTexts);
+  const fetches = [];
+  for (const [pack, ids] of byPack) {
+    for (let offset = 0; offset < ids.length; offset += PRIME_CHUNK_SIZE) {
+      const chunk = ids.slice(offset, offset + PRIME_CHUNK_SIZE);
+      fetches.push(Promise.resolve(pack.getDocuments({ _id__in: chunk })).catch(() => []));
+    }
+  }
+  await Promise.all(fetches);
+}
+
 export function getDragEventData(event) {
   // Strategy 1: Foundry v13+ API
   const impl = globalThis.foundry?.applications?.ux?.TextEditor?.implementation;

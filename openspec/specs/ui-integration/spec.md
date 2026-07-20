@@ -200,9 +200,11 @@ Component browser display data:
 
 - Component descriptions are display-safe plain text.
 Foundry-style description objects must be normalized from their textual fields, and unknown object-shaped descriptions must render as empty text rather than object coercion strings.
-Foundry enricher directives are flattened to human-readable text before display: a labelled content link, reference, check, damage, or roll directive (`@UUID[…]{Label}`, `@Compendium[…]{Label}`, `@Check[…]{Label}`, `@Damage[…]{Label}`, `&Reference[…]{Label}`, `[[/roll …]]{Label}`) renders as its label; a label-less content-link/reference/check/damage directive is dropped; a label-less roll expression renders as its bare dice formula.
-Separators orphaned by a dropped directive (a repeated or dangling `,`/`;` after a list lead-in or at a string edge) are collapsed away, and a malformed (unterminated) directive is left verbatim rather than consuming surrounding prose.
-No raw `@…[…]`, `&…[…]`, or `[[…]]` directive text reaches any component description surface — the component browser (inspector and rows) and the player inventory listing alike.
+A description ingested or repaired under this behaviour contains no unresolved directive text on any surface — the component browser (inspector and rows) and the player inventory listing alike.
+A world upgraded from an earlier version displays its stored text as captured until the GM runs the item-data repair; when unresolved directives are detected at startup the GM is told, once, where that action lives.
+A directive belonging to a game system that registers no enricher for it is left verbatim, except that an authored label is rendered in its place when one is present.
+Description surfaces that read a stored value perform no resolution of their own.
+When a description resolves to no text at all, the surface shows its existing "no description" fallback rather than a blank gap.
 
 Environment browser layout:
 

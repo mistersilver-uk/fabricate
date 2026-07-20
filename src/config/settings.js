@@ -8,7 +8,7 @@ import {
   applyFabricateTheme,
 } from '../ui/theme.js';
 
-import { registerRepairComponentSourcesMenu } from './repairComponentSources.js';
+import { registerRepairItemDataMenu } from './repairItemData.js';
 
 export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
 
@@ -268,7 +268,7 @@ export function registerFabricateSettings() {
     game.settings.register(FABRICATE_SETTINGS_NAMESPACE, key, definition);
   }
   // GM maintenance button, surfaced alongside the theme selector in module settings.
-  registerRepairComponentSourcesMenu();
+  registerRepairItemDataMenu();
 }
 
 export function getSetting(key) {
