@@ -14,6 +14,7 @@ Make behavior changes here, not in the bindings.
 - current git diff
 - changed source files
 - existing docs for the affected area
+- the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)
 
 ## Scope
 
@@ -62,7 +63,8 @@ A dangling `{% link %}` fails the Jekyll build.
 ## Workflow
 
 1. Read the diff first.
-2. Verify the current branch is not `main`; create or switch to the task branch before editing docs.
+2. Verify the assigned worktree path, branch or detached target, base SHA, owned paths, and clean state before acting.
+Stop and return `DOCS NEEDS_CHANGES` when the assignment does not match the worktree.
 3. Read the changed source files before writing docs.
 4. Read the corresponding docs pages.
 5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language.
@@ -71,8 +73,8 @@ Treat the shipped canonical specs under `openspec/specs/` — and the issue delt
 7. Keep quick-start content canonical in `docs/quickstart.md`.
 8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
 9. Iterate with the domain expert until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
-10. Commit owned docs changes to the task branch, push it, and open or update the PR targeting `main` when this role owns the final docs change.
-11. Report exactly what changed, PR status when changed, and what could not be documented confidently.
+10. In a mutable documentation lane, commit only owned documentation paths locally and return the lifecycle's commit handoff to the workflow driver.
+11. Report exactly what changed, the ordered commit SHAs and base-relative path list, recommended issue or PR text, and what could not be documented confidently.
 
 ## Documentation rules
 
@@ -80,6 +82,7 @@ Treat the shipped canonical specs under `openspec/specs/` — and the issue delt
 - Do not edit `docs/_config.yml` unless explicitly instructed.
 - Do not change runtime logic in `src/`.
 - Do not edit files under `tests/`.
+- Never edit the coordinator checkout or another lane, and never push or mutate GitHub from a spawned documentation lane.
 - Do not invent API behavior.
 If the source is ambiguous, leave a TODO note in the doc.
 - Verify every capability claim against `src/` (and the shipped canonical spec), never against other documentation.
@@ -111,15 +114,17 @@ Do not run `npm test` or `npm run build` from this skill unless the user explici
 Those gates belong to implementation.
 Do run `npm run lint:md` (and `npm run lint:md:fix`) over the docs you change before emitting `DOCS APPROVED`, because the Markdown lint gate is part of this role.
 
+When routed only to cross-review domain output, use a fresh detached read-only lane and return the documentation verdict with recommended text without committing.
+
 ## PR description template
 
 PR titles must comply with Conventional Commits.
 For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-Do not edit a PR body while CI is running on its current HEAD, because editing cancels the in-flight run.
-Push, let CI finish, then edit the body.
+Tell the workflow driver not to edit a PR body while CI is running on its current HEAD, because editing cancels the in-flight run.
+The driver should push, let CI finish, and then edit the body.
 
-When opening or updating a PR, use these H2 sections in order.
+Recommend these H2 sections in order when the workflow driver opens or updates a PR.
 The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
 Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
 

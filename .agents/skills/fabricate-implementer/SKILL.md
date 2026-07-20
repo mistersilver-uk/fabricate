@@ -17,11 +17,13 @@ Make behavior changes here, not in the bindings.
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, API shape, or test seams
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` for the `--fab-*` token, component, and pattern reference when the task changes `src/ui/**`, `styles/**`, or any `*.svelte`
 - current git diff when continuing existing work
+- the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)
 
 ## Workflow
 
 1. Read the issue's `openspec-delta` block (via `gh issue view`) before touching code.
-2. Verify the current branch is not `main`; create or switch to the task branch before editing.
+2. Verify the assigned worktree path, mutable branch, base SHA, owned paths, dependencies, and clean state before editing.
+Stop and return `BLOCKED` when the assignment does not match the worktree.
 3. Confirm the task scope and keep changes limited to that task.
 Make the canonical spec changes the delta's `### Spec Deltas` require under `openspec/specs/` as part of the change.
 If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.
@@ -45,8 +47,8 @@ When `collect`, `publish`, worktree smoke, or an `edited`-run CI failure misbeha
 - A standalone `npm run lint:svelte` exists but is NOT part of the CI `lint` gate and currently reports many pre-existing repo-wide errors; treat its output as background noise, not your change's failures
 
 1. If any gate fails, fix the problem and rerun all gates.
-2. Commit to the task branch, push it, and open or update the PR targeting `main`.
-3. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
+2. Commit only owned paths to the assigned mutable branch and leave integration, pushing, issue updates, and PR updates to the workflow driver.
+3. Return the verified base, ordered commit SHAs, base-relative path list and diff, validation results, screenshot artifacts, and any caveats required by the lifecycle handoff.
 
 ## Implementation rules
 
@@ -62,7 +64,8 @@ Re-verify every cited ref against the current tree before editing, skip any find
 - Do not use `any` without an inline justification comment in TypeScript-adjacent code.
 - Keep the work single-task scoped.
 - Assume other agents may be working in parallel.
-Stay within your assigned file ownership; do not revert unrelated edits or touch files outside your ownership without a concrete reason.
+Stay inside the assigned worktree and file ownership, and never edit the coordinator checkout or another lane.
+Do not mutate GitHub or remotes from a spawned implementation lane.
 - Do not add npm dependencies unless the plan explicitly justifies them.
 - In Foundry UI CSS, avoid generic state classes such as `.disabled`, `.active`, and `.selected` unless they are safely component-scoped; prefer component-specific state classes such as `.is-disabled`.
 - For Svelte, CSS, layout, and other UI-focused changes, verify against the local Vite dev server first when available and use the user-provided dev URL if one exists.
@@ -112,10 +115,10 @@ When the task touches Foundry APIs, verify these cases:
 - Preserve `flags.core.sourceId` when embedded items must map back to source items.
 - Use `CraftingSystemManager.getSystems()` and `getItems(systemId)`.
 
-## Branch, commit, and PR rule
+## Commit and delivery rule
 
-Implementation work must be committed to a non-`main` task branch and delivered through a PR targeting `main`.
-Apply review feedback by updating the same branch and PR unless the user explicitly asks for a replacement.
+Implementation work must be committed to the assigned non-`main` lane branch for integration by the workflow driver.
+Apply review feedback in the retained lane when the lifecycle permits it, and leave PR delivery to the workflow driver.
 
 Use Conventional Commits in this form:
 
@@ -124,9 +127,9 @@ Use Conventional Commits in this form:
 Use a Conventional Commits-compliant PR title.
 For `feat`, `fix`, and `perf`, use the same `<type>(#<issue>): <short description>` format when a GitHub issue exists.
 
-Validate with `npx commitlint` before pushing.
+Validate the commit message with `npx commitlint` before handoff.
 
-Use this PR description template.
+Recommend this PR description template to the workflow driver.
 The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging the PR auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
 Use the non-closing `Refs #<issue>` only when the change is partial and the issue should stay open.
 
