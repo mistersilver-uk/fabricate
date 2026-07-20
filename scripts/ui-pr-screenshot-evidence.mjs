@@ -556,6 +556,19 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageMisconfiguredBody\.svelte$/],
   },
   {
+    // Issue 777: the pre-roll required-tools disclosure — the `SalvageToolRequirements`
+    // section with one AVAILABLE (green) and one UNAVAILABLE (red) StatusPill row, the
+    // state the existing player-salvage capture walk cannot reach. Its OWN view (one file
+    // per view id) so `collect` publishes the dedicated frame; appending its label to the
+    // existing `player-salvage` view would never publish it. Narrowly matched to the tool
+    // requirements section ONLY, so the two `player-salvage` deep-equality assertions are
+    // unaffected.
+    id: 'player-salvage-tools',
+    label: 'Player salvage panel — required-tools disclosure',
+    smokeLabels: ['player-salvage-tools'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageToolRequirements\.svelte$/],
+  },
+  {
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],

@@ -137,6 +137,7 @@ function compileManagerRoot() {
     'SalvageRoutedBody',
     'SalvageProgressiveBody',
     'SalvageMisconfiguredBody',
+    'SalvageToolRequirements',
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/inventory/detail/salvage/${salvageComponent}.svelte`);
   }

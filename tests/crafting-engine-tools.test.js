@@ -129,6 +129,45 @@ test('_validateTools: missing tool fails validation with a message', async () =>
   assert.match(result.message, /Missing required tool/);
 });
 
+// issue 777: the missing-tool diagnostic names the tool by its human label/name, then a
+// resolved component name, and only falls back to the raw id when no name is resolvable —
+// exercised THROUGH `_validateTools` (the `toolDisplayReference` helper is not exported).
+test('_validateTools: a missing component-linked tool names its label, not the raw id', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const tool = { componentId: 'c-axe', label: "Leatherworker's Tools" };
+  const result = await engine._validateTools([{ items: [] }], recipe(), [tool]);
+  assert.equal(result.valid, false);
+  assert.match(result.message, /Leatherworker's Tools/);
+  assert.doesNotMatch(result.message, /componentId/, 'the raw id form is gone');
+});
+
+test('_validateTools: a null-snapshot tool resolves the linked component name', async () => {
+  installSystem();
+  const engine = new CraftingEngine({
+    ...toolMatcherManager(),
+    resolveComponentName: (_recipe, componentId) =>
+      componentId === 'c-axe' ? "Woodcutter's Axe" : null,
+  });
+  const tool = { componentId: 'c-axe' };
+  const result = await engine._validateTools([{ items: [] }], recipe(), [tool]);
+  assert.equal(result.valid, false);
+  assert.match(result.message, /Woodcutter's Axe/);
+  assert.doesNotMatch(result.message, /componentId/);
+});
+
+test('_validateTools: a bare tool with no resolvable name falls back to the id', async () => {
+  installSystem();
+  // A stub manager WITHOUT `resolveComponentName`: a full manager would return the
+  // localized "Unknown Component" here, so the raw-id tail is reached only for a manager
+  // that cannot resolve names (legacy/test managers).
+  const engine = new CraftingEngine(toolMatcherManager());
+  const tool = { id: 'bare-tool-id' };
+  const result = await engine._validateTools([{ items: [] }], recipe(), [tool]);
+  assert.equal(result.valid, false);
+  assert.match(result.message, /bare-tool-id/);
+});
+
 test('_validateTools: a broken matching item does NOT satisfy the tool', async () => {
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
