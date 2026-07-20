@@ -17,6 +17,8 @@ caps, and surface any `BLOCKED` verdict to the user.
 The main loop is the workflow driver and creates a unique isolated worktree for every spawned role by default; mutable roles use exclusive lane branches and read-only roles use fresh detached snapshots for each reviewed commit.
 The driver alone mutates the coordinator checkout, GitHub or remote state, integrates local lane commits, runs authoritative gates, and performs guarded cleanup.
 Use the provider-neutral lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; do not create a Claude-specific worktree convention.
+Before maintainer handoff, the driver finalizes PR metadata, rebases onto fetched `origin/main`, reruns authoritative gates and commitlint, obtains fresh detached review, pushes only with an explicit expected-head lease, marks the PR ready, and requires all post-undraft exact-head checks including both SonarCloud checks.
+Draft checks are preflight only; on failure or a moved main/head, return the PR to draft and repeat the delivery loop.
 
 ## Skills
 

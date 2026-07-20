@@ -78,8 +78,11 @@ Hard cap: 3 implementation revisions.
 - loop until both emit `DOCS APPROVED`.
 Hard cap: 3 docs revisions.
 
-1. Ensure the driver has integrated the completed lane commits into the coordinator branch, pushed it, and represented it with a PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.
-2. Surface a final summary including the resolved roster, every loop's iteration count, PR status, and any escalations to the user.
+1. Ensure the driver has integrated the completed lane commits into the coordinator branch and represented them with a draft PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.
+2. Run the final maintainer-handoff loop in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
+Finalize PR metadata before the final run, rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, obtain fresh detached review, push with the exact expected-head lease, mark the PR ready, and require all post-undraft exact-head checks including both SonarCloud checks.
+Return the PR to draft and repeat the loop after any failure or movement of main or the PR head.
+3. Surface a final summary including the resolved roster, every loop's iteration count, exact-head CI result, PR ready state, and any escalations to the user.
 
 ## Coordination rules
 
@@ -91,6 +94,7 @@ They must not post verdicts (or other workflow notes) as GitHub issue or PR comm
 - Do not let spawned agents share the coordinator checkout or another lane, push, mutate GitHub state, integrate commits, or manage worktrees.
 - Require the full assignment and handoff contract from `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for every spawned role.
 - Parallelize only disjoint lanes with integrated dependencies, and serialize resource-heavy and authoritative gates in the coordinator checkout.
+- Treat draft CI as preflight only and never hand a PR to the maintainer until post-undraft checks, both SonarCloud checks, exact-head identity, current-main ancestry, and ready state are simultaneously verified.
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
 Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`), force-push, and let CI re-run, before merging it.

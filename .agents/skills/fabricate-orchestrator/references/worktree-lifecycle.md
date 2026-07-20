@@ -155,6 +155,29 @@ CI does not create agent worktrees.
 It runs the repository's unchanged gates against the pushed integrated commit.
 `npm run validate:agents` invokes the same dependency-free validator with identical behavior in local development and CI; neither environment uses a provider-specific fallback.
 
+## Final PR delivery
+
+The workflow driver completes this loop before handing a PR to the maintainer for review.
+Checks observed while the PR is draft are preflight evidence only because a required workflow may run only after the `ready_for_review` event.
+
+1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final check run.
+2. Fetch `origin/main`, capture the expected remote SHA for the PR branch, and require a clean coordinator checkout with no active mutable lane.
+3. Rebase the integration branch onto current `origin/main`.
+4. Run every required authoritative local gate from the rebased coordinator plus `npx commitlint --from origin/main --to HEAD`.
+5. Create a fresh detached implementation-review worktree pinned to the rebased commit and supply a newly generated immutable diff artifact.
+Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical specification, or documentation content.
+6. Push rewritten history only with `git push --force-with-lease=<branch>:<expected-sha>`.
+If the explicit lease is rejected, stop and investigate the remote change; never retry with `--force` or an unqualified force push.
+7. Mark the PR ready for review, then wait for every required GitHub Actions and external check associated with that exact remote head.
+Both SonarCloud checks, Automatic Analysis and Quality Gate, must report success.
+Pending, skipped when required, cancelled, stale-head, and failing results do not satisfy the gate.
+8. If any check fails, return the PR to draft before gathering evidence, reconciling the issue, and routing fixes through isolated implementation and review lanes.
+Repeat rebase, local validation, detached review, explicit-lease push, ready transition, and exact-head CI after a fix.
+9. After the check rollup succeeds, fetch `origin/main` again and verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
+If main advanced, the PR head changed, or the PR is draft, return it to draft and repeat the complete loop.
+
+The maintainer handoff is valid only when current-main ancestry, exact remote-head identity, ready state, and every required post-undraft check are mechanically true at the same time.
+
 ## Guarded cleanup
 
 After acceptance, the driver inspects each lane's tracked, untracked, and ignored state and proves every returned source commit is integrated.

@@ -80,6 +80,43 @@ The release automation's forward-port merge from `release` into `main` is not ag
 - **AND** it MUST NOT squash-merge a prerelease line into `release`, because squashing collapses Conventional Commit types and mis-computes the stable version
 - **AND** it MUST NOT merge `release` or `main` into a hotfix line; a fix leaves a hotfix line by cherry-pick
 
+### Requirement: Ready-for-review delivery gate
+
+Before maintainer handoff, the workflow driver MUST deliver a PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and fresh detached review, is ready for review, and has every required post-undraft GitHub and external check successful.
+Draft-head checks MUST be treated only as preflight evidence because required workflows may use the `ready_for_review` trigger.
+
+#### Scenario: preparing the final remote head
+
+- **WHEN** implementation, review, and documentation loops have accepted the integrated change
+- **THEN** the driver finalizes PR title, body, issue linkage, screenshots, and other metadata before the final run
+- **AND** it fetches `origin/main`, captures the expected remote PR-head SHA, and requires a clean coordinator with no active mutable lane
+- **AND** it rebases the integration branch onto current `origin/main`
+- **AND** it reruns every required authoritative local gate plus `npx commitlint --from origin/main --to HEAD`
+- **AND** it obtains fresh detached implementation review at the rebased commit
+- **AND** it repeats domain and documentation reconciliation if conflict resolution or later fixes change workflow, canonical specification, or documentation content
+
+#### Scenario: publishing rewritten history
+
+- **WHEN** the rebased head has passed its required local gates and detached review
+- **THEN** the driver updates the remote only with `--force-with-lease=<branch>:<expected-sha>` using the previously captured remote SHA
+- **AND** a rejected lease stops for investigation
+- **AND** the driver MUST NOT retry with `--force` or an unqualified force push
+
+#### Scenario: validating the ready head
+
+- **WHEN** the explicit-lease push succeeds
+- **THEN** the driver marks the PR ready for review before the final check rollup
+- **AND** it waits for every required GitHub Actions and external check on that exact remote head
+- **AND** both SonarCloud checks, Automatic Analysis and Quality Gate, report success
+- **AND** pending, skipped when required, cancelled, stale-head, or failing checks do not satisfy the gate
+
+#### Scenario: restarting failed or stale delivery
+
+- **WHEN** a required check fails, current `origin/main` advances, the remote PR head changes, or the PR is draft
+- **THEN** the driver returns the PR to draft before evidence gathering, issue reconciliation, or isolated fix work
+- **AND** it repeats rebase, authoritative validation, fresh detached review, explicit-lease push, ready transition, and exact-head checks
+- **AND** after a successful rollup it fetches `origin/main` again and verifies current-main ancestry, unchanged remote-head identity, and ready state before maintainer handoff
+
 ### Requirement: Isolated agent worktrees
 
 Every spawned agent MUST work from a unique repository-local Git worktree by default.

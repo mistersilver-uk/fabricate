@@ -86,6 +86,28 @@ The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and 
 Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`.
 Loop until both approve.
 
+### Final maintainer handoff
+
+Before asking the maintainer to review a PR, the workflow driver completes a final delivery loop from the coordinator checkout.
+Draft-head checks are preflight evidence only because some CI workflows may run only on the `ready_for_review` event.
+
+1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
+2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
+3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.
+4. Create a fresh detached implementation-review lane for the rebased commit.
+Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical spec, or documentation content.
+5. Update the remote branch only with `git push --force-with-lease=<branch>:<expected-sha>`.
+A rejected lease stops the loop for investigation; never retry with `--force` or an unqualified force push.
+6. Mark the PR ready for review, then wait for every required GitHub Actions and external check triggered for that exact head.
+Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
+Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
+7. On any failure, return the PR to draft before gathering evidence and routing fixes through the normal isolated implementation and review loops.
+After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks.
+8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
+If main advanced, the head changed, or the PR returned to draft, repeat the complete delivery loop.
+
+Only hand the PR to the maintainer after all final-delivery conditions are true on the same commit.
+
 ### Stop conditions
 
 - Any reviewer returning `BLOCKED` halts the loop and surfaces to the user.
@@ -523,6 +545,8 @@ Re-check after any integration or merge because the expected branch or SHA may h
 The driver verifies and integrates lane commits, then pushes the integration branch and opens or updates the PR targeting `main`.
 - Respond to review feedback through a valid retained lane or a fresh revision lane, then update the same integration branch and PR; do not open replacement PRs unless the user asks.
 - Review-only agents inspect fresh detached snapshots of the assigned integration commit and must not commit, push, merge, or mutate GitHub state.
+- Before maintainer handoff, complete the final delivery loop: rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, obtain fresh detached review, explicit-lease push, mark ready, require all exact-head checks including both SonarCloud checks, then re-fetch main and reverify ancestry, head identity, and ready state.
+- Treat draft checks as preflight only; a required workflow may be triggered by `ready_for_review` and must pass after the PR is undrafted.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 - PR descriptions must include a GitHub closing keyword for the issue the PR resolves: put `Closes #<issue>` (or `Fixes #<issue>` / `Resolves #<issue>`) on its own line in the `Description` section so merging the PR auto-closes the issue.
