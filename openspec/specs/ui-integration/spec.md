@@ -1228,6 +1228,26 @@ Alchemy is the only conditional entry; the others are always present.
   `result` reflects the recipe's terminal execution step in `simple` mode, and a
   `simple` multi-step model additionally carries a `steps[]` per-step requirement
   projection (empty for single-step recipes and outside `simple` mode).
+- The `check` descriptor's `dc` is resolved per-recipe, not per-system: the
+  recipe's selected difficulty tier (`recipe.checkTierId` → the matching
+  `craftingCheck.*` slot's `tiers[].dc`) wins, falling back to the slot's static
+  `dc`; both the tier DC and a finite static DC are truncated to an integer.
+  For the tier and integer-static cases this matches
+  `CraftingEngine._resolveSimpleCheckDc` (the rolled DC) and the GM manager's
+  `_buildRecipeCheckSummary`, so the player card, the roll prompt, and the GM
+  recipe row report one number.
+- A slot with a `rollFormula` but no finite static `dc` reports `dc: null` (no DC
+  chip) rather than the `15` the engine and GM row fall back to.
+  This is a deliberate display-only divergence: the listing must not surface a DC
+  chip where none is authored.
+- A routed **fixed** check (routedByCheck fixed / alchemy tiered fixed) has no
+  meaningful DC and reports `dc: null` (it matches by value range; per-recipe
+  difficulty there is `minSuccessOutcomeId`, not a DC tier).
+- A **dynamic** (macro-resolved) DC reports `dc: null` at browse time: it is
+  resolved at craft time and the read-only listing builder never executes the
+  macro.
+  The DC chip is suppressed rather than showing a static number the macro would
+  override.
 - Each `RecipeListingModel` also carries `category` (the normalized category token;
   `general` for the reserved/default bucket) and a `categoryLabel` display string.
 - The label rule is exact: the reserved `general` token is localized to
