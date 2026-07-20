@@ -41,10 +41,15 @@
     // route-exit guard can persist it on a Save-and-navigate. Emitted on every
     // input, mirroring the essence/component `onDraftChange` → root draft pattern.
     onDetailsChange = () => {},
-    // Report the local dirty state up so the root can gate the route-exit guard.
+    // Report the local dirty state up so the root can gate the route-exit guard. This
+    // is the root's ONLY dirtiness signal: the comparison is against the live
+    // `selectedSystem` projection and only this view holds the typed inputs, so the
+    // root cannot re-derive it from the lifted draft alone.
     onDirtyChange = () => {},
-    // Bumped by the root (discard branch of the guard) to force the local inputs
-    // to re-seed from the persisted system even when the system id is unchanged.
+    // Bumped by the root (discard branch of the guard) to force the local inputs to
+    // re-seed from the persisted system even when the system id is unchanged. A
+    // counter rather than a flag, so a second discard on the SAME system still
+    // registers as a change (the `requestedTabNonce` idiom above).
     reseedNonce = 0,
     onToggleFeature = async () => true,
     characterModifierLibrary = [],

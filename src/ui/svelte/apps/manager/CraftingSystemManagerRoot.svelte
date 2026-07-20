@@ -2185,6 +2185,12 @@
     return true;
   }
 
+  // Apply the three-way discard choice for the identity sub-form and answer whether
+  // navigation may proceed (`true`) or must stay put (`false`). Save persists from the
+  // ROOT-LIFTED draft, not from `SystemEditView`'s local inputs: on a Save-and-navigate
+  // the view is still mounted but the root is the only holder the guard can read.
+  // Navigation is gated on `result !== false`, so only an explicit `false` from
+  // `saveSystemDetails` (its no-selected-system no-op) blocks the exit.
   async function finishSystemDetailsRouteExit(action) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
@@ -2417,6 +2423,10 @@
     return continueRouteExitAfterTools(nextView);
   }
 
+  // Tail of the route-exit cascade: tools, then system-details. `system-details` is
+  // evaluated LAST because it is the only kind whose "editor" is a sub-form of a page the
+  // GM may also be leaving for another reason, so a real editor draft gets first refusal
+  // on the exit. Same promise / `false`-short-circuit shape as the other links.
   function continueRouteExitAfterTools(nextView) {
     const toolsResult = confirmToolsRouteExit(nextView);
     if (isPromise(toolsResult)) {
