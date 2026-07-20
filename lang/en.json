@@ -600,7 +600,6 @@
           "IngredientRoutingHint": "The ingredient option you choose determines what you craft.",
           "ProgressiveHint": "This recipe is crafted over multiple steps.",
           "MultiStepHint": "This recipe is made in {count} steps — craft each in order.",
-          "StepsTitle": "Steps",
           "StepLabel": "Step {index}: {name}",
           "StepFallback": "Step {index}",
           "StageThreshold": "Reached at ≥{threshold}",
