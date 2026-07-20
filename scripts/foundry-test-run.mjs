@@ -5685,6 +5685,43 @@ async function main() {
         await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
+        // Issue 800: prove the component browser inspector flattens Foundry enricher
+        // syntax at PROJECTION/read time. Inject a raw enricher-bearing description
+        // straight onto the in-memory stored component (bypassing the persist-time
+        // normalizer, mirroring pre-existing imported data like the reported Mythwright
+        // world), refresh the projection, select the component, and capture the inspector
+        // rendering human-readable labels — a labelled link list, a labelled roll, a bare
+        // roll, and a tidied dropped-separator, all in one frame.
+        const enricherComponentId = await page.evaluate(async (sysId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          const system = csm.getSystem(sysId);
+          const component = system?.components?.find((c) => c.name === 'Mystic Herb');
+          if (!component) {
+            throw new Error('issue 800: Mystic Herb component not found for enricher fixture');
+          }
+          component.description =
+            'Craft: @UUID[Compendium.dnd5e.items.Item.acid00]{Acid}, '
+            + '@UUID[Compendium.dnd5e.items.Item.nolabel00], '
+            + '@UUID[Compendium.dnd5e.items.Item.oil000]{Oil}, '
+            + '@UUID[Compendium.dnd5e.items.Item.paper0]{Paper}. '
+            + 'Burns for [[/r 1d4]]{1d4 rounds} dealing [[/roll 2d6]] fire damage.';
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          return component.id;
+        }, craftingSetup.systemId);
+        await page.locator(`.fabricate-manager .manager-component-row[data-component-id="${enricherComponentId}"] .manager-component-identity`).first().click();
+        const enricherFlavour = page.locator('.fabricate-manager [data-component-inspector] .manager-component-browser-inspector-flavour').first();
+        await enricherFlavour.waitFor({ state: 'visible', timeout: 5_000 });
+        const enricherText = (await enricherFlavour.textContent() ?? '').trim();
+        if (/@[A-Za-z]+\[|&[A-Za-z]+\[|\[\[/.test(enricherText)) {
+          throw new Error(`issue 800: raw enricher syntax survived in the inspector: ${enricherText}`);
+        }
+        if (!enricherText.includes('Acid') || !enricherText.includes('1d4 rounds') || !enricherText.includes('2d6')) {
+          throw new Error(`issue 800: expected flattened labels + formulas in the inspector, got: ${enricherText}`);
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-enricher');
+        process.stdout.write('  D0: components enricher inspector screenshotted\n');
+
         // Components → open the editor so the identity card (central column) and the
         // linked-source inspector (right context panel) are captured (#398).
         await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-pen)').first().click();
