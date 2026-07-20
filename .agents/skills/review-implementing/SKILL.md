@@ -60,7 +60,7 @@ Repository specifics that shape the fix:
 - Tests are `node:test` files under `tests/`; the `test` script in `package.json` globs a fixed set of directories, so a test outside those directories never runs in CI
 - New mounted Svelte component tests use `createMountedComponentHarness` from `tests/helpers/svelte-component-harness.js`, never inlined compile/mount boilerplate
 - A component missing from a mount harness allowlist hangs and reports `# cancelled`, not a failure — after component changes confirm `# cancelled 0`
-- Keep dependencies explicit and constructors boring per `skills/javascript-structural-design/SKILL.md` when the fix reshapes module boundaries
+- Keep dependencies explicit and constructors boring per `.agents/skills/javascript-structural-design/SKILL.md` when the fix reshapes module boundaries
 
 ### 4. Validation
 

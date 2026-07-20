@@ -81,16 +81,17 @@ The release automation's forward-port merge from `release` into `main` is not ag
 
 ### Requirement: Shared skill source
 
-Shared reusable skills MUST live under the repository `skills/` directory.
+Shared reusable skills MUST live under the repository `.agents/skills/` directory so Codex discovers them from the repository root.
 
 #### Scenario: provider-specific skill discovery
 
-- **WHEN** a provider-specific skill root is needed
-- **THEN** it points back to the canonical `skills/` directory instead of carrying a divergent copy
+- **WHEN** a provider-specific agent binding needs a shared skill
+- **THEN** it points back to the canonical `.agents/skills/` directory instead of carrying a divergent copy
+- **AND** no second repository skill tree is maintained outside the Codex discovery root
 
 ### Requirement: Role persona bindings
 
-Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`.
+Each agent role MUST be defined once in its canonical `.agents/skills/<role>/SKILL.md`.
 Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.md` for Claude) MUST be thin bindings that point at the canonical skill and MUST NOT carry divergent persona behavior.
 
 #### Scenario: resolving a routing token
@@ -102,7 +103,7 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 #### Scenario: changing role behavior
 
 - **WHEN** a role's behavior must change
-- **THEN** the edit is made in `skills/<role>/SKILL.md`
+- **THEN** the edit is made in `.agents/skills/<role>/SKILL.md`
 - **AND** the provider bindings remain thin pointers without divergent persona behavior
 - **AND** provider-local metadata, tool allowlists, and sandbox guardrails may live in bindings when needed
 
@@ -114,7 +115,7 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 
 ### Requirement: Harness reference integrity
 
-Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `skills/README.md`, `skills/*/SKILL.md`, `skills/*/references/*.md`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
+Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `.agents/skills/README.md`, `.agents/skills/*/SKILL.md`, `.agents/skills/*/references/*.md`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
 
 #### Scenario: validating harness references
 
@@ -122,8 +123,17 @@ Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/REA
 - **THEN** it verifies every conservatively path-shaped backtick reference in the harness documents resolves to an existing file or directory, allowing only entries in an explicit, commented allow-missing set
 - **AND** it rejects line-number-based code citations (such as `file.js:NNN` or approximate line references) in the harness documents
 - **AND** it verifies every skill-backed role's Claude binding declares a `model:` and its Codex binding declares a `model =`
-- **AND** it verifies the AGENTS.md shared-skills list equals the set of `skills/` subdirectories containing a `SKILL.md` minus the role directories derived from the bindings table
+- **AND** it verifies every `.agents/skills/<name>/SKILL.md` has only single-line string `name` and `description` frontmatter fields
+- **AND** the `name` matches its directory, contains at most 64 lowercase letters, digits, and hyphens, and the `description` contains 1-1024 characters without angle brackets
+- **AND** it verifies every Markdown file under a skill's `references/` directory is cited directly by that skill's `SKILL.md`
+- **AND** it verifies the AGENTS.md shared-skills list equals the set of `.agents/skills/` subdirectories containing a `SKILL.md` minus the role directories derived from the bindings table
 - **AND** it exits non-zero on any violation
+
+#### Scenario: consistent local and CI validation
+
+- **WHEN** a developer runs `npm run validate:agents` locally or the `validate-agents` CI job runs it on Ubuntu
+- **THEN** the same dependency-free Node validator enforces the same discovery, metadata, reference, and binding requirements
+- **AND** neither path requires network access or a provider-specific fallback
 
 #### Scenario: citing code from harness documents
 

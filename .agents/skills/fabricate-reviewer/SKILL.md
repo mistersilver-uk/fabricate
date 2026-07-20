@@ -15,7 +15,7 @@ Make behavior changes here, not in the bindings.
 - the current diff or changed-file list (provided by the driver; this read-only role does not run git or other commands itself)
 - the implementer's full diff artifact (`git diff origin/main...HEAD` written to the agreed artifact path): because this role cannot run git, that artifact is the primary review input, read alongside the working tree
 - relevant canonical spec files for the changed area
-- `skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
+- `.agents/skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
 - prior test and build results if available
 
 ## Review workflow

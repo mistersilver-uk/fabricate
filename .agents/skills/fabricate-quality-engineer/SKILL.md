@@ -13,7 +13,7 @@ Make behavior changes here, not in the bindings.
 
 - open defect and test-gap issues when `gh` is available
 - relevant `src/`, `tests/`, `styles/`, `docs/`, and `openspec/specs/` files
-- `skills/javascript-structural-design/SKILL.md` when scanning for maintainability or testability risks in JavaScript structure
+- `.agents/skills/javascript-structural-design/SKILL.md` when scanning for maintainability or testability risks in JavaScript structure
 - recent validation results if they exist
 
 ## Workflow

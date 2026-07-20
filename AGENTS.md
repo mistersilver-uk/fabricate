@@ -539,7 +539,7 @@ Bundling is acceptable when changes overlap on the same files such that hunk-spl
 
 ## Agent Roles & Bindings
 
-Each role is defined **once** in its shared `skills/<role>/SKILL.md` (the canonical persona).
+Each role is defined **once** in its shared `.agents/skills/<role>/SKILL.md` (the canonical persona and Codex repository-discovery location).
 Both provider agents are **thin bindings** that point at that skill — change behavior in the
 skill, not in the bindings.
 The default workflow above auto-spawns these roles based on change
@@ -547,15 +547,15 @@ signals; explicit requests are only required for roles the routing table does no
 
 | Routing token                  | Canonical skill (persona)                  | Codex binding                                | Claude `subagent_type`        |
 |---------------------------------|--------------------------------------------|----------------------------------------------|-------------------------------|
-| `fabricate_orchestrator`        | `skills/fabricate-orchestrator/SKILL.md`   | `.codex/agents/fabricate-orchestrator.toml`  | `fabricate-orchestrator`      |
-| `fabricate_implementer`         | `skills/fabricate-implementer/SKILL.md`    | `.codex/agents/fabricate-implementer.toml`   | `fabricate-implementer`       |
-| `fabricate_reviewer`            | `skills/fabricate-reviewer/SKILL.md`       | `.codex/agents/fabricate-reviewer.toml`      | `fabricate-reviewer`          |
-| `fabricate_domain_expert`       | `skills/fabricate-domain-expert/SKILL.md`  | `.codex/agents/fabricate-domain-expert.toml` | `fabricate-domain-expert`     |
-| `fabricate_docs_writer`         | `skills/fabricate-docs-writer/SKILL.md`    | `.codex/agents/fabricate-docs-writer.toml`   | `fabricate-docs-writer`       |
-| `fabricate_ux_designer`         | `skills/fabricate-ux-designer/SKILL.md`    | `.codex/agents/fabricate-ux-designer.toml`   | `fabricate-ux-designer`       |
-| `fabricate_quality_engineer`    | `skills/fabricate-quality-engineer/SKILL.md` | `.codex/agents/fabricate-quality-engineer.toml` | `fabricate-quality-engineer` |
-| `foundry_integrator`            | `skills/foundry-integrator/SKILL.md`       | `.codex/agents/foundry-integrator.toml`      | `foundry-integrator`          |
-| `fabricate_competitive_analyst` | `skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml` | `fabricate-competitive-analyst` |
+| `fabricate_orchestrator`        | `.agents/skills/fabricate-orchestrator/SKILL.md`   | `.codex/agents/fabricate-orchestrator.toml`  | `fabricate-orchestrator`      |
+| `fabricate_implementer`         | `.agents/skills/fabricate-implementer/SKILL.md`    | `.codex/agents/fabricate-implementer.toml`   | `fabricate-implementer`       |
+| `fabricate_reviewer`            | `.agents/skills/fabricate-reviewer/SKILL.md`       | `.codex/agents/fabricate-reviewer.toml`      | `fabricate-reviewer`          |
+| `fabricate_domain_expert`       | `.agents/skills/fabricate-domain-expert/SKILL.md`  | `.codex/agents/fabricate-domain-expert.toml` | `fabricate-domain-expert`     |
+| `fabricate_docs_writer`         | `.agents/skills/fabricate-docs-writer/SKILL.md`    | `.codex/agents/fabricate-docs-writer.toml`   | `fabricate-docs-writer`       |
+| `fabricate_ux_designer`         | `.agents/skills/fabricate-ux-designer/SKILL.md`    | `.codex/agents/fabricate-ux-designer.toml`   | `fabricate-ux-designer`       |
+| `fabricate_quality_engineer`    | `.agents/skills/fabricate-quality-engineer/SKILL.md` | `.codex/agents/fabricate-quality-engineer.toml` | `fabricate-quality-engineer` |
+| `foundry_integrator`            | `.agents/skills/foundry-integrator/SKILL.md`       | `.codex/agents/foundry-integrator.toml`      | `foundry-integrator`          |
+| `fabricate_competitive_analyst` | `.agents/skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml` | `fabricate-competitive-analyst` |
 | `fabricate_pr_explorer`         | — (no shared skill; read-only mapping)     | `.codex/agents/fabricate-pr-explorer.toml`   | `Explore` (built-in)          |
 
 `fabricate_pr_explorer` is read-only codebase mapping; Claude uses its built-in `Explore` agent
@@ -563,11 +563,10 @@ for the same role rather than a dedicated binding.
 
 ### Shared skills with no persona binding
 
-These are loaded on demand (by path) from the role skills that reference them — not auto-spawned
-as agents:
+These are discoverable by Codex as repository skills and loaded on demand by roles that reference them; they are not auto-spawned as agents:
 
-- `skills/javascript-structural-design/SKILL.md`
-- `skills/review-implementing/SKILL.md`
+- `.agents/skills/javascript-structural-design/SKILL.md`
+- `.agents/skills/review-implementing/SKILL.md`
 
 ## What Agents Must Not Do
 

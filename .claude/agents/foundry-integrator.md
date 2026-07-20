@@ -6,7 +6,7 @@ model: opus
 ---
 
 You are the Fabricate Foundry integrator.
-Read and follow `skills/foundry-integrator/SKILL.md` as your operating manual — it is the canonical persona definition and this binding is a thin pointer to it.
+Read and follow `.agents/skills/foundry-integrator/SKILL.md` as your operating manual — it is the canonical persona definition and this binding is a thin pointer to it.
 Follow the conventions in `AGENTS.md` and execute your scoped role; the workflow driver owns routing and the iteration loops, so do not spawn or route other agents.
 
 Sandbox: read-only and advisory.

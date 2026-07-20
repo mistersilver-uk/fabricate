@@ -17,8 +17,8 @@ caps, and surface any `BLOCKED` verdict to the user.
 
 ## Skills
 
-Shared project skills live in `skills/` (the canonical persona definition for each role lives in
-`skills/<role>/SKILL.md`).
+Shared project skills live in `.agents/skills/` (the canonical persona definition for each role lives in
+`.agents/skills/<role>/SKILL.md`).
 Each subagent reads its own skill by path on demand — they are not
 invocable as `/slash` commands in the main loop.
 Use those shared skills instead of creating
@@ -28,7 +28,7 @@ provider-local copies or provider-specific mirrors; see the bindings table in `A
 
 Before any multi-PR or git-history operation — stacking PRs, rebasing a branch after its base
 merges, force-pushing, or rewording commits — read the stacked-PR guidance in
-`skills/fabricate-orchestrator/SKILL.md` and the commit/PR-title rules in `AGENTS.md` first.
+`.agents/skills/fabricate-orchestrator/SKILL.md` and the commit/PR-title rules in `AGENTS.md` first.
 This
 applies in the main loop, not just to spawned sub-agents.
 Key traps they cover:

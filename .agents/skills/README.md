@@ -1,6 +1,7 @@
 # Shared Skills
 
 This directory is the canonical shared skill root for this repository.
+Codex discovers these repository skills from the `.agents/skills/` path and loads each `SKILL.md` on demand.
 
 Each skill directory follows the Agent Skills layout:
 

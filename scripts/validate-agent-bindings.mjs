@@ -15,8 +15,10 @@
 //     cite the symbol and file instead, locatable with `grep -n`;
 //   - every skill-backed role pins a model in both provider bindings;
 //   - the AGENTS.md "Shared skills with no persona binding" list must equal the
-//     set of skills/ subdirectories containing a SKILL.md minus the role
+//     set of .agents/skills/ subdirectories containing a SKILL.md minus the role
 //     directories derived from the bindings table.
+//   - every repository skill has valid matching frontmatter and directly cites
+//     each Markdown reference bundled under its references/ directory.
 //
 // Pure Node, no dependencies, no Docker/network — behaves identically in CI and
 // local dev. Run with `npm run validate:agents`. Exits non-zero on any mismatch.
@@ -26,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const SKILLS_ROOT = ".agents/skills";
 
 // Tools that let a role mutate the workspace. A Claude binding that mirrors a
 // Codex `sandbox_mode = "read-only"` must include none of these.
@@ -109,7 +112,7 @@ for (const { cells, token } of rows) {
   expectedClaude.add(`${roleBase}.md`);
   roleDirs.add(roleBase);
 
-  const skillPath = `skills/${roleBase}/SKILL.md`;
+  const skillPath = `${SKILLS_ROOT}/${roleBase}/SKILL.md`;
   const claudePath = `.claude/agents/${roleBase}.md`;
   const skill = read(skillPath);
   const codex = read(codexPath);
@@ -187,7 +190,7 @@ const listDir = (rel, filter) => {
   return readdirSync(abs).filter(filter).map((f) => `${rel}/${f}`);
 };
 const skillDirs = () => {
-  const abs = join(root, "skills");
+  const abs = join(root, SKILLS_ROOT);
   if (!existsSync(abs)) return [];
   return readdirSync(abs, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
 };
@@ -196,11 +199,11 @@ const harnessDocs = [
   "CLAUDE.md",
   "CONTRIBUTING.md",
   "openspec/README.md",
-  "skills/README.md",
+  `${SKILLS_ROOT}/README.md`,
   ...skillDirs().flatMap((d) => {
     const docs = [];
-    if (existsSync(join(root, "skills", d, "SKILL.md"))) docs.push(`skills/${d}/SKILL.md`);
-    docs.push(...listDir(`skills/${d}/references`, (f) => f.endsWith(".md")));
+    if (existsSync(join(root, SKILLS_ROOT, d, "SKILL.md"))) docs.push(`${SKILLS_ROOT}/${d}/SKILL.md`);
+    docs.push(...listDir(`${SKILLS_ROOT}/${d}/references`, (f) => f.endsWith(".md")));
     return docs;
   }),
   ...listDir(".claude/agents", (f) => f.endsWith(".md")),
@@ -214,6 +217,7 @@ const harnessDocs = [
 // placeholder role directory) is skipped, never guessed at.
 const KNOWN_SEGMENTS = [
   "src/", "tests/", "styles/", "lang/", "docs/", "scripts/", "skills/",
+  ".agents/",
   "openspec/", "examples/", "assets/", ".claude/", ".codex/", ".github/",
 ];
 const ROOT_FILES = new Set([
@@ -274,8 +278,82 @@ for (const doc of harnessDocs) {
   }
 }
 
+// --- Repository skill discovery and progressive disclosure ----------------
+// Codex scans .agents/skills from the working directory to the repository root.
+// Validate the metadata it initially sees and ensure every bundled Markdown
+// reference is named by its owning SKILL.md so the full material is reachable
+// after that skill activates.
+require_(existsSync(join(root, SKILLS_ROOT)), `${SKILLS_ROOT}/ (Codex repository skill root) is missing`);
+require_(!existsSync(join(root, "skills")), "skills/ is a legacy repository skill root; keep a single canonical tree under .agents/skills/");
+
+const skillNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const yamlNonStringPattern = /^(?:null|~|true|false|yes|no|on|off)$/i;
+const yamlPlainStringPattern = /^[A-Za-z][A-Za-z0-9 _.,;!?\/()'"`*+=-]*$/;
+const parseYamlString = (raw) => {
+  const value = raw.trim();
+  if (!value) return null;
+  if (value.startsWith('"')) {
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === "string" ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  if (value.startsWith("'")) {
+    if (!value.endsWith("'") || value.length < 2) return null;
+    const inner = value.slice(1, -1);
+    if (inner.replaceAll("''", "").includes("'")) return null;
+    return inner.replaceAll("''", "'");
+  }
+  // Keep plain values inside a conservative lexical subset that YAML parsers
+  // consistently resolve as strings. Other valid strings can use quotes.
+  if (!yamlPlainStringPattern.test(value) || yamlNonStringPattern.test(value)) return null;
+  return value;
+};
+const parseSkillFrontmatter = (frontmatter, skillPath) => {
+  const fields = new Map();
+  for (const line of frontmatter.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const match = line.match(/^([a-z][a-z0-9-]*):\s*(.*)$/);
+    require_(match, `${skillPath} frontmatter must contain only single-line key/value fields`);
+    if (!match) continue;
+    const [, field, raw] = match;
+    require_(["name", "description"].includes(field), `${skillPath} frontmatter contains unsupported field ${field}`);
+    require_(!fields.has(field), `${skillPath} frontmatter contains duplicate field ${field}`);
+    const value = parseYamlString(raw);
+    require_(value !== null, `${skillPath} frontmatter ${field} must be a valid YAML string`);
+    if (["name", "description"].includes(field) && !fields.has(field)) fields.set(field, value);
+  }
+  return fields;
+};
+
+for (const dir of skillDirs()) {
+  const skillPath = `${SKILLS_ROOT}/${dir}/SKILL.md`;
+  const skill = read(skillPath);
+  require_(skill, `${skillPath} is missing from repository skill directory ${dir}`);
+  if (!skill) continue;
+
+  const frontmatterMatch = skill.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  require_(frontmatterMatch, `${skillPath} must start with YAML frontmatter`);
+  if (frontmatterMatch) {
+    const fields = parseSkillFrontmatter(frontmatterMatch[1], skillPath);
+    const name = fields.get("name");
+    const description = fields.get("description");
+    require_(name === dir, `${skillPath} frontmatter name must match its directory (${dir}), got ${JSON.stringify(name)}`);
+    require_(name && name.length <= 64 && skillNamePattern.test(name), `${skillPath} frontmatter name must use at most 64 lowercase letters, digits, and hyphens`);
+    require_(description && description.length <= 1024, `${skillPath} frontmatter description must contain 1-1024 characters`);
+    require_(description && !/[<>]/.test(description), `${skillPath} frontmatter description must not contain angle brackets`);
+  }
+
+  for (const reference of listDir(`${SKILLS_ROOT}/${dir}/references`, (file) => file.endsWith(".md"))) {
+    const filename = reference.slice(reference.lastIndexOf("/") + 1);
+    require_(skill.includes(`references/${filename}`), `${reference} is not cited directly by its owning ${skillPath}`);
+  }
+}
+
 // --- Shared-skills list parity ---------------------------------------------
-// AGENTS.md "Shared skills with no persona binding" must equal the skills/
+// AGENTS.md "Shared skills with no persona binding" must equal the .agents/skills/
 // subdirectories that contain a SKILL.md minus the role directories from the
 // bindings table. Deleting or adding a shared skill without updating the list
 // (or vice versa) fails here.
@@ -285,17 +363,17 @@ const listedShared = new Set();
 for (let i = sharedHeadingIdx + 1; sharedHeadingIdx >= 0 && i < lines.length; i++) {
   const l = lines[i];
   if (/^#{1,6}\s/.test(l)) break; // next heading
-  const m = l.match(/^-\s+`skills\/([^/`]+)\/SKILL\.md`/);
+  const m = l.match(/^-\s+`\.agents\/skills\/([^/`]+)\/SKILL\.md`/);
   if (m) listedShared.add(m[1]);
 }
 const actualShared = new Set(
-  skillDirs().filter((d) => existsSync(join(root, "skills", d, "SKILL.md")) && !roleDirs.has(d)),
+  skillDirs().filter((d) => existsSync(join(root, SKILLS_ROOT, d, "SKILL.md")) && !roleDirs.has(d)),
 );
 for (const name of actualShared) {
-  require_(listedShared.has(name), `skills/${name}/SKILL.md exists but is not listed under AGENTS.md '### Shared skills with no persona binding' (and is not a bound role)`);
+  require_(listedShared.has(name), `${SKILLS_ROOT}/${name}/SKILL.md exists but is not listed under AGENTS.md '### Shared skills with no persona binding' (and is not a bound role)`);
 }
 for (const name of listedShared) {
-  require_(actualShared.has(name), `AGENTS.md shared-skills list names skills/${name}/SKILL.md, which ${roleDirs.has(name) ? "is a bound role, not a shared skill" : "does not exist"}`);
+  require_(actualShared.has(name), `AGENTS.md shared-skills list names ${SKILLS_ROOT}/${name}/SKILL.md, which ${roleDirs.has(name) ? "is a bound role, not a shared skill" : "does not exist"}`);
 }
 
 if (errors.length) {
@@ -304,4 +382,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Agent bindings OK: ${fullRoles} skill-backed roles + ${mappingRoles} mapping role(s) derived from AGENTS.md, consistent across skills, both providers, tool/sandbox parity, no orphan bindings; ${harnessDocs.length} harness docs pass path-existence and citation checks; shared-skills list parity holds (${actualShared.size} shared skills).`);
+console.log(`Agent bindings OK: ${fullRoles} skill-backed roles + ${mappingRoles} mapping role(s) derived from AGENTS.md, consistent across ${skillDirs().length} Codex-discoverable repository skills, both providers, tool/sandbox parity, no orphan bindings; ${harnessDocs.length} harness docs pass path-existence and citation checks; skill metadata, bundled-reference reachability, and shared-skills list parity hold (${actualShared.size} shared skills).`);

@@ -12,7 +12,7 @@ Make behavior changes here, not in the bindings.
 ## Required context
 
 - `openspec/specs/ui-integration/spec.md` first, then other UI-related specs as needed
-- `skills/fabricate-ux-designer/references/design-system.md` — the `--fab-*` token, component, and pattern reference — when proposing or reviewing visual design or building a new surface
+- `.agents/skills/fabricate-ux-designer/references/design-system.md` — the `--fab-*` token, component, and pattern reference — when proposing or reviewing visual design or building a new surface
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
 - embedded screenshot images in the PR description (S3-hosted, from `npm run screenshots:ui:publish`) and smoke screenshots when no live dev session is available

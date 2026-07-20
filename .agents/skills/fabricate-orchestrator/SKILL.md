@@ -16,7 +16,7 @@ Make behavior changes here, not in the bindings.
 - the work's GitHub issue, including any existing `openspec-delta` block, via `gh issue view`
 - relevant canonical specs under `openspec/specs/`
 - the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills
-- `skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
+- `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
 - GitHub issue context from `gh issue` when available
 
 ## Workflow
