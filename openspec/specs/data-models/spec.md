@@ -733,7 +733,12 @@ Represent one curated item entry available to recipes and salvage operations.
 2. If set, `difficulty` must be an integer >= 1.
 3. Each essence key must exist among the ids in `CraftingSystem.essenceDefinitions` when essences are enabled.
 4. `salvage` is only valid when `CraftingSystem.features.salvage` is true.
-5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group.
+5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group, with a mode-conditioned upper bound.
+In `simple` salvage mode a component's salvage has exactly one success result group (`role !== 'failure'`) plus at most one reserved `role: 'failure'` group, the failure group tolerated only when `salvageCraftingCheck.simple.rollFormula` is authored; no additional groups are permitted.
+`salvage.enabled` is clamped to `false` in `simple` mode when there is no success group (a failure-only config cannot be enabled).
+Routed mode keeps "one or more"; progressive keeps "exactly one".
+This bound is enforced at the `_normalizeSalvage` normalizer — the single chokepoint every writer passes (GM save, import, copy-mode, migration) — not by any UI control, via a success-first retain-one clamp whose post-clamp `resultGroups[0]` is the first success group (the group the engine awards via `slice(0, 1)`, with no role filter).
+The reserved-failure tolerance is a data-model / validation allowance only: salvage Simple awards `slice(0, 1)` and never routes to a failure group.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
 Explicit `fabricate.essences` item flags remain a compatibility override for that item.
 The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
@@ -757,7 +762,8 @@ It gates salvage at runtime.
 A component whose salvage config is invalidated by a system resolution-mode change is auto-disabled and must be re-enablable from the GM component editor.
 No migration seeds this field; an existing component with authored salvage results but no explicit `enabled` value reads as disabled.
 15. Requirement 5 is enforced by normalization, in both directions.
-Component normalization must clamp `salvage.enabled` to `false` whenever the normalized `salvage.resultGroups` is empty.
+Component normalization must clamp `salvage.enabled` to `false` whenever the normalized `salvage.resultGroups` is empty, and — in `simple` mode — whenever no success group survives the clamp.
+In `simple` mode the clamp additionally drops surplus groups: it keeps the first success group at `resultGroups[0]`, keeps at most one reserved `role: 'failure'` group (only when `salvageCraftingCheck.simple.rollFormula` is authored), and re-orders a failure-first input so the success group lands at index 0.
 The clamp applies to every writer that passes through normalization — GM edits, import, copy-mode, and migration — and only ever turns `enabled` off, never on.
 Enforcement must not rest on a UI control's disabled state: a GM surface that merely refuses to *enable* a zero-group component does not prevent a component from *becoming* zero-group while enabled.
 

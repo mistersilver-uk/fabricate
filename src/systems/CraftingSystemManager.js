@@ -140,13 +140,25 @@ export class CraftingSystemManager {
       system.recipeItemDefinitions ?? system.recipeItems
     );
     const essenceIds = new Set(essenceDefinitions.map((def) => def.id));
+    // Salvage-normalization context (issue 764), HOISTED above the component map so the
+    // Simple-mode group-count clamp in `_normalizeSalvage` sees the owning system's mode
+    // and Simple check formula flag. Both derivations are component-independent, so
+    // hoisting is safe; the return literal below reuses `salvageResolutionMode`.
+    const { salvageResolutionMode, salvageSimpleCheckHasFormula } =
+      this._salvageNormalizationContext(system);
     const rawManagedItems = Array.isArray(system.components)
       ? system.components
       : Array.isArray(system.managedItems)
         ? system.managedItems
         : system.items;
     const items = Array.isArray(rawManagedItems)
-      ? rawManagedItems.map((i) => this._normalizeComponent(i, essenceIds))
+      ? rawManagedItems.map((i) =>
+          this._normalizeComponent(i, {
+            validEssenceIds: essenceIds,
+            salvageResolutionMode,
+            salvageSimpleCheckHasFormula,
+          })
+        )
       : [];
     const itemIds = new Set(items.map((i) => i.id));
     const itemById = new Map(items.map((i) => [i.id, i]));
@@ -223,10 +235,9 @@ export class CraftingSystemManager {
       essenceDefinitions: resolvedEssenceDefinitions,
       recipeItemDefinitions,
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
-      salvageResolutionMode: (function _normalizeSalvageResolutionMode(raw) {
-        if (raw === 'tiered') return 'routed'; // legacy alias
-        return ['simple', 'routed', 'progressive'].includes(raw) ? raw : 'simple';
-      })(system.salvageResolutionMode),
+      // Canonical salvage mode, derived above with the salvage-normalization context
+      // (issue 764) so the component map and this field agree on one value.
+      salvageResolutionMode,
       // Tool-breakage authority (issue 419): `toolSpecific` (default, today's
       // behaviour — each Tool's own mode decides, plus the legacy per-crit/per-tier
       // `breakTools` force-break) | `checkDriven` (the active check's `checkBreakage`
@@ -1475,7 +1486,26 @@ export class CraftingSystemManager {
     return [...fallbackSet];
   }
 
-  _normalizeComponent(item = {}, validEssenceIds = null) {
+  /**
+   * Normalize a managed component. The salvage context (issue 764) is threaded through an
+   * options bag so `_normalizeSalvage` can apply the Simple-mode group-count clamp; callers
+   * that hold the owning system pass its resolved salvage mode + Simple-slot formula flag.
+   * A bare call (no options) leaves salvage groups untouched.
+   *
+   * @param {object} [item] - Raw component.
+   * @param {object|Set<string>|null} [options] - Options bag (a legacy positional
+   *   `validEssenceIds` Set is still accepted for back-compat).
+   * @param {Set<string>|null} [options.validEssenceIds] - Essence ids permitted on this system.
+   * @param {string} [options.salvageResolutionMode] - Owning system's salvage mode.
+   * @param {boolean} [options.salvageSimpleCheckHasFormula] - Simple salvage check formula flag.
+   * @returns {object}
+   */
+  _normalizeComponent(item = {}, options = {}) {
+    // Back-compat: a few call paths and tests still pass a bare `validEssenceIds` Set as
+    // the second positional argument. A Set is never a valid options bag, so treat it as
+    // the essence-ids and run with no salvage context (no clamp).
+    const opts = options instanceof Set ? { validEssenceIds: options } : options || {};
+    const { validEssenceIds = null, salvageResolutionMode, salvageSimpleCheckHasFormula } = opts;
     const difficulty = Number(item.difficulty);
     // New-name-first, legacy-name-tolerant (issue 560): the pre-#560 shape used
     // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`; accept both and emit the new names
@@ -1533,11 +1563,60 @@ export class CraftingSystemManager {
       // `features.salvage` toggle is non-destructive: turning salvage off hides and
       // skips it (UI/validation/runtime gate on the flag) but never deletes authored
       // salvage; toggling back on restores it.
-      salvage: this._normalizeSalvage(item.salvage),
+      salvage: this._normalizeSalvage(item.salvage, {
+        salvageResolutionMode,
+        salvageSimpleCheckHasFormula,
+      }),
     };
   }
 
-  _normalizeSalvage(salvage = {}) {
+  /**
+   * Derive the salvage-normalization context (issue 764) from an owning crafting system:
+   * the canonical salvage resolution mode and whether the Simple salvage check slot has an
+   * authored roll formula. `salvageSimpleCheckHasFormula` reads `salvageCraftingCheck.simple.rollFormula`
+   * SPECIFICALLY — the only slot the Simple engine consults — never an OR across the
+   * simple/routed/progressive slots. Tolerant of a raw (pre-normalized) system.
+   *
+   * @param {object} [system] - Crafting system (raw or normalized).
+   * @returns {{ salvageResolutionMode: string, salvageSimpleCheckHasFormula: boolean }}
+   */
+  _salvageNormalizationContext(system = {}) {
+    const raw = system?.salvageResolutionMode;
+    const token = raw === 'tiered' ? 'routed' : raw; // legacy alias
+    const salvageResolutionMode = ['simple', 'routed', 'progressive'].includes(token)
+      ? token
+      : 'simple';
+    const formula = system?.salvageCraftingCheck?.simple?.rollFormula;
+    const salvageSimpleCheckHasFormula = typeof formula === 'string' && formula.trim() !== '';
+    return { salvageResolutionMode, salvageSimpleCheckHasFormula };
+  }
+
+  /**
+   * Normalize a component's salvage config. In Simple salvage mode this enforces the
+   * group-count invariant (issue 764) via a SUCCESS-FIRST retain-one clamp: at most one
+   * success group (`role !== 'failure'`) at `resultGroups[0]` — the group the engine
+   * awards via `slice(0, 1)`, no role filter (`CraftingEngine._resolveSalvageResultGroups`)
+   * — plus at most one reserved `role: 'failure'` group, tolerated ONLY when the Simple
+   * salvage check slot has an authored roll formula. A failure-first `[failure, success]`
+   * input (which import/copy/migration can carry, though the editor never authors it) is
+   * re-ordered so the success group lands at index 0; a failure-only config has NO success
+   * group and clamps `enabled` to false. The reserved-failure tolerance is a DATA-MODEL /
+   * VALIDATION ALLOWANCE ONLY — salvage Simple never awards or routes to a failure group.
+   *
+   * The clamp only applies with a Simple salvage-mode context: `salvageResolutionMode`
+   * absent (a bare unit fixture or non-system caller) leaves groups untouched and keeps
+   * the pre-#764 lower-bound-only `enabled` rule.
+   *
+   * @param {object} salvage - Raw salvage config.
+   * @param {object} [options]
+   * @param {string} [options.salvageResolutionMode] - Owning system's salvage mode; when
+   *   `'simple'`, the retain-one clamp runs. Absent → no clamp.
+   * @param {boolean} [options.salvageSimpleCheckHasFormula] - Whether
+   *   `salvageCraftingCheck.simple.rollFormula` is authored (the ONLY slot the Simple
+   *   engine reads); gates the reserved failure group's retention.
+   * @returns {object}
+   */
+  _normalizeSalvage(salvage = {}, options = {}) {
     if (!salvage || typeof salvage !== 'object') {
       return {
         enabled: false,
@@ -1570,9 +1649,30 @@ export class CraftingSystemManager {
     // HOISTED DELIBERATELY (issue 676). `enabled` is the first key of the literal
     // below and `resultGroups` used to be computed ~10 lines later, so clamping
     // `enabled` in place against the groups would read an uninitialized local.
-    const resultGroups = Array.isArray(salvage.resultGroups)
+    const normalizedGroups = Array.isArray(salvage.resultGroups)
       ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
       : [];
+
+    // Simple-mode SUCCESS-FIRST retain-one clamp (issue 764). Only runs with a Simple
+    // salvage-mode context; routed/progressive and the no-context default keep every
+    // group and the pre-#764 lower-bound-only `enabled` rule.
+    const { salvageResolutionMode, salvageSimpleCheckHasFormula } = options;
+    let resultGroups = normalizedGroups;
+    let enabled = salvage.enabled === true && normalizedGroups.length > 0;
+    if (salvageResolutionMode === 'simple') {
+      const successGroup = normalizedGroups.find((g) => g.role !== 'failure');
+      const failureGroup = normalizedGroups.find((g) => g.role === 'failure');
+      const clamped = [];
+      // Success group ALWAYS at index 0 — the engine awards `slice(0, 1)` with no role
+      // filter, so a failure-first input is re-ordered here rather than awarding failure.
+      if (successGroup) clamped.push(successGroup);
+      // Reserved failure group tolerated ONLY with an authored Simple check formula.
+      if (failureGroup && salvageSimpleCheckHasFormula === true) clamped.push(failureGroup);
+      resultGroups = clamped;
+      // A Simple config with no success group (e.g. a lone `role: 'failure'` group)
+      // cannot be enabled — `slice(0, 1)` would otherwise award the failure group.
+      enabled = salvage.enabled === true && successGroup != null;
+    }
 
     return {
       // Requirement 5 (`data-models` → Component) is ENFORCED HERE, not by any UI
@@ -1585,8 +1685,9 @@ export class CraftingSystemManager {
       // zero-group while enabled.
       //
       // The clamp only ever turns `enabled` OFF, never on: it therefore cannot
-      // contradict the "no migration seeds this field" rule and seeds nothing.
-      enabled: salvage.enabled === true && resultGroups.length > 0,
+      // contradict the "no migration seeds this field" rule and seeds nothing. In Simple
+      // mode `enabled` additionally requires a surviving success group (issue 764).
+      enabled,
       // GM-authored policy: may a player reorder this salvage's progressive result
       // stages? Default TRUE (issue 651) — an absent key reads as `true`, which is why
       // the 1.17.0 migration does not seed it.
@@ -1654,6 +1755,13 @@ export class CraftingSystemManager {
     return {
       id: group.id || foundry.utils.randomID(),
       name: String(group.name || '').trim() || 'Result Group',
+      // Preserve a reserved `role: 'failure'` group (issue 764). The salvage editor
+      // never AUTHORS this role, but import/copy-mode/migration can carry one, and the
+      // Simple-mode success-first clamp in `_normalizeSalvage` distinguishes success
+      // groups (`role !== 'failure'`) from the reserved failure group by it. Mirrors the
+      // recipe result-group serialization (`Recipe.toJSON`): only the reserved value is
+      // emitted, so a plain success group carries no `role` key.
+      ...(group.role === 'failure' && { role: 'failure' }),
       results,
     };
   }
@@ -2232,6 +2340,10 @@ export class CraftingSystemManager {
 
     // Path 1: Mode change -- disable invalid salvage configs. This mutates `merged`
     // in place AFTER the early save above, so persist again when anything changed.
+    // Simple-mode components are NOT disabled here on group count anymore (issue 764):
+    // the `_normalizeSalvage` clamp above already made them valid, so this pass keeps
+    // only its non-count reasons (routed routing gaps, missing progressive check). The
+    // group-drop disclosure it used to provide is the warn below.
     const oldMode = current.salvageResolutionMode || 'simple';
     const disabledComponents = this._disableInvalidSalvageConfigs(merged, oldMode);
     if (disabledComponents.length > 0) {
@@ -2239,6 +2351,19 @@ export class CraftingSystemManager {
       const names = disabledComponents.join(', ');
       ui?.notifications?.warn?.(
         `Fabricate | Salvage disabled for ${disabledComponents.length} component(s) incompatible with new mode: ${names}`
+      );
+    }
+
+    // Issue 764: disclose the Simple-mode success-first clamp when it DROPPED surplus
+    // result groups. The clamp runs silently inside `_normalizeSystem`, so — as the
+    // maintainer required — a switch into (or a save in) Simple mode that discards a
+    // component's extra groups must still cue the GM by name, the same disclosure the
+    // disable-pass used to provide before the clamp made those configs valid.
+    const droppedSalvageComponents = this._detectDroppedSimpleSalvageGroups(mergedInput, merged);
+    if (droppedSalvageComponents.length > 0) {
+      const names = droppedSalvageComponents.join(', ');
+      ui?.notifications?.warn?.(
+        `Fabricate | Simple salvage keeps a single result group — dropped surplus groups on ${droppedSalvageComponents.length} component(s): ${names}`
       );
     }
 
@@ -2593,7 +2718,10 @@ export class CraftingSystemManager {
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
-    const item = this._normalizeComponent(data, validEssenceIds);
+    const item = this._normalizeComponent(data, {
+      validEssenceIds,
+      ...this._salvageNormalizationContext(system),
+    });
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
     await this.save();
@@ -3495,7 +3623,7 @@ export class CraftingSystemManager {
       {
         ...nextSnapshot,
       },
-      validEssenceIds
+      { validEssenceIds, ...this._salvageNormalizationContext(system) }
     );
 
     this._assertUniqueComponentSources(system, item);
@@ -3561,7 +3689,7 @@ export class CraftingSystemManager {
         ),
         id: itemId,
       },
-      validEssenceIds
+      { validEssenceIds, ...this._salvageNormalizationContext(system) }
     );
 
     system.components[idx] = updatedItem;
@@ -3707,7 +3835,7 @@ export class CraftingSystemManager {
     const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
     const updatedItem = this._normalizeComponent(
       { ...system.components[idx], ...updates, id: itemId },
-      validEssenceIds
+      { validEssenceIds, ...this._salvageNormalizationContext(system) }
     );
     if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {
       this._assertUniqueComponentSources(system, updatedItem, itemId);
@@ -4046,6 +4174,48 @@ export class CraftingSystemManager {
       }
     }
     return disabled;
+  }
+
+  /**
+   * Detect components whose surplus Simple-mode salvage success groups were dropped by
+   * the `_normalizeSalvage` clamp (issue 764), comparing the incoming (pre-normalization)
+   * input against the normalized result. Only meaningful in Simple salvage mode; returns
+   * the display names of affected components so `updateSystem` can disclose the deletion.
+   * A dropped reserved failure group (no Simple formula) is NOT reported — this counts
+   * SUCCESS groups only, matching the ruled invariant.
+   *
+   * @param {object} inputSystem - The pre-normalization merged input.
+   * @param {object} normalizedSystem - The normalized (clamped) system.
+   * @returns {string[]} Names of components that lost a success group.
+   */
+  _detectDroppedSimpleSalvageGroups(inputSystem, normalizedSystem) {
+    if (normalizedSystem?.salvageResolutionMode !== 'simple') return [];
+    const rawItems = Array.isArray(inputSystem?.components)
+      ? inputSystem.components
+      : Array.isArray(inputSystem?.managedItems)
+        ? inputSystem.managedItems
+        : Array.isArray(inputSystem?.items)
+          ? inputSystem.items
+          : [];
+    const normalizedById = new Map(
+      (Array.isArray(normalizedSystem?.components) ? normalizedSystem.components : []).map(
+        (component) => [component.id, component]
+      )
+    );
+    const countSuccessGroups = (salvage) =>
+      (Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : []).filter(
+        (group) => group?.role !== 'failure'
+      ).length;
+    const dropped = [];
+    for (const rawItem of rawItems) {
+      const rawSuccess = countSuccessGroups(rawItem?.salvage);
+      const normalized = normalizedById.get(rawItem?.id) || null;
+      const normalizedSuccess = countSuccessGroups(normalized?.salvage);
+      if (rawSuccess > normalizedSuccess) {
+        dropped.push(normalized?.name || rawItem?.name || rawItem?.id || 'component');
+      }
+    }
+    return dropped;
   }
 
   /**

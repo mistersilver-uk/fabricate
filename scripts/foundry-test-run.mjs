@@ -5676,6 +5676,38 @@ async function main() {
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
+        // Issue 764: the Simple-mode salvage editor at its one-success-group CAP. The two
+        // frames above are the ROUTED Arcane Forge salvage editor (multi-group + routing).
+        // Switch to the Simple Forge system and open Smoke Relic — a Simple-mode component
+        // with a single result group — so the frame shows the cap: the Add group control is
+        // HIDDEN and the required hint ("Simple mode uses a single result group") renders.
+        // Fails loudly by design (no guard): a missing hint means the cap regressed.
+        await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+        await selectSmokeSystemInManager(page, executionFixtures.simple.systemId);
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Smoke Relic") button:has(i.fa-pen)')
+          .first().click();
+        await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        const simpleSalvageSection = page
+          .locator('.fabricate-manager [data-component-edit-section="salvage"]')
+          .first();
+        await simpleSalvageSection.waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-salvage-simple-hint]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await simpleSalvageSection.scrollIntoViewIfNeeded();
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-component-edit-salvage-simple');
+        process.stdout.write('  D0: component edit salvage (simple cap) screenshotted\n');
+
+        // Return to the Arcane Forge system so the remaining Phase D0 captures run against
+        // the fully-seeded routed system they expect.
+        await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+        await selectSmokeSystemInManager(page, craftingSetup.systemId);
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
         // Checks → Gathering check editor (#437). The gathering check editor is
         // keyed off the gathering ECONOMY resolution mode, so temporarily flip the
         // economy to routed (the system carries a populated gatheringCraftingCheck.
@@ -6925,6 +6957,64 @@ async function main() {
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage-no-check');
+
+        // Issue 764: the GM-facing Simple-mode MISCONFIGURED salvage cue. A stored Simple
+        // config with more than one success result group is invalid (the engine awards only
+        // the first). The normalizer now CLAMPS it on every save, and initialize()
+        // re-normalizes on load — so it is unreachable through updateSystem or a planted
+        // setting (both self-heal). Reproduce it the only faithful way: an IN-MEMORY
+        // post-init push of a second role-less group onto the live normalized system,
+        // bypassing the normalizer. Then remount InventoryView (a tab switch re-fetches the
+        // listing, which reads the live system) and capture the GM cue: SalvageMisconfigured
+        // Body with Simple-specific copy and the mode banner suppressed. Fails loudly.
+        await page.evaluate(({ systemId, componentId }) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          const system = csm.getSystem(systemId);
+          const component = system?.components?.find((c) => c.id === componentId);
+          if (!component?.salvage) {
+            throw new Error('issue 764 frame: Smoke Relic salvage not found for in-memory injection');
+          }
+          component.salvage.resultGroups.push({ id: 'smoke-relic-surplus-764', name: 'Surplus Parts', results: [] });
+        }, { systemId: executionFixtures.simple.systemId, componentId: executionFixtures.simple.relicComponentId });
+
+        // Tab out and back so InventoryView remounts and re-fetches the (now multi-group)
+        // listing — each tab body is behind an {#if}, so switching unmounts and remounts it.
+        await appShell.locator('.fabricate-app-nav-item:has-text("Gathering")').first().click();
+        await appShell.locator('.fabricate-app-nav-item.active:has-text("Gathering")').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('.fabricate-app-nav-item:has-text("Inventory")').first().click();
+        await appShell.locator('.fabricate-app-nav-item.active:has-text("Inventory")').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-state]:not([data-inventory-state="loading"])').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+
+        const misconfiguredSearch = appShell.locator('[data-inventory-filters] input').first();
+        await misconfiguredSearch.waitFor({ state: 'visible', timeout: 10_000 });
+        await misconfiguredSearch.fill('Smoke Relic');
+        await page.waitForTimeout(200);
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        const misconfiguredTab = appShell.locator('[data-inventory-detail-tab="salvage"]').first();
+        await misconfiguredTab.waitFor({ state: 'visible', timeout: 10_000 });
+        await misconfiguredTab.click();
+        await appShell.locator('[data-inventory-salvage-body="misconfigured"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-salvage-misconfigured');
+
+        // Restore Smoke Relic's healthy single-group salvage so nothing downstream inherits
+        // the injected invalid config.
+        await page.evaluate(({ systemId, componentId }) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          const system = csm.getSystem(systemId);
+          const component = system?.components?.find((c) => c.id === componentId);
+          if (component?.salvage) {
+            component.salvage.resultGroups = component.salvage.resultGroups.filter(
+              (g) => g.id !== 'smoke-relic-surplus-764'
+            );
+          }
+        }, { systemId: executionFixtures.simple.systemId, componentId: executionFixtures.simple.relicComponentId });
 
         // Clear the search so the tab is left in its browsable state for any later
         // inventory work (and so a re-entry does not inherit this filter).
