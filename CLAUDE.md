@@ -14,6 +14,9 @@ subagents are registered in `.claude/agents/`; for the read-only `fabricate_pr_e
 use the built-in `Explore` agent.
 Run plan-review reviewers in parallel, honor the 3-revision
 caps, and surface any `BLOCKED` verdict to the user.
+The main loop is the workflow driver and creates a unique isolated worktree for every spawned role by default; mutable roles use exclusive lane branches and read-only roles use fresh detached snapshots for each reviewed commit.
+The driver alone mutates the coordinator checkout, GitHub or remote state, integrates local lane commits, runs authoritative gates, and performs guarded cleanup.
+Use the provider-neutral lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; do not create a Claude-specific worktree convention.
 
 ## Skills
 

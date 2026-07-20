@@ -33,6 +33,16 @@ It enacts the orchestrator role: it owns routing and the iteration loops and per
 The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec delta in the issue; it returns its plan to the driver.
 Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
 
+### Isolated worktree execution
+
+Every spawned role works in its own Git worktree by default so independent workstreams do not share a mutable checkout.
+The workflow driver owns the clean coordinator checkout and integration branch, GitHub and remote mutations, lane lifecycle, integration, authoritative gates, and guarded cleanup.
+Mutable lanes use unique `agent/<issue>-<stage>-<role>-r<revision>` branches and exclusive path ownership; read-only lanes use fresh detached worktrees pinned to the exact commit under review.
+Spawned agents verify their assigned path, branch or detached SHA, base, and clean state before acting, then return local commits, base-relative diffs, or verdicts without pushing or mutating issue or PR state.
+Parallel mutable lanes require disjoint owned paths and no dependency on unintegrated output.
+The driver serializes dependency installation and complete test, build, lint, Foundry/Docker, and screenshot gates from the fully integrated coordinator branch.
+Follow the canonical mechanics in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for assignment briefs, review artifacts, integration mapping, feedback revisions, conflicts, and cleanup.
+
 ### Auto-spawn routing
 
 Resolve the roster with this procedure — it is mechanical, not a judgment call:
@@ -505,13 +515,14 @@ Apply them to new content and to any section you are already editing.
 
 ## Git Conventions
 
-- All implementation, documentation, and workflow-file changes must happen on a non-`main` branch.
-- Before editing, verify the current branch (`git branch --show-current`).
-If it is `main`, create or switch to a task branch first.
-Re-check after any merge — merging a PR can move the local checkout to `main`, so a branch you were on earlier may no longer be current.
-- When the work is complete, commit to that branch, push it, and open a PR targeting `main`.
-- Respond to review feedback by updating the same branch and PR; do not open replacement PRs unless the user asks.
-- Review-only agents inspect the active branch and PR, and must not merge to `main`.
+- All implementation, documentation, and workflow-file changes must happen on a non-`main` integration or lane branch.
+- Before editing, the driver verifies the coordinator branch, and every mutable spawned agent verifies the branch and base in its assignment (`git branch --show-current` and `git rev-parse HEAD`).
+If the coordinator is on `main`, the driver creates or switches to a task branch before fan-out; a spawned agent treats any lane identity mismatch as blocked.
+Re-check after any integration or merge because the expected branch or SHA may have changed.
+- When a spawned agent completes work, it commits only owned paths locally and returns the commits to the driver without pushing or opening a PR.
+The driver verifies and integrates lane commits, then pushes the integration branch and opens or updates the PR targeting `main`.
+- Respond to review feedback through a valid retained lane or a fresh revision lane, then update the same integration branch and PR; do not open replacement PRs unless the user asks.
+- Review-only agents inspect fresh detached snapshots of the assigned integration commit and must not commit, push, merge, or mutate GitHub state.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 - PR descriptions must include a GitHub closing keyword for the issue the PR resolves: put `Closes #<issue>` (or `Fixes #<issue>` / `Resolves #<issue>`) on its own line in the `Description` section so merging the PR auto-closes the issue.

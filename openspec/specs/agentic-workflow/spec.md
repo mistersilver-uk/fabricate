@@ -41,36 +41,36 @@ The delta is NOT versioned as files in the repository; it lives in a managed blo
 
 ### Requirement: Branch and PR workflow
 
-All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and be delivered through a PR targeting `main`.
+All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and the workflow driver MUST deliver the integrated result through a PR targeting `main`.
 A PR targets `release` or a hotfix line only for a hotfix to the current public release.
 The release automation's forward-port merge from `release` into `main` is not agent work and is exempt from this requirement.
 
 #### Scenario: starting mutable work
 
-- **WHEN** an agent will edit implementation, documentation, specs, prompts, skills, or workflow files
-- **THEN** it verifies the current branch first
-- **AND** if the branch is `main`, `release`, or a hotfix line, it creates or switches to a task branch before editing
+- **WHEN** the workflow driver will coordinate mutable work
+- **THEN** it verifies that the clean coordinator checkout is on a non-protected integration branch
+- **AND** every spawned mutable agent verifies its assigned worktree, lane branch, base SHA, and clean status before editing
 
 #### Scenario: finishing mutable work
 
-- **WHEN** an agent completes a scoped change
-- **THEN** it commits the change to the task branch
-- **AND** pushes the branch
-- **AND** opens or updates a PR targeting `main`, or `release` or a hotfix line when the change is a hotfix to the current public release
+- **WHEN** a spawned mutable agent completes a scoped change
+- **THEN** it commits only owned paths to its local lane branch and returns the commits to the workflow driver without pushing or mutating GitHub state
+- **AND** the driver verifies and integrates the returned commits on the coordinator branch
+- **AND** the driver pushes the integrated branch and opens or updates a PR targeting `main`, or `release` or a hotfix line when the change is a hotfix to the current public release
 - **AND** the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf`
 - **AND** the PR description uses H2 sections for `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`
 
 #### Scenario: responding to review feedback
 
-- **WHEN** a reviewer requests changes on a PR
-- **THEN** the implementing agent updates the same branch and PR
-- **AND** it does not open a replacement PR unless the user explicitly asks
+- **WHEN** a reviewer requests changes
+- **THEN** the driver reuses the retained mutable lane when ownership and dependency context remain valid, or creates a fresh revision lane from current integration `HEAD`
+- **AND** the driver integrates accepted follow-up commits and updates the same PR unless the user explicitly asks for a replacement
 
 #### Scenario: read-only review work
 
 - **WHEN** a review-only agent evaluates work
-- **THEN** it reviews the active branch and PR against the PR's base branch
-- **AND** it must not commit, push, or merge
+- **THEN** it reviews a fresh detached worktree pinned to the exact assigned integration commit against the supplied base and immutable diff artifact
+- **AND** it must not commit, push, merge, mutate GitHub state, or reuse the lane after the integration commit changes
 
 #### Scenario: working near the release branch
 
@@ -78,6 +78,89 @@ The release automation's forward-port merge from `release` into `main` is not ag
 - **THEN** it MUST NOT rebase or force-push that branch, because the release automation stores release state in git tags and in git notes
 - **AND** it MUST NOT squash-merge a prerelease line into `release`, because squashing collapses Conventional Commit types and mis-computes the stable version
 - **AND** it MUST NOT merge `release` or `main` into a hotfix line; a fix leaves a hotfix line by cherry-pick
+
+### Requirement: Isolated agent worktrees
+
+Every spawned agent MUST work from a unique repository-local Git worktree by default.
+Mutable lanes MUST use exclusive branches, and read-only lanes MUST use detached snapshots pinned to the exact commit being evaluated.
+
+#### Scenario: preparing agent lanes
+
+- **WHEN** the workflow driver is ready to fan out approved work
+- **THEN** it requires a clean coordinator checkout and a committed shared baseline
+- **AND** it creates each lane beneath `.worktrees/<issue>/` with a unique directory
+- **AND** it assigns mutable branches named `agent/<issue>-<stage>-<role>-r<revision>` or an exact detached target SHA for read-only work
+- **AND** it keeps immutable review artifacts in the driver-owned sibling directory `.worktrees/<issue>/artifacts/` rather than inside a detached checkout
+
+#### Scenario: briefing a spawned agent
+
+- **WHEN** the driver assigns a mutable or read-only lane
+- **THEN** the brief supplies the absolute worktree path, issue, role, stage, revision, base SHA, expected branch or detached SHA, owned paths, dependency state, expected commit range, allowed focused checks, and handoff format
+- **AND** the agent verifies its top-level path, branch or detached state, assigned SHA, and clean status before acting
+- **AND** an identity mismatch or unexpected existing change blocks the lane before edits begin
+
+#### Scenario: running mutable lanes concurrently
+
+- **WHEN** multiple mutable agents can work at the same time
+- **THEN** their owned paths are disjoint and every lockfile or shared configuration file has exactly one owner
+- **AND** no parallel lane depends on output that has not integrated
+- **AND** dependent work starts from the integration commit containing its prerequisites
+
+### Requirement: Driver-owned coordination and integration
+
+The workflow driver MUST exclusively own the coordinator checkout, integration branch, GitHub and remote mutations, worktree lifecycle, integration ordering, authoritative gates, and cleanup.
+Spawned agents MUST return local work products to the driver and MUST NOT exercise those shared authorities.
+
+#### Scenario: handing off mutable work
+
+- **WHEN** a mutable agent finishes a revision
+- **THEN** it commits only owned paths locally
+- **AND** it returns the verified base, ordered new commit SHAs, base-relative changed paths and diff, focused check results, lane status, and any caveats or recommended managed-block text
+- **AND** it leaves the lane available for driver verification or a valid retained-lane feedback round
+
+#### Scenario: integrating lane commits
+
+- **WHEN** the driver receives a mutable lane handoff
+- **THEN** it verifies the coordinator and lane state, exact commit range, owned changed paths, integrated dependencies, and absence of a prior integration record
+- **AND** it cherry-picks commits in declared dependency order
+- **AND** it records a source-to-integrated SHA mapping for every commit
+- **AND** if a cherry-pick conflicts it aborts the cherry-pick and routes resolution through a fresh revision lane based on current integration `HEAD` without editing another lane
+
+#### Scenario: iterating after feedback
+
+- **WHEN** a mutable lane remains available with unchanged ownership and current dependency context
+- **THEN** the driver reuses it and accepts only the new ordered commits for the revision
+- **AND** when ownership changes, the prior lane is unavailable, or conflict or stale dependency invalidates its context, the driver creates a fresh revision lane from current integration `HEAD`
+
+#### Scenario: reviewing a changed integration target
+
+- **WHEN** implementation, plan, or documentation integration produces a new target commit
+- **THEN** the driver creates fresh detached reviewer lanes at that commit and supplies the immutable base-relative artifact
+- **AND** domain or canonical-spec reconciliation integrates before dependent documentation authoring
+- **AND** domain and documentation cross-review may run concurrently only after both outputs integrate
+
+### Requirement: Serialized validation and guarded cleanup
+
+The workflow driver MUST serialize resource-heavy validation and MUST treat only gates run from the fully integrated coordinator branch as authoritative acceptance evidence.
+Cleanup MUST preserve any lane whose integration or meaningful state has not been mechanically resolved.
+
+#### Scenario: running local and CI gates
+
+- **WHEN** lane work is in progress
+- **THEN** agents may run focused checks allowed by their briefs
+- **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, Foundry or Docker smoke, and screenshot generation
+- **AND** the driver runs required final gates from the fully integrated coordinator branch
+- **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
+
+#### Scenario: cleaning integrated lanes
+
+- **WHEN** the workflow has accepted a lane's integrated output
+- **THEN** the driver verifies its source-to-integrated mappings, stable patch equivalence, tracked state, and meaningful untracked state before removal
+- **AND** known generated content is discarded only after confirming it contains no meaningful work
+- **AND** forced worktree removal is allowed only after integration equivalence and meaningful-state checks succeed
+- **AND** `git branch -D` is allowed for a cherry-picked lane only after every source commit is mapped and patch-equivalent to its integrated commit
+- **AND** dirty, unintegrated, blocked, interrupted, ambiguous, or otherwise unverified lanes and branches are preserved and reported
+- **AND** the driver prunes worktree metadata only after eligible lanes are removed
 
 ### Requirement: Shared skill source
 

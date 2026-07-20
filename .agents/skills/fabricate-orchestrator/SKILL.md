@@ -16,6 +16,7 @@ Make behavior changes here, not in the bindings.
 - the work's GitHub issue, including any existing `openspec-delta` block, via `gh issue view`
 - relevant canonical specs under `openspec/specs/`
 - the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills
+- `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for isolated lane assignment, integration, artifacts, feedback, and cleanup
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
 - GitHub issue context from `gh issue` when available
 
@@ -25,6 +26,8 @@ The orchestrator role drives a `plan → plan-review → implement → review �
 In execution the **workflow driver** (the top-level loop — Codex's depth-0 prompt agent or Claude's main loop) enacts this role and performs the agent spawning, since role agents do not nest.
 A spawned `fabricate_orchestrator` agent is a planning helper: it resolves the roster and drafts the OpenSpec delta in the issue, then hands its plan back to the driver, which spawns the plan-review, implementation, and docs agents across the loops below.
 Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt and surface findings to the user.
+Every spawned role uses the isolated lane lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` by default.
+The driver retains exclusive authority over the coordinator checkout, integration, GitHub and remote mutations, authoritative gates, and lane cleanup.
 
 1. Read the repo guidance and the current task context first.
 2. Verify mutable work will happen on a non-`main` task branch.
@@ -58,12 +61,13 @@ The driver rewrites the delta block in response to `NEEDS_CHANGES` and re-runs t
 Treat any `BLOCKED` verdict as a stop condition.
 Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once all plan reviewers approve.
-9. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
+9. Before implementation fan-out, require a clean committed coordinator baseline, resolve disjoint ownership and dependencies, and create each assigned lane according to `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
+10. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
 When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster, supplying them the issue delta alongside the diff.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta and confirm a faithful realization (or flag a justified deviation for reconciliation).
 Loop on `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
 Hard cap: 3 implementation revisions.
-10. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, the driver runs the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
+11. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, the driver runs the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
 
 - domain-expert updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating the `openspec-delta` block (and its `### Deviations` note) when the shipped canonical spec justifiably differs from the proposed delta;
 - docs-writer updates JSDoc and the Jekyll site under `docs/` to match the shipped canonical spec;
@@ -71,7 +75,7 @@ Hard cap: 3 implementation revisions.
 - loop until both emit `DOCS APPROVED`.
 Hard cap: 3 docs revisions.
 
-1. Ensure the completed change is committed to the task branch, pushed, and represented by a PR targeting `main`; feedback updates go to the same branch and PR unless the user explicitly asks for a replacement.
+1. Ensure the driver has integrated the completed lane commits into the coordinator branch, pushed it, and represented it with a PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.
 2. Surface a final summary including the resolved roster, every loop's iteration count, PR status, and any escalations to the user.
 
 ## Coordination rules
@@ -81,6 +85,9 @@ Planning edits go to the issue's `openspec-delta` block (and, when needed, canon
 - Reviewers in every loop return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
 They must not post verdicts (or other workflow notes) as GitHub issue or PR comments.
 - Do not allow mutable agent work to continue on `main`.
+- Do not let spawned agents share the coordinator checkout or another lane, push, mutate GitHub state, integrate commits, or manage worktrees.
+- Require the full assignment and handoff contract from `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for every spawned role.
+- Parallelize only disjoint lanes with integrated dependencies, and serialize resource-heavy and authoritative gates in the coordinator checkout.
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
 Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`), force-push, and let CI re-run, before merging it.
