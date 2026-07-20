@@ -26,6 +26,7 @@ import {
   normalizeCustomComponentCategories,
 } from '../utils/componentCategories.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
+import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
   getCompendiumSourceUuid,
@@ -49,10 +50,27 @@ const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
 const TOOL_ON_BREAK_MODES = new Set(TOOL_ON_BREAK_MODE_LIST);
 
 export class CraftingSystemManager {
-  constructor(recipeManager) {
+  /**
+   * @param {object} recipeManager
+   * @param {object} [seams] - injected Foundry-facing collaborators (issue 800).
+   *   Mirrors the `CompendiumImporter` precedent: every default is a safe
+   *   pass-through so the ~87 single-argument construction sites (production plus
+   *   the whole test suite) keep working unchanged.
+   * @param {(raw: string, options?: {relativeTo?: object|null}) => Promise<string>|string}
+   *   [seams.enrichToHtml] - RESOLVE a description through Foundry's enricher.
+   *   Defaults to a pass-through: `enrichHTML` cannot run under happy-dom (it needs
+   *   `CONFIG.ux.TextEditor`, `CONFIG.TextEditor.enrichers`, `game.packs`,
+   *   `Roll.defaultImplementation`, `fromUuid`, and `document.createTreeWalker`), so
+   *   the pass-through is what keeps the headless suites honest rather than mocked.
+   * @param {(rawTexts: Iterable<string>) => Promise<void>} [seams.primeEnricherCache]
+   *   - warm the compendium cache once per bulk run.
+   */
+  constructor(recipeManager, seams = {}) {
     this.recipeManager = recipeManager;
     this.systems = new Map();
     this.initialized = false;
+    this._enrichToHtml = seams.enrichToHtml ?? ((text) => text);
+    this._primeEnricherCache = seams.primeEnricherCache ?? (async () => {});
   }
 
   async initialize() {
@@ -1317,84 +1335,72 @@ export class CraftingSystemManager {
     return this._plainTextDescription(description);
   }
 
+  // Thin delegators to the shared Foundry-free NORMALIZER (src/utils/
+  // plainTextDescription.js). These normalize already-resolved text for display;
+  // they never RESOLVE — resolution is the async `_enrichToHtml` seam, applied at
+  // the ingestion boundaries only (issue 800).
   _plainTextDescription(value) {
-    const raw = this._descriptionTextCandidate(value);
-    if (!raw) return '';
-
-    if (globalThis.document?.createElement) {
-      const template = globalThis.document.createElement('template');
-      template.innerHTML = raw;
-      return String(template.content?.textContent || '')
-        .replaceAll(/\s+/g, ' ')
-        .replaceAll(/ ([,.;:!?])/g, '$1')
-        .trim();
-    }
-
-    return raw
-      .replaceAll(/<br\s*\/?>/gi, ' ')
-      .replaceAll(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
-      .replaceAll(/<[^>]{1,2048}>/g, ' ')
-      .replaceAll(/&nbsp;/gi, ' ')
-      .replaceAll(/&amp;/gi, '&')
-      .replaceAll(/&lt;/gi, '<')
-      .replaceAll(/&gt;/gi, '>')
-      .replaceAll(/&quot;/gi, '"')
-      .replaceAll(/&#39;|&apos;/gi, "'")
-      .replaceAll(/\s+/g, ' ')
-      .replaceAll(/ ([,.;:!?])/g, '$1')
-      .trim();
+    return plainTextDescription(value);
   }
 
   _descriptionTextCandidate(value, seen = new Set()) {
-    if (value == null) return '';
-
-    const valueType = typeof value;
-    if (valueType === 'string') return value.trim();
-    if (['number', 'boolean', 'bigint'].includes(valueType)) {
-      return String(value).trim();
-    }
-    if (Array.isArray(value)) {
-      return value
-        .map((entry) => this._descriptionTextCandidate(entry, seen))
-        .filter(Boolean)
-        .join(' ')
-        .trim();
-    }
-    if (valueType !== 'object') return '';
-    if (seen.has(value)) return '';
-    seen.add(value);
-
-    for (const key of [
-      'value',
-      'enriched',
-      'html',
-      'text',
-      'content',
-      'short',
-      'long',
-      'unidentified',
-      'chat',
-    ]) {
-      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-      const candidate = this._descriptionTextCandidate(value[key], seen);
-      if (candidate) return candidate;
-    }
-
-    return '';
+    return descriptionTextCandidate(value, seen);
   }
 
-  _extractSourceDescription(source = null) {
-    if (!source || typeof source !== 'object') return '';
-
-    const candidates = [
+  /**
+   * RESOLVE a source document's description through Foundry's enricher, then
+   * normalize the enriched HTML to display-safe plain text.
+   *
+   * This is the whole point of issue 800: a label-less `@UUID[…]` becomes the
+   * referenced document's real NAME rather than raw directive text (or, under the
+   * rejected approach, nothing at all). Removing the `await this._enrichToHtml(…)`
+   * below reverts the fix, and a test at each composition asserts exactly that.
+   *
+   * Async because `enrichHTML` is async — hence the ingestion boundaries below are
+   * async too and the SYNCHRONOUS normalizers deliberately are not.
+   *
+   * @param {object|null} source - the resolved source Item document
+   * @returns {Promise<string>}
+   */
+  /**
+   * The ordered description fields a Foundry Item may carry, most specific first.
+   * Shared by {@link _extractSourceDescription} (which resolves them) and the repair
+   * pass's priming sweep (which only needs the RAW text).
+   * @private
+   */
+  _sourceDescriptionCandidates(source = null) {
+    if (!source || typeof source !== 'object') return [];
+    return [
       source?.system?.description?.value,
       source?.system?.description,
       source?.description?.value,
       source?.description,
     ];
+  }
+
+  /**
+   * The first non-empty RAW description text on a source document, without
+   * resolving anything. Feeds the repair pass's single priming sweep.
+   * @private
+   */
+  _rawSourceDescription(source = null) {
+    for (const candidate of this._sourceDescriptionCandidates(source)) {
+      const raw = this._descriptionTextCandidate(candidate);
+      if (raw) return raw;
+    }
+    return '';
+  }
+
+  async _extractSourceDescription(source = null) {
+    if (!source || typeof source !== 'object') return '';
+
+    const candidates = this._sourceDescriptionCandidates(source);
 
     for (const candidate of candidates) {
-      const plainText = this._plainTextDescription(candidate);
+      const raw = this._descriptionTextCandidate(candidate);
+      if (!raw) continue;
+      const enriched = await this._enrichToHtml(raw, { relativeTo: source });
+      const plainText = this._plainTextDescription(enriched);
       if (plainText) return plainText;
     }
 
@@ -1417,7 +1423,7 @@ export class CraftingSystemManager {
       name: sourceResolved ? source?.name || fallbackName : fallbackName,
       img: sourceResolved ? source?.img || fallbackImg : fallbackImg,
       description: sourceResolved
-        ? this._extractSourceDescription(source)
+        ? await this._extractSourceDescription(source)
         : this._normalizeComponentDescription(fallbackItem?.description),
       registeredItemUuid: resolvedSourceData.currentUuid,
       originItemUuid: resolvedSourceData.canonicalUuid,
@@ -1440,7 +1446,7 @@ export class CraftingSystemManager {
       name: source?.name || fallbackName,
       img: source?.img || fallbackImg,
       description: source
-        ? this._extractSourceDescription(source)
+        ? await this._extractSourceDescription(source)
         : this._normalizeComponentDescription(fallbackDefinition?.description),
       registeredItemUuid: sourceData.currentUuid,
       originItemUuid: sourceData.canonicalUuid,
@@ -3413,20 +3419,150 @@ export class CraftingSystemManager {
   }
 
   /**
-   * GM maintenance ("Repair item data"): reconcile every crafting component AND recipe-item
-   * definition's identity across world items, writable packs, and actor-owned items so
-   * matching is durable. World/pack SOURCE items are strip-and-stamped with a clone-gated
-   * identity (a duplicated source becomes its own definition, never overwriting the
-   * original). Actor-owned copies are resolved with the ordinary runtime matchers and,
-   * for recipe items, a guardrailed name-assisted re-point. Locked packs are counted and
-   * skipped. Synthetic/unlinked token actors and compendium-resident actors are not in
-   * `game.actors` and are not scanned. Never triggers a learn.
+   * The source reference a DEFINITION owns, for resolving its own authoritative
+   * document. Prefers the live registered uuid, then the canonical origin uuid, then
+   * any recorded alias. Distinct from the item-driven repair walk, which starts from
+   * an ITEM and asks which definition claims it.
+   * @private
+   */
+  _definitionSourceUuid(definition = null) {
+    const refs = [
+      definition?.registeredItemUuid,
+      definition?.originItemUuid,
+      ...(Array.isArray(definition?.aliasItemUuids) ? definition.aliasItemUuids : []),
+    ];
+    for (const ref of refs) {
+      const uuid = typeof ref === 'string' ? ref.trim() : '';
+      if (uuid) return uuid;
+    }
+    return '';
+  }
+
+  /**
+   * DEFINITION-DRIVEN description refresh, run as part of {@link repairItemData}.
+   *
+   * It shares the button, the `_assertGM` gate, and the summary object with the
+   * identity repair — but deliberately NOT its traversal, for two reasons:
+   *
+   * 1. The item-driven walk SKIPS LOCKED PACKS, because identity repair writes flags
+   *    INTO pack items. Descriptions only READ through `fromUuid`, which resolves a
+   *    locked pack fine — and a locked system pack (dnd5e's `equipment24`, say) is
+   *    exactly where the reported raw `@UUID[Compendium.dnd5e.…]` lives. Riding the
+   *    item walk would leave the reported bug unfixed.
+   * 2. It inverts authority. An actor-owned COPY would become a candidate writer of
+   *    the DEFINITION's description, last-writer-wins across every copy in the world.
+   *
+   * Tools are excluded by design: a tool snapshot is name/img only and carries no
+   * description. So the `descriptions` bucket counts components and recipe-item
+   * definitions only.
+   *
+   * Unaffected by `includeCompendiums`, which gates writes into packs.
+   *
+   * @param {object} summary - the shared repair summary; its `descriptions` bucket is mutated
+   * @returns {Promise<boolean>} whether any stored description changed
+   * @private
+   */
+  /**
+   * Record one skipped description against BOTH the split reason counter and the flat
+   * `skipped` total. The split exists so a GM can tell a broken source link (their
+   * problem to fix) from a source that simply has no description (nothing to do).
+   * @private
+   */
+  _countSkippedDescription(summary, reason) {
+    summary.descriptions[reason] += 1;
+    summary.descriptions.skipped += 1;
+  }
+
+  async _refreshDefinitionDescriptions(summary) {
+    const targets = [];
+    for (const system of this.getSystems()) {
+      for (const bucket of ['components', 'recipeItemDefinitions']) {
+        for (const definition of system?.[bucket] || []) {
+          if (definition) targets.push(definition);
+        }
+      }
+    }
+
+    // Sweep 1 — resolve each definition's OWN source document and collect its raw
+    // description. Doing this up front is what makes priming correct: the enricher
+    // cache is warmed ONCE from every reference in the world, instead of core's
+    // per-`enrichHTML` priming costing one round-trip per description.
+    const resolved = [];
+    const rawTexts = [];
+    for (const definition of targets) {
+      const uuid = this._definitionSourceUuid(definition);
+      if (!uuid) {
+        this._countSkippedDescription(summary, 'skippedUnresolved');
+        continue;
+      }
+      let source;
+      try {
+        source = await fromUuid(uuid);
+      } catch {
+        source = null;
+      }
+      if (!source) {
+        // The item, its pack, or the module that provided it is gone. Distinct from a
+        // blank source below, because THIS one is actionable by the GM.
+        this._countSkippedDescription(summary, 'skippedUnresolved');
+        continue;
+      }
+      resolved.push({ definition, source });
+      const raw = this._rawSourceDescription(source);
+      if (raw) rawTexts.push(raw);
+    }
+
+    await this._primeEnricherCache(rawTexts);
+
+    // Sweep 2 — resolve, normalize, store.
+    let changed = false;
+    for (const { definition, source } of resolved) {
+      const next = await this._extractSourceDescription(source);
+      const current = typeof definition.description === 'string' ? definition.description : '';
+      if (next === current) {
+        summary.descriptions.unchanged += 1;
+        continue;
+      }
+      // Never let a source with no description at all WIPE text a definition already
+      // carries — that would be data loss dressed up as a repair. Pinned by
+      // `tests/repair-item-data.test.js`; deleting this guard must fail that test.
+      if (!next) {
+        this._countSkippedDescription(summary, 'skippedEmpty');
+        continue;
+      }
+      definition.description = next;
+      summary.descriptions.refreshed += 1;
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  /**
+   * GM maintenance ("Repair Item Data"): reconcile EVERY PROJECTION of a definition's
+   * resolved source document — durable identity and derived display snapshots alike.
+   *
+   * Identity leg (item-driven): every crafting component, tool, AND recipe-item
+   * definition's identity is reconciled across world items, writable packs, and
+   * actor-owned items so matching is durable. World/pack SOURCE items are
+   * strip-and-stamped with a clone-gated identity (a duplicated source becomes its own
+   * definition, never overwriting the original). Actor-owned copies are resolved with
+   * the ordinary runtime matchers and, for recipe items, a guardrailed name-assisted
+   * re-point. Locked packs are counted and skipped. Synthetic/unlinked token actors and
+   * compendium-resident actors are not in `game.actors` and are not scanned. Never
+   * triggers a learn.
+   *
+   * Description leg (definition-driven, issue 800): each component and recipe-item
+   * definition resolves its OWN source reference — including sources in LOCKED packs —
+   * and its stored description is refreshed to the enricher-resolved plain text. See
+   * {@link _refreshDefinitionDescriptions} for why this cannot ride the item walk.
    *
    * @param {{ includeCompendiums?: boolean }} [options]
-   * @returns {Promise<object>} summary with flat totals plus per-kind buckets, repointed,
-   *   skippedAmbiguous, skippedLocked, and the re-point audit log.
+   * @returns {Promise<object>} summary with flat totals plus per-kind buckets, the
+   *   `descriptions` bucket, repointed, skippedAmbiguous, skippedLocked, and the
+   *   re-point audit log.
    */
-  async repairComponentSourceFlags({ includeCompendiums = true } = {}) {
+  async repairItemData({ includeCompendiums = true } = {}) {
     this._assertGM('repair item data');
 
     // Components, tools, AND recipe items all resolve PER SYSTEM. Their definition ids are
@@ -3495,6 +3631,19 @@ export class CraftingSystemManager {
       components: { stamped: 0, stripped: 0, cleared: 0 },
       tools: { stamped: 0, stripped: 0, cleared: 0 },
       recipeItems: { stamped: 0, stripped: 0, cleared: 0 },
+      // Description refresh outcomes (issue 800), deliberately a bucket of its own so
+      // the identity counts above keep their existing meaning. Components and
+      // recipe-item definitions only — tools carry no description.
+      // `skipped` is the flat total; `skippedUnresolved` (source item/pack/module gone
+      // — actionable) and `skippedEmpty` (source resolved but carries no description —
+      // nothing to do) split it by cause so the GM notice can name one.
+      descriptions: {
+        refreshed: 0,
+        unchanged: 0,
+        skipped: 0,
+        skippedUnresolved: 0,
+        skippedEmpty: 0,
+      },
       repointLog: [],
     };
 
@@ -3547,6 +3696,14 @@ export class CraftingSystemManager {
           await this._repairOwnedItem(item, kind, summary, summary.repointLog);
         }
       }
+    }
+
+    // Description leg — definition-driven, unaffected by `includeCompendiums` and by
+    // `pack.locked` (it reads through `fromUuid` rather than writing into packs).
+    const descriptionsChanged = await this._refreshDefinitionDescriptions(summary);
+    if (descriptionsChanged) {
+      await this.save();
+      this._notifySystemsChanged();
     }
 
     return summary;
@@ -3731,6 +3888,14 @@ export class CraftingSystemManager {
     const documents = await pack.getDocuments();
     const items = documents.filter((d) => d.documentName === 'Item');
 
+    // DECISION (issue 800): no `_primeEnricherCache` call here, deliberately.
+    // This loops `addItemFromUuid`, so each item pays core's own per-`enrichHTML`
+    // priming — but the `getDocuments()` above has already loaded THIS pack into the
+    // document cache, and an intra-pack reference is the common case, so those primes
+    // are cache hits. The batched prime exists for the repair, which sweeps every
+    // definition in the world across arbitrarily many packs; here the same call would
+    // add a full extra pass over N descriptions to save round-trips that mostly are not
+    // happening. Revisit if a cross-pack-heavy import ever measures slow.
     let added = 0;
     let updated = 0;
     let skipped = 0;
@@ -3792,7 +3957,10 @@ export class CraftingSystemManager {
 
     const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;
     const nextImg = refreshImg ? item?.img || changes.img || 'icons/svg/item-bag.svg' : null;
-    const nextDescription = refreshDescription ? this._extractSourceDescription(item) : null;
+    // Item-sync RESOLVES too (issue 800). Without the await here an edited source
+    // item would re-propagate raw directive text over a description the GM had
+    // already repaired, silently undoing the backfill one edit at a time.
+    const nextDescription = refreshDescription ? await this._extractSourceDescription(item) : null;
     let updated = 0;
 
     for (const system of this.systems.values()) {

@@ -725,7 +725,7 @@ export class CompendiumImporter {
           method: 'exact',
         });
         remapped.push(
-          this._withResolvedSourceMetadata(
+          await this._withResolvedSourceMetadata(
             { ...component, aliasItemUuids: mergedFallbacks },
             exactDoc
           )
@@ -754,7 +754,7 @@ export class CompendiumImporter {
         });
         const foundDoc = await this._resolveUuidDocument(foundUuid);
         remapped.push(
-          this._withResolvedSourceMetadata(
+          await this._withResolvedSourceMetadata(
             {
               ...component,
               originItemUuid: foundUuid,
@@ -816,7 +816,7 @@ export class CompendiumImporter {
    *
    * @private
    */
-  _withResolvedSourceMetadata(component, sourceDoc) {
+  async _withResolvedSourceMetadata(component, sourceDoc) {
     if (!sourceDoc) return component;
     const enriched = { ...component };
 
@@ -828,9 +828,13 @@ export class CompendiumImporter {
     const storedDescription =
       typeof component.description === 'string' ? component.description.trim() : '';
     if (!storedDescription) {
+      // Async since issue 800: `_extractSourceDescription` now RESOLVES the source
+      // description through Foundry's enricher before normalizing it.
       const extract = this._craftingSystemManager?._extractSourceDescription;
       const description =
-        typeof extract === 'function' ? extract.call(this._craftingSystemManager, sourceDoc) : '';
+        typeof extract === 'function'
+          ? await extract.call(this._craftingSystemManager, sourceDoc)
+          : '';
       if (description) enriched.description = description;
     }
 

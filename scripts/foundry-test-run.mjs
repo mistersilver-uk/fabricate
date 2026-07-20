@@ -5685,6 +5685,219 @@ async function main() {
         await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
+        // ---------------------------------------------------------------------
+        // Issue 800 — write-time RESOLUTION of source descriptions, in three frames.
+        //
+        // Source items live in a world compendium that is then LOCKED, because the
+        // locked case is the reported one and the one an item-driven walk cannot reach:
+        // `repairItemData`'s identity leg skips locked packs (it writes flags INTO pack
+        // items) while its description leg resolves them through `fromUuid`. A
+        // world-item fixture would pass green while the reported bug stayed broken.
+        //
+        // TWO source documents, deliberately: `addItemFromUuid` is an UPSERT keyed on
+        // source uuid, so registering the uuid already bound to Mystic Herb would take
+        // the `existing` branch, overwrite that component's name/img/description, and
+        // `save()` it — silently renaming Mystic Herb for every downstream screenshot
+        // while the "ingestion" frame proved nothing (the new-id guard would never
+        // fire). The second, UNBOUND document makes the lookup miss so the create
+        // branch runs and the frame demonstrates the write path it exists for.
+        //
+        // Frames: BEFORE (raw stored text, as an un-repaired world renders it),
+        // AFTER-Repair (the same component after the GM action), and AFTER-ingestion
+        // (a component registered fresh through the write path).
+        // ---------------------------------------------------------------------
+        const enricher800 = await page.evaluate(async (sysId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          const system = csm.getSystem(sysId);
+          const component = system?.components?.find((c) => c.name === 'Mystic Herb');
+          if (!component) {
+            throw new Error('issue 800: Mystic Herb component not found for the enricher fixture');
+          }
+
+          // Two REAL dnd5e items to reference, so resolution produces genuine document
+          // names rather than anything this fixture could have supplied itself.
+          const referencePack = game.packs.get('dnd5e.items');
+          if (!referencePack) throw new Error('issue 800: dnd5e.items pack not found');
+          const index = await referencePack.getIndex();
+          const entries = [...index]
+            .filter((entry) => entry?._id && entry?.name)
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+          if (entries.length < 2) throw new Error('issue 800: dnd5e.items index too small');
+          const [first, second] = entries;
+
+          // The label-less reference is the headline case (it resolves to the document's
+          // real NAME). The unresolvable one lands immediately before a full stop, which
+          // is the shape that used to render a stranded separator. The GM-gated span is
+          // the privacy scrub's only live-Foundry exercise — its text must never reach
+          // the inspector.
+          const GATED_SECRET = 'GM-ONLY-SECRET-800';
+          const rawFor = (label) =>
+            `${label}: @UUID[Compendium.dnd5e.items.Item.${first._id}], `
+            + `@UUID[Compendium.dnd5e.items.Item.${second._id}]{${second.name}}, `
+            + '@UUID[Compendium.dnd5e.items.Item.doesnotexist0000]. '
+            + `<span data-visibility="gm">${GATED_SECRET}</span> `
+            + 'Burns for [[/r 1d4]]{1d4 rounds} dealing [[2d6]] fire damage.';
+
+          // A world compendium we own, holding both source items, LOCKED afterwards.
+          const CompendiumCollectionClass =
+            foundry.documents?.collections?.CompendiumCollection ?? globalThis.CompendiumCollection;
+          const packName = 'fabricate-smoke-800';
+          let sourcePack = game.packs.get(`world.${packName}`);
+          if (!sourcePack) {
+            sourcePack = await CompendiumCollectionClass.createCompendium({
+              label: 'Fabricate Smoke 800',
+              type: 'Item',
+              name: packName,
+            });
+          }
+          await sourcePack.configure({ locked: false });
+          const existingDocs = await sourcePack.getDocuments();
+          const ensureDoc = async (name, raw) => {
+            const found = existingDocs.find((doc) => doc.name === name);
+            if (found) {
+              await found.update({ 'system.description.value': raw });
+              return found;
+            }
+            const [created] = await Item.createDocuments(
+              [{ name, type: 'loot', system: { description: { value: raw } } }],
+              { pack: sourcePack.collection }
+            );
+            return created;
+          };
+          // Bound to Mystic Herb (frames 1 + 2).
+          const boundDoc = await ensureDoc('Smoke Supplies', rawFor('Craft'));
+          // Deliberately NOT bound to any component (frame 3).
+          const unboundDoc = await ensureDoc('Smoke Reagents', rawFor('Contains'));
+          await sourcePack.configure({ locked: true });
+          if (!game.packs.get(`world.${packName}`)?.locked) {
+            throw new Error('issue 800: the fixture pack must be LOCKED — that is the case under test');
+          }
+
+          // Snapshot what we are about to mutate so the fixture can be restored: every
+          // later manager/crafting/gathering frame shares this component.
+          const restore800 = {
+            componentId: component.id,
+            registeredItemUuid: component.registeredItemUuid,
+            originItemUuid: component.originItemUuid,
+            aliasItemUuids: [...(component.aliasItemUuids ?? [])],
+            name: component.name,
+            img: component.img,
+            description: component.description,
+          };
+          globalThis.__fabricateSmoke800Restore = restore800;
+
+          // Point the component at the locked source and seed the RAW stored text,
+          // which is exactly the state a world upgraded from an earlier version is in.
+          component.registeredItemUuid = boundDoc.uuid;
+          component.originItemUuid = boundDoc.uuid;
+          component.aliasItemUuids = [];
+          component.description = rawFor('Craft');
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          return {
+            componentId: component.id,
+            unboundSourceUuid: unboundDoc.uuid,
+            firstName: first.name,
+            secondName: second.name,
+            gatedSecret: GATED_SECRET,
+          };
+        }, craftingSetup.systemId);
+
+        const inspectorFlavour = () =>
+          page.locator('.fabricate-manager [data-component-inspector] .manager-component-browser-inspector-flavour').first();
+        const selectComponent = async (componentId) => {
+          await page.locator(`.fabricate-manager .manager-component-row[data-component-id="${componentId}"] .manager-component-identity`).first().click();
+          await inspectorFlavour().waitFor({ state: 'visible', timeout: 5_000 });
+          return (await inspectorFlavour().textContent() ?? '').trim();
+        };
+        const assertResolved = (text, frame) => {
+          if (/@[A-Za-z]+\[|&[A-Za-z]+\[/.test(text)) {
+            throw new Error(`issue 800 (${frame}): raw directive text survived: ${text}`);
+          }
+          for (const expected of [enricher800.firstName, enricher800.secondName, '1d4 rounds', '2d6']) {
+            if (!text.includes(expected)) {
+              throw new Error(`issue 800 (${frame}): expected "${expected}" in: ${text}`);
+            }
+          }
+          if (text.includes('Unknown')) {
+            throw new Error(`issue 800 (${frame}): the broken-reference placeholder leaked: ${text}`);
+          }
+          // The privacy scrub, exercised against a REAL Foundry render rather than only
+          // against happy-dom fixtures. This is the highest-consequence assertion here.
+          if (text.includes(enricher800.gatedSecret)) {
+            throw new Error(`issue 800 (${frame}): GM-gated content reached a stored, player-visible description: ${text}`);
+          }
+          if (/[,;:]\s*\./.test(text)) {
+            throw new Error(`issue 800 (${frame}): a separator was left stranded against a full stop: ${text}`);
+          }
+        };
+
+        // Frame 1 — BEFORE. The un-repaired world, raw directives visible.
+        const beforeText = await selectComponent(enricher800.componentId);
+        if (!beforeText.includes('@UUID[')) {
+          throw new Error(`issue 800 (before): expected the un-repaired raw text, got: ${beforeText}`);
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-before');
+        process.stdout.write('  D0: components description BEFORE screenshotted\n');
+
+        // Frame 2 — AFTER the GM Repair Item Data action, which reaches the locked pack.
+        await page.evaluate(async () => {
+          const summary = await game.fabricate.getCraftingSystemManager().repairItemData();
+          if (!(summary?.descriptions?.refreshed > 0)) {
+            throw new Error(`issue 800: repair refreshed no descriptions: ${JSON.stringify(summary?.descriptions)}`);
+          }
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
+        const repairedText = await selectComponent(enricher800.componentId);
+        assertResolved(repairedText, 'after repair');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-repaired');
+        process.stdout.write('  D0: components description AFTER-REPAIR screenshotted\n');
+
+        // Frame 3 — AFTER ingestion. Registering the UNBOUND locked-pack item drives the
+        // async write path (`_buildComponentSourceSnapshot`) and must create, not upsert.
+        const ingestedComponentId = await page.evaluate(async ({ sysId, sourceUuid }) => {
+          const result = await game.fabricate.getCraftingSystemManager().addItemFromUuid(sysId, sourceUuid);
+          if (result?.action !== 'added') {
+            throw new Error(`issue 800: expected ingestion to CREATE a component, got action="${result?.action}" — the fixture source must not already be bound to one`);
+          }
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          return result?.item?.id ?? null;
+        }, { sysId: craftingSetup.systemId, sourceUuid: enricher800.unboundSourceUuid });
+        if (!ingestedComponentId || ingestedComponentId === enricher800.componentId) {
+          throw new Error('issue 800: ingestion did not yield a distinct new component id');
+        }
+        const ingestedText = await selectComponent(ingestedComponentId);
+        assertResolved(ingestedText, 'after ingestion');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-ingested');
+        process.stdout.write('  D0: components description AFTER-INGESTION screenshotted\n');
+
+        // Restore the fixture. Every later frame in this run shares these components, so
+        // leaving Mystic Herb re-pointed at the smoke pack with a rewritten description —
+        // or leaving the ingested component in the browser — would silently corrupt them.
+        await page.evaluate(async ({ sysId, ingestedId }) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.deleteItem(sysId, ingestedId);
+          const restore = globalThis.__fabricateSmoke800Restore;
+          const component = csm.getSystem(sysId)?.components?.find((c) => c.id === restore?.componentId);
+          if (restore && component) {
+            Object.assign(component, {
+              registeredItemUuid: restore.registeredItemUuid,
+              originItemUuid: restore.originItemUuid,
+              aliasItemUuids: restore.aliasItemUuids,
+              name: restore.name,
+              img: restore.img,
+              description: restore.description,
+            });
+            await csm.save();
+          }
+          delete globalThis.__fabricateSmoke800Restore;
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        }, { sysId: craftingSetup.systemId, ingestedId: ingestedComponentId });
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Mystic Herb")').first().waitFor({ state: 'visible', timeout: 5_000 });
+        process.stdout.write('  D0: components description fixture restored\n');
+
         // Components → open the editor so the identity card (central column) and the
         // linked-source inspector (right context panel) are captured (#398).
         await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-pen)').first().click();

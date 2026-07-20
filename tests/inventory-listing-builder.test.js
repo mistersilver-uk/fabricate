@@ -2,6 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
+import {
+  REPORTER_ENRICHER_DESCRIPTION,
+  REPORTER_RESOLVED_EXPECTED,
+} from './helpers/enricherDescriptionFixtures.js';
 
 // Components are matched to actor items by name fallback (no source flags in these
 // fakes), so an item whose `name` equals a component's `name` is "owned".
@@ -141,6 +145,27 @@ describe('InventoryListingBuilder — ownership aggregation', () => {
     // Both Iron and Coal carry Fire → one Fire essence row.
     assert.equal(listing.counts.essences, 1);
     assert.equal(listing.counts.total, 3);
+  });
+
+  it('forwards the STORED component description unchanged, resolving nothing (issue 800)', () => {
+    // Inverted from the rejected read-side flatten. Descriptions are RESOLVED at write
+    // time, so a read surface that rewrote what it was handed would be a second,
+    // divergent implementation of the grammar. What it must do is forward the stored
+    // string byte-for-byte — including an un-repaired legacy one, which stays visibly
+    // raw until the GM runs Repair Item Data rather than being silently half-fixed here.
+    const system = makeSystem({
+      components: [
+        { id: 'c1', name: 'Iron', img: 'icons/iron.webp', description: REPORTER_RESOLVED_EXPECTED },
+        { id: 'c2', name: 'Coal', img: 'icons/coal.webp', description: REPORTER_ENRICHER_DESCRIPTION },
+      ],
+      tools: [],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').description, REPORTER_RESOLVED_EXPECTED);
+    assert.equal(rowByComponent(listing, 'c2').description, REPORTER_ENRICHER_DESCRIPTION);
   });
 });
 
@@ -825,6 +850,30 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   function bookRow(listing) {
     return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
   }
+
+  it('forwards the STORED recipe-item description and the recipe flavor unchanged (issue 800)', () => {
+    const system = bookSystem();
+    system.recipeItemDefinitions[0].description = REPORTER_RESOLVED_EXPECTED;
+    // Recipe flavor is Fabricate-authored free text and is explicitly out of scope —
+    // it is never resolved and never rewritten.
+    const recipes = [
+      {
+        id: 'r1',
+        name: 'Fireball',
+        description: 'Deals @Damage[8d6]{8d6 fire} damage.',
+        img: 'icons/fb.webp',
+        craftingSystemId: 'sys-b',
+        recipeItemId: 'def-1',
+      },
+    ];
+    const listing = bookBuilder({ system, recipes }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+      viewer: { isGM: true },
+    });
+    const row = bookRow(listing);
+    assert.equal(row.description, REPORTER_RESOLVED_EXPECTED);
+    assert.equal(row.recipes[0].description, 'Deals @Damage[8d6]{8d6 fire} damage.');
+  });
 
   it('flags a book’s recipes learnBlocked when the reader fails its character prerequisites (issue 544)', () => {
     const EXPERT = {

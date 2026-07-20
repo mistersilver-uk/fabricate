@@ -85,6 +85,35 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(!rootIds.includes('manager-system-edit'));
   });
 
+  it('maps the issue-800 description frames to their OWN view ids', () => {
+    // Three dedicated ids, each with exactly one smokeLabel. Appending them to
+    // `manager-components` would be silently useless: `collect` publishes only
+    // `candidates[0]` from a filename-sorted list, so the BEFORE/AFTER pair that
+    // constitutes the evidence would never both reach the PR.
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    for (const id of [
+      'manager-components-description-before',
+      'manager-components-description-repaired',
+      'manager-components-description-ingested',
+    ]) {
+      assert.deepEqual(byId[id], [id], `${id} must be its own single-frame view`);
+    }
+
+    // The normalizer republishes all three; the repair module republishes only the
+    // repaired frame.
+    const normalizerIds = mapChangedFilesToViews([
+      'src/utils/plainTextDescription.js',
+    ]).map(view => view.id);
+    assert.ok(normalizerIds.includes('manager-components-description-before'));
+    assert.ok(normalizerIds.includes('manager-components-description-repaired'));
+    assert.ok(normalizerIds.includes('manager-components-description-ingested'));
+
+    const repairIds = mapChangedFilesToViews([
+      'src/config/repairItemData.js',
+    ]).map(view => view.id);
+    assert.deepEqual(repairIds, ['manager-components-description-repaired']);
+  });
+
   it('maps player gathering app files to the player-gathering recipes (incl. the realm-lock frame)', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/gathering/GatheringView.svelte',
@@ -555,7 +584,9 @@ describe('UI PR screenshot evidence', () => {
 
   it('treats a lang change alongside a render file as UI driven by that render file', () => {
     const view = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
-    const logicOnly = 'src/ui/svelte/stores/adminStore.js';
+    // A non-render `src/ui/**` file that matches NO recipe. `adminStore.js` used to
+    // serve here and no longer can: issue 800 gave it real description frames.
+    const logicOnly = 'src/ui/svelte/util/dropUtils.js';
     const ids = files => mapChangedFilesToViews(files).map(recipe => recipe.id);
 
     // A recipe-matching view drives the mapping; the lang file adds nothing.

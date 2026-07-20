@@ -751,6 +751,21 @@ Every SUCCESS tier must route to an existing result group; failure tiers may sta
 When the salvage check defines no outcome tiers, routing is impossible and the component must NOT be faulted — the gap surfaces once as the system-level `salvageRoutedNoTiers` issue instead of a per-component error.
 8. `salvage.ingredientQuantity` must be a positive integer.
 9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
+9a.
+A component's or recipe-item definition's stored `description` is the RESOLVED plain text of its source document's description.
+A content-link directive resolves to the referenced document's name whether or not the author supplied a label.
+A reference that cannot be resolved contributes its authored label when one is present, and is otherwise omitted rather than rendered as a placeholder word.
+Enrichment output has visibility-gated and secret markup removed before storage, by attribute — GM-only, owner-only, hidden, and unrevealed secret regions are stripped from the resolved markup regardless of which user performed the enrichment — so no such content reaches a stored description or any reader of one.
+Resolution never inlines an embedded document, and never evaluates a dice expression into a fixed number: an inline roll contributes its label when authored and otherwise its bare dice formula.
+9b.
+The stored description is refreshed by exactly two triggers: a linked source item changing, and the GM item-data repair.
+It is not refreshed on render.
+9c.
+Unlike the one-hop `name` and `img` snapshots of requirement 9, a resolved description is N-hop — it embeds the names of other documents.
+Renaming a referenced document, or removing the module that provided it, does not refresh the components quoting it; the GM item-data repair is the reconciliation path.
+A game-system or module content update is likewise a reason to run it.
+9d.
+A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.

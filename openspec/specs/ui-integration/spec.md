@@ -200,6 +200,11 @@ Component browser display data:
 
 - Component descriptions are display-safe plain text.
 Foundry-style description objects must be normalized from their textual fields, and unknown object-shaped descriptions must render as empty text rather than object coercion strings.
+A description ingested or repaired under this behaviour contains no unresolved directive text on any surface — the component browser (inspector and rows) and the player inventory listing alike.
+A world upgraded from an earlier version displays its stored text as captured until the GM runs the item-data repair; when unresolved directives are detected at startup the GM is told, once, where that action lives.
+A directive belonging to a game system that registers no enricher for it is left verbatim, except that an authored label is rendered in its place when one is present.
+Description surfaces that read a stored value perform no resolution of their own.
+When a description resolves to no text at all, the surface shows its existing "no description" fallback rather than a blank gap.
 
 Environment browser layout:
 

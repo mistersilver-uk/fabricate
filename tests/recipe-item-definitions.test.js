@@ -55,11 +55,35 @@ test('_normalizeComponentDescription does not stringify unknown objects', () => 
   assert.equal(manager._normalizeComponentDescription({ unexpected: 'shape' }), '');
 });
 
-test('_extractSourceDescription skips object fallback text instead of returning object strings', () => {
+test('_normalizeComponentDescription NORMALIZES stored text and resolves nothing (issue 800)', () => {
+  // The synchronous normalizer is reached from `_normalizeComponent` across nine call
+  // sites and deliberately stays synchronous: resolution happens only at the async
+  // ingestion boundaries.
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  // It NORMALIZES: markup is stripped and an unregistered LABELLED directive falls
+  // back to its authored label (the post-resolution mop-up).
+  assert.equal(
+    manager._normalizeComponentDescription('<p><a class="content-link">Acid</a>, Oil</p>'),
+    'Acid, Oil'
+  );
+  assert.equal(manager._normalizeComponentDescription('&Reference[prone]{Prone}'), 'Prone');
+
+  // It does NOT resolve: a LABEL-LESS reference cannot become a document name here, so
+  // it survives verbatim rather than being dropped (the rejected approach) or
+  // half-fixed by a second, divergent grammar.
+  const labelless = '@UUID[Compendium.dnd5e.equipment24.Item.componentpouch]';
+  assert.equal(manager._normalizeComponentDescription(labelless), labelless);
+});
+
+// `_extractSourceDescription` is ASYNC since issue 800 — it awaits the `enrichToHtml`
+// seam before normalizing. That signature change is the reason this suite legitimately
+// changes; the CONSTRUCTOR change is the one that must be invisible to existing tests.
+test('_extractSourceDescription skips object fallback text instead of returning object strings', async () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
   assert.equal(
-    manager._extractSourceDescription({
+    await manager._extractSourceDescription({
       system: {
         description: {
           value: '<p>Dreamleaf petals.</p>',
@@ -69,7 +93,7 @@ test('_extractSourceDescription skips object fallback text instead of returning 
     'Dreamleaf petals.'
   );
   assert.equal(
-    manager._extractSourceDescription({
+    await manager._extractSourceDescription({
       system: {
         description: {
           unexpected: '<p>Should not stringify the object.</p>',

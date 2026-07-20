@@ -9,6 +9,12 @@ import {
   DEFAULT_GATHERING_EVENT_IMG,
   DEFAULT_GATHERING_TASK_IMG,
 } from '../../src/gatheringImageDefaults.js';
+import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
+import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
+import {
+  REPORTER_ENRICHER_DESCRIPTION,
+  REPORTER_RESOLVED_EXPECTED,
+} from '../helpers/enricherDescriptionFixtures.js';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -6176,6 +6182,192 @@ describe('createAdminStore', () => {
       assert.equal(vs.itemCards[1].description, '');
       assert.equal(vs.itemCards[1].hasDescription, false);
       assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
+    });
+
+    // -----------------------------------------------------------------------
+    // Issue 800 — read-side precedence. Descriptions are RESOLVED at write time,
+    // so the store reads the STORED value first and only falls back to the live
+    // document (enriching it) when the stored value is empty.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Seed `sys1` with a single component and drive a refresh, with `fromUuid` and the
+     * `enrichToHtml` seam stubbed. Returns the projected card plus the enrich calls.
+     */
+    async function itemCardFor(component, { liveDoc = null } = {}) {
+      const services = createMockServices();
+      const enrichCalls = [];
+      services.enrichToHtml = async (raw, options) => {
+        enrichCalls.push({ raw, options });
+        return `<a class="content-link">Component Pouch</a>`;
+      };
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = [makeItem(component)];
+      delete sys.items;
+
+      const originalFromUuid = globalThis.fromUuid;
+      globalThis.fromUuid = async () => liveDoc;
+      try {
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        return { card: get(store.viewState).itemCards[0], enrichCalls };
+      } finally {
+        globalThis.fromUuid = originalFromUuid;
+      }
+    }
+
+    it('itemCards prefer a NON-EMPTY stored description over a differing live document (issue 800)', async () => {
+      const { card, enrichCalls } = await itemCardFor(
+        {
+          id: 'comp-stored',
+          name: 'Alchemist’s Supplies',
+          registeredItemUuid: 'Compendium.dnd5e.equipment24.Item.supplies',
+          description: REPORTER_RESOLVED_EXPECTED,
+        },
+        { liveDoc: { system: { description: { value: 'Something else entirely.' } } } }
+      );
+
+      assert.equal(card.description, REPORTER_RESOLVED_EXPECTED);
+      assert.equal(
+        enrichCalls.length,
+        0,
+        'statement form is load-bearing: `(await enriched) || stored` would re-introduce ' +
+          'the per-component enrichHTML call this flip exists to avoid'
+      );
+    });
+
+    it('itemCards fall back to the ENRICHED live document when the stored description is empty (issue 800)', async () => {
+      // The issue 676 population — a compendium-linked component with no stored
+      // description — is exactly the population whose live text carries raw
+      // directives, so a non-enriching fallback would leave the reported bug visible
+      // here until a GM ran Repair.
+      const { card, enrichCalls } = await itemCardFor(
+        {
+          id: 'comp-empty',
+          name: 'Alchemist’s Supplies',
+          registeredItemUuid: 'Compendium.dnd5e.equipment24.Item.supplies',
+          description: '',
+        },
+        { liveDoc: { system: { description: { value: REPORTER_ENRICHER_DESCRIPTION } } } }
+      );
+
+      assert.equal(card.description, 'Component Pouch');
+      // A refresh publishes view state in two phases, so the projection may be built
+      // more than once; what matters is that the fallback resolves at all (the
+      // stored-first test above pins the ZERO-call case).
+      assert.ok(enrichCalls.length >= 1, 'the live fallback resolves');
+      assert.equal(enrichCalls[0].raw, REPORTER_ENRICHER_DESCRIPTION);
+      assert.ok(
+        enrichCalls[0].options?.relativeTo,
+        'relativeTo must be passed on the live path too, or a description that resolved ' +
+          'at ingestion goes broken on this fallback'
+      );
+    });
+
+    it('every read surface forwards the STORED string unchanged (issue 800 cross-caller invariant)', async () => {
+      // The cross-caller invariant in its new form. Its old form asserted that three
+      // surfaces produced identical FLATTENED output; the flatten is gone, so what must
+      // now hold across surfaces is that a STORED (already-resolved) description is
+      // forwarded byte-for-byte, with no surface resolving or rewriting it.
+      const stored = REPORTER_RESOLVED_EXPECTED;
+      const { card } = await itemCardFor({
+        id: 'comp-forward',
+        name: 'Alchemist’s Supplies',
+        description: stored,
+      });
+      assert.equal(card.description, stored, 'adminStore projection');
+
+      const manager = new CraftingSystemManager({ getRecipes: () => [] });
+      assert.equal(
+        manager._normalizeComponentDescription(stored),
+        stored,
+        'CraftingSystemManager sync normalizer'
+      );
+
+      const builder = new InventoryListingBuilder({
+        recipeManager: { getRecipes: () => [], toolMatchesItem: () => false },
+        craftingSystemManager: {
+          getSystems: () => [
+            {
+              id: 'sys-x',
+              name: 'Alchemy',
+              components: [{ id: 'cx', name: 'Supplies', description: stored }],
+            },
+          ],
+        },
+        localize: (key) => key,
+        nowWorldTime: () => 0,
+      });
+      const listing = builder.buildListing({
+        craftingActor: {
+          id: 'a1',
+          name: 'Akra',
+          img: 'icons/a1.webp',
+          items: [{ name: 'Supplies', system: { quantity: 1 } }],
+        },
+      });
+      assert.equal(
+        listing.rows.find((row) => row.componentId === 'cx' && !row.isEssenceSource)?.description,
+        stored,
+        'InventoryListingBuilder buildListing row'
+      );
+    });
+
+    it('read surfaces DIVERGE on an un-repaired labelled directive, and that is the real contract (issue 800)', async () => {
+      // The test above passes for a resolved string, but a resolved string is already
+      // plain text — so normalization is a no-op there and it would pass identically if
+      // the surfaces diverged wildly. This case uses a LABELLED directive, where they
+      // genuinely differ, so the contract is pinned rather than merely asserted.
+      //
+      // `adminStore` and the manager's sync normalizer both run `plainTextDescription`,
+      // whose retained mop-up renders the label; `InventoryListingBuilder` forwards the
+      // stored string untouched. The consequence is real and worth seeing: until a GM
+      // runs Repair Item Data, the SAME component reads "Acid" in the manager and
+      // "@UUID[…]{Acid}" in a player's inventory. Repair converges them, which is why
+      // it — not a wider read-side rewrite — is the fix.
+      const labelled = '@UUID[Compendium.dnd5e.items.Item.acid00]{Acid}';
+
+      const { card } = await itemCardFor({
+        id: 'comp-labelled',
+        name: 'Alchemist’s Supplies',
+        description: labelled,
+      });
+      assert.equal(card.description, 'Acid', 'adminStore normalizes: the mop-up renders the label');
+
+      const manager = new CraftingSystemManager({ getRecipes: () => [] });
+      assert.equal(
+        manager._normalizeComponentDescription(labelled),
+        'Acid',
+        'the manager normalizer agrees with adminStore'
+      );
+
+      const builder = new InventoryListingBuilder({
+        recipeManager: { getRecipes: () => [], toolMatchesItem: () => false },
+        craftingSystemManager: {
+          getSystems: () => [
+            {
+              id: 'sys-x',
+              name: 'Alchemy',
+              components: [{ id: 'cx', name: 'Supplies', description: labelled }],
+            },
+          ],
+        },
+        localize: (key) => key,
+        nowWorldTime: () => 0,
+      });
+      const listing = builder.buildListing({
+        craftingActor: {
+          id: 'a1',
+          name: 'Akra',
+          img: 'icons/a1.webp',
+          items: [{ name: 'Supplies', system: { quantity: 1 } }],
+        },
+      });
+      assert.equal(
+        listing.rows.find((row) => row.componentId === 'cx' && !row.isEssenceSource)?.description,
+        labelled,
+        'the inventory listing forwards the stored string VERBATIM and resolves nothing'
+      );
     });
 
     it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {

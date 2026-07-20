@@ -26,7 +26,7 @@ import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
-import { renderDialog, viewScene, localize as bridgeLocalize } from './ui/svelte/util/foundryBridge.js';
+import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
@@ -71,6 +71,7 @@ import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
@@ -423,7 +424,15 @@ class Fabricate {
     await this._runMigrations();
     // Create managers
     this.recipeManager = new RecipeManager();
-    this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
+    // Issue 800: the manager RESOLVES source descriptions through Foundry's own
+    // enricher at its async ingestion boundaries, so a content link is stored as the
+    // referenced document's name rather than raw `@UUID[…]` text. Both seams default
+    // to pass-throughs (`enrichHTML` cannot run under happy-dom), so wiring the real
+    // implementations here is what makes the production path resolve at all.
+    this.craftingSystemManager = new CraftingSystemManager(this.recipeManager, {
+      enrichToHtml: (raw, options) => enrichToHtml(raw, options),
+      primeEnricherCache: (rawTexts) => primeEnricherCache(rawTexts)
+    });
     // Wire the real primary-GM check into the timed world-time resume paths (issue
     // 656). Both managers default `isPrimaryGM` to `() => true` (fail-open, so unit
     // fixtures resume), so passing the real `activeGM` check here is load-bearing —
@@ -2582,6 +2591,12 @@ Hooks.once('ready', async () => {
   // inventories that predate it.
   await runOwnedItemComponentIdentityRestamp();
 
+  // Issue 800: GM-only cue for a world whose stored descriptions predate write-time
+  // resolution and still show raw `@UUID[…]` text. A DETECTOR only — it scans
+  // already-loaded descriptions synchronously, resolves nothing, rewrites nothing,
+  // and self-clears once the GM has run Repair Item Data.
+  notifyUnresolvedItemDescriptions();
+
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
   // marker, the region-enter presence prompt, the controlToken re-trigger, and
@@ -2602,7 +2617,7 @@ Hooks.once('ready', async () => {
     try {
       routeEventSceneSocketMessage(payload, {
         currentUserId: () => game.user?.id,
-        isActiveGM: () => game.user === game.users?.activeGM,
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
         showPrompt: showEventScenePrompt,
         viewSceneForSelf: (uuid) => viewScene(uuid)
       });
@@ -2803,7 +2818,7 @@ async function runInteractableMarkerSync() {
     const environmentStore = fabricate?.getGatheringEnvironmentStore?.() ?? null;
     await syncInteractableMarkers({
       scenes: game.scenes,
-      isActiveGM: () => game.user === game.users?.activeGM,
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
       resolveEnvironment: (environmentId) => environmentStore?.get?.(environmentId) ?? null,
       resolveTask: (systemId, taskId) => {
         const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);

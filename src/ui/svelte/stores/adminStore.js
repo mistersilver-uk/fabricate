@@ -47,6 +47,10 @@ import {
 } from '../../../utils/componentCategories.js';
 import { withCategoryIcon } from '../../../utils/categoryIcons.js';
 import {
+  plainTextDescription,
+  descriptionTextCandidate,
+} from '../../../utils/plainTextDescription.js';
+import {
   planRecipeCategoryReassignments,
   planComponentCategoryReassignments,
   planTagRemovals,
@@ -1788,9 +1792,20 @@ async function _resolveSourceDocumentState(uuid) {
  * @param {object|null} doc
  * @returns {string}
  */
-function _documentDescriptionCandidate(doc) {
+async function _documentDescriptionCandidate(doc, enrichToHtml) {
   if (!doc) return '';
-  return _plainTextDescription(doc.system?.description ?? doc.description ?? '');
+  const raw = _descriptionTextCandidate(doc.system?.description ?? doc.description ?? '');
+  if (!raw) return '';
+  // The live fallback RESOLVES too (issue 800). It has to: the population this
+  // fallback exists for — a compendium-linked component whose stored description is
+  // empty (issue 676) — is precisely the population whose live description carries
+  // the raw directives the reporter saw. A non-enriching fallback would leave the
+  // reported bug visible for exactly those components until a GM ran Repair.
+  // `relativeTo` is passed here as well as at ingestion, or the same description can
+  // resolve at registration and go broken on this path.
+  const enriched =
+    typeof enrichToHtml === 'function' ? await enrichToHtml(raw, { relativeTo: doc }) : raw;
+  return _plainTextDescription(enriched);
 }
 
 // ---------------------------------------------------------------------------
@@ -1962,7 +1977,8 @@ async function _buildItemCards(
   itemSearchTerm,
   showTags,
   showEssences,
-  essenceDefinitionById
+  essenceDefinitionById,
+  enrichToHtml
 ) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
@@ -1970,20 +1986,29 @@ async function _buildItemCards(
   return Promise.all(
     items.map(async (item) => {
       const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
-      // Resolve the LINKED DOCUMENT, not just its existence (issue 676). The editor's
-      // identity strip promises "name, image & description follow the linked item and
-      // can't be edited here" — and for description that promise was FALSE: this read
-      // `item.description` off the stored component record, which holds whatever was
-      // captured at registration. For a compendium-linked component that is routinely
-      // empty, so the strip rendered a bare "—" while the item's sheet showed prose.
+      // Precedence: STORED FIRST, enriched live document as the fallback (issue 800,
+      // flipping the live-first order issue 676 introduced).
       //
-      // The stored value remains the FALLBACK, so an unresolvable source (and every
-      // environment without `fromUuid`) renders exactly what it rendered before.
-      // A genuinely description-less item still yields '' -> the strip's own "—".
+      // Issue 676 preferred the live document because the stored description was
+      // routinely empty for a compendium-linked component, so the identity strip's
+      // promise that "name, image & description follow the linked item" rendered a bare
+      // "—". Since descriptions are now RESOLVED and stored at ingestion and by the GM
+      // repair, the stored value is the authoritative one and reading the live document
+      // on every render is pure cost.
+      //
+      // The trade is honest and is read FRESHNESS: a pack-content change (a game system
+      // or module shipping new prose) now reaches the component when a GM runs Repair
+      // Item Data, where previously it landed on the next render. Item-sync covers
+      // in-world edits only.
+      //
+      // Statement form, deliberately: `(await enrichedLive) || stored` would re-introduce
+      // the per-component `enrichHTML` call this flip exists to avoid.
       const { doc: sourceDoc, missing: sourceMissing } =
         await _resolveSourceDocumentState(registeredItemUuidDisplay);
-      const description =
-        _documentDescriptionCandidate(sourceDoc) || _plainTextDescription(item.description);
+      let description = _plainTextDescription(item.description);
+      if (!description) {
+        description = await _documentDescriptionCandidate(sourceDoc, enrichToHtml);
+      }
       const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
       return {
         ...item,
@@ -2113,70 +2138,18 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
   });
 }
 
+// Thin delegators to the shared Foundry-free plain-texter (src/utils/
+// plainTextDescription.js). Kept as named module functions because
+// `_documentDescriptionCandidate`, `_buildManagedItemOptions`, and the Books &
+// Scrolls projection call them, and source-contract tests may pin the names.
+// The shared helper flattens Foundry enricher directives (issue 800) before the
+// HTML strip, so every description surface renders human-readable labels.
 function _plainTextDescription(value) {
-  const raw = _descriptionTextCandidate(value);
-  if (!raw) return '';
-
-  if (globalThis.document?.createElement) {
-    const template = globalThis.document.createElement('template');
-    template.innerHTML = raw;
-    return String(template.content?.textContent || '')
-      .replace(/\s+/g, ' ')
-      .replace(/\s+([,.;:!?])/g, '$1')
-      .trim();
-  }
-
-  return raw
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([,.;:!?])/g, '$1')
-    .trim();
+  return plainTextDescription(value);
 }
 
 function _descriptionTextCandidate(value, seen = new Set()) {
-  if (value == null) return '';
-
-  const valueType = typeof value;
-  if (valueType === 'string') return value.trim();
-  if (valueType === 'number' || valueType === 'boolean' || valueType === 'bigint') {
-    return String(value).trim();
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((entry) => _descriptionTextCandidate(entry, seen))
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-  }
-  if (valueType !== 'object') return '';
-  if (seen.has(value)) return '';
-  seen.add(value);
-
-  for (const key of [
-    'value',
-    'enriched',
-    'html',
-    'text',
-    'content',
-    'short',
-    'long',
-    'unidentified',
-    'chat',
-  ]) {
-    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-    const candidate = _descriptionTextCandidate(value[key], seen);
-    if (candidate) return candidate;
-  }
-
-  return '';
+  return descriptionTextCandidate(value, seen);
 }
 
 /**
@@ -4954,7 +4927,8 @@ export function createAdminStore(services) {
         get(itemSearch),
         showTags,
         showEssences,
-        essenceDefinitionById
+        essenceDefinitionById,
+        services?.enrichToHtml
       );
     }
 
