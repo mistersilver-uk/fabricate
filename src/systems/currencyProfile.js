@@ -414,6 +414,19 @@ export function validateCurrencyProfile(units = [], options = {}) {
   };
 }
 
+/**
+ * Format a currency requirement as `<amount> <label>` for display.
+ *
+ * Resolves the requirement's unit id to a human label through the chain `abbreviation` (when
+ * authored), then `label`, so a well-formed requirement never surfaces the raw unit id (a resolved
+ * unit always carries a non-empty label). The one exception is a degenerate orphaned reference: when
+ * `requirement.unit` names an id no longer present in `units`, the raw id is rendered verbatim as a
+ * last resort, because a stale id reads better than a blank cost.
+ *
+ * @param {{ unit?: string, amount?: number }} requirement
+ * @param {object[]} [units]
+ * @returns {string}
+ */
 export function formatCurrencyRequirement(requirement, units = []) {
   const unit = findCurrencyUnit(units, requirement?.unit);
   const label = unit?.abbreviation || unit?.label || requirement?.unit || '';
@@ -633,6 +646,16 @@ export function canAddCurrencySubUnit(units = [], parentUnitId = '', subUnitId =
   return true;
 }
 
+/**
+ * List the units eligible to become a direct sub-unit of `parentUnitId` (see
+ * {@link canAddCurrencySubUnit}), each projected to `{ id, label, abbreviation }` for the picker.
+ * Both display fields resolve through a fallback so neither renders empty: `label` falls back to the
+ * id, and `abbreviation` resolves through `abbreviation`, then `label`, then `id`.
+ *
+ * @param {object[]} [units]
+ * @param {string} [parentUnitId]
+ * @returns {{ id: string, label: string, abbreviation: string }[]}
+ */
 export function currencySubUnitOptions(units = [], parentUnitId = '') {
   return (Array.isArray(units) ? units : [])
     .filter((unit) => canAddCurrencySubUnit(units, parentUnitId, unit?.id))
