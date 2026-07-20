@@ -33,6 +33,14 @@ It enacts the orchestrator role: it owns routing and the iteration loops and per
 The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec delta in the issue; it returns its plan to the driver.
 Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
 
+### Proportionality and momentum
+
+The workflow driver uses the shortest workflow that satisfies mandatory repository gates and the actual risk, prioritizing the earliest honestly reviewable PR while preserving mandatory safety, review, and exact-head delivery gates.
+One mechanically valid evidence run satisfies every gate it directly covers, so agents do not repeat equivalent checks or reviews ceremonially.
+A reviewer repeats only when its target or owned concern materially changed or an unresolved finding remains; issue or PR metadata edits alone do not invalidate approval.
+The driver front-loads cheap checks for branch and base freshness, affected paths and roster, PR title and commitlint, existing CI state, and screenshot scope.
+The driver timeboxes delegated lanes: after about 60 seconds without observable progress it requests status once, and after another about 60 seconds it interrupts and reassigns the work or continues locally within driver authority.
+
 ### Isolated worktree execution
 
 Every spawned role works in its own Git worktree by default so independent workstreams do not share a mutable checkout.

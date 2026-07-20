@@ -40,6 +40,34 @@ The delta is NOT versioned as files in the repository; it lives in a managed blo
 - **THEN** post-implementation review and the documentation loop compare the actual `openspec/specs/` diff against the proposed delta in the issue
 - **AND** they confirm the implementation faithfully realizes the delta, or — when implementation justifiably deviated — the issue's delta and its `Deviations` note are updated so the delta accurately describes what shipped
 
+### Requirement: Proportional workflow and momentum
+
+The workflow driver MUST use the shortest workflow that satisfies mandatory repository gates and the actual risk, and MUST prioritize the earliest honestly reviewable PR while preserving mandatory safety, review, and exact-head delivery gates.
+One mechanically valid evidence run MUST satisfy every gate it directly covers without ceremonial repetition.
+
+#### Scenario: front-loading cheap checks
+
+- **WHEN** the driver begins or resumes a workflow
+- **THEN** it checks branch and base freshness, affected paths and roster, PR title and commitlint compliance, existing CI and external-check state, and screenshot scope before starting more expensive or delegated work
+
+#### Scenario: reusing valid evidence and approvals
+
+- **WHEN** a mechanically valid check or review already covers an unchanged target and concern
+- **THEN** the driver reuses that evidence instead of repeating an equivalent check or review ceremonially
+- **AND** a reviewer repeats only when its target or owned concern materially changed or an unresolved finding remains
+- **AND** issue or PR metadata edits alone do not invalidate approval
+
+#### Scenario: timeboxing a delegated lane
+
+- **WHEN** a delegated lane shows no observable progress for about 60 seconds
+- **THEN** the driver requests status once
+- **AND** after about another 60 seconds without progress it interrupts and reassigns the work or continues locally within driver authority
+
+#### Scenario: preserving mandatory gates
+
+- **WHEN** reused evidence is stale or ambiguous, its target changed, or repository policy requires an exact-head result
+- **THEN** the driver reruns the applicable check or review before maintainer handoff
+
 ### Requirement: Branch and PR workflow
 
 All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and the workflow driver MUST deliver the integrated result through a PR targeting `main`.

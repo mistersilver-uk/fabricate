@@ -31,6 +31,19 @@ Every spawned role uses the isolated lane lifecycle in `.agents/skills/fabricate
 The driver retains exclusive authority over the coordinator checkout, integration, GitHub and remote mutations, authoritative gates, and lane cleanup.
 The numbered state-machine procedure belongs to the driver; a spawned helper performs only its read-only planning analysis and handoff portions from the context in its brief.
 
+### Proportionality and momentum
+
+The driver chooses the shortest workflow that satisfies mandatory repository gates and the actual risk.
+It prioritizes the earliest honestly reviewable PR while preserving mandatory safety, review, and exact-head delivery gates.
+
+- Front-load cheap checks before expensive or delegated work: branch and base freshness, affected paths and resolved roster, PR title and commitlint compliance, existing CI and external-check state, and screenshot scope.
+- Treat one mechanically valid evidence run as satisfying every gate it directly covers, and record or retain that evidence instead of repeating equivalent checks ceremonially.
+- Repeat a reviewer only when the commit or artifact it reviews materially changes within its owned concern, or when one of its findings remains unresolved.
+- Do not invalidate an approval merely because issue or PR metadata changed when the reviewed code, specification, documentation, and relevant acceptance evidence did not.
+- Monitor each delegated lane for observable progress, such as tool output, a status report, a diff, or a commit.
+- After about 60 seconds without observable progress, request status once; after another about 60 seconds without progress, interrupt and reassign the lane or continue locally when that work is within driver authority.
+- Reuse valid evidence only for the unchanged target and concern it proves; rerun a gate when its target changed, its evidence is stale or ambiguous, or repository policy explicitly requires an exact-head result.
+
 1. Read the repo guidance and the current task context first.
 2. The driver verifies mutable work will happen on a non-`main` task branch.
 If the current branch is `main`, the driver creates or switches to a task branch before changing canonical specs or workflow files.
