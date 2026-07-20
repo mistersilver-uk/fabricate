@@ -223,6 +223,13 @@ Two traps.
 (2) Use the **modern `ContextMenuEntry` shape** `{ label, icon, visible, onClick }`, NOT the deprecated `{ name, condition, callback }` (compat-warns per menu open, removed in v15): `visible(target)` returns a boolean, and `onClick(event, target)` takes the target **second** (the old `callback` passed `(target, event)` reversed).
 The entry element is a raw `HTMLElement`; read the pack id from `target.dataset.pack`.
 See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `main.js` wiring.
+- **V13 progress notifications** are `ui.notifications.info(msg, { progress: true })`, which returns a handle whose `handle.update({ pct, message })` advances the bar (`pct` on `[0, 1]`); this superseded `SceneNavigation.displayProgressBar`.
+A progress toast is **lifetime-exempt** — it ignores the normal 5 s dismissal and only self-dismisses when it reaches `pct: 1`, so a run that ends below `1` (or throws before its completion tick) leaves the bar on screen until reload.
+Two guards are mandatory: `.update()` can **throw before the toast renders** when it is queued behind the visible-toast cap, and a test stub for `info` returns `undefined` (no `.update`) — so wrap the update in try/catch and no-op on a falsy handle.
+A stateful default reporter (opens one toast, then drives it) must be built **per run**, not once per long-lived importer, or a second run updates the first run's already-dismissed toast.
+See `createDefaultProgressReporter` (`src/systems/CompendiumImporter.js`).
+- **`CompendiumCollection#getIndex` already self-caches per pack**: a call whose `fields` are a subset of the pack's already-`#indexedFields` short-circuits to the cached index, and `clear()` does not reset it.
+So wrapping `getIndex` in a memo saves nothing — the residual cost of a per-item miss scan is the linear walk of the index, and the fix is a per-run `Map<nameLower, entry[]>` name→entry lookup, not memoizing the build.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
