@@ -614,3 +614,91 @@ test('writer path — replaceItemSource clamps the existing Simple groups', asyn
   assert.equal(item.salvage.resultGroups[0].id, 'grp-a');
   delete globalThis.fromUuid;
 });
+
+test('writer path — addItemFromUuid threads the Simple context to the clamp', async () => {
+  // The import-add call site: an imported Item carries no salvage today, so the clamp is a
+  // practical no-op — but a snapshot that DID carry a multi-group Simple salvage must be
+  // clamped, which pins the context threading at this writer (an unthreaded site would
+  // ship green). Stub the source-resolution collaborators so the snapshot carries salvage.
+  const manager = makeLoadedManager([SIMPLE_SYSTEM([])]);
+  globalThis.fromUuid = async () => ({ documentName: 'Item', name: 'Relic', img: 'icons/svg/item-bag.svg' });
+  manager._resolveImportedComponentSourceData = async () => ({
+    currentUuid: 'Item.relic',
+    canonicalUuid: 'Item.relic',
+    aliasItemUuids: [],
+    sourceFallbacks: [],
+    references: ['Item.relic'],
+  });
+  manager._buildComponentSourceSnapshot = async () => ({
+    name: 'Relic',
+    img: 'icons/svg/item-bag.svg',
+    description: '',
+    registeredItemUuid: 'Item.relic',
+    originItemUuid: 'Item.relic',
+    aliasItemUuids: [],
+    sourceFallbacks: [],
+    references: ['Item.relic'],
+    // A snapshot carrying surplus Simple groups — proves the call site threads context.
+    salvage: { enabled: true, resultGroups: [successGroup('grp-a'), successGroup('grp-b')] },
+  });
+  manager._componentRoleFlagKey = () => null; // skip source stamping in the stubbed world
+
+  const { item } = await manager.addItemFromUuid('sys-simple', 'Item.relic');
+  assert.equal(item.salvage.resultGroups.length, 1, 'addItemFromUuid threads the Simple context');
+  assert.equal(item.salvage.resultGroups[0].id, 'grp-a');
+  delete globalThis.fromUuid;
+});
+
+// --- The Simple-slot formula gate, DERIVED through a real writer (finding 1) --------
+// These drive `_salvageNormalizationContext` reading `salvageCraftingCheck.simple.rollFormula`
+// specifically. Feeding the boolean directly (simpleContext) would not catch a derivation
+// that mistakenly OR-ed across the simple/routed/progressive slots — these do.
+
+test('reserved failure group is RETAINED when the SIMPLE slot has a formula (via _normalizeSystem)', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys-simple-formula',
+    features: { salvage: true },
+    salvageResolutionMode: 'simple',
+    salvageCraftingCheck: { simple: { rollFormula: '1d20', dc: 12 } },
+    components: [
+      {
+        id: 'comp-1',
+        name: 'Scale',
+        salvage: { enabled: true, resultGroups: [successGroup('grp-ok'), failureGroup('grp-fail')] },
+      },
+    ],
+  });
+  const groups = system.components[0].salvage.resultGroups;
+  assert.deepEqual(groups.map((g) => g.id), ['grp-ok', 'grp-fail']);
+  assert.equal(groups[1].role, 'failure', 'the reserved failure group survives with a Simple formula');
+});
+
+test('reserved failure group is DROPPED when ONLY a non-simple slot has a formula (via _normalizeSystem)', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys-routed-formula',
+    features: { salvage: true },
+    salvageResolutionMode: 'simple',
+    // A formula in the ROUTED and PROGRESSIVE slots only; the SIMPLE slot is unauthored.
+    // The Simple engine reads only the simple slot, so the reserved failure group must NOT
+    // be retained — an OR across slots would wrongly keep it.
+    salvageCraftingCheck: {
+      routed: { type: 'relative', rollFormula: '1d20', relativeOutcomes: [] },
+      progressive: { rollFormula: '1d20' },
+    },
+    components: [
+      {
+        id: 'comp-1',
+        name: 'Scale',
+        salvage: { enabled: true, resultGroups: [successGroup('grp-ok'), failureGroup('grp-fail')] },
+      },
+    ],
+  });
+  const groups = system.components[0].salvage.resultGroups;
+  assert.deepEqual(
+    groups.map((g) => g.id),
+    ['grp-ok'],
+    'a non-simple slot formula must not retain the reserved failure group'
+  );
+});
