@@ -26,6 +26,7 @@ import {
   normalizeCustomComponentCategories,
 } from '../utils/componentCategories.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
+import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 import {
   getCompendiumSourceUuid,
@@ -1317,70 +1318,16 @@ export class CraftingSystemManager {
     return this._plainTextDescription(description);
   }
 
+  // Thin delegators to the shared Foundry-free plain-texter (src/utils/
+  // plainTextDescription.js). Method shape preserved so `_normalizeComponentDescription`
+  // and `_extractSourceDescription` keep calling them unchanged. The shared helper
+  // flattens Foundry enricher directives (issue 800) before the HTML strip.
   _plainTextDescription(value) {
-    const raw = this._descriptionTextCandidate(value);
-    if (!raw) return '';
-
-    if (globalThis.document?.createElement) {
-      const template = globalThis.document.createElement('template');
-      template.innerHTML = raw;
-      return String(template.content?.textContent || '')
-        .replaceAll(/\s+/g, ' ')
-        .replaceAll(/ ([,.;:!?])/g, '$1')
-        .trim();
-    }
-
-    return raw
-      .replaceAll(/<br\s*\/?>/gi, ' ')
-      .replaceAll(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
-      .replaceAll(/<[^>]{1,2048}>/g, ' ')
-      .replaceAll(/&nbsp;/gi, ' ')
-      .replaceAll(/&amp;/gi, '&')
-      .replaceAll(/&lt;/gi, '<')
-      .replaceAll(/&gt;/gi, '>')
-      .replaceAll(/&quot;/gi, '"')
-      .replaceAll(/&#39;|&apos;/gi, "'")
-      .replaceAll(/\s+/g, ' ')
-      .replaceAll(/ ([,.;:!?])/g, '$1')
-      .trim();
+    return plainTextDescription(value);
   }
 
   _descriptionTextCandidate(value, seen = new Set()) {
-    if (value == null) return '';
-
-    const valueType = typeof value;
-    if (valueType === 'string') return value.trim();
-    if (['number', 'boolean', 'bigint'].includes(valueType)) {
-      return String(value).trim();
-    }
-    if (Array.isArray(value)) {
-      return value
-        .map((entry) => this._descriptionTextCandidate(entry, seen))
-        .filter(Boolean)
-        .join(' ')
-        .trim();
-    }
-    if (valueType !== 'object') return '';
-    if (seen.has(value)) return '';
-    seen.add(value);
-
-    for (const key of [
-      'value',
-      'enriched',
-      'html',
-      'text',
-      'content',
-      'short',
-      'long',
-      'unidentified',
-      'chat',
-    ]) {
-      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-      const candidate = this._descriptionTextCandidate(value[key], seen);
-      if (candidate) return candidate;
-    }
-
-    return '';
+    return descriptionTextCandidate(value, seen);
   }
 
   _extractSourceDescription(source = null) {

@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
+import {
+  BROAD_ENRICHER_DESCRIPTION,
+  BROAD_ENRICHER_EXPECTED,
+} from './helpers/enricherDescriptionFixtures.js';
 
 let idCounter = 0;
 
@@ -53,6 +57,14 @@ test('_normalizeComponentDescription does not stringify unknown objects', () => 
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
 
   assert.equal(manager._normalizeComponentDescription({ unexpected: 'shape' }), '');
+});
+
+test('_normalizeComponentDescription flattens Foundry enricher directives to labels (issue 800)', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  const flattened = manager._normalizeComponentDescription(BROAD_ENRICHER_DESCRIPTION);
+  assert.equal(flattened, BROAD_ENRICHER_EXPECTED);
+  assert.ok(!/@[A-Za-z]+\[|&[A-Za-z]+\[|\[\[/.test(flattened), 'no raw enricher directive survives');
 });
 
 test('_extractSourceDescription skips object fallback text instead of returning object strings', () => {

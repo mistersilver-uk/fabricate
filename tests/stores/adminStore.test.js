@@ -9,6 +9,13 @@ import {
   DEFAULT_GATHERING_EVENT_IMG,
   DEFAULT_GATHERING_TASK_IMG,
 } from '../../src/gatheringImageDefaults.js';
+import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
+import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
+import { plainTextDescription } from '../../src/utils/plainTextDescription.js';
+import {
+  REPORTER_ENRICHER_DESCRIPTION,
+  REPORTER_ENRICHER_EXPECTED,
+} from '../helpers/enricherDescriptionFixtures.js';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -6176,6 +6183,93 @@ describe('createAdminStore', () => {
       assert.equal(vs.itemCards[1].description, '');
       assert.equal(vs.itemCards[1].hasDescription, false);
       assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
+    });
+
+    it('viewState.itemCards flatten Foundry enricher directives to labels (issue 800)', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({
+            id: 'comp-enricher',
+            name: 'Alchemist’s Supplies',
+            // The reporter's raw description reaches the projection unflattened; the
+            // adminStore read/projection surface must render labels only, no raw
+            // @UUID[...]{...} text.
+            description: REPORTER_ENRICHER_DESCRIPTION,
+          }),
+        ];
+        delete sys.items;
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+
+      assert.equal(vs.itemCards[0].description, REPORTER_ENRICHER_EXPECTED);
+      assert.ok(!/@[A-Za-z]+\[/.test(vs.itemCards[0].description), 'no raw enricher directive');
+    });
+
+    it('adminStore, CraftingSystemManager, and buildListing produce identical flattened output (issue 800)', async () => {
+      // Cross-caller equivalence: all three item-derived description surfaces share
+      // one Foundry-free implementation, so a revert-to-local-copy or one-sided
+      // drift diverges here.
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({
+            id: 'comp-xcaller',
+            name: 'Alchemist’s Supplies',
+            description: REPORTER_ENRICHER_DESCRIPTION,
+          }),
+        ];
+        delete sys.items;
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const adminOutput = get(store.viewState).itemCards[0].description;
+
+      const expected = plainTextDescription(REPORTER_ENRICHER_DESCRIPTION);
+      assert.equal(adminOutput, expected, 'adminStore projection');
+
+      const manager = new CraftingSystemManager({ getRecipes: () => [] });
+      assert.equal(
+        manager._normalizeComponentDescription(REPORTER_ENRICHER_DESCRIPTION),
+        expected,
+        'CraftingSystemManager'
+      );
+
+      const builder = new InventoryListingBuilder({
+        recipeManager: { getRecipes: () => [], toolMatchesItem: () => false },
+        craftingSystemManager: {
+          getSystems: () => [
+            {
+              id: 'sys-x',
+              name: 'Alchemy',
+              components: [
+                { id: 'cx', name: 'Supplies', description: REPORTER_ENRICHER_DESCRIPTION },
+              ],
+            },
+          ],
+        },
+        localize: (key) => key,
+        nowWorldTime: () => 0,
+      });
+      const listing = builder.buildListing({
+        craftingActor: {
+          id: 'a1',
+          name: 'Akra',
+          img: 'icons/a1.webp',
+          items: [{ name: 'Supplies', system: { quantity: 1 } }],
+        },
+      });
+      const builderOutput = listing.rows.find(
+        (row) => row.componentId === 'cx' && !row.isEssenceSource
+      )?.description;
+      assert.equal(builderOutput, expected, 'InventoryListingBuilder buildListing row');
     });
 
     it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {

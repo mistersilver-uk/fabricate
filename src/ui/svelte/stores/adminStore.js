@@ -47,6 +47,10 @@ import {
 } from '../../../utils/componentCategories.js';
 import { withCategoryIcon } from '../../../utils/categoryIcons.js';
 import {
+  plainTextDescription,
+  descriptionTextCandidate,
+} from '../../../utils/plainTextDescription.js';
+import {
   planRecipeCategoryReassignments,
   planComponentCategoryReassignments,
   planTagRemovals,
@@ -2113,70 +2117,18 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
   });
 }
 
+// Thin delegators to the shared Foundry-free plain-texter (src/utils/
+// plainTextDescription.js). Kept as named module functions because
+// `_documentDescriptionCandidate`, `_buildManagedItemOptions`, and the Books &
+// Scrolls projection call them, and source-contract tests may pin the names.
+// The shared helper flattens Foundry enricher directives (issue 800) before the
+// HTML strip, so every description surface renders human-readable labels.
 function _plainTextDescription(value) {
-  const raw = _descriptionTextCandidate(value);
-  if (!raw) return '';
-
-  if (globalThis.document?.createElement) {
-    const template = globalThis.document.createElement('template');
-    template.innerHTML = raw;
-    return String(template.content?.textContent || '')
-      .replace(/\s+/g, ' ')
-      .replace(/\s+([,.;:!?])/g, '$1')
-      .trim();
-  }
-
-  return raw
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([,.;:!?])/g, '$1')
-    .trim();
+  return plainTextDescription(value);
 }
 
 function _descriptionTextCandidate(value, seen = new Set()) {
-  if (value == null) return '';
-
-  const valueType = typeof value;
-  if (valueType === 'string') return value.trim();
-  if (valueType === 'number' || valueType === 'boolean' || valueType === 'bigint') {
-    return String(value).trim();
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((entry) => _descriptionTextCandidate(entry, seen))
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-  }
-  if (valueType !== 'object') return '';
-  if (seen.has(value)) return '';
-  seen.add(value);
-
-  for (const key of [
-    'value',
-    'enriched',
-    'html',
-    'text',
-    'content',
-    'short',
-    'long',
-    'unidentified',
-    'chat',
-  ]) {
-    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-    const candidate = _descriptionTextCandidate(value[key], seen);
-    if (candidate) return candidate;
-  }
-
-  return '';
+  return descriptionTextCandidate(value, seen);
 }
 
 /**

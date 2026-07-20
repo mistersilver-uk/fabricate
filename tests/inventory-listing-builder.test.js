@@ -2,6 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
+import {
+  BROAD_ENRICHER_DESCRIPTION,
+  BROAD_ENRICHER_EXPECTED,
+} from './helpers/enricherDescriptionFixtures.js';
 
 // Components are matched to actor items by name fallback (no source flags in these
 // fakes), so an item whose `name` equals a component's `name` is "owned".
@@ -141,6 +145,22 @@ describe('InventoryListingBuilder — ownership aggregation', () => {
     // Both Iron and Coal carry Fire → one Fire essence row.
     assert.equal(listing.counts.essences, 1);
     assert.equal(listing.counts.total, 3);
+  });
+
+  it('flattens Foundry enricher syntax in the component row description read-side (issue 800)', () => {
+    // A pre-existing stored description carrying raw enricher directives must
+    // render flat on the player inventory read path without a re-save.
+    const system = makeSystem({
+      components: [
+        { id: 'c1', name: 'Iron', img: 'icons/iron.webp', description: BROAD_ENRICHER_DESCRIPTION },
+      ],
+      tools: [],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').description, BROAD_ENRICHER_EXPECTED);
   });
 });
 
@@ -825,6 +845,30 @@ describe('InventoryListingBuilder — recipe-item books', () => {
   function bookRow(listing) {
     return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
   }
+
+  it('flattens the recipe-item description but leaves recipe flavor untouched (issue 800)', () => {
+    const system = bookSystem();
+    system.recipeItemDefinitions[0].description = BROAD_ENRICHER_DESCRIPTION;
+    // Recipe flavor is Fabricate-authored free text — an out-of-scope surface that
+    // stays verbatim, proving the read-side flatten is scoped to item-derived reads.
+    const recipes = [
+      {
+        id: 'r1',
+        name: 'Fireball',
+        description: 'Deals @Damage[8d6]{8d6 fire} damage.',
+        img: 'icons/fb.webp',
+        craftingSystemId: 'sys-b',
+        recipeItemId: 'def-1',
+      },
+    ];
+    const listing = bookBuilder({ system, recipes }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+      viewer: { isGM: true },
+    });
+    const row = bookRow(listing);
+    assert.equal(row.description, BROAD_ENRICHER_EXPECTED);
+    assert.equal(row.recipes[0].description, 'Deals @Damage[8d6]{8d6 fire} damage.');
+  });
 
   it('flags a book’s recipes learnBlocked when the reader fails its character prerequisites (issue 544)', () => {
     const EXPERT = {
