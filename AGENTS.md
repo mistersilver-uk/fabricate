@@ -223,6 +223,13 @@ Two traps.
 (2) Use the **modern `ContextMenuEntry` shape** `{ label, icon, visible, onClick }`, NOT the deprecated `{ name, condition, callback }` (compat-warns per menu open, removed in v15): `visible(target)` returns a boolean, and `onClick(event, target)` takes the target **second** (the old `callback` passed `(target, event)` reversed).
 The entry element is a raw `HTMLElement`; read the pack id from `target.dataset.pack`.
 See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `main.js` wiring.
+- **V13 progress notifications** are `ui.notifications.info(msg, { progress: true })`, which returns a handle whose `handle.update({ pct, message })` advances the bar (`pct` on `[0, 1]`); this superseded `SceneNavigation.displayProgressBar`.
+A progress toast is **lifetime-exempt** — it ignores the normal 5 s dismissal and only self-dismisses when it reaches `pct: 1`, so a run that ends below `1` (or throws before its completion tick) leaves the bar on screen until reload.
+Two guards are mandatory: `.update()` can **throw before the toast renders** when it is queued behind the visible-toast cap, and a test stub for `info` returns `undefined` (no `.update`) — so wrap the update in try/catch and no-op on a falsy handle.
+A stateful default reporter (opens one toast, then drives it) must be built **per run**, not once per long-lived importer, or a second run updates the first run's already-dismissed toast.
+See `createDefaultProgressReporter` (`src/systems/CompendiumImporter.js`).
+- **`CompendiumCollection#getIndex` already self-caches per pack**: a call whose `fields` are a subset of the pack's already-`#indexedFields` short-circuits to the cached index, and `clear()` does not reset it.
+So wrapping `getIndex` in a memo saves nothing — the residual cost of a per-item miss scan is the linear walk of the index, and the fix is a per-run `Map<nameLower, entry[]>` name→entry lookup, not memoizing the build.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
@@ -297,6 +304,11 @@ The consequence: **a string occupying a namespace slot silently shadows every ke
 Every child key of the shadowing string is affected at once.
 `tests/ui-lang-keys-resolve.test.js` (PR #674) gates only the **reference direction** (a key the code reads must exist); it does **not** detect a shadowed namespace, and **orphaned keys stay invisible to it entirely**.
 So when adding a key, check no ancestor path is itself a string, and prefer a distinct leaf (`…Salvage.Label`) over reusing a container path as a value.
+- **`setFlag` / `Document#update` OBJECT flags DEEP-MERGE, so removing a key needs an explicit `-=` deletion — whereas `game.settings.set` REPLACES the whole value and needs no deletion key.** This merge-vs-replace split is load-bearing across three subsystems: active-run containers, learned knowledge, and the party learn pool.
+An object flag written through `setFabricateFlag` is stored DOUBLY nested (`flags.fabricate.fabricate.<key>`) because the helper prefixes `fabricate.` and `expandObject` nests it again under the scope, so the deletion key is `flags.fabricate.fabricate.<map>.-=<id>` — a shallow `flags.fabricate.<map>.-=<id>` silently no-ops and the entry resurrects on reload.
+Never prune by rebuilding a filtered map and writing it back through `setFlag` as the sole write — that merge never removes keys.
+A same-`update` parent-delete + re-assert mix (`-=<map>` plus a fresh `<map>` in one payload) is ORDER-DEPENDENT in `mergeObject` (no delete-before-insert guarantee, so it can process the delete last and wipe the whole map); issue TWO sequential awaited updates instead — parent `-=<map>` first, then the retained-map write.
+See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `deleteRemovedActiveRunFlags` (`src/config/flags.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers

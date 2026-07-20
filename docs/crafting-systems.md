@@ -563,11 +563,14 @@ If a macro reports failure or stops with an error, Fabricate blocks the step and
 #### Defining currency units
 
 When you use the **Actor data path** or **Macro** strategy, you define your own currency units.
-Each unit has a label, an abbreviation, and an icon.
+Each unit has a label, an optional abbreviation, and an icon.
+The abbreviation is the short form shown on a step's currency cost.
+When you leave it blank, the cost shows the unit's full label instead.
 
 - Under **Actor data path**, each unit also names the field on the actor sheet that holds its balance.
 - Under **Macro**, units have no path or denomination.
-  Your macros match coins by abbreviation, so a note reminds you that conversion between units is handled by your macros.
+  Your macros match coins by abbreviation, so every unit must have one.
+  Fabricate reports a configuration error if a unit is missing its abbreviation, and a note reminds you that conversion between units is handled by your macros.
 
 You can also describe how units break down into smaller ones, such as one gold breaking down into ten silver.
 A unit with no breakdown is treated as a base denomination.

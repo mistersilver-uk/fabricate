@@ -5,6 +5,15 @@ function defaultRandomID() {
   );
 }
 
+// A generated unit id has the shape produced by `defaultRandomID`: `foundry.utils.randomID()`
+// returns 16 alphanumeric chars and the crypto fallback returns 10 hex chars, so any id of 10+
+// alphanumeric characters is treated as machine-generated. Short, semantic ids (e.g. the preset
+// coin keys `cp`/`sp`/`ep`/`gp`/`pp`) deliberately fail this guard so a hand-authored abbreviation
+// that intentionally equals such an id is preserved.
+function isGeneratedUnitId(value) {
+  return /^[A-Za-z0-9]{10,}$/.test(value);
+}
+
 /**
  * Normalize one raw currency-unit entry into the canonical
  * `{ id, label, abbreviation, icon, actorPath, denomination?, contains[] }` shape.
@@ -15,6 +24,12 @@ function defaultRandomID() {
  * deduplicated by child id and drops any entry without a positive integer amount. Returns `null`
  * for a non-object entry or one that resolves to an empty id.
  *
+ * `abbreviation` is optional and defaults to the empty string when unauthored — it is never
+ * defaulted to, or persisted as, the unit `id`. A stored `abbreviation` that strictly equals the
+ * unit `id` is self-healed back to `''` when the id has the generated shape (see
+ * {@link isGeneratedUnitId}); a hand-authored abbreviation that equals a short semantic id (e.g. a
+ * preset coin key) is left intact.
+ *
  * @param {object} [entry]
  * @param {() => string} [randomID] - id factory used when the entry has no id.
  * @returns {object|null}
@@ -24,7 +39,9 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
   const id = String(entry.id || randomID()).trim();
   if (!id) return null;
   const label = String(entry.label || entry.name || id).trim() || id;
-  const abbreviation = String(entry.abbreviation || entry.abbr || id).trim() || id;
+  const rawAbbreviation = String(entry.abbreviation || entry.abbr || '').trim();
+  const abbreviation =
+    rawAbbreviation && !(rawAbbreviation === id && isGeneratedUnitId(id)) ? rawAbbreviation : '';
   const actorPath = String(entry.actorPath || entry.path || '').trim();
   const denomination = String(entry.denomination || '').trim();
   const contains = Array.isArray(entry.contains)
@@ -397,6 +414,19 @@ export function validateCurrencyProfile(units = [], options = {}) {
   };
 }
 
+/**
+ * Format a currency requirement as `<amount> <label>` for display.
+ *
+ * Resolves the requirement's unit id to a human label through the chain `abbreviation` (when
+ * authored), then `label`, so a well-formed requirement never surfaces the raw unit id (a resolved
+ * unit always carries a non-empty label). The one exception is a degenerate orphaned reference: when
+ * `requirement.unit` names an id no longer present in `units`, the raw id is rendered verbatim as a
+ * last resort, because a stale id reads better than a blank cost.
+ *
+ * @param {{ unit?: string, amount?: number }} requirement
+ * @param {object[]} [units]
+ * @returns {string}
+ */
 export function formatCurrencyRequirement(requirement, units = []) {
   const unit = findCurrencyUnit(units, requirement?.unit);
   const label = unit?.abbreviation || unit?.label || requirement?.unit || '';
@@ -616,13 +646,23 @@ export function canAddCurrencySubUnit(units = [], parentUnitId = '', subUnitId =
   return true;
 }
 
+/**
+ * List the units eligible to become a direct sub-unit of `parentUnitId` (see
+ * {@link canAddCurrencySubUnit}), each projected to `{ id, label, abbreviation }` for the picker.
+ * Both display fields resolve through a fallback so neither renders empty: `label` falls back to the
+ * id, and `abbreviation` resolves through `abbreviation`, then `label`, then `id`.
+ *
+ * @param {object[]} [units]
+ * @param {string} [parentUnitId]
+ * @returns {{ id: string, label: string, abbreviation: string }[]}
+ */
 export function currencySubUnitOptions(units = [], parentUnitId = '') {
   return (Array.isArray(units) ? units : [])
     .filter((unit) => canAddCurrencySubUnit(units, parentUnitId, unit?.id))
     .map((unit) => ({
       id: unit.id,
       label: unit.label || unit.id,
-      abbreviation: unit.abbreviation || unit.id,
+      abbreviation: unit.abbreviation || unit.label || unit.id,
     }));
 }
 

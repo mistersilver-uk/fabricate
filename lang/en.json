@@ -1124,7 +1124,12 @@
       "NoNewRecipesLearned": "{actor} already knows the matched recipe item recipes.",
       "CouldNotLearnRecipe": "Could not learn recipe",
       "PrerequisiteNotMet": "You must learn the required recipes first.",
-      "CharacterPrerequisiteNotMet": "You do not meet the prerequisites to learn {name}: {reason}."
+      "CharacterPrerequisiteNotMet": "You do not meet the prerequisites to learn {name}: {reason}.",
+      "Reset": {
+        "Success": "Reset crafting knowledge for {actor} ({count} recipe(s)).",
+        "GMOnly": "Only a GM can reset crafting knowledge.",
+        "NoActor": "No such actor to reset crafting knowledge for."
+      }
     },
     "Admin": {
       "Title": "Crafting Admin",

@@ -55,7 +55,7 @@ function _readPool() {
 /**
  * Build the default, world-setting-backed party learn pool store.
  *
- * @returns {{ get(key: string): number, increment(key: string): Promise<boolean> }}
+ * @returns {{ get(key: string): number, increment(key: string): Promise<boolean>, decrement(key: string): Promise<boolean> }}
  */
 export function createDefaultPartyLearnPool() {
   return {
@@ -71,6 +71,22 @@ export function createDefaultPartyLearnPool() {
       try {
         const pool = { ..._readPool() };
         pool[key] = Number(pool[key] || 0) + 1;
+        await globalThis.game.settings.set(SETTING_SCOPE, SETTING_KEY, pool);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    async decrement(key) {
+      // GM-authoritative and symmetric with `increment`: freeing a shared slot on
+      // knowledge reset/erase decrements the pooled count, floored at 0 so a
+      // double-free (or a stale slot) can never drive the shared budget negative.
+      // A non-GM path degrades safely (skipped, reported failed) exactly as
+      // `increment` does, so a client never mutates the shared budget.
+      if (!_isGM() || !_ensureRegistered()) return false;
+      try {
+        const pool = { ..._readPool() };
+        pool[key] = Math.max(0, Number(pool[key] || 0) - 1);
         await globalThis.game.settings.set(SETTING_SCOPE, SETTING_KEY, pool);
         return true;
       } catch {
