@@ -1346,6 +1346,44 @@ class Fabricate {
   }
 
   /**
+   * GM-only crafting-knowledge reset (issue 773) — the interim macro/console access
+   * path until #785 ships the Books & Scrolls Knowledge tab. Clears one actor's
+   * learned recipes (and their scoped discovery progress) for one crafting system
+   * (`systemId`) or, when `systemId` is null, across every system, delegating to the
+   * shared {@link RecipeVisibilityService#forgetLearnedRecipes} deletion primitive.
+   *
+   * Explicitly GM-gated even though it is GM-only: it mutates player-owned actor
+   * state and, for `total`-scope books, a world setting. Takes an `actorId` (never an
+   * actor uuid), resolves it via `game.actors.get`, and never throws — it returns the
+   * `{ success, message }` facade convention so a macro can branch on the outcome.
+   *
+   * @param {object} options
+   * @param {string} options.actorId The actor whose knowledge is reset.
+   * @param {string|null} [options.systemId] Limit to one crafting system, or null for all.
+   * @param {boolean} [options.freeLearnBudget=true] Free the consumed learn budget so
+   *   capped books permit re-learning.
+   * @returns {Promise<{ success: boolean, message: string, messageData?: object }>}
+   */
+  async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
+    if (game.user?.isGM !== true) {
+      return { success: false, message: 'FABRICATE.Knowledge.Reset.GMOnly' };
+    }
+    const actor = game.actors?.get?.(actorId);
+    if (!actor) {
+      return { success: false, message: 'FABRICATE.Knowledge.Reset.NoActor' };
+    }
+    const service = this.recipeVisibilityService;
+    const result = systemId
+      ? await service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })
+      : await service.forgetAllLearnedRecipes(actor, { freeLearnBudget });
+    return {
+      success: result.success === true,
+      message: 'FABRICATE.Knowledge.Reset.Success',
+      messageData: { actor: actor.name, count: result.count || 0, systemId },
+    };
+  }
+
+  /**
    * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
    * Resolves the crafting actor + component sources from the supplied ids (or the
    * persisted defaults) so the attempt uses the same inventory scope the listing
