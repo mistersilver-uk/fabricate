@@ -5477,6 +5477,76 @@ async function main() {
           await openManagerCraftingSection(page, 'recipes', 'recipes');
         }
 
+        // Issue 801 — the grouped-category CONTINUATION frame. With "Group by category" ON
+        // the library is ordered category-major BEFORE pagination, so a category larger
+        // than the page renders contiguously across the boundary: its remaining slice
+        // ("N of M") sits at the HEAD of the next page rather than being interleaved into
+        // an alphabetical slice on every page. Seed one category with 14 rows so it alone
+        // spans pages 1→2, shrink the page to 10, advance to the continuation page, and
+        // capture. Every seeded row is removed afterward so no downstream frame sees them.
+        // Guarded so a hiccup records a failed step rather than aborting the phase.
+        let seededRecipeIds801 = [];
+        try {
+          seededRecipeIds801 = await page.evaluate(async (sysId) => {
+            const rm = game.fabricate.getRecipeManager();
+            const ids = [];
+            for (let index = 1; index <= 14; index += 1) {
+              const recipe = await rm.createRecipe({
+                name: `Continuation Draught ${String(index).padStart(2, '0')}`,
+                description: 'Issue 801 grouped-pagination continuation fixture.',
+                craftingSystemId: sysId,
+                ingredientSets: [{
+                  ingredientGroups: [{
+                    name: 'Any reagent',
+                    options: [{ quantity: 1, match: { type: 'tags', tags: ['reagent'], tagMatch: 'any' } }]
+                  }]
+                }]
+              }, { allowIncomplete: true, notify: false });
+              // A category that sorts FIRST (recipes order categories plain-alphabetically),
+              // so its 14 rows alone occupy the first two pages.
+              await rm.updateRecipe(
+                recipe.id,
+                { category: 'Aaa Continuation' },
+                { allowIncomplete: true, notify: false }
+              );
+              ids.push(recipe.id);
+            }
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+            return ids;
+          }, craftingSetup.systemId);
+
+          await openManagerCraftingSection(page, 'recipes', 'recipes');
+          const recipeSize = page.locator('.fabricate-manager [data-pagination-size]').first();
+          await recipeSize.selectOption('10');
+          await settleManagerNav(page);
+          await page.locator('.fabricate-manager [data-pagination-next]').first().click();
+          await settleManagerNav(page);
+          await page.locator('.fabricate-manager .manager-recipe-group .fab-group-count').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'recipes grouped continuation',
+            label: 'manager-recipes-grouped-continuation',
+          });
+          // Reset the page size while the seeded rows still keep the pager on screen.
+          await recipeSize.selectOption('25').catch(() => {});
+          await settleManagerNav(page);
+          results.steps.push({ step: 'recipes-grouped-continuation', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipes-grouped-continuation', passed: false, error: err.message });
+          process.stderr.write(`Recipes grouped continuation capture failed: ${err.message}\n`);
+        } finally {
+          if (seededRecipeIds801.length > 0) {
+            await page.evaluate(async (ids) => {
+              const rm = game.fabricate.getRecipeManager();
+              for (const id of ids) {
+                await rm.deleteRecipe(id, { notify: false }).catch(() => {});
+              }
+              await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+            }, seededRecipeIds801);
+          }
+          await openManagerCraftingSection(page, 'recipes', 'recipes');
+        }
+
         // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
         // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a
         // hiccup records a failed step rather than aborting the whole phase.
@@ -6259,6 +6329,83 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-components-stacked');
         process.stdout.write('  D0: components stacked screenshotted\n');
+
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+
+        // Issue 801 — the grouped-category CONTINUATION frame for the component library.
+        // Same shape as the recipe frame above: seed one category with 14 rows so it alone
+        // spans pages 1→2 under a shrunk page, advance to the continuation page (its "N of
+        // M" slice at the head), and capture. The page size is reset and every seeded row +
+        // its backing item removed afterward, so no downstream frame sees them. Guarded so a
+        // hiccup records a failed step rather than aborting the phase. Placed AFTER the
+        // stacked frame so the shrunk page size can never leak into an earlier capture.
+        let seeded801Components = { componentIds: [], itemIds: [] };
+        try {
+          seeded801Components = await page.evaluate(async (sysId) => {
+            const csm = game.fabricate.getCraftingSystemManager();
+            const rawItemTypes = game.documentTypes?.Item ?? game.system?.documentTypes?.Item ?? [];
+            const itemTypes = Array.from(rawItemTypes);
+            const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
+            const specs = Array.from({ length: 14 }, (_, index) => ({
+              name: `Continuation Reagent ${String(index + 1).padStart(2, '0')}`,
+              type: itemType,
+              img: 'icons/commodities/materials/bowl-powder-teal.webp',
+            }));
+            const items = await Item.createDocuments(specs);
+            const componentIds = [];
+            for (const item of items) {
+              const result = await csm.addItemFromUuid(sysId, item.uuid);
+              // A category that sorts FIRST, so its 14 rows alone occupy the first two pages.
+              await csm.updateItem(sysId, result.item.id, { category: 'Aaa Continuation' });
+              componentIds.push(result.item.id);
+            }
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+            return { componentIds, itemIds: items.map((item) => item.id) };
+          }, craftingSetup.systemId);
+
+          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="components"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          const componentSize = page.locator('.fabricate-manager [data-pagination-size]').first();
+          await componentSize.selectOption('10');
+          await page.waitForTimeout(300);
+          await page.locator('.fabricate-manager [data-pagination-next]').first().click();
+          await page.waitForTimeout(300);
+          await page.locator('.fabricate-manager .manager-component-group .fab-group-count').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'components grouped continuation',
+            label: 'manager-components-grouped-continuation',
+          });
+          // Reset the page size while the seeded rows still keep the pager on screen.
+          await componentSize.selectOption('25').catch(() => {});
+          await page.waitForTimeout(200);
+          results.steps.push({ step: 'components-grouped-continuation', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'components-grouped-continuation', passed: false, error: err.message });
+          process.stderr.write(`Components grouped continuation capture failed: ${err.message}\n`);
+        } finally {
+          if (seeded801Components.componentIds.length > 0 || seeded801Components.itemIds.length > 0) {
+            await page.evaluate(async ({ sysId, componentIds, itemIds }) => {
+              const csm = game.fabricate.getCraftingSystemManager();
+              for (const id of componentIds) {
+                await csm.deleteItem(sysId, id).catch(() => {});
+              }
+              const items = itemIds.map((id) => game.items.get(id)).filter(Boolean);
+              if (items.length > 0) {
+                await Item.deleteDocuments(items.map((item) => item.id)).catch(() => {});
+              }
+              await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+            }, {
+              sysId: craftingSetup.systemId,
+              componentIds: seeded801Components.componentIds,
+              itemIds: seeded801Components.itemIds,
+            });
+          }
+          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="components"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+        }
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Tags")').first().click();

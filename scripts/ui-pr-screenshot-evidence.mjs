@@ -104,6 +104,19 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
     ],
   },
+  // Issue 801: the grouped-category CONTINUATION frame — a category split across a page
+  // boundary, its continuation slice ("N of M") at the head of the next page. Its OWN view
+  // id (one file per published frame; `collect` emits only `candidates[0]`) so the
+  // continuation state itself reaches the PR rather than an unrelated components frame.
+  {
+    id: 'manager-components-grouped-continuation',
+    label: 'Manager components browser — grouped category continued across a page boundary',
+    smokeLabels: ['manager-components-grouped-continuation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/utils\/componentBrowserModel\.js$/,
+    ],
+  },
   // Issue 800: write-time RESOLUTION of source descriptions. Three DEDICATED view ids,
   // not extra smokeLabels on `manager-components`: `collect` publishes only
   // `candidates[0]` from a filename-sorted list, so appending them there would publish
@@ -288,6 +301,19 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
+    ],
+  },
+  // Issue 801: the grouped-category CONTINUATION frame for the recipe library. Phase 1 is
+  // MODEL-ONLY — RecipesBrowserView.svelte is untouched — so `recipeBrowserModel.js` is the
+  // SOLE changed file that maps a frame to this browser; its `matches` MUST name it or the
+  // frame is silently stranded. Its own view id (one published frame per view id).
+  {
+    id: 'manager-recipes-grouped-continuation',
+    label: 'Manager recipes browser — grouped category continued across a page boundary',
+    smokeLabels: ['manager-recipes-grouped-continuation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/utils\/recipeBrowserModel\.js$/,
     ],
   },
   {

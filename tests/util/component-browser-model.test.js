@@ -132,6 +132,71 @@ describe('component browser model (issue 676)', () => {
     ]);
   });
 
+  // The non-grouped path is the byte-identical pre-issue-801 order. These literal
+  // orderings pin BOTH directions per key so a bug injected into the shared
+  // `rowComparator` flips them (rather than a self-comparison against the code).
+  it('pins each sort key in both directions (the flat, non-grouped path)', () => {
+    assert.deepEqual(names(sortComponents(ROWS, { key: 'name', direction: 'asc' })), [
+      'Copper Ore', 'Glass Vial', 'Iron Ore', 'Sage',
+    ]);
+    assert.deepEqual(names(sortComponents(ROWS, { key: 'name', direction: 'desc' })), [
+      'Sage', 'Iron Ore', 'Glass Vial', 'Copper Ore',
+    ]);
+    // Category ASC: Herb, then Metal (Copper before Iron by name), then general LAST.
+    assert.deepEqual(names(sortComponents(ROWS, { key: 'category', direction: 'asc' })), [
+      'Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial',
+    ]);
+    // Category DESC flips the group order — general (pinned last) floats to the FRONT —
+    // while the within-category tiebreak stays name-ascending.
+    assert.deepEqual(names(sortComponents(ROWS, { key: 'category', direction: 'desc' })), [
+      'Glass Vial', 'Copper Ore', 'Iron Ore', 'Sage',
+    ]);
+    assert.deepEqual(names(sortComponents(ROWS, { key: 'essences', direction: 'asc' })), [
+      'Copper Ore', 'Glass Vial', 'Iron Ore', 'Sage',
+    ]);
+    assert.deepEqual(names(sortComponents(ROWS, { key: 'essences', direction: 'desc' })), [
+      'Iron Ore', 'Sage', 'Copper Ore', 'Glass Vial',
+    ]);
+  });
+
+  // Issue 801 — with grouping ON the list is ordered category-major BEFORE pagination.
+  // `compareCategories` (general pinned LAST) is the DIRECTION-INDEPENDENT primary; the
+  // active sort orders rows only within a category.
+  describe('category-major grouped ordering (issue 801)', () => {
+    it('orders rows category-major with general pinned last, name-ascending within', () => {
+      // A name-key sort with categoryMajor groups the rows into their category order
+      // (Herb, Metal, general) with names ascending inside each bucket.
+      assert.deepEqual(names(sortComponents(ROWS, { key: 'name', categoryMajor: true })), [
+        'Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial',
+      ]);
+    });
+
+    // The components-only edge: grouping ON + key 'category' + direction 'desc'. The
+    // direction must touch NEITHER the primary (groups stay ascending, general last) NOR
+    // the tiebreak (names ascending) — it would otherwise double-apply and reverse the
+    // very group order the headers render.
+    it('keeps a desc category sort rendering ascending groups (general last), name-asc within', () => {
+      assert.deepEqual(names(sortComponents(ROWS, { key: 'category', direction: 'desc', categoryMajor: true })), [
+        'Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial',
+      ]);
+      // Identical to the ascending category-major order — the direction is inert here,
+      // exactly the opposite of the flat category-desc order pinned above.
+      assert.deepEqual(
+        names(sortComponents(ROWS, { key: 'category', direction: 'desc', categoryMajor: true })),
+        names(sortComponents(ROWS, { key: 'category', direction: 'asc', categoryMajor: true }))
+      );
+    });
+
+    it('confines a non-category sort direction to within-category rows only', () => {
+      // desc by essences: groups stay Herb, Metal, general (direction-independent), and
+      // only the rows within Metal descend by essence count (Iron Ore[1] before Copper[0]).
+      assert.deepEqual(
+        sortComponents(ROWS, { key: 'essences', direction: 'desc', categoryMajor: true }).map((row) => row.name),
+        ['Sage', 'Iron Ore', 'Copper Ore', 'Glass Vial']
+      );
+    });
+  });
+
   it('does not mutate the input, and falls back to name for an unknown key', () => {
     const before = names(ROWS);
     sortComponents(ROWS, { key: 'nonsense' });

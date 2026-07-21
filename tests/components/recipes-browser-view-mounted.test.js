@@ -92,6 +92,45 @@ function rowIds(root) {
   return [...root.querySelectorAll('.manager-recipe-row')].map((row) => row.dataset.recipeId);
 }
 
+/** [category, countText] per rendered group, in DOM order, for the current page. The
+ * category is read off the group list's region id (`manager-recipe-group-<category>`). */
+function recipeGroupsOnPage(root) {
+  return [...root.querySelectorAll('.manager-recipe-group')]
+    .filter((section) => section.querySelector('[data-group-header]'))
+    .map((section) => {
+      const list = section.querySelector('ul.manager-recipe-group-list');
+      const category = list ? list.id.replace('manager-recipe-group-', '') : '';
+      return [category, section.querySelector('.fab-group-count').textContent.trim()];
+    });
+}
+
+/**
+ * A multi-category library whose row NAMES are assigned round-robin across the
+ * categories, so a global name sort (the pre-issue-801 paginate-then-group order)
+ * SCATTERS each category across every page. Only category-major ordering makes a category
+ * contiguous — so this fixture binds the view's grouped pipeline end to end.
+ */
+function interleavedRecipeLibrary(plan) {
+  const buckets = plan.map(([category, count]) =>
+    Array.from({ length: count }, () => category)
+  );
+  const order = [];
+  let remaining = plan.reduce((sum, [, count]) => sum + count, 0);
+  const cursor = buckets.map(() => 0);
+  while (remaining > 0) {
+    for (const [bucketIndex, bucket] of buckets.entries()) {
+      if (cursor[bucketIndex] < bucket.length) {
+        order.push(bucket[cursor[bucketIndex]]);
+        cursor[bucketIndex] += 1;
+        remaining -= 1;
+      }
+    }
+  }
+  return order.map((category, index) =>
+    makeRecipe({ id: `r${index}`, name: `Item ${String(index + 1).padStart(2, '0')}`, category })
+  );
+}
+
 before(async () => {
   await browser.setup();
   await inspector.setup();
@@ -215,6 +254,57 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     header.click();
     flushSync();
     assert.deepEqual(rowIds(root), ['r1', 'r2']);
+  });
+});
+
+// Issue 801 — with grouping ON the recipe library is ordered category-major before
+// pagination, so a category larger than the page renders contiguously across the
+// boundary. The contiguity is bound in the util test through `buildRecipeBrowserModel`;
+// this confirms the same reaches the rendered mount.
+describe('RecipesBrowserView category-major grouped pagination (issue 801)', () => {
+  it('renders each category contiguously across a page boundary, N of M on both sides', async () => {
+    // alchemy (6) · general (12, the boundary-spanning bucket, in its plain-alpha slot)
+    // · smithing (4) = 22 rows.
+    const root = await browser.mount({
+      recipes: interleavedRecipeLibrary([
+        ['alchemy', 6],
+        ['general', 12],
+        ['smithing', 4],
+      ]),
+      recipeCategories: [
+        { name: 'alchemy', count: 6 },
+        { name: 'general', count: 12 },
+        { name: 'smithing', count: 4 },
+      ],
+      showRecipeCategories: true,
+    });
+
+    // Shrink the page to 10 so general (12) must span two pages.
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    // Page 1: the whole alchemy bucket, then the first slice of general — not an
+    // interleaved alphabetical slice of all three categories.
+    assert.equal(root.querySelectorAll('.manager-recipe-row').length, 10, 'page 1 holds ten');
+    assert.deepEqual(recipeGroupsOnPage(root), [
+      ['alchemy', '6 recipes'],
+      ['general', '4 of 12 recipes'],
+    ]);
+
+    // Page 2: general CONTINUES contiguously (its remaining 8), then smithing begins.
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    assert.deepEqual(recipeGroupsOnPage(root), [
+      ['general', '8 of 12 recipes'],
+      ['smithing', '2 of 4 recipes'],
+    ]);
+
+    // Page 3: smithing finishes; general never reappears on a non-adjacent page.
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    assert.deepEqual(recipeGroupsOnPage(root), [['smithing', '2 of 4 recipes']]);
   });
 });
 
