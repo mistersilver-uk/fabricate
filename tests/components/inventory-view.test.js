@@ -56,9 +56,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
-    // The role=radiogroup system selector InventoryComponentDetail renders for a
-    // multi-system card (issue 766). A `.svelte` leaf, so it lives in compiledModules —
-    // NOT CRAFTING_APP_RAW_MODULES; an omission HANGS this suite (# cancelled), never fails.
+    // The <select> system selector InventoryComponentDetail renders for a multi-system
+    // card (issue 766). A `.svelte` leaf, so it lives in compiledModules — NOT
+    // CRAFTING_APP_RAW_MODULES; an omission HANGS this suite (# cancelled), never fails.
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
