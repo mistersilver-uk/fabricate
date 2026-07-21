@@ -28,12 +28,17 @@ function clampProgressFraction(pct) {
 
 /**
  * Build the default V13 progress-notification reporter used when no `reportProgress`
- * seam is injected. `ui.notifications.info(msg, { progress: true })` returns a handle
- * whose `handle.update({ pct, message })` advances the bar (`pct` on `[0, 1]`); it
- * superseded `SceneNavigation.displayProgressBar`.
+ * seam is injected. `ui.notifications.info(msg, { progress: true, console: false })`
+ * returns a handle whose `handle.update({ pct, message })` advances the bar (`pct` on
+ * `[0, 1]`); it superseded `SceneNavigation.displayProgressBar`. `console: false`
+ * matches the native scene loader and stops every progress tick from writing a
+ * `console.info` line.
  *
- * The returned reporter is stateful (it lazily opens ONE toast on first call and
- * updates it thereafter) and carries the three required guards:
+ * The returned value is a callable reporter that ALSO owns the toast lifecycle: it is
+ * the single owner of its notification handle, and it carries an idempotent `dismiss()`
+ * terminal seam so an abnormal exit can finalize the still-open toast. The reporter is
+ * stateful (it lazily opens ONE toast on first call, updates it thereafter, and tracks
+ * `started`/`completed`) and carries the required guards:
  *   1. Undefined-handle / test-stub safety — when `info` is absent or returns a falsy
  *      handle (or a handle without `.update`), it degrades to a no-op rather than
  *      throwing (the test harness stubs `info` as `() => {}`, returning `undefined`).
@@ -41,14 +46,27 @@ function clampProgressFraction(pct) {
  *      cap may not be rendered when `.update()` is first called, which can throw; the
  *      call is wrapped in try/catch and degrades silently.
  *   3. Completion at `pct: 1` — a progress toast is exempt from the normal lifetime and
- *      only self-dismisses when it reaches `pct: 1`, so callers MUST finish at `pct: 1`.
+ *      only self-dismisses when it reaches `pct: 1`, so callers MUST finish at `pct: 1`;
+ *      reaching `pct: 1` sets `completed`, after which `dismiss()` stands down (the toast
+ *      already scheduled its own 500ms self-remove, so there is no double-remove race).
  *
- * @returns {(update: { pct?: number, message?: string, phase?: string }) => void}
+ * `dismiss()` guarantees a terminal state on an exit that never reached `pct: 1`
+ * (e.g. an import that throws mid-pipeline). It is a no-op when the reporter never
+ * started or already completed; otherwise it removes the still-open toast via the
+ * handle's own `handle.remove()` (immediate and queue-safe — it splices the notify
+ * queue without touching the DOM, unlike `update({ pct: 1 })` which would flash the
+ * bar to a misleading SUCCESS state and can throw on an un-rendered toast). The
+ * removal call mirrors the existing guards: a falsy handle, a missing `remove`
+ * method, or a teardown throw all degrade to a no-op.
+ *
+ * @returns {((update: { pct?: number, message?: string, phase?: string }) => void) & { dismiss: () => void }}
  */
 export function createDefaultProgressReporter() {
   let handle = null;
   let started = false;
-  return function reportProgress({ pct, message } = {}) {
+  let completed = false;
+
+  function reportProgress({ pct, message } = {}) {
     const notifications = globalThis.ui?.notifications;
     if (!notifications || typeof notifications.info !== 'function') return;
 
@@ -56,11 +74,16 @@ export function createDefaultProgressReporter() {
     if (!started) {
       started = true;
       try {
-        handle = notifications.info(message ?? '', { progress: true });
+        handle = notifications.info(message ?? '', { progress: true, console: false });
       } catch {
         handle = null;
       }
     }
+
+    // `clampProgressFraction` returns a literal `1` at/above the cap, so this boundary
+    // has no float-drift risk; reaching it marks the run complete (the toast self-
+    // dismisses at strict `pct === 1`) so a later `dismiss()` stands down.
+    if (fraction === 1) completed = true;
 
     if (!handle || typeof handle.update !== 'function') return;
     try {
@@ -69,7 +92,23 @@ export function createDefaultProgressReporter() {
       // Toast not yet rendered (queued behind the visible-toast cap): degrade to a
       // no-op tick rather than throwing out of the import loop.
     }
+  }
+
+  reportProgress.dismiss = function dismiss() {
+    // No-op when the toast never opened, or already reached pct:1 (where it scheduled
+    // its own self-remove). Idempotent: `completed` is latched before the removal so a
+    // repeat call — or a removal throw — cannot re-enter the removal path.
+    if (!started || completed) return;
+    completed = true;
+    if (!handle || typeof handle.remove !== 'function') return;
+    try {
+      handle.remove();
+    } catch {
+      // Teardown on an un-rendered / queued toast can throw: degrade to a no-op.
+    }
   };
+
+  return reportProgress;
 }
 
 /**
@@ -224,198 +263,213 @@ export class CompendiumImporter {
     const systemLabel = summary.system.name || 'crafting system';
     this._emitProgress({ pct: 0, phase: 'start', message: `Importing ${systemLabel}…` });
 
-    // --- Phase 1: Resolve existing system ---
-    const existingSystem = this._findExistingSystem(systemData);
+    // Guarantee a terminal reporter state on EVERY exit path. This try wraps the phase
+    // body AFTER the pct:0 start emit, so its catch targets THIS run's freshly-assigned
+    // `_activeProgressReporter`, never a stale prior-run reporter on the instance field.
+    // A progress toast self-dismisses only at pct:1, so a throw before the pct:1
+    // completion emit would otherwise leave the bar frozen until reload; the catch
+    // dismisses the still-open toast and then RE-THROWS the original error UNCHANGED so
+    // the UI caller still surfaces the real failure (its distinct `Import failed:` toast).
+    try {
+      // --- Phase 1: Resolve existing system ---
+      const existingSystem = this._findExistingSystem(systemData);
 
-    if (existingSystem && !overwriteExisting) {
-      summary.system.id = existingSystem.id;
-      summary.system.name = existingSystem.name;
-      summary.system.skipped = true;
-      summary.collisions.push({
-        type: 'system',
-        id: existingSystem.id,
-        name: existingSystem.name,
-        resolution: 'skipped',
-      });
-      this._emitProgress({
-        pct: 1,
-        phase: 'complete',
-        message: `${existingSystem.name} already installed`,
-      });
-      return summary;
-    }
-
-    // --- Phase 2: Remap component UUIDs ---
-    const components = Array.isArray(systemData.components) ? systemData.components : [];
-    summary.components.total = components.length;
-
-    this._emitProgress({
-      pct: 0.05,
-      phase: 'components',
-      message: `Resolving ${components.length} component references…`,
-    });
-
-    const remappedComponents = await this._remapComponentUuids(
-      components,
-      existingSystem,
-      retainFallbackIds,
-      additionalFallbackIds,
-      targetPackIds,
-      summary
-    );
-
-    // --- Phase 3: Create or overwrite system ---
-    this._emitProgress({ pct: 0.2, phase: 'system', message: `Saving ${systemLabel}…` });
-    const systemInput = { ...systemData, components: remappedComponents };
-    await this._validateGatheringConfig(systemInput);
-
-    let system;
-    if (existingSystem && overwriteExisting) {
-      system = await this._craftingSystemManager.updateSystem(existingSystem.id, systemInput);
-      summary.system.id = system.id;
-      summary.system.name = system.name;
-      summary.collisions.push({
-        type: 'system',
-        id: system.id,
-        name: system.name,
-        resolution: 'overwritten',
-      });
-    } else {
-      // Force the pack's system ID if provided so cross-references remain stable
-      system = await this._craftingSystemManager.createSystem(systemInput);
-      summary.system.id = system.id;
-      summary.system.name = system.name;
-      summary.system.created = true;
-    }
-
-    // Provenance key for recipe import stamping (issue 775): the pack's own stable
-    // identity when the payload carries one (keep-mode — preserved across reinstalls of
-    // the same pack, which is what makes provenance-matched pruning correct on the NEXT
-    // reinstall), else the freshly-created system id (copy-mode / id-less payloads,
-    // where the stamp is inert because copy never overwrites an existing system).
-    const packSystemId = systemData.id || system.id;
-
-    // --- Phase 4: Import recipes ---
-    // Each recipe mutates the in-memory recipe map only (persist:false); the whole
-    // batch is flushed with ONE `save()` after the loop, collapsing N growing
-    // whole-array `recipes` world writes to a single write. Per-recipe error
-    // isolation is unchanged (the try/catch still runs per recipe), and a caught
-    // failure leaves earlier successes in the map for the final `save()` to persist.
-    const totalRecipes = recipesData.length;
-    let processedRecipes = 0;
-    for (const recipeData of recipesData) {
-      const resolved = {
-        ...recipeData,
-        craftingSystemId:
-          recipeData.craftingSystemId === '__SYSTEM_ID__'
-            ? system.id
-            : recipeData.craftingSystemId || system.id,
-        // ALWAYS re-stamp provenance (issue 775), discarding any inbound `importSource`,
-        // so it self-heals across re-export/re-import chains and across a stale/foreign
-        // inbound value. A "stamp only when null" shortcut would be wrong.
-        importSource: { systemId: packSystemId, importedAt: Date.now() },
-      };
-
-      const existing = this._recipeManager.getRecipe(resolved.id);
-      if (existing && !overwriteExisting) {
-        summary.recipes.skipped++;
+      if (existingSystem && !overwriteExisting) {
+        summary.system.id = existingSystem.id;
+        summary.system.name = existingSystem.name;
+        summary.system.skipped = true;
         summary.collisions.push({
-          type: 'recipe',
-          id: resolved.id,
-          name: resolved.name || resolved.id,
+          type: 'system',
+          id: existingSystem.id,
+          name: existingSystem.name,
           resolution: 'skipped',
         });
-        processedRecipes++;
-        this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
-        continue;
+        this._emitProgress({
+          pct: 1,
+          phase: 'complete',
+          message: `${existingSystem.name} already installed`,
+        });
+        return summary;
       }
 
-      try {
-        if (existing && overwriteExisting) {
-          await this._recipeManager.updateRecipe(resolved.id, resolved, {
-            notify: false,
-            emitChange: false,
-            persist: false,
-          });
+      // --- Phase 2: Remap component UUIDs ---
+      const components = Array.isArray(systemData.components) ? systemData.components : [];
+      summary.components.total = components.length;
+
+      this._emitProgress({
+        pct: 0.05,
+        phase: 'components',
+        message: `Resolving ${components.length} component references…`,
+      });
+
+      const remappedComponents = await this._remapComponentUuids(
+        components,
+        existingSystem,
+        retainFallbackIds,
+        additionalFallbackIds,
+        targetPackIds,
+        summary
+      );
+
+      // --- Phase 3: Create or overwrite system ---
+      this._emitProgress({ pct: 0.2, phase: 'system', message: `Saving ${systemLabel}…` });
+      const systemInput = { ...systemData, components: remappedComponents };
+      await this._validateGatheringConfig(systemInput);
+
+      let system;
+      if (existingSystem && overwriteExisting) {
+        system = await this._craftingSystemManager.updateSystem(existingSystem.id, systemInput);
+        summary.system.id = system.id;
+        summary.system.name = system.name;
+        summary.collisions.push({
+          type: 'system',
+          id: system.id,
+          name: system.name,
+          resolution: 'overwritten',
+        });
+      } else {
+        // Force the pack's system ID if provided so cross-references remain stable
+        system = await this._craftingSystemManager.createSystem(systemInput);
+        summary.system.id = system.id;
+        summary.system.name = system.name;
+        summary.system.created = true;
+      }
+
+      // Provenance key for recipe import stamping (issue 775): the pack's own stable
+      // identity when the payload carries one (keep-mode — preserved across reinstalls of
+      // the same pack, which is what makes provenance-matched pruning correct on the NEXT
+      // reinstall), else the freshly-created system id (copy-mode / id-less payloads,
+      // where the stamp is inert because copy never overwrites an existing system).
+      const packSystemId = systemData.id || system.id;
+
+      // --- Phase 4: Import recipes ---
+      // Each recipe mutates the in-memory recipe map only (persist:false); the whole
+      // batch is flushed with ONE `save()` after the loop, collapsing N growing
+      // whole-array `recipes` world writes to a single write. Per-recipe error
+      // isolation is unchanged (the try/catch still runs per recipe), and a caught
+      // failure leaves earlier successes in the map for the final `save()` to persist.
+      const totalRecipes = recipesData.length;
+      let processedRecipes = 0;
+      for (const recipeData of recipesData) {
+        const resolved = {
+          ...recipeData,
+          craftingSystemId:
+            recipeData.craftingSystemId === '__SYSTEM_ID__'
+              ? system.id
+              : recipeData.craftingSystemId || system.id,
+          // ALWAYS re-stamp provenance (issue 775), discarding any inbound `importSource`,
+          // so it self-heals across re-export/re-import chains and across a stale/foreign
+          // inbound value. A "stamp only when null" shortcut would be wrong.
+          importSource: { systemId: packSystemId, importedAt: Date.now() },
+        };
+
+        const existing = this._recipeManager.getRecipe(resolved.id);
+        if (existing && !overwriteExisting) {
+          summary.recipes.skipped++;
           summary.collisions.push({
             type: 'recipe',
             id: resolved.id,
             name: resolved.name || resolved.id,
-            resolution: 'overwritten',
+            resolution: 'skipped',
           });
-        } else {
-          await this._recipeManager.createRecipe(resolved, {
-            notify: false,
-            emitChange: false,
-            persist: false,
+          processedRecipes++;
+          this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
+          continue;
+        }
+
+        try {
+          if (existing && overwriteExisting) {
+            await this._recipeManager.updateRecipe(resolved.id, resolved, {
+              notify: false,
+              emitChange: false,
+              persist: false,
+            });
+            summary.collisions.push({
+              type: 'recipe',
+              id: resolved.id,
+              name: resolved.name || resolved.id,
+              resolution: 'overwritten',
+            });
+          } else {
+            await this._recipeManager.createRecipe(resolved, {
+              notify: false,
+              emitChange: false,
+              persist: false,
+            });
+          }
+          summary.recipes.imported++;
+        } catch (error) {
+          summary.recipes.errors.push({
+            recipeId: resolved.id,
+            recipeName: resolved.name || resolved.id,
+            error: error.message || String(error),
           });
         }
-        summary.recipes.imported++;
-      } catch (error) {
-        summary.recipes.errors.push({
-          recipeId: resolved.id,
-          recipeName: resolved.name || resolved.id,
-          error: error.message || String(error),
-        });
+
+        processedRecipes++;
+        this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
       }
 
-      processedRecipes++;
-      this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
-    }
+      // --- Phase 4b: Prune provenance-matched orphans (overwrite of an existing system) ---
+      // Only ever runs in the `existingSystem && overwriteExisting` path: a copy-mode /
+      // fresh-system import mints a new id and has no persisted recipes to overwrite, so
+      // there is never an orphan to prune. Deletes mutate the in-memory map only
+      // (persist:false), folding into the single post-loop save below.
+      if (existingSystem && overwriteExisting) {
+        this._emitProgress({
+          pct: 0.92,
+          phase: 'prune',
+          message: 'Removing recipes dropped from the pack…',
+        });
+        await this._pruneOrphanedRecipes(system, recipesData, packSystemId, summary);
+      }
 
-    // --- Phase 4b: Prune provenance-matched orphans (overwrite of an existing system) ---
-    // Only ever runs in the `existingSystem && overwriteExisting` path: a copy-mode /
-    // fresh-system import mints a new id and has no persisted recipes to overwrite, so
-    // there is never an orphan to prune. Deletes mutate the in-memory map only
-    // (persist:false), folding into the single post-loop save below.
-    if (existingSystem && overwriteExisting) {
-      this._emitProgress({
-        pct: 0.92,
-        phase: 'prune',
-        message: 'Removing recipes dropped from the pack…',
+      // Single batched persist for the whole recipe phase. Widened from `imported > 0` so
+      // a prune-only reinstall (payload drops recipes but adds none, imported === 0) still
+      // writes; an overwrite that imports and prunes NOTHING still writes nothing.
+      // Optional-chained so a synchronous-storing mock recipe manager (which never needs a
+      // settings flush) is a no-op here; the real RecipeManager always defines `save`, so
+      // production still issues one write.
+      if (summary.recipes.imported > 0 || summary.recipes.pruned > 0) {
+        await this._recipeManager.save?.();
+      }
+
+      // ONE bulk actor-flag cleanup pass after the prune batch (F1, the deleteSystem
+      // precedent): reconciles invalid-run and learned-recipe flags against the
+      // post-deletion map in O(affected actors), not O(pruned × actors). Independent of
+      // the `recipes` write above, so it runs after the single save.
+      if (summary.recipes.pruned > 0) {
+        await this._recipeManager.cleanupOrphanedRecipeFlags?.();
+      }
+
+      this._recipeManager.notifyRecipesChanged?.({
+        action: 'importFromPack',
+        imported: summary.recipes.imported,
+        skipped: summary.recipes.skipped,
+        pruned: summary.recipes.pruned,
+        errors: summary.recipes.errors.length,
+        systemId: system.id,
       });
-      await this._pruneOrphanedRecipes(system, recipesData, packSystemId, summary);
+
+      // --- Phase 5: Gathering authoring (environments + config) ---
+      this._emitProgress({ pct: 0.95, phase: 'gathering', message: 'Saving gathering data…' });
+      await this._importGatheringAuthoring(packData, system, recipesData, summary);
+
+      // Fold the component source-item resolution into the unified reference report.
+      this._foldComponentReferences(summary);
+
+      // Completion MUST reach pct:1 — a progress toast is lifetime-exempt and only
+      // self-dismisses at pct:1, so anything less leaves the bar on screen.
+      this._emitProgress({ pct: 1, phase: 'complete', message: `Imported ${systemLabel}` });
+
+      return summary;
+    } catch (error) {
+      // Terminal-on-throw: finalize the still-open progress indicator (no-op on the
+      // success/skip paths, which already reached pct:1), then re-throw the ORIGINAL
+      // error unchanged — no wrapping, no swallow.
+      this._activeProgressReporter?.dismiss?.();
+      throw error;
     }
-
-    // Single batched persist for the whole recipe phase. Widened from `imported > 0` so
-    // a prune-only reinstall (payload drops recipes but adds none, imported === 0) still
-    // writes; an overwrite that imports and prunes NOTHING still writes nothing.
-    // Optional-chained so a synchronous-storing mock recipe manager (which never needs a
-    // settings flush) is a no-op here; the real RecipeManager always defines `save`, so
-    // production still issues one write.
-    if (summary.recipes.imported > 0 || summary.recipes.pruned > 0) {
-      await this._recipeManager.save?.();
-    }
-
-    // ONE bulk actor-flag cleanup pass after the prune batch (F1, the deleteSystem
-    // precedent): reconciles invalid-run and learned-recipe flags against the
-    // post-deletion map in O(affected actors), not O(pruned × actors). Independent of
-    // the `recipes` write above, so it runs after the single save.
-    if (summary.recipes.pruned > 0) {
-      await this._recipeManager.cleanupOrphanedRecipeFlags?.();
-    }
-
-    this._recipeManager.notifyRecipesChanged?.({
-      action: 'importFromPack',
-      imported: summary.recipes.imported,
-      skipped: summary.recipes.skipped,
-      pruned: summary.recipes.pruned,
-      errors: summary.recipes.errors.length,
-      systemId: system.id,
-    });
-
-    // --- Phase 5: Gathering authoring (environments + config) ---
-    this._emitProgress({ pct: 0.95, phase: 'gathering', message: 'Saving gathering data…' });
-    await this._importGatheringAuthoring(packData, system, recipesData, summary);
-
-    // Fold the component source-item resolution into the unified reference report.
-    this._foldComponentReferences(summary);
-
-    // Completion MUST reach pct:1 — a progress toast is lifetime-exempt and only
-    // self-dismisses at pct:1, so anything less leaves the bar on screen.
-    this._emitProgress({ pct: 1, phase: 'complete', message: `Imported ${systemLabel}` });
-
-    return summary;
   }
 
   /**

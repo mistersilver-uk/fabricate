@@ -1139,7 +1139,16 @@ test('#776: default progress reporter opens one toast and drives it to pct:1', (
     report({ pct: 1, message: 'c' });
 
     assert.equal(infoCalls.length, 1, 'exactly one progress toast is opened');
-    assert.deepEqual(infoCalls[0].opts, { progress: true });
+    assert.deepEqual(
+      infoCalls[0].opts,
+      { progress: true, console: false },
+      'opens as a progress toast with console logging suppressed (native scene-loader parity)'
+    );
+    assert.equal(
+      infoCalls[0].opts.console,
+      false,
+      'console: false is passed to suppress per-tick logging'
+    );
     assert.equal(updates.length, 3);
     assert.equal(updates[1].pct, 1, 'pct above 1 is clamped to 1');
     assert.equal(updates.at(-1).pct, 1, 'completion drives the bar to pct:1');
@@ -1175,6 +1184,198 @@ test('#776: import emits progress at phase boundaries, ticks through recipes, an
     'the recipe phase emits at least one interim tick'
   );
   assert.equal(saveCalls.length, 1, 'the recipe batch is flushed once');
+});
+
+// ---------------------------------------------------------------------------
+// #794 — terminal progress-indicator state on the throw path (default reporter)
+// ---------------------------------------------------------------------------
+
+// A crafting-system manager whose createSystem rejects with a caller-supplied error
+// instance, so the throw-path tests can assert the ORIGINAL error propagates unchanged.
+function makeRejectingSystemManager(bootError) {
+  return {
+    getSystems: () => [],
+    createSystem: async () => {
+      throw bootError;
+    },
+    updateSystem: async () => {
+      throw new Error('updateSystem should not run on a fresh-system import');
+    }
+  };
+}
+
+test('#794: a throw after the pct:0 start emit dismisses the toast and re-throws the original error unchanged', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const savedUi = globalThis.ui;
+  const removeCalls = [];
+  const handle = {
+    update: () => {},
+    remove: () => {
+      removeCalls.push(Date.now());
+    }
+  };
+  globalThis.ui = { notifications: { info: () => handle, warn() {}, error() {} } };
+
+  try {
+    const bootError = new Error('createSystem exploded');
+    const systemManager = makeRejectingSystemManager(bootError);
+    const recipeManager = makeMockRecipeManager({});
+    // No reportProgress seam injected: the DEFAULT reporter owns the toast lifecycle,
+    // so this exercises the reporter-owned dismiss() the fix adds.
+    const importer = new CompendiumImporter(systemManager, recipeManager);
+
+    let caught;
+    try {
+      await importer.importFromPackData(makePackData({ recipes: [] }));
+    } catch (err) {
+      caught = err;
+    }
+
+    // Both effects proven on one run: the toast is dismissed AND the original error
+    // instance propagates. Asserting only rejection would survive removing the fix.
+    assert.equal(removeCalls.length, 1, 'the still-open progress toast was dismissed exactly once on the throw path');
+    assert.equal(caught, bootError, 'the ORIGINAL error instance propagates unchanged (not wrapped)');
+  } finally {
+    globalThis.ui = savedUi;
+  }
+});
+
+test('#794: a removal throw during dismissal does not mask the original import error', async () => {
+  resetGame();
+  globalThis.fromUuid = async () => null;
+
+  const savedUi = globalThis.ui;
+  globalThis.ui = {
+    notifications: {
+      info: () => ({
+        update: () => {},
+        remove: () => {
+          throw new Error('remove blew up');
+        }
+      }),
+      warn() {},
+      error() {}
+    }
+  };
+
+  try {
+    const bootError = new Error('createSystem exploded');
+    const systemManager = makeRejectingSystemManager(bootError);
+    const recipeManager = makeMockRecipeManager({});
+    const importer = new CompendiumImporter(systemManager, recipeManager);
+
+    let caught;
+    try {
+      await importer.importFromPackData(makePackData({ recipes: [] }));
+    } catch (err) {
+      caught = err;
+    }
+
+    // The guard absorbs the teardown throw so the real import failure — not the
+    // removal error — is what the caller sees.
+    assert.equal(
+      caught,
+      bootError,
+      'the original import error survives a throwing toast teardown (removal error absorbed)'
+    );
+  } finally {
+    globalThis.ui = savedUi;
+  }
+});
+
+test('#794: reporter dismiss() is a no-op on the completed (pct:1) path and when never started', () => {
+  const savedUi = globalThis.ui;
+  try {
+    const removeCalls = [];
+    const handle = {
+      update: () => {},
+      remove: () => {
+        removeCalls.push(1);
+      }
+    };
+    globalThis.ui = { notifications: { info: () => handle } };
+
+    // Completed path: driven to pct:1, so the toast scheduled its own self-remove and
+    // dismiss() stands down (no explicit removal, no double-remove race).
+    const completedReporter = createDefaultProgressReporter();
+    completedReporter({ pct: 0, message: 'start' });
+    completedReporter({ pct: 1, message: 'done' });
+    completedReporter.dismiss();
+    completedReporter.dismiss();
+    assert.equal(removeCalls.length, 0, 'no explicit remove after the toast reached pct:1');
+
+    // Never-started path: dismiss() before any emit opens/removes nothing.
+    const idleReporter = createDefaultProgressReporter();
+    idleReporter.dismiss();
+    assert.equal(removeCalls.length, 0, 'dismiss() before any progress emit opens/removes nothing');
+  } finally {
+    globalThis.ui = savedUi;
+  }
+});
+
+test('#794: reporter dismiss() removes an incomplete toast exactly once across repeated calls', () => {
+  const savedUi = globalThis.ui;
+  try {
+    const removeCalls = [];
+    const handle = {
+      update: () => {},
+      remove: () => {
+        removeCalls.push(1);
+      }
+    };
+    globalThis.ui = { notifications: { info: () => handle } };
+
+    const reporter = createDefaultProgressReporter();
+    reporter({ pct: 0, message: 'start' });
+    reporter({ pct: 0.3 }); // never reached pct:1 — the toast is still open
+    reporter.dismiss();
+    reporter.dismiss();
+    reporter.dismiss();
+    assert.equal(removeCalls.length, 1, 'an incomplete toast is removed once; dismiss() is idempotent');
+  } finally {
+    globalThis.ui = savedUi;
+  }
+});
+
+test('#794: reporter dismiss() degrades safely for undefined / remove-less / throwing handles', () => {
+  const savedUi = globalThis.ui;
+  try {
+    // 1. info returns undefined: started, but there is no handle to remove.
+    globalThis.ui = { notifications: { info: () => undefined } };
+    const r1 = createDefaultProgressReporter();
+    r1({ pct: 0 }); // start, still incomplete
+    assert.doesNotThrow(() => r1.dismiss());
+
+    // 2. handle present but without a remove method.
+    globalThis.ui = { notifications: { info: () => ({ update: () => {} }) } };
+    const r2 = createDefaultProgressReporter();
+    r2({ pct: 0 });
+    assert.doesNotThrow(() => r2.dismiss());
+
+    // 3. handle.remove throws (teardown on an un-rendered / queued toast).
+    globalThis.ui = {
+      notifications: {
+        info: () => ({
+          update: () => {},
+          remove: () => {
+            throw new Error('not yet rendered');
+          }
+        })
+      }
+    };
+    const r3 = createDefaultProgressReporter();
+    r3({ pct: 0 });
+    assert.doesNotThrow(() => r3.dismiss());
+
+    // 4. no notifications surface at all.
+    globalThis.ui = {};
+    const r4 = createDefaultProgressReporter();
+    assert.doesNotThrow(() => r4.dismiss());
+  } finally {
+    globalThis.ui = savedUi;
+  }
 });
 
 test('#776: the default progress reporter opens a FRESH toast on each run of a reused importer', async () => {
