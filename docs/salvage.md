@@ -117,6 +117,27 @@ An item that cannot be salvaged shows no tab bar at all.
 Salvage happens inline in the inspector, so nothing opens in a separate window.
 Cards in the grid carry a recycle badge in their top-left corner when the component is salvageable, so players can see what can be broken down without opening each item.
 
+### Items in More Than One System
+
+A component can belong to more than one crafting system at once.
+When it does, the Inventory tab shows it as a single card rather than one card per system.
+Its quantity is counted once, so the grid reflects what the character actually holds.
+The card's recycle and tool markers cover every system the item takes part in, so a marker shows when the item can be salvaged or used as a tool in any of them.
+
+Selecting such an item adds a **System** drop-down to the top of the inspector, above the **Info** and **Salvage** tabs.
+The system in use is the selected option, and each option names the system followed by whether the item can be salvaged in that system and whether it acts as a tool there.
+A drop-down is used so the control stays compact however many systems the item belongs to.
+Picking a system re-scopes the whole inspector to that system's view of the item.
+The name, image, essences, tags, where it is used, and the Salvage tab all follow the selected system.
+This matters when two systems describe the same physical item differently, such as one giving it an essence and another a tag.
+
+Salvage always acts on the system you have selected, never a default one.
+When the item belongs to more than one system, the Salvage tab names the system it is about to act in.
+Breaking the item down acts only in the selected system, and the grid shows the true remaining quantity once the tab reloads.
+
+An item that belongs to only one system is unchanged.
+It shows no **System** drop-down and behaves exactly as before.
+
 ### What the Salvage Tab Shows
 
 The tab opens with a short banner naming the rule the component follows, then lists what the player stands to recover.

@@ -60,6 +60,48 @@ function matchesQuery(row, query) {
   return false;
 }
 
+/**
+ * The primary participation of a card: the `systems[]` entry the card's top-level
+ * identity mirrors (the builder's salvageable-biased primary), else the first entry.
+ * Pure, so the store never re-derives the builder's primary-selection bias.
+ */
+function primaryParticipation(item) {
+  const systems = Array.isArray(item?.systems) ? item.systems : [];
+  return systems.find((entry) => entry?.systemId === item?.systemId) ?? systems[0] ?? null;
+}
+
+/**
+ * The progressive salvage order id for a participation — `<systemId>:<componentId>`
+ * (issue 766). Component ids are NOT globally unique (copy-import preserves them), so the
+ * old `salvage:<componentId>` key collided across systems the moment the collapse surfaced
+ * two participations of one card. Returns null when either id is missing.
+ */
+function salvageOrderId(participation) {
+  const systemId = participation?.systemId;
+  const componentId = participation?.componentId;
+  if (typeof systemId !== 'string' || systemId.trim() === '') return null;
+  if (typeof componentId !== 'string' || componentId.trim() === '') return null;
+  return `${systemId}:${componentId}`;
+}
+
+/**
+ * Reconcile the held salvage snapshot against the reloaded listing (issue 675/766). When
+ * the card survives (stock remains anywhere on it) the fresh live row is authoritative;
+ * when the card is gone the acting participation is depleted, so the snapshot carries a
+ * zero card total AND a zero owned quantity on the acting participation only.
+ */
+function reconcileHeldRow(row, liveRow, systemId, componentId) {
+  if (liveRow) return liveRow;
+  const systems = Array.isArray(row?.systems)
+    ? row.systems.map((entry) =>
+        entry?.systemId === systemId && entry?.componentId === componentId
+          ? { ...entry, ownedQuantity: 0 }
+          : entry
+      )
+    : row?.systems;
+  return { ...row, totalQuantity: 0, systems };
+}
+
 function matchesFilter(row, filter) {
   switch (filter) {
     case 'components':
@@ -84,6 +126,11 @@ export function createInventoryStore({ services } = {}) {
   let error = $state(null);
   let loadedOnce = $state(false);
   let selectedKey = $state(null);
+  // The acting/selected system participation within the selected card (issue 766). null =
+  // the primary participation. Reset on every `select`, so a freshly-selected card always
+  // opens on its primary. Salvage routing, the success-ribbon gate, and the progressive
+  // order key all resolve through the participation this names — never the primary default.
+  let selectedSystemId = $state(null);
   let search = $state('');
   let filter = $state('all');
   let sort = $state('name');
@@ -194,6 +241,30 @@ export function createInventoryStore({ services } = {}) {
   });
 
   /**
+   * The acting participation of the selected card (issue 766): the `systems[]` entry named
+   * by `selectedSystemId`, else the PRIMARY. For a single-system / legacy card (no
+   * `systems`) it is the card's own top-level identity, so salvage routing is uniform and
+   * byte-identical to today. Never falls back to the primary once a system is explicitly
+   * selected AND still present.
+   */
+  const selectedParticipation = $derived.by(() => {
+    const item = selectedItem;
+    if (!item) return null;
+    const systems = Array.isArray(item.systems) ? item.systems : [];
+    if (systems.length === 0) {
+      return {
+        systemId: item.systemId ?? null,
+        componentId: item.componentId ?? null,
+        salvage: item.salvage ?? null,
+        ownedQuantity: Number(item.totalQuantity ?? 0),
+      };
+    }
+    const chosen =
+      systems.find((entry) => entry?.systemId === selectedSystemId) ?? primaryParticipation(item);
+    return chosen ?? null;
+  });
+
+  /**
    * The selected component's progressive salvage stages in the PLAYER'S order, with
    * thresholds RECOMPUTED for that order (issue 675).
    *
@@ -208,11 +279,11 @@ export function createInventoryStore({ services } = {}) {
    * mode, which is the only thing that keeps the badge and the award in step.
    */
   const orderedSalvageStages = $derived.by(() => {
-    const salvage = selectedItem?.salvage ?? null;
+    const salvage = selectedParticipation?.salvage ?? null;
     const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
     if (stages.length === 0) return stages;
     if (salvage.allowPlayerResultReorder === false) return stages;
-    const key = progressiveOrderKey({ scope: 'salvage', id: selectedItem?.componentId });
+    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
     if (!key) return stages;
 
     const ordered = applyPlayerResultOrder(stages, progressiveOrders[key] ?? null);
@@ -279,9 +350,8 @@ export function createInventoryStore({ services } = {}) {
    *   the i18n, and reads the moved stage's name BEFORE the move)
    */
   function reorderSalvageStage(index, target, announcement = '') {
-    const componentId = selectedItem?.componentId;
-    const key = progressiveOrderKey({ scope: 'salvage', id: componentId });
-    if (!key || selectedItem?.salvage?.allowPlayerResultReorder === false) return;
+    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
+    if (!key || selectedParticipation?.salvage?.allowPlayerResultReorder === false) return;
 
     const current = orderedSalvageStages;
     if (target < 0 || target >= current.length || index < 0 || index >= current.length) return;
@@ -310,7 +380,9 @@ export function createInventoryStore({ services } = {}) {
    * does nothing when pressed.
    */
   const salvageOrderIsCustom = $derived.by(() => {
-    const stages = Array.isArray(selectedItem?.salvage?.stages) ? selectedItem.salvage.stages : [];
+    const stages = Array.isArray(selectedParticipation?.salvage?.stages)
+      ? selectedParticipation.salvage.stages
+      : [];
     if (stages.length === 0) return false;
     const ordered = orderedSalvageStages;
     return ordered.length === stages.length && ordered.some((stage, i) => stage.id !== stages[i].id);
@@ -331,8 +403,8 @@ export function createInventoryStore({ services } = {}) {
    *   the i18n)
    */
   function resetSalvageOrder(announcement = '') {
-    const key = progressiveOrderKey({ scope: 'salvage', id: selectedItem?.componentId });
-    if (!key || selectedItem?.salvage?.allowPlayerResultReorder === false) return;
+    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
+    if (!key || selectedParticipation?.salvage?.allowPlayerResultReorder === false) return;
 
     progressiveOrders = { ...progressiveOrders, [key]: [] };
     salvageOrderAnnouncement = announcement;
@@ -361,7 +433,7 @@ export function createInventoryStore({ services } = {}) {
     if (!orderCommitTimer) return Promise.resolve({ ok: true });
     clearTimeout(orderCommitTimer);
     orderCommitTimer = null;
-    const key = progressiveOrderKey({ scope: 'salvage', id: selectedItem?.componentId });
+    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
     return key ? commitProgressiveOrder(key) : Promise.resolve({ ok: true });
   }
 
@@ -493,14 +565,20 @@ export function createInventoryStore({ services } = {}) {
    * the row and announced the revert, so proceeding would consume the component against
    * an order the player can see was undone. Nothing is consumed; they retry deliberately.
    *
-   * @param {string} componentId
+   * ROUTES THROUGH THE SELECTED PARTICIPATION (issue 766), never the primary: the acting
+   * `(systemId, componentId, targetActorId)` and the depleted basis are the acting
+   * participation's own — a system-B salvage on a divergent-roles card must consume B's
+   * documents and reflect B's remaining stock, not the card union.
+   *
+   * @param {string} systemId The acting participation's system id.
+   * @param {string} componentId The acting participation's component id.
    * @returns {Promise<{success: boolean, cancelled?: boolean, message?: string}>}
    */
-  async function salvage(componentId) {
-    if (!componentId || salvagingKey) return { success: false };
-    const row = rows.find((entry) => entry?.componentId === componentId) ?? null;
-    const systemId = row?.systemId ?? null;
-    if (!systemId) return { success: false };
+  async function salvage(systemId, componentId) {
+    if (!systemId || !componentId || salvagingKey) return { success: false };
+    const participation = resolveActingParticipation(systemId, componentId);
+    if (!participation) return { success: false };
+    const row = selectedItem;
 
     salvagingKey = componentId;
     try {
@@ -511,8 +589,8 @@ export function createInventoryStore({ services } = {}) {
         return { success: false, message: salvageOrderAnnouncement };
       }
       const result = await services?.salvageComponent?.({
-        // Decision 8: the first OWNED actor holding the component.
-        actorId: row?.salvage?.targetActorId ?? null,
+        // Decision 8: the first OWNED actor holding the acting participation's documents.
+        actorId: participation.salvage?.targetActorId ?? null,
         systemId,
         componentId,
         interactive: true,
@@ -523,7 +601,7 @@ export function createInventoryStore({ services } = {}) {
         return result;
       }
       if (result?.success === true && result?.results == null) {
-        salvageResult = { componentId, state: 'waiting', message: result?.message ?? '' };
+        salvageResult = { systemId, componentId, state: 'waiting', message: result?.message ?? '' };
         await load(true);
         return result;
       }
@@ -541,6 +619,7 @@ export function createInventoryStore({ services } = {}) {
         heldItem = row;
         selectedKey = row?.key ?? selectedKey;
         salvageResult = {
+          systemId,
           componentId,
           state: 'success',
           message: result?.message ?? '',
@@ -577,12 +656,21 @@ export function createInventoryStore({ services } = {}) {
         await load(true);
         // Reconcile the held snapshot with post-salvage reality (issue 675 defect).
         // The live listing now reflects the consumed stock: when the last copy was
-        // broken down the row is GONE (remaining 0); otherwise the fresh live row still
-        // exists and `selectedItem` prefers it. Carry the TRUE remaining onto the held
-        // row so a depleted component reads "None remaining" and withholds "Salvage
-        // again" — never the stale pre-roll count that would offer an impossible re-roll.
-        const liveRow = rows.find((entry) => entry?.componentId === componentId) ?? null;
-        heldItem = { ...row, totalQuantity: liveRow ? Number(liveRow.totalQuantity ?? 0) : 0 };
+        // broken down the CARD is GONE (remaining 0); otherwise the fresh live row still
+        // exists (found by its stable card KEY, not the acting componentId — the acting
+        // participation's component id is not the card's top-level id on a multi-system
+        // card) and `selectedItem` prefers it. Carry the TRUE remaining onto the held row
+        // so a depleted participation reads "None remaining" and withholds "Salvage
+        // again" — scoped to the acting participation, never the card union.
+        //
+        // The card key could in principle shift if depleting one participation changed the
+        // salvageable-biased primary — but that cannot surface a stale row today: the
+        // primary bias keys on salvageability (which salvaging never changes), and
+        // `ingredientQuantity` is effectively always 1 (per DOMAIN.md, no UI authors it), so
+        // a partial multi-participation depletion that leaves the card present under a
+        // different primary key is unreachable. A bounded edge, not an oversight.
+        const liveRow = rows.find((entry) => entry?.key === row?.key) ?? null;
+        heldItem = reconcileHeldRow(row, liveRow, systemId, componentId);
         return result;
       }
       salvageResult = null;
@@ -598,17 +686,60 @@ export function createInventoryStore({ services } = {}) {
     }
   }
 
+  /**
+   * Resolve the acting participation `(systemId, componentId)` names within the selected
+   * card (issue 766). For a single-system / legacy card (no `systems[]`) the top-level
+   * identity IS the participation. Returns null when the ids name nothing on the card.
+   */
+  function resolveActingParticipation(systemId, componentId) {
+    const item = selectedItem;
+    if (!item) return null;
+    const systems = Array.isArray(item.systems) ? item.systems : [];
+    if (systems.length === 0) {
+      if (item.systemId === systemId && item.componentId === componentId) {
+        return {
+          systemId,
+          componentId,
+          salvage: item.salvage ?? null,
+          ownedQuantity: Number(item.totalQuantity ?? 0),
+        };
+      }
+      return null;
+    }
+    return (
+      systems.find(
+        (entry) => entry?.systemId === systemId && entry?.componentId === componentId
+      ) ?? null
+    );
+  }
+
   /** Dismiss the salvage outcome and return the panel to its pre-roll state. */
   function resetSalvage() {
     salvageResult = null;
     heldItem = null;
   }
 
-  /** Select an item by key. Releases any held (salvaged) row and its ribbon. */
+  /**
+   * Select an item by key. Releases any held (salvaged) row and its ribbon, and resets the
+   * acting participation to the primary so a freshly-selected card opens on its default
+   * system (issue 766).
+   */
   function select(key) {
     selectedKey = key ?? null;
+    selectedSystemId = null;
     heldItem = null;
     salvageResult = null;
+  }
+
+  /**
+   * Choose which system participation the selected card's detail body scopes to (issue
+   * 766). null restores the primary. Clears the salvage ribbon: it belongs to whichever
+   * participation was just acted on, and switching systems changes the acting one.
+   */
+  function selectSystem(systemId) {
+    selectedSystemId = systemId ?? null;
+    salvageResult = null;
+    heldItem = null;
   }
 
   /** Update the search query and jump back to the first page. */
@@ -717,6 +848,12 @@ export function createInventoryStore({ services } = {}) {
     get selectedItem() {
       return selectedItem;
     },
+    get selectedSystemId() {
+      return selectedSystemId;
+    },
+    get selectedParticipation() {
+      return selectedParticipation;
+    },
     load,
     learn,
     learnAll,
@@ -726,6 +863,7 @@ export function createInventoryStore({ services } = {}) {
     resetSalvageOrder,
     flushSalvageOrder,
     select,
+    selectSystem,
     setSearch,
     setFilter,
     setSort,

@@ -579,6 +579,19 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageToolRequirements\.svelte$/],
   },
   {
+    // Issue 766: the one-card-per-unified-physical-stack collapse — a single card for a
+    // stack registered in two crafting systems, carrying the role=radiogroup System
+    // selector that re-scopes the whole detail body. Its OWN view (one file per view id)
+    // so `collect` publishes the dedicated frame; the frame the existing player-inventory
+    // capture walk (a single-system selection) cannot reach. Narrowly matched to the new
+    // selector component ONLY, so the `player-inventory` deep-equality assertions above are
+    // unaffected (it still ALSO maps to player-inventory via the broad inventory glob).
+    id: 'player-inventory-multi-system',
+    label: 'Player Inventory tab — multi-system collapsed card + system selector',
+    smokeLabels: ['player-inventory-multi-system'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySystemSelector\.svelte$/],
+  },
+  {
     id: 'fabricate-app-shell',
     label: 'Shared Fabricate app shell',
     smokeLabels: ['fabricate-app-shell'],

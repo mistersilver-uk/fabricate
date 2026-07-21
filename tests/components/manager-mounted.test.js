@@ -142,6 +142,8 @@ function compileManagerRoot() {
     writeCompiledSvelte(`src/ui/svelte/apps/inventory/detail/salvage/${salvageComponent}.svelte`);
   }
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte');
+  // The multi-system participation selector InventoryComponentDetail imports (issue 766).
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryDetail.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/crafting/CraftingThumb.svelte');

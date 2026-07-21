@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import {
+  SYS_A,
+  SYS_B,
+  multiSystemCardRow,
+  multiSystemProgressiveCardRow,
+} from '../helpers/inventoryCollapseFixtures.js';
 
 let compiler;
 let createInventoryStore;
@@ -410,7 +416,7 @@ describe('inventoryStore', () => {
       await store.load();
       flushSync();
 
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(calls.length, 1);
@@ -430,7 +436,7 @@ describe('inventoryStore', () => {
       const store = createInventoryStore({ services });
       await store.load();
       flushSync();
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       assert.deepEqual(Object.keys(calls[0]).sort(), [
@@ -451,7 +457,7 @@ describe('inventoryStore', () => {
       await store.load();
       flushSync();
 
-      const result = await store.salvage('c1');
+      const result = await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(result.cancelled, true);
@@ -472,7 +478,7 @@ describe('inventoryStore', () => {
       await store.load();
       flushSync();
 
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(store.salvageResult.state, 'waiting');
@@ -497,7 +503,7 @@ describe('inventoryStore', () => {
       flushSync();
 
       const before = listCalls.listInventoryForActor.length;
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(store.salvageResult.state, 'success');
@@ -519,7 +525,7 @@ describe('inventoryStore', () => {
       await store.load();
       flushSync();
 
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(store.salvageResult.state, 'success');
@@ -538,7 +544,7 @@ describe('inventoryStore', () => {
       await store.load();
       flushSync();
 
-      const result = await store.salvage('c1');
+      const result = await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(result.success, false);
@@ -559,12 +565,12 @@ describe('inventoryStore', () => {
       await store.load();
       flushSync();
 
-      const first = store.salvage('c1');
+      const first = store.salvage('sys', 'c1');
       flushSync();
       // The busy state is claimed SYNCHRONOUSLY, ahead of the awaited order flush, so a
       // second press inside that window is refused before it can reach the engine.
       assert.equal(store.salvagingKey, 'c1');
-      const second = await store.salvage('c1');
+      const second = await store.salvage('sys', 'c1');
       assert.deepEqual(second, { success: false }, 'the second press is refused');
 
       resolveCall({ success: true, results: [{}] });
@@ -599,7 +605,7 @@ describe('inventoryStore', () => {
       store.select('sys:c1');
       flushSync();
 
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(store.rows.length, 1, 'the salvaged row has left the listing');
@@ -643,7 +649,7 @@ describe('inventoryStore', () => {
       store.select('sys:c1');
       flushSync();
 
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(store.rows.length, 1, 'the row is still in the listing');
@@ -662,7 +668,7 @@ describe('inventoryStore', () => {
       await store.load();
       flushSync();
       store.select('sys:c1');
-      await store.salvage('c1');
+      await store.salvage('sys', 'c1');
       flushSync();
 
       store.resetSalvage();
@@ -775,7 +781,7 @@ describe('inventoryStore', () => {
       assert.deepEqual(await store.flushSalvageOrder(), { ok: true });
       assert.deepEqual(
         log,
-        [['setProgressiveResultOrder', 'salvage:c1', []]],
+        [['setProgressiveResultOrder', 'salvage:sys:c1', []]],
         'EMPTY, not [s1, s2]: "no preference" follows a later GM re-author, whereas the ' +
           'authored ids would pin this sequence and silently outlive it'
       );
@@ -843,7 +849,7 @@ describe('inventoryStore', () => {
       const flush = await store.flushSalvageOrder();
       flushSync();
       assert.deepEqual(flush, { ok: true });
-      assert.deepEqual(log, [['setProgressiveResultOrder', 'salvage:c1', ['s2', 's1']]]);
+      assert.deepEqual(log, [['setProgressiveResultOrder', 'salvage:sys:c1', ['s2', 's1']]]);
     });
 
     // The threshold is CUMULATIVE - a property of a stage's POSITION, not of the stage.
@@ -909,7 +915,7 @@ describe('inventoryStore', () => {
 
       // Press Salvage INSIDE the debounce window: without the flush, the engine would
       // capture the stale order.
-      const attempt = store.salvage('c1');
+      const attempt = store.salvage('sys', 'c1');
       await Promise.resolve();
       assert.deepEqual(
         log.map((entry) => entry[0]),
@@ -940,7 +946,7 @@ describe('inventoryStore', () => {
       store.reorderSalvageStage(0, 1, 'Shard moved to position 2 of 2');
       flushSync();
 
-      const result = await store.salvage('c1');
+      const result = await store.salvage('sys', 'c1');
       flushSync();
 
       assert.equal(result.success, false, 'the salvage is aborted');
@@ -988,12 +994,108 @@ describe('inventoryStore', () => {
     });
 
     it('seeds the stored order from settings on load', async () => {
-      const { store } = await loadedProgressiveStore({ orders: { 'salvage:c1': ['s2', 's1'] } });
+      const { store } = await loadedProgressiveStore({ orders: { 'salvage:sys:c1': ['s2', 's1'] } });
       assert.deepEqual(
         store.orderedSalvageStages.map((s) => s.id),
         ['s2', 's1'],
         'the standing preference is honoured on first render'
       );
+    });
+  });
+
+  // --- Selected-participation salvage routing (issue 766) ------------------------
+  describe('inventoryStore - multi-system participation routing', () => {
+    function multiSystemServices() {
+      const calls = [];
+      const { services } = makeServices({
+        listing: { selectedActorId: 'hero', rows: [multiSystemCardRow({ total: 2, actorId: 'a1' })] },
+      });
+      services.notify = () => {};
+      services.salvageComponent = async (opts) => {
+        calls.push(opts);
+        return { success: true, results: [{ name: 'Recovered' }] };
+      };
+      return { services, calls };
+    }
+
+    it('salvage routes to the SELECTED participation, explicitly not the primary', async () => {
+      const { services, calls } = multiSystemServices();
+      const store = createInventoryStore({ services });
+      await store.load();
+      store.select(`${SYS_A}:cA`);
+      store.selectSystem(SYS_B);
+      flushSync();
+
+      // The view hands the store the selected participation's ids.
+      await store.salvage(store.selectedParticipation.systemId, store.selectedParticipation.componentId);
+      flushSync();
+
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].systemId, SYS_B, 'System B, the selected participation');
+      assert.equal(calls[0].componentId, 'cB');
+      assert.notEqual(calls[0].systemId, SYS_A, 'explicitly NOT the primary (System A)');
+      assert.notEqual(calls[0].componentId, 'cA');
+      // targetActorId scoped to the selected participation's own documents.
+      assert.equal(calls[0].actorId, 'a1');
+    });
+
+    it('the progressive order commit key is distinct per system for a SHARED component id', async () => {
+      // Two participations whose component ids COLLIDE ('shared') must still commit to
+      // DISTINCT keys — the pre-existing latent collision the collapse surfaces (component
+      // ids are not globally unique). Routed through the store's OWN `salvageOrderId` /
+      // `selectedParticipation` derivation (reorder → flush → observe the committed key),
+      // NOT pre-composed ids handed to `progressiveOrderKey` — so dropping the `systemId`
+      // term from `salvageOrderId` collapses BOTH commits onto `salvage:shared` and flips
+      // this test, which the neighbouring flush/reorder tests would not catch.
+      const committed = [];
+      const { services } = makeServices({
+        listing: {
+          selectedActorId: 'hero',
+          rows: [multiSystemProgressiveCardRow({ actorId: 'a1' })],
+        },
+      });
+      services.notify = () => {};
+      services.getProgressiveResultOrder = () => ({});
+      services.setProgressiveResultOrder = async (key) => {
+        committed.push(key);
+      };
+      const store = createInventoryStore({ services });
+      await store.load();
+
+      // System A (the primary): reorder a stage and flush; observe the commit key.
+      store.select(`${SYS_A}:shared`);
+      flushSync();
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      await store.flushSalvageOrder();
+
+      // System B (same component id): reorder and flush again.
+      store.selectSystem(SYS_B);
+      flushSync();
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      await store.flushSalvageOrder();
+
+      assert.deepEqual(committed, [`salvage:${SYS_A}:shared`, `salvage:${SYS_B}:shared`]);
+      assert.notEqual(committed[0], committed[1], 'the shared component id does not collide the keys');
+    });
+
+    it('selectedParticipation defaults to the primary and follows selectSystem', async () => {
+      const { services } = multiSystemServices();
+      const store = createInventoryStore({ services });
+      await store.load();
+      store.select(`${SYS_A}:cA`);
+      flushSync();
+      assert.equal(store.selectedParticipation.systemId, SYS_A, 'defaults to the primary');
+
+      store.selectSystem(SYS_B);
+      flushSync();
+      assert.equal(store.selectedParticipation.systemId, SYS_B);
+
+      // Reselecting the card resets to the primary.
+      store.select(`${SYS_A}:cA`);
+      flushSync();
+      assert.equal(store.selectedParticipation.systemId, SYS_A);
     });
   });
 

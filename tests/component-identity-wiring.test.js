@@ -57,10 +57,10 @@ function conflictingIdentityFixture({ quantity } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// A7 — essence USED-BY path: InventoryListingBuilder._buildSystemRows (:218)
+// A7 — essence USED-BY path: InventoryListingBuilder._buildSystemParticipations
 // ---------------------------------------------------------------------------
 
-test('A7 - used-by: _buildSystemRows threads system.id so a roles-only item buckets under its roles component, not its duplicateSource sibling', () => {
+test('A7 - used-by: _buildSystemParticipations threads system.id so a roles-only item buckets under its roles component, not its duplicateSource sibling', () => {
   const { rolesComp, item, components } = conflictingIdentityFixture({ quantity: 2 });
   const builder = new InventoryListingBuilder({
     recipeManager: { getRecipes: () => [] },
@@ -69,10 +69,9 @@ test('A7 - used-by: _buildSystemRows threads system.id so a roles-only item buck
   const system = { id: 'sysA', name: 'System A', components };
   const actor = { id: 'actor-1', name: 'Hero', items: [item] };
 
-  const rows = builder._buildSystemRows(system, [actor]);
-  const componentRows = rows.filter((row) => row.isEssenceSource === false);
-  assert.equal(componentRows.length, 1, 'the owned item resolves to exactly one component');
-  assert.equal(componentRows[0].componentId, rolesComp.id, 'bucketed under the roles component');
+  const { participations } = builder._buildSystemParticipations(system, [actor]);
+  assert.equal(participations.length, 1, 'the owned item resolves to exactly one component');
+  assert.equal(participations[0].componentId, rolesComp.id, 'bucketed under the roles component');
 });
 
 // ---------------------------------------------------------------------------

@@ -315,6 +315,21 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-salvage-tools'], ['player-salvage-tools']);
   });
 
+  // Issue 766: the multi-system collapse frame is its own recipe (one file per id) so
+  // `collect` publishes it; the existing player-inventory capture walk selects a
+  // single-system item and cannot reach the selector. Its narrow glob onto
+  // InventorySystemSelector.svelte adds it alongside the broad inventory frame, without
+  // disturbing the player-inventory deep-equality above.
+  it('maps the issue-766 multi-system frame to its changed source', () => {
+    const ids = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    ]).map(v => v.id).sort();
+    assert.deepEqual(ids, ['player-inventory', 'player-inventory-multi-system']);
+
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['player-inventory-multi-system'], ['player-inventory-multi-system']);
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
