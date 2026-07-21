@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -84,22 +85,7 @@ function groupsOnPage(root) {
  * contiguous — so this fixture is what binds the view's `categoryMajor` wiring.
  */
 function interleavedLibrary(plan) {
-  const buckets = plan.map(([category, count]) =>
-    Array.from({ length: count }, () => category)
-  );
-  const order = [];
-  let remaining = plan.reduce((sum, [, count]) => sum + count, 0);
-  const cursor = buckets.map(() => 0);
-  while (remaining > 0) {
-    for (const [bucketIndex, bucket] of buckets.entries()) {
-      if (cursor[bucketIndex] < bucket.length) {
-        order.push(bucket[cursor[bucketIndex]]);
-        cursor[bucketIndex] += 1;
-        remaining -= 1;
-      }
-    }
-  }
-  return order.map((category, index) =>
+  return buildInterleavedCategoryOrder(plan).map((category, index) =>
     makeComponent({
       id: `c${index}`,
       name: `Item ${String(index + 1).padStart(2, '0')}`,

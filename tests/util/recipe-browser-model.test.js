@@ -17,6 +17,7 @@ import {
   paginateRecipes,
   sortRecipes
 } from '../../src/utils/recipeBrowserModel.js';
+import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 
 function makeRecipe(overrides = {}) {
   return {
@@ -192,27 +193,11 @@ describe('recipeBrowserModel — category-major grouped pagination (issue 801)',
   // categories, so a global name sort (the pre-801 order) SCATTERS them — only
   // category-major ordering makes each category contiguous, which is what these bind.
   function interleavedLibrary() {
-    const plan = [
+    return buildInterleavedCategoryOrder([
       ['alchemy', 3],
       ['general', 3],
       ['smithing', 3],
-    ];
-    const buckets = plan.map(([category, count]) =>
-      Array.from({ length: count }, () => category)
-    );
-    const order = [];
-    let remaining = plan.reduce((sum, [, count]) => sum + count, 0);
-    const cursor = buckets.map(() => 0);
-    while (remaining > 0) {
-      for (const [bucketIndex, bucket] of buckets.entries()) {
-        if (cursor[bucketIndex] < bucket.length) {
-          order.push(bucket[cursor[bucketIndex]]);
-          cursor[bucketIndex] += 1;
-          remaining -= 1;
-        }
-      }
-    }
-    return order.map((category, index) =>
+    ]).map((category, index) =>
       makeRecipe({ id: `r${index}`, name: `Item ${String(index + 1).padStart(2, '0')}`, category })
     );
   }
