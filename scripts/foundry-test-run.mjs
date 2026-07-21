@@ -5527,14 +5527,20 @@ async function main() {
             layout: 'recipes grouped continuation',
             label: 'manager-recipes-grouped-continuation',
           });
-          // Reset the page size while the seeded rows still keep the pager on screen.
-          await recipeSize.selectOption('25').catch(() => {});
-          await settleManagerNav(page);
           results.steps.push({ step: 'recipes-grouped-continuation', passed: true });
         } catch (err) {
           results.steps.push({ step: 'recipes-grouped-continuation', passed: false, error: err.message });
           process.stderr.write(`Recipes grouped continuation capture failed: ${err.message}\n`);
         } finally {
+          // Reset the page size FIRST — while the seeded rows still keep the pager on
+          // screen — so a shrink-to-10 can never leak into a downstream frame even if the
+          // capture threw after the shrink; THEN tear down the seeded rows. Idempotent:
+          // resetting to 25 when nothing was shrunk (or the pager is absent) is a no-op.
+          const recipeSizeReset = page.locator('.fabricate-manager [data-pagination-size]').first();
+          if (await recipeSizeReset.count() > 0) {
+            await recipeSizeReset.selectOption('25').catch(() => {});
+            await settleManagerNav(page);
+          }
           if (seededRecipeIds801.length > 0) {
             await page.evaluate(async (ids) => {
               const rm = game.fabricate.getRecipeManager();
@@ -6377,14 +6383,20 @@ async function main() {
             layout: 'components grouped continuation',
             label: 'manager-components-grouped-continuation',
           });
-          // Reset the page size while the seeded rows still keep the pager on screen.
-          await componentSize.selectOption('25').catch(() => {});
-          await page.waitForTimeout(200);
           results.steps.push({ step: 'components-grouped-continuation', passed: true });
         } catch (err) {
           results.steps.push({ step: 'components-grouped-continuation', passed: false, error: err.message });
           process.stderr.write(`Components grouped continuation capture failed: ${err.message}\n`);
         } finally {
+          // Reset the page size FIRST — while the seeded rows still keep the pager on
+          // screen — so a shrink-to-10 can never leak into a downstream frame even if the
+          // capture threw after the shrink; THEN tear down the seeded rows/items.
+          // Idempotent: resetting to 25 when nothing shrank (or the pager is absent) is a no-op.
+          const componentSizeReset = page.locator('.fabricate-manager [data-pagination-size]').first();
+          if (await componentSizeReset.count() > 0) {
+            await componentSizeReset.selectOption('25').catch(() => {});
+            await page.waitForTimeout(200);
+          }
           if (seeded801Components.componentIds.length > 0 || seeded801Components.itemIds.length > 0) {
             await page.evaluate(async ({ sysId, componentIds, itemIds }) => {
               const csm = game.fabricate.getCraftingSystemManager();
