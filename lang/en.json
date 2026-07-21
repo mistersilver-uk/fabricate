@@ -458,7 +458,8 @@
           "Depleted": "That was the last one — nothing left to salvage.",
           "OutcomeSuccess": "Salvaged",
           "OutcomeWaiting": "In progress",
-          "SummaryWithRoll": "with a roll of"
+          "SummaryWithRoll": "with a roll of",
+          "ActingSystem": "Salvaging as {system}"
         },
         "Detail": {
           "SelectHint": "Select an item to see its sources and where it's used.",
@@ -467,6 +468,7 @@
           "TabsLabel": "Item details",
           "TabInfo": "Info",
           "TabSalvage": "Salvage",
+          "SystemSelectorLabel": "System",
           "BrokenBanner": "This tool is broken and can't be used for crafting.",
           "Tier": "Tier {tier}",
           "TypeComponent": "Component",

@@ -33,6 +33,7 @@
 
   let {
     salvage = null,
+    actingSystemName = '',
     busy = false,
     depleted = false,
     result = null,
@@ -72,6 +73,15 @@
   // A time-gated run has STARTED and awarded nothing. No ribbon, and no "Salvage
   // again" — that would only re-enter the time gate.
   const waiting = $derived(result?.state === 'waiting');
+
+  // Names the acting participation when the card spans more than one system (issue 766), so
+  // the player knows which system's salvage this panel drives. Empty for a single-system
+  // card, where there is no ambiguity.
+  const actingSystemLabel = $derived(
+    actingSystemName
+      ? localize('FABRICATE.App.Inventory.Salvage.ActingSystem', { system: actingSystemName })
+      : ''
+  );
 
   // Default TRUE — an absent key reads as permitted; only an explicit false pins the
   // GM's authored order. FROZEN once committed: the roll has already been spent down
@@ -163,6 +173,9 @@
 </script>
 
 <div class="salvage-panel" data-inventory-salvage-panel={mode}>
+  {#if actingSystemLabel}
+    <p class="salvage-acting-system" data-inventory-salvage-acting-system>{actingSystemLabel}</p>
+  {/if}
   <!-- SUPPRESSED when misconfigured (issue 764). The banner derives a mode/usability
        tone — for a Simple no-check config that is the green "you'll recover this" ramp —
        which contradicts the misconfigured body sitting directly beneath it. The
@@ -284,6 +297,16 @@
        honoured, restoring ~24px below the last control (measured). Scoped here, not on
        the shared `.inventory-detail`, which also serves the Info and book panels. */
     padding-bottom: var(--fab-space-6);
+  }
+
+  /* A quiet eyebrow naming the acting participation on a multi-system card. */
+  .salvage-acting-system {
+    margin: 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fab-text-muted);
   }
 
   .salvage-banner {

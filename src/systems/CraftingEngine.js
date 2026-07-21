@@ -4051,7 +4051,14 @@ export class CraftingEngine {
         // normalizes individual run records, so this field survives the persist/read
         // round-trip. (Counter-case to this codebase's usual "normalizers strip unknown
         // fields" rule.)
-        resultOrder: this.getPlayerResultOrder({ scope: 'salvage', id: componentId }),
+        // The order key is scoped per (systemId, componentId): component ids are NOT
+        // globally unique (copy-import preserves them), so `salvage:<componentId>` alone
+        // collided across systems (issue 766). Must match the store's write key exactly,
+        // or the captured order silently reads empty.
+        resultOrder: this.getPlayerResultOrder({
+          scope: 'salvage',
+          id: `${craftingSystemId}:${componentId}`,
+        }),
       });
       salvageRunCreatedThisCall = true;
     }

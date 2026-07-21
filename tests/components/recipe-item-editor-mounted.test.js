@@ -53,6 +53,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
+    // The multi-system participation selector InventoryComponentDetail imports (issue 766).
+    'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',

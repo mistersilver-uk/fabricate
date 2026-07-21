@@ -23,9 +23,12 @@
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
   import InventorySalvagePanel from './InventorySalvagePanel.svelte';
+  import InventorySystemSelector from './InventorySystemSelector.svelte';
 
   let {
     item = null,
+    activeSystem = null,
+    onSelectSystem = () => {},
     onOpenRecipe = null,
     salvaging = false,
     salvageResult = null,
@@ -43,9 +46,17 @@
   // paginates independently at this many rows.
   const PAGE_SIZE = 6;
 
+  // A physical stack backing a component in more than one crafting system carries a
+  // `systems[]` participation array (issue 766); the detail then scopes its WHOLE body to
+  // the SELECTED participation. With one (or no) participation the surface is byte-identical
+  // to before: `active` is null and every read falls back to the top-level card field.
+  const systems = $derived(Array.isArray(item?.systems) ? item.systems : []);
+  const multiSystem = $derived(systems.length > 1);
+  const active = $derived(multiSystem ? activeSystem : null);
+
   const isEssence = $derived(item?.isEssenceSource === true);
-  const isTool = $derived(item?.isTool === true);
-  const description = $derived(String(item?.description ?? '').trim());
+  const isTool = $derived((active ? active.isTool : item?.isTool) === true);
+  const description = $derived(String((active ? active.description : item?.description) ?? '').trim());
   // A read-only verdict decided builder-side, from a persisted `toolBroken` past fact
   // or a projected usage exhaustion. Nothing un-breaks a tool, so the banner states
   // that it is unusable and offers no action — and it does NOT gate salvage: recycling
@@ -54,16 +65,34 @@
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
   );
-  const tags = $derived(Array.isArray(item?.tags) ? item.tags.filter((tag) => String(tag ?? '').trim() !== '') : []);
-  const essences = $derived(Array.isArray(item?.essences) ? item.essences : []);
-  const sources = $derived(Array.isArray(item?.sources) ? item.sources : []);
-  const usedBy = $derived(Array.isArray(item?.usedBy) ? item.usedBy : []);
-  const requiredFor = $derived(Array.isArray(item?.requiredFor) ? item.requiredFor : []);
-  const producedBy = $derived(Array.isArray(item?.producedBy) ? item.producedBy : []);
-  const contributors = $derived(Array.isArray(item?.contributors) ? item.contributors : []);
-  const tierLabel = $derived(
-    item?.tier != null && item.tier !== '' ? localize('FABRICATE.App.Inventory.Detail.Tier', { tier: item.tier }) : null
+  // Tags/essences/used-by/required-for/produced-by scope to the selected participation
+  // (essences and their neighbours are GM-authored per system — the reported case: air
+  // essence in one system, an elemental tag in the other). Sources/contributors are
+  // physical facts of the stack, so they stay top-level.
+  const scopedTags = $derived(active ? active.tags : item?.tags);
+  const tags = $derived(
+    Array.isArray(scopedTags) ? scopedTags.filter((tag) => String(tag ?? '').trim() !== '') : []
   );
+  const essences = $derived(
+    Array.isArray(active ? active.essences : item?.essences) ? (active ? active.essences : item.essences) : []
+  );
+  const sources = $derived(Array.isArray(item?.sources) ? item.sources : []);
+  const usedBy = $derived(Array.isArray(active ? active.usedBy : item?.usedBy) ? (active ? active.usedBy : item.usedBy) : []);
+  const requiredFor = $derived(
+    Array.isArray(active ? active.requiredFor : item?.requiredFor) ? (active ? active.requiredFor : item.requiredFor) : []
+  );
+  const producedBy = $derived(
+    Array.isArray(active ? active.producedBy : item?.producedBy) ? (active ? active.producedBy : item.producedBy) : []
+  );
+  const contributors = $derived(Array.isArray(item?.contributors) ? item.contributors : []);
+  const scopedTier = $derived(active ? active.tier : item?.tier);
+  const tierLabel = $derived(
+    scopedTier != null && scopedTier !== '' ? localize('FABRICATE.App.Inventory.Detail.Tier', { tier: scopedTier }) : null
+  );
+  // Header identity re-derives from the SELECTED participation's component name/img — a GM
+  // may know the same stack by a different name/icon in each system.
+  const displayName = $derived(String((active ? active.name : item?.name) ?? ''));
+  const displayImg = $derived((active ? active.img : item?.img) ?? '');
   const typeLabel = $derived(
     localize(
       isEssence
@@ -119,15 +148,19 @@
   // broken tool. Brokenness does not gate salvageability (the engine has no broken
   // check), and hiding the tab would read as "this isn't salvageable": wrong, and
   // unfixable by the player.
-  const salvage = $derived(item?.salvage?.enabled === true ? item.salvage : null);
+  const scopedSalvage = $derived(active ? active.salvage : item?.salvage);
+  const salvage = $derived(scopedSalvage?.enabled === true ? scopedSalvage : null);
   const salvageable = $derived(salvage !== null);
 
-  // Remaining owned quantity. Zero means the stack is depleted — the honest state
-  // after salvaging the last copy, where the row has left the live listing and the
-  // store holds a post-salvage snapshot carrying 0 (issue 675 defect). A depleted
-  // component still keeps its ribbon (the player must see what they recovered) but
-  // must never offer a way back to rolling an impossible salvage.
-  const remaining = $derived(Number(item?.totalQuantity ?? 0));
+  // Remaining owned quantity. Scoped to the SELECTED participation's OWN owned quantity,
+  // NOT the card union (issue 766): a system-B salvage on a divergent-roles card can only
+  // consume the documents B backs, so the depleted/"None remaining"/disabled-action basis
+  // is B's stock. Zero means depleted — the honest state after salvaging the last copy,
+  // where the row has left the live listing and the store holds a post-salvage snapshot
+  // carrying 0 (issue 675 defect). A depleted participation still keeps its ribbon (the
+  // player must see what they recovered) but must never offer a way back to rolling an
+  // impossible salvage.
+  const remaining = $derived(Number((active ? active.ownedQuantity : item?.totalQuantity) ?? 0));
   const depleted = $derived(remaining <= 0);
   // "N total" while stock remains; "None remaining" once depleted — a count of 0
   // would read as a stack that is somehow both present and empty.
@@ -197,12 +230,22 @@
 
 <InventoryDetailHeader
   detailKey={item.key}
-  img={item.img ?? ''}
+  img={displayImg}
   icon={isEssence ? icon : ''}
-  name={item.name}
+  name={displayName}
   total={totalLabel}
   chips={headerChips}
 >
+  {#if multiSystem}
+    <!-- FIRST in the header, before the Info|Salvage tablist: it re-scopes the WHOLE body
+         (see InventorySystemSelector). Only present with >1 participation. -->
+    <InventorySystemSelector
+      systems={item.systems}
+      selectedSystemId={active?.systemId ?? null}
+      onSelect={onSelectSystem}
+    />
+  {/if}
+
   {#if salvageable}
     <!-- ARIA contract reproduced from the in-repo precedent, GatheringDetailTabs:
          role=tablist/tab, aria-selected, aria-controls, roving tabindex, Arrow-key
@@ -242,6 +285,7 @@
     >
       <InventorySalvagePanel
         {salvage}
+        actingSystemName={multiSystem ? (active?.systemName ?? '') : ''}
         busy={salvaging}
         {depleted}
         result={salvageResult}

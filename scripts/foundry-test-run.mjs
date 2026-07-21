@@ -1696,7 +1696,12 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Cracked Amphora', img: 'icons/containers/kitchenware/vase-clay-painted-blue-gold.webp' },
       { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' },
       { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/paver-tile-blue.webp' },
-      { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' }
+      { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' },
+      // Issue 766: ONE physical world item registered as a salvageable component in TWO
+      // crafting systems (the simple forge and the progressive forge). A single crafter
+      // copy of it must collapse to ONE inventory card carrying a system selector — the
+      // reported "same item shows twice, once per system" defect and its fix.
+      { name: 'Smoke Air Shard', img: 'icons/commodities/gems/pearl-turquoise.webp' }
     ];
     const createdItems = await Item.createDocuments(
       worldSpecs.map((s) => ({ name: s.name, type: itemType, img: s.img }))
@@ -1745,8 +1750,27 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // tools frame shows one available and one unavailable required-tool row.
       'Smoke Toolchest',
       // Multi-option ingredient recipe (issue #552) components.
-      'Smoke Copper Coil', 'Smoke Bronze Coil', 'Smoke Filigree'
+      'Smoke Copper Coil', 'Smoke Bronze Coil', 'Smoke Filigree',
+      // Issue 766: also registered in the progressive forge below — one physical stack,
+      // two systems, one collapsed card.
+      'Smoke Air Shard'
     ]);
+    // Issue 766: Smoke Air Shard salvage in the SIMPLE forge (simple mode, yields Smoke
+    // Shard). Its progressive-forge participation (below) salvages differently, so the
+    // collapsed card's two participations carry genuinely distinct salvage surfaces.
+    await csm.updateItem(simpleSystemId, simpleMap['Smoke Air Shard'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [
+          {
+            id: 'smoke-air-simple-salvage',
+            name: 'Air Fragments',
+            results: [{ id: 'smoke-air-simple-shard', componentId: simpleMap['Smoke Shard'], quantity: 1 }]
+          }
+        ]
+      }
+    });
     const malletToolId = 'smoke-mallet-tool';
     const chiselToolId = 'smoke-chisel-tool';
     const anvilToolId = 'smoke-anvil-tool';
@@ -2071,7 +2095,10 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         // formula (so it renders the no-check body) and `Iron Ore` is seeded for the
         // component EDITOR, not player inventory — so the player salvage surface's
         // headline feature, the reorderable stage list, had no capturable frame.
-        'Smoke Cracked Amphora'
+        'Smoke Cracked Amphora',
+        // Issue 766: the SAME world item already registered in the simple forge — so one
+        // owned copy resolves to a component in both systems and collapses to one card.
+        'Smoke Air Shard'
       ],
       1
     );
@@ -2142,6 +2169,23 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         ]
       }
     });
+    // Issue 766: Smoke Air Shard salvage in the PROGRESSIVE forge (simple mode here for a
+    // deterministic capture, yielding Smoke Brick). Its simple-forge participation yields
+    // Smoke Shard — so the collapsed card's System selector switches between two genuinely
+    // different salvage surfaces, proving the whole body re-scopes to the chosen system.
+    await csm.updateItem(progressiveSystemId, progressiveMap['Smoke Air Shard'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [
+          {
+            id: 'smoke-air-prog-salvage',
+            name: 'Air Fragments',
+            results: [{ id: 'smoke-air-prog-brick', componentId: progressiveMap['Smoke Brick'], quantity: 1 }]
+          }
+        ]
+      }
+    });
     const progressiveRecipe = await rm.createRecipe({
       name: 'Smoke Mold Brick',
       description: 'progressive: one low-difficulty result awarded in a single advance.',
@@ -2202,7 +2246,10 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ...invCopies('Smoke Ingot B', 1),               // routedByIngredients set B (asserted NOT produced)
       ...invCopies('Smoke Bar', 1),                   // routedByCheck stock
       ...invCopies('Smoke Clay', 1),                  // progressive stock
-      ...invCopies('Smoke Cracked Amphora', 1)        // progressive-salvage subject (#675)
+      ...invCopies('Smoke Cracked Amphora', 1),       // progressive-salvage subject (#675)
+      // Issue 766: ONE physical copy registered in BOTH forges. It must collapse to a
+      // SINGLE card (quantity ×1, counted once — never ×2) with a system selector.
+      ...invCopies('Smoke Air Shard', 1)              // multi-system collapse subject (#766)
     ]);
 
     // ── 7. Always-run guaranteed-success gather (Arcane Forge, scene-less) ──
@@ -7253,6 +7300,30 @@ async function main() {
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage-tools');
+
+        // Issue 766: ONE physical stack registered as a salvageable component in TWO
+        // crafting systems (Smoke Air Shard, in the simple AND progressive forges) must
+        // render as a SINGLE inventory card, its quantity counted ONCE, carrying a
+        // role=radiogroup System selector that re-scopes the whole detail body. This one
+        // frame proves both halves: (a) the collapsed single card with its union badges
+        // and a ×1 pip (never ×2), and (b) the selector with per-system affordance
+        // annotations, opened to a participation's detail. Fails loudly, by design (no
+        // guard, no try/catch), for the same reason as the salvage frames above — the
+        // evidence gate only scrapes the `screenshot(page, '<label>')` literal, so a
+        // silent no-op would publish no PNG yet still pass. Does NOT commit a salvage.
+        const collapseSearch = appShell.locator('[data-inventory-filters] input').first();
+        await collapseSearch.waitFor({ state: 'visible', timeout: 10_000 });
+        await collapseSearch.fill('Smoke Air Shard');
+        await page.waitForTimeout(200);
+        // Exactly ONE card for the multi-system stack — the collapse contract.
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        // The multi-system selector is the visual proof of the collapse.
+        await appShell.locator('[data-inventory-system-selector] [role="radiogroup"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-inventory-multi-system');
 
         // Issue 764: the GM-facing Simple-mode MISCONFIGURED salvage cue. A stored Simple
         // config with more than one success result group is invalid (the engine awards only

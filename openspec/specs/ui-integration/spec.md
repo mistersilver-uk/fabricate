@@ -1564,6 +1564,15 @@ Every overlay sits **inside** the thumbnail's bounds and above it — not hangin
   - **essence pips**: one chip per essence the component carries, rendering the essence's **own authored icon**.
     Essences are GM-authored per system with their own icon; a fixed icon set, or a hue keyed on an essence's name, silently mis-renders any essence the GM named differently.
     The chip exists so the glyph reads against arbitrary artwork.
+- **One card per unified physical stack.**
+The listing renders **one card per unified physical stack**, not one per crafting system.
+A physical document that backs a component in **N crafting systems** appears **once**, with its quantity counted **once** — a per-system card duplicated the same stack and let the player read N× the true count, and salvaging one card silently consumed the sibling's documents.
+The projection **aggregates then collapses**: each system contributes today's within-system aggregate of a component across every owned document and source actor (a **participation**), then participations whose **contributing-document identity sets intersect** collapse into one card, and `totalQuantity` / `sources` are computed over the **union** of the card's contributing documents **deduped by identity** (a document participating in two systems counts its stack quantity once) and summed per source actor.
+Document identity for this dedup and join is **`item.uuid` alone** — never a compendium/duplicate-source union: `_stats.compendiumSource` and the transitive `_stats.duplicateSource` are shared across **distinct** documents (Foundry stamps a fresh `duplicateSource` on every drag-to-actor), so keying on them would merge two genuinely-owned stacks and undercount real holdings (`getItemIdentityReferences` is the codebase's precedent for excluding `duplicateSource` from identity; see `data-models/spec.md` for the `roles`-map component identity these participations resolve through).
+This **adds** cross-system unification and does **not** disturb today's same-component aggregation: distinct documents (across stacks or source actors) that resolve to the **same** component still aggregate into one summed card, and distinct documents that resolve to **different** components — even when they share a compendium/duplicate-source template — stay **distinct** cards.
+The card's at-a-glance signals (salvageable, tool, essence pips) are the **union** across participations, essence pips **deduped by essence id**.
+`broken` is a **singular** physical property of the document(s), never per system.
+Essence rows (synthetic per-system aggregates keyed `essence:<systemId>:<essenceId>`) and Books & Scrolls rows are legitimately distinct per system and are **NOT** collapsed by this behaviour.
 - **Broken treatment.**
 `broken` is a **read-only** verdict, and no engine path un-breaks a tool.
 It has **two** sources, and reading only the second reports almost every broken tool a player can actually see as intact:
@@ -1577,8 +1586,15 @@ A broken item dims its artwork, takes a danger wash and a danger card border, an
 There is **no repair affordance** anywhere; the treatment states why the tool is unusable and offers no action.
 Brokenness is about **usability, not salvageability**, and MUST NOT gate the salvage surface.
 
+- **Inspector system selector.**
+When a card participates in **more than one** crafting system, the inspector presents a **system selector** as the **first** element of the detail header, above the `Info | Salvage` control, scoping the **whole body** (name, image, description, tags, tier, essences, used-by, required-for, produced-by, and the salvage surface) to the **selected participation** — the reported case is an essence in one system and an elemental tag in the other.
+The selector is a **`role="radiogroup"`** (children `role="radio"` with `aria-checked`, a roving tabindex, and Arrow-key navigation), **not** a nested `role="tablist"`: its options re-parameterize both the Info and Salvage panels, so "pick which system's data this body shows" is a value choice, not content-tab navigation, and two stacked tablists whose tabs do not map 1:1 to tabpanels mislead assistive tech.
+It keeps a **segmented** visual (quieter than the accent `Info | Salvage` segments) with a **`<select>`** fallback beyond three systems, and annotates each option with per-system affordance glyphs (a recycle where salvageable, a wrench where a tool there).
+Display name and image are the **primary** (default-selected) participation's component name/image, biased to a **salvageable** participation first so clicking the union recycle badge never opens a primary with no Salvage tab.
+With exactly one participation the selector is **absent** and the surface is byte-identical to a single-system card — no selector node, no chrome, no layout shift.
 - **Inspector Info order.**
 Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
+Sources and Contributing are physical facts of the stack and stay card-scoped; every other Info leaf scopes to the selected participation.
 - **Used-by reverse index composition.**
 The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
 Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.
@@ -1590,6 +1606,11 @@ Essence-type options continue to feed the separate essence contributor channel a
 The player's route to salvage.
 
 - Salvage lives **inline in the inspector**; it is never a modal.
+- **The acting participation is the selected one, never the primary default.**
+On a card that participates in more than one system the salvage action resolves the acting `(systemId, componentId, targetActorId)` from the **selected** participation (the system selector's current choice) across the view handler, the store, the success-ribbon gate, and the panel — none falls back to the primary.
+Each participation salvages against **its own** contributing documents, so the depleted / "None remaining" / disabled-action basis is the selected participation's **own** owned quantity, not the card's cross-system union (a system-B salvage on a divergent-roles card cannot consume documents system B does not back).
+The panel **names the acting system** when the card spans more than one.
+The progressive stage-order preference is keyed per **`(systemId, componentId)`** (`salvage:<systemId>:<componentId>`): component ids are not globally unique (copy-import preserves them), so a component-id-only key collided across systems the moment the collapse surfaced two participations of one card, and the store's write key must match the engine's capture key exactly or the captured order silently reads empty.
 - An **`Info | Salvage`** control appears when the item is salvageable — **including when it is broken**, since brokenness does not gate salvageability.
 When the item is not salvageable, **no tab bar renders at all**: a hidden tab reads as "this isn't salvageable", which is wrong and unfixable by the player.
 - The body dispatches on the pair **`(mode, checkUsable)`** against **`system.salvageCraftingCheck`** — salvage's own check block, NOT `system.craftingCheck`, which is the recipe block.
