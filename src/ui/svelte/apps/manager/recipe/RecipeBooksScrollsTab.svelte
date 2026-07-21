@@ -152,10 +152,14 @@
 </section>
 
 <style>
+  /* Reconciled with `.manager-recipe-access-body` (issue 740): NO `align-items`, so the
+     list fills via default `stretch` and the auto-fill grid tiles across the panel. An
+     `align-items: flex-start` here would collapse the grid to a single content-width
+     column. The "Open Books & Scrolls" action opts back out with its own
+     `align-self: flex-start`. */
   .manager-recipe-books-body {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
     gap: var(--fab-space-2);
     min-width: 0;
   }
@@ -164,7 +168,8 @@
      GATHERING environment editor's `manager-environment-scene-*` classes — a book is
      not a scene, and borrowing a neighbour's vocabulary is how a surface silently
      inherits that neighbour's ramp (issue 676's tag pills went amber exactly this way).
-     Capped like the access list: a thumb + a name + an unlink is a short row. */
+     A thumb + a name + an unlink is a short row, tiled by the auto-fill grid below just
+     like the access list (the uncapped auto-fill grid since issue 740). */
   .manager-recipe-book-link {
     display: flex;
     align-items: center;
@@ -226,12 +231,28 @@
     align-self: flex-start;
   }
 
-  .manager-recipe-item-links,
-  .manager-recipe-section-empty {
-    width: 100%;
-    max-width: 520px;
+  /* Grid parity with `.manager-recipe-access-list` (issue 740): a thumb + a name + an
+     unlink is a short row, so tile the list into a responsive auto-fill grid that fills
+     the panel rather than a single stretched column. `auto-fill` (NOT `auto-fit`) keeps a
+     lone book compact ~220px left-aligned instead of stretching it across the panel.
+     Scoped under the `.manager-recipe-books-tab` ancestor for a deterministic (0,3,0) win
+     over the shared `.fabricate-manager .manager-recipe-item-links` flex rule (0,2,0),
+     which sets `display: flex` on this same `<ul>` — a bare scoped class would collide at
+     equal specificity, decided only by injection order. */
+  .manager-recipe-books-tab .manager-recipe-item-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--fab-space-1);
   }
 
+  /* Full-width dashed empty panel, split out of the old shared cap rule. */
+  .manager-recipe-section-empty {
+    width: 100%;
+  }
+
+  /* The shared rule sets `margin: 0 0 var(--fab-space-2)`, but the body already spaces the
+     list from the action with its `gap`; keep this `margin: 0` so the spacing isn't
+     doubled. */
   .manager-recipe-item-links {
     margin: 0;
   }

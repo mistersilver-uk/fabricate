@@ -331,14 +331,14 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-experimental-off'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
-  // The recipe editor publishes TEN distinct frames (overview/identity, ingredients,
+  // The recipe editor publishes twelve distinct frames (overview/identity, ingredients,
   // validation tab, multi-step durations, the four Results-tab modes — routed-by-check,
-  // multi-step, progressive, alchemy — tools, and the restricted-visibility context
-  // rail). `collect` emits ONE file per recipe id (it takes the first matching smoke
-  // label), so each frame needs its own recipe — a single recipe with ten smoke labels
-  // would only ever publish the first (overview) frame and silently drop the rest. All
-  // ten share the same `matches`, so any change to a recipe editor/inspector or recipe
-  // sub-component republishes them together.
+  // multi-step, progressive, alchemy — tools, the restricted-visibility Access tab, and
+  // the Books & Scrolls tab body). `collect` emits ONE file per recipe id (it takes the
+  // first matching smoke label), so each frame needs its own recipe — a single recipe
+  // with twelve smoke labels would only ever publish the first (overview) frame and
+  // silently drop the rest. All twelve share the same `matches`, so any change to a recipe
+  // editor/inspector or recipe sub-component republishes them together.
   {
     id: 'manager-recipe-edit-normal',
     label: 'Manager recipe editor — overview / identity',
@@ -421,6 +421,17 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-recipe-edit-access-rail',
     label: 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)',
     smokeLabels: ['manager-recipe-edit-access-rail'],
+    matches: RECIPE_EDIT_MATCHES,
+  },
+  {
+    // The Books & Scrolls tab body (issue 796). Its own dedicated frame because `collect`
+    // publishes only `candidates[0]` per view id, so without a view mapped to this smoke
+    // label the linked-book grid fix would never reach a PR — the sibling recipe-edit
+    // frames capture other tabs. This frame proves the tab body tiles into an auto-fill
+    // grid filling the panel rather than the old ~half-width capped column.
+    id: 'manager-recipe-edit-books-scrolls',
+    label: 'Manager recipe editor — Books & Scrolls tab (linked-book grid fills the panel)',
+    smokeLabels: ['manager-recipe-edit-books-scrolls'],
     matches: RECIPE_EDIT_MATCHES,
   },
   {

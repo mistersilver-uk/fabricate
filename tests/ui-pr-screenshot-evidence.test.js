@@ -330,7 +330,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
   });
 
-  it('maps a recipe editor file to all eleven recipe-edit frame recipes', () => {
+  it('maps a recipe editor file to all twelve recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
@@ -352,9 +352,12 @@ describe('UI PR screenshot evidence', () => {
       // only frame captured against a restricted-visibility system; the others
       // run against a system whose mode drives the Books & Scrolls branch.
       'manager-recipe-edit-access-rail',
+      // The Books & Scrolls tab body (issue 796): its own frame so the linked-book grid
+      // fix reaches a PR (collect publishes only candidates[0] per view id).
+      'manager-recipe-edit-books-scrolls',
     ];
 
-    // The top-level editor view and any recipe sub-component all republish all eleven
+    // The top-level editor view and any recipe sub-component all republish all twelve
     // frames. Every editor tab lives under `recipe/` so the glob covers it; the BROWSER
     // inspector deliberately lives under `recipes/`.
     for (const file of [
@@ -364,7 +367,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all eleven recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all twelve recipe-edit frames`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -381,10 +384,11 @@ describe('UI PR screenshot evidence', () => {
       ['manager-recipe-edit-results-alchemy'],
       ['manager-recipe-edit-tools'],
       ['manager-recipe-edit-access-rail'],
+      ['manager-recipe-edit-books-scrolls'],
     ]);
   });
 
-  it('collects the eleven recipe-edit frames into eleven separate files', () => {
+  it('collects the twelve recipe-edit frames into twelve separate files', () => {
     withScreenshotFixtures(
       {
         'screenshot-01-manager-recipe-edit-normal.png': 'normal',
@@ -398,6 +402,7 @@ describe('UI PR screenshot evidence', () => {
         'screenshot-09-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
         'screenshot-10-manager-recipe-edit-tools.png': 'tools',
         'screenshot-11-manager-recipe-edit-access-rail.png': 'access-rail',
+        'screenshot-12-manager-recipe-edit-books-scrolls.png': 'books-scrolls',
       },
       (root) => {
         const result = collectScreenshotEvidence({
@@ -405,7 +410,7 @@ describe('UI PR screenshot evidence', () => {
           prNumber: 654,
           root,
         });
-        assert.equal(result.copied.length, 11);
+        assert.equal(result.copied.length, 12);
         const byName = Object.fromEntries(
           result.copied.map(item => [
             item.destination.replaceAll('\\', '/').split('/').pop(),
@@ -424,6 +429,7 @@ describe('UI PR screenshot evidence', () => {
           'manager-recipe-edit-results-alchemy.png': 'results-alchemy',
           'manager-recipe-edit-tools.png': 'tools',
           'manager-recipe-edit-access-rail.png': 'access-rail',
+          'manager-recipe-edit-books-scrolls.png': 'books-scrolls',
         });
       },
     );

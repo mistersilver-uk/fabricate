@@ -229,6 +229,31 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
       'missing state copy'
     );
   });
+
+  // Issue 796: the linked-book list tiles into the same responsive auto-fill grid the
+  // Access tab adopted in issue 740, dropping the old `max-width: 520px` cap. The cascade
+  // win over the shared flex rule and the tiled fill are verified live in the smoke frame;
+  // this pins the rule SHAPE so a re-cap regresses at test time. The COMPOUND selector is
+  // extracted deliberately — a bare `.manager-recipe-item-links` regex would match the
+  // leftover `margin: 0` block first and assert against the wrong rule.
+  it('tiles the linked-book list into an uncapped auto-fill grid (Access-tab parity)', () => {
+    const gridRule = booksTabSource.match(
+      /\.manager-recipe-books-tab \.manager-recipe-item-links\s*\{[^}]*\}/
+    );
+    assert.ok(gridRule, 'scoped compound grid rule exists');
+    assert.match(gridRule[0], /display:\s*grid/, 'the list is a grid, not the shared flex column');
+    assert.match(gridRule[0], /repeat\(auto-fill/, 'auto-fill tracks keep a lone book compact');
+    assert.equal(/max-width/.test(gridRule[0]), false, 'the ~half-width cap is gone');
+  });
+
+  // The original bug capped BOTH the list and the empty state. Without this symmetric
+  // guard a re-cap of only the empty panel would ship green.
+  it('keeps the empty state a full-width uncapped panel', () => {
+    const emptyRule = booksTabSource.match(/\.manager-recipe-section-empty\s*\{[^}]*\}/);
+    assert.ok(emptyRule, 'scoped empty-state rule exists');
+    assert.match(emptyRule[0], /width:\s*100%/, 'the empty panel fills the tab body width');
+    assert.equal(/max-width/.test(emptyRule[0]), false, 'the ~half-width cap is gone');
+  });
 });
 
 describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', () => {
