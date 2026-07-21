@@ -54,7 +54,8 @@ test('the smoke harness no longer ships or reads bundled actor portraits', async
 // recipe actually carries a grant — and the smoke world seeded none of that, so a run
 // would silently capture the Books & Scrolls branch instead and the PR evidence would
 // show the wrong rail. These assertions are the guard: they fail if the fixture is
-// dropped, and the failure names what went missing.
+// dropped, and the failure names what went missing. Issue 796: the grant also seeds four
+// extra grant-only characters so the Access tab's three-column grid is captured populated.
 test('the smoke world seeds a restricted-visibility system so the recipe access rail is screenshottable', () => {
   assert.match(
     smokeRunSource,
@@ -63,8 +64,13 @@ test('the smoke world seeds a restricted-visibility system so the recipe access 
   );
   assert.match(
     smokeRunSource,
-    /access: \{\s*characterIds: \[crafterId, travelMemberId\]\.filter\(Boolean\),\s*playerIds: \[gathererUserId\]\.filter\(Boolean\)\s*\}/,
+    /access: \{\s*characterIds: \[crafterId, travelMemberId, \.\.\.accessGrantActors\.map\(\(a\) => a\.id\)\]\.filter\(Boolean\),\s*playerIds: \[gathererUserId\]\.filter\(Boolean\)\s*\}/,
     'the restricted recipe must carry an access grant naming BOTH characters and a player'
+  );
+  assert.match(
+    smokeRunSource,
+    /const accessGrantActors = await Actor\.createDocuments\(/,
+    'the access grant must seed extra grant-only characters so the three-column grid is captured populated'
   );
   assert.match(
     smokeRunSource,

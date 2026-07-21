@@ -231,17 +231,20 @@
     align-self: flex-start;
   }
 
-  /* Grid parity with `.manager-recipe-access-list` (issue 740): a thumb + a name + an
-     unlink is a short row, so tile the list into a responsive auto-fill grid that fills
-     the panel rather than a single stretched column. `auto-fill` (NOT `auto-fit`) keeps a
-     lone book compact ~220px left-aligned instead of stretching it across the panel.
-     Scoped under the `.manager-recipe-books-tab` ancestor for a deterministic (0,3,0) win
-     over the shared `.fabricate-manager .manager-recipe-item-links` flex rule (0,2,0),
-     which sets `display: flex` on this same `<ul>` — a bare scoped class would collide at
-     equal specificity, decided only by injection order. */
+  /* Grid parity with `.manager-recipe-access-list` (issue 740/796): a thumb + a name + an
+     unlink is a short row, so tile the list into a grid that fills the panel rather than a
+     single stretched column. A FIXED three-column grid (`minmax(0, 1fr)` so a long book
+     name shrinks its card gracefully instead of overflowing) gives ~340px per card at the
+     ~1040px editor panel — a third more name width than the earlier `auto-fill` 220px
+     tracks, which were truncating long titles. A lone card now fills one of three columns
+     rather than staying compact; that width is the accepted trade-off. Scoped under the
+     `.manager-recipe-books-tab` ancestor for a deterministic (0,3,0) win over the shared
+     `.fabricate-manager .manager-recipe-item-links` flex rule (0,2,0), which sets
+     `display: flex` on this same `<ul>` — a bare scoped class would collide at equal
+     specificity, decided only by injection order. */
   .manager-recipe-books-tab .manager-recipe-item-links {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--fab-space-1);
   }
 

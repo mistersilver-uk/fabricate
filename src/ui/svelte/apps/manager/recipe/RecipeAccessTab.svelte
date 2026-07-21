@@ -146,15 +146,15 @@
     min-width: 0;
   }
 
-  /* The access rows, rehomed from the rail (issue 740): the tab now fills the editor
-     width like its sibling tabs, so the list tiles into a responsive grid rather than a
-     single stretched column. An avatar + a name + a sub-line is a short row; auto-fill
-     tracks pack several rows per line so the full width reads dense instead of stranding
-     one name against empty space. minmax keeps each row wide enough for the identity
-     cluster and collapses to one column on a narrow editor. */
+  /* The access rows, rehomed from the rail (issue 740/796): the tab fills the editor width
+     like its sibling tabs, so the list tiles into a grid rather than a single stretched
+     column. A FIXED three-column grid (`minmax(0, 1fr)` so a long character name shrinks
+     its card gracefully instead of overflowing) gives ~340px per card at the ~1040px
+     editor panel — wider than the earlier `auto-fill` 220px tracks, which were truncating
+     long names — and keeps this tab in visual parity with the Books & Scrolls grid. */
   .manager-recipe-access-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--fab-space-1);
     margin: 0;
     padding: 0;

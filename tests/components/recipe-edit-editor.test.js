@@ -247,17 +247,18 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
     );
   });
 
-  // Issue 796: the linked-book list tiles into the same responsive auto-fill grid the
-  // Access tab adopted in issue 740, dropping the old `max-width: 520px` cap. The cascade
-  // win over the shared flex rule and the tiled fill are verified live in the smoke frame;
-  // this pins the rule SHAPE so a re-cap regresses at test time. The COMPOUND selector is
-  // extracted deliberately — a bare `.manager-recipe-item-links` regex would match the
-  // leftover `margin: 0` block first and assert against the wrong rule.
-  it('tiles the linked-book list into an uncapped auto-fill grid (Access-tab parity)', () => {
+  // Issue 796: the linked-book list tiles into a fixed three-column grid (widened from the
+  // earlier auto-fill 220px tracks, which truncated long titles), dropping the old
+  // `max-width: 520px` cap. The cascade win over the shared flex rule and the tiled fill
+  // are verified live in the smoke frame; this pins the rule SHAPE so a re-cap or a revert
+  // to narrow tracks regresses at test time. The COMPOUND selector is extracted so the
+  // match stays pinned to the grid rule (robust to future style-block reordering; the file
+  // also carries a bare `.manager-recipe-item-links { margin }` rule).
+  it('tiles the linked-book list into an uncapped three-column grid (Access-tab parity)', () => {
     assertScopedRuleHasNoMaxWidth(
       booksTabSource,
       '.manager-recipe-books-tab .manager-recipe-item-links',
-      { mustContain: ['display: grid', 'repeat(auto-fill'] }
+      { mustContain: ['display: grid', 'repeat(3, minmax(0, 1fr)'] }
     );
   });
 
@@ -301,6 +302,16 @@ describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', (
       'the whole-table case has its OWN string, never "Played by <one name>"'
     );
     assert.equal(accessTabSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  });
+
+  // Issue 796: the access list widened from auto-fill 220px tracks (which truncated long
+  // names) to a fixed three-column grid, kept in visual parity with the Books & Scrolls
+  // grid. Access has no shared-rule collision, so no ancestor specificity guard is needed —
+  // pin the bare class rule.
+  it('tiles the access list into a three-column grid (Books & Scrolls parity)', () => {
+    assertScopedRuleHasNoMaxWidth(accessTabSource, '.manager-recipe-access-list', {
+      mustContain: ['display: grid', 'repeat(3, minmax(0, 1fr)'],
+    });
   });
 });
 

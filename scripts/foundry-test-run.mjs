@@ -4717,15 +4717,28 @@ async function main() {
             }]
           }]
         });
-        // The grant carries BOTH a player and characters, and the two characters
-        // reach their controllers by DIFFERENT routes — the crafter via Foundry
-        // OWNER ownership, the travel member via `User#character` assignment — so the
-        // rail's `controlledBy` union is exercised, not just one half of it.
+        // Access-grid evidence (issue 796): the recipe editor's Access tab tiles the
+        // granted characters into the SAME fixed three-column grid as Books & Scrolls.
+        // The two NAMED characters below reach their controllers by DIFFERENT routes —
+        // the crafter via Foundry OWNER ownership, the travel member via `User#character`
+        // assignment — so the `controlledBy` union is exercised; but two cards fill only
+        // part of one row. Seed four more resolvable grant-only characters so the list
+        // holds six, wrapping the three-column grid to two rows and proving it fills the
+        // panel. They are `smokeSeed`-flagged so cleanup removes them and are never
+        // referenced by the craft/gather steps (which key off the crafter/travel ids).
+        const accessGrantType = game.actors.get(crafterId)?.type || 'character';
+        const accessGrantActors = await Actor.createDocuments(
+          ['Seraphine the Warded', 'Brother Alden', 'Initiate Kaelen', 'Mistweaver Vane'].map((name) => ({
+            name,
+            type: accessGrantType,
+            flags: { fabricate: { smokeSeed: true } }
+          }))
+        );
         await rm.updateRecipe(
           wardedRecipe.id,
           {
             access: {
-              characterIds: [crafterId, travelMemberId].filter(Boolean),
+              characterIds: [crafterId, travelMemberId, ...accessGrantActors.map((a) => a.id)].filter(Boolean),
               playerIds: [gathererUserId].filter(Boolean)
             }
           },
