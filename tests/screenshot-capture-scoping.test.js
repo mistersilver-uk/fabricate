@@ -282,3 +282,35 @@ test('the harness wires a scoped-skip guard for every declared section (drift gu
   // The guard is inert under rc/ci/full: it short-circuits true when scoping is off.
   assert.ok(/function shouldRunScreenshotSection[\s\S]*?if \(!SCREENSHOT_SCOPING_ACTIVE\) return true;/.test(HARNESS));
 });
+
+test('no skippable-section label sits inside a DIFFERENT section\'s guard block (cross-section drift guard)', () => {
+  // The partition test proves the MAP assigns each D0 label to one section; this proves
+  // the HARNESS captures it there too. Without it, moving a label to the wrong section in
+  // the map still passes partition, and a scoped run for its real section would skip its
+  // frame — caught at runtime only as a loud collect "Missing smoke screenshots" throw.
+  // A section's source span runs from its guard to the next section's guard (the last to
+  // EOF). Labels emitted by a helper defined ABOVE the first guard (e.g.
+  // captureRecipeEditorRoundtrip -> 'manager-recipes-editor-roundtrip') fall in no span
+  // and are simply never attributed here — the invariant is only that a label must never
+  // land in the WRONG span, which such labels cannot.
+  const guards = D0_SKIPPABLE_SECTIONS.map(section => {
+    const at = HARNESS.indexOf(`shouldRunScreenshotSection('${section.name}')`);
+    assert.ok(at !== -1, `section '${section.name}' guard not found in harness`);
+    return { name: section.name, at };
+  }).sort((a, b) => a.at - b.at);
+
+  for (let i = 0; i < guards.length; i += 1) {
+    const start = guards[i].at;
+    const end = i + 1 < guards.length ? guards[i + 1].at : HARNESS.length;
+    const span = HARNESS.slice(start, end);
+    for (const other of D0_SKIPPABLE_SECTIONS) {
+      if (other.name === guards[i].name) continue;
+      for (const label of other.labels) {
+        assert.ok(
+          !span.includes(`'${label}'`),
+          `label '${label}' is mapped to section '${other.name}' but its literal sits inside the '${guards[i].name}' guard block — a scoped run for '${other.name}' would skip its frame (cross-section drift)`,
+        );
+      }
+    }
+  }
+});
