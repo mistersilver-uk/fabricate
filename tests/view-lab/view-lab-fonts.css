@@ -1,0 +1,74 @@
+/*
+ * View Lab font bundle (issue 823, Design E).
+ *
+ * `styles/fabricate.css` self-hosts only Spectral + JetBrains Mono; Signika
+ * (`--font-primary`) and Font Awesome normally come from Foundry core. Font-SIZE is
+ * faithful (proven by the gates) but font-METRICS are not — an Arial substitute
+ * diverges text width / wrapping / ellipsis / overflow-clip, exactly the axis UX
+ * review turns on. So the View Lab bundles the REAL OFL Signika (self-hosted here)
+ * and Font Awesome Free (via assets/fonts/fontawesome/css/all.css) and defines
+ * `--font-primary` as Signika. These OFL fonts + FA Free are NOT the proprietary
+ * "Foundry distribution assets" (Signika-via-Foundry-package / FA Pro) the brief
+ * forbids — they are the open-licensed upstream originals.
+ *
+ * ORTHOGONALITY: the two font-size gates alias `--font-primary: Arial` — a
+ * font-FAMILY override, orthogonal to sharing the compat CSS (family != size). The
+ * gates keep Arial while the View Lab loads real Signika; the shared artifact is the
+ * compat CSS file, never the family override. Do not "fix" the Arial alias.
+ */
+
+@font-face {
+  font-family: Signika;
+  font-style: normal;
+  font-display: block;
+  font-weight: 400;
+  src: url("../../assets/fonts/signika-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Signika;
+  font-style: normal;
+  font-display: block;
+  font-weight: 500;
+  src: url("../../assets/fonts/signika-latin-500-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Signika;
+  font-style: normal;
+  font-display: block;
+  font-weight: 600;
+  src: url("../../assets/fonts/signika-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Signika;
+  font-style: normal;
+  font-display: block;
+  font-weight: 700;
+  src: url("../../assets/fonts/signika-latin-700-normal.woff2") format("woff2");
+}
+
+/* Foundry sets `--font-primary` to Signika; reproduce that so fabricate.css's
+   `font-family: var(--font-primary)` call sites render in real Signika metrics. */
+:root {
+  --font-primary: "Signika", sans-serif;
+}
+
+/* Deterministic rendering (Design D): kill transitions/animations/carets and keep a
+   stable scrollbar gutter so geometry is identical local vs CI. */
+:root,
+.view-lab-root * {
+  scrollbar-gutter: stable;
+}
+
+.view-lab-root *,
+.view-lab-root *::before,
+.view-lab-root *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  caret-color: transparent !important;
+  scroll-behavior: auto !important;
+}

@@ -15,6 +15,16 @@
  *
  * A recipe-studio element whose computed font-size equals 14px is therefore Foundry
  * bleed; anything else is fabricate-controlled.
+ *
+ * LAYOUT-FIDELITY SUPERSET (issue 823): the Fabricate View Lab reuses THIS SAME file
+ * (single-sourced with the two font-size gates), so it additionally carries the
+ * load-bearing LAYOUT/reset/chrome core rules the width-sensitive View Lab cases turn
+ * on — box-sizing, the `.application` display/layout, and default input/select/button
+ * chrome. Every added rule lives INSIDE the existing `@layer` structure so unlayered
+ * `fabricate.css` still wins, and NONE of them set a font-SIZE, so the pinned
+ * font-size anchors the gates assert are unchanged (the conformance test guards this).
+ * The `@layer` precedence — not load order — is what reproduces Foundry: a compat file
+ * loaded "first" does not reproduce core; the rules MUST be wrapped in declared layers.
  */
 @layer reset, variables, elements, blocks, applications;
 
@@ -25,17 +35,52 @@
 }
 
 @layer reset {
+  /* Foundry V13 core box-sizing reset — load-bearing for the View Lab width cases
+     (content-box vs border-box changes wrapping/overflow outcomes), font-size-neutral. */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  /* Controls inherit the app font (the "Foundry default bleed" the gates hunt for).
+     `font: inherit` carries family/size/weight/line-height from the app base. */
   input,
   button,
   textarea,
   select {
     font: inherit;
   }
+
+  /* Default control chrome (border/padding/background/radius) — geometry only, no
+     font-size. The bare-<input> bleed baseline stays 14px because `font: inherit`
+     above is untouched. */
+  input,
+  textarea,
+  select {
+    padding: 1px 3px;
+    border: 1px solid var(--color-border-light-tertiary, #7a7971);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.1);
+    color: inherit;
+    line-height: 1.5;
+  }
+
+  button {
+    padding: 1px 8px;
+    border: 1px solid var(--color-border-light-tertiary, #7a7971);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.1);
+    color: inherit;
+    cursor: pointer;
+    line-height: 1.5;
+  }
 }
 
 @layer elements {
   body {
     font-size: var(--font-size-14);
+    margin: 0;
   }
   h1 {
     font-size: 2rem;
@@ -43,7 +88,22 @@
 }
 
 @layer applications {
+  /* The application frame: the 14px base AND the core flex layout/display the
+     View Lab renders inside. Font-size stays var(--font-size-14) so `.application`
+     computes to 14px exactly as the gates assert. */
   .application {
     font-size: var(--font-size-14);
+    display: flex;
+    flex-direction: column;
+    color: var(--color-text-primary, #1b1b1b);
+    background: var(--color-bg, #f0f0e0);
+  }
+
+  .application .window-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    padding: 8px;
+    overflow: hidden auto;
   }
 }

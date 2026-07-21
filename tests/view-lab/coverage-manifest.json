@@ -1,0 +1,561 @@
+{
+  "schemaVersion": 1,
+  "note": "View Lab pilot coverage vs legacy VIEW_RECIPES. #824 gates its CI-flip + VIEW_RECIPES deletion on fullCoverage:true.",
+  "generatedAt": null,
+  "legacyViewCount": 85,
+  "coveredCount": 13,
+  "gapCount": 72,
+  "fullCoverage": false,
+  "covered": [
+    {
+      "legacyId": "player-crafting",
+      "label": "Player crafting tab",
+      "sample": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-essence-legacy",
+      "label": "Player crafting — legacy set-level essence authored icon",
+      "sample": "src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-essence-ingredient",
+      "label": "Player crafting — first-class essence ingredient authored icon",
+      "sample": "src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-essence-alternative",
+      "label": "Player crafting — essence OR-alternative authored icon",
+      "sample": "src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-essence-shopping",
+      "label": "Player crafting — Shopping List essence shortage authored icon",
+      "sample": "src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-stacked",
+      "label": "Player crafting — narrow window stacked columns",
+      "sample": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-roll-result",
+      "label": "Player crafting — roll-result box (awarded pills + outcome)",
+      "sample": "src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-progressive",
+      "label": "Player crafting — progressive stage list, reorder allowed (default)",
+      "sample": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-progressive-reordered",
+      "label": "Player crafting — progressive stage list after a keyboard reorder (thresholds recomputed)",
+      "sample": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-progressive-fixed",
+      "label": "Player crafting — progressive stage list, order fixed by the GM",
+      "sample": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-progressive-stacked",
+      "label": "Player crafting — progressive stage list, narrow window",
+      "sample": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "player-crafting-multistep",
+      "label": "Player crafting — explicit multi-step simple recipe detail",
+      "sample": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "cases": [
+        "player-crafting-row-long-name",
+        "player-crafting-row-narrow"
+      ]
+    },
+    {
+      "legacyId": "fabricate-app-shell",
+      "label": "Shared Fabricate app shell",
+      "sample": "src/ui/svelte/apps/FabricateAppRoot.svelte",
+      "cases": [
+        "player-crafting-row-narrow"
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "legacyId": "manager-systems",
+      "label": "Manager systems browser",
+      "sample": "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-rail-expanded",
+      "label": "Manager rail expanded (default)",
+      "sample": "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-rail-collapsed",
+      "label": "Manager rail collapsed (icon strip)",
+      "sample": "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-system-edit",
+      "label": "Manager system settings",
+      "sample": "src/ui/svelte/apps/manager/SystemEditView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-system-edit-dirty",
+      "label": "Manager system settings — unsaved-changes chip",
+      "sample": "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-currency",
+      "label": "Manager currency configuration (spend strategy, units, macros)",
+      "sample": "src/config/currencyPresets.js",
+      "fallbackOnly": false
+    },
+    {
+      "legacyId": "manager-components",
+      "label": "Manager components browser",
+      "sample": "src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-components-progressive",
+      "label": "Manager components browser — progressive difficulty badge (value + None)",
+      "sample": "src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-components-grouped-continuation",
+      "label": "Manager components browser — grouped category continued across a page boundary",
+      "sample": "src/ui/svelte/apps/manager/ComponentsBrowserView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-components-description-before",
+      "label": "Component description — BEFORE (un-repaired world, raw directive text)",
+      "sample": "src/ui/svelte/stores/adminStore.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-components-description-repaired",
+      "label": "Component description — AFTER Repair Item Data (locked-pack source resolved)",
+      "sample": "src/config/repairItemData.js",
+      "fallbackOnly": false
+    },
+    {
+      "legacyId": "manager-components-description-ingested",
+      "label": "Component description — AFTER ingestion (resolved on the write path)",
+      "sample": "src/systems/CraftingSystemManager.js",
+      "fallbackOnly": false
+    },
+    {
+      "legacyId": "manager-component-edit",
+      "label": "Manager component editor (single column: identity strip + category, no rail)",
+      "sample": "src/ui/svelte/apps/manager/component/ComponentEditorHeader.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-component-edit-difficulty",
+      "label": "Manager component editor — staged progressive difficulty control",
+      "sample": "src/ui/svelte/apps/manager/ComponentEditView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-component-edit-salvage",
+      "label": "Manager component editor — salvage authoring (enable toggle, result groups, routing, DC presets)",
+      "sample": "src/ui/svelte/apps/manager/component/salvageDcPresets.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-component-edit-salvage-simple",
+      "label": "Manager component editor — Simple-mode salvage single-group cap (no Add group, required hint)",
+      "sample": "src/ui/svelte/apps/manager/ComponentEditView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-checks-gathering",
+      "label": "Manager Checks tab — gathering check editor (routed)",
+      "sample": "src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-checks-validation",
+      "label": "Manager Checks tab — per-check Validation tab (readiness + issues)",
+      "sample": "src/ui/svelte/apps/manager/checks/checksReadiness.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-checks-crafting-consumption",
+      "label": "Manager Checks tab — crafting failure-consumption controls",
+      "sample": "src/ui/svelte/apps/manager/checks/ChecksView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-tags-categories",
+      "label": "Manager tags and categories",
+      "sample": "src/ui/svelte/apps/manager/TagsCategoriesView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-tags-categories-tags-tab",
+      "label": "Manager tags and categories — Item tags rows",
+      "sample": "src/ui/svelte/apps/manager/TagsCategoriesView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-essences",
+      "label": "Manager essences",
+      "sample": "src/ui/svelte/apps/manager/EssenceBrowserView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-environments",
+      "label": "Manager gathering environments",
+      "sample": "src/ui/svelte/apps/manager/environment/CompositionList.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-gathering-tasks",
+      "label": "Manager gathering tasks",
+      "sample": "src/ui/svelte/apps/manager/GatheringTaskEditView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-gathering-events",
+      "label": "Manager gathering events",
+      "sample": "src/ui/svelte/apps/manager/GatheringEventEditView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-tools",
+      "label": "Manager gathering tools",
+      "sample": "src/ui/svelte/apps/manager/ToolsBrowserView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-travel",
+      "label": "Manager travel and parties",
+      "sample": "src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipes",
+      "label": "Manager recipes",
+      "sample": "src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipes-grouped-continuation",
+      "label": "Manager recipes browser — grouped category continued across a page boundary",
+      "sample": "src/ui/svelte/apps/manager/RecipesBrowserView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipes-editor-roundtrip",
+      "label": "Manager recipes browser — category filter + collapsed group preserved across an editor round-trip (#806)",
+      "sample": "src/ui/svelte/apps/manager/RecipesBrowserView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-import-report",
+      "label": "Manager import — post-import unresolved-reference report (#492)",
+      "sample": "src/systems/importReportContent.js",
+      "fallbackOnly": false
+    },
+    {
+      "legacyId": "manager-crafting-group",
+      "label": "Manager Crafting nav group (expanded: Settings + Recipes + Books & Scrolls)",
+      "sample": "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-books-scrolls",
+      "label": "Manager Books & Scrolls recipe-item surface",
+      "sample": "src/ui/svelte/apps/manager/BooksScrollsView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-item-validation",
+      "label": "Manager recipe-item editor — Validation tab (all clear)",
+      "sample": "src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-item-validation-blocked",
+      "label": "Manager recipe-item editor — Validation tab (mixed pass/block, cannot be used)",
+      "sample": "src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-crafting-settings",
+      "label": "Manager Crafting → Settings placeholder",
+      "sample": "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-alchemy-settings",
+      "label": "Manager Crafting → Settings for an alchemy-mode system",
+      "sample": "src/ui/svelte/apps/manager/CraftingSettingsView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-experimental-off",
+      "label": "Manager rail — experimental features disabled",
+      "sample": "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-normal",
+      "label": "Manager recipe editor — overview / identity",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-ingredients",
+      "label": "Manager recipe editor — ingredients (components, OR groups, tags, currency cost)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-validation",
+      "label": "Manager recipe editor — validation tab",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-multistep",
+      "label": "Manager recipe editor — multi-step durations",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-results",
+      "label": "Manager recipe editor — results (routed-by-check outcome sets)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-results-multistep",
+      "label": "Manager recipe editor — results (per-step content, multi-step)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-multistep-disable-confirm",
+      "label": "Manager system settings — disable multi-step recipes confirm",
+      "sample": "src/ui/svelte/apps/manager/SystemEditView.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-collapsed",
+      "label": "Manager recipe editor — collapsed multi-step (feature off)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-results-progressive",
+      "label": "Manager recipe editor — results (progressive ordered stages)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-results-alchemy",
+      "label": "Manager recipe editor — results (alchemy two-slot success/reserved-failure)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-tools",
+      "label": "Manager recipe editor — tools (component-name fallback for unlabelled tools)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-access-rail",
+      "label": "Manager recipe editor — restricted-visibility Access tab (players and characters with access)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "manager-recipe-edit-books-scrolls",
+      "label": "Manager recipe editor — Books & Scrolls tab (linked-book grid fills the panel)",
+      "sample": "src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-gathering",
+      "label": "Player gathering tab",
+      "sample": "src/ui/svelte/apps/gathering/ChanceBar.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-gathering-realm-locked",
+      "label": "Player gathering — realm-locked environment",
+      "sample": "src/ui/svelte/apps/gathering/ChanceBar.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-gathering-stacked",
+      "label": "Player gathering — narrow window stacked columns (#330)",
+      "sample": "src/ui/svelte/apps/gathering/ChanceBar.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-alchemy",
+      "label": "Player alchemy workbench",
+      "sample": "src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-alchemy-chooser",
+      "label": "Player alchemy — discipline chooser",
+      "sample": "src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-alchemy-stacked",
+      "label": "Player alchemy — narrow window stacked columns",
+      "sample": "src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "fabricate-journal",
+      "label": "Player Journal tab",
+      "sample": "src/ui/svelte/apps/journal/AboutThisRun.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "fabricate-journal-craft-detail",
+      "label": "Player Journal — crafting run detail (requirements card)",
+      "sample": "src/ui/svelte/apps/journal/AboutThisRun.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-inventory",
+      "label": "Player Inventory tab",
+      "sample": "src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-salvage",
+      "label": "Player salvage panel",
+      "sample": "src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-salvage-misconfigured",
+      "label": "Player salvage panel — Simple misconfigured cue (GM inventory)",
+      "sample": "src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-salvage-tools",
+      "label": "Player salvage panel — required-tools disclosure",
+      "sample": "src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "player-inventory-multi-system",
+      "label": "Player Inventory tab — multi-system collapsed card + system selector",
+      "sample": "src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "chat-craft-card",
+      "label": "Chat — crafting result card",
+      "sample": "src/systems/CraftingChatCard.js",
+      "fallbackOnly": false
+    },
+    {
+      "legacyId": "interactable-config",
+      "label": "Canvas interactable config",
+      "sample": "src/ui/InteractableConfigApp.svelte.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "interactable-config-needs-configuration",
+      "label": "Canvas interactable config — unconfigured \"Needs configuration\" state (#342)",
+      "sample": "src/ui/InteractableConfigApp.svelte.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "interactable-config-source-configured",
+      "label": "Canvas interactable config — configured source/identity section (#342)",
+      "sample": "src/ui/InteractableConfigApp.svelte.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "interactables-manager-list",
+      "label": "Canvas Manage Interactables panel — populated list",
+      "sample": "src/ui/InteractablesManagerApp.svelte.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "interactables-manager-promote",
+      "label": "Canvas Manage Interactables panel — promote region flow",
+      "sample": "src/ui/InteractablesManagerApp.svelte.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "interactables-manager-empty",
+      "label": "Canvas Manage Interactables panel — empty state",
+      "sample": "src/ui/InteractablesManagerApp.svelte.js",
+      "fallbackOnly": true
+    },
+    {
+      "legacyId": "theme-or-global-ui",
+      "label": "Global UI styling or theme",
+      "sample": "styles/fabricate.css",
+      "fallbackOnly": true
+    }
+  ]
+}

@@ -163,3 +163,38 @@ The smoke test gates releases via the `foundry-integration.yml` workflow:
 - Runs on push to main, PRs to main (on `src/`, `scripts/`, `module.json` changes), weekly, and as part of `release.yml`
 - Uploads `test-results/` as a build artifact on every run
 - Opens a GitHub issue with `foundry-smoke-failure` label on failure
+
+## Fabricate View Lab
+
+The **View Lab** (`scripts/view-lab-screenshots.mjs`, issue 823) is the deterministic, Foundry-free routine producer of PR screenshot evidence.
+It mounts real Fabricate Svelte components in a real Chromium (the already-present `playwright` library, under `playwright-viewlab.config.js`) over production `styles/fabricate.css`, the single-sourced `tests/fixtures/foundry-core-min.css` compat superset, and bundled OFL fonts — no Foundry, Docker, world, or live-smoke harness.
+
+- Canonical case registry: `scripts/lib/viewLabCases.js` (each case renders directly to its own `<id>.png`).
+- Browser lab (Vite + mount + fixtures): `tests/view-lab/` (excluded from the `npm test` glob so a browser flake can never surface as `# cancelled`).
+- Registry invariants run in `npm test`: `tests/view-lab-cases.test.js` (+ `tests/view-lab-artifact.test.js`, `tests/view-lab-publish-hardening.test.js`).
+
+Commands:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run screenshots:view-lab:plan -- --base origin/main` | List the cases a changed-file set selects |
+| `npm run screenshots:view-lab:test` | Render + assert every case (the lab's own gate) |
+| `npm run screenshots:view-lab:capture` | Write `ui-screenshot-artifact/{manifest.json,<id>.png}` + refresh the coverage manifest |
+| `npm run screenshots:view-lab:validate` | Validate the artifact manifest (schema, ids, `file === <id>.png`, sha256) |
+
+The `screenshots:ui:collect`/`screenshots:ui:publish` commands are RETAINED: `publish` is still the local publish path (now with revision-addressed `pr-screenshots/<pr>/<head-sha>/<view>.png` keys), and `collect` remains the live-smoke fallback for surfaces the registry does not yet cover.
+The machine-readable coverage manifest `tests/view-lab/coverage-manifest.json` is a #823 deliverable handed to #824, whose CI-gate-flip + `VIEW_RECIPES` deletion are blocked until it reports `fullCoverage: true`.
+
+## Fidelity gap
+
+The View Lab is a faithful-but-approximate renderer.
+These residual gaps are intentionally NOT covered by it and are routed to the live-Foundry smoke fidelity gate (`npm run test:foundry`):
+
+- **FA Pro-only glyphs** — only Font Awesome Free is bundled; a Pro-only icon renders as its Free fallback or tofu.
+- **Exact Foundry default input/select/button chrome** — the compat superset approximates core control chrome; it is not byte-identical to a specific Foundry build.
+- **Real window frame / resize handles / scroll gutters** — the lab renders the application-content frame, not Foundry's ApplicationV2 window chrome or geometry (a green View Lab render does not assert window-chrome/geometry truth).
+- **Cross-app Foundry context** — sheets, canvas, dialogs, and other modules' cascade are absent; only the mounted Fabricate component tree is rendered.
+- **Linked content imagery** — Foundry/dnd5e core icon paths are not served; image requests are satisfied with a deterministic transparent placeholder, so linked-image fidelity stays a smoke-harness concern.
+- **Not-yet-migrated surfaces** — the pilot registry covers a subset of `VIEW_RECIPES`; uncovered surfaces are produced by the reduced/full smoke until the coverage manifest reaches full coverage.
+
+Cross-OS antialiasing differences are expected and tolerable — the View Lab is evidence for humans plus interaction/console/font-presence assertions, not pixel-diff equality.

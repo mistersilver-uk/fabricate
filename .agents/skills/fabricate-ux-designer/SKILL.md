@@ -31,13 +31,13 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 3. Inspect the current Svelte components, stores, styles, and localized strings.
 4. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
 5. If no live dev session is available, check the PR body/comments/artifacts for recent smoke evidence before trying to generate fresh screenshots.
-6. Ask the workflow driver for container-backed Foundry validation when UI PR screenshot evidence must be created from real smoke artifacts, then inspect the returned evidence.
-7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main` and ask the workflow driver to run the authoritative smoke, collection, publication, and cleanup commands from the integrated coordinator branch.
-Review the resulting `npm run test:foundry` output and the S3-hosted images embedded by `npm run screenshots:ui:publish`.
+6. For a registry-covered view, render the affected view cases locally with `npm run screenshots:view-lab:capture` (real Svelte over `styles/fabricate.css` + bundled fonts in a real browser, no Foundry/Docker/world) and inspect `ui-screenshot-artifact/`; for a surface the registry does not yet cover, ask the workflow driver for container-backed Foundry validation from real smoke artifacts, then inspect the returned evidence.
+7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:view-lab:plan -- --base origin/main` (or `screenshots:ui:plan` for a not-yet-covered surface), render the affected view cases locally, and ask the workflow driver to run the authoritative publish (and, for uncovered surfaces, smoke/collect/cleanup) commands from the integrated coordinator branch.
+Judge fidelity against the View Lab's own gates (readySelector presence, the fail-closed font-presence check, the console-error gate) — screenshots are evidence for humans, not pixel equality — and remember a green View Lab render does not assert window-chrome/geometry truth, which stays the live-smoke fidelity gate's concern.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label.
 8. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
 Verify the published evidence against the fix itself: at least one frame must show the changed state, and you judge that frame for both correctness (it does what the change claims) and polish.
-A frame that only satisfies the `check-screenshots` gate without depicting the changed state is missing evidence — call for a capture state that reaches it rather than approving on an unrelated frame.
+A frame that only satisfies the `check-screenshots` gate without depicting the changed state is missing evidence — call for a view case that reaches it rather than approving on an unrelated frame.
 9. Compare the implementation against the spec and against Foundry-native interaction patterns.
 10. Turn confirmed problems into specific design guidance or backlog issues.
 11. For explicitly assigned mutable work, commit only owned spec, design, or workflow paths locally and return the commit handoff to the workflow driver.
@@ -76,7 +76,7 @@ When reviewing a plan, audit the UI portion of the issue delta against these con
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
 - Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.
-- Treat unrelated image markdown, artifact names, and file lists in a PR as missing normal UI evidence; screenshots must be embedded images of the changed view (produced by `npm run screenshots:ui:publish`, S3-hosted).
+- Treat unrelated image markdown, artifact names, and file lists in a PR as missing normal UI evidence; screenshots must be embedded images of the changed view (rendered locally by the View Lab `npm run screenshots:view-lab:capture` for registry-covered views, or the live smoke otherwise, then published S3-hosted via `npm run screenshots:ui:publish`).
 There is no `SCREENSHOTS_NEEDED:` handoff; only a maintainer-applied `screenshots-exempt` label can waive the requirement.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 

@@ -735,12 +735,29 @@ If you remove a screenshot from a page, delete the `.webp` too (and vice versa).
 
 UI changes must include screenshot evidence in the PR body.
 The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`: the body must contain a **Screenshots** heading (any ATX level, normally `##`) with at least one image beneath it.
-The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading — including a drag-and-dropped GitHub attachment — satisfies the check.
+The routine producer is the **Fabricate View Lab** (below); the live-Foundry smoke workflow after it stays the fidelity gate and the producer for surfaces the registry does not yet cover.
+Any image under a Screenshots heading — including a drag-and-dropped GitHub attachment — satisfies the check.
 
 ### When it applies
 
 The rule applies when a PR changes any file under `src/ui/`, `styles/`, any `*.svelte` file, or any `*.css` file.
 A `lang/` change (visible UI text) requires screenshots only when the same PR also changes one of those render files.
+
+### View Lab (routine producer)
+
+The **Fabricate View Lab** renders real Fabricate Svelte components in a real Chromium (via the already-present `playwright` library, under `playwright-viewlab.config.js`) over production `styles/fabricate.css`, the single-sourced `tests/fixtures/foundry-core-min.css` compat superset, and bundled OFL fonts — with NO Foundry, Docker, world, or live-smoke harness.
+It produces evidence in seconds.
+
+- Case registry: `scripts/lib/viewLabCases.js` (each case renders directly to `<id>.png`).
+- `npm run screenshots:view-lab:plan -- --base origin/main` lists the affected cases.
+- `npm run screenshots:view-lab:test` renders + asserts every case (the lab's own gate: readySelector present, one signature behaviour fires, the fail-closed font-presence check, and the console-error gate).
+- `npm run screenshots:view-lab:capture` writes `ui-screenshot-artifact/{manifest.json,<id>.png}` and refreshes `tests/view-lab/coverage-manifest.json`.
+- `npm run screenshots:view-lab:validate` checks the manifest (schemaVersion, ids in the registry, `file === <id>.png`, sha256).
+
+Screenshots are EVIDENCE for humans, not pixel assertions — trust comes from the interaction assertions + `readySelector` presence + the console-error gate, not pixel equality, so cross-OS antialiasing differences are tolerable.
+For a view the registry does not yet cover, add a view case for the changed state; the reduced (`rc`/`ci`) or full smoke path below remains the producer until `coverage-manifest.json` reports full coverage (which #824 gates its CI-flip + old-registry deletion on).
+
+The `ui-screenshot-artifact/` output supersedes `tmp/pr-screenshots/<number>/`; publish still runs locally (below), now with revision-addressed S3 keys `pr-screenshots/<number>/<head-sha>/<view>.png`.
 
 ### Prerequisites
 
@@ -750,7 +767,9 @@ A `lang/` change (visible UI text) requires screenshots only when the same PR al
   **In CI**, OIDC role assumption only — never static keys.
   `publish` uploads PNGs to `s3://<bucket>/pr-screenshots/<number>/` (bucket/baseUrl from `release.s3.config.json`, overridable via `S3_RELEASE_BUCKET`/`RELEASE_BASE_URL`/`AWS_REGION`).
 
-### Local workflow
+### Live-smoke workflow (fidelity gate / not-yet-covered views)
+
+This live-Foundry path stays the fidelity gate and the producer for surfaces the View Lab registry does not yet cover.
 
 1. Plan the required screenshot views:
 
@@ -820,14 +839,15 @@ Never rerun the `edited` run: let it settle, then fully rerun the original PUSH 
 
 ### Screenshot source
 
-Screenshot evidence must come from real smoke-harness artifacts in `test-results/`.
-The script does not render hand-authored HTML fixtures, does not use copied mock asset manifests, and does not generate synthetic previews.
-Smoke fixture data should use Foundry core or dnd5e non-SVG raster icon paths directly when a preview image is needed.
+Screenshot evidence must come from a real renderer: the View Lab (real Svelte in real Chromium) for registry-covered views, or real smoke-harness artifacts in `test-results/` otherwise.
+Neither path renders hand-authored HTML fixtures, uses copied mock asset manifests, or generates synthetic previews.
+View Lab and smoke fixture data should use Foundry core or dnd5e non-SVG raster icon paths directly when a preview image is needed.
 
 ### CI behavior
 
-CI runs only the lightweight `check` (no smoke run on the runner).
+CI runs only the lightweight `check` (no smoke run and no View Lab render on the runner — the unprivileged CI render gate is the follow-on #824).
 It reads the live PR body, changed files, and labels, then passes when the body has a **Screenshots** heading whose section contains at least one image.
+Because publication is unchanged (S3 + managed PR-body block), a View Lab frame satisfies this body-grep gate exactly as a smoke frame does.
 
 - The heading match is case-insensitive, accepts any ATX level (`#`–`######`) and the singular form (`## Screenshot`).
 - The section runs from the heading to the next heading of the same or higher level, so an image under a *different* later heading does not count.

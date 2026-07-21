@@ -227,7 +227,8 @@ Cleanup MUST preserve any lane whose integration or meaningful state has not bee
 
 - **WHEN** lane work is in progress
 - **THEN** agents may run focused checks allowed by their briefs
-- **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, Foundry or Docker smoke, and screenshot generation
+- **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, and the resource-heavy Foundry or Docker smoke screenshot generation
+- **AND** the View Lab **render** is cheap and parallel-safe and MAY run in a read-only reviewer lane, but the **publish** (S3 upload plus PR-body managed-block mutation) stays a driver-owned GitHub/remote mutation regardless of cost — a read-only reviewer lane MUST NOT publish
 - **AND** the driver runs required final gates from the fully integrated coordinator branch
 - **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
 
@@ -344,30 +345,41 @@ Agents planning or implementing Manager feature routes MUST account for placehol
 
 ### Requirement: UI PR screenshot evidence
 
-Pull requests that change UI files MUST include smoke-run screenshot evidence for the relevant changed views before the PR is opened or updated.
+Pull requests that change UI files MUST include screenshot evidence for the relevant changed views before the PR is opened or updated.
+The routine producer of that evidence is the deterministic, Foundry-free **Fabricate View Lab** for views covered by the canonical view-case registry; the live-Foundry smoke remains the fidelity gate and the producer for not-yet-migrated surfaces.
 
 #### Scenario: UI files changed
 
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
-- **THEN** the agent runs the Foundry smoke harness locally (the `full` profile via `npm run test:foundry`) and collects the relevant smoke screenshots for the changed views
+- **THEN** affected views are selected from the canonical view-case registry (with a single global-UI fallback case)
+- **AND** for a **registry-covered** view, each affected case is rendered from real Fabricate Svelte components over production `styles/fabricate.css` in a real browser with deterministic fixtures and the bundled fonts, WITHOUT Foundry, Docker, a world, or the live-smoke harness
+- **AND** the rendered frames are published by the trusted agent's local capture-and-publish (the existing S3 upload + managed PR-body block) keyed by PR number and head SHA
+- **AND** at least one published frame shows the changed state itself; when no registry case reaches that state, the branch ADDS a view case rather than publishing an unrelated frame
+- **AND** for a view NOT yet migrated into the registry, the add-a-view-case invariant applies AND the reduced or full live-smoke capture path remains available as the producer until the registry reaches full coverage (the coverage manifest #824 gates its flip and old-registry deletion on)
 - **AND** the full smoke profile is not run on a GitHub Actions runner
-- **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence
-- **AND** `npm run screenshots:ui:publish -- --pr <number>` uploads the collected screenshots to S3 (`pr-screenshots/<number>/`) and embeds the returned `![pr-<number> ...]` markdown into a managed block in the PR body
-- **AND** the agent cleans `tmp/pr-screenshots/<number>/` immediately after the evidence is added to the PR
-- **AND** generic unrelated image links are not sufficient evidence
-- **AND** uploaded artifact names or `test-results/` paths are treated as automation fallback evidence, not the normal visible PR screenshot handoff
+- **AND** the agent does not leave PR screenshots as committed repo assets; the `ui-screenshot-artifact/` output plus revision-addressed S3 keys (`pr-screenshots/<number>/<head-sha>/<view>.png`) supersede the `tmp/pr-screenshots/<number>/` path, and the clean-up-after rule still holds
+- **AND** generic unrelated image links, uploaded artifact names, and `test-results/` paths are not sufficient evidence
 
 #### Scenario: screenshot capture is blocked
 
-- **WHEN** a UI-changing PR genuinely cannot capture screenshots because the Foundry smoke harness or browser is unavailable
+- **WHEN** a UI-changing PR genuinely cannot capture screenshots because the render environment or browser is unavailable
 - **THEN** a maintainer (not an agent) applies the `screenshots-exempt` label to waive the required `check-screenshots` gate
 - **AND** there is no self-serve `SCREENSHOTS_NEEDED:` text bypass; the gate cannot be satisfied from the PR body without real screenshot evidence or the maintainer label
+- **AND** the managed PR-body screenshot block is replaced idempotently on re-runs
 
 #### Scenario: smoke screenshots need images
 
-- **WHEN** smoke fixture data needs item, environment, event, or placeholder imagery
+- **WHEN** View Lab or smoke fixture data needs item, environment, event, or placeholder imagery
 - **THEN** it uses Foundry VTT core or dnd5e non-SVG raster icon paths directly
-- **AND** it does not invent custom SVG preview art for smoke screenshots
+- **AND** it does not invent custom SVG preview art
+
+#### Scenario: layered UI gates
+
+- **WHEN** the workflow assesses UI evidence and fidelity
+- **THEN** the View Lab render is the routine per-PR UI evidence gate (seconds), producing the published frames
+- **AND** the **reduced** live-Foundry smoke (`rc`/`ci`) remains a required CI and release **fidelity** gate but is NOT the routine evidence producer
+- **AND** the full live-Foundry smoke remains an occasional outer-loop suite (scheduled, manual, pre-promotion, or post-Foundry-or-system upgrade) and is not run on a GitHub Actions runner
+- **AND** a green View Lab render does not assert window-chrome or window-geometry truth, which stays the live-smoke fidelity gate's concern
 
 ### Requirement: Provider-specific skill metadata
 
