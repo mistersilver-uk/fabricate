@@ -4135,6 +4135,31 @@ async function main() {
           }]
         });
 
+        // Books & Scrolls fixture (issue 796): seed FIVE resolvable book/scroll recipe
+        // items and link them all to "Brew Healing Potion" so its Books & Scrolls editor
+        // tab renders the POPULATED auto-fill grid — the tiling + specificity-cascade
+        // evidence the empty "Not in any book or scroll" panel cannot show. Five cards
+        // wrap past the editor's ~four-track row, proving the grid fills the panel and
+        // wraps rather than stretching one card. Real world Items back each definition so
+        // `fromUuid` resolves a live thumb/name instead of the missing-state row. These
+        // are created AFTER the component-registration loop above, so they never enter
+        // `componentMap`. The `-` covers the (0,3,0) grid rule vs the shared flex rule.
+        // Every img below is a Foundry-core raster confirmed to resolve (no 404s in the
+        // smoke console-error gate); `blueprint-recipe-alchemical` is the shared default
+        // recipe image every recipe frame already loads.
+        const bookItemType = worldItemByName['Mystic Herb']?.type || 'loot';
+        const bookItems = await Item.createDocuments([
+          { name: "Mythwright Crafter's Handbook", type: bookItemType, img: 'icons/sundries/books/book-tooled-eye-gold-red.webp' },
+          { name: "Alchemist's Field Notes", type: bookItemType, img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp' },
+          { name: 'Grimoire of the Verdant Path', type: bookItemType, img: 'icons/sundries/books/book-embossed-jewel-gold-green.webp' },
+          { name: 'Scroll of Restorative Draughts', type: bookItemType, img: 'icons/sundries/books/book-red-exclamation.webp' },
+          { name: "The Apothecary's Compendium", type: bookItemType, img: 'icons/sundries/books/book-embossed-jewel-gold-green.webp' }
+        ]);
+        for (const book of bookItems) {
+          const { item: bookDef } = await csm.addRecipeItemFromUuid(systemId, book.uuid);
+          await csm.updateRecipeItemDefinition(systemId, bookDef.id, { recipeIds: [recipe2.id] });
+        }
+
         const recipe3 = await rm.createRecipe({
           name: 'Craft Dragon Scale Armor',
           description: 'Forge dragon scales with iron ore into legendary armor.',
@@ -4692,15 +4717,28 @@ async function main() {
             }]
           }]
         });
-        // The grant carries BOTH a player and characters, and the two characters
-        // reach their controllers by DIFFERENT routes — the crafter via Foundry
-        // OWNER ownership, the travel member via `User#character` assignment — so the
-        // rail's `controlledBy` union is exercised, not just one half of it.
+        // Access-grid evidence (issue 796): the recipe editor's Access tab tiles the
+        // granted characters into the SAME fixed three-column grid as Books & Scrolls.
+        // The two NAMED characters below reach their controllers by DIFFERENT routes —
+        // the crafter via Foundry OWNER ownership, the travel member via `User#character`
+        // assignment — so the `controlledBy` union is exercised; but two cards fill only
+        // part of one row. Seed four more resolvable grant-only characters so the list
+        // holds six, wrapping the three-column grid to two rows and proving it fills the
+        // panel. They are `smokeSeed`-flagged so cleanup removes them and are never
+        // referenced by the craft/gather steps (which key off the crafter/travel ids).
+        const accessGrantType = game.actors.get(crafterId)?.type || 'character';
+        const accessGrantActors = await Actor.createDocuments(
+          ['Seraphine the Warded', 'Brother Alden', 'Initiate Kaelen', 'Mistweaver Vane'].map((name) => ({
+            name,
+            type: accessGrantType,
+            flags: { fabricate: { smokeSeed: true } }
+          }))
+        );
         await rm.updateRecipe(
           wardedRecipe.id,
           {
             access: {
-              characterIds: [crafterId, travelMemberId].filter(Boolean),
+              characterIds: [crafterId, travelMemberId, ...accessGrantActors.map((a) => a.id)].filter(Boolean),
               playerIds: [gathererUserId].filter(Boolean)
             }
           },
@@ -5341,10 +5379,11 @@ async function main() {
           await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
           await page.locator('.fabricate-manager [data-books-scrolls]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          // The Books & Scrolls surface is legitimately empty for a fixture system
-          // with no recipe items, so its zero-row state is not a layout failure —
-          // capture it without the row-count heuristic and never block the
-          // Crafting Settings capture that follows.
+          // The Books & Scrolls management surface now lists the five book/scroll recipe
+          // items seeded for "Brew Healing Potion" (issue 796). It is still captured
+          // without the row-count heuristic — the surface can legitimately be empty for a
+          // system with no recipe items — so this never blocks the Crafting Settings
+          // capture that follows.
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-books-scrolls-normal');
           await openManagerCraftingSection(page, 'settings', 'crafting-settings');
