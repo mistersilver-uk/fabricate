@@ -697,6 +697,13 @@ describe('UI PR screenshot evidence', () => {
     for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
       emitted.add(match[1]);
     }
+    // Issue 801: the grouped-continuation frames route through the shared
+    // captureGroupedContinuationFrame(page, results, { … label: '…' … }) helper, which
+    // forwards `label` to captureStableManagerView as a variable — so the literal lives in
+    // the helper CALL's options object, not in the captureStableManagerView call itself.
+    for (const match of harness.matchAll(/captureGroupedContinuationFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
     // The Results-tab captures (issue 643) route through captureRecipeResultsTab(page,
     // <recipeName>, '<label>', <selector>); the label is the third, string-literal arg.
     for (const match of harness.matchAll(/captureRecipeResultsTab\(\s*page,\s*[^,]+,\s*'([^']+)'/g)) {
