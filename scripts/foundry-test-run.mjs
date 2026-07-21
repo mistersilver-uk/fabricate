@@ -4451,6 +4451,41 @@ async function main() {
         await rm.updateRecipe(recipe2.id, { category: 'Alchemy' }, { allowIncomplete: true });
         await rm.updateRecipe(multiStepRecipe.id, { category: 'Smithing' }, { allowIncomplete: true });
 
+        // ── Books & Scrolls recipe items (issue 797) ─────────────────────────────
+        // Two recipe items so the recipe-item editor's Validation tab can be captured in
+        // BOTH an all-clear and a mixed pass/block state. Arcane Forge leaves
+        // `visibilityMode` at its 'knowledge' default, so the mode-specific check row is
+        // `learnsValid`. The two linked world items are created HERE, AFTER the
+        // component-registration loop above, so they are NOT registered as components and
+        // do not disturb the components-browser frames.
+        const bookType = worldItemByName['Iron Ore']?.type || 'loot';
+        const [tomeItem, scrollItem] = await Item.createDocuments([
+          {
+            name: 'Tome of Brewing',
+            type: bookType,
+            img: 'icons/sundries/books/book-worn-brown.webp',
+            system: { description: { value: '<p>A well-thumbed brewing manual that teaches its reader to brew a healing draught.</p>' } }
+          },
+          {
+            name: 'Torn Recipe Scroll',
+            type: bookType,
+            img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
+            system: { description: { value: '<p>A half-legible scroll whose recipe list has been torn away.</p>' } }
+          }
+        ]);
+
+        // All-clear recipe item: a world item is linked (originItemUuid), a recipe is
+        // linked, and learnsValid holds (learning limit off) → summary reads "All clear".
+        const clearRecipeItem = (await csm.addRecipeItemFromUuid(systemId, tomeItem.uuid)).item;
+        await csm.updateRecipeItemDefinition(systemId, clearRecipeItem.id, { recipeIds: [recipe2.id] });
+
+        // Mixed recipe item: the world item is linked, but NO recipe is linked, so
+        // `recipeLinked` BLOCKS while `itemLinked` and `learnsValid` pass. One frame then
+        // shows a PASS row AND a BLOCK row together with the blocked medallion and both
+        // non-zero count tiles (issue 797, decision 7). Left with its default empty
+        // `recipeIds`, so no update is needed.
+        const mixedRecipeItem = (await csm.addRecipeItemFromUuid(systemId, scrollItem.uuid)).item;
+
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
@@ -4801,6 +4836,7 @@ async function main() {
           restrictedRecipeName: 'Warded Rite',
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id, wardedRecipe.id],
+          recipeItemIds: { clear: clearRecipeItem.id, mixed: mixedRecipeItem.id },
           healingPotionRecipeId: recipe2.id,
           sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
@@ -5426,11 +5462,12 @@ async function main() {
           await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
           await page.locator('.fabricate-manager [data-books-scrolls]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          // The Books & Scrolls management surface now lists the five book/scroll recipe
-          // items seeded for "Brew Healing Potion" (issue 796). It is still captured
-          // without the row-count heuristic — the surface can legitimately be empty for a
-          // system with no recipe items — so this never blocks the Crafting Settings
-          // capture that follows.
+          // The Books & Scrolls management surface now lists the book/scroll recipe items
+          // seeded for "Brew Healing Potion" (issue 796) PLUS the two recipe items seeded
+          // for the Validation-tab captures (issue 797) — the all-clear "Tome of Brewing"
+          // and the mixed "Torn Recipe Scroll" — so it is deliberately POPULATED. It is
+          // still captured without the row-count heuristic (a filtered/empty state would
+          // still be valid) and never blocks the Crafting Settings capture that follows.
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-books-scrolls-normal');
           await openManagerCraftingSection(page, 'settings', 'crafting-settings');
@@ -5444,6 +5481,37 @@ async function main() {
         } catch (err) {
           results.steps.push({ step: 'crafting-group-surfaces', passed: false, error: err.message });
           process.stderr.write(`Crafting group surface capture failed: ${err.message}\n`);
+        }
+
+        // Recipe-item editor → Validation tab (issue 797): brought to parity with the
+        // recipe editor's Validation tab (summary card + Passing/Blocking count tiles +
+        // grouped bordered rows with status pills). Captured in TWO states off the two
+        // recipe items seeded above: the all-clear "Tome of Brewing" and the mixed
+        // pass/block "Torn Recipe Scroll". Guarded so a hiccup records a failed step
+        // instead of aborting Phase D0.
+        try {
+          const openRecipeItemValidation = async (recipeItemId) => {
+            await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
+            await page.locator(`.fabricate-manager [data-books-scrolls-edit="${recipeItemId}"]`).first().click();
+            await page.locator('.fabricate-manager[data-manager-view="recipe-item-edit"]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            await page.locator('.fabricate-manager [data-recipe-item-tab-button="validation"]').first().click();
+            // Wait on the summary card marker (the recipe-item editor is an edit-form
+            // view with no table rows, so `assertManagerLayoutStable` — which requires
+            // them — does not apply; the recipe-editor tab captures likewise use only the
+            // overlay guard).
+            await page.locator('.fabricate-manager [data-recipe-item-tab="validation"] [data-recipe-item-validation-summary]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            await assertNoScreenshotOverlays(page);
+          };
+          await openRecipeItemValidation(craftingSetup.recipeItemIds.clear);
+          await screenshot(page, 'manager-recipe-item-validation');
+          await openRecipeItemValidation(craftingSetup.recipeItemIds.mixed);
+          await screenshot(page, 'manager-recipe-item-validation-blocked');
+          results.steps.push({ step: 'recipe-item-validation', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipe-item-validation', passed: false, error: err.message });
+          process.stderr.write(`Recipe-item validation capture failed: ${err.message}\n`);
         }
 
         // Recipes → open the editor so the Overview tab's identity card is captured

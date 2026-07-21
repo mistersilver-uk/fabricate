@@ -1,9 +1,19 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Validation tab of the recipe-item editor. A mode-aware checklist with green-check /
-  red-x rows and a summary count pill. Driven by the `validation` prop when the router
-  supplies one, otherwise computed here from `recipeItem` + `linkedItem` +
-  `visibilityMode` so the tab is self-sufficient.
+  Validation tab of the recipe-item editor. Mirrors the recipe editor's Validation
+  tab treatment (issue 797): an aggregate summary card, Passing/Blocking count tiles,
+  and a grouped block of bordered rows, each carrying a Pass/Block status pill. The
+  entire visual treatment reuses the GLOBAL recipe-validation CSS classes in
+  styles/fabricate.css — this tab renders inside `.fabricate-manager`, so emitting the
+  same classes yields the same look with no new component.
+
+  Books & Scrolls validation is strictly TWO-state — a check passes or it blocks —
+  so there is no Warnings tile and no warning pill (issue 797, decisions 1 + 5). Rows
+  are label-only: the check labels are self-describing and the books check-set carries
+  no per-check failure message, so there is no detail sub-line.
+
+  Driven by the `validation` prop when the router supplies one, otherwise computed here
+  from `recipeItem` + `linkedItem` + `visibilityMode` so the tab is self-sufficient.
 
   Rules:
    - A game-world item is linked (required in both modes).
@@ -70,81 +80,92 @@
   const checks = $derived(Array.isArray(validation?.checks) && validation.checks.length > 0
     ? validation.checks
     : computedChecks);
-  const criticalCount = $derived(checks.filter(check => !check.ok).length);
+
+  // --- The aggregate summary (issue 797) -----------------------------------------
+  // A two-state read of the SAME `checks` the rows below render — passing vs blocking,
+  // no warning tier — so the aggregate can never disagree with the list.
+  const passingCount = $derived(checks.filter(check => check.ok).length);
+  const blockingCount = $derived(checks.filter(check => !check.ok).length);
+  const summaryStatus = $derived(blockingCount > 0 ? 'blocked' : 'clear');
+  const summaryMeta = $derived(
+    summaryStatus === 'blocked'
+      ? {
+          icon: 'fas fa-circle-xmark',
+          title: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryBlocked', 'Cannot be used'),
+          sub: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryBlockedSub', 'Clear every blocking check before this recipe item works for players.')
+        }
+      : {
+          icon: 'fas fa-circle-check',
+          title: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClear', 'All clear'),
+          sub: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClearSub', 'Every check passes. This recipe item is ready to use.')
+        }
+  );
+
+  const rows = $derived(checks.map(check => ({
+    id: check.id,
+    ok: check.ok,
+    status: check.ok ? 'pass' : 'block',
+    title: check.label || checkLabel(check.id)
+  })));
+
+  function statusPill(status) {
+    return status === 'block'
+      ? text('FABRICATE.Admin.Manager.RecipeItem.Validation.StatusBlock', 'Block')
+      : text('FABRICATE.Admin.Manager.RecipeItem.Validation.StatusPass', 'Pass');
+  }
+  function statusIcon(status) {
+    return status === 'block' ? 'fas fa-circle-exclamation' : 'fas fa-circle-check';
+  }
 </script>
 
 <section class="manager-recipe-item-tab manager-recipe-item-validation" data-recipe-item-tab="validation" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')}>
-  <div class="manager-recipe-item-validation-heading">
-    <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')}</h3>
+  <div class="manager-recipe-tab-intro">
+    <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')}</h2>
+    <p class="manager-muted">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.Intro', 'A recipe item saves while incomplete, but only works for players once every blocking check passes.')}</p>
   </div>
 
-  <div class="manager-recipe-item-validation-summary">
-    <span
-      class={`manager-chip ${criticalCount > 0 ? 'is-danger' : 'is-active'}`}
-      data-recipe-item-validation-pill
-      data-critical-count={criticalCount}
-    >
-      {criticalCount > 0
-        ? text('FABRICATE.Admin.Manager.RecipeItem.Validation.CriticalCount', '{count} Critical').replace('{count}', String(criticalCount))
-        : text('FABRICATE.Admin.Manager.RecipeItem.Validation.AllPass', 'All checks pass')}
-    </span>
-  </div>
-
-  <ul class="manager-recipe-item-validation-list" data-recipe-item-validation-list>
-    {#each checks as check (check.id)}
-      <li class={`manager-recipe-item-validation-check ${check.ok ? 'is-satisfied' : 'is-unsatisfied'}`} data-recipe-item-check={check.id} data-ok={check.ok}>
-        <i class={check.ok ? 'fas fa-circle-check' : 'fas fa-circle-xmark'} aria-hidden="true"></i>
-        <span>{check.label || checkLabel(check.id)}</span>
+  <!-- The aggregate header: a status medallion + the Passing/Blocking counts, off the
+       SAME checks the grouped rows below are built from. Reuses the recipe tab's global
+       classes; the counts list is two-state (no Warnings tile — decision 1). -->
+  <section class="manager-recipe-validation-summary-row" data-recipe-item-section="validation-summary">
+    <div class={`manager-recipe-rail-summary is-${summaryStatus}`} data-recipe-item-validation-summary={summaryStatus}>
+      <span class="manager-recipe-rail-summary-medallion" aria-hidden="true">
+        <i class={summaryMeta.icon}></i>
+      </span>
+      <span class="manager-recipe-rail-summary-copy">
+        <span class="manager-recipe-rail-summary-title">{summaryMeta.title}</span>
+        <span class="manager-recipe-rail-summary-sub manager-muted">{summaryMeta.sub}</span>
+      </span>
+    </div>
+    <ul class="manager-recipe-rail-counts" data-recipe-item-validation-counts>
+      <li class="manager-recipe-rail-count is-passing">
+        <i class="fas fa-circle-check" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountPassing', 'Passing')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-item-count-passing>{passingCount}</span>
       </li>
-    {/each}
-  </ul>
+      <li class="manager-recipe-rail-count is-blocking">
+        <i class="fas fa-circle-xmark" aria-hidden="true"></i>
+        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountBlocking', 'Blocking')}</span>
+        <span class="manager-recipe-rail-count-value" data-recipe-item-count-blocking data-critical-count={blockingCount}>{blockingCount}</span>
+      </li>
+    </ul>
+  </section>
+
+  <div class="manager-recipe-val-group" data-recipe-item-validation-group="requirements">
+    <p class="manager-recipe-val-group-label">
+      <i class="fas fa-clipboard-check" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.RecipeItem.Validation.GroupRequirements', 'Requirements')}</span>
+    </p>
+    <ul class="manager-recipe-val-rows">
+      {#each rows as row (row.id)}
+        <li class={`manager-recipe-val-row is-${row.status}`} data-recipe-item-check={row.id} data-ok={row.ok}>
+          <i class={`manager-recipe-val-status ${statusIcon(row.status)}`} aria-hidden="true"></i>
+          <div class="manager-recipe-val-copy">
+            <span class="manager-recipe-val-title">{row.title}</span>
+          </div>
+          <span class={`manager-chip manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</span>
+        </li>
+      {/each}
+    </ul>
+  </div>
 </section>
-
-<style>
-  .manager-recipe-item-validation {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-  }
-
-  .manager-recipe-item-validation-heading {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    color: var(--fab-accent);
-  }
-
-  .manager-recipe-item-validation-heading .manager-card-title {
-    margin: 0;
-  }
-
-  .manager-recipe-item-validation-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-validation-check {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    font-size: 0.78rem;
-    color: var(--fab-text-muted);
-  }
-
-  .manager-recipe-item-validation-check.is-satisfied > i {
-    color: var(--fab-success);
-  }
-
-  .manager-recipe-item-validation-check.is-unsatisfied {
-    color: var(--fab-danger-text);
-  }
-
-  .manager-recipe-item-validation-check.is-unsatisfied > i {
-    color: var(--fab-danger-text);
-  }
-</style>
