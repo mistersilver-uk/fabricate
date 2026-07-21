@@ -46,7 +46,7 @@ import {
   assertExpectedSelectorsPresent,
   expectedSelectorsForManagerSurface
 } from './lib/managerLayoutGuards.js';
-import { isPhaseNeededForTargets } from './lib/screenshotCaptureMap.js';
+import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being
 // killed while a final screenshot click is still in flight) can leave a FLOATING page
@@ -126,6 +126,22 @@ const SCREENSHOT_SCOPING_ACTIVE = SMOKE_PROFILE === 'screenshots' && SCREENSHOT_
 function shouldRunScreenshotPhase(phase) {
   if (!SCREENSHOT_SCOPING_ACTIVE) return true;
   return isPhaseNeededForTargets(phase, SCREENSHOT_TARGET_LABELS);
+}
+
+/**
+ * Whether a skippable Phase-D0 capture SECTION must run (issue #826 increment 2).
+ * ALWAYS true for `rc`/`ci`/`full` (scoping inactive) — so every section body is
+ * DEAD CODE under those profiles and the walk is byte-behaviour-identical by
+ * construction; the section skips exist ONLY on an actively-scoped `screenshots`
+ * run, where a section whose mapped labels are all off-target is skipped along with
+ * its expensive navigate+settle work. The always-run D0 spine (manager open + system
+ * select + fixture seeding + currency config) is NOT a section, so it never skips.
+ * @param {string} sectionName
+ * @returns {boolean}
+ */
+function shouldRunScreenshotSection(sectionName) {
+  if (!SCREENSHOT_SCOPING_ACTIVE) return true;
+  return isD0SectionNeededForTargets(sectionName, SCREENSHOT_TARGET_LABELS);
 }
 
 // Exact set of screenshot labels the `rc` profile captures. Every other
@@ -5676,6 +5692,10 @@ async function main() {
         await currencyStrategy.selectOption('actorProperty');
         await page.waitForTimeout(300);
 
+        // ── D0 section: recipes / crafting (issue #826 scoped-skip guard) ──────
+        // Inert under rc/ci/full; skips the recipe + crafting captures on a scoped
+        // `screenshots` run whose target set touches none of them.
+        if (shouldRunScreenshotSection('recipes')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const recipeApiCount = await page.evaluate((sysId) => {
           const rm = game.fabricate?.getRecipeManager?.();
@@ -6160,7 +6180,15 @@ async function main() {
 
         // Return to the recipes browser for the remaining navigation.
         await openManagerCraftingSection(page, 'recipes', 'recipes');
+        } else {
+          process.stdout.write('Phase D0: recipes section skipped (off scoped target set).\n');
+        }
 
+        // ── D0 section: components + checks (issue #826 scoped-skip guard) ─────
+        // Re-enters via an absolute Components nav click, so it does not depend on
+        // the recipes section having run; net-zero (issue-800 restore + economy
+        // revert + system-switch re-selects all inline).
+        if (shouldRunScreenshotSection('components-checks')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -6622,7 +6650,12 @@ async function main() {
             await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
           }, { sysId: craftingSetup.systemId, componentIds: handle.componentIds, itemIds: handle.itemIds }),
         });
+        } else {
+          process.stdout.write('Phase D0: components-checks section skipped (off scoped target set).\n');
+        }
 
+        // ── D0 section: tags & categories + essences (issue #826 skip guard) ──
+        if (shouldRunScreenshotSection('tags-essences')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Tags")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="tags"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -6704,7 +6737,15 @@ async function main() {
             }
           }
         }
+        } else {
+          process.stdout.write('Phase D0: tags-essences section skipped (off scoped target set).\n');
+        }
 
+        // ── D0 section: environments + gathering (issue #826 skip guard) ──────
+        // Enters via exerciseManagerEnvironmentPointerTargets, which itself clicks
+        // the Gathering nav first (absolute), and only browses/edits — the
+        // phase-E gathering fixtures were seeded earlier in the always-run spine.
+        if (shouldRunScreenshotSection('gathering')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await exerciseManagerEnvironmentPointerTargets(page);
         if (await page.locator('.fabricate-manager .manager-environment-row').count() < 1) {
@@ -6899,7 +6940,15 @@ async function main() {
         // assertManagerLayoutStable (which requires table rows) does not apply here.
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-settings');
+        } else {
+          process.stdout.write('Phase D0: gathering section skipped (off scoped target set).\n');
+        }
 
+        // ── D0 section: tools + system-overview + interactables (issue #826) ──
+        // Enters via an absolute Tools nav click; the system-overview and
+        // interactables sub-blocks switch systems / open independent apps and
+        // restore the smoke-system selection + active scene inline.
+        if (shouldRunScreenshotSection('overview-interactables')) {
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager .manager-tools-row:has-text("Herbalist Sickle")').first()
@@ -7363,7 +7412,16 @@ async function main() {
           results.steps.push({ step: 'interactables-manager', passed: false, error: err.message });
           process.stderr.write(`Manage Interactables capture failed: ${err.message}\n`);
         }
+        } else {
+          process.stdout.write('Phase D0: overview-interactables section skipped (off scoped target set).\n');
+        }
 
+        // ── D0 section: import report + alchemy settings + experimental-off ───
+        // (issue #826 skip guard.) Each sub-block opens its own fresh manager /
+        // dialog session and self-restores (import "(Copy)" deletion; experimental
+        // features restored by the phase finally), so it is independent of prior
+        // sections and safe to skip as a unit.
+        if (shouldRunScreenshotSection('import-alchemy-experimental')) {
         // ── Post-import unresolved-reference report (#492) ─────────────────────
         // The GM-facing import report is a DialogV2 that only appears AFTER an
         // import, and only surfaces its "needs attention" list when the imported
@@ -7596,6 +7654,18 @@ async function main() {
           results.steps.push({ step: 'manager-experimental-off', passed: false, error: err.message });
           process.stderr.write(`Manager experimental-off capture failed: ${err.message}\n`);
           await closeOpenApplications(page).catch(() => {});
+        }
+        } else {
+          process.stdout.write('Phase D0: import-alchemy-experimental section skipped (off scoped target set).\n');
+        }
+
+        // On a scoped `screenshots` run the experimental-off milestone capture (which
+        // sets d0RequiredCapturesComplete) may be skipped, so mark the D0 required
+        // captures complete here: every targeted D0 section has run by this point, so
+        // a later transient renderer teardown is the tolerable post-milestone class.
+        // Inert under rc/ci/full (the milestone is set by the real capture there).
+        if (SCREENSHOT_SCOPING_ACTIVE) {
+          d0RequiredCapturesComplete = true;
         }
 
         await page.evaluate(async (sysId) => {

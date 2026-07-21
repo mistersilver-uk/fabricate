@@ -261,3 +261,175 @@ export function phasesForTargetLabels(targetLabels) {
 export function isPhaseNeededForTargets(phase, targetLabels) {
   return phasesForTargetLabels(targetLabels).has(phase);
 }
+
+/**
+ * ── Phase-D0 intra-phase collapse (issue #826 increment 2) ─────────────────────
+ *
+ * `phase-D0` (the Crafting System Manager walk) cannot be skipped wholesale (see
+ * `isPhaseNeededForTargets`) because its opening SPINE seeds fixtures a later
+ * `phase-E` reads. But its body is a sequence of contiguous capture SECTIONS, and
+ * measured `viewTimings` show D0 at ~64% of the walk. A scoped `screenshots` run
+ * therefore skips the navigate+settle+capture work of any SECTION whose labels are
+ * all off-target, keeping only the always-run spine + the sections a PR touches.
+ *
+ * SAFETY MODEL (why a whole-section skip cannot publish a wrong frame):
+ * - The spine (`D0_SPINE_LABELS`) ALWAYS runs — it opens the manager, selects the
+ *   smoke system, seeds the gathering library + travel/realm fixtures `phase-E`
+ *   needs, and enables the persisted currency config a downstream view may read. It
+ *   is the baseline every section re-navigates from.
+ * - Each skippable section re-enters via ABSOLUTE manager navigation (a nav-parent /
+ *   nav-button click or `openManager*` helper — never a relative move off the prior
+ *   section's position), so a section never depends on an upstream section's UI
+ *   state; and each section is persisted-NET-ZERO: it either only captures, or it
+ *   mutates shared state and restores it INLINE (the multi-step feature toggle's
+ *   `finally`, the issue-800 description-repair restore, the gathering-economy
+ *   revert, every system switch's re-select, the import "(Copy)" deletion). Skipping
+ *   a whole section skips the mutation AND its inline restore together, leaving world
+ *   state exactly as if the section never ran — so no co-scoped reader is
+ *   contaminated. (Section granularity is why the multi-step `finally` needs no
+ *   per-routine split: the enabled-state frames, the toggle, and the restore are all
+ *   inside ONE section and either all run or all skip.)
+ *
+ * These lists are the MAPPED (`VIEW_RECIPES`) labels only; unmapped ride-along frames
+ * (e.g. `manager-system-overview`) are produced only when their section runs and are
+ * never a PR target, so they need no entry here. `tests/screenshot-capture-scoping.js`
+ * proves spine + sections PARTITION every mapped D0 label (nothing unguarded).
+ */
+export const D0_SPINE_LABELS = Object.freeze([
+  'manager-default-selection',
+  'manager-selected-normal',
+  'manager-rail-expanded',
+  'manager-rail-collapsed',
+  'manager-selected-stacked',
+  'manager-system-edit-normal',
+  'manager-system-edit-narrow',
+  'manager-system-edit-dirty',
+  'currency-actor-property',
+  'currency-macro',
+  'currency-actor-inventory',
+]);
+
+/**
+ * The ordered, contiguous, independently-skippable D0 capture sections. Each `name`
+ * is the token the harness passes to its `shouldRunScreenshotSection` guard; `labels`
+ * are that section's mapped capture labels. A section runs iff scoping is inactive
+ * (rc/ci/full — the guard short-circuits true) OR at least one of its labels is in the
+ * PR target set. Order mirrors the walk so the list reads as the walk's own table of
+ * contents.
+ * @type {readonly {name: string, labels: readonly string[]}[]}
+ */
+export const D0_SKIPPABLE_SECTIONS = Object.freeze([
+  {
+    name: 'recipes',
+    labels: Object.freeze([
+      'manager-recipes-editor-roundtrip',
+      'manager-recipes-normal',
+      'manager-recipes-narrow',
+      'manager-recipes-no-check',
+      'manager-recipes-grouped-continuation',
+      'manager-crafting-group-expanded',
+      'manager-books-scrolls-normal',
+      'manager-crafting-settings',
+      'manager-recipe-item-validation',
+      'manager-recipe-item-validation-blocked',
+      'manager-recipe-edit-normal',
+      'manager-recipe-edit-books-scrolls',
+      'manager-recipe-edit-tools',
+      'manager-recipe-edit-ingredients',
+      'manager-recipe-edit-validation',
+      'manager-recipe-edit-multistep',
+      'manager-recipe-edit-results',
+      'manager-recipe-edit-results-multistep',
+      'manager-multistep-disable-confirm',
+      'manager-recipe-edit-collapsed',
+      'manager-recipe-edit-results-progressive',
+      'manager-recipe-edit-results-alchemy',
+      'manager-recipe-edit-access-rail',
+    ]),
+  },
+  {
+    name: 'components-checks',
+    labels: Object.freeze([
+      'manager-components-normal',
+      'manager-components-description-before',
+      'manager-components-description-repaired',
+      'manager-components-description-ingested',
+      'manager-component-edit-normal',
+      'manager-component-edit-salvage',
+      'manager-component-edit-salvage-off',
+      'manager-component-edit-salvage-simple',
+      'manager-checks-gathering',
+      'manager-checks-validation',
+      'manager-checks-crafting-consumption',
+      'manager-components-stacked',
+      'manager-components-grouped-continuation',
+    ]),
+  },
+  {
+    name: 'tags-essences',
+    labels: Object.freeze([
+      'manager-tags-categories-normal',
+      'manager-tags-categories-tags-tab',
+      'manager-tags-categories-stacked',
+      'manager-essences-normal',
+      'manager-essences-stacked',
+      'manager-essence-edit-first-state',
+    ]),
+  },
+  {
+    name: 'gathering',
+    labels: Object.freeze([
+      'manager-environments-browse-normal',
+      'manager-environments-browse-stacked',
+      'manager-gathering-task-editor-normal',
+      'manager-gathering-task-editor-stacked',
+      'manager-environment-edit-placeholder',
+      'manager-gathering-events-normal',
+      'manager-gathering-event-editor-normal',
+      'manager-gathering-travel-normal',
+      'manager-gathering-travel-stacked',
+    ]),
+  },
+  {
+    name: 'overview-interactables',
+    labels: Object.freeze([
+      'manager-tools-normal',
+      'manager-components-progressive',
+      'manager-component-edit-difficulty',
+      'interactable-config-linked',
+      'interactable-config-unlinked',
+      'interactable-config-source-configured',
+      'interactable-config-needs-configuration',
+      'interactables-manager-list',
+      'interactables-manager-promote',
+      'interactables-manager-empty',
+    ]),
+  },
+  {
+    name: 'import-alchemy-experimental',
+    labels: Object.freeze([
+      'manager-import-report',
+      'manager-alchemy-settings',
+      'manager-experimental-off',
+    ]),
+  },
+]);
+
+const D0_SECTION_LABELS_BY_NAME = new Map(D0_SKIPPABLE_SECTIONS.map((s) => [s.name, s.labels]));
+
+/**
+ * Whether the named D0 section must run to satisfy `targetLabels` — i.e. any of the
+ * section's mapped labels is in the target set. Pure: the harness composes it with
+ * its own `SCREENSHOT_SCOPING_ACTIVE` short-circuit (rc/ci/full always run every
+ * section). An unknown section name returns `true` (fail-safe: never silently skip a
+ * section the harness knows about but the map does not).
+ * @param {string} sectionName
+ * @param {Iterable<string>} targetLabels
+ * @returns {boolean}
+ */
+export function isD0SectionNeededForTargets(sectionName, targetLabels) {
+  const labels = D0_SECTION_LABELS_BY_NAME.get(sectionName);
+  if (!labels) return true;
+  const targets = targetLabels instanceof Set ? targetLabels : new Set(targetLabels);
+  return labels.some((label) => targets.has(label));
+}

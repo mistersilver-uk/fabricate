@@ -28,6 +28,9 @@ import {
   isPhaseNeededForTargets,
   CAPTURE_PHASE_D0,
   CAPTURE_PHASE_E,
+  D0_SPINE_LABELS,
+  D0_SKIPPABLE_SECTIONS,
+  isD0SectionNeededForTargets,
 } from '../scripts/lib/screenshotCaptureMap.js';
 
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
@@ -178,4 +181,104 @@ test('phase assignment matches the manager/player prefix split', () => {
   assert.equal(phaseForCaptureLabel('player-crafting-stacked'), CAPTURE_PHASE_E);
   assert.equal(phaseForCaptureLabel('chat-craft-card'), CAPTURE_PHASE_E);
   assert.equal(phaseForCaptureLabel('fabricate-journal'), CAPTURE_PHASE_E);
+});
+
+// ── Phase-D0 intra-phase section collapse (issue #826 increment 2) ──────────────
+
+const ALL_D0_LABELS = SCREENSHOT_CAPTURE_ORDER.filter(
+  (label) => phaseForCaptureLabel(label) === CAPTURE_PHASE_D0,
+);
+
+test('the D0 spine + skippable sections PARTITION every mapped phase-D0 label (nothing unguarded, nothing double-guarded)', () => {
+  const seen = new Map();
+  const record = (label, owner) => {
+    assert.ok(
+      !seen.has(label),
+      `phase-D0 label '${label}' is claimed by both '${seen.get(label)}' and '${owner}' — a label must run in exactly one place`,
+    );
+    seen.set(label, owner);
+  };
+  for (const label of D0_SPINE_LABELS) record(label, 'spine');
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    for (const label of section.labels) record(label, section.name);
+  }
+  // Every mapped D0 label is covered.
+  for (const label of ALL_D0_LABELS) {
+    assert.ok(seen.has(label), `phase-D0 label '${label}' is neither in the spine nor any skippable section — a scoped run could never capture it`);
+  }
+  // And nothing claims a label that is not a real mapped D0 capture.
+  for (const label of seen.keys()) {
+    assert.ok(ALL_D0_LABELS.includes(label), `'${label}' is claimed by '${seen.get(label)}' but is not a mapped phase-D0 label`);
+  }
+  assert.equal(seen.size, ALL_D0_LABELS.length);
+});
+
+test('every skippable-section label is a capturable phase-D0 routine', () => {
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    assert.ok(section.labels.length > 0, `section '${section.name}' has no labels`);
+    for (const label of section.labels) {
+      assert.ok(isCapturableLabel(label), `section '${section.name}' label '${label}' is not capturable`);
+      assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0);
+    }
+  }
+});
+
+test('spine labels are ALWAYS-run — none is gated by a skippable section', () => {
+  const sectioned = new Set(D0_SKIPPABLE_SECTIONS.flatMap((s) => s.labels));
+  for (const label of D0_SPINE_LABELS) {
+    assert.ok(!sectioned.has(label), `spine label '${label}' also appears in a skippable section`);
+  }
+  // A target set of ONLY a spine label needs NO skippable section (the spine runs
+  // unconditionally, so a scoped run collapses D0 to just the spine).
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    assert.equal(
+      isD0SectionNeededForTargets(section.name, ['manager-system-edit-dirty']),
+      false,
+      `a spine-only target incorrectly kept section '${section.name}'`,
+    );
+  }
+});
+
+test('a recipe-only target set runs ONLY the recipes section; component/tag/gathering/etc. are skippable', () => {
+  const targets = ['manager-recipe-edit-ingredients', 'manager-recipes-normal'];
+  assert.equal(isD0SectionNeededForTargets('recipes', targets), true);
+  for (const name of ['components-checks', 'tags-essences', 'gathering', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, targets), false, `recipe-only target should skip '${name}'`);
+  }
+});
+
+test('a component-only target set runs ONLY components-checks; recipes is skippable', () => {
+  const targets = ['manager-component-edit-salvage'];
+  assert.equal(isD0SectionNeededForTargets('components-checks', targets), true);
+  assert.equal(isD0SectionNeededForTargets('recipes', targets), false);
+  assert.equal(isD0SectionNeededForTargets('gathering', targets), false);
+});
+
+test("theme-or-global-ui's multi-section target set keeps exactly the sections its labels touch (spine label rides the always-run spine)", () => {
+  const themeView = VIEW_RECIPES.find((v) => v.id === 'theme-or-global-ui');
+  const targets = themeView.smokeLabels;
+  // Its labels span the spine (manager-default-selection) + three sections.
+  assert.ok(D0_SPINE_LABELS.includes('manager-default-selection'));
+  assert.equal(isD0SectionNeededForTargets('components-checks', targets), true); // manager-components-normal
+  assert.equal(isD0SectionNeededForTargets('tags-essences', targets), true); // manager-essences-normal
+  assert.equal(isD0SectionNeededForTargets('gathering', targets), true); // environments/tasks/events
+  // No theme label lands in these, so they stay skippable.
+  assert.equal(isD0SectionNeededForTargets('recipes', targets), false);
+  assert.equal(isD0SectionNeededForTargets('overview-interactables', targets), false);
+  assert.equal(isD0SectionNeededForTargets('import-alchemy-experimental', targets), false);
+});
+
+test('an unknown section name is fail-safe (runs) rather than silently skipped', () => {
+  assert.equal(isD0SectionNeededForTargets('not-a-real-section', ['manager-recipes-normal']), true);
+});
+
+test('the harness wires a scoped-skip guard for every declared section (drift guard)', () => {
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    assert.ok(
+      HARNESS.includes(`shouldRunScreenshotSection('${section.name}')`),
+      `section '${section.name}' has no shouldRunScreenshotSection guard in the harness — it would never be skipped`,
+    );
+  }
+  // The guard is inert under rc/ci/full: it short-circuits true when scoping is off.
+  assert.ok(/function shouldRunScreenshotSection[\s\S]*?if \(!SCREENSHOT_SCOPING_ACTIVE\) return true;/.test(HARNESS));
 });
