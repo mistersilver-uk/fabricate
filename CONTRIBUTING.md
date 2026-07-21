@@ -639,7 +639,7 @@ The profile is selected by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>` on `n
 | `rc` | Release-candidate CI | Phase B → C → E (unified shell, one Gathering success, Healing Potion craft) → console-error check | < 25 min including cold setup |
 | `ci` | Deprecated alias for `rc` (removed after one release) | same as `rc` | same |
 | `full` (default) | Local and visual-regression runs | + Phase D0 (manager screenshots), extended Gathering states, non-GM redaction, no-selectable actors, Phase F (cleanup) | ~10–15 min locally |
-| `screenshots` | Scoped PR screenshot evidence (issue 826) | Same rendering path and budget as `full`, but captures ONLY the labels a PR's changed files affect and skips a view-bearing phase whose labels are all off-target; the full-only behavioral assert phases do NOT run | Faster than `full` for a typical scoped PR |
+| `screenshots` | Scoped PR screenshot evidence (issue 826) | Same rendering path and budget as `full`, but captures ONLY the labels a PR's changed files affect and skips a view-bearing phase whose labels are all off-target; the full-only behavioral assert phases do NOT run | Modestly faster for a manager-only PR (phase E skipped, ~25% off) but ≈no win yet for player PRs since phase D0 still fully navigates — the per-view within-D0 scoping that yields the larger win is a follow-on |
 
 The `rc` profile captures a pinned screenshot budget (`world-loaded`, `fabricate-app-shell`, `post-craft`, `alara-post-craft-inventory`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run.
 
