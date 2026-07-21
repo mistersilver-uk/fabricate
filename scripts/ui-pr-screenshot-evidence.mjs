@@ -832,6 +832,21 @@ export function mapChangedFilesToViews(files = []) {
   return matched.filter(Boolean);
 }
 
+// The flat, de-duplicated list of smoke labels the views a PR's changed files affect
+// map to — the EXACT target set the scoped `screenshots` capture profile
+// (`scripts/foundry-test-run.mjs`, issue #826) should capture. This is the same
+// `mapChangedFilesToViews` lookup `collect`/`publish` consume, so the captured set and
+// the collected set stay in lockstep.
+export function smokeLabelsForChangedFiles(files = []) {
+  const labels = [];
+  for (const view of mapChangedFilesToViews(files)) {
+    for (const label of view.smokeLabels) {
+      if (!labels.includes(label)) labels.push(label);
+    }
+  }
+  return labels;
+}
+
 // A UI PR satisfies the screenshot check when its body has a "Screenshots"
 // heading (any ATX level — typically `##`) whose section contains at least one
 // image. Images may be markdown (`![alt](url)`) or HTML (`<img ... src=...>`);
@@ -929,10 +944,32 @@ export function isExemptByLabel(labels = [], exemptLabel = DEFAULT_EXEMPT_LABEL)
   return labels.some(label => String(label).trim().toLowerCase() === target);
 }
 
+// CONSERVATIVE label sanitization (salvaged from #823, Design H hardening #1). A view
+// label flows unescaped into `![label](url)` alt-text + the managed PR-body block, an
+// injection/block-breakout vector. Reject/escape ONLY what actually breaks the
+// `![...](...)` structure or the managed block: control chars, newlines, the block
+// sentinels, and the `[`/`]` that terminate alt-text. Parens are LEGAL in markdown
+// alt-text and appear in real labels (e.g. "Manager currency configuration (spend
+// strategy, units, macros)"), so they are deliberately preserved — do NOT over-escape.
+export function sanitizeLabel(label = '') {
+  return (
+    String(label)
+      // Strip control characters (incl. newlines/DEL) that could break the block/line.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+      // Neutralize the managed-block sentinels so a label can't forge/break the block.
+      .replace(/<!--\s*fabricate:screenshots:(?:start|end)\s*-->/gi, '')
+      // Escape the alt-text terminators; parens are intentionally left intact.
+      .replace(/([[\]])/g, '\\$1')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
 export function buildScreenshotMarkdown(prNumber, uploaded = []) {
   const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   const prefix = normalizedPrNumber ? `pr-${normalizedPrNumber} ` : '';
-  return uploaded.map(({ label, url }) => `![${prefix}${label}](${url})`).join('\n\n');
+  return uploaded.map(({ label, url }) => `![${prefix}${sanitizeLabel(label)}](${url})`).join('\n\n');
 }
 
 export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
@@ -999,11 +1036,30 @@ async function defaultS3ListAndDelete(region) {
   };
 }
 
-// Upload collected screenshots to S3 under <prefix>/<pr>/<view>.png. Headless,
-// no GitHub Releases/branches; the public-read object URL is embedded in the PR
-// body. `putObject` is injectable so tests never touch AWS.
-export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject } = {}) {
+// A normalized, filesystem-safe S3 key path segment: reject `..`, path separators,
+// and anything but a revision-shaped token so a supplied headSha cannot escape the
+// PR-scoped prefix (parity with the PR-number validation). Salvaged from #823.
+function normalizeHeadShaSegment(headSha) {
+  if (headSha === undefined || headSha === null || headSha === '') return '';
+  const value = String(headSha).trim();
+  if (!/^[0-9a-zA-Z._-]+$/.test(value) || value.includes('..')) {
+    throw new Error(`Invalid head SHA segment: ${headSha}`);
+  }
+  return value;
+}
+
+// Upload collected screenshots to S3. Publish adopts REVISION-ADDRESSED keys
+// `<prefix>/<pr>/<head-sha>/<view>.png` when a headSha is supplied (cache-busting so a
+// re-pushed revision does not serve a stale cached frame; the existing prefix-delete
+// cleanup still works with nested keys), else the legacy `<prefix>/<pr>/<view>.png`.
+// Headless, no GitHub Releases/branches; the public-read object URL is embedded in the
+// PR body. `putObject` is injectable so tests never touch AWS. `labelForId` lets a
+// caller supply labels from its own registry; otherwise labels resolve from
+// `VIEW_RECIPES` and fall back to the id (the id is DERIVED from the filename here, so
+// the pairing is unambiguous by construction).
+export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
+  const shaSegment = normalizeHeadShaSegment(headSha);
   const cfg = config || loadS3Config(root);
   if (!cfg.bucket || !cfg.baseUrl) {
     throw new Error('S3 is not configured. Set bucket/baseUrl in release.s3.config.json (or S3_RELEASE_BUCKET/RELEASE_BASE_URL).');
@@ -1013,10 +1069,14 @@ export async function uploadScreenshotObjects({ prNumber, files = [], root = ROO
   for (const file of files) {
     const name = basename(file);
     const viewId = name.slice(0, name.length - extensionOf(file).length);
-    const key = `${cfg.prefix}/${normalizedPrNumber}/${name}`;
+    const prScope = shaSegment
+      ? `${cfg.prefix}/${normalizedPrNumber}/${shaSegment}`
+      : `${cfg.prefix}/${normalizedPrNumber}`;
+    const key = `${prScope}/${name}`;
     await put({ bucket: cfg.bucket, key, body: readFileSync(file), contentType: contentTypeFor(file) });
     const recipe = VIEW_RECIPES.find(item => item.id === viewId);
-    uploaded.push({ viewId, label: recipe ? recipe.label : viewId, url: `${cfg.baseUrl}/${key}`, key, file });
+    const label = (labelForId && labelForId(viewId)) || (recipe ? recipe.label : viewId);
+    uploaded.push({ viewId, label, url: `${cfg.baseUrl}/${key}`, key, file });
   }
   return uploaded;
 }
@@ -1048,6 +1108,8 @@ export async function publishScreenshotEvidence({
   runGh = defaultGhRunner,
   putObject,
   config,
+  headSha,
+  labelForId,
 } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const destinationRoot = resolve(root, dir || `tmp/pr-screenshots/${normalizedPrNumber}`);
@@ -1068,7 +1130,7 @@ export async function publishScreenshotEvidence({
     };
   }
 
-  const uploaded = await uploadScreenshotObjects({ prNumber: normalizedPrNumber, files, root, config, putObject });
+  const uploaded = await uploadScreenshotObjects({ prNumber: normalizedPrNumber, files, root, config, putObject, headSha, labelForId });
 
   const repoArgs = repo ? ['--repo', repo] : [];
   const view = runGh(['pr', 'view', String(normalizedPrNumber), ...repoArgs, '--json', 'body', '--jq', '.body']);
@@ -1256,6 +1318,15 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     return;
   }
 
+  if (command === 'targets') {
+    // Print the scoped `screenshots`-profile target label set (CSV) for the changed
+    // files, for `FOUNDRY_SCREENSHOT_TARGET_LABELS` / `--target-labels`. Empty output
+    // (no UI change) tells the caller to skip the capture run entirely.
+    const changedFiles = loadChanged();
+    console.log(smokeLabelsForChangedFiles(changedFiles).join(','));
+    return;
+  }
+
   if (command === 'check') {
     const changedFiles = loadChanged();
     const body = args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '';
@@ -1337,6 +1408,9 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       runGh,
       putObject,
       config,
+      // Revision-addressed keys (`<prefix>/<pr>/<head-sha>/<view>.png`) when the head
+      // SHA is supplied; without it the keys fall back to the legacy PR-scoped path.
+      headSha: args.headSha,
     });
     if (result.skipped) {
       console.log(result.reason);
