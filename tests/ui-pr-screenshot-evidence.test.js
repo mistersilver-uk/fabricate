@@ -22,13 +22,49 @@ import {
   hasScreenshotEvidence,
   hasUiChanges,
   isExemptByLabel,
+  loadChangedFiles,
+  main,
   mapChangedFilesToViews,
   publishScreenshotEvidence,
   readLabelList,
+  resolveDefaultBase,
   upsertScreenshotsBlock,
   VIEW_RECIPES,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
+
+// A `resolveDefaultBase`-shaped git runner: `rev-parse --verify --quiet <ref>` returns
+// status 0 only for a ref in `verifiable`, else status 1. Shared so the fallback-order
+// and no-base tests do not each re-spell a spawnSync-shaped stub (Sonar duplication).
+function gitVerifyStub(verifiable) {
+  const set = new Set(verifiable);
+  const calls = [];
+  const run = (args) => {
+    const ref = args[args.length - 1];
+    calls.push(ref);
+    return { status: set.has(ref) ? 0 : 1, stdout: '', stderr: '' };
+  };
+  run.calls = calls;
+  return run;
+}
+
+// Capture console.log output produced while `fn()` runs, restoring the real console
+// afterwards. Used to assert the plan path's "No UI changes detected." line without a
+// subprocess.
+async function captureLog(fn) {
+  const lines = [];
+  const realLog = console.log;
+  const realError = console.error;
+  console.log = (...args) => lines.push(args.join(' '));
+  console.error = () => {};
+  try {
+    await fn();
+  } finally {
+    console.log = realLog;
+    console.error = realError;
+  }
+  return lines;
+}
 
 // Run `runAssert(root)` against a temp dir seeded with `test-results/<name>`
 // fixtures, cleaning up afterwards. Module-scope so the per-test collect setup is
@@ -931,6 +967,133 @@ describe('UI PR screenshot evidence', () => {
           ? { status: 1, stdout: '', stderr: 'not logged in' }
           : { status: 0, stdout: '', stderr: '' }),
       }), /not authenticated/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves the first VERIFIABLE default base, skipping candidates git cannot verify', () => {
+    // origin/main fails rev-parse but origin/HEAD verifies → returns origin/HEAD. This
+    // kills a "return candidates[0] regardless of verify" mutant, which would wrongly
+    // return origin/main.
+    assert.equal(resolveDefaultBase({ runGit: gitVerifyStub(['origin/HEAD', 'main']) }), 'origin/HEAD');
+
+    // origin/main and origin/HEAD both fail → falls through to local main.
+    assert.equal(resolveDefaultBase({ runGit: gitVerifyStub(['main']) }), 'main');
+
+    // The happy path still prefers origin/main when it verifies.
+    assert.equal(resolveDefaultBase({ runGit: gitVerifyStub(['origin/main', 'origin/HEAD', 'main']) }), 'origin/main');
+  });
+
+  it('returns null when no default base candidate can be verified', () => {
+    const stub = gitVerifyStub([]);
+    assert.equal(resolveDefaultBase({ runGit: stub }), null);
+    // It actually probed every candidate rather than short-circuiting.
+    assert.deepEqual(stub.calls, ['origin/main', 'origin/HEAD', 'main']);
+  });
+
+  it('throws a base-resolution diagnostic that names the tried candidates and instructs --base', () => {
+    // The load-bearing distinction from a real "no UI changes" answer: an UNRESOLVABLE
+    // base throws a clear, actionable error rather than returning [].
+    let message = '';
+    try {
+      loadChangedFiles({}, { resolveBase: () => null });
+      assert.fail('expected loadChangedFiles to throw when no base resolves');
+    } catch (error) {
+      message = error.message;
+    }
+    assert.match(message, /origin\/main/);
+    assert.match(message, /origin\/HEAD/);
+    assert.match(message, /\bmain\b/);
+    assert.match(message, /--base <ref>/);
+  });
+
+  it('honours changed-files > base > default-base precedence via injected spies', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-changed-'));
+    try {
+      const changedFilesPath = join(root, 'changed-files.txt');
+      writeFileSync(changedFilesPath, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte\n');
+
+      // --changed-files wins: neither seam is consulted.
+      let resolveCalls = 0;
+      let readCalls = 0;
+      const resolveBase = () => { resolveCalls += 1; return 'origin/main'; };
+      const readChangedFiles = (base) => { readCalls += 1; return [`from:${base}`]; };
+
+      const both = loadChangedFiles(
+        { changedFiles: changedFilesPath, base: 'origin/dev' },
+        { resolveBase, readChangedFiles },
+      );
+      assert.deepEqual(both, ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte']);
+      assert.equal(resolveCalls, 0);
+      assert.equal(readCalls, 0);
+
+      // Explicit --base: readChangedFiles gets that base; resolveBase is NOT called.
+      const explicit = loadChangedFiles({ base: 'origin/dev' }, { resolveBase, readChangedFiles });
+      assert.deepEqual(explicit, ['from:origin/dev']);
+      assert.equal(resolveCalls, 0);
+      assert.equal(readCalls, 1);
+
+      // Neither flag: resolveBase decides the base, then readChangedFiles diffs it.
+      const defaulted = loadChangedFiles({}, { resolveBase, readChangedFiles });
+      assert.deepEqual(defaulted, ['from:origin/main']);
+      assert.equal(resolveCalls, 1);
+      assert.equal(readCalls, 2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does NOT throw when a resolved base legitimately yields no UI files (conflation guard)', async () => {
+    // The distinction the issue exists to protect: a resolved base whose diff genuinely
+    // contains no UI files is a REAL "no UI changes" answer — loadChangedFiles returns the
+    // non-UI list and never throws, and the plan path prints "No UI changes detected."
+    // This must stay distinct from the base-resolution failure that DOES throw.
+    const resolveBase = () => 'origin/main';
+    const readChangedFiles = () => ['docs/readme.md', 'openspec/specs/foo/spec.md'];
+
+    const files = loadChangedFiles({}, { resolveBase, readChangedFiles });
+    assert.deepEqual(files, ['docs/readme.md', 'openspec/specs/foo/spec.md']);
+    assert.equal(hasUiChanges(files), false);
+    assert.deepEqual(mapChangedFilesToViews(files), []);
+
+    const lines = await captureLog(() => main(['plan'], { resolveBase, readChangedFiles }));
+    assert.deepEqual(lines, ['No UI changes detected.']);
+  });
+
+  it('lists required views on the plan path when the resolved-base diff has UI files', async () => {
+    const resolveBase = () => 'origin/main';
+    const readChangedFiles = () => ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
+    const lines = await captureLog(() => main(['plan'], { resolveBase, readChangedFiles }));
+    assert.match(lines[0], /UI smoke screenshot artifacts required:/);
+    assert.ok(lines.some(line => /manager-tools/.test(line)));
+  });
+
+  it('never resolves a default base for publish or clean (command scoping)', async () => {
+    // publish derives files from tmp/pr-screenshots/<pr>/ and clean just removes a local
+    // dir — neither must spawn git or trip base resolution / its throw.
+    let resolveCalls = 0;
+    const resolveBase = () => { resolveCalls += 1; return 'origin/main'; };
+
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-scope-'));
+    try {
+      // clean: harmless local rm of a PR-scoped tmp dir under the real repo (a high PR
+      // number with no such dir), asserting only that the resolver is untouched.
+      await captureLog(() => main(['clean', '--pr', '999999'], { resolveBase }));
+      assert.equal(resolveCalls, 0);
+
+      // publish: an empty output dir → skipped before any PR read; gh/S3 seams stubbed so
+      // no real network/CLI, and the resolver still must not be called.
+      const emptyDir = join(root, 'empty');
+      mkdirSync(emptyDir, { recursive: true });
+      const runGh = (args) => (args[0] === 'auth'
+        ? { status: 0, stdout: 'ok', stderr: '' }
+        : { status: 1, stdout: '', stderr: 'should not be reached' });
+      await captureLog(() => main(
+        ['publish', '--pr', '251', '--output-dir', emptyDir],
+        { resolveBase, runGh, putObject: async () => {}, config: S3_CONFIG },
+      ));
+      assert.equal(resolveCalls, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -1127,10 +1127,40 @@ function readLines(path) {
     .filter(Boolean);
 }
 
-function readChangedFilesFromGit(base) {
-  const result = spawnSync('git', ['diff', '--name-only', `${base}..HEAD`], { cwd: ROOT, encoding: 'utf8' });
+// Ordered default-base candidates. The first ref git can verify wins when neither
+// --base nor --changed-files is supplied. Named in the failure diagnostic so a
+// contributor knows exactly what was tried.
+const DEFAULT_BASE_CANDIDATES = Object.freeze(['origin/main', 'origin/HEAD', 'main']);
+
+// Single spawn path for every git call so `readChangedFilesFromGit` and
+// `resolveDefaultBase` share one implementation. `scripts/**` is NOT excluded from
+// SonarCloud's new-code duplication under Automatic Analysis, so two near-identical
+// inline `spawnSync('git', …)` blocks would risk the duplication gate.
+function runGit(args, { root = ROOT } = {}) {
+  return spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+}
+
+function readChangedFilesFromGit(base, { root = ROOT } = {}) {
+  // Three-dot `<base>...HEAD` is merge-base semantics: "what did THIS branch change
+  // since it forked from <base>", applied to BOTH the resolved-default and explicit
+  // --base paths so bare `plan` never disagrees with `plan --base <ref>`. On the
+  // integration path the driver rebases onto origin/main first, so the merge base is
+  // origin/main's tip and three-dot collapses to two-dot.
+  const result = runGit(['diff', '--name-only', `${base}...HEAD`], { root });
   if (result.status !== 0) throw new Error(result.stderr || `git diff failed with status ${result.status}`);
   return result.stdout.split(/\r?\n/).filter(Boolean);
+}
+
+// Resolve a default base ref when the caller supplies neither --base nor
+// --changed-files. Returns the first candidate git can verify, or null when none
+// resolve (e.g. a checkout with no `origin` remote and no local `main`). The git
+// runner and candidate list are injectable so tests never touch a real repository.
+export function resolveDefaultBase({ root = ROOT, runGit: gitRunner = runGit, candidates = DEFAULT_BASE_CANDIDATES } = {}) {
+  for (const ref of candidates) {
+    const result = gitRunner(['rev-parse', '--verify', '--quiet', ref], { root });
+    if (result && result.status === 0) return ref;
+  }
+  return null;
 }
 
 function parseArgs(argv) {
@@ -1165,18 +1195,39 @@ function toCamelCase(value) {
   return value.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
 }
 
-function loadChangedFiles(args) {
+// Resolve the changed-file set from, in precedence order: --changed-files (read
+// line-by-line), --base (diff against that ref), else a resolved default base. On a
+// resolved default it prints a one-line stderr note (stdout stays a clean artifact
+// listing) and diffs; when no base ref can be resolved it throws a clear, actionable
+// error rather than returning [] — so a bare invocation never reports a confident
+// "no UI changes" from an empty input set. The seams default to the real
+// implementations so `main()`'s existing call site is unchanged.
+export function loadChangedFiles(args, { resolveBase = resolveDefaultBase, readChangedFiles = readChangedFilesFromGit } = {}) {
   if (args.changedFiles) return readLines(args.changedFiles);
-  if (args.base) return readChangedFilesFromGit(args.base);
-  return [];
+  if (args.base) return readChangedFiles(args.base);
+  const base = resolveBase();
+  if (!base) {
+    throw new Error(
+      `Could not resolve a default base ref (tried ${DEFAULT_BASE_CANDIDATES.join(', ')}). `
+      + 'Pass --base <ref> (e.g. --base origin/main) or --changed-files <file>.',
+    );
+  }
+  console.error(`Using default base ${base} (no --base given).`);
+  return readChangedFiles(base);
 }
 
-async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0] || 'plan';
-  const changedFiles = loadChangedFiles(args);
+  const { resolveBase, readChangedFiles, runGh, putObject, config } = deps;
+  // Base resolution is scoped to the commands that CONSUME the changed-file set.
+  // `publish` derives its files from tmp/pr-screenshots/<pr>/ and `clean` just removes
+  // a local dir — neither must spawn git, print the default-base note, or throw when no
+  // base ref resolves (that would turn `clean` into a spurious exit 1).
+  const loadChanged = () => loadChangedFiles(args, { resolveBase, readChangedFiles });
 
   if (command === 'plan') {
+    const changedFiles = loadChanged();
     if (!hasUiChanges(changedFiles)) {
       console.log('No UI changes detected.');
       return;
@@ -1189,6 +1240,7 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'check') {
+    const changedFiles = loadChanged();
     const body = args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '';
     const exemptLabel = args.exemptLabel || DEFAULT_EXEMPT_LABEL;
     const labels = readLabelList(args.labels);
@@ -1222,6 +1274,7 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'collect') {
+    const changedFiles = loadChanged();
     const result = collectScreenshotEvidence({
       changedFiles,
       prNumber: args.pr,
@@ -1264,6 +1317,9 @@ async function main(argv = process.argv.slice(2)) {
       prNumber: args.pr,
       repo: args.repo,
       dir: args.outputDir,
+      runGh,
+      putObject,
+      config,
     });
     if (result.skipped) {
       console.log(result.reason);
