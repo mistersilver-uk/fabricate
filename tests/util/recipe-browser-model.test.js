@@ -17,6 +17,7 @@ import {
   paginateRecipes,
   sortRecipes
 } from '../../src/utils/recipeBrowserModel.js';
+import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 
 function makeRecipe(overrides = {}) {
   return {
@@ -84,6 +85,18 @@ describe('recipeBrowserModel — sorting', () => {
     assert.deepEqual(names(sortRecipes(rows, { key: 'results' })), ['Beta', 'Gamma', 'Alpha']);
   });
 
+  // The non-grouped path is the byte-identical pre-issue-801 order. These literal
+  // orderings pin BOTH directions per key so a bug injected into the shared
+  // `rowComparator` flips them (rather than a self-comparison against the code).
+  it('pins each sort key in both directions (the flat, non-grouped path)', () => {
+    assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'asc' })), ['Gamma', 'Beta', 'Alpha']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'desc' })), ['Alpha', 'Beta', 'Gamma']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'dc', direction: 'asc' })), ['Alpha', 'Beta', 'Gamma']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'dc', direction: 'desc' })), ['Gamma', 'Beta', 'Alpha']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'results', direction: 'asc' })), ['Beta', 'Gamma', 'Alpha']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'results', direction: 'desc' })), ['Alpha', 'Gamma', 'Beta']);
+  });
+
   it('ranks attention as blocked > incomplete > clear and tiebreaks by name', () => {
     const blocked = makeRecipe({ name: 'Blocked', incomplete: true, enabled: false });
     const incomplete = makeRecipe({ name: 'Incomplete', incomplete: true, enabled: true });
@@ -123,6 +136,18 @@ describe('recipeBrowserModel — grouping', () => {
     assert.deepEqual(groups.map((group) => group.total), [2, 1], 'total degrades to the bucket length');
   });
 
+  // The shared `compareRecipeCategories` orders the reserved `general` catch-all
+  // plain-alphabetically (unlike components, which pin it last) — so it falls between
+  // alchemy and smithing, and this order is what the category-major page order must match.
+  it('orders the general catch-all plain-alphabetically among the named buckets', () => {
+    const groups = groupRecipesByCategory([
+      makeRecipe({ name: 'Zinc', category: 'smithing' }),
+      makeRecipe({ name: 'Plain', category: '  ' }),
+      makeRecipe({ name: 'Acid', category: 'alchemy' })
+    ]);
+    assert.deepEqual(groups.map((group) => group.category), ['alchemy', 'general', 'smithing']);
+  });
+
   // buildRecipeBrowserModel groups the PAGE, so a bucket's own length is only what is on
   // screen. The header pairs it with the category's FILTERED total — issue 676.
   it('carries the category total from the filtered rows, not the page slice', () => {
@@ -156,6 +181,92 @@ describe('recipeBrowserModel — grouping', () => {
       { groupByCategory: false }
     );
     assert.equal(model.groups[0].total, 2);
+  });
+});
+
+// Issue 801 — with grouping ON the list is ordered category-major BEFORE pagination, so a
+// category larger than the page fills consecutive pages contiguously instead of being
+// interleaved into an alphabetical slice on every page.
+describe('recipeBrowserModel — category-major grouped pagination (issue 801)', () => {
+  // Recipes order categories plain-alphabetically, `general` INCLUDED at its natural
+  // slot: alchemy < general < smithing. Names are assigned round-robin across the three
+  // categories, so a global name sort (the pre-801 order) SCATTERS them — only
+  // category-major ordering makes each category contiguous, which is what these bind.
+  function interleavedLibrary() {
+    return buildInterleavedCategoryOrder([
+      ['alchemy', 3],
+      ['general', 3],
+      ['smithing', 3],
+    ]).map((category, index) =>
+      makeRecipe({ id: `r${index}`, name: `Item ${String(index + 1).padStart(2, '0')}`, category })
+    );
+  }
+
+  const pageModel = (rows, pageIndex) =>
+    buildRecipeBrowserModel(rows, { groupByCategory: true, pageSize: 4, pageIndex });
+
+  it('orders category-major before paginating, so every category is contiguous across pages', () => {
+    const rows = interleavedLibrary();
+    const { pageCount } = pageModel(rows, 0);
+    const groupOrder = [];
+    const pagesByCategory = new Map();
+    for (let page = 0; page < pageCount; page += 1) {
+      for (const group of pageModel(rows, page).groups) {
+        groupOrder.push(group.category);
+        if (!pagesByCategory.has(group.category)) pagesByCategory.set(group.category, []);
+        pagesByCategory.get(group.category).push(page);
+      }
+    }
+
+    // The rendered group headers, in page order, are the category-major order — the
+    // boundary-spanning `general` appears on two ADJACENT pages and nothing else does.
+    assert.deepEqual(groupOrder, ['alchemy', 'general', 'general', 'smithing', 'smithing']);
+
+    // Contiguity: every category occupies a consecutive run of pages (never scattered
+    // onto a non-adjacent page).
+    for (const [category, pages] of pagesByCategory) {
+      const span = pages[pages.length - 1] - pages[0] + 1;
+      assert.equal(span, pages.length, `${category} landed on non-adjacent pages`);
+    }
+
+    // The page order equals a straight category-major sort of the same filtered rows.
+    assert.deepEqual(
+      sortRecipes(rows, { key: 'name', categoryMajor: true }).map((row) => row.category),
+      ['alchemy', 'alchemy', 'alchemy', 'general', 'general', 'general', 'smithing', 'smithing', 'smithing']
+    );
+  });
+
+  it('reports N of M on both the filling and the continuation page of a split category', () => {
+    const rows = interleavedLibrary();
+
+    const filling = pageModel(rows, 0).groups.find((group) => group.category === 'general');
+    assert.equal(filling.recipes.length, 1, 'page 1 fills with one general row after the whole alchemy bucket');
+    assert.equal(filling.total, 3, 'the header reads 1 of 3 on the filling page');
+
+    const continuation = pageModel(rows, 1).groups.find((group) => group.category === 'general');
+    assert.equal(continuation.recipes.length, 2, 'the remaining two general rows continue on page 2');
+    // group.total vs group.recipes.length on the continuation page: still partial, still "N of M".
+    assert.ok(continuation.total > continuation.recipes.length, 'the continuation page still reads N of M');
+    assert.equal(continuation.total, 3);
+  });
+
+  it('confines sort DIRECTION to within-category rows; the group order is direction-independent', () => {
+    const rows = [
+      makeRecipe({ id: 's1', name: 'S1', category: 'smithing', ingredientCount: 5 }),
+      makeRecipe({ id: 'a1', name: 'A1', category: 'alchemy', ingredientCount: 1 }),
+      makeRecipe({ id: 'a2', name: 'A2', category: 'alchemy', ingredientCount: 9 }),
+    ];
+    // desc by ingredients: groups stay alchemy-before-smithing (the primary is
+    // direction-independent), and only the rows WITHIN alchemy descend (A2 before A1).
+    assert.deepEqual(
+      sortRecipes(rows, { key: 'ingredients', direction: 'desc', categoryMajor: true }).map((row) => [row.category, row.name]),
+      [['alchemy', 'A2'], ['alchemy', 'A1'], ['smithing', 'S1']]
+    );
+    // asc flips only the within-category order, never the group order.
+    assert.deepEqual(
+      sortRecipes(rows, { key: 'ingredients', direction: 'asc', categoryMajor: true }).map((row) => row.name),
+      ['A1', 'A2', 'S1']
+    );
   });
 });
 

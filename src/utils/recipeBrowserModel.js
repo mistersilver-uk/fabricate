@@ -152,25 +152,58 @@ function sortValue(recipe, key) {
 }
 
 /**
+ * Order two rows by their category. It reads `recipeCategoryOf`, so it works on a
+ * projected recipe row AND on a `{category}` bucket alike — and it is byte-equal to the
+ * `a.category.localeCompare(b.category)` that `groupRecipesByCategory` inlined before this
+ * was extracted. Shared by the group ordering and the category-major sort so the two can
+ * never disagree: "page order == rendered group order" becomes structural, not convention.
+ * Recipes order the reserved `general` catch-all plain-alphabetically (unlike components,
+ * which pin it last), so the scoped-out unification is a one-line change here.
+ */
+function compareRecipeCategories(left, right) {
+  return recipeCategoryOf(left).localeCompare(recipeCategoryOf(right));
+}
+
+/**
+ * The per-key row comparator, factored out so both the flat sort and the category-major
+ * sort compose the SAME within-row ordering (a bug injected here flips both). Name is the
+ * stable tiebreak.
+ */
+function rowComparator(key, direction) {
+  const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
+  return (a, b) => {
+    if (key === 'name') return direction * byName(a, b);
+    const delta = sortValue(a, key) - sortValue(b, key);
+    if (delta !== 0) return direction * delta;
+    return byName(a, b);
+  };
+}
+
+/**
  * Sort the rows by key + direction with an EXPLICIT comparator. `Array#sort()`
  * with no comparator is a SonarCloud finding (and lexicographic on numbers), so
  * every path through here passes one. Name is the stable tiebreak.
  *
+ * With `categoryMajor` (set when grouping is ON), the category comparator is the
+ * DIRECTION-INDEPENDENT primary key — group headers render in a fixed order regardless of
+ * `sortDirection` — and the active sort key + direction only order rows WITHIN a category.
+ * Each category then occupies a contiguous run of rows, so a group that spans a page
+ * boundary is shown contiguously across pages rather than interleaved. Without it the
+ * comparator is byte-identical to the pre-flag flat sort.
+ *
  * @param {object[]} recipes
- * @param {{key?: RecipeSortKey, direction?: SortDirection}} [options]
+ * @param {{key?: RecipeSortKey, direction?: SortDirection, categoryMajor?: boolean}} [options]
  * @returns {object[]} a new array; the input is not mutated.
  */
 export function sortRecipes(recipes, options = {}) {
   const key = RECIPE_SORT_KEYS.includes(options.key) ? options.key : 'name';
   const direction = options.direction === 'desc' ? -1 : 1;
-  const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
+  const compareRows = rowComparator(key, direction);
+  const comparator = options.categoryMajor
+    ? (a, b) => compareRecipeCategories(a, b) || compareRows(a, b)
+    : compareRows;
 
-  return [...(Array.isArray(recipes) ? recipes : [])].sort((a, b) => {
-    if (key === 'name') return direction * byName(a, b);
-    const delta = sortValue(a, key) - sortValue(b, key);
-    if (delta !== 0) return direction * delta;
-    return byName(a, b);
-  });
+  return [...(Array.isArray(recipes) ? recipes : [])].sort(comparator);
 }
 
 /**
@@ -204,7 +237,7 @@ export function groupRecipesByCategory(recipes, categoryTotals) {
       recipes: rows,
       total: categoryTotalOf(categoryTotals, category, rows.length),
     }))
-    .sort((a, b) => a.category.localeCompare(b.category));
+    .sort((a, b) => compareRecipeCategories(a, b));
 }
 
 /**
@@ -650,6 +683,9 @@ export function buildRecipeBrowserModel(recipes, options = {}) {
   const filtered = sortRecipes(filterRecipes(recipes, options), {
     key: options.sortKey,
     direction: options.sortDirection,
+    // Grouping ON ⇒ order category-major BEFORE pagination, so each category is a
+    // contiguous run across page boundaries rather than an interleaved slice per page.
+    categoryMajor: !!options.groupByCategory,
   });
   const paged = paginateRecipes(filtered, options);
   const groups = options.groupByCategory

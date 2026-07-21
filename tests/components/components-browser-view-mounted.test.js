@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -67,6 +68,31 @@ function manyGeneral(count) {
 
 function countTexts(root) {
   return [...root.querySelectorAll('.fab-group-count')].map((node) => node.textContent.trim());
+}
+
+/** [category, countText] per rendered group, in DOM order, for the current page. */
+function groupsOnPage(root) {
+  return [...root.querySelectorAll('[data-component-group]')].map((section) => [
+    section.dataset.componentGroup,
+    section.querySelector('.fab-group-count').textContent.trim(),
+  ]);
+}
+
+/**
+ * A multi-category library whose row NAMES are assigned round-robin across the
+ * categories, so a global name sort (the pre-issue-801 paginate-then-group order)
+ * SCATTERS each category across every page. Only category-major ordering makes a category
+ * contiguous — so this fixture is what binds the view's `categoryMajor` wiring.
+ */
+function interleavedLibrary(plan) {
+  return buildInterleavedCategoryOrder(plan).map((category, index) =>
+    makeComponent({
+      id: `c${index}`,
+      name: `Item ${String(index + 1).padStart(2, '0')}`,
+      // `general` is the reserved catch-all — leave the category off to land there.
+      category: category === 'general' ? undefined : category,
+    })
+  );
 }
 
 before(async () => {
@@ -137,5 +163,53 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
       ['2 components'],
       'a total that counted the unfiltered roster would report the whole library here'
     );
+  });
+});
+
+// Issue 801 — the LOAD-BEARING components contiguity proof. The util test can only show
+// `sortComponents({categoryMajor:true})` yields a flat category-major order; it cannot
+// bind the view (which could pass `categoryMajor:false` and still pass the util test).
+// This drives the real view: a category larger than the page must render contiguously
+// across the boundary, reading "N of M" on the filling page AND the continuation page.
+describe('ComponentsBrowserView category-major grouped pagination (issue 801)', () => {
+  it('renders each category contiguously across a page boundary, N of M on both sides', async () => {
+    // Herb (6) · Metal (12, the boundary-spanning bucket) · general (4) = 22 rows.
+    const root = await browser.mount({
+      itemCards: interleavedLibrary([
+        ['Herb', 6],
+        ['Metal', 12],
+        ['general', 4],
+      ]),
+      categoryVocabulary: ['Herb', 'Metal'],
+    });
+
+    // Shrink the page to 10 so Metal (12) must span two pages.
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    // Page 1: the whole Herb bucket, then the first slice of Metal — NOT an interleaved
+    // Herb/Metal/general alphabetical slice, which is what the pre-801 order produced.
+    assert.equal(root.querySelectorAll('.manager-component-row').length, 10, 'page 1 holds ten');
+    assert.deepEqual(groupsOnPage(root), [
+      ['Herb', '6 components'],
+      ['Metal', '4 of 12 components'],
+    ]);
+
+    // Page 2: Metal CONTINUES contiguously (its remaining 8), then general begins. Metal's
+    // header reads "N of M" on this continuation page too, and no Metal rows are stranded
+    // on any non-adjacent page.
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    assert.deepEqual(groupsOnPage(root), [
+      ['Metal', '8 of 12 components'],
+      ['general', '2 of 4 components'],
+    ]);
+
+    // Page 3: general finishes; Metal never reappears (contiguity across the boundary).
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    assert.deepEqual(groupsOnPage(root), [['general', '2 of 4 components']]);
   });
 });

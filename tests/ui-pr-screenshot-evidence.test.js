@@ -114,6 +114,38 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(repairIds, ['manager-components-description-repaired']);
   });
 
+  it('maps the issue-801 grouped-continuation frames to their OWN view ids', () => {
+    // Two dedicated ids, one published frame each (`collect` emits only `candidates[0]`).
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    for (const id of [
+      'manager-recipes-grouped-continuation',
+      'manager-components-grouped-continuation',
+    ]) {
+      assert.deepEqual(byId[id], [id], `${id} must be its own single-frame view`);
+    }
+
+    // Phase 1 is model-only for recipes: recipeBrowserModel.js is the SOLE changed file
+    // that maps a frame to the recipes browser, so it MUST resolve to the continuation id.
+    const recipeModelIds = mapChangedFilesToViews([
+      'src/utils/recipeBrowserModel.js',
+    ]).map(view => view.id);
+    assert.ok(recipeModelIds.includes('manager-recipes-grouped-continuation'));
+
+    // The component model change maps to both the ordinary browser frame and the
+    // dedicated continuation frame.
+    const componentModelIds = mapChangedFilesToViews([
+      'src/utils/componentBrowserModel.js',
+    ]).map(view => view.id);
+    assert.ok(componentModelIds.includes('manager-components'));
+    assert.ok(componentModelIds.includes('manager-components-grouped-continuation'));
+
+    // The components view file also republishes the continuation frame.
+    const componentViewIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
+    ]).map(view => view.id);
+    assert.ok(componentViewIds.includes('manager-components-grouped-continuation'));
+  });
+
   it('maps player gathering app files to the player-gathering recipes (incl. the realm-lock frame)', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/gathering/GatheringView.svelte',
@@ -663,6 +695,13 @@ describe('UI PR screenshot evidence', () => {
       emitted.add(match[1]);
     }
     for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
+      emitted.add(match[1]);
+    }
+    // Issue 801: the grouped-continuation frames route through the shared
+    // captureGroupedContinuationFrame(page, results, { … label: '…' … }) helper, which
+    // forwards `label` to captureStableManagerView as a variable — so the literal lives in
+    // the helper CALL's options object, not in the captureStableManagerView call itself.
+    for (const match of harness.matchAll(/captureGroupedContinuationFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     // The Results-tab captures (issue 643) route through captureRecipeResultsTab(page,

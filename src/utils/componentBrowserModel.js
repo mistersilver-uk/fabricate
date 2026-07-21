@@ -127,20 +127,13 @@ function sortValue(component, key) {
 }
 
 /**
- * Sort the rows by key + direction with an EXPLICIT comparator. `Array#sort()` with no
- * comparator is a SonarCloud finding (and lexicographic on numbers), so every path
- * through here passes one. Name is the stable tiebreak.
- *
- * @param {object[]} components
- * @param {{key?: ComponentSortKey, direction?: SortDirection}} [options]
- * @returns {object[]} a new array; the input is not mutated.
+ * The per-key row comparator, factored out so both the flat sort and the category-major
+ * sort compose the SAME within-row ordering (a bug injected here flips both). Name is the
+ * stable tiebreak.
  */
-export function sortComponents(components, options = {}) {
-  const key = COMPONENT_SORT_KEYS.includes(options.key) ? options.key : 'name';
-  const direction = options.direction === 'desc' ? -1 : 1;
+function rowComparator(key, direction) {
   const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
-
-  return [...(Array.isArray(components) ? components : [])].sort((a, b) => {
+  return (a, b) => {
     if (key === 'name') return direction * byName(a, b);
     if (key === 'category') {
       // `general` sorts LAST, matching groupComponentsByCategory's pinning. Plain
@@ -153,7 +146,42 @@ export function sortComponents(components, options = {}) {
     const delta = sortValue(a, key) - sortValue(b, key);
     if (delta !== 0) return direction * delta;
     return byName(a, b);
-  });
+  };
+}
+
+/**
+ * Sort the rows by key + direction with an EXPLICIT comparator. `Array#sort()` with no
+ * comparator is a SonarCloud finding (and lexicographic on numbers), so every path
+ * through here passes one. Name is the stable tiebreak.
+ *
+ * With `categoryMajor` (set when grouping is ON), `compareCategories` is the
+ * DIRECTION-INDEPENDENT primary key — `general` stays pinned LAST and groups render in a
+ * fixed order regardless of `sortDirection` — and the active sort orders rows only WITHIN
+ * a category, so each category is a contiguous run across page boundaries rather than an
+ * interleaved slice per page. When the active key IS `category`, its direction would
+ * otherwise re-sort the primary, so the secondary collapses to the name tiebreak: a
+ * `desc` category sort still renders groups ascending (general last) with names ascending
+ * inside each. Without the flag the comparator is byte-identical to the pre-flag flat sort.
+ *
+ * @param {object[]} components
+ * @param {{key?: ComponentSortKey, direction?: SortDirection, categoryMajor?: boolean}} [options]
+ * @returns {object[]} a new array; the input is not mutated.
+ */
+export function sortComponents(components, options = {}) {
+  const key = COMPONENT_SORT_KEYS.includes(options.key) ? options.key : 'name';
+  const direction = options.direction === 'desc' ? -1 : 1;
+  const rows = [...(Array.isArray(components) ? components : [])];
+  const compareRows = rowComparator(key, direction);
+
+  if (!options.categoryMajor) {
+    return rows.sort(compareRows);
+  }
+
+  const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
+  const secondary = key === 'category' ? byName : compareRows;
+  return rows.sort(
+    (a, b) => compareCategories(componentCategoryOf(a), componentCategoryOf(b)) || secondary(a, b)
+  );
 }
 
 /**

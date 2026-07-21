@@ -72,9 +72,15 @@
     category: ui.categoryFilter,
     essence: ui.essenceFilter
   }));
+  // Grouping ON ⇒ order category-major BEFORE pagination (issue 801), so each category is
+  // a contiguous run across page boundaries rather than an interleaved slice on every
+  // page. `groups` still groups the current `page.components`; the header's "N of M" stays
+  // truthful for a category that spans a boundary. When grouping is OFF the order is
+  // unchanged.
   const sortedComponents = $derived(sortComponents(filteredComponents, {
     key: ui.sortKey,
-    direction: ui.sortDirection
+    direction: ui.sortDirection,
+    categoryMajor: ui.groupByCategory
   }));
   const page = $derived(paginateComponents(sortedComponents, {
     pageIndex: ui.pageIndex,
