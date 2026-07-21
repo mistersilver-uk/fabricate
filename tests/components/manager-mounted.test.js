@@ -941,7 +941,9 @@ function createStore(calls = [], options = {}) {
         ],
     systemsLoading: options.systemsLoading === true,
     selectedSystem,
-    recipes: options.emptyRecipes
+    recipes: options.recipes
+      ? options.recipes
+      : options.emptyRecipes
       ? []
       : [
           {
@@ -4686,6 +4688,102 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
       'desc',
       'the descending sort survived the edit round-trip',
+    );
+  });
+
+  // Issue 806: the category filter AND the current page are lost across the edit
+  // round-trip when the reset sentinel is component-local (it re-fires on the remount).
+  // The lift now carries a persisted `systemId`, so the remount is not read as a system
+  // switch. This exercises the REAL root's `$state` proxy (unlike the isolated mounted
+  // browser tests, whose plain-object browserState cannot re-derive the page), so page
+  // preservation is faithful here. Fails on revert: category resets to All and the page
+  // returns to 1.
+  it('preserves the recipe browser category filter and page across an edit round-trip', async () => {
+    const calls = [];
+    // Twelve same-category recipes so a page-2 (size 10) view is reachable; cloned from
+    // the r1 fixture shape so the recipe editor renders the same way it does for r1.
+    const potions = Array.from({ length: 12 }, (_, index) => ({
+      id: `p${String(index + 1).padStart(2, '0')}`,
+      name: `Potion ${String(index + 1).padStart(2, '0')}`,
+      img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
+      description: 'A brew.',
+      category: 'potions',
+      recipeItemId: `ri-p${index + 1}`,
+      enabled: true,
+      locked: false,
+      isSimple: true,
+      structureLabel: 'Simple',
+      stepCount: 1,
+      resultGroupCount: 1,
+      ingredientCount: 2,
+      toolCount: 0,
+      checkSummary: { kind: 'none', dc: null },
+      requirementsPreview: [
+        { id: 'step-1', name: 'Step 1', ingredientSetCount: 1, ingredientCount: 2, toolCount: 0, resultGroupCount: 1 },
+      ],
+      visibilitySummary: 'All players',
+      ingredients: new Array(2),
+      tools: [],
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { experimentalFeaturesEnabled: true, recipes: potions }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    craftingParent().click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+
+    // Filter to the potions category, then shrink the page and step to page 2.
+    const categorySelect = target.querySelector('[data-recipe-category-filter]');
+    categorySelect.value = 'potions';
+    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const size = target.querySelector('[data-pagination-size]');
+    size.value = '10';
+    size.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('[data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-recipe-count]').textContent.trim(),
+      '11–12 of 12',
+      'the browser is on page 2 before opening the editor',
+    );
+
+    // Open the editor from a page-2 row, then return via Back to recipes.
+    target.querySelector('[data-recipe-id="p11"] [data-recipe-edit]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
+
+    const backButton = Array.from(
+      target.querySelectorAll('.manager-header-actions .manager-button'),
+    ).find((button) => button.textContent.includes('Back to recipes'));
+    backButton.click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.ok(
+      target.querySelector('[data-recipe-filter-chip="category"]'),
+      'the category filter survived the edit round-trip',
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-count]').textContent.trim(),
+      '11–12 of 12',
+      'the browser returned to page 2, not page 1',
     );
   });
 

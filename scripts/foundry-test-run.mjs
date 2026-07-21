@@ -1149,6 +1149,113 @@ async function captureGroupedContinuationFrame(page, results, options) {
 }
 
 /**
+ * Issue 806 — the editor round-trip preservation frame for the recipe library. Opening a
+ * recipe editor unmounts the browser and returning remounts it; the persisted `systemId`
+ * sentinel now stops that remount being misread as a system switch, so the page, filters
+ * and per-category collapse the GM left are preserved rather than wiped.
+ *
+ * The frame demonstrates it with the two round-trip-lost fields that fit a small fixture:
+ * a NON-DEFAULT category filter (a visible chip + a filtered single-group list) and a
+ * COLLAPSED category group, both set BEFORE opening the editor and photographed AFTER
+ * returning. Opening the editor from a collapsed group is impossible from the browser (a
+ * collapsed group renders no rows), so the recipe is SELECTED into the shared shell
+ * inspector first — the selection survives the collapse, so the inspector's Edit action
+ * drives the round-trip without a visible row. Page-index preservation is bound by the
+ * mounted tests, not this frame, to keep the smoke fixture small.
+ *
+ * Seeded rows are torn down and the category filter reset afterwards so no downstream frame
+ * inherits them. Guarded so a hiccup records a failed step rather than aborting the phase.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
+ * @param {{systemId: string}} craftingSetup
+ */
+async function captureRecipeEditorRoundtrip(page, results, craftingSetup) {
+  const CATEGORY = 'Roundtrip Brews';
+  let ids = [];
+  try {
+    ids = await page.evaluate(async ({ sysId, category }) => {
+      const rm = game.fabricate.getRecipeManager();
+      const created = [];
+      for (let index = 1; index <= 3; index += 1) {
+        const recipe = await rm.createRecipe({
+          name: `Roundtrip Draught ${String(index).padStart(2, '0')}`,
+          description: 'Issue 806 editor round-trip preservation fixture.',
+          craftingSystemId: sysId,
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Any reagent',
+              options: [{ quantity: 1, match: { type: 'tags', tags: ['reagent'], tagMatch: 'any' } }]
+            }]
+          }]
+        }, { allowIncomplete: true, notify: false });
+        await rm.updateRecipe(recipe.id, { category }, { allowIncomplete: true, notify: false });
+        created.push(recipe.id);
+      }
+      await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+      return created;
+    }, { sysId: craftingSetup.systemId, category: CATEGORY });
+
+    await openManagerCraftingSection(page, 'recipes', 'recipes');
+
+    // Filter to the seeded category: a visible chip and a single-group filtered list.
+    const categoryFilter = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
+    await categoryFilter.selectOption(CATEGORY);
+    await settleManagerNav(page);
+    await page.locator('.fabricate-manager [data-recipe-filter-chip="category"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Select a row into the shared shell inspector, so its Edit action survives the
+    // collapse below (a collapsed group renders no rows to click).
+    await page.locator('.fabricate-manager .manager-recipe-row .manager-recipe-identity').first().click();
+    const inspectorEdit = page.locator('.fabricate-manager .manager-recipe-browser-inspector [data-recipe-action="edit"]').first();
+    await inspectorEdit.waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Collapse the category group, then open the editor from the inspector.
+    const header = page.locator('.fabricate-manager .manager-recipe-group [data-group-header]').first();
+    await header.click();
+    await settleManagerNav(page);
+    await inspectorEdit.click();
+    await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Return to the browser: the category filter chip and the collapsed group both survive.
+    await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to recipes")').first().click();
+    await page.locator('.fabricate-manager[data-manager-view="recipes"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    await page.locator('.fabricate-manager [data-recipe-filter-chip="category"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    const stillCollapsed = await page.locator('.fabricate-manager .manager-recipe-group [data-group-header]').first()
+      .getAttribute('aria-expanded');
+    if (stillCollapsed !== 'false') {
+      throw new Error(`Expected the collapsed group to survive the round-trip; aria-expanded=${stillCollapsed}`);
+    }
+
+    await captureStableManagerView(page, { layout: 'recipes editor round-trip', label: 'manager-recipes-editor-roundtrip' });
+    results.steps.push({ step: 'recipes-editor-roundtrip', passed: true });
+  } catch (err) {
+    results.steps.push({ step: 'recipes-editor-roundtrip', passed: false, error: err.message });
+    process.stderr.write(`Recipes editor round-trip capture failed: ${err.message}\n`);
+  } finally {
+    const categoryReset = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
+    if (await categoryReset.count() > 0) {
+      await categoryReset.selectOption('all').catch(() => {});
+      await settleManagerNav(page);
+    }
+    if (ids.length > 0) {
+      await page.evaluate(async (recipeIds) => {
+        const rm = game.fabricate.getRecipeManager();
+        for (const id of recipeIds) {
+          await rm.deleteRecipe(id, { notify: false }).catch(() => {});
+        }
+        await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+      }, ids);
+    }
+    await openManagerCraftingSection(page, 'recipes', 'recipes');
+  }
+}
+
+/**
  * Assert manager table rows and summary regions do not horizontally overflow.
  * @param {import('playwright').Page} page
  * @param {string} label
@@ -5617,6 +5724,10 @@ async function main() {
             await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
           }, ids),
         });
+
+        // Issue 806 — prove the editor round-trip preserves the browser's view-state
+        // (category filter + collapsed group) rather than resetting it on the remount.
+        await captureRecipeEditorRoundtrip(page, results, craftingSetup);
 
         // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
         // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a

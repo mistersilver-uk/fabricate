@@ -156,6 +156,8 @@ describe('UI PR screenshot evidence', () => {
     for (const id of [
       'manager-recipes-grouped-continuation',
       'manager-components-grouped-continuation',
+      // Issue 806: the editor round-trip frame is also its own single-frame view.
+      'manager-recipes-editor-roundtrip',
     ]) {
       assert.deepEqual(byId[id], [id], `${id} must be its own single-frame view`);
     }
@@ -166,6 +168,8 @@ describe('UI PR screenshot evidence', () => {
       'src/utils/recipeBrowserModel.js',
     ]).map(view => view.id);
     assert.ok(recipeModelIds.includes('manager-recipes-grouped-continuation'));
+    // Issue 806: the state factory now also maps to the editor round-trip frame.
+    assert.ok(recipeModelIds.includes('manager-recipes-editor-roundtrip'));
 
     // The component model change maps to both the ordinary browser frame and the
     // dedicated continuation frame.

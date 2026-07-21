@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -163,6 +164,89 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
       ['2 components'],
       'a total that counted the unfiltered roster would report the whole library here'
     );
+  });
+});
+
+// Issue 806 — the editor round-trip. Opening a component editor UNMOUNTS this browser and
+// returning REMOUNTS it. The system-change reset must fire on a genuine SYSTEM SWITCH
+// only, so the sentinel lives on the persisted `browserState` (`ui.systemId`), not in
+// component-local `$state` that reset to '' on every mount (the bug). These tests cross a
+// real remount with a NON-EMPTY `selectedSystemId` and mutate the view-state — including
+// the ESSENCE filter — AFTER the first mount, so they FAIL on revert rather than passing
+// vacuously.
+describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
+  function metalWithFireLibrary() {
+    // 15 Metal (each carrying a Fire essence) + 5 Herb, so a page-2 (pageSize 10) filter
+    // by BOTH category=Metal AND essence=Fire is a real, non-empty page.
+    const rows = [];
+    for (let i = 0; i < 15; i += 1) {
+      rows.push(
+        makeComponent({
+          id: `m${i}`,
+          name: `Metal ${String(i + 1).padStart(2, '0')}`,
+          category: 'Metal',
+          essences: [{ id: 'fire', name: 'Fire', quantity: 1 }]
+        })
+      );
+    }
+    for (let i = 0; i < 5; i += 1) {
+      rows.push(makeComponent({ id: `h${i}`, name: `Herb ${String(i + 1).padStart(2, '0')}`, category: 'Herb' }));
+    }
+    return rows;
+  }
+
+  it('preserves page, category filter, essence filter and collapse across an editor round-trip', async () => {
+    const shared = createComponentBrowserState();
+    const itemCards = metalWithFireLibrary();
+
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-1', browserState: shared });
+    assert.equal(shared.systemId, 'sys-1', 'the first mount stamps the persisted system sentinel');
+
+    shared.categoryFilter = 'Metal';
+    shared.essenceFilter = 'Fire';
+    shared.pageSize = 10;
+    shared.pageIndex = 1;
+    shared.collapsedCategories = new Set(['Metal']);
+    shared.sortKey = 'salvage';
+
+    browser.remount();
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-1', browserState: shared });
+
+    assert.equal(shared.categoryFilter, 'Metal', 'the category filter survives the round-trip');
+    assert.equal(shared.essenceFilter, 'Fire', 'the essence filter survives the round-trip');
+    assert.equal(shared.pageIndex, 1, 'the page survives the round-trip');
+    assert.equal(shared.collapsedCategories.has('Metal'), true, 'the collapsed group survives the round-trip');
+    assert.equal(shared.sortKey, 'salvage', 'the sort key is a preference and is untouched');
+  });
+
+  it('resets category, essence, page and collapse on a genuine system switch, keeping sort/group', async () => {
+    const shared = createComponentBrowserState();
+    const itemCards = metalWithFireLibrary();
+
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-1', browserState: shared });
+
+    // Default page size keeps the 20-row library on one page, so the page index reads 0
+    // deterministically: the plain-object `browserState` (not a `$state` proxy) cannot
+    // drive the non-reactive `model` to recompute after the reset effect, so a smaller
+    // page size would let the page-sync effect memoize a stale non-zero page. The app uses
+    // a real proxy; page preservation on a same-system return is proven above.
+    shared.categoryFilter = 'Metal';
+    shared.essenceFilter = 'Fire';
+    shared.pageIndex = 1;
+    shared.collapsedCategories = new Set(['Metal']);
+    shared.sortKey = 'salvage';
+    shared.groupByCategory = false;
+
+    browser.remount();
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-2', browserState: shared });
+
+    assert.equal(shared.categoryFilter, 'all', 'a switch clears the vocabulary-scoped category filter');
+    assert.equal(shared.essenceFilter, 'all', 'a switch clears the essence filter too');
+    assert.equal(shared.pageIndex, 0, 'a switch returns to the first page');
+    assert.equal(shared.collapsedCategories.size, 0, 'a switch re-expands every group');
+    assert.equal(shared.systemId, 'sys-2', 'the persisted sentinel advances to the new system');
+    assert.equal(shared.sortKey, 'salvage', 'sort key is a cross-system preference and is kept');
+    assert.equal(shared.groupByCategory, false, 'group-by-category is a cross-system preference and is kept');
   });
 });
 

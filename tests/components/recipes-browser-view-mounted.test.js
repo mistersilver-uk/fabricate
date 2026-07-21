@@ -590,6 +590,140 @@ describe('RecipesBrowserView lifted browser state', () => {
     );
   });
 
+  // Issue 806 — the editor round-trip. Opening an editor UNMOUNTS this browser and
+  // returning REMOUNTS it. The system-change reset must fire on a genuine SYSTEM SWITCH
+  // only, not on a remount with the system unchanged. The sentinel therefore lives on the
+  // persisted `browserState` (`ui.systemId`), not in component-local `$state` that resets
+  // to '' on every mount. These tests cross a real remount with a NON-EMPTY
+  // `selectedSystemId` and mutate the view-state AFTER the first mount — if the sentinel
+  // were still local (the reverted bug) the return would be misread as a switch and wipe
+  // the page/category/collapse, so they FAIL on revert rather than passing vacuously.
+  function alchemyHeavyLibrary() {
+    // 15 alchemy + 5 smithing, so a page-2 (pageSize 10) alchemy filter is a real page.
+    const rows = [];
+    for (let i = 0; i < 15; i += 1) {
+      rows.push(makeRecipe({ id: `a${i}`, name: `Alch ${String(i + 1).padStart(2, '0')}`, category: 'alchemy' }));
+    }
+    for (let i = 0; i < 5; i += 1) {
+      rows.push(makeRecipe({ id: `s${i}`, name: `Smith ${String(i + 1).padStart(2, '0')}`, category: 'smithing' }));
+    }
+    return rows;
+  }
+
+  it('preserves page, category filter and collapse across an editor round-trip (same system)', async () => {
+    const shared = createRecipeBrowserState();
+    const recipes = alchemyHeavyLibrary();
+
+    // First mount with a REAL system id: the reset effect runs once and stamps
+    // ui.systemId = 'sys-1'.
+    await browser.mount({
+      recipes,
+      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      showRecipeCategories: true,
+      selectedSystemId: 'sys-1',
+      browserState: shared
+    });
+    assert.equal(shared.systemId, 'sys-1', 'the first mount stamps the persisted system sentinel');
+
+    // The GM narrows the library AFTER arriving: a non-default category, page 2, a
+    // collapsed group, and a non-default sort to prove cross-system prefs survive a switch.
+    shared.categoryFilter = 'alchemy';
+    shared.pageSize = 10;
+    shared.pageIndex = 1;
+    shared.collapsedCategories = new Set(['alchemy']);
+    shared.sortKey = 'dc';
+
+    // Open the editor (unmount) then return (remount) with the SAME state object and the
+    // SAME system id.
+    browser.remount();
+    await browser.mount({
+      recipes,
+      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      showRecipeCategories: true,
+      selectedSystemId: 'sys-1',
+      browserState: shared
+    });
+
+    assert.equal(shared.categoryFilter, 'alchemy', 'the category filter survives the round-trip');
+    assert.equal(shared.pageIndex, 1, 'the page survives the round-trip');
+    assert.equal(shared.collapsedCategories.has('alchemy'), true, 'the collapsed group survives the round-trip');
+    assert.equal(shared.sortKey, 'dc', 'the sort key is a preference and is untouched');
+  });
+
+  it('resets category, page and collapse on a genuine system switch, keeping sort/group', async () => {
+    const shared = createRecipeBrowserState();
+    const recipes = alchemyHeavyLibrary();
+
+    await browser.mount({
+      recipes,
+      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      showRecipeCategories: true,
+      selectedSystemId: 'sys-1',
+      browserState: shared
+    });
+
+    // The default page size keeps the 20-row library on a single page, so the page index
+    // reads 0 deterministically here: the test's `browserState` is a plain object rather
+    // than a `$state` proxy, so the non-reactive `model` cannot recompute after the reset
+    // effect writes — the page-sync effect would otherwise memoize a stale non-zero page.
+    // The page RESET on switch is faithful in the app (a real proxy) and the page PRESERVE
+    // on a same-system return is proven rigorously by the sibling round-trip test above.
+    shared.categoryFilter = 'alchemy';
+    shared.pageIndex = 1;
+    shared.collapsedCategories = new Set(['alchemy']);
+    shared.sortKey = 'dc';
+    shared.groupByCategory = false;
+
+    // Remount with a DIFFERENT system id: a real switch, so the vocabulary-scoped fields
+    // and the page/collapse reset — but sort and group-by are cross-system preferences.
+    browser.remount();
+    await browser.mount({
+      recipes,
+      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      showRecipeCategories: true,
+      selectedSystemId: 'sys-2',
+      browserState: shared
+    });
+
+    assert.equal(shared.categoryFilter, 'all', 'a switch clears the vocabulary-scoped category filter');
+    assert.equal(shared.pageIndex, 0, 'a switch returns to the first page');
+    assert.equal(shared.collapsedCategories.size, 0, 'a switch re-expands every group');
+    assert.equal(shared.systemId, 'sys-2', 'the persisted sentinel advances to the new system');
+    assert.equal(shared.sortKey, 'dc', 'sort key is a cross-system preference and is kept');
+    assert.equal(shared.groupByCategory, false, 'group-by-category is a cross-system preference and is kept');
+  });
+
+  it('clamps a restored page that no longer exists to the last valid page', async () => {
+    const shared = createRecipeBrowserState();
+    const recipes = alchemyHeavyLibrary();
+
+    await browser.mount({
+      recipes,
+      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      showRecipeCategories: true,
+      selectedSystemId: 'sys-1',
+      browserState: shared
+    });
+
+    // The GM was on page 2 (pageSize 10, 20 rows → two pages) when they opened the editor.
+    shared.pageSize = 10;
+    shared.pageIndex = 1;
+
+    // While editing, rows were deleted so only 8 remain — page 2 no longer exists.
+    browser.remount();
+    await browser.mount({
+      recipes: recipes.slice(0, 8),
+      recipeCategories: [{ name: 'alchemy', count: 8 }],
+      showRecipeCategories: true,
+      selectedSystemId: 'sys-1',
+      browserState: shared
+    });
+
+    // The pager clamps to the last valid page rather than stranding an empty one; the
+    // page-sync effect writes the clamped index back into the persisted state.
+    assert.equal(shared.pageIndex, 0, 'the out-of-range page clamps to the last valid page');
+  });
+
   it('claims a blocked enable through the store seam and flashes it in-window, dismissibly', async () => {
     // The row asks the STORE to enable and hands it an `onBlocked` sink. Supplying
     // that sink is exactly what makes the store SUPPRESS its Foundry notification
