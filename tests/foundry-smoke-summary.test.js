@@ -12,6 +12,8 @@ import {
   computeSmokeSignal,
   evaluateSmokeOutcome,
   isTransientPageTeardown,
+  shouldTolerateSmokeTeardown,
+  TRANSIENT_TEARDOWN_SKIP_PREFIX,
 } from '../scripts/lib/foundrySmokeSignal.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,13 +42,13 @@ test('a failing step with zero console errors is distinguishable from the invers
     steps: [{ step: 'a', passed: false, error: 'boom' }],
     consoleErrors: [],
   });
-  assert.deepEqual(failedStepOnly, { stepFailures: 1, consoleErrorCount: 0 });
+  assert.deepEqual(failedStepOnly, { stepFailures: 1, consoleErrorCount: 0, degraded: false });
 
   const consoleErrorOnly = computeSmokeSignal({
     steps: [{ step: 'a', passed: true }],
     consoleErrors: ['a runtime error'],
   });
-  assert.deepEqual(consoleErrorOnly, { stepFailures: 0, consoleErrorCount: 1 });
+  assert.deepEqual(consoleErrorOnly, { stepFailures: 0, consoleErrorCount: 1, degraded: false });
 
   // The two states are numerically distinct — a gate can tell them apart.
   assert.notDeepEqual(failedStepOnly, consoleErrorOnly);
@@ -63,7 +65,7 @@ test('computeSmokeSignal populates from partial results (an early phase abort)',
   assert.equal(signal.consoleErrorCount, 1);
 
   // Robust even when fields are entirely absent (never throws, never undefined).
-  assert.deepEqual(computeSmokeSignal({}), { stepFailures: 0, consoleErrorCount: 0 });
+  assert.deepEqual(computeSmokeSignal({}), { stepFailures: 0, consoleErrorCount: 0, degraded: false });
 });
 
 // ── The appendable waiver ─────────────────────────────────────────────────
@@ -326,4 +328,228 @@ test('the harness guards the process against a late teardown rejection and exits
   assert.match(source, /browser\.close\(\) failed \(ignored\)/);
   // The final exit keys on the harness's own verdict, immediately.
   assert.match(source, /process\.exit\(results\.passed \? 0 : 1\)/);
+});
+
+// ── Issue #807: transient D0 renderer-teardown tolerance ──────────────────
+//
+// Walk-order note (reconciled against the real D0 walk): the motivating
+// essence-edit interaction is the `manager-essence-edit-first-state` capture,
+// which runs BEFORE the `manager-experimental-off` milestone (several captures
+// upstream). A teardown truly on that click is PRE-milestone and correctly still
+// FAILS. The tolerance property is stated by MILESTONE POSITION, not by that
+// interaction, so these tests assert on the milestone, never on essence-edit.
+
+test('shouldTolerateSmokeTeardown: truth table (teardown class AND required captures complete)', () => {
+  const teardown = 'locator.click: Target page, context or browser has been closed';
+
+  // Teardown class present but captures NOT complete → do not tolerate (pre-milestone).
+  assert.equal(
+    shouldTolerateSmokeTeardown({ message: teardown, pageClosed: false, requiredCapturesComplete: false }),
+    false
+  );
+  assert.equal(
+    shouldTolerateSmokeTeardown({ message: 'unrelated', pageClosed: true, requiredCapturesComplete: false }),
+    false
+  );
+
+  // Teardown class present AND captures complete → tolerate (post-milestone).
+  assert.equal(
+    shouldTolerateSmokeTeardown({ message: teardown, pageClosed: false, requiredCapturesComplete: true }),
+    true
+  );
+  assert.equal(
+    shouldTolerateSmokeTeardown({ message: 'unrelated', pageClosed: true, requiredCapturesComplete: true }),
+    true
+  );
+
+  // A REAL (non-teardown) failure with captures complete is NEVER tolerated —
+  // the predicate is not just `return requiredCapturesComplete`. Kills that mutant.
+  assert.equal(
+    shouldTolerateSmokeTeardown({
+      message: 'Manager rendered no rows',
+      pageClosed: false,
+      requiredCapturesComplete: true,
+    }),
+    false
+  );
+});
+
+test('computeSmokeSignal.degraded is true only for a tolerated-teardown skip record', () => {
+  const degraded = computeSmokeSignal({
+    steps: [
+      { step: 'navigate-setup', passed: true },
+      {
+        step: 'screenshot-manager',
+        passed: true,
+        skipped: true,
+        error: TRANSIENT_TEARDOWN_SKIP_PREFIX + 'Target page, context or browser has been closed',
+      },
+    ],
+    consoleErrors: [],
+  });
+  assert.equal(degraded.degraded, true);
+
+  // A skip for any OTHER reason (not the tolerated-teardown prefix) is NOT degraded.
+  const notDegraded = computeSmokeSignal({
+    steps: [
+      { step: 'navigate-setup', passed: true },
+      { step: 'cleanup', passed: true, skipped: true, error: 'profile skip' },
+    ],
+    consoleErrors: [],
+  });
+  assert.equal(notDegraded.degraded, false);
+
+  // A clean run with no skips is not degraded.
+  assert.equal(computeSmokeSignal({ steps: [{ step: 'a', passed: true }] }).degraded, false);
+});
+
+test('evaluateSmokeOutcome names the console-error count in the steps-first message', () => {
+  // Steps still win the reason, but a nonzero console-error count is APPENDED so a
+  // masked console-error total is visible behind a step failure. Kills the mutant
+  // that removes the append.
+  const outcome = evaluateSmokeOutcome({
+    steps: [{ step: 'craft-item-phase', passed: false, error: 'craft failed' }],
+    consoleErrors: ['a runtime console error', 'and another'],
+  });
+  assert.equal(outcome.throws, true);
+  assert.equal(outcome.reason, 'steps');
+  assert.match(outcome.message, /step\(s\) failed/);
+  assert.match(outcome.message, /console error/);
+  assert.ok(outcome.message.includes('2'), 'the console-error count must appear in the message');
+
+  // With zero console errors the note is absent (no bare "(+0 ...)" noise).
+  const noNote = evaluateSmokeOutcome({
+    steps: [{ step: 'craft-item-phase', passed: false, error: 'craft failed' }],
+    consoleErrors: [],
+  });
+  assert.doesNotMatch(noNote.message, /console error/);
+});
+
+test('a tolerated D0 skip step does NOT waive a coincident console error — console-error gate still fails', () => {
+  // The tolerance touches only the STEP outcome; a tolerated teardown becomes
+  // passed:true/skipped:true and drops out of failedSteps, so control reaches the
+  // independent console-error gate. A real Fabricate JS bug surfaces there, NOT
+  // through the teardown path — so the run still FAILS on reason 'console-errors'.
+  const outcome = evaluateSmokeOutcome({
+    steps: [
+      { step: 'navigate-setup', passed: true },
+      {
+        step: 'screenshot-manager',
+        passed: true,
+        skipped: true,
+        error: TRANSIENT_TEARDOWN_SKIP_PREFIX + 'Target page, context or browser has been closed',
+      },
+    ],
+    consoleErrors: ['a real Fabricate regression'],
+  });
+  assert.equal(outcome.throws, true);
+  assert.equal(outcome.reason, 'console-errors');
+});
+
+// ── Source contracts: the harness wiring (region-bounded literal couplings) ──
+
+test('source: the D0 screenshot-manager catch tolerates WITHOUT rethrowing', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+
+  // Bound the catch region between its unique passed:false push (the hard-failure
+  // branch) and the D0 finally. The old code had `throw err;` in exactly this
+  // span; the fix removes it. INTENTIONAL literal coupling to the harness spelling.
+  const failPush = source.indexOf("step: 'screenshot-manager', passed: false, error: err.message");
+  assert.ok(failPush > 0, 'expected the D0 screenshot-manager hard-failure push');
+  const finallyClose = source.indexOf('} finally {', failPush);
+  assert.ok(finallyClose > failPush, 'expected the D0 finally after the hard-failure push');
+  const catchRegion = source.slice(failPush, finallyClose);
+
+  // The tolerate branch lives in this span and it does NOT rethrow.
+  assert.match(catchRegion, /d0TeardownTolerated = true/);
+  assert.ok(!/\bthrow\b/.test(catchRegion), 'the D0 catch must not rethrow (would double-record in Phase C)');
+
+  // The tolerate decision routes through the shared predicate — assert against the
+  // whole catch (the condition precedes the hard-failure push, so it is upstream
+  // of the bounded no-throw span above).
+  const catchStart = source.lastIndexOf('} catch (err) {', failPush);
+  assert.ok(catchStart > 0 && catchStart < failPush, 'expected the enclosing D0 catch');
+  assert.match(source.slice(catchStart, finallyClose), /shouldTolerateSmokeTeardown\(\{/);
+});
+
+test('source: d0RequiredCapturesComplete flips true AFTER the last capture, BEFORE the screenshot-manager pass push (not hoisted)', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+
+  const screenshotAnchor = source.indexOf("screenshot(page, 'manager-experimental-off')");
+  assert.ok(screenshotAnchor > 0, 'expected the manager-experimental-off milestone capture');
+
+  const milestoneAssign = source.indexOf('d0RequiredCapturesComplete = true', screenshotAnchor);
+  assert.ok(milestoneAssign > screenshotAnchor, 'milestone flag must be set AFTER the last capture');
+
+  // The success push {step:'screenshot-manager', passed:true} (single line, no skipped).
+  const managerPassPush = source.indexOf("step: 'screenshot-manager', passed: true }", screenshotAnchor);
+  assert.ok(managerPassPush > milestoneAssign, 'milestone flag must be set BEFORE the screenshot-manager pass push');
+
+  // Pin against hoisting: the ONLY `= true` assignment is the post-milestone one.
+  assert.equal(
+    source.indexOf('d0RequiredCapturesComplete = true'),
+    milestoneAssign,
+    'd0RequiredCapturesComplete must not be assigned true anywhere before the milestone'
+  );
+  // And it is declared false to begin with.
+  assert.match(source, /let d0RequiredCapturesComplete = false;/);
+});
+
+test('source: results.degraded and results.rendererCrashed are assigned in the finally block before summary.json', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+
+  const anchor = source.indexOf('results.consoleErrors = consoleErrors;');
+  assert.ok(anchor > 0, 'expected the finally-block consoleErrors anchor');
+  const finallyOpen = source.lastIndexOf('} finally {', anchor);
+  assert.ok(finallyOpen > 0 && finallyOpen < anchor, 'anchor must live inside a finally block');
+  const summaryWrite = source.indexOf("join(RESULTS_DIR, 'summary.json')", anchor);
+  assert.ok(summaryWrite > anchor, 'summary.json write must follow the anchor');
+
+  const degradedAssign = source.indexOf('results.degraded =', finallyOpen);
+  // Distinguish from the crash listener's `results.rendererCrashed = true` (which
+  // sits in the try, before the finally) by matching the finally-block coercion.
+  const rendererAssign = source.indexOf('results.rendererCrashed = Boolean(', finallyOpen);
+
+  assert.ok(degradedAssign > finallyOpen, 'results.degraded must be assigned inside the finally block');
+  assert.ok(rendererAssign > finallyOpen, 'results.rendererCrashed must be assigned inside the finally block');
+  assert.ok(degradedAssign < summaryWrite, 'results.degraded must be written before summary.json');
+  assert.ok(rendererAssign < summaryWrite, 'results.rendererCrashed must be written before summary.json');
+
+  // degraded is computed via the same helper this suite tests.
+  assert.match(source, /const \{ stepFailures, consoleErrorCount, degraded \} = computeSmokeSignal\(results\)/);
+  // A causation-bearing renderer-crash listener feeds rendererCrashed.
+  assert.match(source, /page\.on\('crash'/);
+});
+
+test('source (F2): the Phase E craft-failure screenshot is wrapped, and the Phase E guard keys on d0TeardownTolerated', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+
+  // (a) A gone-page failure screenshot cannot throw out of the Phase E catch into
+  // the Phase C catch and revive the deleted create-crafting-system record.
+  assert.match(
+    source,
+    /try \{[\s\S]*?screenshot\(page, 'craft-failure'\)[\s\S]*?\} catch/,
+    'the craft-failure screenshot must be wrapped in try/catch (mirroring journal-failure)'
+  );
+
+  // (b) The Phase E entry guard keys on d0TeardownTolerated, not page.isClosed() alone —
+  // a 'browser has been disconnected'-class teardown leaves page.isClosed() false.
+  assert.match(source, /if \(page\.isClosed\?\.\(\) \|\| d0TeardownTolerated\)/);
+  // When skipping, craft-item-phase is recorded skipped (not silently dropped).
+  assert.match(source, /step: 'craft-item-phase', passed: true, skipped: true/);
+});
+
+test('source (F4): both teardown-skip writer sites reference the exported TRANSIENT_TEARDOWN_SKIP_PREFIX symbol, no re-inlined literal', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+
+  // Both writer sites (D0 skip + Journal skip) stamp the error via the symbol.
+  const symbolWrites = source.match(/error: TRANSIENT_TEARDOWN_SKIP_PREFIX \+ /g) ?? [];
+  assert.equal(symbolWrites.length, 2, 'both skip writers must reference the exported prefix symbol');
+
+  // The literal string must NOT be re-inlined anywhere in the harness — that would
+  // defeat the drift protection (change the constant and that writer stops marking degraded).
+  assert.ok(
+    !source.includes('transient page teardown (skipped): '),
+    'the prefix literal must live only in foundrySmokeSignal.js, not re-inlined in the harness'
+  );
 });

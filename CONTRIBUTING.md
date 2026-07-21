@@ -601,7 +601,7 @@ After any run (success or failure), results are written to `test-results/`:
 
 | File | Description |
 |------|-------------|
-| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], phaseTimings[], viewTimings[] }` — pass/fail result, smoke profile, timings, and list of errors |
+| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], stepFailures, consoleErrorCount, degraded, rendererCrashed, phaseTimings[], viewTimings[] }` — pass/fail result, the split `stepFailures`/`consoleErrorCount` signals, the `degraded`/`rendererCrashed` flags, smoke profile, timings, and list of errors |
 | `console.log` | Full browser console output captured during the test |
 | `screenshot-*.png` | Per-step screenshots captured by the selected profile |
 | `screenshot-failure.png` | Captured only when a step throws (last DOM state) |
@@ -666,6 +666,23 @@ These are very different signals:
 So before treating a run as broken — or discarding its captured screenshots — confirm whether `steps[]` contains an actual failing step.
 A `passed: false` driven purely by `404` console noise with zero failed steps means the walk succeeded and the `screenshot-*.png` artifacts are valid evidence.
 (Example seen in practice: all phases B–F passed and `fabricate-app-shell` captured correctly, but `passed: false` came solely from 12 generic `404` console errors.)
+
+### Tolerated transient renderer teardown (`degraded` / `rendererCrashed`)
+
+A long `full` run can hit a transient Chromium renderer/page teardown at the tail — the message class `Target page, context or browser has been closed` (or `disconnected`/`crashed`).
+This is the same infra flake the Phase E Journal step and the process-level `unhandledRejection` guard already absorb.
+The Phase D0 manager walk now absorbs it too, but only after its last load-bearing capture (the `manager-experimental-off` milestone).
+
+`d0RequiredCapturesComplete` flips true immediately after the `manager-experimental-off` screenshot — the last genuine D0 capture.
+A teardown after that milestone records the `screenshot-manager` step skipped (not failed) and the run continues.
+A teardown before it still records `screenshot-manager: false` and fails the run, because the later frames were genuinely never captured and a PR relying on them must not go green.
+The tolerated window is deliberately minimal, so any earlier teardown fails loudly.
+
+`degraded: true` means a transient teardown was tolerated (a `screenshot-manager` or `player-journal` step is `skipped: true` with a `transient page teardown (skipped): …` error), so the run still exits 0 but is distinguishable from a clean pass.
+`rendererCrashed: true` means Playwright fired a page `crash` event (canonically an OOM) — the causation-bearing renderer-crash signal that `page.isClosed()` cannot distinguish from an intentional close — so a crash-flagged tolerated run stays exit 0 but warrants a confirming re-run.
+A real Fabricate JS error surfaces as a `pageerror`/`console.error` in the independent `consoleErrors[]` gate, not through the teardown path, so a tolerated teardown coincident with any non-waived console error still fails the run.
+The tolerance can therefore only ever mask a post-captures renderer process crash, never a JS regression.
+A persistent `rendererCrashed`/`degraded` pattern across runs is actionable (a systematic tail OOM), not cosmetic.
 
 ### Known drift pattern: Phase D0 selectors
 

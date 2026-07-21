@@ -38,7 +38,9 @@ import {
   classifyCapturedError,
   computeSmokeSignal,
   evaluateSmokeOutcome,
-  isTransientPageTeardown
+  isTransientPageTeardown,
+  shouldTolerateSmokeTeardown,
+  TRANSIENT_TEARDOWN_SKIP_PREFIX
 } from './lib/foundrySmokeSignal.js';
 import {
   assertExpectedSelectorsPresent,
@@ -3410,6 +3412,17 @@ async function main() {
     consoleErrors: []
   };
 
+  // Issue #807: page.isClosed() is causation-blind (true for an intentional
+  // close OR a renderer crash), so a tolerated post-captures teardown could hide
+  // a real product OOM as an untraceable "transient". page 'crash' is
+  // Playwright's causation-bearing renderer-crash signal (OOM canonical). Flag
+  // it so a crash-flagged tolerated run stays exit 0 but is visibly
+  // rendererCrashed in summary.json — a truthful signal, not a red run.
+  page.on('crash', () => {
+    results.rendererCrashed = true;
+    process.stderr.write('Renderer process crashed (page "crash" event).\n');
+  });
+
   try {
     startPhase('boot-and-join');
     // ── Step 1: Navigate to setup page and handle first-run flows ──────────
@@ -4967,6 +4980,17 @@ async function main() {
         results.steps.push({ step: 'gathering-feature-gate-negative', passed: true, skipped: true });
       }
 
+      // Phase D0 renderer-teardown tolerance state (issue #807).
+      // `d0RequiredCapturesComplete` flips true only AFTER the last load-bearing
+      // D0 capture (manager-experimental-off), so a teardown BEFORE that milestone
+      // still fails loudly — those later frames were never captured and a PR
+      // relying on them must not go green. `d0TeardownTolerated` records that D0
+      // absorbed a post-milestone teardown so the Phase E entry guard can skip a
+      // dead page even when page.isClosed() reads false (a 'browser has been
+      // disconnected'-class teardown). Declared at this scope so both the D0 catch
+      // and the sibling Phase E block below can read them.
+      let d0RequiredCapturesComplete = false;
+      let d0TeardownTolerated = false;
       // ── Phase D0: Screenshot Crafting System Manager ─────────────────────
       // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
       // ~25 manager captures and pointer hit-tests; local `full` runs
@@ -7194,6 +7218,14 @@ async function main() {
           await assertManagerLayoutStable(page, 'experimental off');
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-experimental-off');
+          // Milestone (issue #807): the last load-bearing D0 capture has landed.
+          // A renderer teardown AFTER this point is tolerable infra flake; before
+          // it is not (later frames would be genuinely missing). Deliberately NOT
+          // hoisted earlier — the motivating essence-edit interaction is the
+          // `manager-essence-edit-first-state` capture several captures upstream of
+          // this milestone, so a teardown truly on that click is PRE-milestone and
+          // still fails loudly, which is correct.
+          d0RequiredCapturesComplete = true;
           process.stdout.write('  D0: experimental-off rail screenshotted\n');
           await closeOpenApplications(page);
           results.steps.push({ step: 'manager-experimental-off', passed: true });
@@ -7215,8 +7247,37 @@ async function main() {
         results.steps.push({ step: 'screenshot-manager', passed: true });
         process.stdout.write('Phase D0 complete: Crafting System Manager screenshotted and hit-tested.\n');
       } catch (err) {
-        results.steps.push({ step: 'screenshot-manager', passed: false, error: err.message });
-        throw err;
+        // Issue #807: tolerate-or-fail. A real (non-teardown) failure, or ANY
+        // teardown BEFORE the manager-experimental-off milestone, records a hard
+        // screenshot-manager failure and fails via the terminal
+        // evaluateSmokeOutcome (D0 no longer rethrows, so this single record is the
+        // whole story — it is never double-recorded as create-crafting-system in
+        // the Phase C catch).
+        if (
+          !shouldTolerateSmokeTeardown({
+            message: err.message,
+            pageClosed: page.isClosed?.(),
+            requiredCapturesComplete: d0RequiredCapturesComplete
+          })
+        ) {
+          results.steps.push({ step: 'screenshot-manager', passed: false, error: err.message });
+        } else {
+          // Post-milestone transient renderer/page teardown: the same infra class
+          // the Phase E Journal step and the unhandledRejection guard already
+          // absorb. Record the step SKIPPED (not failed) and do NOT rethrow, so it
+          // neither reds the run nor propagates into Phase C. d0TeardownTolerated
+          // lets the Phase E guard skip the now-dead page.
+          d0TeardownTolerated = true;
+          results.steps.push({
+            step: 'screenshot-manager',
+            passed: true,
+            skipped: true,
+            error: TRANSIENT_TEARDOWN_SKIP_PREFIX + err.message
+          });
+          process.stderr.write(
+            `Phase D0 manager walk skipped after a transient page teardown: ${err.message}\n`
+          );
+        }
       } finally {
         await page.evaluate(async (previous) => {
           await game.settings.set('fabricate', 'experimentalFeatures', previous === true);
@@ -7226,6 +7287,16 @@ async function main() {
 
       // ── Phase E: Craft an item ──────────────────────────────────────────────
       startPhase('phase-E');
+      // Issue #807: with the D0 rethrow removed, Phase E is now reachable after a
+      // tolerated D0 teardown. The shared app Phase E drives cannot open on a
+      // dead/torn-down page, so skip it. Keyed on d0TeardownTolerated AND
+      // page.isClosed?.() — a 'browser has been disconnected'-class teardown is
+      // predicate-matched yet can leave page.isClosed() false, so isClosed alone
+      // would let Phase E proceed and throw into the Phase C catch.
+      if (page.isClosed?.() || d0TeardownTolerated) {
+        process.stdout.write('Phase E: skipped (renderer teardown tolerated in Phase D0).\n');
+        results.steps.push({ step: 'craft-item-phase', passed: true, skipped: true });
+      } else {
       process.stdout.write('Phase E: Crafting a Healing Potion...\n');
       try {
         // The "Craft Item" and "Gathering" sidebar actions both open ONE
@@ -8392,15 +8463,25 @@ async function main() {
         if (!journalErr) {
           results.steps.push({ step: 'player-journal', passed: true });
           process.stdout.write('  Screenshotted the player Journal screen.\n');
-        } else if (page.isClosed?.() || isTransientPageTeardown(journalErr.message)) {
+        } else if (
+          shouldTolerateSmokeTeardown({
+            message: journalErr.message,
+            pageClosed: page.isClosed?.(),
+            requiredCapturesComplete: true,
+          })
+        ) {
           // Infra teardown (renderer/page closed) — do not fail the whole smoke on
           // a known-flaky last step; mark it skipped with the reason so a
-          // persistent pattern is still visible in summary.json.
+          // persistent pattern is still visible in summary.json. The Journal step
+          // is the last step, so its required captures are complete by definition.
+          // Routes through the same shouldTolerateSmokeTeardown helper and stamps
+          // the same exported TRANSIENT_TEARDOWN_SKIP_PREFIX as the D0 skip site,
+          // so both writers and the degraded matcher can never drift.
           results.steps.push({
             step: 'player-journal',
             passed: true,
             skipped: true,
-            error: `transient page teardown (skipped): ${journalErr.message}`,
+            error: TRANSIENT_TEARDOWN_SKIP_PREFIX + journalErr.message,
           });
           process.stderr.write(
             `Player Journal capture skipped after a transient page teardown: ${journalErr.message}\n`
@@ -8420,8 +8501,16 @@ async function main() {
       } catch (err) {
         results.steps.push({ step: 'craft-item-phase', passed: false, error: err.message });
         process.stderr.write(`Phase E failed: ${err.message}\n`);
-        await screenshot(page, 'craft-failure');
+        // Issue #807: wrap the failure screenshot (mirroring journal-failure). A
+        // gone-page screenshot would otherwise throw out of this catch into the
+        // Phase C catch and REVIVE the deleted create-crafting-system record.
+        try {
+          await screenshot(page, 'craft-failure');
+        } catch {
+          /* page may already be gone — a gone-page screenshot must not throw */
+        }
       }
+      } // end Phase E (else branch of the D0-teardown guard)
 
     } catch (err) {
       results.steps.push({ step: 'create-crafting-system', passed: false, error: err.message });
@@ -8553,9 +8642,16 @@ async function main() {
     // or did we merely capture noise?". Computed HERE in the finally block —
     // beside results.consoleErrors — not in the try, so an early phase abort
     // still populates them and a gate never reads undefined.
-    const { stepFailures, consoleErrorCount } = computeSmokeSignal(results);
+    const { stepFailures, consoleErrorCount, degraded } = computeSmokeSignal(results);
     results.stepFailures = stepFailures;
     results.consoleErrorCount = consoleErrorCount;
+    // Issue #807: a tolerated transient D0/Journal teardown marks the run DEGRADED
+    // (still exit 0, but distinguishable in summary.json); rendererCrashed carries
+    // the causation-bearing page 'crash' signal (coerced to a boolean here even
+    // when the listener never fired). Both ride in summary.json beside the other
+    // signals — see AGENTS.md for how to read them.
+    results.degraded = degraded;
+    results.rendererCrashed = Boolean(results.rendererCrashed);
     results.waivedConsoleErrors = waivedConsoleErrors;
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
