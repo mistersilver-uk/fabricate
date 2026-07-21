@@ -26,6 +26,13 @@ const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
 ];
 
+// Every recipe-editor frame maps one same-named smoke label to the shared
+// RECIPE_EDIT_MATCHES glob. The factory collapses the twelve otherwise-identical view
+// literals into one call each so the block does not read as a large duplicated span —
+// Sonar's Automatic Analysis counts repeated object literals (`cpd.exclusions` is ignored)
+// and a fresh sibling entry would otherwise trip the new-code duplication gate.
+const recipeEditFrame = (id, label) => ({ id, label, smokeLabels: [id], matches: RECIPE_EDIT_MATCHES });
+
 export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-systems',
@@ -331,50 +338,20 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-experimental-off'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
-  // The recipe editor publishes TEN distinct frames (overview/identity, ingredients,
+  // The recipe editor publishes twelve distinct frames (overview/identity, ingredients,
   // validation tab, multi-step durations, the four Results-tab modes — routed-by-check,
-  // multi-step, progressive, alchemy — tools, and the restricted-visibility context
-  // rail). `collect` emits ONE file per recipe id (it takes the first matching smoke
-  // label), so each frame needs its own recipe — a single recipe with ten smoke labels
-  // would only ever publish the first (overview) frame and silently drop the rest. All
-  // ten share the same `matches`, so any change to a recipe editor/inspector or recipe
-  // sub-component republishes them together.
-  {
-    id: 'manager-recipe-edit-normal',
-    label: 'Manager recipe editor — overview / identity',
-    smokeLabels: ['manager-recipe-edit-normal'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-ingredients',
-    label: 'Manager recipe editor — ingredients (components, OR groups, tags, currency cost)',
-    smokeLabels: ['manager-recipe-edit-ingredients'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-validation',
-    label: 'Manager recipe editor — validation tab',
-    smokeLabels: ['manager-recipe-edit-validation'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-multistep',
-    label: 'Manager recipe editor — multi-step durations',
-    smokeLabels: ['manager-recipe-edit-multistep'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results',
-    label: 'Manager recipe editor — results (routed-by-check outcome sets)',
-    smokeLabels: ['manager-recipe-edit-results'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results-multistep',
-    label: 'Manager recipe editor — results (per-step content, multi-step)',
-    smokeLabels: ['manager-recipe-edit-results-multistep'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
+  // multi-step, progressive, alchemy — tools, the restricted-visibility Access tab, and
+  // the Books & Scrolls tab body). `collect` emits ONE file per recipe id (it takes the
+  // first matching smoke label), so each frame needs its own recipe — a single recipe
+  // with twelve smoke labels would only ever publish the first (overview) frame and
+  // silently drop the rest. All twelve share the same `matches`, so any change to a recipe
+  // editor/inspector or recipe sub-component republishes them together.
+  recipeEditFrame('manager-recipe-edit-normal', 'Manager recipe editor — overview / identity'),
+  recipeEditFrame('manager-recipe-edit-ingredients', 'Manager recipe editor — ingredients (components, OR groups, tags, currency cost)'),
+  recipeEditFrame('manager-recipe-edit-validation', 'Manager recipe editor — validation tab'),
+  recipeEditFrame('manager-recipe-edit-multistep', 'Manager recipe editor — multi-step durations'),
+  recipeEditFrame('manager-recipe-edit-results', 'Manager recipe editor — results (routed-by-check outcome sets)'),
+  recipeEditFrame('manager-recipe-edit-results-multistep', 'Manager recipe editor — results (per-step content, multi-step)'),
   // Multi-step visibility gating (issue 710). The disable-confirm frame is the system
   // settings view whose multi-step feature tile opens the confirm dialog (SystemEditView
   // renders the tile; the adminStore toggle/confirm gate drives it — but adminStore is
@@ -387,42 +364,23 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-multistep-disable-confirm'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   },
-  {
-    id: 'manager-recipe-edit-collapsed',
-    label: 'Manager recipe editor — collapsed multi-step (feature off)',
-    smokeLabels: ['manager-recipe-edit-collapsed'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results-progressive',
-    label: 'Manager recipe editor — results (progressive ordered stages)',
-    smokeLabels: ['manager-recipe-edit-results-progressive'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results-alchemy',
-    label: 'Manager recipe editor — results (alchemy two-slot success/reserved-failure)',
-    smokeLabels: ['manager-recipe-edit-results-alchemy'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-tools',
-    label: 'Manager recipe editor — tools (component-name fallback for unlabelled tools)',
-    smokeLabels: ['manager-recipe-edit-tools'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
-    // rail). Every other recipe frame is captured against a system whose visibility mode
-    // drives the Books & Scrolls branch, so without this frame the restricted (access)
-    // branch would ship with no screenshot evidence at all. The frame ID keeps its
-    // `-access-rail` suffix: it is a stable identifier the published S3 keys and the
-    // smoke labels share, and renaming it would orphan existing evidence for no gain.
-    id: 'manager-recipe-edit-access-rail',
-    label: 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)',
-    smokeLabels: ['manager-recipe-edit-access-rail'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
+  recipeEditFrame('manager-recipe-edit-collapsed', 'Manager recipe editor — collapsed multi-step (feature off)'),
+  recipeEditFrame('manager-recipe-edit-results-progressive', 'Manager recipe editor — results (progressive ordered stages)'),
+  recipeEditFrame('manager-recipe-edit-results-alchemy', 'Manager recipe editor — results (alchemy two-slot success/reserved-failure)'),
+  recipeEditFrame('manager-recipe-edit-tools', 'Manager recipe editor — tools (component-name fallback for unlabelled tools)'),
+  // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
+  // rail). Every other recipe frame is captured against a system whose visibility mode
+  // drives the Books & Scrolls branch, so without this frame the restricted (access)
+  // branch would ship with no screenshot evidence at all. The frame ID keeps its
+  // `-access-rail` suffix: it is a stable identifier the published S3 keys and the
+  // smoke labels share, and renaming it would orphan existing evidence for no gain.
+  recipeEditFrame('manager-recipe-edit-access-rail', 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)'),
+  // The Books & Scrolls tab body (issue 796). Its own dedicated frame because `collect`
+  // publishes only `candidates[0]` per view id, so without a view mapped to this smoke
+  // label the linked-book grid fix would never reach a PR — the sibling recipe-edit frames
+  // capture other tabs. This frame proves the tab body tiles into an auto-fill grid filling
+  // the panel rather than the old ~half-width capped column.
+  recipeEditFrame('manager-recipe-edit-books-scrolls', 'Manager recipe editor — Books & Scrolls tab (linked-book grid fills the panel)'),
   {
     id: 'player-gathering',
     label: 'Player gathering tab',
