@@ -218,6 +218,29 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[6].smokeLabels, ['player-crafting-multistep']);
   });
 
+  it('maps all four player crafting essence icon states to dedicated evidence views', () => {
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
+    ]);
+    const ids = views.map((view) => view.id);
+    for (const id of [
+      'player-crafting-essence-legacy',
+      'player-crafting-essence-ingredient',
+      'player-crafting-essence-alternative',
+      'player-crafting-essence-shopping',
+    ]) {
+      assert.ok(ids.includes(id), `${id} is collected for the shared essence thumb`);
+      const view = views.find((candidate) => candidate.id === id);
+      assert.deepEqual(view.smokeLabels, [id]);
+      assert.match(harness, new RegExp(`screenshot\\(page, '${id}'\\)`));
+    }
+    assert.match(harness, /icon: 'fas fa-star-of-life'/);
+    assert.match(harness, /name: 'Smoke Legacy Essence Seal'/);
+    assert.match(harness, /name: 'Smoke First-Class Essence Draught'/);
+    assert.match(harness, /type: 'essence', essenceId: 'smoke-star-essence'/);
+  });
+
   it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/alchemy/AlchemyView.svelte',

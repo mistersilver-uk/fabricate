@@ -89,6 +89,8 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
+  'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
   'src/systems/CraftingListingBuilder.js',
@@ -113,6 +115,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+  'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
   'src/ui/svelte/apps/crafting/QuantityTag.svelte',
   'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',

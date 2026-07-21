@@ -477,6 +477,42 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/crafting\//],
   },
   {
+    id: 'player-crafting-essence-legacy',
+    label: 'Player crafting — legacy set-level essence authored icon',
+    smokeLabels: ['player-crafting-essence-legacy'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+    ],
+  },
+  {
+    id: 'player-crafting-essence-ingredient',
+    label: 'Player crafting — first-class essence ingredient authored icon',
+    smokeLabels: ['player-crafting-essence-ingredient'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+    ],
+  },
+  {
+    id: 'player-crafting-essence-alternative',
+    label: 'Player crafting — essence OR-alternative authored icon',
+    smokeLabels: ['player-crafting-essence-alternative'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IngredientOptionSelector\.svelte$/,
+    ],
+  },
+  {
+    id: 'player-crafting-essence-shopping',
+    label: 'Player crafting — Shopping List essence shortage authored icon',
+    smokeLabels: ['player-crafting-essence-shopping'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/ShoppingList\.svelte$/,
+    ],
+  },
+  {
     id: 'player-crafting-stacked',
     label: 'Player crafting — narrow window stacked columns',
     smokeLabels: ['player-crafting-stacked'],

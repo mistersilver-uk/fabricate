@@ -9,6 +9,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import CraftingEssenceThumb from './CraftingEssenceThumb.svelte';
   import CraftingThumb from './CraftingThumb.svelte';
 
   let {
@@ -40,7 +41,8 @@
         key: `ing:${ing.componentId ?? ing.description ?? ing.name}`,
         name: displayName(ing.name, ing.description),
         img: ing.img ?? null,
-        isEssence: false,
+        isEssence: ing.isEssence === true,
+        icon: ing.icon ?? null,
         have: ing.have ?? 0,
         need: ing.totalNeed ?? 0
       })),
@@ -49,7 +51,7 @@
       .map((ess) => ({
         key: `ess:${ess.type}`,
         name: displayName(ess.name, ess.type),
-        img: null,
+        icon: ess.icon ?? null,
         isEssence: true,
         have: ess.have ?? 0,
         need: ess.totalNeed ?? 0
@@ -187,9 +189,7 @@
             {#each acquireComponents as row (row.key)}
               <li class="crafting-shopping-acquire-row">
                 {#if row.isEssence}
-                  <span class="crafting-shopping-acquire-essence" aria-hidden="true">
-                    <i class="fas fa-mortar-pestle"></i>
-                  </span>
+                  <CraftingEssenceThumb icon={row.icon} size={28} />
                 {:else}
                   <CraftingThumb src={row.img} alt="" size={28} />
                 {/if}
@@ -457,21 +457,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-surface);
-  }
-
-  /* Essences have no component image; render a generic essence icon tile instead. */
-  .crafting-shopping-acquire-essence {
-    box-sizing: border-box;
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-    font-size: 13px;
   }
 
   .crafting-shopping-acquire-name {

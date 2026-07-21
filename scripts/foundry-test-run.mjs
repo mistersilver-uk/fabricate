@@ -1836,7 +1836,15 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       salvageResolutionMode: 'simple',
       // Issue 765: unlock explicit multi-step authoring so the simple system can host
       // a stepped recipe (the player-crafting-multistep screenshot subject).
-      features: { multiStepRecipes: true },
+      features: { multiStepRecipes: true, essences: true },
+      essenceDefinitions: [
+        {
+          id: 'smoke-star-essence',
+          name: 'Smoke Star Essence',
+          description: 'Distinctive authored essence icon fixture for player Crafting evidence.',
+          icon: 'fas fa-star-of-life'
+        }
+      ],
       tools: [
         {
           // Always breaks (rng()*100 ∈ [0,100) < 100) → deterministic breakageChance break.
@@ -1961,14 +1969,12 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     });
     await rm.updateRecipe(negativeToolRecipe.id, { toolIds: [anvilToolId] });
 
-    // Multi-option ingredient recipe (issue #552): a single ingredient group that
-    // offers TWO interchangeable components the crafter actually holds, so the
-    // player detail renders the IngredientOptionSelector "Alternatives"
-    // radiogroup with two satisfiable, selectable rows. Additive — no execution
-    // assert consumes it — so it never perturbs the #489 consumption pins.
+    // Multi-option ingredient recipe (issue #552): a component OR authored essence
+    // choice. The held component keeps the recipe selectable while the essence option
+    // deterministically exercises its distinctive authored glyph.
     const multiOptionRecipe = await rm.createRecipe({
       name: 'Smoke Weave Filigree',
-      description: 'Simple-mode craft with one ingredient group offering two interchangeable coils (issue #552).',
+      description: 'Simple-mode craft with one component-or-essence ingredient choice (issue #552).',
       craftingSystemId: simpleSystemId,
       img: 'icons/commodities/metal/ingot-gold.webp',
       ingredientSets: [{
@@ -1977,7 +1983,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
           name: 'Coil',
           options: [
             { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Copper Coil'] } },
-            { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Bronze Coil'] } }
+            { quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 2 } }
           ]
         }]
       }],
@@ -1985,6 +1991,36 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         name: 'Filigree',
         results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }]
       }]
+    });
+
+    await rm.createRecipe({
+      name: 'Smoke Legacy Essence Seal',
+      description: 'Legacy set-level essence requirement with an authored icon.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/commodities/treasure/token-gold-gem-purple.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Plank',
+          options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+        }],
+        essences: { 'smoke-star-essence': 2 }
+      }],
+      resultGroups: [{ name: 'Seal', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
+    });
+
+    await rm.createRecipe({
+      name: 'Smoke First-Class Essence Draught',
+      description: 'First-class essence ingredient and shopping-list shortage fixture.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/consumables/potions/bottle-corked-purple.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          id: 'smoke-star-essence-group',
+          name: 'Star Essence',
+          options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 3 } }]
+        }]
+      }],
+      resultGroups: [{ name: 'Draught', results: [{ componentId: simpleMap['Smoke Toy'], quantity: 1 }] }]
     });
 
     // Explicit multi-step simple recipe (issue 765): the reported defect. Its sets
@@ -7949,6 +7985,16 @@ async function main() {
             }
           }
 
+          async function selectCraftingRecipeByName(name) {
+            const recipeSearch = appShell.locator('.crafting-browser-search input').first();
+            await recipeSearch.fill(name);
+            await page.waitForTimeout(350);
+            const row = appShell.locator(`[data-recipe-id]:has-text("${name}")`).first();
+            await row.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await row.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
+            return { recipeSearch, row };
+          }
+
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'player-crafting-simple');
 
@@ -8000,7 +8046,7 @@ async function main() {
 
           // Multi-option ingredient selector evidence (issue #552): select the
           // seeded 'Smoke Weave Filigree' recipe, whose single ingredient group
-          // offers two interchangeable coils the crafter holds, so the detail
+          // offers a held component or authored essence, so the detail
           // renders the IngredientOptionSelector "Alternatives" radiogroup with
           // two selectable rows. Defensive: a missing recipe/control records a
           // failed step rather than aborting the surrounding phase.
@@ -8021,6 +8067,7 @@ async function main() {
             await appShell.locator('.crafting-alt-option').first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-alternative');
             await screenshot(page, 'player-crafting-alternatives');
 
             // Nice-to-have "switched" variant: click the second alternative so the
@@ -8043,6 +8090,37 @@ async function main() {
               error: String(altError?.message ?? altError)
             });
             process.stdout.write(`  Player Crafting alternatives capture skipped: ${altError?.message ?? altError}\n`);
+          }
+
+          try {
+            const legacy = await selectCraftingRecipeByName('Smoke Legacy Essence Seal');
+            await appShell.locator('[data-io-group="essences"] .crafting-io-essence-icon').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-legacy');
+            await legacy.recipeSearch.fill('');
+
+            const firstClass = await selectCraftingRecipeByName(
+              'Smoke First-Class Essence Draught'
+            );
+            await appShell.locator('[data-io-group="ingredients"] .crafting-essence-thumb').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-ingredient');
+
+            await firstClass.row.locator('.crafting-recipe-row-add').click({ timeout: 5_000 });
+            await appShell.locator('[data-shopping-acquire-components] .crafting-essence-thumb').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-shopping');
+            await firstClass.recipeSearch.fill('');
+            results.steps.push({ step: 'player-crafting-essence-icons', passed: true });
+          } catch (essenceIconError) {
+            results.steps.push({
+              step: 'player-crafting-essence-icons',
+              passed: false,
+              error: String(essenceIconError?.message ?? essenceIconError)
+            });
           }
 
           // ── Explicit multi-step simple recipe (issue 765) ─────────────────

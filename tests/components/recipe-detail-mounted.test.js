@@ -175,6 +175,61 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(shortPip.classList.contains('is-insufficient'), 'short pip is red');
   });
 
+  it('renders authored essence glyphs with fallback while preserving ordinary images', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ modeToken: 'simple', modeLabel: 'Simple' }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [
+          {
+            componentId: null,
+            name: 'Restorative essence',
+            img: null,
+            icon: 'fa-solid fa-heart',
+            isEssence: true,
+            description: '2x Restorative essence',
+            need: 2,
+            have: 1,
+            satisfied: false,
+          },
+          {
+            componentId: 'c1',
+            name: 'Iron',
+            img: 'icons/iron.webp',
+            description: '1x Iron',
+            need: 1,
+            have: 1,
+            satisfied: true,
+          },
+        ],
+        essenceStates: [
+          { type: 'aether', name: 'Aether', icon: 'fa-regular fa-star', need: 1, have: 1, satisfied: true },
+          { type: 'void', name: 'Void', icon: 'not-a-font-awesome-icon', need: 1, have: 0, satisfied: false },
+        ],
+      }),
+    });
+
+    const tiles = target.querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    const essenceThumb = tiles[0].querySelector('.crafting-essence-thumb');
+    assert.ok(essenceThumb, 'first-class essence uses a glyph thumb');
+    assert.match(essenceThumb.getAttribute('style'), /48px/, 'detail glyph keeps 48px geometry');
+    assert.equal(essenceThumb.getAttribute('aria-hidden'), 'true');
+    assert.ok(essenceThumb.querySelector('i').classList.contains('fa-heart'));
+    assert.equal(tiles[0].querySelector('img'), null, 'essence does not render an image');
+    assert.equal(tiles[0].querySelector('.crafting-io-pip').textContent.trim(), '1/2');
+    assert.equal(tiles[1].querySelector('.crafting-thumb img').getAttribute('src'), 'icons/iron.webp');
+
+    const legacyIcons = target.querySelectorAll(
+      '[data-io-group="essences"] .crafting-io-essence-icon'
+    );
+    assert.ok(legacyIcons[0].classList.contains('far'), 'legacy icon prefix is normalized');
+    assert.ok(legacyIcons[0].classList.contains('fa-star'), 'authored legacy glyph renders');
+    assert.ok(legacyIcons[1].classList.contains('fa-mortar-pestle'), 'unusable legacy icon falls back');
+    assert.match(target.querySelector('[data-io-group="essences"]').textContent, /Aether/);
+    assert.match(target.querySelector('[data-io-group="essences"]').textContent, /Void/);
+  });
+
   it('shows the tool image to the left of the tool name', async () => {
     const target = await harness.mount({
       recipe: recipe({ modeToken: 'simple', modeLabel: 'Simple' }),

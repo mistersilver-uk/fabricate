@@ -1445,12 +1445,18 @@ It is offered only when the rendered order actually **differs** from the authore
 - Show the outcome-tier table for `routedByCheck` recipes, with each tier's
   awarded results (success tiers only).
 - Show blocking reasons when not craftable (derived from `browseStatus`).
+- Essence requirements use the GM-authored `EssenceDefinition.icon` after canonical icon normalization for legacy set-level requirements, first-class essence ingredient tiles, and essence choices within mixed alternatives.
+  Missing or unusable icons use `DEFAULT_ESSENCE_ICON`.
+  Non-essence images and the existing accessible labels and selection semantics remain unchanged.
 - (No learn action on the Crafting tab: recipe learning is wired through the Inventory surface only — see §Books & Scrolls learning.)
 
 #### Shopping List Panel
 
 - Session-scoped aggregation of materials needed for queued recipes.
 - Shown only on the Crafting tab.
+- Essence shortages from first-class ingredient states and legacy set-level essence states retain the first nonblank GM-authored icon across aggregation.
+  Later blank values do not erase it.
+  Render-time canonical normalization uses `DEFAULT_ESSENCE_ICON` when the retained value is missing or unusable, without changing need/have totals.
 
 #### Right Rail (Run Summary or Shopping List)
 

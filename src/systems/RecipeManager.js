@@ -32,10 +32,6 @@ const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 // resolves to an inventory item — always shows a coin icon.
 const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
 const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
-// An essence match never resolves to an inventory item (it is met by accumulating an
-// essence across items), so its tile shows a generic aura image plus the essence
-// definition's authored icon when one exists.
-const FALLBACK_ESSENCE_IMG = 'icons/svg/aura.svg';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -452,9 +448,9 @@ export class RecipeManager {
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
    *   missing: { ingredients: Array, essences: Array, tools: Array },
-   *   ingredientStates: Array<{ groupId: string|null, description: string, need: number, have: number, satisfied: boolean, hasChoice: boolean, choiceCount: number }>,
+   *   ingredientStates: Array<{ groupId: string|null, description: string, need: number, have: number, satisfied: boolean, hasChoice: boolean, choiceCount: number, isEssence?: boolean, icon?: string|null }>,
    *   ingredientChoices: Array<object>,
-   *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
+   *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean, isEssence: boolean, icon: string|null }>,
    *   toolStates: Array<{ name: string, img: string|null, available: boolean, virtual?: boolean }>
    * }}
    */
@@ -821,7 +817,7 @@ export class RecipeManager {
    * @param {IngredientSet} ingredientSet
    * @param {Object} selection - result from resolveIngredientSelection
    * @param {Item[]} availableItems
-   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have: number, satisfied: boolean }>}
+   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have: number, satisfied: boolean, isEssence?: boolean, icon?: string|null }>}
    * @private
    */
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
@@ -978,7 +974,7 @@ export class RecipeManager {
    * the common case shows no selector.
    *
    * Each `option` carries `{ optionIndex, name, img, need, have, satisfied,
-   * isCurrency, costLabel, affordable }` — an insufficient option is included
+   * isCurrency, isEssence?, icon?, costLabel, affordable }` — an insufficient option is included
    * (selectable but flagged `satisfied: false`), matching the resolver, which
    * honours it and lets the craft block with the missing-materials message.
    *
@@ -1100,7 +1096,7 @@ export class RecipeManager {
     );
     const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
     const need = Number(option?.quantity || 1);
-    return {
+    const choice = {
       optionIndex,
       name: visual.name || this._resolveIngredientDescription(recipe, option),
       img: visual.img,
@@ -1111,6 +1107,11 @@ export class RecipeManager {
       costLabel: '',
       affordable: true,
     };
+    if (visual.isEssence === true) {
+      choice.isEssence = true;
+      choice.icon = visual.icon ?? null;
+    }
+    return choice;
   }
 
   /**
@@ -1160,8 +1161,8 @@ export class RecipeManager {
   }
 
   /**
-   * Resolve the tile visuals (component id, display name, icon image) for an
-   * ingredient, so the player detail can render an image grid. Component-typed
+   * Resolve the tile presentation (component id, display name, image or essence
+   * glyph metadata) for an ingredient, so the player detail can render its grid. Component-typed
    * matches resolve through the managed component library. Tag- and currency-typed
    * matches carry no managed component id, so their image is resolved from a live
    * inventory item that satisfies the match (issue 551): a tag tile shows the img
@@ -1179,7 +1180,7 @@ export class RecipeManager {
    *   supplied, a tag tile borrows THIS item's image so the tile matches the item
    *   the craft spends, not merely the first inventory item that shares the tag
    *   (issue 553). Falls back to the first tag-matching held item (issue 551).
-   * @returns {{ componentId: string|null, name: string, img: string|null }}
+   * @returns {{ componentId: string|null, name: string, img: string|null, isEssence?: boolean, icon?: string|null }}
    * @private
    */
   _resolveIngredientVisual(recipe, ingredient, availableItems = [], consumedItem = null) {
@@ -1193,15 +1194,14 @@ export class RecipeManager {
     }
 
     // An essence tile resolves its NAME + authored icon from the essence definition
-    // (never the raw essenceId) and shows a generic aura image, mirroring the
-    // currency tile's coin fallback. The FA `icon` class is carried alongside so a
-    // tile that renders an icon can prefer it.
+    // (never the raw essenceId). It carries an explicit presentation discriminator so
+    // player surfaces render the authored glyph rather than an image fallback.
     if (match?.type === 'essence') {
       const definition = this._resolveEssenceDefinition(recipe, match.essenceId);
       const essenceName = this._resolveIngredientDescription(recipe, ingredient);
       const icon =
         typeof definition?.icon === 'string' && definition.icon.trim() ? definition.icon : null;
-      return { componentId: null, name: essenceName, img: FALLBACK_ESSENCE_IMG, icon };
+      return { componentId: null, name: essenceName, img: null, isEssence: true, icon };
     }
 
     const name = ingredient?.getDescription?.() || '';
@@ -1226,7 +1226,7 @@ export class RecipeManager {
    * @param {IngredientSet} ingredientSet
    * @param {Item[]} availableItems
    * @param {{ enableEssences: boolean }} features
-   * @returns {Array<{ type: string, need: number, have: number, satisfied: boolean }>}
+   * @returns {Array<{ type: string, name: string, icon: string|null, isEssence: boolean, need: number, have: number, satisfied: boolean }>}
    * @private
    */
   _buildEssenceStates(recipe, ingredientSet, availableItems, features) {
@@ -1244,6 +1244,7 @@ export class RecipeManager {
         type,
         name: typeof name === 'string' && name.trim() ? name : String(type ?? ''),
         icon: typeof icon === 'string' && icon.trim() ? icon : null,
+        isEssence: true,
         need,
         have,
         satisfied: have >= need,

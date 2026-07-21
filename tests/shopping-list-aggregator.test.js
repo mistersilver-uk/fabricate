@@ -260,6 +260,76 @@ describe('aggregateShoppingList', () => {
     assert.equal(ess.satisfied, false);
   });
 
+  for (const channel of ['ingredientStates', 'essenceStates']) {
+    it(`retains the first nonblank authored icon for ${channel}`, () => {
+      const recipes = ['blank-first', 'authored-a', 'authored-b', 'blank-last'].map((id) =>
+        makeRecipe(id)
+      );
+      const icons = {
+        'blank-first': ' ',
+        'authored-a': 'fas fa-heart',
+        'authored-b': 'fas fa-fire',
+        'blank-last': null,
+      };
+      const manager = makeRecipeManager(recipes, (_actors, recipe) => {
+        const state = {
+          need: 1,
+          have: 0,
+          satisfied: false,
+          isEssence: true,
+          icon: icons[recipe.id],
+        };
+        return {
+          ingredientStates:
+            channel === 'ingredientStates'
+              ? [makeIngredientState({ ...state, description: 'Restorative essence' })]
+              : [],
+          essenceStates:
+            channel === 'essenceStates'
+              ? [makeEssenceState({ ...state, type: 'restorative', name: 'Restorative' })]
+              : [],
+          toolStates: [],
+        };
+      });
+
+      const result = aggregateShoppingList(
+        recipes.map((recipe) => ({ recipeId: recipe.id, quantity: 1 })),
+        manager,
+        ['actor1']
+      );
+      const [state] =
+        channel === 'ingredientStates' ? result.ingredients : result.essences;
+      assert.equal(state.isEssence, true);
+      assert.equal(state.icon, 'fas fa-heart');
+    });
+  }
+
+  it('leaves an all-blank essence icon for render-time fallback', () => {
+    const recipe = makeRecipe('r1');
+    const manager = makeRecipeManager([recipe], () => ({
+      ingredientStates: [
+        makeIngredientState({
+          description: 'Aether essence',
+          isEssence: true,
+          icon: ' ',
+          need: 1,
+          have: 0,
+        }),
+      ],
+      essenceStates: [
+        makeEssenceState({ type: 'aether', isEssence: true, icon: '', need: 1, have: 0 }),
+      ],
+      toolStates: [],
+    }));
+    const result = aggregateShoppingList(
+      [{ recipeId: recipe.id, quantity: 1 }],
+      manager,
+      ['actor1']
+    );
+    assert.equal(result.ingredients[0].icon, null);
+    assert.equal(result.essences[0].icon, null);
+  });
+
   it('tool deduplication: same tool from two recipes appears once', () => {
     const recipeA = makeRecipe('r1', 'Recipe A');
     const recipeB = makeRecipe('r2', 'Recipe B');
