@@ -169,3 +169,17 @@
     </ul>
   </div>
 </section>
+
+<style>
+  /* Root section rhythm ONLY. The inner elements use the shared global
+     `.manager-recipe-*` classes; but the recipe tab draws its section spacing from
+     its own root rule (`.fabricate-manager .manager-recipe-validation { gap: … }`),
+     which this tab does not carry — so this restores matching vertical rhythm
+     between the intro, summary card, and Requirements group. `--fab-space-4` matches
+     the recipe tab (issue 797). */
+  .manager-recipe-item-validation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-4);
+  }
+</style>
