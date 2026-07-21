@@ -528,7 +528,7 @@ test('source (F2): the Phase E craft-failure screenshot is wrapped, and the Phas
   // the Phase C catch and revive the deleted create-crafting-system record.
   assert.match(
     source,
-    /try \{[\s\S]*?screenshot\(page, 'craft-failure'\)[\s\S]*?\} catch/,
+    /try \{\s*await screenshot\(page, 'craft-failure'\);\s*\} catch/,
     'the craft-failure screenshot must be wrapped in try/catch (mirroring journal-failure)'
   );
 
