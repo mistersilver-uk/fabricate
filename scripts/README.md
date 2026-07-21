@@ -194,7 +194,8 @@ These residual gaps are intentionally NOT covered by it and are routed to the li
 - **Exact Foundry default input/select/button chrome** — the compat superset approximates core control chrome; it is not byte-identical to a specific Foundry build.
 - **Real window frame / resize handles / scroll gutters** — the lab renders the application-content frame, not Foundry's ApplicationV2 window chrome or geometry (a green View Lab render does not assert window-chrome/geometry truth).
 - **Cross-app Foundry context** — sheets, canvas, dialogs, and other modules' cascade are absent; only the mounted Fabricate component tree is rendered.
-- **Linked content imagery** — Foundry/dnd5e core icon paths are not served; image requests are satisfied with a deterministic transparent placeholder, so linked-image fidelity stays a smoke-harness concern.
+- **Linked content imagery** — Foundry/dnd5e core icon paths (`/icons/…`) and cross-origin images are not served; those requests are satisfied with a deterministic transparent 1x1 placeholder, so linked-image fidelity stays a smoke-harness concern (genuine same-origin Fabricate assets under `/assets/` load for real).
+The transparent placeholder is safe only where the thumbnail box is CSS-fixed (e.g. `CraftingThumb`'s 44px box); a surface that sizes imagery by INTRINSIC dimensions would collapse under a 1x1 placeholder and needs a realistic-dimension bundled placeholder — flag for the #824 migration.
 - **Not-yet-migrated surfaces** — the pilot registry covers a subset of `VIEW_RECIPES`; uncovered surfaces are produced by the reduced/full smoke until the coverage manifest reaches full coverage.
 
 Cross-OS antialiasing differences are expected and tolerable — the View Lab is evidence for humans plus interaction/console/font-presence assertions, not pixel-diff equality.

@@ -66,6 +66,7 @@
       "label": "Player crafting — roll-result box (awarded pills + outcome)",
       "sample": "src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte",
       "cases": [
+        "player-crafting-check-mono",
         "player-crafting-row-long-name",
         "player-crafting-row-narrow"
       ]

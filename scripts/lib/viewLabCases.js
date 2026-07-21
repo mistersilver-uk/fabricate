@@ -80,13 +80,19 @@ export const VIEW_CASES = Object.freeze([
   // ── Font-metric-width cases (Design E): load-bearing for the weakest fidelity
   //    axis; MUST render under the real bundled fonts (Signika/Spectral/JetBrains).
   {
-    id: 'player-crafting-qty-mono',
-    label: 'Player crafting — have/need quantity tag (mono-numeric column)',
-    component: 'src/ui/svelte/apps/crafting/QuantityTag.svelte',
-    fixtureId: 'quantityTagMonoNumeric',
-    sourceMatches: [/^src\/ui\/svelte\/apps\/crafting\/QuantityTag\.svelte$/],
-    viewport: { width: 480, height: 200 },
-    readySelector: '.crafting-qty-tag',
+    // Mono-numeric case: CraftingCheckCard paints its roll formula `<code>` in
+    // `var(--fab-font-mono)` (JetBrains Mono), whose width is mono-metric-sensitive.
+    // (QuantityTag, by contrast, only sets `tabular-nums` on inherited Signika, so it
+    // would NOT exercise the JetBrains-Mono width axis — see the fidelity register.)
+    // The readySelector keys on the mono `<code>` so the ready gate ties to the frame's
+    // mono content directly.
+    id: 'player-crafting-check-mono',
+    label: 'Player crafting — check card roll formula (JetBrains Mono)',
+    component: 'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
+    fixtureId: 'craftingCheckMono',
+    sourceMatches: [/^src\/ui\/svelte\/apps\/crafting\/detail\/CraftingCheckCard\.svelte$/],
+    viewport: { width: 480, height: 260 },
+    readySelector: '.crafting-check-formula code',
     publish: true,
     kinds: ['font-metric', 'crafting'],
   },

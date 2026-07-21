@@ -45,8 +45,28 @@ export const FIXTURES = Object.freeze({
         'Missing materials — gather more reagents before crafting',
     },
   },
-  quantityTagMonoNumeric: {
-    props: { label: 'Have', value: '128 / 1024', tone: 'info', icon: 'fa-cubes' },
+  craftingCheckMono: {
+    // CraftingCheckCard paints its roll formula `<code>` in JetBrains Mono
+    // (`.crafting-check-formula code { font-family: var(--fab-font-mono) }`), so this
+    // frame actually exercises the mono-metric width axis (verified: the code element
+    // computes to "JetBrains Mono, …"). A rollFormula is required for the code to render.
+    props: {
+      check: {
+        dc: 18,
+        skill: 'Arcana',
+        rollFormula: '1d20 + @prof + @int',
+        resolvedFormula: '1d20 + 4 + 3',
+        formulaResolved: true,
+        mandatory: true,
+        usable: true,
+      },
+    },
+    i18n: {
+      'FABRICATE.App.Crafting.Check.Title': 'Crafting check',
+      'FABRICATE.App.Crafting.Check.Mandatory': 'Required',
+      'FABRICATE.App.Crafting.Check.Optional': 'Optional',
+      'FABRICATE.App.Crafting.Check.DcLabel': 'DC {dc}',
+    },
   },
   statusPillEnabled: {
     props: { tone: 'success', icon: 'fas fa-circle', label: 'Enabled' },

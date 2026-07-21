@@ -1052,11 +1052,10 @@ export async function uploadScreenshotObjects({ prNumber, files = [], root = ROO
   for (const file of files) {
     const name = basename(file);
     const viewId = name.slice(0, name.length - extensionOf(file).length);
-    // Hardening #2: bind `file === `${id}.png``, so a known id can never be paired with
-    // the wrong file (a `manager-tools` id must ship the `manager-tools.png` bytes).
-    if (name !== `${viewId}${extensionOf(file)}`) {
-      throw new Error(`Screenshot file '${name}' does not bind to its view id '${viewId}'`);
-    }
+    // Note: here the id is DERIVED from the filename, so the pairing is unambiguous by
+    // construction. The load-bearing `file === `${id}.png`` binding — where an id and a
+    // file arrive from SEPARATE sources — is enforced (and tested) in
+    // `validateManifest` (`scripts/lib/viewLabArtifact.js`) against the capture manifest.
     const prScope = shaSegment
       ? `${cfg.prefix}/${normalizedPrNumber}/${shaSegment}`
       : `${cfg.prefix}/${normalizedPrNumber}`;

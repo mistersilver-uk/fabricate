@@ -21,11 +21,9 @@
         padding: 0;
       }
       /* The application-frame the case renders inside; the capture targets it, not
-         the page, so give it an intrinsic size and let the case viewport bound it. */
+         the page. `mount.js` sets its width inline from the case viewport, so the
+         width-sensitive cases exercise the width they name (never a min-width floor). */
       .view-lab-frame {
-        width: max-content;
-        min-width: 240px;
-        max-width: 100%;
         border: 1px solid var(--fab-border, #444);
       }
     </style>

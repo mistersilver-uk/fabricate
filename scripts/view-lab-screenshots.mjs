@@ -93,23 +93,27 @@ async function renderCase(browser, baseUrl, viewCase) {
   });
   page.on('pageerror', (error) => consoleErrors.push(String(error && error.message ? error.message : error)));
 
-  // A 1x1 transparent PNG used to deterministically satisfy image requests. Real
-  // Foundry/dnd5e core icon paths are NOT served by the Foundry-free lab (a documented
-  // fidelity gap — see scripts/README `## Fidelity gap`), so an unresolved icon path
-  // would 404 and trip the console-error gate. Fulfilling image requests with a stable
-  // placeholder keeps the console honest and the layout geometry intact.
+  // A 1x1 transparent PNG used to deterministically satisfy the image requests the
+  // Foundry-free lab cannot resolve: Foundry/dnd5e core icon paths (`/icons/…`) and any
+  // cross-origin image. Those are a documented fidelity gap (see scripts/README
+  // `## Fidelity gap`); left alone they 404 and trip the console-error gate. Genuine
+  // SAME-ORIGIN Fabricate assets (e.g. under `/assets/`) are NOT stubbed — they load for
+  // real, so the icon frames are as representative as the repo assets allow.
   const TRANSPARENT_PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
     'base64',
   );
+  // Foundry serves core icons under `/icons/…`; the lab does not, so those paths are
+  // unresolvable even though they are same-origin to Vite.
+  const isFoundryCoreIcon = (url) => /\/icons\//.test(new URL(url).pathname);
   // Block all EXTERNAL network (Design D). Same-origin (Vite/local fonts/CSS) is allowed.
   const origin = new URL(baseUrl).origin;
   await page.route('**', (route) => {
     const request = route.request();
-    if (request.resourceType() === 'image') {
+    const url = request.url();
+    if (request.resourceType() === 'image' && (!url.startsWith(origin) || isFoundryCoreIcon(url))) {
       return route.fulfill({ status: 200, contentType: 'image/png', body: TRANSPARENT_PNG });
     }
-    const url = request.url();
     if (url.startsWith(origin) || url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
     return route.abort();
   });

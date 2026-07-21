@@ -15,16 +15,11 @@ import { mount, unmount } from 'svelte';
 
 import { VIEW_CASES } from '../../scripts/lib/viewLabCases.js';
 import { getFixture } from './fixtures.js';
+import { REQUIRED_TEXT_FONTS, FA_FONT, assertFontsLoaded, browserFontSurface } from './fontPresence.js';
 
 // Lazy importers for every component the registry can mount. `import.meta.glob`
 // keys are absolute-from-Vite-root (`/src/…`); the registry stores `src/…`.
 const COMPONENT_IMPORTERS = import.meta.glob('/src/ui/svelte/**/*.svelte');
-
-// The families the View Lab bundles and the FA icon face. FA glyphs are FONT glyphs,
-// so a missing FA font renders tofu (not a failed <img>) — the presence assertion,
-// not the image-decode gate, is what catches it.
-const REQUIRED_TEXT_FONTS = Object.freeze(['Signika', 'Spectral', 'JetBrains Mono']);
-const FA_FONT = 'Font Awesome 6 Free';
 
 function currentCaseId() {
   const params = new URLSearchParams(window.location.search);
@@ -34,19 +29,30 @@ function currentCaseId() {
 function seedI18n(i18nMap = {}) {
   // The SAME stub shape installComponentTestGlobals uses, seeded with the fixture's
   // localized strings so a case can render real localized text (font-metric width
-  // depends on it) instead of the bare key.
+  // depends on it) instead of the bare key. `format` interpolates `{name}` tokens from
+  // the seeded string so a `localize(key, { dc })` call paints "DC 15", not raw JSON.
+  const resolve = (key) => (Object.prototype.hasOwnProperty.call(i18nMap, key) ? i18nMap[key] : key);
   window.game = {
     i18n: {
-      localize: (key) => (Object.prototype.hasOwnProperty.call(i18nMap, key) ? i18nMap[key] : key),
-      format: (key, data) => `${key}:${JSON.stringify(data)}`,
+      localize: resolve,
+      format: (key, data = {}) =>
+        resolve(key).replace(/\{(\w+)\}/g, (whole, token) =>
+          Object.prototype.hasOwnProperty.call(data, token) ? String(data[token]) : whole,
+        ),
     },
   };
 }
 
-function buildFrame() {
+// Size the CAPTURED frame to the case viewport width so the width-sensitive cases
+// exercise the width they name (a 320 narrow row stacks/wraps at 320, a 360 long-name
+// row ellipsises at 360) — the frame is what `locator.screenshot()` captures, so a
+// `max-content` frame would collapse below the viewport and the declared width would
+// never bind.
+function buildFrame(width) {
   const frame = document.createElement('div');
   frame.className = 'application theme-dark view-lab-frame';
   frame.setAttribute('data-view-lab-frame', '');
+  if (Number.isFinite(width)) frame.style.width = `${width}px`;
   const content = document.createElement('section');
   content.className = 'window-content';
   const root = document.createElement('div');
@@ -78,47 +84,6 @@ async function loadBundledFonts() {
   await Promise.all(loads.map((p) => p.catch(() => {})));
 }
 
-/**
- * FAIL-CLOSED font/glyph PRESENCE assertion (Design E). `document.fonts.ready`
- * gates TIMING only — it resolves even when a face 404'd — so it CANNOT make a load
- * failure fatal. This affirmatively checks each family is actually loaded and that a
- * representative FA glyph resolves to the FA face (canvas width-probe), and THROWS if
- * any is absent. A silent Arial/tofu fallback that renders green is the exact worst
- * outcome this gate exists to prevent.
- */
-export function assertFontsLoaded() {
-  const missing = [];
-  for (const family of REQUIRED_TEXT_FONTS) {
-    if (!document.fonts.check(`16px "${family}"`)) missing.push(family);
-  }
-  if (!document.fonts.check(`900 16px "${FA_FONT}"`)) missing.push(FA_FONT);
-
-  // Canvas width-probe: a known FA glyph string must render WIDER than 0 and differ
-  // from the same codepoint in a generic serif (tofu/fallback would collapse to the
-  // serif metric). This catches a face that "checks" true but never actually painted.
-  const probe = (font, text) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.font = font;
-    return ctx.measureText(text).width;
-  };
-  const faGlyph = String.fromCharCode(0xf00c); // fa-check (Font Awesome solid)
-  const faWidth = probe(`900 32px "${FA_FONT}"`, faGlyph);
-  const serifWidth = probe('32px serif', faGlyph);
-  if (!(faWidth > 0) || Math.abs(faWidth - serifWidth) < 0.5) {
-    missing.push(`${FA_FONT} (glyph probe: FA=${faWidth}, serif=${serifWidth})`);
-  }
-
-  if (missing.length > 0) {
-    throw new Error(
-      `View Lab font PRESENCE assertion failed — missing/unloaded: ${missing.join(', ')}. ` +
-        'Capture is aborted (a silent Arial/tofu fallback would render green). ' +
-        'Confirm the bundled woff2 under assets/fonts/ are present and served.',
-    );
-  }
-  return true;
-}
-
 async function decodeVisibleImages(rootEl) {
   const images = [...rootEl.querySelectorAll('img')].filter((img) => img.getAttribute('src'));
   await Promise.all(
@@ -142,16 +107,16 @@ async function boot() {
   const module = await importer();
   const Component = module.default;
 
-  const mountPoint = buildFrame();
+  const mountPoint = buildFrame(viewCase.viewport?.width);
   const state = { props: { ...(fixture.props || {}) } };
   let instance = mount(Component, { target: mountPoint, props: state.props });
 
   const readyPromise = (async () => {
-    // fonts.ready gates TIMING only (see assertFontsLoaded); actively load the bundled
-    // faces, await settle, THEN affirmatively assert presence.
+    // fonts.ready gates TIMING only (see fontPresence.js); actively load the bundled
+    // faces, await settle, THEN affirmatively assert presence via the browser surface.
     await loadBundledFonts();
     await document.fonts.ready;
-    assertFontsLoaded();
+    assertFontsLoaded(browserFontSurface());
     await decodeVisibleImages(mountPoint);
     // One frame so layout settles under the real cascade.
     await new Promise((resolve) => requestAnimationFrame(() => resolve()));
