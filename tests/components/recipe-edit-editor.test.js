@@ -62,6 +62,21 @@ const resultGroupCardSource = readFileSync(resultGroupCardPath, 'utf8');
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 
+// Extract a single scoped-`<style>` rule block by its selector and assert it (a) carries
+// each required fragment and (b) no longer sets `max-width` (the issue-796 cap on both the
+// grid list and the empty panel). The selector must be given VERBATIM — for the grid rule
+// pass the COMPOUND `.manager-recipe-books-tab .manager-recipe-item-links`, since a bare
+// `.manager-recipe-item-links` regex would match the leftover `margin: 0` block first.
+function assertScopedRuleHasNoMaxWidth(source, selector, { mustContain = [] } = {}) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rule = source.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`));
+  assert.ok(rule, `scoped rule for "${selector}" exists`);
+  for (const fragment of mustContain) {
+    assert.ok(rule[0].includes(fragment), `"${selector}" declares ${fragment}`);
+  }
+  assert.equal(/max-width/.test(rule[0]), false, `"${selector}" no longer carries the cap`);
+}
+
 describe('RecipeEditView identity-only single column', () => {
   it('renders the identity card in the standard manager-main, with no bespoke workspace', () => {
     // The editor is fully controlled now: no <form> wrapper, the root's header Save
@@ -237,22 +252,19 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
   // extracted deliberately — a bare `.manager-recipe-item-links` regex would match the
   // leftover `margin: 0` block first and assert against the wrong rule.
   it('tiles the linked-book list into an uncapped auto-fill grid (Access-tab parity)', () => {
-    const gridRule = booksTabSource.match(
-      /\.manager-recipe-books-tab \.manager-recipe-item-links\s*\{[^}]*\}/
+    assertScopedRuleHasNoMaxWidth(
+      booksTabSource,
+      '.manager-recipe-books-tab .manager-recipe-item-links',
+      { mustContain: ['display: grid', 'repeat(auto-fill'] }
     );
-    assert.ok(gridRule, 'scoped compound grid rule exists');
-    assert.match(gridRule[0], /display:\s*grid/, 'the list is a grid, not the shared flex column');
-    assert.match(gridRule[0], /repeat\(auto-fill/, 'auto-fill tracks keep a lone book compact');
-    assert.equal(/max-width/.test(gridRule[0]), false, 'the ~half-width cap is gone');
   });
 
   // The original bug capped BOTH the list and the empty state. Without this symmetric
   // guard a re-cap of only the empty panel would ship green.
   it('keeps the empty state a full-width uncapped panel', () => {
-    const emptyRule = booksTabSource.match(/\.manager-recipe-section-empty\s*\{[^}]*\}/);
-    assert.ok(emptyRule, 'scoped empty-state rule exists');
-    assert.match(emptyRule[0], /width:\s*100%/, 'the empty panel fills the tab body width');
-    assert.equal(/max-width/.test(emptyRule[0]), false, 'the ~half-width cap is gone');
+    assertScopedRuleHasNoMaxWidth(booksTabSource, '.manager-recipe-section-empty', {
+      mustContain: ['width: 100%'],
+    });
   });
 });
 
