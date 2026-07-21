@@ -51,17 +51,22 @@
   // are reactive AND, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  let lastSystemId = $state('');
-
   // Switching system resets the filters — they name a vocabulary the new system does
   // not share. The page/sort/group PREFERENCES are deliberately kept.
+  //
+  // The sentinel is `ui.systemId`, PERSISTED on the lifted browser state — NOT a
+  // component-local `$state`. A local sentinel re-initialised to '' on every mount, so
+  // returning from an editor (a remount with the system unchanged) was misread as a
+  // system switch and wiped the page/filters/collapse this object otherwise preserves
+  // (issue 806). The equality early-return means writing `ui.systemId` back inside the
+  // same effect does not loop — it mirrors the `model.pageIndex` sync effect.
   $effect(() => {
-    if (selectedSystemId === lastSystemId) return;
+    if (selectedSystemId === ui.systemId) return;
     ui.categoryFilter = 'all';
     ui.essenceFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
-    lastSystemId = selectedSystemId;
+    ui.systemId = selectedSystemId;
   });
 
   const showComponentEssences = $derived((itemCards || []).some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));

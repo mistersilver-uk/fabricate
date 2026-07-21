@@ -48,10 +48,15 @@ export const COMPONENT_DEFAULT_PAGE_SIZE = 25;
  * the state — so this must always return a NEW object with a NEW Set, never a shared
  * singleton. `collapsedCategories` is collapse-opt-IN: absent from the set = expanded.
  *
+ * `systemId` is the PERSISTED system sentinel the view's reset effect compares against
+ * `selectedSystemId`. It lives here — not as component-local `$state` — so a remount (the
+ * editor round-trip) is not misread as a system switch and does not wipe the page/filters
+ * this object otherwise preserves. See the reset effect in each browser view.
+ *
  * @returns {{
  *   categoryFilter: string, essenceFilter: string, groupByCategory: boolean,
  *   sortKey: ComponentSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>
+ *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string
  * }}
  */
 export function createComponentBrowserState() {
@@ -64,6 +69,7 @@ export function createComponentBrowserState() {
     pageIndex: 0,
     pageSize: COMPONENT_DEFAULT_PAGE_SIZE,
     collapsedCategories: new Set(),
+    systemId: '',
   };
 }
 

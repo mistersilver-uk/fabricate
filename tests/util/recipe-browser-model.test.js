@@ -8,6 +8,7 @@ import {
   buildRecipeRequirementRows,
   buildRecipeRoutingModel,
   buildRecipeStepModel,
+  createRecipeBrowserState,
   groupProduceRowsByResultGroup,
   deriveRecipeIo,
   deriveRecipeStatuses,
@@ -36,6 +37,34 @@ function makeRecipe(overrides = {}) {
 }
 
 const names = (rows) => rows.map((row) => row.name);
+
+describe('recipeBrowserModel — view-state factory', () => {
+  it('createRecipeBrowserState returns the default shape with a persisted systemId', () => {
+    const state = createRecipeBrowserState();
+    assert.equal(state.statusFilter, 'all');
+    assert.equal(state.lockFilter, 'all');
+    assert.equal(state.categoryFilter, 'all');
+    assert.equal(state.groupByCategory, true);
+    assert.equal(state.sortKey, 'name');
+    assert.equal(state.sortDirection, 'asc');
+    assert.equal(state.pageIndex, 0);
+    assert.equal(state.pageSize, RECIPE_DEFAULT_PAGE_SIZE);
+    assert.ok(state.collapsedCategories instanceof Set);
+    assert.equal(state.collapsedCategories.size, 0);
+    // The PERSISTED system sentinel (issue 806): starts empty so the first mount's reset
+    // effect stamps it, and it survives the editor round-trip so a remount is not a switch.
+    assert.equal(state.systemId, '');
+  });
+
+  it('createRecipeBrowserState returns a FRESH object with a fresh Set each call', () => {
+    const first = createRecipeBrowserState();
+    const second = createRecipeBrowserState();
+    assert.notEqual(first, second);
+    assert.notEqual(first.collapsedCategories, second.collapsedCategories);
+    first.collapsedCategories.add('alchemy');
+    assert.equal(second.collapsedCategories.has('alchemy'), false);
+  });
+});
 
 describe('recipeBrowserModel — filtering', () => {
   const rows = [

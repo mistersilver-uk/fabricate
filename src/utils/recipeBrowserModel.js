@@ -59,10 +59,15 @@ export const RECIPE_DEFAULT_PAGE_SIZE = 25;
  * arrival (defaults) and by isolated mounted tests that don't lift the state — so this
  * must always return a NEW object with a NEW Set, never a shared singleton.
  *
+ * `systemId` is the PERSISTED system sentinel the view's reset effect compares against
+ * `selectedSystemId`. It lives here — not as component-local `$state` — so a remount (the
+ * editor round-trip) is not misread as a system switch and does not wipe the page/filters
+ * this object otherwise preserves. See the reset effect in each browser view.
+ *
  * @returns {{
  *   statusFilter: string, lockFilter: string, categoryFilter: string,
  *   groupByCategory: boolean, sortKey: RecipeSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>
+ *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string
  * }}
  */
 export function createRecipeBrowserState() {
@@ -76,6 +81,7 @@ export function createRecipeBrowserState() {
     pageIndex: 0,
     pageSize: RECIPE_DEFAULT_PAGE_SIZE,
     collapsedCategories: new Set(),
+    systemId: '',
   };
 }
 

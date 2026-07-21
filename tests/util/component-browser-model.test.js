@@ -50,6 +50,9 @@ describe('component browser model (issue 676)', () => {
     assert.equal(state.sortDirection, 'asc');
     assert.equal(state.pageIndex, 0);
     assert.equal(state.pageSize, COMPONENT_DEFAULT_PAGE_SIZE);
+    // The PERSISTED system sentinel (issue 806): starts empty so the first mount's reset
+    // effect stamps it, and it survives the editor round-trip so a remount is not a switch.
+    assert.equal(state.systemId, '');
   });
 
   it('every component has a category — an absent one reads general', () => {

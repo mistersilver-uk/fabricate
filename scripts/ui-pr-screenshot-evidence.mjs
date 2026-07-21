@@ -316,6 +316,19 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/utils\/recipeBrowserModel\.js$/,
     ],
   },
+  // Issue 806: the editor round-trip preservation frame. The fix persists the reset
+  // sentinel (a `systemId` field) on the lifted browser state, so both the view file and
+  // the state factory in `recipeBrowserModel.js` are load-bearing changed files that must
+  // map a frame to this browser or it is silently stranded. Its own view id (one frame).
+  {
+    id: 'manager-recipes-editor-roundtrip',
+    label: 'Manager recipes browser — category filter + collapsed group preserved across an editor round-trip (#806)',
+    smokeLabels: ['manager-recipes-editor-roundtrip'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/utils\/recipeBrowserModel\.js$/,
+    ],
+  },
   {
     id: 'manager-import-report',
     label: 'Manager import — post-import unresolved-reference report (#492)',
