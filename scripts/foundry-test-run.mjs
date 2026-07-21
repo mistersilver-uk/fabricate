@@ -141,7 +141,11 @@ function shouldRunScreenshotPhase(phase) {
  */
 function shouldRunScreenshotSection(sectionName) {
   if (!SCREENSHOT_SCOPING_ACTIVE) return true;
-  return isD0SectionNeededForTargets(sectionName, SCREENSHOT_TARGET_LABELS);
+  const needed = isD0SectionNeededForTargets(sectionName, SCREENSHOT_TARGET_LABELS);
+  if (!needed) {
+    process.stdout.write(`Phase D0: ${sectionName} section skipped (off scoped target set).\n`);
+  }
+  return needed;
 }
 
 // Exact set of screenshot labels the `rc` profile captures. Every other
@@ -6180,8 +6184,6 @@ async function main() {
 
         // Return to the recipes browser for the remaining navigation.
         await openManagerCraftingSection(page, 'recipes', 'recipes');
-        } else {
-          process.stdout.write('Phase D0: recipes section skipped (off scoped target set).\n');
         }
 
         // ── D0 section: components + checks (issue #826 scoped-skip guard) ─────
@@ -6650,8 +6652,6 @@ async function main() {
             await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
           }, { sysId: craftingSetup.systemId, componentIds: handle.componentIds, itemIds: handle.itemIds }),
         });
-        } else {
-          process.stdout.write('Phase D0: components-checks section skipped (off scoped target set).\n');
         }
 
         // ── D0 section: tags & categories + essences (issue #826 skip guard) ──
@@ -6737,8 +6737,6 @@ async function main() {
             }
           }
         }
-        } else {
-          process.stdout.write('Phase D0: tags-essences section skipped (off scoped target set).\n');
         }
 
         // ── D0 section: environments + gathering (issue #826 skip guard) ──────
@@ -6940,8 +6938,6 @@ async function main() {
         // assertManagerLayoutStable (which requires table rows) does not apply here.
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-settings');
-        } else {
-          process.stdout.write('Phase D0: gathering section skipped (off scoped target set).\n');
         }
 
         // ── D0 section: tools + system-overview + interactables (issue #826) ──
@@ -7412,8 +7408,6 @@ async function main() {
           results.steps.push({ step: 'interactables-manager', passed: false, error: err.message });
           process.stderr.write(`Manage Interactables capture failed: ${err.message}\n`);
         }
-        } else {
-          process.stdout.write('Phase D0: overview-interactables section skipped (off scoped target set).\n');
         }
 
         // ── D0 section: import report + alchemy settings + experimental-off ───
@@ -7655,8 +7649,6 @@ async function main() {
           process.stderr.write(`Manager experimental-off capture failed: ${err.message}\n`);
           await closeOpenApplications(page).catch(() => {});
         }
-        } else {
-          process.stdout.write('Phase D0: import-alchemy-experimental section skipped (off scoped target set).\n');
         }
 
         // On a scoped `screenshots` run the experimental-off milestone capture (which

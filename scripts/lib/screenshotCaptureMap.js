@@ -295,125 +295,84 @@ export function isPhaseNeededForTargets(phase, targetLabels) {
  * never a PR target, so they need no entry here. `tests/screenshot-capture-scoping.js`
  * proves spine + sections PARTITION every mapped D0 label (nothing unguarded).
  */
-export const D0_SPINE_LABELS = Object.freeze([
-  'manager-default-selection',
-  'manager-selected-normal',
-  'manager-rail-expanded',
-  'manager-rail-collapsed',
-  'manager-selected-stacked',
-  'manager-system-edit-normal',
-  'manager-system-edit-narrow',
-  'manager-system-edit-dirty',
-  'currency-actor-property',
-  'currency-macro',
-  'currency-actor-inventory',
-]);
+/**
+ * The inclusive `[fromLabel, toLabel]` slice of `SCREENSHOT_CAPTURE_ORDER`. The spine
+ * and section label lists are DERIVED from these boundary markers rather than
+ * re-listing every label, so each label string lives exactly once (in the capture
+ * order) — the single source of truth. Re-listing them here instead would duplicate
+ * ~70 label strings the new-code duplication gate rejects, and would drift silently
+ * from the capture order. Throws on an unknown or inverted boundary (a fail-loud
+ * mis-edit guard).
+ * @param {string} fromLabel
+ * @param {string} toLabel
+ * @returns {string[]}
+ */
+function captureOrderSlice(fromLabel, toLabel) {
+  const from = CAPTURE_ORDER_INDEX.get(fromLabel);
+  const to = CAPTURE_ORDER_INDEX.get(toLabel);
+  if (from === undefined || to === undefined || from > to) {
+    throw new Error(`invalid capture-order slice: ${fromLabel}..${toLabel}`);
+  }
+  return SCREENSHOT_CAPTURE_ORDER.slice(from, to + 1);
+}
+
+export const D0_SPINE_LABELS = Object.freeze(
+  captureOrderSlice('manager-default-selection', 'currency-actor-inventory')
+);
 
 /**
  * The ordered, contiguous, independently-skippable D0 capture sections. Each `name`
  * is the token the harness passes to its `shouldRunScreenshotSection` guard; `labels`
- * are that section's mapped capture labels. A section runs iff scoping is inactive
- * (rc/ci/full — the guard short-circuits true) OR at least one of its labels is in the
- * PR target set. Order mirrors the walk so the list reads as the walk's own table of
- * contents.
+ * are that section's mapped capture labels, DERIVED (see `captureOrderSlice`) from the
+ * section's contiguous `[from, to]` span in the capture order. A section runs iff
+ * scoping is inactive (rc/ci/full — the guard short-circuits true) OR at least one of
+ * its labels is in the PR target set. `extra` carries a label the walk captures OUT of
+ * its section's contiguous span: the recipe-editor roundtrip is hoisted to the front of
+ * the capture order (for `candidates[0]`) but belongs to the recipes section.
  * @type {readonly {name: string, labels: readonly string[]}[]}
  */
-export const D0_SKIPPABLE_SECTIONS = Object.freeze([
+const D0_SECTION_SPANS = [
   {
     name: 'recipes',
-    labels: Object.freeze([
-      'manager-recipes-editor-roundtrip',
-      'manager-recipes-normal',
-      'manager-recipes-narrow',
-      'manager-recipes-no-check',
-      'manager-recipes-grouped-continuation',
-      'manager-crafting-group-expanded',
-      'manager-books-scrolls-normal',
-      'manager-crafting-settings',
-      'manager-recipe-item-validation',
-      'manager-recipe-item-validation-blocked',
-      'manager-recipe-edit-normal',
-      'manager-recipe-edit-books-scrolls',
-      'manager-recipe-edit-tools',
-      'manager-recipe-edit-ingredients',
-      'manager-recipe-edit-validation',
-      'manager-recipe-edit-multistep',
-      'manager-recipe-edit-results',
-      'manager-recipe-edit-results-multistep',
-      'manager-multistep-disable-confirm',
-      'manager-recipe-edit-collapsed',
-      'manager-recipe-edit-results-progressive',
-      'manager-recipe-edit-results-alchemy',
-      'manager-recipe-edit-access-rail',
-    ]),
+    from: 'manager-recipes-normal',
+    to: 'manager-recipe-edit-access-rail',
+    extra: ['manager-recipes-editor-roundtrip'],
   },
   {
     name: 'components-checks',
-    labels: Object.freeze([
-      'manager-components-normal',
-      'manager-components-description-before',
-      'manager-components-description-repaired',
-      'manager-components-description-ingested',
-      'manager-component-edit-normal',
-      'manager-component-edit-salvage',
-      'manager-component-edit-salvage-off',
-      'manager-component-edit-salvage-simple',
-      'manager-checks-gathering',
-      'manager-checks-validation',
-      'manager-checks-crafting-consumption',
-      'manager-components-stacked',
-      'manager-components-grouped-continuation',
-    ]),
+    from: 'manager-components-normal',
+    to: 'manager-components-grouped-continuation',
   },
   {
     name: 'tags-essences',
-    labels: Object.freeze([
-      'manager-tags-categories-normal',
-      'manager-tags-categories-tags-tab',
-      'manager-tags-categories-stacked',
-      'manager-essences-normal',
-      'manager-essences-stacked',
-      'manager-essence-edit-first-state',
-    ]),
+    from: 'manager-tags-categories-normal',
+    to: 'manager-essence-edit-first-state',
   },
   {
     name: 'gathering',
-    labels: Object.freeze([
-      'manager-environments-browse-normal',
-      'manager-environments-browse-stacked',
-      'manager-gathering-task-editor-normal',
-      'manager-gathering-task-editor-stacked',
-      'manager-environment-edit-placeholder',
-      'manager-gathering-events-normal',
-      'manager-gathering-event-editor-normal',
-      'manager-gathering-travel-normal',
-      'manager-gathering-travel-stacked',
-    ]),
+    from: 'manager-environments-browse-normal',
+    to: 'manager-gathering-travel-stacked',
   },
   {
     name: 'overview-interactables',
-    labels: Object.freeze([
-      'manager-tools-normal',
-      'manager-components-progressive',
-      'manager-component-edit-difficulty',
-      'interactable-config-linked',
-      'interactable-config-unlinked',
-      'interactable-config-source-configured',
-      'interactable-config-needs-configuration',
-      'interactables-manager-list',
-      'interactables-manager-promote',
-      'interactables-manager-empty',
-    ]),
+    from: 'manager-tools-normal',
+    to: 'interactables-manager-empty',
   },
   {
     name: 'import-alchemy-experimental',
-    labels: Object.freeze([
-      'manager-import-report',
-      'manager-alchemy-settings',
-      'manager-experimental-off',
-    ]),
+    from: 'manager-import-report',
+    to: 'manager-experimental-off',
   },
-]);
+];
+
+export const D0_SKIPPABLE_SECTIONS = Object.freeze(
+  D0_SECTION_SPANS.map(({ name, from, to, extra = [] }) =>
+    Object.freeze({
+      name,
+      labels: Object.freeze([...extra, ...captureOrderSlice(from, to)]),
+    })
+  )
+);
 
 const D0_SECTION_LABELS_BY_NAME = new Map(D0_SKIPPABLE_SECTIONS.map((s) => [s.name, s.labels]));
 
