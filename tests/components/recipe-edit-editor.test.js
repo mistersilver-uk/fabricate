@@ -65,8 +65,10 @@ const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.
 // Extract a single scoped-`<style>` rule block by its selector and assert it (a) carries
 // each required fragment and (b) no longer sets `max-width` (the issue-796 cap on both the
 // grid list and the empty panel). The selector must be given VERBATIM — for the grid rule
-// pass the COMPOUND `.manager-recipe-books-tab .manager-recipe-item-links`, since a bare
-// `.manager-recipe-item-links` regex would match the leftover `margin: 0` block first.
+// pass the COMPOUND `.manager-recipe-books-tab .manager-recipe-item-links` rather than the
+// bare class, so the match stays pinned to the grid rule and is robust to future reordering
+// of the style blocks (the file also carries a bare `.manager-recipe-item-links { margin }`
+// rule that a bare-class regex could latch onto).
 function assertScopedRuleHasNoMaxWidth(source, selector, { mustContain = [] } = {}) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const rule = source.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`));
