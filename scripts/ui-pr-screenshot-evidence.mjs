@@ -1136,8 +1136,12 @@ const DEFAULT_BASE_CANDIDATES = Object.freeze(['origin/main', 'origin/HEAD', 'ma
 // `resolveDefaultBase` share one implementation. `scripts/**` is NOT excluded from
 // SonarCloud's new-code duplication under Automatic Analysis, so two near-identical
 // inline `spawnSync('git', …)` blocks would risk the duplication gate.
+// `git` is resolved from PATH by design: this is a local maintainer/CI dev tool that
+// assumes git on PATH (like the sibling `gh`/`git` spawns in this file), the command
+// name is a fixed literal, args are an array with no shell, so there is no injection
+// vector. S4036 (PATH must be fixed/unwriteable) is not applicable here.
 function runGit(args, { root = ROOT } = {}) {
-  return spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  return spawnSync('git', args, { cwd: root, encoding: 'utf8' }); // NOSONAR S4036 — git-from-PATH is the intended dev-tool contract (see note above)
 }
 
 function readChangedFilesFromGit(base, { root = ROOT } = {}) {
