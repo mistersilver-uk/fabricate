@@ -147,3 +147,77 @@ export function multiSystemCardRow({ total = 2, actorId = 'a1' } = {}) {
     systems: [systemA, systemB],
   };
 }
+
+/**
+ * A projected multi-system card whose two participations SHARE one component id (`shared`)
+ * across two systems — the pre-existing latent order-key collision the collapse surfaces
+ * (component ids are not globally unique). Each participation is progressive and
+ * reorderable, so the store's `salvageOrderId`/`selectedParticipation` derivation is
+ * exercised end-to-end when a stage is reordered and the commit key observed.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.actorId]
+ * @returns {object}
+ */
+export function multiSystemProgressiveCardRow({ actorId = 'a1' } = {}) {
+  const stages = () => [
+    { id: 's1', componentId: 'r1', name: 'Shard', difficulty: 5, threshold: 5 },
+    { id: 's2', componentId: 'r2', name: 'Slag', difficulty: 3, threshold: 8 },
+  ];
+  const participation = (systemId) => ({
+    systemId,
+    systemName: systemId,
+    componentId: 'shared',
+    name: 'Collision Stone',
+    img: 'icons/shared.webp',
+    description: `${systemId} view`,
+    tags: [],
+    tier: null,
+    isTool: false,
+    salvage: {
+      enabled: true,
+      mode: 'progressive',
+      checkUsable: true,
+      misconfigured: false,
+      allowPlayerResultReorder: true,
+      awardMode: 'equal',
+      results: [],
+      routedOutcomes: [],
+      stages: stages(),
+      toolStates: [],
+      toolsAvailable: true,
+      targetActorId: actorId,
+    },
+    ownedQuantity: 1,
+    essences: [],
+    usedBy: [],
+    requiredFor: [],
+    producedBy: [],
+  });
+  const systemA = participation(SYS_A);
+  const systemB = participation(SYS_B);
+  return {
+    key: `${SYS_A}:shared`,
+    componentId: 'shared',
+    systemId: SYS_A,
+    systemName: SYS_A,
+    name: 'Collision Stone',
+    img: 'icons/shared.webp',
+    icon: null,
+    description: `${SYS_A} view`,
+    tags: [],
+    tier: null,
+    isEssenceSource: false,
+    isTool: false,
+    broken: false,
+    salvage: systemA.salvage,
+    totalQuantity: 1,
+    sources: [{ actorId, actorName: 'Akra', actorImg: null, quantity: 1 }],
+    essences: [],
+    usedBy: [],
+    requiredFor: [],
+    producedBy: [],
+    contributors: [],
+    systems: [systemA, systemB],
+  };
+}

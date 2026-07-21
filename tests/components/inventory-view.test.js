@@ -5,7 +5,12 @@ import { readFileSync } from 'node:fs';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { SYS_A, SYS_B, multiSystemCardRow } from '../helpers/inventoryCollapseFixtures.js';
+import {
+  SYS_A,
+  SYS_B,
+  multiSystemCardRow,
+  multiSystemProgressiveCardRow,
+} from '../helpers/inventoryCollapseFixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -2012,6 +2017,55 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     assert.ok(
       target.querySelector('[data-inventory-salvage-acting-system]'),
       'the salvage panel names the acting system'
+    );
+  });
+
+  it('pressing Salvage routes the SELECTED participation ids, explicitly not the primary', async () => {
+    // Binds InventoryView.onSalvage (a routing site the earlier tests left unpressed):
+    // mutating it to forward the PRIMARY `selectedItem` ids instead of `activeSystem`
+    // would send System A's cA here, flipping this test.
+    const { services, store } = makeServices(multiSystemCardRow());
+    const salvageCalls = [];
+    store.salvage = (systemId, componentId) => {
+      salvageCalls.push([systemId, componentId]);
+      return Promise.resolve({ success: true });
+    };
+    store.selectedSystemId = SYS_B;
+    const target = await harness.mount({ services });
+    await settle();
+
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    target.querySelector('[data-inventory-salvage-action]').click();
+    await settle();
+
+    assert.deepEqual(salvageCalls, [[SYS_B, 'cB']], 'System B (selected), never System A (primary)');
+  });
+
+  it('withholds the ribbon for a result belonging to a DIFFERENT participation of the same component id', async () => {
+    // Binds the success-ribbon gate's systemId term (a routing site left untested).
+    // Both participations share the component id `shared`, so the gate MUST compare on
+    // systemId too: a result stamped for System A must not surface while System B is
+    // selected. Dropping the systemId term from the gate makes `shared === shared` true
+    // and shows the ribbon — flipping this test.
+    const { services, store } = makeServices(multiSystemProgressiveCardRow());
+    store.selectedSystemId = SYS_B;
+    store.salvageResult = {
+      systemId: SYS_A,
+      componentId: 'shared',
+      state: 'success',
+      message: '',
+      awarded: [],
+    };
+    const target = await harness.mount({ services });
+    await settle();
+
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-ribbon]'),
+      null,
+      "System A's result must not surface a ribbon while System B is selected"
     );
   });
 });

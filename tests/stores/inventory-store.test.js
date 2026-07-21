@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
-import { progressiveOrderKey } from '../../src/utils/progressiveResultOrder.js';
-import { SYS_A, SYS_B, multiSystemCardRow } from '../helpers/inventoryCollapseFixtures.js';
+import {
+  SYS_A,
+  SYS_B,
+  multiSystemCardRow,
+  multiSystemProgressiveCardRow,
+} from '../helpers/inventoryCollapseFixtures.js';
 
 let compiler;
 let createInventoryStore;
@@ -1035,15 +1039,45 @@ describe('inventoryStore', () => {
       assert.equal(calls[0].actorId, 'a1');
     });
 
-    it('the progressive order key is distinct per (systemId, componentId) sharing a component id', () => {
-      // Two participations whose component ids COLLIDE must still write to distinct keys —
-      // the pre-existing latent collision the collapse surfaces (component ids are not
-      // globally unique). Derived through the same `salvageOrderId` the store uses.
-      const keyA = progressiveOrderKey({ scope: 'salvage', id: `${SYS_A}:shared` });
-      const keyB = progressiveOrderKey({ scope: 'salvage', id: `${SYS_B}:shared` });
-      assert.notEqual(keyA, keyB);
-      assert.equal(keyA, `salvage:${SYS_A}:shared`);
-      assert.equal(keyB, `salvage:${SYS_B}:shared`);
+    it('the progressive order commit key is distinct per system for a SHARED component id', async () => {
+      // Two participations whose component ids COLLIDE ('shared') must still commit to
+      // DISTINCT keys — the pre-existing latent collision the collapse surfaces (component
+      // ids are not globally unique). Routed through the store's OWN `salvageOrderId` /
+      // `selectedParticipation` derivation (reorder → flush → observe the committed key),
+      // NOT pre-composed ids handed to `progressiveOrderKey` — so dropping the `systemId`
+      // term from `salvageOrderId` collapses BOTH commits onto `salvage:shared` and flips
+      // this test, which the neighbouring flush/reorder tests would not catch.
+      const committed = [];
+      const { services } = makeServices({
+        listing: {
+          selectedActorId: 'hero',
+          rows: [multiSystemProgressiveCardRow({ actorId: 'a1' })],
+        },
+      });
+      services.notify = () => {};
+      services.getProgressiveResultOrder = () => ({});
+      services.setProgressiveResultOrder = async (key) => {
+        committed.push(key);
+      };
+      const store = createInventoryStore({ services });
+      await store.load();
+
+      // System A (the primary): reorder a stage and flush; observe the commit key.
+      store.select(`${SYS_A}:shared`);
+      flushSync();
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      await store.flushSalvageOrder();
+
+      // System B (same component id): reorder and flush again.
+      store.selectSystem(SYS_B);
+      flushSync();
+      store.reorderSalvageStage(0, 1, '');
+      flushSync();
+      await store.flushSalvageOrder();
+
+      assert.deepEqual(committed, [`salvage:${SYS_A}:shared`, `salvage:${SYS_B}:shared`]);
+      assert.notEqual(committed[0], committed[1], 'the shared component id does not collide the keys');
     });
 
     it('selectedParticipation defaults to the primary and follows selectSystem', async () => {

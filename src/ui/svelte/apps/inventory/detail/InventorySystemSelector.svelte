@@ -77,7 +77,10 @@
       onchange={(event) => choose(event.currentTarget.value)}
     >
       {#each options as option (option.systemId)}
-        <option value={option.systemId} label={optionAria(option)}>
+        <!-- The annotation rides `title`, NOT `label`: a present non-empty `label`
+             attribute REPLACES the option's visible text per the HTML spec, so the player
+             would otherwise see "System, Salvageable, Tool" instead of the bare name. -->
+        <option value={option.systemId} title={optionAria(option)}>
           {option.systemName || option.systemId}
         </option>
       {/each}

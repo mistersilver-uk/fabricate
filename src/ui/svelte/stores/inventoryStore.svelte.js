@@ -662,6 +662,13 @@ export function createInventoryStore({ services } = {}) {
         // card) and `selectedItem` prefers it. Carry the TRUE remaining onto the held row
         // so a depleted participation reads "None remaining" and withholds "Salvage
         // again" — scoped to the acting participation, never the card union.
+        //
+        // The card key could in principle shift if depleting one participation changed the
+        // salvageable-biased primary — but that cannot surface a stale row today: the
+        // primary bias keys on salvageability (which salvaging never changes), and
+        // `ingredientQuantity` is effectively always 1 (per DOMAIN.md, no UI authors it), so
+        // a partial multi-participation depletion that leaves the card present under a
+        // different primary key is unreachable. A bounded edge, not an oversight.
         const liveRow = rows.find((entry) => entry?.key === row?.key) ?? null;
         heldItem = reconcileHeldRow(row, liveRow, systemId, componentId);
         return result;
