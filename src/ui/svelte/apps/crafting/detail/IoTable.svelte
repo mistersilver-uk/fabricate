@@ -8,6 +8,8 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
+  import CraftingEssenceThumb from '../CraftingEssenceThumb.svelte';
   import CraftingThumb from '../CraftingThumb.svelte';
   import QuantityTag from '../QuantityTag.svelte';
   import IngredientOptionSelector from './IngredientOptionSelector.svelte';
@@ -30,7 +32,7 @@
     return String(state?.name ?? state?.label ?? state?.type ?? state?.essenceType ?? '');
   }
   function essenceIcon(state) {
-    return typeof state?.icon === 'string' && state.icon.trim() ? state.icon : null;
+    return normalizeEssenceIcon(state?.icon);
   }
 </script>
 
@@ -52,7 +54,11 @@
               { have: state.have ?? 0, need: state.need ?? 0 }
             )}`}
           >
-            <CraftingThumb src={state.img} alt="" size={48} />
+            {#if state.isEssence}
+              <CraftingEssenceThumb icon={state.icon} size={48} />
+            {:else}
+              <CraftingThumb src={state.img} alt="" size={48} />
+            {/if}
             {#if state.hasChoice}
               <!-- Discoverability badge: this ingredient slot has selectable
                    alternatives (see the Alternatives section below the grid). -->
@@ -89,9 +95,7 @@
         {#each essences as state, index (state.type ?? state.essenceType ?? index)}
           <li class="crafting-io-row" data-io-satisfied={state.satisfied ? 'true' : 'false'}>
             <span class="crafting-io-essence-label">
-              {#if essenceIcon(state)}
-                <i class={`crafting-io-essence-icon ${essenceIcon(state)}`} aria-hidden="true"></i>
-              {/if}
+              <i class={`crafting-io-essence-icon ${essenceIcon(state)}`} aria-hidden="true"></i>
               <span class="crafting-io-name">{essenceLabel(state)}</span>
             </span>
             <span class="crafting-io-tags">

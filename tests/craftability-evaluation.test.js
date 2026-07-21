@@ -702,6 +702,7 @@ test('TC9: evaluateCraftability essenceStates show satisfied when essences avail
   assert.equal(result.essenceStates[0].have, 3);
   assert.equal(result.essenceStates[0].need, 2);
   assert.equal(result.essenceStates[0].satisfied, true);
+  assert.equal(result.essenceStates[0].isEssence, true);
 });
 
 test('TC9a: evaluateCraftability counts essences from matched component definitions', () => {
@@ -754,9 +755,38 @@ test('TC9a: evaluateCraftability counts essences from matched component definiti
   // player crafting detail can show them instead of the essence id.
   assert.equal(result.essenceStates[0].name, 'Restorative');
   assert.equal(result.essenceStates[0].icon, 'fas fa-heart');
+  assert.equal(result.essenceStates[0].isEssence, true);
   assert.equal(result.essenceStates[0].have, 2);
   assert.equal(result.essenceStates[0].need, 2);
   assert.equal(result.essenceStates[0].satisfied, true);
+});
+
+test('TC9a: missing legacy essence states retain authored presentation metadata', () => {
+  const systemId = 'sys-tc9a-missing';
+  const essenceId = 'restorative';
+  const set = makeIngredientSet([], { [essenceId]: 2 });
+  const manager = makeRecipeManagerWithEssences(systemId, [
+    { id: essenceId, name: 'Restorative', icon: 'fas fa-heart' },
+  ]);
+  const recipe = new Recipe({
+    name: 'Missing Essence Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability([makeActor([])], recipe);
+
+  assert.equal(result.canCraft, false);
+  assert.deepEqual(result.essenceStates[0], {
+    type: essenceId,
+    name: 'Restorative',
+    icon: 'fas fa-heart',
+    isEssence: true,
+    need: 2,
+    have: 0,
+    satisfied: false,
+  });
 });
 
 test('TC9b: evaluateCraftability multiplies component-defined essences by stack quantity', () => {
@@ -1302,6 +1332,8 @@ test('essence group tile resolves the essence NAME + icon (never the raw id) and
   assert.equal(state.description, '2x Restorative essence', 'tile shows the resolved essence name');
   assert.ok(!state.description.includes(essenceId), 'the raw essence id never leaks into the tile');
   assert.equal(state.icon, 'fas fa-heart', 'the essence definition icon is carried on the tile');
+  assert.equal(state.isEssence, true, 'the tile is marked for essence glyph rendering');
+  assert.equal(state.img, null, 'the tile does not expose the synthetic aura image');
   // Finding 2: a SATISFIED essence tile shows amount-based need + accumulated have.
   assert.equal(state.need, 2, 'need is the essence amount, not the option quantity');
   assert.equal(state.have, 3, 'have is the accumulated essence (3 herbs x 1 each)');
@@ -1319,7 +1351,9 @@ test('a MISSING essence group tile shows the accumulated have and the essence am
       scope === 'fabricate' && key === 'fabricate.essences' ? { fire: 1 } : undefined,
   };
   const set = makeIngredientSet([makeEssenceOptionGroup(essenceId, 4, 'g-ess')]);
-  const manager = makeRecipeManagerWithEssences(systemId, [{ id: 'fire', name: 'Fire' }]);
+  const manager = makeRecipeManagerWithEssences(systemId, [
+    { id: 'fire', name: 'Fire', icon: 'fas fa-fire-flame-curved' },
+  ]);
   const recipe = new Recipe({
     name: 'Fire Brew',
     craftingSystemId: systemId,
@@ -1333,6 +1367,9 @@ test('a MISSING essence group tile shows the accumulated have and the essence am
   assert.equal(state.need, 4);
   assert.equal(state.have, 1, 'have reflects the accumulated fire essence');
   assert.equal(state.satisfied, false);
+  assert.equal(state.isEssence, true);
+  assert.equal(state.icon, 'fas fa-fire-flame-curved');
+  assert.equal(state.img, null, 'missing essence tiles do not expose the aura image');
 });
 
 test('consumption threads the component-aware resolver: a component-defined essence draws down via canCraft', () => {
