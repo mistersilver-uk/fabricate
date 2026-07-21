@@ -1231,7 +1231,15 @@ async function captureRecipeEditorRoundtrip(page, results, craftingSetup) {
       throw new Error(`Expected the collapsed group to survive the round-trip; aria-expanded=${stillCollapsed}`);
     }
 
-    await captureStableManagerView(page, { layout: 'recipes editor round-trip', label: 'manager-recipes-editor-roundtrip' });
+    // The collapsed single-category group renders ZERO rows on purpose, so
+    // `assertManagerLayoutStable` (which throws "Manager rendered no table rows" when no
+    // row and no edit-form is present) does not apply here — the recipe-item validation
+    // and recipe-editor tab captures skip it for the same reason. Settle explicitly (we
+    // lose `captureStableManagerView`'s internal settle) and guard overlays only.
+    await settleManagerNav(page);
+    await page.waitForTimeout(200);
+    await assertNoScreenshotOverlays(page);
+    await screenshot(page, 'manager-recipes-editor-roundtrip');
     results.steps.push({ step: 'recipes-editor-roundtrip', passed: true });
   } catch (err) {
     results.steps.push({ step: 'recipes-editor-roundtrip', passed: false, error: err.message });
