@@ -53,11 +53,14 @@ function clampProgressFraction(pct) {
  * `dismiss()` guarantees a terminal state on an exit that never reached `pct: 1`
  * (e.g. an import that throws mid-pipeline). It is a no-op when the reporter never
  * started or already completed; otherwise it removes the still-open toast via the
- * handle's own `handle.remove()` (immediate and queue-safe — it splices the notify
- * queue without touching the DOM, unlike `update({ pct: 1 })` which would flash the
- * bar to a misleading SUCCESS state and can throw on an un-rendered toast). The
- * removal call mirrors the existing guards: a falsy handle, a missing `remove`
- * method, or a teardown throw all degrade to a no-op.
+ * handle's own `handle.remove()` — NOT the `ui.notifications.remove(handle)` class
+ * method, which throws on an undefined or stubbed handle, whereas `handle.remove()` is
+ * reached only past the falsy/`remove`-method guard below. `handle.remove()` is also
+ * immediate and queue-safe: it splices the notify queue without touching the DOM,
+ * unlike `update({ pct: 1 })`, which would flash the bar to a misleading SUCCESS state
+ * and can throw on an un-rendered toast. The removal call mirrors the existing guards:
+ * a falsy handle, a missing `remove` method, or a teardown throw all degrade to a
+ * no-op.
  *
  * @returns {((update: { pct?: number, message?: string, phase?: string }) => void) & { dismiss: () => void }}
  */
@@ -217,6 +220,10 @@ export class CompendiumImporter {
    * @param {object} [options.additionalFallbackIds={}] - Map of componentId -> string[] extra fallbacks
    * @param {string[]} [options.targetPackIds=[]] - Limit source+name search to specific pack IDs
    * @returns {Promise<object>} Structured import summary
+   * @throws Re-throws the original error UNCHANGED (no wrapping, no swallow) when a phase
+   *   after the `pct:0` start emit fails, after invoking the active reporter's terminal
+   *   `dismiss()` so the still-open progress toast is torn down and a failed import never
+   *   orphans the bar on screen until reload.
    */
   async importFromPackData(packData, options = {}) {
     if (!packData || typeof packData !== 'object' || !packData.system) {
