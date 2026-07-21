@@ -330,6 +330,31 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-inventory-multi-system'], ['player-inventory-multi-system']);
   });
 
+  // Issue 797: the recipe-item Validation tab is brought to parity with the recipe
+  // Validation tab. TWO dedicated view ids (all-clear + mixed-failing), each its own
+  // single-frame view — `collect` publishes only `candidates[0]` from a filename-sorted
+  // list, so both frames must be separate views to reach the PR. Both map to the
+  // validation tab file AND the editor shell that hosts it.
+  it('maps the issue-797 recipe-item Validation frames to their own view ids', () => {
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-recipe-item-validation'], ['manager-recipe-item-validation']);
+    assert.deepEqual(byId['manager-recipe-item-validation-blocked'], ['manager-recipe-item-validation-blocked']);
+
+    // The validation tab file republishes BOTH frames.
+    const tabIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
+    ]).map(view => view.id);
+    assert.ok(tabIds.includes('manager-recipe-item-validation'));
+    assert.ok(tabIds.includes('manager-recipe-item-validation-blocked'));
+
+    // The editor shell that hosts the tab republishes BOTH frames too.
+    const editorIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
+    ]).map(view => view.id);
+    assert.ok(editorIds.includes('manager-recipe-item-validation'));
+    assert.ok(editorIds.includes('manager-recipe-item-validation-blocked'));
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',

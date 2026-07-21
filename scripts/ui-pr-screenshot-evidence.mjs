@@ -314,6 +314,31 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-books-scrolls-normal'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/],
   },
+  // Issue 797: the recipe-item editor's Validation tab, brought to parity with the
+  // recipe editor's Validation tab (summary card + count tiles + grouped bordered rows
+  // with status pills). TWO dedicated view ids — one all-clear, one mixed-failing — each
+  // its own single-frame view: `collect` publishes only `candidates[0]` from a
+  // filename-sorted list, so appending both labels to one view would drop one of the
+  // evidence frames. Both match the validation tab file AND the editor shell that hosts
+  // it, so a change to either republishes the pair.
+  {
+    id: 'manager-recipe-item-validation',
+    label: 'Manager recipe-item editor — Validation tab (all clear)',
+    smokeLabels: ['manager-recipe-item-validation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\/RecipeItemValidationTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemEditor\.svelte$/,
+    ],
+  },
+  {
+    id: 'manager-recipe-item-validation-blocked',
+    label: 'Manager recipe-item editor — Validation tab (mixed pass/block, cannot be used)',
+    smokeLabels: ['manager-recipe-item-validation-blocked'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\/RecipeItemValidationTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemEditor\.svelte$/,
+    ],
+  },
   {
     id: 'manager-crafting-settings',
     label: 'Manager Crafting → Settings placeholder',
