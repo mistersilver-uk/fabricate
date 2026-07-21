@@ -7304,9 +7304,9 @@ async function main() {
         // Issue 766: ONE physical stack registered as a salvageable component in TWO
         // crafting systems (Smoke Air Shard, in the simple AND progressive forges) must
         // render as a SINGLE inventory card, its quantity counted ONCE, carrying a
-        // role=radiogroup System selector that re-scopes the whole detail body. This one
-        // frame proves both halves: (a) the collapsed single card with its union badges
-        // and a ×1 pip (never ×2), and (b) the selector with per-system affordance
+        // System selector DROP-DOWN that re-scopes the whole detail body. This one frame
+        // proves both halves: (a) the collapsed single card with its union badges and a ×1
+        // pip (never ×2), and (b) the `<select>` selector with per-system affordance
         // annotations, opened to a participation's detail. Fails loudly, by design (no
         // guard, no try/catch), for the same reason as the salvage frames above — the
         // evidence gate only scrapes the `screenshot(page, '<label>')` literal, so a
@@ -7319,8 +7319,8 @@ async function main() {
         await appShell.locator('[data-inventory-card]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await appShell.locator('[data-inventory-card]').first().click();
-        // The multi-system selector is the visual proof of the collapse.
-        await appShell.locator('[data-inventory-system-selector] [role="radiogroup"]').first()
+        // The multi-system selector drop-down is the visual proof of the collapse.
+        await appShell.locator('[data-inventory-system-select]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-inventory-multi-system');

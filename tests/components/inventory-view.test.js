@@ -1964,22 +1964,26 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     assert.match(detail.textContent, /Fire/, 'essence content (Info leaf)');
   });
 
-  it('multi-system card: renders a role=radiogroup selector with one radio per participation', async () => {
+  it('multi-system card: renders a <select> drop-down with one option per participation', async () => {
     const { services } = makeServices(multiSystemCardRow());
     const target = await harness.mount({ services });
     await settle();
 
-    const selector = target.querySelector('[data-inventory-system-selector] [role="radiogroup"]');
-    assert.ok(selector, 'the selector is a radiogroup, not a second tablist');
-    const radios = selector.querySelectorAll('[role="radio"]');
-    assert.equal(radios.length, 2, 'one radio per participation');
-    // Primary (System A) is checked, roving tabindex.
-    const active = selector.querySelector(`[data-inventory-system-option="${SYS_A}"]`);
-    assert.equal(active.getAttribute('aria-checked'), 'true');
-    assert.equal(active.getAttribute('tabindex'), '0');
-    const other = selector.querySelector(`[data-inventory-system-option="${SYS_B}"]`);
-    assert.equal(other.getAttribute('aria-checked'), 'false');
-    assert.equal(other.getAttribute('tabindex'), '-1');
+    const select = target.querySelector('[data-inventory-system-select]');
+    assert.ok(select, 'the selector is a native <select> drop-down');
+    assert.equal(select.tagName, 'SELECT', 'a value choice, not a radiogroup toggle');
+    const opts = select.querySelectorAll('option');
+    assert.equal(opts.length, 2, 'one option per participation');
+    // The label is associated with the select (a11y).
+    assert.ok(
+      target.querySelector('label[for="inventory-system-selector-select"]'),
+      'a <label for> is associated with the select'
+    );
+    // The primary (System A) is the selected value, and options read as the system NAME.
+    const optionByValue = (id) =>
+      [...opts].find((option) => (option.value || option.getAttribute('value')) === id);
+    assert.ok(optionByValue(SYS_A)?.selected, 'the salvageable-biased primary is selected');
+    assert.match(optionByValue(SYS_A).textContent, new RegExp(SYS_A), 'option reads as the system name');
     // The primary participation's name/essence scope the body.
     const detail = target.querySelector(`[data-inventory-detail="${SYS_A}:cA"]`);
     assert.match(detail.textContent, /Air Shard/, 'header name is the primary participation');
@@ -1987,16 +1991,18 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     assert.doesNotMatch(detail.textContent, /Water/, 'System B essence is not shown for System A');
   });
 
-  it('clicking a system radio routes the selection to store.selectSystem', async () => {
+  it('changing the system drop-down routes the selection to store.selectSystem', async () => {
     const { services, store } = makeServices(multiSystemCardRow());
     const picks = [];
     store.selectSystem = (systemId) => picks.push(systemId);
     const target = await harness.mount({ services });
     await settle();
 
-    target.querySelector(`[data-inventory-system-option="${SYS_B}"]`).click();
+    const select = target.querySelector('[data-inventory-system-select]');
+    select.value = SYS_B;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
     await settle();
-    assert.deepEqual(picks, [SYS_B], 'the radio drives the store selection');
+    assert.deepEqual(picks, [SYS_B], 'the drop-down drives the store selection');
   });
 
   it('with System B selected, the whole body scopes to System B (name + essence + salvage)', async () => {
