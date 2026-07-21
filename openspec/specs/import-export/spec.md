@@ -121,6 +121,8 @@ The import summary MUST include an `orphans[]` collection, each entry carrying t
 
 A system import MUST surface live progress to the GM while it runs, advancing at phase boundaries and periodically through the recipe phase, so a large import is not indistinguishable from a frozen client.
 Progress reporting MUST NOT alter the import's final state, summary counts, or reference reporting.
+Progress feedback MUST reach a terminal (dismissed) state on every exit path — successful completion, an already-installed skip, and a thrown failure before completion — so a failed import never leaves a frozen progress indicator on screen until reload.
+Terminating the progress indicator on failure MUST NOT suppress, wrap, or alter the error the import propagates to its caller.
 
 ### Round-trip integrity
 
