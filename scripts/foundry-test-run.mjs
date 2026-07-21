@@ -2012,7 +2012,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       name: 'Smoke First-Class Essence Draught',
       description: 'First-class essence ingredient and shopping-list shortage fixture.',
       craftingSystemId: simpleSystemId,
-      img: 'icons/consumables/potions/bottle-corked-purple.webp',
+      img: 'icons/commodities/treasure/token-gold-gem-purple.webp',
       ingredientSets: [{
         ingredientGroups: [{
           id: 'smoke-star-essence-group',
