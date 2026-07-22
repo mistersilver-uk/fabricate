@@ -115,12 +115,23 @@ describe('UI PR screenshot evidence', () => {
     ]).map(view => view.id);
     assert.ok(editViewIds.includes('manager-system-edit'));
     assert.ok(editViewIds.includes('manager-system-edit-dirty'));
+    assert.ok(editViewIds.includes('manager-system-edit-lists'));
 
     const rootIds = mapChangedFilesToViews([
       'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     ]).map(view => view.id);
     assert.ok(rootIds.includes('manager-system-edit-dirty'));
     assert.ok(!rootIds.includes('manager-system-edit'));
+  });
+
+  it('maps a system/ settings-list child card to the system-edit frame (issue 768)', () => {
+    // The list-ergonomics work touches CharacterPrerequisitesCard, which renders
+    // INSIDE the system-edit frame. A change to any `system/` card must map to
+    // `manager-system-edit` rather than falling through to the generic UI frame.
+    const cardIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
+    ]).map(view => view.id);
+    assert.ok(cardIds.includes('manager-system-edit'));
   });
 
   it('maps the issue-800 description frames to their OWN view ids', () => {

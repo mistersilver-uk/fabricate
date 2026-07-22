@@ -4346,6 +4346,13 @@ async function main() {
               ]
             }
           },
+          // Two character prerequisites so the System Settings Character
+          // Prerequisites list renders populated for the issue-768 list-ergonomics
+          // evidence (section collapse, copy-to-modifiers).
+          characterPrerequisites: [
+            { id: 'smoke-pre-trained', name: 'Trained in Alchemy', icon: 'fa-solid fa-flask', path: 'skills.alchemy.rank', op: 'gte', value: 2 },
+            { id: 'smoke-pre-focused', name: 'Focused', icon: 'fa-solid fa-bullseye', path: 'flags.focused', op: 'isTrue', value: null }
+          ],
           essenceDefinitions: [
             {
               name: 'Verdant',
@@ -4874,6 +4881,13 @@ async function main() {
               vocabularies: {
                 regions: { values: ['northreach'] }
               },
+              // Two character modifiers so the System Settings Character Modifiers
+              // list renders populated for the issue-768 list-ergonomics evidence
+              // (icon picker, section collapse, copy-to-prerequisites).
+              characterModifiers: [
+                { id: 'smoke-mod-herbalism', label: 'Herbalism Training', icon: 'fa-solid fa-leaf', expression: '@skills.nature.value' },
+                { id: 'smoke-mod-survival', label: 'Wilderness Survival', icon: 'fa-solid fa-campground', expression: '@skills.survival.value' }
+              ],
               tasks: [{
                 id: 'smoke-forage-library',
                 name: 'Forage Wild Herbs',
@@ -5670,6 +5684,53 @@ async function main() {
           .first()
           .waitFor({ state: 'detached', timeout: 5_000 })
           .catch(() => {});
+
+        // --- Settings-list ergonomics (issue 768) ---
+        // The seeded system carries two Character Modifiers, two Character
+        // Prerequisites and two Currency Units. Capture the three lists together
+        // proving the three increment-1 features: (a) the shared IconPicker open on
+        // a modifier (icon-picker parity), (b) a whole-section collapse on the
+        // Currency Units card, and (c) the row-level copy buttons on the summary
+        // rows. Reset afterwards so the Currency captures below start expanded.
+        await setManagerWindowSize(page, { width: 1280, height: 980 });
+        const modifierCard = page.locator('.fabricate-manager [data-system-character-modifiers]').first();
+        await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+        await modifierCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+        await page.waitForTimeout(200);
+
+        // Collapse the Currency Units section to demonstrate whole-section collapse.
+        const currencyCollapseToggle = page.locator('.fabricate-manager [data-section-collapse="currency"]').first();
+        if (await currencyCollapseToggle.count() > 0) {
+          await currencyCollapseToggle.click();
+          await page.waitForTimeout(150);
+        }
+
+        // Open the first modifier in edit mode and open its IconPicker so the icon
+        // dropdown is visible (parity with Currency Units / Character Prerequisites).
+        const firstModifierRow = modifierCard.locator('[data-system-character-modifier]').first();
+        await firstModifierRow.locator('.manager-character-modifier-summary .manager-icon-button').first().click();
+        await page.waitForTimeout(150);
+        const modifierIconTrigger = firstModifierRow.locator('.essence-icon-picker-trigger').first();
+        if (await modifierIconTrigger.count() > 0) {
+          await modifierIconTrigger.click();
+          await page.waitForTimeout(200);
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-system-edit-lists');
+
+        // Reset: close the editor (also dismisses the IconPicker popover) and
+        // re-expand the Currency Units section for the currency captures below.
+        const modifierDone = firstModifierRow
+          .locator('.manager-character-modifier-editor button:has-text("Done")')
+          .first();
+        if (await modifierDone.count() > 0) {
+          await modifierDone.click().catch(() => {});
+          await page.waitForTimeout(150);
+        }
+        if (await page.locator('.fabricate-manager [data-system-currency-units].is-section-collapsed').count() > 0) {
+          await page.locator('.fabricate-manager [data-section-collapse="currency"]').first().click();
+          await page.waitForTimeout(150);
+        }
 
         // --- Currency configuration (#393) ---
         // Enable currency via the optional-features toggle, seed the dnd5e (actorProperty)
