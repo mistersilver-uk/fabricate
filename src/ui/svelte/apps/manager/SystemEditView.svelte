@@ -318,7 +318,7 @@
   function currencyUnitSubUnitOptions(unitId) {
     return currencyUnits
       .filter(entry => currencyCanAddSubUnit(unitId, entry.id))
-      .map(entry => ({ id: entry.id, label: entry.label || entry.id, abbreviation: entry.abbreviation || entry.id }));
+      .map(entry => ({ id: entry.id, label: entry.label || entry.id, abbreviation: entry.abbreviation || '' }));
   }
 
   function currencySelectedSubUnit(unitId) {
@@ -835,7 +835,7 @@
                                 onchange={(event) => updateCurrencySubUnitSelection(unit.id, event.currentTarget.value)}
                               >
                                 {#each subUnitOptions as option (option.id)}
-                                  <option value={option.id}>{option.label} ({option.abbreviation})</option>
+                                  <option value={option.id}>{option.label}{option.abbreviation ? ` (${option.abbreviation})` : ''}</option>
                                 {/each}
                               </select>
                             </label>
