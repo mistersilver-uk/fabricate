@@ -63,12 +63,14 @@
     onAddCharacterModifier = async () => null,
     onUpdateCharacterModifier = async () => {},
     onDeleteCharacterModifier = async () => {},
+    onReorderCharacterModifier = async () => {},
     onSeedCharacterModifierPresets = async () => {},
     characterPrerequisiteLibrary = [],
     characterPrerequisitePresetsSupported = false,
     onAddCharacterPrerequisite = async () => null,
     onUpdateCharacterPrerequisite = async () => {},
     onDeleteCharacterPrerequisite = async () => {},
+    onReorderCharacterPrerequisite = async () => {},
     onSeedCharacterPrerequisitePresets = async () => {},
     currencyUnits = [],
     currencyPresetsSupported = false,
@@ -79,6 +81,7 @@
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
     onDeleteCurrencyUnit = async () => {},
+    onReorderCurrencyUnit = async () => {},
     onAddCurrencySubUnit = async () => {},
     onUpdateCurrencySubUnit = async () => {},
     onDeleteCurrencySubUnit = async () => {},
@@ -248,6 +251,32 @@
     ) {
       copyAnnouncement = `Copied ${String(name || '').trim()} and icon — set the condition.`;
     }
+  }
+
+  // Manual reorder (issue 768) — Move-up/down chevron buttons on each settings-list
+  // row call the list's index-based store op (array order IS the persisted order),
+  // mirroring the accessible CompositionList pattern. One shared aria-live region
+  // announces the new position so the move is observable without sight of the
+  // reflowed list. `reorderList` is shared by all three lists so the announce +
+  // persist pattern lives in one place (no per-list duplication).
+  let reorderAnnouncement = $state('');
+  function announceReorder(name, position, total) {
+    reorderAnnouncement = localize('FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement', {
+      name: String(name || '').trim(),
+      position: String(position),
+      total: String(total)
+    });
+    if (
+      !reorderAnnouncement ||
+      reorderAnnouncement === 'FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement'
+    ) {
+      reorderAnnouncement = `Moved ${String(name || '').trim()} to position ${position} of ${total}.`;
+    }
+  }
+  async function reorderList(reorderOp, index, delta, name, total) {
+    const toIndex = index + delta;
+    await reorderOp(index, toIndex);
+    announceReorder(name, toIndex + 1, total);
   }
 
   // The copied entry opens in edit mode in the OTHER section (Prereqs sit below
@@ -538,6 +567,7 @@
 
     <form class="manager-system-edit-form" onsubmit={handleSubmit}>
       <div class="visually-hidden" role="status" aria-live="polite" data-list-copy-announcement>{copyAnnouncement}</div>
+      <div class="visually-hidden" role="status" aria-live="polite" data-list-reorder-announcement>{reorderAnnouncement}</div>
       {#if systemBlocked}
         <div class="manager-environment-comp-callout manager-system-edit-blocker" role="note" data-system-edit-blocker>
           <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
@@ -699,7 +729,7 @@
             <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Empty', 'No character modifiers yet.')}</p>
           {:else}
             <ul class="manager-character-modifier-list">
-              {#each characterModifierLibrary as entry (entry.id)}
+              {#each characterModifierLibrary as entry, index (entry.id)}
                 {@const modifierOpen = characterModifierEditingId === entry.id}
                 {@const modifierExpression = characterModifierExpressionDisplay(entry)}
                 <li class="manager-modifier-item" class:is-open={modifierOpen} data-system-character-modifier={entry.id}>
@@ -724,6 +754,12 @@
                           {modifierExpression}
                         </span>
                       {/if}
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-move-modifier-up={entry.id} disabled={index === 0} onclick={() => reorderList(onReorderCharacterModifier, index, -1, entry.label, characterModifierLibrary.length)}>
+                      <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-move-modifier-down={entry.id} disabled={index === characterModifierLibrary.length - 1} onclick={() => reorderList(onReorderCharacterModifier, index, 1, entry.label, characterModifierLibrary.length)}>
+                      <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                     </button>
                     <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-copy-to-prerequisite={entry.id} onclick={() => handleCopyModifierToPrerequisite(entry)}>
                       <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
@@ -774,6 +810,10 @@
         onAdd={onAddCharacterPrerequisite}
         onUpdate={onUpdateCharacterPrerequisite}
         onDelete={onDeleteCharacterPrerequisite}
+        onReorder={async (fromIndex, toIndex, name) => {
+          await onReorderCharacterPrerequisite(fromIndex, toIndex);
+          announceReorder(name, toIndex + 1, characterPrerequisiteLibrary.length);
+        }}
         onSeedPresets={onSeedCharacterPrerequisitePresets}
         collapsed={isSectionCollapsed('prerequisites')}
         onToggleCollapsed={() => toggleSectionCollapsed('prerequisites')}
@@ -955,7 +995,7 @@
           <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
         {:else}
           <ul class="manager-character-modifier-list">
-            {#each currencyUnits as unit (unit.id)}
+            {#each currencyUnits as unit, index (unit.id)}
               {@const expanded = currencyExpandedUnitId === unit.id}
               {@const subUnitOptions = currencyUnitSubUnitOptions(unit.id)}
               <li class="manager-character-modifier-row" data-system-currency-unit={unit.id}>
@@ -1059,6 +1099,12 @@
                     <span class="manager-character-modifier-icon"><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"></i></span>
                     <span class="manager-character-modifier-label">{unit.label || unit.id}</span>
                     <span class="manager-chip">{(unit.contains || []).length} {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</span>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-move-currency-up={unit.id} disabled={index === 0} onclick={() => reorderList(onReorderCurrencyUnit, index, -1, unit.label || unit.id, currencyUnits.length)}>
+                      <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-move-currency-down={unit.id} disabled={index === currencyUnits.length - 1} onclick={() => reorderList(onReorderCurrencyUnit, index, 1, unit.label || unit.id, currencyUnits.length)}>
+                      <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                    </button>
                     <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Edit', 'Edit currency unit')} onclick={() => currencyExpandedUnitId = unit.id}>
                       <i class="fa-solid fa-pen" aria-hidden="true"></i>
                     </button>

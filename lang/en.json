@@ -3457,7 +3457,10 @@
           "ToggleSection": "Collapse or expand this section",
           "CopyToPrerequisites": "Copy to prerequisites",
           "CopyToModifiers": "Copy to modifiers",
-          "CopiedAnnouncement": "Copied {name} and icon — set the condition."
+          "CopiedAnnouncement": "Copied {name} and icon — set the condition.",
+          "MoveUp": "Move up",
+          "MoveDown": "Move down",
+          "ReorderedAnnouncement": "Moved {name} to position {position} of {total}."
         },
         "CharacterPrerequisites": {
           "Title": "Character prerequisites",

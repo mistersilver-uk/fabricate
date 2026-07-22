@@ -5,13 +5,15 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// System Overview list ergonomics (issue 768, increment 1): the Character
-// Modifiers icon now uses the shared IconPicker; each settings-list section has a
+// System Overview list ergonomics (issue 768): increment 1 — the Character
+// Modifiers icon uses the shared IconPicker; each settings-list section has a
 // whole-section collapse toggle; and a row-level copy adds into the sibling store
-// and opens the new entry in edit mode. These behaviours live across
-// SystemEditView + CharacterPrerequisitesCard, so they are asserted through a real
-// mount (the same harness the currency-subunit test uses, plus the copy-mapping
-// module in the raw allowlist so the mount stays hang-free).
+// and opens the new entry in edit mode. Increment 2 — each row of all three lists
+// has accessible Move up/down chevrons (disabled at the ends) that fire an
+// index-based reorder op and announce the new position. These behaviours live
+// across SystemEditView + CharacterPrerequisitesCard, so they are asserted through
+// a real mount (the same harness the currency-subunit test uses, plus the
+// copy-mapping module in the raw allowlist so the mount stays hang-free).
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-list-ergonomics-',
@@ -59,6 +61,11 @@ const MODIFIERS = Object.freeze([
 const PREREQUISITES = Object.freeze([
   { id: 'pre-trained', name: 'Trained', icon: 'fa-solid fa-graduation-cap', path: 'skills.cra.rank', op: 'gte', value: 2 },
   { id: 'pre-open', name: 'Copy target', icon: 'fa-solid fa-user-shield', path: '', op: 'gte', value: null }
+]);
+
+const CURRENCY_UNITS = Object.freeze([
+  { id: 'cur-gold', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [] },
+  { id: 'cur-silver', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
 ]);
 
 function clickEvent() {
@@ -221,6 +228,75 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
       target.contains(globalThis.window.document.activeElement),
       'focus moves into the newly-opened modifier editor'
     );
+  });
+
+  it('reorders a Character Modifier via the Move up/down chevrons (op fires with indices, disabled at the ends)', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      characterModifierLibrary: MODIFIERS,
+      onReorderCharacterModifier: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
+    });
+
+    // First row: Move up disabled, Move down enabled.
+    const firstUp = root.querySelector('[data-move-modifier-up="mod-herbalism"]');
+    const firstDown = root.querySelector('[data-move-modifier-down="mod-herbalism"]');
+    assert.ok(firstUp && firstDown, 'the first modifier row has both chevrons');
+    assert.equal(firstUp.disabled, true, 'Move up is disabled on the first row');
+    assert.equal(firstDown.disabled, false, 'Move down is enabled on the first row');
+
+    // Last row: Move down disabled.
+    const lastDown = root.querySelector('[data-move-modifier-down="mod-lore"]');
+    assert.equal(lastDown.disabled, true, 'Move down is disabled on the last row');
+
+    firstDown.dispatchEvent(clickEvent());
+    await flushRender();
+    assert.deepEqual(calls, [[0, 1]], 'Move down fires the reorder op with (index, index+1)');
+
+    // The move announces its new position via the shared aria-live region.
+    const announcement = root.querySelector('[data-list-reorder-announcement]');
+    assert.ok(announcement && announcement.textContent.includes('Herbalism'), 'a reorder is announced');
+  });
+
+  it('reorders a Currency Unit via the Move up/down chevrons on the summary row', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      currencyUnits: CURRENCY_UNITS,
+      onReorderCurrencyUnit: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
+    });
+
+    const firstUp = root.querySelector('[data-move-currency-up="cur-gold"]');
+    const lastUp = root.querySelector('[data-move-currency-up="cur-silver"]');
+    assert.ok(firstUp && lastUp, 'each currency summary row has a Move up chevron');
+    assert.equal(firstUp.disabled, true, 'Move up disabled on the first unit');
+    assert.equal(lastUp.disabled, false, 'Move up enabled on the last unit');
+
+    lastUp.dispatchEvent(clickEvent());
+    await flushRender();
+    assert.deepEqual(calls, [[1, 0]], 'Move up fires the reorder op with (index, index-1)');
+  });
+
+  it('reorders a Character Prerequisite via the Move up/down chevrons', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      characterPrerequisiteLibrary: PREREQUISITES,
+      onReorderCharacterPrerequisite: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
+    });
+
+    const firstUp = root.querySelector('[data-move-prerequisite-up="pre-trained"]');
+    const firstDown = root.querySelector('[data-move-prerequisite-down="pre-trained"]');
+    assert.ok(firstUp && firstDown, 'the first prerequisite row has both chevrons');
+    assert.equal(firstUp.disabled, true, 'Move up disabled on the first prerequisite');
+    assert.equal(firstDown.disabled, false, 'Move down enabled on the first prerequisite');
+
+    const lastDown = root.querySelector('[data-move-prerequisite-down="pre-open"]');
+    assert.equal(lastDown.disabled, true, 'Move down disabled on the last prerequisite');
+
+    firstDown.dispatchEvent(clickEvent());
+    await flushRender();
+    assert.deepEqual(calls, [[0, 1]], 'the prerequisite reorder op fires with (index, index+1)');
   });
 
   it('hides the Copy to Modifiers button (and the Modifiers section) when gathering is off', async () => {

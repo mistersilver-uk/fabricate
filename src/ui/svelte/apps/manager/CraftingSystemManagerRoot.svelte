@@ -861,6 +861,10 @@
     if (!selectedSystemId) return;
     await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
   }
+  async function onReorderCharacterModifier(fromIndex, toIndex) {
+    if (!selectedSystemId) return;
+    await store.reorderGatheringCharacterModifier(fromIndex, toIndex, selectedSystemId);
+  }
 
   // Character prerequisites (issue 544) — system-owned pass/fail learning gates.
   const selectedCharacterPrerequisites = $derived(
@@ -883,6 +887,10 @@
     if (!selectedSystemId) return;
     await store.deleteCharacterPrerequisite(selectedSystemId, prerequisiteId);
   }
+  async function onReorderCharacterPrerequisite(fromIndex, toIndex) {
+    if (!selectedSystemId) return;
+    await store.reorderCharacterPrerequisite(fromIndex, toIndex, selectedSystemId);
+  }
   async function onSeedCharacterPrerequisitePresets() {
     if (!selectedSystemId || !characterPrerequisitePresetsSupported) return;
     await store.seedCharacterPrerequisitePresetsForSystem(selectedSystemId);
@@ -899,6 +907,10 @@
   async function onDeleteCurrencyUnit(unitId) {
     if (!selectedSystemId) return;
     await store.deleteCurrencyUnit(selectedSystemId, unitId);
+  }
+  async function onReorderCurrencyUnit(fromIndex, toIndex) {
+    if (!selectedSystemId) return;
+    await store.reorderCurrencyUnit(fromIndex, toIndex, selectedSystemId);
   }
   async function onAddCurrencySubUnit(parentUnitId, subUnitId) {
     if (!selectedSystemId) return;
@@ -5534,12 +5546,14 @@
         onAddCharacterModifier={onAddCharacterModifier}
         onUpdateCharacterModifier={onUpdateCharacterModifier}
         onDeleteCharacterModifier={onDeleteCharacterModifier}
+        onReorderCharacterModifier={onReorderCharacterModifier}
         onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
         characterPrerequisiteLibrary={selectedCharacterPrerequisites}
         {characterPrerequisitePresetsSupported}
         onAddCharacterPrerequisite={onAddCharacterPrerequisite}
         onUpdateCharacterPrerequisite={onUpdateCharacterPrerequisite}
         onDeleteCharacterPrerequisite={onDeleteCharacterPrerequisite}
+        onReorderCharacterPrerequisite={onReorderCharacterPrerequisite}
         onSeedCharacterPrerequisitePresets={onSeedCharacterPrerequisitePresets}
         currencyUnits={selectedCurrencyUnits}
         {currencyPresetsSupported}
@@ -5550,6 +5564,7 @@
         onAddCurrencyUnit={onAddCurrencyUnit}
         onUpdateCurrencyUnit={onUpdateCurrencyUnit}
         onDeleteCurrencyUnit={onDeleteCurrencyUnit}
+        onReorderCurrencyUnit={onReorderCurrencyUnit}
         onAddCurrencySubUnit={onAddCurrencySubUnit}
         onUpdateCurrencySubUnit={onUpdateCurrencySubUnit}
         onDeleteCurrencySubUnit={onDeleteCurrencySubUnit}

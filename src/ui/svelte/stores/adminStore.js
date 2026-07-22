@@ -241,6 +241,27 @@ function _deleteCurrencyUnitFromList(units, unitId) {
   return nextUnits.length === units.length ? null : nextUnits;
 }
 
+/**
+ * Reorder a list by moving the element at `fromIndex` to `toIndex`, returning a
+ * new array. Returns null for an invalid or no-op move so callers can skip the
+ * save. Array order is the persisted order for the System Overview settings lists
+ * (issue 768) — a reorder just rewrites the array through each list's existing
+ * whole-payload save path, no new persisted field.
+ */
+function _reorderListByIndex(list, fromIndex, toIndex) {
+  const source = Array.isArray(list) ? list : [];
+  const from = Number(fromIndex);
+  const to = Number(toIndex);
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  if (from < 0 || from >= source.length) return null;
+  if (to < 0 || to >= source.length) return null;
+  if (from === to) return null;
+  const next = [...source];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 function _setSubUnitAmount(entry, subUnitId, numericAmount) {
   if (entry.unitId !== subUnitId) return entry;
   return { ...entry, amount: numericAmount };
@@ -3788,6 +3809,32 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * Move one character prerequisite from `fromIndex` to `toIndex` (issue 768).
+   * Array order IS the persisted order, so the reorder rewrites the system's
+   * characterPrerequisites array and persists through updateSystem. Returns false
+   * on an invalid/no-op move.
+   *
+   * @param {number} fromIndex Source position.
+   * @param {number} toIndex Destination position.
+   * @param {string} [systemId] Target crafting system id.
+   * @returns {Promise<boolean>}
+   */
+  async function reorderCharacterPrerequisite(
+    fromIndex,
+    toIndex,
+    systemId = get(selectedSystemId)
+  ) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return false;
+    const next = _reorderListByIndex(_systemCharacterPrerequisites(id), fromIndex, toIndex);
+    if (!next) return false;
+    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    if (persisted === null) return false;
+    await refresh();
+    return true;
+  }
+
   async function seedCharacterPrerequisitePresetsForSystem(systemId = get(selectedSystemId)) {
     const id = String(systemId || get(selectedSystemId) || '');
     if (!id) return { added: 0, skipped: 0, unsupported: true, foundrySystemId: '' };
@@ -6909,6 +6956,33 @@ export function createAdminStore(services) {
   }
 
   /**
+   * Move one library character modifier from `fromIndex` to `toIndex` (issue
+   * 768). The array order IS the persisted order, so the reorder rewrites the
+   * gathering config's characterModifiers array in place and saves through the
+   * existing gathering-config path. Returns false on an invalid/no-op move.
+   *
+   * @param {number} fromIndex Source position.
+   * @param {number} toIndex Destination position.
+   * @param {string} [systemId] Target crafting system id.
+   * @returns {Promise<boolean>}
+   */
+  async function reorderGatheringCharacterModifier(
+    fromIndex,
+    toIndex,
+    systemId = get(selectedSystemId)
+  ) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    const next = _reorderListByIndex(systemConfig.characterModifiers, fromIndex, toIndex);
+    if (!next) return false;
+    systemConfig.characterModifiers = next;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  /**
    * Idempotently seed the active Foundry game system's preset bundle into the
    * selected crafting system's character modifier library. Existing ids are
    * preserved; the return value identifies added vs. skipped presets and
@@ -7491,6 +7565,25 @@ export function createAdminStore(services) {
       const nextUnits = _deleteCurrencyUnitFromList(currency.units, unitId);
       if (!nextUnits) return false;
       currency.units = nextUnits;
+      return true;
+    });
+  }
+
+  /**
+   * Move one currency unit from `fromIndex` to `toIndex` (issue 768). Array order
+   * IS the persisted order, so the reorder rewrites the currency units array and
+   * persists through updateSystem. Returns false on an invalid/no-op move.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {number} fromIndex Source position.
+   * @param {number} toIndex Destination position.
+   * @returns {Promise<boolean>}
+   */
+  async function reorderCurrencyUnit(fromIndex, toIndex, systemId = get(selectedSystemId)) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const next = _reorderListByIndex(currency.units, fromIndex, toIndex);
+      if (!next) return false;
+      currency.units = next;
       return true;
     });
   }
@@ -8295,10 +8388,12 @@ export function createAdminStore(services) {
     addGatheringCharacterModifier,
     updateGatheringCharacterModifier,
     deleteGatheringCharacterModifier,
+    reorderGatheringCharacterModifier,
     seedGatheringCharacterModifierPresets,
     addCharacterPrerequisite,
     updateCharacterPrerequisite,
     deleteCharacterPrerequisite,
+    reorderCharacterPrerequisite,
     seedCharacterPrerequisitePresetsForSystem,
     addGatheringDropRowCharacterModifier,
     updateGatheringDropRowCharacterModifier,
@@ -8321,6 +8416,7 @@ export function createAdminStore(services) {
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,
+    reorderCurrencyUnit,
     addCurrencySubUnit,
     updateCurrencySubUnit,
     deleteCurrencySubUnit,
