@@ -24,6 +24,7 @@ import {
   PORT_BASE,
   PORT_SPAN
 } from './lib/foundryRunIdentity.js';
+import { defaultRunTimeoutMs, resolveSmokeProfile } from './lib/foundryRunBudget.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -166,13 +167,18 @@ async function main() {
   // Step 2: Run the smoke test (capture result, always proceed to down).
   // The run phase gets its own wall-clock budget so the 25-minute GitHub
   // Actions job timeout can never preempt Docker teardown + artifact upload.
-  // Override with FOUNDRY_RUN_TIMEOUT_MS; defaults to 18 minutes. The default
-  // sits comfortably above the observed rc run duration (~870-930s across all
-  // phases) so ordinary hosted-runner variance no longer trips the watchdog on
-  // an otherwise-passing smoke, while staying well under the job cap so
-  // teardown + upload always run.
+  // The default is PROFILE-DERIVED (expected walk + finalization grace) so it
+  // clears a legitimately-passing walk of that profile plus its post-verdict
+  // `summary.json` write: `rc`/`ci` keep today's ~18-minute budget (~870-930s
+  // walk) while `full`/`screenshots` get enough headroom that the long walk no
+  // longer needs a manual override to avoid a SIGTERM mid-finalization. An
+  // explicit FOUNDRY_RUN_TIMEOUT_MS (e.g. CI's pin) still wins, and the budget
+  // stays well under the job cap so teardown + upload always run.
   process.stdout.write('=== foundry-test: RUN ===\n');
-  const runTimeoutMs = Number(process.env.FOUNDRY_RUN_TIMEOUT_MS ?? 18 * 60_000);
+  const runTimeoutMs = Number(
+    process.env.FOUNDRY_RUN_TIMEOUT_MS ??
+      defaultRunTimeoutMs(resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE))
+  );
   const runCode = runScript(run, [], runTimeoutMs);
 
   // Step 3: Tear down regardless of test result
