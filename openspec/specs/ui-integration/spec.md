@@ -549,6 +549,8 @@ The library uses the Manager three-column shell at `210px | 1fr | 340px`.
 It owns the sole system-breakage-authority card above search, with self-describing `toolSpecific` and `checkDriven` options; changing authority persists live and never erases the inactive per-Tool settings.
 The center library accepts an Item drop or Item-picker selection to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
 Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state, and the right inspector presents selected-Tool detail and Edit.
+The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
+Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
 
 Each row exposes selection through a keyboard-focusable identity target with explicit selected semantics and Enter/Space activation.
 Selection, Edit, and enabled toggle are distinct localized named hit targets.
@@ -571,6 +573,8 @@ Validation lists every failing model check, exposes the first failure for focus,
 Leaving a dirty `tool-edit` route through Back, rail or breadcrumb navigation, a system-scope change, another Tool selection, or application close invokes the standard DialogV2 Save / Discard / Keep editing guard.
 Save proceeds only after successful validation and persistence.
 Invalid or failed Save keeps the same Tool mounted, opens Validation, and focuses or exposes the first failing check.
+The Validation tab projects domain failures onto stable localized categories and never renders raw field paths, exception messages, adapter details, or other internal error text.
+Save, delete, and enabled-toggle failures likewise emit only their localized operation-specific message; raw caught errors may remain internal state for control flow but never become notification copy.
 Discard restores the baseline before navigation, while Keep editing preserves the draft and focus.
 Re-entering the same Tool does not prompt.
 Delete uses a separate destructive DialogV2 confirmation; cancellation preserves the draft, and successful deletion returns to the library without a second dirty prompt.

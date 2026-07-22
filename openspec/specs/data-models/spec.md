@@ -1331,7 +1331,7 @@ Legacy `breakage.mode: "immune"` reads forward in both `Tool` construction and `
 The system normalizer processes `characterPrerequisites` before Tools, prunes unknown Tool prerequisite ids in every state, retains valid ids while disabled, and changes an enabled gate to disabled when pruning leaves no ids.
 7. Exactly one `onBreak.mode` is configured per Tool.
 `replaceWith` carries exactly one discriminator in `replacementTarget`: a managed Component id or a direct Item UUID; malformed, empty, or dual targets are invalid, and a Component target must differ from the Tool's own `componentId` when present.
-`flagBroken` permits zero or more repair `IngredientGroup`s; every present group must be complete canonical `IngredientGroup`/`Ingredient` JSON whose options use valid Component, Tag, Essence, or Currency match shapes.
+`flagBroken` permits zero or more repair `IngredientGroup`s; every present group must be complete canonical `IngredientGroup`/`Ingredient` JSON whose options use valid Component, Tag, Essence, or Currency match shapes and numeric positive option quantities.
 Every breakage consumer resolves and creates exactly one quantity-one replacement before deleting the original.
 Direct UUID resolution awaits `fromUuid` and accepts only a returned Document with `documentName === "Item"`; null, index entries, and non-Item Documents fail.
 Resolution failure, missing creation API, a throw, and null/empty creation preserve the original and are not reported as `replaced`.
