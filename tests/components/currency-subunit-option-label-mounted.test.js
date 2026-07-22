@@ -23,7 +23,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
     'src/ui/svelte/util/iconPickerPopover.js',
-    'src/systems/characterPrerequisites.js'
+    'src/systems/characterPrerequisites.js',
+    // SystemEditView imports the pure copy-mapping helpers (issue 768); omitting it
+    // HANGS this mount (reported as `# cancelled`).
+    'src/systems/characterModifierPrerequisiteCopy.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/IconPicker.svelte',

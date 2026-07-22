@@ -845,9 +845,9 @@
   const currencyProviderOptions = $derived(
     getCurrencyProvidersForFoundrySystem(foundrySystemId).map(provider => ({ id: provider.id, label: provider.label }))
   );
-  async function onAddCharacterModifier() {
+  async function onAddCharacterModifier(partial) {
     if (!selectedSystemId) return null;
-    return await store.addGatheringCharacterModifier(selectedSystemId);
+    return await store.addGatheringCharacterModifier(selectedSystemId, partial);
   }
   async function onSeedCharacterModifierPresets() {
     if (!selectedSystemId || !characterModifierPresetsSupported) return;
@@ -871,9 +871,9 @@
   const characterPrerequisitePresetsSupported = $derived(
     ['dnd5e', 'pf2e'].includes(foundrySystemId)
   );
-  async function onAddCharacterPrerequisite() {
+  async function onAddCharacterPrerequisite(partial) {
     if (!selectedSystemId) return null;
-    return await store.addCharacterPrerequisite(selectedSystemId);
+    return await store.addCharacterPrerequisite(selectedSystemId, partial);
   }
   async function onUpdateCharacterPrerequisite(prerequisiteId, patch) {
     if (!selectedSystemId) return;

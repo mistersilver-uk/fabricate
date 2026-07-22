@@ -2167,6 +2167,48 @@
   font-style: italic;
 }
 
+/*
+  Whole-section collapse (issue 768) — a chevron toggle in each settings-list card
+  header, mirroring the category-collapse affordance. The wrapped body preserves the
+  card's own column gap so collapsing/expanding never reflows the inner spacing.
+*/
+.fabricate-manager .manager-section-collapse-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text-subtle);
+  background: var(--fab-surface-soft);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-section-collapse-toggle:hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
+  color: var(--fab-text-secondary);
+}
+
+.fabricate-manager .manager-section-collapse-toggle:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
 /* Character prerequisites accordion (issue 544) */
 .fabricate-manager .manager-prerequisite-empty {
   font-style: italic;
