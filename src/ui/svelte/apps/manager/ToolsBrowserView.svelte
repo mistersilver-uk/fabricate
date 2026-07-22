@@ -170,6 +170,15 @@
                 <strong>{row.name}</strong>
                 <small>{row.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}</small>
                 <span class="manager-tools-library-chips">
+                  <span
+                    class={`manager-chip ${row.validation.valid ? 'is-positive' : 'is-danger'}`}
+                    data-tool-validation-status={row.validation.valid ? 'ready' : 'needs-attention'}
+                  >
+                    <i class={row.validation.valid ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'} aria-hidden="true"></i>
+                    {row.validation.valid
+                      ? text('FABRICATE.Admin.Manager.Tools.ValidationReady', 'Ready')
+                      : text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
+                  </span>
                   <span class="manager-chip is-neutral">{breakageLabel(row.breakage)}</span>
                   <span class="manager-chip is-neutral">{onBreakLabel(row.onBreak)}</span>
                 </span>

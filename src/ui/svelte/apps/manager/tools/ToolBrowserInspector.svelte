@@ -40,6 +40,19 @@
       replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with item'),
     }[key];
   }
+
+  function validationContext() {
+    if (row.validation.valid) {
+      return text('FABRICATE.Admin.Manager.Tools.ValidationValid', 'This Tool is ready to save.');
+    }
+    if (row.validation.errorCount === 1) {
+      return text('FABRICATE.Admin.Manager.Tools.ValidationIssue', '1 issue');
+    }
+    return text('FABRICATE.Admin.Manager.Tools.ValidationIssues', '{count} issues').replace(
+      '{count}',
+      row.validation.errorCount
+    );
+  }
 </script>
 
 {#if row}
@@ -52,9 +65,22 @@
         <span class={`manager-chip ${row.enabled ? 'is-positive' : 'is-neutral'}`}>
           {row.enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
         </span>
+        <span
+          class={`manager-chip ${row.validation.valid ? 'is-positive' : 'is-danger'}`}
+          data-tool-validation-status={row.validation.valid ? 'ready' : 'needs-attention'}
+        >
+          <i class={row.validation.valid ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'} aria-hidden="true"></i>
+          {row.validation.valid
+            ? text('FABRICATE.Admin.Manager.Tools.ValidationReady', 'Ready')
+            : text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
+        </span>
       </div>
     </div>
     <p class="manager-muted">{row.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}</p>
+    <p class={`manager-muted ${row.validation.valid ? '' : 'is-danger'}`} data-tool-inspector-validation>
+      <i class={row.validation.valid ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'} aria-hidden="true"></i>
+      {validationContext()}
+    </p>
     <div class="manager-tool-inspector-facts">
       <div><span>{text('FABRICATE.Admin.Manager.Tools.Breakage', 'Breakage')}</span><strong>{breakageLabel()}</strong></div>
       <div><span>{text('FABRICATE.Admin.Manager.Tools.OnBreak', 'On break')}</span><strong>{onBreakLabel()}</strong></div>

@@ -13,6 +13,9 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-tool-editor-',
   rawModules: [
     'src/config/flags.js',
+    'src/models/Ingredient.js',
+    'src/models/IngredientGroup.js',
+    'src/models/Tool.js',
     'src/models/match/matchTypes.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/recipeCurrency.js',

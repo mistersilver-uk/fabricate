@@ -1,4 +1,5 @@
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
+import { Tool } from '../../../../../models/Tool.js';
 
 const DEFAULT_TOOL_IMAGE = 'icons/svg/item-bag.svg';
 
@@ -89,6 +90,19 @@ export function filterTools(tools = [], term = '', managedItems = []) {
   return tools.filter((tool) => toolSearchText(tool, managedItems).includes(needle));
 }
 
+/**
+ * Project a Tool through the canonical domain validator for browse surfaces.
+ * Keeping this at the shared Tool Studio boundary prevents row and inspector
+ * status from drifting from the save gate.
+ */
+export function toolValidationStatus(tool) {
+  const validation = Tool.fromJSON(tool).validate();
+  return {
+    valid: validation.valid,
+    errorCount: validation.errors.length,
+  };
+}
+
 export function projectToolRow(tool, managedItems = [], authority = 'toolSpecific') {
   return {
     id: String(tool?.id || ''),
@@ -98,6 +112,7 @@ export function projectToolRow(tool, managedItems = [], authority = 'toolSpecifi
     enabled: tool?.enabled !== false,
     breakage: toolBreakageSummary(tool, authority),
     onBreak: toolOnBreakSummary(tool),
+    validation: toolValidationStatus(tool),
   };
 }
 

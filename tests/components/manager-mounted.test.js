@@ -326,6 +326,7 @@ function compileManagerRoot() {
     'src/models/IngredientSet.js',
     'src/models/IngredientGroup.js',
     'src/models/Result.js',
+    'src/models/Tool.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
     // The component category vocabulary (issue 676) — the SIBLING of the above, not a
@@ -9875,6 +9876,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(selections, ['tool-catalyst']);
   });
 
+  it('shows canonical validation status on every Tool row and preserves a long label', () => {
+    const longLabel =
+      'Masterwork Catalyst With An Exceptionally Long Localized Tool Name For Precision Smithing';
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [
+          { ...toolRouteFixture, id: 'valid-tool', label: longLabel },
+          { ...toolRouteFixture, id: 'invalid-tool', componentId: null, label: 'Unlinked Tool' },
+        ],
+        managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
+      },
+    });
+    flushSync();
+
+    const validRow = target.querySelector('[data-manager-tool-id="valid-tool"]');
+    const invalidRow = target.querySelector('[data-manager-tool-id="invalid-tool"]');
+    assert.match(validRow.textContent, new RegExp(longLabel));
+    assert.equal(
+      validRow.querySelector('[data-tool-validation-status]').dataset.toolValidationStatus,
+      'ready'
+    );
+    assert.match(validRow.querySelector('[data-tool-validation-status]').textContent, /Ready/);
+    assert.equal(
+      invalidRow.querySelector('[data-tool-validation-status]').dataset.toolValidationStatus,
+      'needs-attention'
+    );
+    assert.match(
+      invalidRow.querySelector('[data-tool-validation-status]').textContent,
+      /Needs attention/
+    );
+  });
+
   async function mountToolRoute({ storeOptions = {}, services = {} } = {}) {
     const calls = [];
     target = document.createElement('div');
@@ -9929,6 +9965,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(inspector.querySelector('[data-tool-inspector-edit]'));
     assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
+  });
+
+  it('shows canonical validation context in the selected Tool inspector', async () => {
+    await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: [
+          toolRouteFixture,
+          { ...toolRouteFixture, id: 'invalid-tool', componentId: null, label: 'Unlinked Tool' },
+        ],
+      },
+    });
+    target.querySelector('[data-manager-tool-id="invalid-tool"] .manager-tools-select-target').click();
+    await tick();
+    flushSync();
+
+    const inspector = target.querySelector('[data-tool-browser-inspector]');
+    const status = inspector.querySelector('[data-tool-validation-status]');
+    assert.equal(status.dataset.toolValidationStatus, 'needs-attention');
+    assert.match(status.textContent, /Needs attention/);
+    assert.match(inspector.querySelector('[data-tool-inspector-validation]').textContent, /1 issue/);
   });
 
   it('routes the Tool library inspector Edit action to the focused editor', async () => {
