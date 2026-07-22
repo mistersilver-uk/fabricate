@@ -94,7 +94,7 @@ async function evaluateEnabledBonus({ tool, actor, eligible, evaluateExpression 
   }
   try {
     const result = await evaluateExpression({ actor, expression, tool });
-    const numeric = result === null || result === undefined ? Number.NaN : Number(result);
+    const numeric = result === null || result === undefined ? NaN : Number(result);
     return Number.isFinite(numeric) ? numeric : 0;
   } catch {
     return 0;
@@ -153,10 +153,16 @@ export function composeToolBonusTerms(contributions) {
   };
 }
 
+function isControlCharacter(character) {
+  const codePoint = character.codePointAt(0);
+  return codePoint <= 0x1f || codePoint === 0x7f;
+}
+
 function sanitizeTermLabel(label) {
-  return String(label || '')
+  return [...String(label || '')]
+    .map((character) => (isControlCharacter(character) ? ' ' : character))
+    .join('')
     .replaceAll(/[[\]]/g, '')
-    .replaceAll(/[\u0000-\u001f\u007f]/g, ' ')
     .replaceAll(/\s+/g, ' ')
     .trim();
 }

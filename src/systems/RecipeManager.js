@@ -16,9 +16,9 @@ import {
   itemIsToolByDurableIdentity,
 } from '../utils/sourceUuid.js';
 
+import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
-import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
