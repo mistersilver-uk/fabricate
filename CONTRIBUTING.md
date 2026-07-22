@@ -719,8 +719,8 @@ Don't assume green PR CI means the full smoke walk passes.
 The container is cached between runs, so re-runs boot in ~5s.
 - Running smoke from a disposable worktree needs a few extras the main checkout has already.
 Copy `.env.foundry` from the main checkout (a fresh worktree does not carry it).
-Run `docker rm -f fabricate-foundry-test` both before and after the run, because the container name collides across worktrees.
-Run `docker network prune -f` first: Compose in many worktrees exhausts Docker's address pool, and the exhaustion surfaces as a generic compose-up failure rather than a pool message.
+The container identity (name, hostname, compose project, host port) is now derived deterministically from the worktree root by `scripts/lib/foundryRunIdentity.js`, so it is unique per worktree and no longer collides — the old pre-run/post-run `docker rm -f fabricate-foundry-test` dance is superseded and unnecessary.
+Tear a disposed worktree down with `npm run test:foundry:down -- --clean` so its per-worktree container and compose network are removed; that is a cleaner reclaim than the periodic `docker network prune -f` guard (which stays safe, since it only frees networks with no attached container — preserved stopped containers keep theirs in use).
 On a branch that predates the current workflow defaults, give the run `FOUNDRY_RUN_TIMEOUT_MS` headroom so the older default does not trip the watchdog on an otherwise-passing smoke.
 - The `run` phase **wipes `test-results/`** at startup.
 Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`.
