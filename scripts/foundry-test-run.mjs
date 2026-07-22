@@ -5136,12 +5136,15 @@ async function main() {
         // holds six, wrapping the three-column grid to two rows and proving it fills the
         // panel. They are `smokeSeed`-flagged so cleanup removes them and are never
         // referenced by the craft/gather steps (which key off the crafter/travel ids).
+        // They also carry `smokeSeedRole = 'access-grant'` (#816) so grant-only
+        // actors are distinguishable from the two hero fixtures; cleanup still keys
+        // solely on `smokeSeed === true`, so both cohorts are torn down.
         const accessGrantType = game.actors.get(crafterId)?.type || 'character';
         const accessGrantActors = await Actor.createDocuments(
           ['Seraphine the Warded', 'Brother Alden', 'Initiate Kaelen', 'Mistweaver Vane'].map((name) => ({
             name,
             type: accessGrantType,
-            flags: { fabricate: { smokeSeed: true } }
+            flags: { fabricate: { smokeSeed: true, smokeSeedRole: 'access-grant' } }
           }))
         );
         await rm.updateRecipe(
@@ -5538,17 +5541,18 @@ async function main() {
         // instead of the empty setup-checklist state. Seeding must precede the
         // app .show() because entering the Travel tab does not itself re-read the
         // party store. Idempotent across reruns: clears any prior party first.
-        await page.evaluate(async (sysId) => {
+        await page.evaluate(async ({ sysId, crafterId, travelMemberId }) => {
           const realmStore = game.fabricate.getGatheringRealmStore?.();
           const partyStore = game.fabricate.getGatheringPartyStore?.();
           if (!realmStore || !partyStore) {
             throw new Error('Gathering realm/party stores unavailable for Travel seeding.');
           }
-          const smokeHeroes = game.actors.contents
-            .filter(a => a.type === 'character' && a.flags?.fabricate?.smokeSeed === true)
-            .sort((a, b) => a.name.localeCompare(b.name, 'en'));
-          const crafter = smokeHeroes[0];
-          const travelMember = smokeHeroes[1];
+          // Select the party actors by stable id (#816). The `smokeSeed` namespace
+          // is shared with grant-only Access-grid actors, so a name sort over that
+          // set could silently pick a grant actor; resolve the intended crafter and
+          // travel member from the ids the craft/gather steps already recorded.
+          const crafter = game.actors.get(crafterId);
+          const travelMember = travelMemberId ? game.actors.get(travelMemberId) : null;
           if (!crafter) {
             throw new Error('No smoke-seeded gathering actor found for Travel seeding.');
           }
@@ -5599,7 +5603,11 @@ async function main() {
               });
             }
           }
-        }, craftingSetup.systemId);
+        }, {
+          sysId: craftingSetup.systemId,
+          crafterId: cleanup.crafterId,
+          travelMemberId: cleanup.travelMemberId
+        });
         await page.evaluate(() => {
           globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
         });
