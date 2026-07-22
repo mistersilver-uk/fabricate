@@ -4539,13 +4539,14 @@ async function main() {
 
         // Showcase recipe whose single ingredient set exercises every requirement row
         // type so the Ingredients tab renders: a plain component, an OR group (one
-        // group with two component options), a tag requirement, and a currency cost.
+        // group with two component options), a tag requirement, an essence requirement,
+        // and a currency cost.
         // complex:true forces the full set-card render; allowIncomplete persists it as a
         // structurally-valid editor shell. Single result group → produced on any
         // non-failure outcome (single-group exemption); routed modes ignore resultSelection.
         const showcaseRecipe = await rm.createRecipe({
           name: 'Showcase Requirements',
-          description: 'Demonstrates every ingredient requirement row: component, OR group, tag, and currency cost.',
+          description: 'Demonstrates every ingredient requirement row: component, OR group, tag, essence, and currency cost.',
           craftingSystemId: systemId,
           img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
           complex: true,
@@ -4577,6 +4578,19 @@ async function main() {
                 options: [{
                   quantity: 1,
                   match: { type: 'tags', tags: ['reagent', 'rare'], tagMatch: 'any' }
+                }]
+              },
+              // An essence requirement (issue 684): a first-class essence match (issue
+              // 649) with its own end-of-row Stepper. `verdant` is the derived id of the
+              // "Verdant" essence seeded on this system (the normalizer slugs the name via
+              // `_uniqueKey`). This row sits directly above the currency cost so the
+              // `manager-recipe-edit-ingredients-cost` capture — which scrolls the LAST
+              // (currency) row into view — shows BOTH the essence and currency rows.
+              {
+                name: 'Verdant essence',
+                options: [{
+                  quantity: 1,
+                  match: { type: 'essence', essenceId: 'verdant', amount: 2 }
                 }]
               },
               {
@@ -5924,11 +5938,13 @@ async function main() {
           process.stderr.write(`Recipe tools capture failed: ${err.message}\n`);
         }
 
-        // Showcase Requirements → Ingredients tab: capture every requirement row type
-        // (component, OR group, tag, currency cost), the faint dividers, and the tag
-        // layout. The recipe has a SINGLE ingredient set, so it renders CHROMELESS
-        // (issue 643) — the requirement rows sit on the tab background with no "Set 1"
-        // box, above the full-width "Add ingredient set" promotion button.
+        // Showcase Requirements → Ingredients tab. The recipe has a SINGLE ingredient
+        // set, so it renders CHROMELESS (issue 643) — the requirement rows sit on the tab
+        // background with no "Set 1" box, above the full-width "Add ingredient set"
+        // promotion button. The tab is taller than the manager window, so ONE viewport
+        // frame cannot hold every row type (issue 684): this first frame, captured at the
+        // top of the tab, covers the component, OR-group and tag rows; the essence and
+        // currency-cost rows below the fold get their own scrolled frame immediately below.
         await openManagerRecipeEditor(page, 'Showcase Requirements');
         await page.locator('.fabricate-manager [data-recipe-tab-button="ingredients"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5936,6 +5952,20 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipe edit ingredients');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-ingredients');
+
+        // Issue 684: the essence + currency-cost requirement rows sit BELOW the fold of
+        // the viewport-sized frame above, so they were cropped out of every published
+        // frame while the caption still claimed them. Split them into their own frame:
+        // scroll the currency-cost row (the LAST requirement, with the essence row
+        // directly above it) into view so both rows AND their shared end-of-row Steppers
+        // are on-screen, then capture. Inline like the first ingredients frame above — a
+        // hiccup fails the walk loudly rather than publishing a silently-cropped frame.
+        const ingredientsTab = page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first();
+        await ingredientsTab.locator('[data-recipe-option-currency]').first().scrollIntoViewIfNeeded();
+        await ingredientsTab.locator('[data-recipe-option-essence]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await ingredientsTab.locator('[data-recipe-currency-amount]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipe-edit-ingredients-cost');
 
         // Return to the recipes browser, then open the check-routed recipe whose
         // Validation tab carries both routed readiness warnings (issue 431 PR-2). The

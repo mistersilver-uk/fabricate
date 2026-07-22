@@ -101,6 +101,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-recipe-edit-books-scrolls',
   'manager-recipe-edit-tools',
   'manager-recipe-edit-ingredients',
+  'manager-recipe-edit-ingredients-cost',
   'manager-recipe-edit-validation',
   'manager-recipe-edit-multistep',
   'manager-recipe-edit-results',
