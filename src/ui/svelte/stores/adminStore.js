@@ -1992,6 +1992,52 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
   });
 }
 
+// Deterministic structural serialization with recursively sorted object keys.
+// JSON.stringify alone follows insertion order, so two structurally-identical
+// items built by different code paths could serialize differently; sorting keys
+// makes the signature depend on structure/values only.
+function _stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(_stableStringify).join(',')}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${_stableStringify(value[k])}`).join(',')}}`;
+}
+
+// Per-item memo signature. The card is `{ ...item, ...overrides }`, so it ships
+// EVERY stored `item` field — the signature therefore serializes the WHOLE item
+// (not a hand-enumerated subset, which would miss e.g. `category`/`difficulty`
+// and serve a stale card). It is combined with the EXTERNAL inputs the card also
+// reads: the `showTags`/`showEssences`/`showSalvage` flags (a `features.salvage`
+// toggle is a system-level change that is neither an item field nor a system-id
+// change, so it MUST live in the signature to invalidate) and the resolved
+// essence name/icon per essence id (an essence-catalog edit is system-level).
+function _itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
+  const essenceResolution = Object.keys(item?.essences || {})
+    .sort()
+    .map((id) => [id, essenceDefinitionById.get(id)?.name || id, essenceDefinitionById.get(id)?.icon]);
+  return _stableStringify({
+    item,
+    showTags,
+    showEssences,
+    showSalvage,
+    essenceResolution,
+  });
+}
+
+// The per-store item-card memo (a Map keyed `${systemId}:${itemId}` → `{signature, card}`)
+// lets an unchanged component skip its per-item `fromUuid` (`_resolveSourceDocumentState`)
+// and conditional `enrichHTML` on refresh, so a single-component edit no longer pays
+// O(all-components) resolution cost.
+//
+// FRESHNESS TRADE (disclosed, NOT "unchanged"): on a cache hit the memo reuses the
+// last-resolved source-document state, so `sourceMissing`/`sourceOrigin` (the "Missing"
+// badge) reflects an EXTERNAL source-document delete/restore only on system re-select
+// (the whole cache clears on a system-id change) or on Repair Item Data / item-sync of
+// that component (its stored fields change → signature miss) — NOT on an unrelated
+// same-system refresh. This matches the existing best-effort, opportunistic behavior:
+// there is no world-item-delete refresh hook (foundryBridge ignores non-actor items), so
+// today such a change is already reflected only on the next unrelated refresh. No
+// USER-edited field goes stale — a user edit mutates the stored item → signature miss.
 async function _buildItemCards(
   systemManager,
   selectedSystem,
@@ -1999,13 +2045,25 @@ async function _buildItemCards(
   showTags,
   showEssences,
   essenceDefinitionById,
-  enrichToHtml
+  enrichToHtml,
+  cache
 ) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
   const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
   return Promise.all(
     items.map(async (item) => {
+      const cacheKey = `${selectedSystem.id}:${item.id}`;
+      const signature = _itemCardSignature(
+        item,
+        showTags,
+        showEssences,
+        showSalvage,
+        essenceDefinitionById
+      );
+      const cached = cache?.get(cacheKey);
+      // Hit: reuse the prior card verbatim, skipping `fromUuid` + `enrichHTML`.
+      if (cached && cached.signature === signature) return cached.card;
       const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
       // Precedence: STORED FIRST, enriched live document as the fallback (issue 800,
       // flipping the live-first order issue 676 introduced).
@@ -2031,7 +2089,7 @@ async function _buildItemCards(
         description = await _documentDescriptionCandidate(sourceDoc, enrichToHtml);
       }
       const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
-      return {
+      const card = {
         ...item,
         img: item.img || 'icons/svg/item-bag.svg',
         description,
@@ -2053,6 +2111,8 @@ async function _buildItemCards(
         showTags,
         showEssences,
       };
+      cache?.set(cacheKey, { signature, card });
+      return card;
     })
   );
 }
@@ -2415,6 +2475,14 @@ export function createAdminStore(services) {
   let readyRefreshScheduled = false;
   let externalRefreshScheduled = false;
   let destroyed = false;
+
+  // Per-store item-card memo (store-instance scope, NEVER module-global — avoids
+  // cross-app/test bleed). See `_buildItemCards` for the signature shape and the
+  // disclosed source-document freshness trade. Cleared in `refresh()` on a
+  // resolved-system-id change (the single invalidation chokepoint); item-search
+  // changes deliberately do NOT invalidate.
+  const itemCardCache = new Map();
+  let itemCardCacheSystemId = '';
 
   // --- Computed state ---
   const viewState = writable({
@@ -4860,6 +4928,15 @@ export function createAdminStore(services) {
       if (resolvedSystemId !== currentSystemId) selectedSystemId.set(resolvedSystemId);
     }
 
+    // Item-card memo invalidation chokepoint: a system-id change (selectSystem,
+    // fallback resolution, createSystem) drops every cached card. `features.salvage`
+    // and essence-catalog toggles are captured IN the per-item signature, so they
+    // miss without a clear; item-search changes deliberately do not invalidate.
+    if (resolvedSystemId !== itemCardCacheSystemId) {
+      itemCardCache.clear();
+      itemCardCacheSystemId = resolvedSystemId;
+    }
+
     // Build system list after resolving selection so the library row highlight matches view state.
     const systemList = allSystems.map((s) => ({
       id: s.id,
@@ -4975,7 +5052,8 @@ export function createAdminStore(services) {
         showTags,
         showEssences,
         essenceDefinitionById,
-        services?.enrichToHtml
+        services?.enrichToHtml,
+        itemCardCache
       );
     }
 
