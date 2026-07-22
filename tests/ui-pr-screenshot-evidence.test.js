@@ -467,10 +467,12 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
   });
 
-  it('maps a recipe editor file to all twelve recipe-edit frame recipes', () => {
+  it('maps a recipe editor file to all thirteen recipe-edit frame recipes', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
+      // Issue 684: the essence + currency-cost rows, split into their own scrolled frame.
+      'manager-recipe-edit-ingredients-cost',
       'manager-recipe-edit-validation',
       'manager-recipe-edit-multistep',
       // The four Results-tab modes (issue 643): routed-by-check outcome bands, the
@@ -494,7 +496,7 @@ describe('UI PR screenshot evidence', () => {
       'manager-recipe-edit-books-scrolls',
     ];
 
-    // The top-level editor view and any recipe sub-component all republish all twelve
+    // The top-level editor view and any recipe sub-component all republish all thirteen
     // frames. Every editor tab lives under `recipe/` so the glob covers it; the BROWSER
     // inspector deliberately lives under `recipes/`.
     for (const file of [
@@ -504,7 +506,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all twelve recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all thirteen recipe-edit frames`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -512,6 +514,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views.map(view => view.smokeLabels), [
       ['manager-recipe-edit-normal'],
       ['manager-recipe-edit-ingredients'],
+      ['manager-recipe-edit-ingredients-cost'],
       ['manager-recipe-edit-validation'],
       ['manager-recipe-edit-multistep'],
       ['manager-recipe-edit-results'],
@@ -525,21 +528,25 @@ describe('UI PR screenshot evidence', () => {
     ]);
   });
 
-  it('collects the twelve recipe-edit frames into twelve separate files', () => {
+  it('collects the thirteen recipe-edit frames into thirteen separate files', () => {
     withScreenshotFixtures(
       {
         'screenshot-01-manager-recipe-edit-normal.png': 'normal',
         'screenshot-02-manager-recipe-edit-ingredients.png': 'ingredients',
-        'screenshot-03-manager-recipe-edit-validation.png': 'validation',
-        'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
-        'screenshot-05-manager-recipe-edit-results.png': 'results',
-        'screenshot-06-manager-recipe-edit-results-multistep.png': 'results-multistep',
-        'screenshot-07-manager-recipe-edit-collapsed.png': 'collapsed',
-        'screenshot-08-manager-recipe-edit-results-progressive.png': 'results-progressive',
-        'screenshot-09-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
-        'screenshot-10-manager-recipe-edit-tools.png': 'tools',
-        'screenshot-11-manager-recipe-edit-access-rail.png': 'access-rail',
-        'screenshot-12-manager-recipe-edit-books-scrolls.png': 'books-scrolls',
+        // Issue 684: the `-cost` label ENDS in `-cost.png`, so `matchesSmokeLabel`
+        // (anchored `…<label>\.png$`) keeps it distinct from the `-ingredients` frame
+        // even though `manager-recipe-edit-ingredients` is a string prefix of it.
+        'screenshot-03-manager-recipe-edit-ingredients-cost.png': 'ingredients-cost',
+        'screenshot-04-manager-recipe-edit-validation.png': 'validation',
+        'screenshot-05-manager-recipe-edit-multistep.png': 'multistep',
+        'screenshot-06-manager-recipe-edit-results.png': 'results',
+        'screenshot-07-manager-recipe-edit-results-multistep.png': 'results-multistep',
+        'screenshot-08-manager-recipe-edit-collapsed.png': 'collapsed',
+        'screenshot-09-manager-recipe-edit-results-progressive.png': 'results-progressive',
+        'screenshot-10-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
+        'screenshot-11-manager-recipe-edit-tools.png': 'tools',
+        'screenshot-12-manager-recipe-edit-access-rail.png': 'access-rail',
+        'screenshot-13-manager-recipe-edit-books-scrolls.png': 'books-scrolls',
       },
       (root) => {
         const result = collectScreenshotEvidence({
@@ -547,7 +554,7 @@ describe('UI PR screenshot evidence', () => {
           prNumber: 654,
           root,
         });
-        assert.equal(result.copied.length, 12);
+        assert.equal(result.copied.length, 13);
         const byName = Object.fromEntries(
           result.copied.map(item => [
             item.destination.replaceAll('\\', '/').split('/').pop(),
@@ -557,6 +564,7 @@ describe('UI PR screenshot evidence', () => {
         assert.deepEqual(byName, {
           'manager-recipe-edit-normal.png': 'normal',
           'manager-recipe-edit-ingredients.png': 'ingredients',
+          'manager-recipe-edit-ingredients-cost.png': 'ingredients-cost',
           'manager-recipe-edit-validation.png': 'validation',
           'manager-recipe-edit-multistep.png': 'multistep',
           'manager-recipe-edit-results.png': 'results',

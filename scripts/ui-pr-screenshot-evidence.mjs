@@ -424,7 +424,13 @@ export const VIEW_RECIPES = Object.freeze([
   // silently drop the rest. All twelve share the same `matches`, so any change to a recipe
   // editor/inspector or recipe sub-component republishes them together.
   recipeEditFrame('manager-recipe-edit-normal', 'Manager recipe editor — overview / identity'),
-  recipeEditFrame('manager-recipe-edit-ingredients', 'Manager recipe editor — ingredients (components, OR groups, tags, currency cost)'),
+  recipeEditFrame('manager-recipe-edit-ingredients', 'Manager recipe editor — ingredients (components, OR groups, tags)'),
+  // Issue 684: the essence + currency-cost rows sit below the fold of the ingredients
+  // frame above, so they get their OWN scrolled frame (the harness scrolls the last
+  // currency-cost row into view before capturing). Its own recipe-edit view id so
+  // `collect` publishes it as a distinct frame; the caption owns ONLY the two rows the
+  // frame actually shows.
+  recipeEditFrame('manager-recipe-edit-ingredients-cost', 'Manager recipe editor — ingredients scrolled to essence + currency-cost rows (with steppers)'),
   recipeEditFrame('manager-recipe-edit-validation', 'Manager recipe editor — validation tab'),
   recipeEditFrame('manager-recipe-edit-multistep', 'Manager recipe editor — multi-step durations'),
   recipeEditFrame('manager-recipe-edit-results', 'Manager recipe editor — results (routed-by-check outcome sets)'),
