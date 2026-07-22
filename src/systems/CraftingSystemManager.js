@@ -4013,6 +4013,85 @@ export class CraftingSystemManager {
     return system.components[idx];
   }
 
+  /**
+   * Apply a category and/or a set of tags to a SET of components in one `save()`.
+   *
+   * The shared set-apply primitive behind folder-aware import categorization (issue
+   * 771) and multi-select bulk edit (issue 772): both need "assign this category
+   * and/or these tags to these components" as a single persist rather than a
+   * per-component `updateItem` loop (N saves, N notifications).
+   *
+   * The two axes match `Component`'s own semantics (data-models spec):
+   *  - `category` is SINGLE-valued, so a provided category OVERWRITES each component's
+   *    current one. Omitting it (or an empty/whitespace string) leaves the category
+   *    untouched — a folder that maps to no category still applies its tags.
+   *  - `tags` is many-valued and ADDITIVE, so `addTags` is unioned into each
+   *    component's existing tags (case-insensitively de-duplicated, stored lowercase
+   *    to match the `itemTags` vocabulary) rather than replacing them.
+   *
+   * A call that resolves to neither a category nor any tag is a no-op (no save).
+   *
+   * @param {string} systemId
+   * @param {Iterable<string>} componentIds ids of the components to mutate.
+   * @param {{category?: string, addTags?: string[]}} [mapping]
+   * @returns {Promise<{updated: number, componentIds: string[]}>} the ids actually changed.
+   */
+  async applyCategoryAndTagsToComponents(systemId, componentIds, mapping = {}) {
+    this._assertGM('apply category and tags to components');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const targetIds = new Set(Array.from(componentIds || [], String));
+    if (targetIds.size === 0) return { updated: 0, componentIds: [] };
+
+    const rawCategory = typeof mapping.category === 'string' ? mapping.category.trim() : '';
+    const hasCategory = rawCategory !== '';
+    const addTags = Array.isArray(mapping.addTags)
+      ? mapping.addTags
+          .map((tag) =>
+            String(tag || '')
+              .trim()
+              .toLowerCase()
+          )
+          .filter(Boolean)
+      : [];
+    if (!hasCategory && addTags.length === 0) return { updated: 0, componentIds: [] };
+
+    const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
+    const salvageContext = this._salvageNormalizationContext(system);
+    const changedIds = [];
+    for (let idx = 0; idx < system.components.length; idx += 1) {
+      const component = system.components[idx];
+      if (!targetIds.has(String(component.id))) continue;
+
+      const currentTags = Array.isArray(component.tags) ? component.tags : [];
+      let nextTags = currentTags;
+      if (addTags.length > 0) {
+        const seen = new Set(currentTags.map((tag) => String(tag).toLowerCase()));
+        nextTags = [...currentTags];
+        for (const tag of addTags) {
+          if (seen.has(tag)) continue;
+          seen.add(tag);
+          nextTags.push(tag);
+        }
+      }
+
+      system.components[idx] = this._normalizeComponent(
+        {
+          ...component,
+          category: hasCategory ? rawCategory : component.category,
+          tags: nextTags,
+          id: component.id,
+        },
+        { validEssenceIds, ...salvageContext }
+      );
+      changedIds.push(String(component.id));
+    }
+
+    if (changedIds.length > 0) await this.save();
+    return { updated: changedIds.length, componentIds: changedIds };
+  }
+
   async deleteItem(systemId, itemId) {
     this._assertGM('delete component');
     const system = this.getSystem(systemId);
