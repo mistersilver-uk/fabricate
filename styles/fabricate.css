@@ -18808,8 +18808,12 @@
 
 .fabricate-manager .manager-tools-select-target {
   display: grid;
+  width: 100%;
+  height: auto;
+  min-height: 72px;
   grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
+  justify-content: flex-start;
   gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-3);
