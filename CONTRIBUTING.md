@@ -648,10 +648,11 @@ Its target label set comes from `mapChangedFilesToViews` — derive it with `npm
 Phase E (the player/craft/journal frames) is skipped when no target label maps to it, so a manager-only PR drops that whole phase.
 The label → phase registration lives in `scripts/lib/screenshotCaptureMap.js` (a pure, playwright-free module the harness and the unit tests share).
 
-The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`, default 18 minutes).
-The default keeps headroom over the observed rc run duration (~870-930s across all phases) so ordinary hosted-runner variance no longer trips the watchdog on an otherwise-passing smoke.
+The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`).
+When unset, the default is **profile-derived**: the expected walk duration for the resolved profile plus a fixed finalization grace (`scripts/lib/foundryRunBudget.js`), so the budget always clears a legitimately-passing walk *plus* its post-verdict `summary.json` write rather than SIGTERM-killing finalization on a green run.
+`rc`/`ci` keep today's 18-minute budget (headroom over the observed ~870-930s rc walk), while `full`/`screenshots` derive ~26 minutes — so the `full` walk no longer needs a manual `FOUNDRY_RUN_TIMEOUT_MS` override to finish teardown and write `summary.json`.
 On overrun, the run process is sent `SIGTERM` and the orchestrator proceeds to Docker teardown + artifact upload, so the 25-minute Actions budget can never preempt cleanup.
-Override locally if you need a longer or shorter cap:
+An explicit `FOUNDRY_RUN_TIMEOUT_MS` (for example CI's pinned value) always wins; override locally if you need a longer or shorter cap:
 
 ```bash
 FOUNDRY_RUN_TIMEOUT_MS=600000 npm run test:foundry:rc          # POSIX (10 minutes)
@@ -721,7 +722,8 @@ The container is cached between runs, so re-runs boot in ~5s.
 Copy `.env.foundry` from the main checkout (a fresh worktree does not carry it).
 The container identity (name, hostname, compose project, host port) is now derived deterministically from the worktree root by `scripts/lib/foundryRunIdentity.js`, so it is unique per worktree and no longer collides — the old pre-run/post-run `docker rm -f fabricate-foundry-test` dance is superseded and unnecessary.
 Tear a disposed worktree down with `npm run test:foundry:down -- --clean` so its per-worktree container and compose network are removed; that is a cleaner reclaim than the periodic `docker network prune -f` guard (which stays safe, since it only frees networks with no attached container — preserved stopped containers keep theirs in use).
-On a branch that predates the current workflow defaults, give the run `FOUNDRY_RUN_TIMEOUT_MS` headroom so the older default does not trip the watchdog on an otherwise-passing smoke.
+The default run budget is now profile-derived, so a local `full` walk (`npm run test:foundry`, no `FOUNDRY_RUN_TIMEOUT_MS`) already gets ~26 minutes and no longer needs a manual headroom override to finish teardown and write `summary.json`.
+On a branch that predates this profile-derived default, still give the run `FOUNDRY_RUN_TIMEOUT_MS` headroom so the older flat 18-minute default does not trip the watchdog on an otherwise-passing full walk.
 - The `run` phase **wipes `test-results/`** at startup.
 Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`.
 Tee to a path outside `test-results/` if you need a copy.

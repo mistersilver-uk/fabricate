@@ -48,6 +48,7 @@ import {
 } from './lib/managerLayoutGuards.js';
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
+import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being
 // killed while a final screenshot click is still in flight) can leave a FLOATING page
@@ -97,7 +98,10 @@ const WORLD_ID = 'fabricate-smoke-ci';
 //            all off-target. It runs the SCREENSHOT phases but NOT the full-only
 //            behavioral assert phases — so `rc`/`ci`/`full` truth values are untouched.
 const RAW_SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
-const SMOKE_PROFILE = RAW_SMOKE_PROFILE === 'ci' ? 'rc' : RAW_SMOKE_PROFILE;
+// `resolveSmokeProfile` replicates the exact normalization RAW_SMOKE_PROFILE feeds
+// (nullish-default `'full'`, lowercase, `'ci'` → `'rc'`); shared with the parent
+// wrapper so they can never drift on what `full`/`ci` mean.
+const SMOKE_PROFILE = resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE);
 const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full' || SMOKE_PROFILE === 'screenshots';
 const RUN_FULL_ONLY_BEHAVIORS = SMOKE_PROFILE === 'full';
 const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
