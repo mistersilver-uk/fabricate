@@ -23,6 +23,7 @@ test('Tool Studio owns its three-column geometry and stacks at its responsive br
   const toolStudioCss = css.slice(css.lastIndexOf('Manager — Tool Studio library'));
   const main = toolStudioCss.match(/\.fabricate-manager \.manager-tools-main\s*\{[\s\S]*?\}/)?.[0] || '';
   const rows = blockFor('.fabricate-manager .manager-tools-library-list > article');
+  const selectTarget = blockFor('.fabricate-manager .manager-tools-select-target');
   const responsive = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const compact = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
@@ -30,6 +31,10 @@ test('Tool Studio owns its three-column geometry and stacks at its responsive br
   assert.ok(collapsed.includes('grid-template-columns: 56px minmax(0, 1fr) 340px;'));
   assert.ok(main.includes('overflow-y: auto;'), 'the library center should own its wide-layout scrolling');
   assert.ok(rows.includes('grid-template-columns: minmax(0, 1fr) max-content;'));
+  assert.ok(selectTarget.includes('height: auto;'));
+  assert.ok(selectTarget.includes('min-height: 72px;'));
+  assert.ok(selectTarget.includes('justify-content: flex-start;'));
+  assert.ok(selectTarget.includes('width: 100%;'));
   assert.match(responsive, /grid-template-columns:\s*minmax\(0, 1fr\);/);
   assert.match(responsive, /overflow-y:\s*auto;/);
   assert.match(compact, /\.fabricate-manager \.manager-tools-library-list > article\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);/);
