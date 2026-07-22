@@ -14,11 +14,74 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
+
+/**
+ * Whether a TCP port on 127.0.0.1 is bindable right now. Used for the free-port
+ * fallback around the derived per-worktree port: the derived port is a mod-bounded
+ * candidate, so distinct worktrees can occasionally collide (or a stale process can
+ * hold it). up.mjs already recreates a cached container on a port-binding mismatch.
+ * @param {number} port
+ * @returns {Promise<boolean>}
+ */
+function isPortFree(port) {
+  return new Promise(resolve => {
+    const server = createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => server.close(() => resolve(true)));
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+/**
+ * The derived candidate port, or the next free port scanning upward within the bounded
+ * range (wrapping back to 30100). Falls back to the derived candidate if nothing is free
+ * (up.mjs then surfaces the bind failure with full docker logs).
+ * @param {number} candidate
+ * @returns {Promise<number>}
+ */
+async function resolveHostPort(candidate) {
+  const base = 30100;
+  const span = 400;
+  for (let i = 0; i < span; i += 1) {
+    const port = base + ((candidate - base + i) % span);
+    if (await isPortFree(port)) return port;
+  }
+  return candidate;
+}
+
+/**
+ * Derive this worktree's stable container identity and export it (with a free-port
+ * fallback) so every child phase — up, run, down — agrees on the container name,
+ * hostname, compose project, host port, AND the base URL. The run phase reads
+ * FOUNDRY_URL SEPARATELY from FOUNDRY_HOST_PORT, so both must be set or Playwright
+ * connects to the wrong port. Explicit overrides win (CI / manual pinning).
+ */
+async function exportRunIdentity() {
+  const identity = deriveRunIdentity(ROOT);
+  process.env.FOUNDRY_CONTAINER_NAME ||= identity.containerName;
+  process.env.FOUNDRY_CONTAINER_HOSTNAME ||= identity.hostname;
+  process.env.COMPOSE_PROJECT_NAME ||= identity.project;
+
+  if (!process.env.FOUNDRY_HOST_PORT) {
+    const port = await resolveHostPort(identity.port);
+    process.env.FOUNDRY_HOST_PORT = String(port);
+  }
+  if (!process.env.FOUNDRY_URL) {
+    process.env.FOUNDRY_URL = `http://localhost:${process.env.FOUNDRY_HOST_PORT}`;
+  }
+  process.stdout.write(
+    `Worktree container identity: ${process.env.FOUNDRY_CONTAINER_NAME} ` +
+    `(host ${process.env.FOUNDRY_URL})\n`
+  );
+}
 
 /**
  * Run a node script and return its exit code.
@@ -55,6 +118,9 @@ async function main() {
     const targets = /^--target-labels=(.*)$/.exec(arg);
     if (targets) process.env.FOUNDRY_SCREENSHOT_TARGET_LABELS = targets[1];
   }
+
+  // Pin the per-worktree container identity + host port/URL for every child phase.
+  await exportRunIdentity();
 
   const up = join(__dirname, 'foundry-test-up.mjs');
   const run = join(__dirname, 'foundry-test-run.mjs');

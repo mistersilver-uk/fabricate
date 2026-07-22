@@ -41,7 +41,7 @@ Prefer the most authoritative source available and always cite which one a claim
 1. **Foundry VTT sources first.** The actual client/server source is authoritative for real signatures, return shapes, hook timing, and side effects; cite the file and symbol.
 Locate it with this probe ladder — one probe per rung, then fall through; never stall waiting for a source that is not present:
    - Probe a local Foundry install's `resources/app` (on Windows typically `C:\Program Files\Foundry Virtual Tabletop\resources\app`, or the path the user supplies).
-   - Otherwise probe the repo's smoke-test container, which exists after any `npm run test:foundry` run: `docker exec fabricate-foundry-test ls /home/foundry/resources/app` (start it first with `npm run test:foundry:up` only when the task already warrants a smoke environment; do not boot Docker solely to read source).
+   - Otherwise probe the repo's smoke-test container, which exists after any `npm run test:foundry` run and whose per-worktree-stable name is derived from the worktree root by `scripts/lib/foundryRunIdentity.js` (no longer the fixed `fabricate-foundry-test`), so resolve the name first with `docker ps --filter label=com.docker.compose.service=foundry --format '{{.Names}}'` and then `docker exec <name> ls /home/foundry/resources/app` (start it first with `npm run test:foundry:up` only when the task already warrants a smoke environment; do not boot Docker solely to read source).
    - If neither probe succeeds, proceed directly to rung 2 and say which rung your claims rest on.
 2. **Official API documentation second.** Use the version-matched API docs at `foundryvtt.com/api` when source is not to hand, or to confirm a documented contract.
 Cite the page/symbol.
