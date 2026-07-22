@@ -19,7 +19,8 @@
   import SystemOverviewView from './SystemOverviewView.svelte';
   import {
     mapModifierToPrerequisite,
-    mapPrerequisiteToModifier
+    mapPrerequisiteToModifier,
+    stripExpressionSigil
   } from '../../../../systems/characterModifierPrerequisiteCopy.js';
 
   let {
@@ -346,6 +347,13 @@
 
   function characterModifierIsRoll(entry) {
     return Boolean(entry?.expression) && ROLL_EXPRESSION_PATTERN_UI.test(entry.expression);
+  }
+
+  // The collapsed summary row shows the expression with its leading `@` sigil
+  // stripped for a cleaner inline read (the raw `@`-prefixed value stays in the
+  // editor's Expression field — only the DISPLAY strips it).
+  function characterModifierExpressionDisplay(entry) {
+    return stripExpressionSigil(entry?.expression);
   }
 
   async function handleAddCharacterModifier() {
@@ -692,20 +700,54 @@
           {:else}
             <ul class="manager-character-modifier-list">
               {#each characterModifierLibrary as entry (entry.id)}
-                <li class="manager-character-modifier-row" data-system-character-modifier={entry.id}>
-                  {#if characterModifierEditingId === entry.id}
-                    <div class="manager-character-modifier-editor">
-                      <label class="manager-field">
-                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Label', 'Label')}</span>
-                        <input type="text" value={entry.label} oninput={(event) => onUpdateCharacterModifier(entry.id, { label: event.currentTarget.value })} />
-                      </label>
-                      <div class="manager-field">
-                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Icon', 'Icon')}</span>
-                        <IconPicker
-                          value={entry.icon || 'fa-solid fa-user'}
-                          buttonTitle={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ChangeIcon', 'Change icon')}
-                          onChange={(iconClass) => onUpdateCharacterModifier(entry.id, { icon: iconClass })}
-                        />
+                {@const modifierOpen = characterModifierEditingId === entry.id}
+                {@const modifierExpression = characterModifierExpressionDisplay(entry)}
+                <li class="manager-modifier-item" class:is-open={modifierOpen} data-system-character-modifier={entry.id}>
+                  <div class="manager-modifier-header">
+                    <button
+                      type="button"
+                      class="manager-modifier-summary"
+                      aria-expanded={modifierOpen}
+                      aria-controls={`character-modifier-body-${entry.id}`}
+                      data-toggle-character-modifier
+                      onclick={() => characterModifierEditingId = modifierOpen ? '' : entry.id}
+                    >
+                      <i class={`fa-solid ${modifierOpen ? 'fa-chevron-down' : 'fa-chevron-right'} manager-modifier-chevron`} aria-hidden="true"></i>
+                      <span class="manager-modifier-icon"><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i></span>
+                      <span class="manager-modifier-label">{entry.label}</span>
+                      {#if characterModifierIsRoll(entry)}
+                        <span class="manager-chip manager-character-modifier-roll-tag">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag', 'Roll')}</span>
+                      {/if}
+                      {#if modifierExpression}
+                        <span class="manager-modifier-expression" data-character-modifier-expression>
+                          <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
+                          {modifierExpression}
+                        </span>
+                      {/if}
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-copy-to-prerequisite={entry.id} onclick={() => handleCopyModifierToPrerequisite(entry)}>
+                      <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    </button>
+                  </div>
+
+                  {#if modifierOpen}
+                    <div class="manager-modifier-body manager-character-modifier-editor" id={`character-modifier-body-${entry.id}`}>
+                      <div class="manager-modifier-name-row">
+                        <div class="manager-field manager-modifier-icon-field">
+                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Icon', 'Icon')}</span>
+                          <IconPicker
+                            value={entry.icon || 'fa-solid fa-user'}
+                            buttonTitle={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ChangeIcon', 'Change icon')}
+                            onChange={(iconClass) => onUpdateCharacterModifier(entry.id, { icon: iconClass })}
+                          />
+                        </div>
+                        <label class="manager-field manager-modifier-label-field">
+                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Label', 'Label')}</span>
+                          <input type="text" value={entry.label} oninput={(event) => onUpdateCharacterModifier(entry.id, { label: event.currentTarget.value })} />
+                        </label>
                       </div>
                       <label class="manager-field">
                         <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
@@ -715,23 +757,6 @@
                         <button type="button" class="manager-button" onclick={() => characterModifierEditingId = ''}>{text('FABRICATE.Admin.Manager.Done', 'Done')}</button>
                         <button type="button" class="manager-button is-danger" onclick={() => handleDeleteCharacterModifier(entry.id)}>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')}</button>
                       </div>
-                    </div>
-                  {:else}
-                    <div class="manager-character-modifier-summary">
-                      <span class="manager-character-modifier-icon"><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i></span>
-                      <span class="manager-character-modifier-label">{entry.label}</span>
-                      {#if characterModifierIsRoll(entry)}
-                        <span class="manager-chip manager-character-modifier-roll-tag">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag', 'Roll')}</span>
-                      {/if}
-                      <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Edit', 'Edit character modifier')} onclick={() => characterModifierEditingId = entry.id}>
-                        <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                      </button>
-                      <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-copy-to-prerequisite={entry.id} onclick={() => handleCopyModifierToPrerequisite(entry)}>
-                        <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
-                      </button>
-                      <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
-                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                      </button>
                     </div>
                   {/if}
                 </li>

@@ -81,7 +81,7 @@ afterEach(() => {
 });
 
 describe('system-edit list ergonomics (mounted, issue 768)', () => {
-  it('renders the shared IconPicker for a Character Modifier in edit mode', async () => {
+  it('renders a compact summary row (label + inline @-stripped expression) that is collapsed by default', async () => {
     const root = await harness.mount({
       selectedSystem: makeSystem(),
       characterModifierLibrary: MODIFIERS
@@ -89,12 +89,42 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
 
     const row = root.querySelector('[data-system-character-modifier="mod-herbalism"]');
     assert.ok(row, 'modifier row exists');
-    const editButton = row.querySelector('.manager-character-modifier-summary .manager-icon-button');
-    editButton.dispatchEvent(clickEvent());
+
+    // Collapsed by default: a summary toggle, no editor body.
+    const summary = row.querySelector('[data-toggle-character-modifier]');
+    assert.ok(summary, 'the row renders an accordion summary toggle');
+    assert.equal(summary.getAttribute('aria-expanded'), 'false', 'starts collapsed');
+    assert.ok(!row.querySelector('.manager-modifier-body'), 'no editor body when collapsed');
+
+    // The label and the inline expression (leading @ stripped) render on the summary.
+    assert.ok(row.querySelector('.manager-modifier-label').textContent.includes('Herbalism'), 'label shows');
+    const expression = row.querySelector('[data-character-modifier-expression]');
+    assert.ok(expression, 'the expression renders inline on the summary');
+    assert.ok(expression.textContent.includes('skills.nature.value'), 'expression body shows');
+    assert.ok(!expression.textContent.includes('@'), 'the leading @ sigil is stripped from the inline display');
+  });
+
+  it('expands to the IconPicker editor on the summary toggle', async () => {
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      characterModifierLibrary: MODIFIERS
+    });
+
+    const row = root.querySelector('[data-system-character-modifier="mod-herbalism"]');
+    const summary = row.querySelector('[data-toggle-character-modifier]');
+    summary.dispatchEvent(clickEvent());
     await flushRender();
 
+    assert.equal(summary.getAttribute('aria-expanded'), 'true', 'summary toggles open');
+    assert.ok(row.querySelector('.manager-modifier-body'), 'the editor body opens');
     const trigger = row.querySelector('.essence-icon-picker-trigger');
     assert.ok(trigger, 'the modifier editor renders an IconPicker trigger, not a bare text input');
+    // The editor keeps the RAW @-prefixed expression (only the summary strips it).
+    const expressionInput = [...row.querySelectorAll('.manager-modifier-body input')].find(
+      (input) => input.value.includes('skills.nature.value')
+    );
+    assert.ok(expressionInput, 'the editor exposes the expression field');
+    assert.ok(expressionInput.value.startsWith('@'), 'the stored expression keeps its @ sigil in the editor');
   });
 
   it('collapses a whole section on its header toggle', async () => {

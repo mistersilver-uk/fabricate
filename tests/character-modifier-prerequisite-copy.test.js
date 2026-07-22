@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   mapModifierToPrerequisite,
   mapPrerequisiteToModifier,
+  stripExpressionSigil,
 } from '../src/systems/characterModifierPrerequisiteCopy.js';
 import {
   DEFAULT_PREREQUISITE_OPERATOR,
@@ -23,6 +24,30 @@ function normalizeModifierLike(partial, id = 'generated-id') {
     expression: String(partial.expression ?? '').trim(),
   };
 }
+
+describe('stripExpressionSigil (issue 768 inline summary display)', () => {
+  it('strips a single leading @ from a bare path expression', () => {
+    assert.equal(stripExpressionSigil('@skills.nature.value'), 'skills.nature.value');
+  });
+
+  it('leaves a @-less expression unchanged', () => {
+    assert.equal(stripExpressionSigil('1d4'), '1d4');
+  });
+
+  it('strips only the leading @ of a compound formula', () => {
+    assert.equal(stripExpressionSigil('@abilities.str.mod + 1d4'), 'abilities.str.mod + 1d4');
+  });
+
+  it('trims surrounding whitespace', () => {
+    assert.equal(stripExpressionSigil('  @a.b  '), 'a.b');
+  });
+
+  it('returns an empty string for nullish or empty input', () => {
+    assert.equal(stripExpressionSigil(''), '');
+    assert.equal(stripExpressionSigil(null), '');
+    assert.equal(stripExpressionSigil(undefined), '');
+  });
+});
 
 describe('mapModifierToPrerequisite (issue 768)', () => {
   it('carries label→name and icon→icon cleanly', () => {

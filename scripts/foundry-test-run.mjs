@@ -5708,7 +5708,7 @@ async function main() {
         // Open the first modifier in edit mode and open its IconPicker so the icon
         // dropdown is visible (parity with Currency Units / Character Prerequisites).
         const firstModifierRow = modifierCard.locator('[data-system-character-modifier]').first();
-        await firstModifierRow.locator('.manager-character-modifier-summary .manager-icon-button').first().click();
+        await firstModifierRow.locator('[data-toggle-character-modifier]').first().click();
         await page.waitForTimeout(150);
         const modifierIconTrigger = firstModifierRow.locator('.essence-icon-picker-trigger').first();
         if (await modifierIconTrigger.count() > 0) {

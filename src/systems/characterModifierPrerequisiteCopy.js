@@ -24,17 +24,31 @@
 import { DEFAULT_PREREQUISITE_OPERATOR } from './characterPrerequisites.js';
 
 /**
+ * Strip a single leading `@` sigil from a modifier expression, trimming
+ * surrounding whitespace. Used both to derive a prerequisite `path` (faithful for
+ * a bare `@abilities.str.mod`; a compound formula like `@abilities.str.mod + 1d4`
+ * yields a value the GM must fix by hand) and to render the cleaner inline summary
+ * display in the Character Modifiers list. A `@`-less expression (e.g. `1d4`) is
+ * returned unchanged.
+ *
+ * @param {*} expression Raw modifier expression.
+ * @returns {string} The expression without a single leading `@`.
+ */
+export function stripExpressionSigil(expression) {
+  return String(expression ?? '')
+    .trim()
+    .replace(/^@/, '');
+}
+
+/**
  * Strip a single leading `@` from a modifier expression to yield a prerequisite
- * path. Faithful for a bare `@abilities.str.mod`; a compound formula (e.g.
- * `@abilities.str.mod + 1d4`) yields a path the GM must fix by hand.
+ * path.
  *
  * @param {*} expression Raw modifier expression.
  * @returns {string} The path, without a leading `@`.
  */
 function expressionToPath(expression) {
-  return String(expression ?? '')
-    .trim()
-    .replace(/^@/, '');
+  return stripExpressionSigil(expression);
 }
 
 /**
