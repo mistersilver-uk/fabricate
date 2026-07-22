@@ -3883,6 +3883,8 @@
             "StatusIncomplete": "Incomplete",
             "ResolveValidation": "Resolve validation issues before saving.",
             "SaveFailed": "The Tool could not be saved. Try again.",
+            "DeleteFailed": "The Tool could not be deleted. Try again.",
+            "ToggleFailed": "The Tool status could not be changed. Try again.",
             "ValidationErrorSource": "Link an Item or managed Component.",
             "ValidationErrorRequirement": "Enter a Tool requirement formula.",
             "ValidationErrorMaxUses": "Maximum uses must be blank or a positive whole number.",
