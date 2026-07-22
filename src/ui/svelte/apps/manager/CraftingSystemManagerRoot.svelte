@@ -5237,6 +5237,9 @@
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
+            craftingCheckModifiers={selectedSystem?.craftingCheck?.checkModifiers || []}
+            craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
+            craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !== false}
@@ -5260,6 +5263,7 @@
             {onUpdateGatheringCheckRouted}
             onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
             onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
+            onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
             {onUpdateAlchemyFlags}
             onTabChange={(tab) => { checksActiveTab = tab; }}
             {onToggleCheckActive}
@@ -5435,6 +5439,8 @@
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
+        craftingModifierOptions={selectedSystem?.craftingCheck?.checkModifiers || []}
+        craftingModifierPolicyDefault={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
         categories={selectedSystem?.categories || []}
         onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}

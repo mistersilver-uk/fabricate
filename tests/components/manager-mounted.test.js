@@ -78,6 +78,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte');
+  // Per-recipe check-modifier catalogue card (issue 770), rendered inside the crafting
+  // checks stack; omitting it HANGS the mounted suite (# cancelled).
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
@@ -3497,6 +3500,49 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target.querySelector('[data-checks-panel="gathering"]'),
       'the gathering panel is shown when the tab is selected'
+    );
+  });
+
+  it('checks view: the crafting-modifier catalogue card renders when the check is usable and emits edits (issue 770)', () => {
+    const patches = [];
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'highest',
+      craftingDefaultModifierIds: ['med'],
+      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+    });
+    const card = target.querySelector('[data-crafting-modifier-catalogue]');
+    assert.ok(card, 'the catalogue card renders in the crafting stack when a formula is authored');
+    // The policy radio-cards reflect the passed default policy.
+    assert.equal(
+      card.querySelector('[data-crafting-modifier-policy-option="highest"] input').checked,
+      true,
+      'the default policy is pinned on the radio-cards'
+    );
+    // Adding a modifier emits a checkModifiers patch (whole-array replace).
+    card.querySelector('[data-crafting-modifier-add]').click();
+    flushSync();
+    assert.ok(
+      patches.some((p) => Array.isArray(p.checkModifiers) && p.checkModifiers.length === 2),
+      'add emits a two-entry checkModifiers patch'
+    );
+    // Switching policy emits a defaultModifierPolicy patch.
+    card.querySelector('[data-crafting-modifier-policy-option="addAll"] input').click();
+    flushSync();
+    assert.ok(
+      patches.some((p) => p.defaultModifierPolicy === 'addAll'),
+      'selecting a policy radio emits defaultModifierPolicy'
+    );
+  });
+
+  it('checks view: the modifier catalogue card is hidden when the crafting check has no formula (issue 770)', () => {
+    mountChecksView({ resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } });
+    assert.equal(
+      target.querySelector('[data-crafting-modifier-catalogue]'),
+      null,
+      'a formula-less (unusable) check offers no modifier catalogue'
     );
   });
 

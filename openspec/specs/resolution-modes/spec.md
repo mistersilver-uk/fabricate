@@ -66,6 +66,11 @@ This built-in dice-expression check is the low-complexity path for GMs who do no
 - A check is **usable** IFF its mode's `rollFormula` is authored.
 The historical macro-as-check-source and the `checkSource: "builtIn"` game-system adapter (`builtIn: { ability, skill, dc, advantage }`) were removed in 1.8.0 and are not part of the model; see `data-models` requirement 30 and its *Crafting Check Macro Contract* section.
 - The legacy `craftingCheck.mode` discriminator has the single valid value `passFail` and drives nothing; the active check sub-object is selected by `resolutionMode` (see `data-models` requirement 29).
+- A check roll formula MAY reference **`@craftingmod`**, a Fabricate-resolved scalar computed from the system's **`checkModifiers`** catalogue (`{id,label,icon?,expression}[]`) under a **`defaultModifierPolicy`** (`addAll` → sum, `highest` → deterministic `max(...)` scalar, `byRecipe` → the recipe's own set summed), optionally overridden per recipe by **`Recipe.craftingModifier`** (`{policy?, modifierIds?}`; absent = inherit the system default policy + `defaultModifierIds`).
+Each eligible entry's `expression` is a roll-data fragment (e.g. `@abilities.med.mod`) evaluated against the crafter's roll data to a number (a missing/failed expression contributes 0, never NaN).
+Resolution is **deterministic** in Phase 1 (no new interactive branch — whether the player is prompted stays governed by the existing `interactive` flag); `@craftingmod` is resolved to a scalar and substituted **before** the string reaches Foundry's `Roll` (Foundry would otherwise treat an unresolved `@craftingmod` as 0), feeding **both** evaluation (`checkRoll.js` `evaluateCheckRoll`) and display (`resolveCheckFormulaDisplay`) so the shown formula equals what evaluates.
+A formula with no `@craftingmod` token is unchanged (full single-formula back-compat).
+The interactive `playerPicks` selection policy is out of scope for this phase (Phase 2).
 
 ## Player-Facing Mode Labels
 

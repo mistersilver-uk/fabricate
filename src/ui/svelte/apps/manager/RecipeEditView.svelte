@@ -68,6 +68,11 @@
     itemTags = [],
     checkTierOptions = [],
     minSuccessTierOptions = [],
+    // Per-recipe crafting-check modifier override (issue 770). Threaded through this
+    // wrapper so the Overview tab receives them — a tab prop skipping this wrapper
+    // silently drops to its default and the control never renders.
+    craftingModifierOptions = [],
+    craftingModifierPolicyDefault = 'addAll',
     // Category lives on the Overview tab (prototype §5.1). Threaded through this
     // wrapper so the Overview tab receives them (a tab prop skipping this wrapper
     // silently drops to its default and the control never renders).
@@ -401,6 +406,8 @@
             {onSetCategory}
             {checkTierOptions}
             {minSuccessTierOptions}
+            {craftingModifierOptions}
+            {craftingModifierPolicyDefault}
             {locked}
             {onToggleLocked}
             {multiStepEnabled}

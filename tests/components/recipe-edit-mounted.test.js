@@ -449,6 +449,61 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('threads the per-recipe crafting-modifier override through RecipeEditView to the Overview tab (issue 770)', async () => {
+    // The catalogue options + default policy are RecipeEditView wrapper props; a tab
+    // prop the wrapper fails to forward silently drops to its default and never renders.
+    // Mount THROUGH the wrapper so a missing forward fails here.
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, craftingModifier: { policy: 'byRecipe', modifierIds: ['med'] } },
+        onUpdateRecipe: (patch) => patches.push(patch),
+        craftingModifierOptions: [
+          { id: 'med', label: 'Medicine' },
+          { id: 'alch', label: 'Alchemy' },
+        ],
+        craftingModifierPolicyDefault: 'highest',
+      })
+    );
+    const field = target.querySelector('[data-recipe-crafting-modifier]');
+    assert.ok(field, 'the crafting-modifier override control renders when the wrapper forwards options');
+    const select = field.querySelector('[data-recipe-field="craftingModifierPolicy"]');
+    assert.equal(select.value, 'byRecipe', 'reflects the recipe override policy');
+    assert.deepEqual(
+      [...select.querySelectorAll('option')].map((o) => o.value),
+      ['', 'addAll', 'highest', 'byRecipe']
+    );
+    // The per-modifier picker shows the catalogue with the recipe's set pre-checked.
+    const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
+    assert.ok(picker, 'the eligible-modifier picker shows for an active override');
+    assert.equal(picker.querySelector('[data-recipe-crafting-modifier-id="med"]').checked, true);
+    assert.equal(picker.querySelector('[data-recipe-crafting-modifier-id="alch"]').checked, false);
+    // Toggling alch on stages the combined set.
+    const alch = picker.querySelector('[data-recipe-crafting-modifier-id="alch"]');
+    alch.checked = true;
+    alch.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(patches.at(-1), {
+      craftingModifier: { policy: 'byRecipe', modifierIds: ['med', 'alch'] },
+    });
+    // Switching the policy select back to "inherit" clears the whole override.
+    select.value = '';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(patches.at(-1), { craftingModifier: null });
+    editHarness.remount();
+  });
+
+  it('hides the crafting-modifier override when the system has no catalogue (issue 770)', async () => {
+    const target = await editHarness.mount(identityProps({ craftingModifierOptions: [] }));
+    assert.equal(
+      target.querySelector('[data-recipe-crafting-modifier]'),
+      null,
+      'no catalogue → no override control'
+    );
+    editHarness.remount();
+  });
+
   it('renders the identity inputs in Overview and no recipe-item card', async () => {
     const target = await editHarness.mount(identityProps());
     assert.ok(target.querySelector('[data-recipe-field="name"]'), 'name input renders');

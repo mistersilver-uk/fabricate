@@ -1195,7 +1195,8 @@ class Fabricate {
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
       nowWorldTime: () => game.time?.worldTime ?? 0,
-      resolveCheckFormula: (formula, actor) => resolveCheckFormulaDisplay(formula, actor),
+      resolveCheckFormula: (formula, actor, craftingModifier) =>
+        resolveCheckFormulaDisplay(formula, actor, craftingModifier),
     });
     return this._craftingListingBuilder;
   }
