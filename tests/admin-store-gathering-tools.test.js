@@ -106,6 +106,7 @@ function createMockServices(overrides = {}) {
     },
     deleteTool: async (id, toolId) => {
       calls.push(['deleteTool', id, toolId]);
+      if (overrides.deleteToolError) throw overrides.deleteToolError;
       const sys = systems.find(system => system.id === id);
       const before = sys?.tools.length || 0;
       if (sys) sys.tools = sys.tools.filter(tool => tool.id !== toolId);
@@ -652,7 +653,14 @@ describe('adminStore library tools (system-owned)', () => {
     });
 
     it('keeps a valid draft mounted when manager persistence fails', async () => {
-      const services = createMockServices({ upsertToolError: new Error('write failed') });
+      const errors = [];
+      const services = createMockServices({
+        upsertToolError: new Error('adapter leaked secret save detail'),
+        notify: { error: (message) => errors.push(message) },
+        localize: (key) => ({
+          'FABRICATE.Admin.Manager.Tools.Editor.SaveFailed': 'The Tool could not be saved. Try again.'
+        })[key] || key
+      });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       store.createToolDraft({ componentId: 'comp-hammer', label: 'Hammer' });
@@ -660,7 +668,46 @@ describe('adminStore library tools (system-owned)', () => {
       const state = get(store.viewState);
       assert.equal(state.toolDraft.label, 'Hammer');
       assert.equal(state.toolDraftDirty, true);
-      assert.equal(state.toolDraftSaveError, 'write failed');
+      assert.equal(state.toolDraftSaveError, 'adapter leaked secret save detail');
+      assert.deepEqual(errors, ['The Tool could not be saved. Try again.']);
+      assert.doesNotMatch(errors.join(' '), /adapter leaked secret/);
+    });
+
+    it('reports localized operation errors without exposing adapter details', async () => {
+      const localized = {
+        'FABRICATE.Admin.Manager.Tools.Editor.DeleteFailed': 'The Tool could not be deleted. Try again.',
+        'FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed': 'The Tool status could not be changed. Try again.'
+      };
+
+      for (const operation of ['delete', 'toggle']) {
+        const errors = [];
+        const rawMessage = `adapter leaked secret ${operation} detail`;
+        const services = createMockServices({
+          systemTools: [{ id: 'hammer', componentId: 'comp-hammer', enabled: true }],
+          ...(operation === 'delete'
+            ? { deleteToolError: new Error(rawMessage) }
+            : { upsertToolError: new Error(rawMessage) }),
+          notify: { error: (message) => errors.push(message) },
+          localize: (key) => localized[key] || key
+        });
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+
+        if (operation === 'delete') {
+          store.openToolDraft('hammer');
+          assert.equal(await store.deleteToolDraft(), false);
+        } else {
+          assert.equal(await store.toggleToolEnabled('hammer', false), false);
+        }
+
+        assert.equal(errors.length, 1);
+        const errorKey =
+          operation === 'delete'
+            ? 'FABRICATE.Admin.Manager.Tools.Editor.DeleteFailed'
+            : 'FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed';
+        assert.equal(errors[0], localized[errorKey]);
+        assert.doesNotMatch(errors[0], /adapter leaked secret/);
+      }
     });
 
     it('deletes through manager behavior and toggles library enabled state live', async () => {

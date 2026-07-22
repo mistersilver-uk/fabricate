@@ -2806,7 +2806,10 @@ export function createAdminStore(services) {
       return true;
     } catch (error) {
       toolDraftSaveError.set(error?.message || 'save');
-      services.notify?.error?.(error?.message || 'Failed to save tool');
+      services.notify?.error?.(
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.SaveFailed') ||
+          'The Tool could not be saved. Try again.'
+      );
       return false;
     } finally {
       toolDraftSaving.set(false);
@@ -2853,7 +2856,10 @@ export function createAdminStore(services) {
       return true;
     } catch (error) {
       toolDraftSaveError.set(error?.message || 'delete');
-      services.notify?.error?.(error?.message || 'Failed to delete tool');
+      services.notify?.error?.(
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.DeleteFailed') ||
+          'The Tool could not be deleted. Try again.'
+      );
       return false;
     } finally {
       toolDraftSaving.set(false);
@@ -2884,8 +2890,11 @@ export function createAdminStore(services) {
       await refresh();
       _patchToolsDraftViewState();
       return true;
-    } catch (error) {
-      services.notify?.error?.(error?.message || 'Failed to update tool');
+    } catch {
+      services.notify?.error?.(
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed') ||
+          'The Tool status could not be changed. Try again.'
+      );
       return false;
     }
   }
