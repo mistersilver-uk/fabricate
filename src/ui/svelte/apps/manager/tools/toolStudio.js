@@ -1,3 +1,5 @@
+import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
+
 const DEFAULT_TOOL_IMAGE = 'icons/svg/item-bag.svg';
 
 function managedItemFor(tool, managedItems = []) {
@@ -117,10 +119,17 @@ function validRepair(tool) {
   return groups.every((group) =>
     Array.isArray(group?.options) &&
     group.options.length > 0 &&
-    group.options.every((option) =>
-      Number(option?.quantity) > 0 &&
-      (Boolean(option?.match?.componentId) || Boolean(option?.itemUuid))
-    )
+    group.options.every((option) => {
+      if (Number(option?.quantity) <= 0) return false;
+      if (option?.itemUuid) return true;
+
+      const match = option?.match;
+      const handler = getMatchHandler(match);
+      return (
+        handler.isComplete(match) &&
+        handler.validate(match, { requireComplete: true }).length === 0
+      );
+    })
   );
 }
 
