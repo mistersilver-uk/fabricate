@@ -30,10 +30,10 @@
     // System vocabularies (live; updated by the store after an inline create).
     componentCategories = [],
     itemTags = [],
-    // Inline vocabulary creation, reusing the issue 689 store ops. Both return truthy on
-    // success (or `false` to surface add-failed feedback in InlineVocabularyAdd).
+    // Inline CATEGORY creation, reusing the issue 689 store op. Returns truthy on success
+    // (or `false` to surface add-failed feedback in InlineVocabularyAdd). Tags are
+    // assign-from-existing only (Design G) — a new tag is created in Tags & Categories.
     onAddCategory = async () => {},
-    onAddTag = async () => {},
     // commit(decisions) — decisions is [{ folderId, folderName, itemUuids, category, addTags }]
     // for the NON-skipped rows only. category '' means "no category assignment".
     onCommit = () => {},
@@ -46,11 +46,33 @@
   let matchByName = $state(true);
   let creatingCategoryFor = $state(-1);
   let dialogRoot = $state(null);
+  let matchToggle = $state(null);
 
   function text(key, fallback) {
     if (!key) return fallback ?? '';
     const translated = localize(key);
     return translated && translated !== key ? translated : (fallback ?? key);
+  }
+
+  // Localized item count with a singular form (house pattern: VocabularyPanel's
+  // UsageCountSingular), so a one-item folder reads "1 item", not "1 items".
+  function itemCountLabel(count) {
+    const key =
+      count === 1
+        ? 'FABRICATE.Admin.Items.ImportMapping.ItemCountSingular'
+        : 'FABRICATE.Admin.Items.ImportMapping.ItemCount';
+    return text(key, count === 1 ? '{count} item' : '{count} items').replace('{count}', count);
+  }
+
+  function commitLabel(count) {
+    const key =
+      count === 1
+        ? 'FABRICATE.Admin.Items.ImportMapping.CommitSingular'
+        : 'FABRICATE.Admin.Items.ImportMapping.Commit';
+    return text(key, count === 1 ? 'Import {count} item' : 'Import {count} items').replace(
+      '{count}',
+      count
+    );
   }
 
   // (Re)seed assignments whenever the drop's folders change. Match-by-name pre-fills the
@@ -80,6 +102,10 @@
       matchByName = true;
       creatingCategoryFor = -1;
       seedAssignments();
+      // Land keyboard focus on the match-by-name toggle when the modal opens (parity
+      // with ItemPickerModal autofocusing its search), on the next microtask so the
+      // portaled node is mounted.
+      queueMicrotask(() => matchToggle?.focus?.());
     }
   });
 
@@ -235,7 +261,12 @@
       </div>
 
       <label class="manager-import-mapping-match" data-import-mapping-match>
-        <input type="checkbox" checked={matchByName} onchange={toggleMatchByName} />
+        <input
+          type="checkbox"
+          bind:this={matchToggle}
+          checked={matchByName}
+          onchange={toggleMatchByName}
+        />
         <span>
           {text(
             'FABRICATE.Admin.Items.ImportMapping.MatchByName',
@@ -260,10 +291,7 @@
                 data-import-mapping-count
                 style="font-variant-numeric: tabular-nums;"
               >
-                {text('FABRICATE.Admin.Items.ImportMapping.ItemCount', '{count} items').replace(
-                  '{count}',
-                  row.group.itemCount
-                )}
+                {itemCountLabel(row.group.itemCount)}
               </span>
               <button
                 type="button"
@@ -325,7 +353,6 @@
               {#if creatingCategoryFor === row.index}
                 <div class="manager-import-mapping-create" data-import-mapping-create-category>
                   <InlineVocabularyAdd
-                    variant="compact"
                     inputId={`import-mapping-new-category-${row.index}`}
                     inputLabel={text(
                       'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryName',
@@ -369,10 +396,7 @@
         >
           <i class="fas fa-file-import" aria-hidden="true"></i>
           <span>
-            {text('FABRICATE.Admin.Items.ImportMapping.Commit', 'Import {count} items').replace(
-              '{count}',
-              importCount
-            )}
+            {commitLabel(importCount)}
           </span>
         </button>
       </div>

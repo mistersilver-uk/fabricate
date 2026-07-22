@@ -2957,6 +2957,10 @@
       importMappingOpen = true;
       return;
     }
+    // `handled` means the collector already notified (e.g. a compendium-directory folder
+    // groups packs, not items) and there is nothing to import — do NOT fall through to
+    // onDropItem, or it would fire a second toast for the same drop.
+    if (plan?.handled) return;
     services?.onDropItem?.(data);
   }
 
@@ -7171,7 +7175,6 @@
     componentCategories={selectedSystem?.componentCategories || []}
     itemTags={selectedSystem?.itemTags || []}
     onAddCategory={addComponentCategory}
-    onAddTag={addTag}
     onCommit={commitImportFolderMapping}
     onClose={() => importMappingOpen = false}
   />

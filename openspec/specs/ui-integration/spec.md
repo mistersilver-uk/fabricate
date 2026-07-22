@@ -467,8 +467,10 @@ Folder
   whole-compendium drop that contains at least one item-bearing folder opens a mapping step before
   the import commits.
 The step lists each detected folder (the dropped folder plus every nested subfolder) with its item
-  count, and lets the GM assign a category and/or tags per folder, inline-create a category or tag
-  (reusing the shared vocabulary model), or skip a folder.
+  count, and lets the GM assign a category and/or tags per folder, inline-create a category (reusing
+  the shared vocabulary model), or skip a folder.
+Tags are assigned from the existing vocabulary only; a new tag is created in the Tags & Categories
+  screen, not inline at import.
 Category assignment is single-valued and OVERWRITES the imported default; tag assignment is additive
   (union).
 A "match-by-name" toggle, ON by default, pre-fills each folder's row when the folder name matches an

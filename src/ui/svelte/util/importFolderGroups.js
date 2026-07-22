@@ -111,6 +111,67 @@ export function collectWorldFolderGroups(folder, folders) {
   return buildFolderGroupsFromItems(items, { folderNames });
 }
 
+/**
+ * Whether a collected group list warrants the mapping modal: it must carry at least one
+ * REAL source folder. A drop that resolves to only the folderless "unfiled" group (a pack
+ * with no folder structure) has nothing to categorize per-folder, so it falls back to the
+ * one-shot import instead of opening the modal. This is the group-level divert decision
+ * shared by every branch of `collectImportFolderGroups`.
+ *
+ * @param {Array<{folderId: string|null}>} groups
+ * @returns {boolean}
+ */
+export function hasRealFolderGroups(groups) {
+  return Array.isArray(groups) && groups.some((group) => group.folderId);
+}
+
+/**
+ * Import each non-skipped folder decision's items, then apply that folder's category and
+ * tags to the freshly imported component set via the manager's set-apply primitive (one
+ * `save()` per folder). The shared commit loop behind the import mapping modal (issue
+ * 771); Foundry-global-free — the caller injects the `systemManager` so it is unit
+ * testable against a real `CraftingSystemManager`.
+ *
+ * @param {{
+ *   addItemFromUuid: (systemId: string, uuid: string) => Promise<{item?: {id?: string}, action: string, sourceFallbacks?: Array}>,
+ *   applyCategoryAndTagsToComponents: (systemId: string, ids: string[], mapping: object) => Promise<object>
+ * }} systemManager
+ * @param {string} systemId
+ * @param {Array<{itemUuids?: string[], category?: string, addTags?: string[]}>} decisions
+ * @returns {Promise<{added: number, updated: number, skipped: number, total: number, sourceFallbacks: Array}>}
+ */
+export async function applyFolderImportDecisions(systemManager, systemId, decisions) {
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  let total = 0;
+  const sourceFallbacks = [];
+  for (const decision of decisions || []) {
+    const itemUuids = Array.isArray(decision.itemUuids) ? decision.itemUuids : [];
+    const importedIds = [];
+    for (const itemUuid of itemUuids) {
+      total += 1;
+      const result = await systemManager.addItemFromUuid(systemId, itemUuid);
+      if (result.action === 'added') added += 1;
+      else if (result.action === 'updated') updated += 1;
+      else skipped += 1;
+      if (result.item?.id) importedIds.push(result.item.id);
+      if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+    }
+    const addTags = Array.isArray(decision.addTags) ? decision.addTags : [];
+    if (importedIds.length > 0 && (decision.category || addTags.length > 0)) {
+      // Applied to EVERY imported id, INCLUDING a 'skipped' (re-dropped, already-existing)
+      // component: re-dropping a folder deliberately re-categorizes its items, so the
+      // overwrite-on-redrop here is intended, not a leak.
+      await systemManager.applyCategoryAndTagsToComponents(systemId, importedIds, {
+        category: decision.category || '',
+        addTags,
+      });
+    }
+  }
+  return { added, updated, skipped, total, sourceFallbacks };
+}
+
 /** A pack folder document's parent folder id, across the shapes v13 exposes. */
 function packFolderParentId(packFolder) {
   const parent = packFolder?.folder ?? packFolder?.parent ?? packFolder?._source?.folder;

@@ -16,6 +16,8 @@ import { validateImportData, prepareForImport } from '../systems/CraftingSystemE
 import {
   collectWorldFolderGroups,
   collectPackFolderGroups,
+  applyFolderImportDecisions,
+  hasRealFolderGroups,
 } from './svelte/util/importFolderGroups.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 import { buildImportReportContent } from '../systems/importReportContent.js';
@@ -628,7 +630,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const systemId = get(this._adminStore.selectedSystemId) || '';
           if (!systemId) return null;
           const unfiledName = localize('FABRICATE.Admin.Items.ImportMapping.Unfiled');
-          const groupsWithFolders = (groups) => (groups.some((group) => group.folderId) ? { groups } : null);
+          const groupsWithFolders = (groups) => (hasRealFolderGroups(groups) ? { groups } : null);
 
           // Whole compendium pack drop.
           if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
@@ -644,12 +646,14 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             if (!folder) return null;
             const docType = folderDocumentType(folder);
             // A compendium-DIRECTORY folder groups packs, not items (descope 2c): no
-            // item-level grouping exists, so skip it with a notice and no import.
+            // item-level grouping exists, so skip it with a notice. Return the `handled`
+            // sentinel — NOT null — so `dropComponent` does not fall through to
+            // `onDropItem` and fire a SECOND (FolderEmpty) toast for the same drop.
             if (docType === 'Compendium') {
               ui.notifications.info(
                 localize('FABRICATE.Admin.Items.ImportMapping.CompendiumDirectorySkipped')
               );
-              return null;
+              return { handled: true };
             }
             if (folder.pack) {
               const pack = game.packs?.get?.(folder.pack);
@@ -674,35 +678,16 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
             return;
           }
-          let added = 0;
-          let updated = 0;
-          let skipped = 0;
-          let total = 0;
-          const sourceFallbacks = [];
-          for (const decision of decisions || []) {
-            const itemUuids = Array.isArray(decision.itemUuids) ? decision.itemUuids : [];
-            const importedIds = [];
-            for (const itemUuid of itemUuids) {
-              total += 1;
-              const result = await systemManager.addItemFromUuid(systemId, itemUuid);
-              if (result.action === 'added') added += 1;
-              else if (result.action === 'updated') updated += 1;
-              else skipped += 1;
-              if (result.item?.id) importedIds.push(result.item.id);
-              if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
-            }
-            const addTags = Array.isArray(decision.addTags) ? decision.addTags : [];
-            if (importedIds.length > 0 && (decision.category || addTags.length > 0)) {
-              await systemManager.applyCategoryAndTagsToComponents(systemId, importedIds, {
-                category: decision.category || '',
-                addTags,
-              });
-            }
-          }
+          const summary = await applyFolderImportDecisions(systemManager, systemId, decisions || []);
           ui.notifications.info(
-            localize('FABRICATE.Admin.Items.ImportMapping.Summary', { added, updated, skipped, total })
+            localize('FABRICATE.Admin.Items.ImportMapping.Summary', {
+              added: summary.added,
+              updated: summary.updated,
+              skipped: summary.skipped,
+              total: summary.total,
+            })
           );
-          notifyBulkSourceFallback(sourceFallbacks);
+          notifyBulkSourceFallback(summary.sourceFallbacks);
           await this._adminStore.refresh();
         },
         onDropItem: async (data) => {

@@ -4487,9 +4487,11 @@
           "SearchTags": "Search tags...",
           "NoTags": "No tags yet — create them in Tags & Categories.",
           "ItemCount": "{count} items",
+          "ItemCountSingular": "{count} item",
           "Skip": "Skip",
           "Unskip": "Include",
           "Commit": "Import {count} items",
+          "CommitSingular": "Import {count} item",
           "Unfiled": "Ungrouped items",
           "CompendiumDirectorySkipped": "That folder groups compendium packs, not items — drop an individual pack or an Item folder to categorize on import.",
           "Summary": "Imported {added} new, updated {updated}, skipped {skipped} of {total} items with folder categories and tags."

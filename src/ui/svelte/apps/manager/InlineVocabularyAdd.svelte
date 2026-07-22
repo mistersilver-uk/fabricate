@@ -10,9 +10,7 @@
   the value normalizer (`normalize`), the optional per-entry icon field (`showIcon`),
   and the localized labels. Emits the normalized value (and trimmed icon, when shown) to
   `onAdd`; an `onAdd` that returns `false` renders the failure feedback and keeps focus.
-
-  `variant="compact"` drops the icon column ergonomics for the tight import row; the
-  default preserves VocabularyPanel's exact markup and classes.
+  The markup preserves VocabularyPanel's exact classes so both callers style identically.
 -->
 <script>
   let {
@@ -20,7 +18,6 @@
     inputLabel = '',
     inputPlaceholder = '',
     addLabel = '',
-    variant = 'panel',
     // Live hint machine: (rawValue) => { tone: 'info'|'success'|'danger'|'', message, blocked }.
     // `blocked` refuses submit; `tone` drives the hint styling and icon.
     describeInput = () => ({ tone: '', message: '', blocked: false }),
@@ -89,11 +86,7 @@
   }
 </script>
 
-<form
-  class={`manager-vocabulary-form ${variant === 'compact' ? 'is-compact' : ''}`}
-  onsubmit={submit}
-  data-inline-vocabulary-add
->
+<form class="manager-vocabulary-form" onsubmit={submit} data-inline-vocabulary-add>
   <div class="manager-vocabulary-form-fields">
     <label class="manager-field" for={inputId}>
       <span>{inputLabel}</span>
