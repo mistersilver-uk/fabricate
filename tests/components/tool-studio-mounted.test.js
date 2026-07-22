@@ -257,7 +257,7 @@ describe('Tool Studio editor (mounted)', () => {
 
   it('renders five validation checks, range/repair failures, live preview, and alert semantics', async () => {
     const invalidTool = tool({ breakage: { mode: 'breakageChance', breakageChance: 101 }, repairRequirements: [{ id: 'empty', options: [] }] });
-    const root = await harness.mount(props({ activeTab: 'validation', tool: invalidTool, validation: { valid: false, errors: ['breakage chance is out of range'] } }));
+    const root = await harness.mount(props({ activeTab: 'validation', tool: invalidTool, validation: { valid: false, errors: ['breakage.breakageChance must be an integer between 0 and 100'] } }));
     assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 5);
     assert.equal(root.querySelector('[data-tool-validation-check="breakage"]').classList.contains('is-invalid'), true);
     assert.equal(root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'), true);
@@ -267,7 +267,51 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.ok(root.querySelector('[role="alert"]'));
     assert.match(root.querySelector('[data-tool-behavior-preview]').textContent, /Smith Hammer/);
-    assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /breakageChance/);
+    assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /101% break chance/);
+    assert.match(root.querySelector('[data-tool-validation-errors]').textContent, /Break chance must be between 0% and 100%/);
+    assert.doesNotMatch(root.textContent, /breakage\.breakageChance|breakageChance/);
+  });
+
+  it('localizes effective behavior states instead of exposing stored mode tokens', async () => {
+    const root = await harness.mount(props({
+      authority: 'checkDriven',
+      tool: tool({
+        checkBreakable: false,
+        onBreak: { mode: 'flagBroken' },
+        prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+        bonus: { enabled: true, expression: '' },
+      }),
+    }));
+
+    assert.equal(root.querySelector('[data-tool-preview-breakage]').textContent, 'Never breaks');
+    assert.equal(
+      root.querySelector('[data-tool-preview-on-break]').textContent,
+      'Not applicable while this Tool cannot break'
+    );
+    assert.equal(root.querySelector('[data-tool-preview-prerequisites]').textContent, 'Off');
+    assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Incomplete');
+    assert.doesNotMatch(root.textContent, /flagBroken|limitedUses|breakageChance/);
+  });
+
+  it('projects domain validation and save failures to localized safe copy', async () => {
+    const rawErrors = [
+      'a tool requires either a componentId or its own source references',
+      'repairRequirements[2]: Tag-based ingredient match requires at least one tag',
+      'unexpected internal validation detail',
+    ];
+    const root = await harness.mount(props({
+      activeTab: 'validation',
+      validation: { valid: false, errors: rawErrors },
+      saveError: 'database adapter exploded',
+    }));
+
+    const blockers = root.querySelector('[data-tool-validation-errors]').textContent;
+    assert.match(blockers, /Link an Item or managed Component/);
+    assert.match(blockers, /Repair group 3 is incomplete/);
+    assert.match(blockers, /Some Tool settings are incomplete/);
+    assert.doesNotMatch(blockers, /componentId|repairRequirements|unexpected internal/);
+    assert.equal(root.querySelector('[data-tool-save-error]').textContent, 'The Tool could not be saved. Try again.');
+    assert.equal(root.querySelector('[data-tool-editor-save]').getAttribute('title'), 'Resolve validation issues before saving.');
   });
 
   it('accepts every complete repair match kind and rejects an incomplete option', async () => {
