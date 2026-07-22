@@ -4214,7 +4214,7 @@ async function main() {
             await csm.deleteSystem(system.id);
           }
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -5335,8 +5335,8 @@ async function main() {
         }, craftingSetup.systemId);
         await seedSmokeGatheringLibrary(page, craftingSetup);
 
-        await page.evaluate(() => {
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
 
@@ -5491,8 +5491,8 @@ async function main() {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, { features: { essences: true, gathering: false } });
         }, craftingSetup.systemId);
-        await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -5608,8 +5608,8 @@ async function main() {
           crafterId: cleanup.crafterId,
           travelMemberId: cleanup.travelMemberId
         });
-        await page.evaluate(() => {
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -7590,8 +7590,8 @@ async function main() {
             game.fabricate.getCraftingSystemManager().getSystems().map((s) => s.id)
           );
 
-          await page.evaluate(() => {
-            globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -7705,8 +7705,8 @@ async function main() {
             };
           }, craftingSetup.systemId);
 
-          await page.evaluate(() => {
-            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -7780,8 +7780,8 @@ async function main() {
         if (alchemyBenchSystemId) {
           try {
             await closeOpenApplications(page);
-            await page.evaluate(() => {
-              game.fabricate.api.getCraftingSystemManagerAppClass().show();
+            await page.evaluate(async () => {
+              (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
             });
             await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
             await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -7836,8 +7836,8 @@ async function main() {
           await page.evaluate(async () => {
             await game.settings.set('fabricate', 'experimentalFeatures', false);
           });
-          await page.evaluate(() => {
-            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });

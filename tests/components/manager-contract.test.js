@@ -110,9 +110,20 @@ describe('CraftingSystemManager source contract', () => {
       !mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
       'legacy manager side-effect import should be removed'
     );
+    // Issue 150: the GM-only manager subtree is deferred to a lazy chunk, so
+    // main.js must NOT statically side-effect-import it and must instead pull it
+    // in through a dynamic import() behind the memoized loader.
     assert.ok(
-      mainSource.includes("import './ui/SvelteCraftingSystemManagerApp.svelte.js';"),
-      'manager side-effect import should be present for registry wiring'
+      !mainSource.includes("import './ui/SvelteCraftingSystemManagerApp.svelte.js';"),
+      'manager static side-effect import should be removed so it lands in a lazy chunk'
+    );
+    assert.ok(
+      mainSource.includes("import('./ui/SvelteCraftingSystemManagerApp.svelte.js')"),
+      'manager app should be pulled in via a dynamic import for the lazy chunk'
+    );
+    assert.ok(
+      mainSource.includes('loadCraftingSystemManagerAppClass'),
+      'main.js should expose the memoized async manager loader'
     );
   });
 
