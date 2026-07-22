@@ -220,6 +220,46 @@ export function createAlchemyStore({ services } = {}) {
   }
 
   /**
+   * Whether the bench CONTAINS a concrete recipe's multiset — every required unit
+   * is present in at least the required count (`>=`, the engine's superset-tolerant
+   * rule). Extras on the bench do not disqualify the match.
+   */
+  function concreteContainedByBench(concrete) {
+    return Object.entries(concrete).every(([cid, need]) => (workbench[cid] || 0) >= need);
+  }
+
+  /**
+   * Whether concrete multiset `a` STRICTLY contains `b` — `a` supplies at least
+   * every unit `b` requires and strictly more somewhere. This is the client mirror
+   * of the engine's `signatureDominates` specificity order for the concrete
+   * single-option-per-group shape.
+   */
+  function concreteStrictlyContains(a, b) {
+    for (const [cid, need] of Object.entries(b)) {
+      if ((a[cid] || 0) < need) return false;
+    }
+    return Object.entries(a).some(([cid, have]) => have > (b[cid] || 0));
+  }
+
+  /**
+   * The unique MOST-SPECIFIC concrete recipe among candidates the bench contains:
+   * the single one no other candidate strictly contains. Returns null on an empty
+   * set OR a non-unique maximum (incomparable siblings / duplicate signatures),
+   * mirroring the engine's fail-safe fizzle so the client never promises a brew the
+   * engine would fizzle.
+   */
+  function mostSpecificConcrete(candidates) {
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+    const maximal = candidates.filter((candidate) =>
+      candidates.every(
+        (other) => other === candidate || !concreteStrictlyContains(other.concrete, candidate.concrete)
+      )
+    );
+    return maximal.length === 1 ? maximal[0] : null;
+  }
+
+  /**
    * Five-mode resolution (best-effort, engine-authoritative, fail-safe to
    * `untried`). Two recipe shapes resolve client-side:
    *  - a COMPONENT recipe with a `concrete` plain-component multiset (exact match);
@@ -232,11 +272,20 @@ export function createAlchemyStore({ services } = {}) {
   const resolution = $derived.by(() => {
     if (benchEmpty) return { mode: 'empty', target: null, missing: [] };
 
-    // 1. Bench satisfies a revealed recipe -> ready.
+    // 1. Bench satisfies a revealed recipe -> ready. This mirrors the engine's
+    //    most-specific match (issue 774): the engine is superset-tolerant (a bench
+    //    that CONTAINS a concrete recipe matches it) and, among several matches,
+    //    brews the MOST-SPECIFIC (the strict-superset concrete), failing safe to a
+    //    fizzle on an incomparable tie. So the client selects the unique concrete
+    //    the bench contains that no other contained concrete is a subset of; a
+    //    non-unique maximum yields no confident `ready` (the engine would fizzle).
+    const concreteWinner = mostSpecificConcrete(
+      (Array.isArray(listing?.recipes) ? listing.recipes : []).filter(
+        (recipe) => recipe?.concrete && concreteContainedByBench(recipe.concrete)
+      )
+    );
+    if (concreteWinner) return { mode: 'ready', target: concreteWinner, missing: [] };
     for (const recipe of Array.isArray(listing?.recipes) ? listing.recipes : []) {
-      if (recipe?.concrete && signatureKey(recipe.concrete) === benchKey) {
-        return { mode: 'ready', target: recipe, missing: [] };
-      }
       const requirement = essenceRequirementOf(recipe);
       if (requirement && essencesSatisfied(requirement)) {
         return { mode: 'ready', target: recipe, missing: [] };

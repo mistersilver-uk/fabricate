@@ -1456,7 +1456,7 @@
         "RecipeActivation": {
           "CannotEnable": "Cannot enable recipe \"{name}\": {errors}",
           "CannotSave": "This recipe could not be saved: {errors}",
-          "IssueSignatureCollision": "Recipe \"{recipeA}\" (ingredient set {setA}) and recipe \"{recipeB}\" (ingredient set {setB}) can both be crafted from the same components ({components}), so alchemy cannot tell which one you are making.",
+          "IssueSignatureCollision": "Recipe \"{recipeA}\" (ingredient set {setA}) and recipe \"{recipeB}\" (ingredient set {setB}) have interchangeable ingredient requirements ({components}) — no combination of ingredients can tell them apart, so alchemy cannot decide which one you are brewing. Give one recipe an additional or different required ingredient.",
           "IssueStepIngredientSetCountExact": "Step \"{step}\" must have exactly 1 ingredient set in {mode} mode",
           "IssueStepResultGroupCountExact": "Step \"{step}\" must have exactly 1 result group in {mode} mode",
           "IssueStepIngredientSetCountMin": "Step \"{step}\" must have at least 1 ingredient set in {mode} mode",
