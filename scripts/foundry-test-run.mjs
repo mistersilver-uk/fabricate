@@ -1372,6 +1372,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-vocabulary-row',
       '.manager-gathering-task-row',
       '.manager-gathering-event-row',
+      '.manager-tools-row',
       '[data-manager-tool-id]',
       '[data-tool-edit-view]',
       '.manager-inspector-card',

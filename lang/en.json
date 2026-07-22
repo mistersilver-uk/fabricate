@@ -1870,6 +1870,7 @@
           "General": "General",
           "ResultGroups": "Result sets",
           "IngredientsSection": "Ingredients",
+          "IngredientSet": "Ingredient set",
           "IngredientsEmpty": "No ingredients yet",
           "IngredientsEmptyHint": "Add a set of ingredients required to craft this recipe.",
           "AddIngredientSet": "Add ingredient set",
@@ -3790,6 +3791,8 @@
         "Tools": {
           "Title": "Tools",
           "Subtitle": "Manage reusable gathering tools and configure how they behave when required by tasks.",
+          "EditTitle": "Edit Tool",
+          "EditSubtitle": "Configure Tool identity, breakage, requirements, and validation.",
           "Edit": "Edit Tool",
           "Enable": "Enable Tool",
           "Disable": "Disable Tool",
