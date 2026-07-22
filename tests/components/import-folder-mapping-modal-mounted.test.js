@@ -70,6 +70,16 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(selects[1].value, '', 'Widgets folder matches nothing → no category');
   });
 
+  it('renders the singular item form for a one-item folder', async () => {
+    await harness.mount({
+      open: true,
+      folders: [{ folderId: 'solo', folderName: 'Solo', itemCount: 1, itemUuids: ['Item.z'] }],
+      ...VOCAB,
+    });
+    assert.equal(document.querySelector('[data-import-mapping-count]').textContent.trim(), '1 item');
+    assert.match(commitButton().textContent, /Import 1 item(?!s)/);
+  });
+
   it('turning match-by-name OFF clears the pre-filled assignment', async () => {
     await harness.mount({ open: true, folders: FOLDERS, ...VOCAB });
     const toggle = document.querySelector('[data-import-mapping-match] input');
