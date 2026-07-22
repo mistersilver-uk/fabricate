@@ -67,7 +67,12 @@ const CURRENCY_UNITS = Object.freeze([
 function expandUnit(root, unitId) {
   const row = root.querySelector(`[data-system-currency-unit="${unitId}"]`);
   assert.ok(row, `currency row for ${unitId} exists`);
-  const editButton = row.querySelector('.manager-character-modifier-summary .manager-icon-button');
+  // Target the Edit control by its accessible name: the summary row also carries
+  // the Move up/down reorder chevrons (issue 768), so "first icon button" is no
+  // longer the editor.
+  const editButton = row.querySelector(
+    '.manager-character-modifier-summary [aria-label="Edit currency unit"]'
+  );
   assert.ok(editButton, `edit button for ${unitId} exists`);
   editButton.dispatchEvent(new globalThis.window.Event('click', { bubbles: true }));
 }

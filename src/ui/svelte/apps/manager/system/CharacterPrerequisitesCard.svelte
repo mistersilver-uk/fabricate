@@ -23,6 +23,10 @@
     onAdd = async () => null,
     onUpdate = async () => {},
     onDelete = async () => {},
+    // Manual reorder (issue 768). Called with (fromIndex, toIndex, name); the
+    // parent owns the store op + the shared aria-live announcement. Array order IS
+    // the persisted order, so no new field is threaded.
+    onReorder = async () => {},
     onSeedPresets = async () => {},
     // Whole-section collapse (issue 768) — owned by the parent SystemEditView so
     // all three list sections share one session Set and one reset-on-switch. This
@@ -131,7 +135,7 @@
     </p>
   {:else}
     <ul class="manager-prerequisite-list">
-      {#each library as entry (entry.id)}
+      {#each library as entry, index (entry.id)}
         {@const open = openId === entry.id}
         <li class="manager-prerequisite-item" class:is-open={open} data-system-character-prerequisite={entry.id}>
           <div class="manager-prerequisite-header">
@@ -155,6 +159,28 @@
                 <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
                 {prerequisitePreview(entry)}
               </span>
+            </button>
+            <button
+              type="button"
+              class="manager-icon-button"
+              aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+              data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+              data-move-prerequisite-up={entry.id}
+              disabled={index === 0}
+              onclick={() => onReorder(index, index - 1, entry.name)}
+            >
+              <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+            </button>
+            <button
+              type="button"
+              class="manager-icon-button"
+              aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+              data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+              data-move-prerequisite-down={entry.id}
+              disabled={index === library.length - 1}
+              onclick={() => onReorder(index, index + 1, entry.name)}
+            >
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
             </button>
             {#if onCopyToModifier}
               <button
