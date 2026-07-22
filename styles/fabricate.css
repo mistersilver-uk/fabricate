@@ -14548,7 +14548,10 @@
 .fabricate-manager .manager-tools-main {
   display: flex;
   flex-direction: column;
-  gap: var(--fab-space-4);
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .fabricate-manager .manager-tools-card {
@@ -18664,13 +18667,6 @@
   grid-template-columns: 56px minmax(0, 1fr) 340px;
 }
 
-.fabricate-manager .manager-tools-main {
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  gap: var(--fab-space-3);
-}
-
 .fabricate-manager .manager-tools-authority-card,
 .fabricate-manager .manager-tools-create-card,
 .fabricate-manager .manager-tools-library-card {
@@ -18684,10 +18680,9 @@
 }
 
 .fabricate-manager .manager-tools-authority-card {
-  flex-direction: row;
+  flex-flow: row wrap;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: var(--fab-space-3);
 }
 
