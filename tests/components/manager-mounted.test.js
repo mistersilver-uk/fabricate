@@ -112,6 +112,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SegmentedControl.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RosterRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPickerModal.svelte');
+  // Folder-aware import mapping modal + its inline vocabulary add-form (issue 771). Both
+  // are always rendered in the root tree, so omitting either HANGS the mounted suite.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/AccessTabView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GrantAccessInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
@@ -343,6 +347,9 @@ function compileManagerRoot() {
     // RecipeValidationTab localizes a signature-collision blocker row via this pure
     // leaf (issue 549); copy it so the mounted import resolves.
     'src/utils/recipeActivationMessages.js',
+    // Folder-aware import mapping (issue 771): the modal's match-by-name pre-fill leaf.
+    // Omitting it HANGS the mounted manager suite (the modal is always in the tree).
+    'src/utils/matchFolderVocabulary.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
