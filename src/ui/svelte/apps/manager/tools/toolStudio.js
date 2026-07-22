@@ -160,7 +160,8 @@ function validRepair(tool) {
     Array.isArray(group?.options) &&
     group.options.length > 0 &&
     group.options.every((option) => {
-      if (Number(option?.quantity) <= 0) return false;
+      const quantity = option?.quantity;
+      if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) return false;
       if (option?.itemUuid) return true;
 
       const match = option?.match;
