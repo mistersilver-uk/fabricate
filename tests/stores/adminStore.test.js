@@ -364,6 +364,97 @@ describe('createAdminStore', () => {
       }
     });
 
+    it('projects the crafting check-modifier catalogue, policy, and default ids (issue 770 allowlist)', async () => {
+      // The projection is a hand-built allowlist: a field dropped from it is invisible
+      // to the UI. The ChecksView mount test feeds these as direct props, bypassing the
+      // projection, so this reads the ACTUAL projection to catch a silently-dropped field.
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.craftingCheck = {
+        mode: 'passFail',
+        simple: { rollFormula: '1d20 + @craftingmod' },
+        checkModifiers: [
+          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+          { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+        ],
+        defaultModifierPolicy: 'highest',
+        defaultModifierIds: ['med'],
+      };
+      const store = createAdminStore(services);
+      await store.refresh();
+      const check = get(store.viewState).selectedSystem.craftingCheck;
+
+      assert.deepEqual(
+        check.checkModifiers.map((modifier) => modifier.id),
+        ['med', 'alch'],
+        'the catalogue surfaces through the projection allowlist'
+      );
+      assert.notEqual(
+        check.checkModifiers[0],
+        sys.craftingCheck.checkModifiers[0],
+        'catalogue entries are cloned, not shared with the live system'
+      );
+      assert.equal(check.defaultModifierPolicy, 'highest');
+      assert.deepEqual(check.defaultModifierIds, ['med']);
+    });
+
+    it('saveCraftingCheckModifiers preserves sibling check fields and replaces the catalogue array (issue 770 persistence trap)', async () => {
+      // updateSystem shallow-merges only the top level, so a checkModifiers-only patch
+      // that failed to spread `...existing` would drop every sibling check field. Capture
+      // the persisted payload and assert the siblings survive AND that a dropped catalogue
+      // entry does not resurrect (whole-array replace, not merge).
+      let updateArgs = null;
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.craftingCheck = {
+        mode: 'passFail',
+        simple: { rollFormula: '1d20 + @craftingmod', dc: 12 },
+        routed: { type: 'relative', rollFormula: '1d20' },
+        progressive: { rollFormula: '2d6' },
+        consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
+        checkModifiers: [
+          { id: 'med', label: 'Medicine', expression: '@med' },
+          { id: 'alch', label: 'Alchemy', expression: '@alch' },
+        ],
+        defaultModifierPolicy: 'addAll',
+        defaultModifierIds: ['med', 'alch'],
+      };
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // A checkModifiers-only patch (the shallow-spread footgun surface): drop 'alch'.
+      await store.saveCraftingCheckModifiers({
+        checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+      });
+
+      const persisted = updateArgs.updates.craftingCheck;
+      // Every sibling check field survives the nested write (would vanish without ...existing).
+      assert.equal(persisted.simple.rollFormula, '1d20 + @craftingmod');
+      assert.equal(persisted.simple.dc, 12);
+      assert.equal(persisted.routed.type, 'relative');
+      assert.equal(persisted.progressive.rollFormula, '2d6');
+      assert.deepEqual(persisted.consumption, {
+        consumeIngredientsOnFail: false,
+        breakToolsOnFail: true,
+      });
+      // The catalogue array is REPLACED whole — 'alch' does not resurrect.
+      assert.deepEqual(
+        persisted.checkModifiers.map((modifier) => modifier.id),
+        ['med'],
+        'the whole checkModifiers array is replaced, not merged'
+      );
+      // A sibling modifier field not in the patch is preserved from existing.
+      assert.deepEqual(persisted.defaultModifierIds, ['med', 'alch']);
+    });
+
     it('projects toolBreakage.authority as toolSpecific when the system has none (issue 419)', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);

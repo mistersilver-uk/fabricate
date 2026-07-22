@@ -166,7 +166,7 @@
     {/each}
     <button
       type="button"
-      class="manager-secondary-button"
+      class="manager-button"
       data-crafting-modifier-add
       onclick={addModifier}
     >
