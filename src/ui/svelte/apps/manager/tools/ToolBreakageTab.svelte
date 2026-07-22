@@ -44,6 +44,20 @@
   function setReplacement(type, value) {
     patchOnBreak({ replacementTarget: type === 'component' ? { type, componentId: value } : { type, itemUuid: value } });
   }
+  function breakageModeLabel(mode) {
+    return {
+      limitedUses: text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses'),
+      breakageChance: text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance'),
+      diceExpression: text('FABRICATE.Admin.Manager.Tools.BreakageDice', 'Dice expression'),
+    }[mode];
+  }
+  function onBreakModeLabel(mode) {
+    return {
+      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy item'),
+      flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlag', 'Mark as broken'),
+      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with item'),
+    }[mode];
+  }
 </script>
 
 <div class="manager-tool-tab-stack" data-tool-breakage-tab>
@@ -56,8 +70,8 @@
     <h3>{text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}</h3>
     {#if authority === 'toolSpecific'}
       <div class="manager-tool-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}>
-        {#each [['limitedUses', 'Limited uses'], ['breakageChance', 'Breakage chance'], ['diceExpression', 'Dice expression']] as mode}
-          <label class:is-selected={tool?.breakage?.mode === mode[0]}><input type="radio" name="tool-breakage-mode" value={mode[0]} checked={tool?.breakage?.mode === mode[0]} onchange={() => changeMode(mode[0])} /><span>{mode[1]}</span></label>
+        {#each ['limitedUses', 'breakageChance', 'diceExpression'] as mode}
+          <label class:is-selected={tool?.breakage?.mode === mode}><input type="radio" name="tool-breakage-mode" value={mode} checked={tool?.breakage?.mode === mode} onchange={() => changeMode(mode)} /><span>{breakageModeLabel(mode)}</span></label>
         {/each}
       </div>
       {#if tool?.breakage?.mode === 'limitedUses'}
@@ -79,8 +93,8 @@
     <legend>{text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}</legend>
     {#if immune}<p class="manager-tool-info-strip"><i class="fas fa-shield" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.ImmuneHint', 'Immune Tools never run an on-break action.')}</p>{/if}
     <div class="manager-tool-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}>
-      {#each [['destroy', 'Destroy item'], ['flagBroken', 'Mark as broken'], ['replaceWith', 'Replace with item']] as action}
-        <label class:is-selected={onBreak.mode === action[0]}><input type="radio" name="tool-on-break" value={action[0]} checked={onBreak.mode === action[0]} onchange={() => setOnBreakMode(action[0])} /><span>{action[1]}</span></label>
+      {#each ['destroy', 'flagBroken', 'replaceWith'] as action}
+        <label class:is-selected={onBreak.mode === action}><input type="radio" name="tool-on-break" value={action} checked={onBreak.mode === action} onchange={() => setOnBreakMode(action)} /><span>{onBreakModeLabel(action)}</span></label>
       {/each}
     </div>
     {#if onBreak.mode === 'replaceWith'}

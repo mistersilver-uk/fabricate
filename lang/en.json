@@ -3822,6 +3822,7 @@
           "UnlinkItem": "Unlink Item",
           "Preview": "Live behavior preview",
           "ValidationValid": "This Tool is ready to save.",
+          "ValidationIssues": "{count} issues",
           "EditorKicker": "Tool editor",
           "Editor": {
             "Tabs": "Tool editor sections",
