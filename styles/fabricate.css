@@ -2142,7 +2142,6 @@
   display: flex;
   flex-flow: row wrap;
   align-items: flex-start;
-  justify-content: space-between;
   gap: var(--fab-space-4);
 }
 
@@ -2161,6 +2160,7 @@
   gap: var(--fab-space-chip);
   align-items: center;
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .fabricate-manager .manager-character-modifier-empty {
