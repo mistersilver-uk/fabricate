@@ -5958,22 +5958,14 @@ async function main() {
         // frame while the caption still claimed them. Split them into their own frame:
         // scroll the currency-cost row (the LAST requirement, with the essence row
         // directly above it) into view so both rows AND their shared end-of-row Steppers
-        // are on-screen, then capture. Guarded so a hiccup records a failed step instead
-        // of aborting the rest of Phase D0.
-        try {
-          await page.locator('.fabricate-manager [data-recipe-tab="ingredients"] [data-recipe-option-currency]').first()
-            .scrollIntoViewIfNeeded();
-          await page.locator('.fabricate-manager [data-recipe-tab="ingredients"] [data-recipe-option-essence]').first()
-            .waitFor({ state: 'visible', timeout: 5_000 });
-          await page.locator('.fabricate-manager [data-recipe-tab="ingredients"] [data-recipe-currency-amount]').first()
-            .waitFor({ state: 'visible', timeout: 5_000 });
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'manager-recipe-edit-ingredients-cost');
-          results.steps.push({ step: 'recipe-edit-ingredients-cost', passed: true });
-        } catch (err) {
-          results.steps.push({ step: 'recipe-edit-ingredients-cost', passed: false, error: err.message });
-          process.stderr.write(`Recipe ingredients cost capture failed: ${err.message}\n`);
-        }
+        // are on-screen, then capture. Inline like the first ingredients frame above — a
+        // hiccup fails the walk loudly rather than publishing a silently-cropped frame.
+        const ingredientsTab = page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first();
+        await ingredientsTab.locator('[data-recipe-option-currency]').first().scrollIntoViewIfNeeded();
+        await ingredientsTab.locator('[data-recipe-option-essence]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await ingredientsTab.locator('[data-recipe-currency-amount]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipe-edit-ingredients-cost');
 
         // Return to the recipes browser, then open the check-routed recipe whose
         // Validation tab carries both routed readiness warnings (issue 431 PR-2). The
