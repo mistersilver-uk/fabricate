@@ -369,5 +369,35 @@ describe('Tool Studio editor (mounted)', () => {
       incomplete.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'),
       true
     );
+
+    for (const quantity of ['garbage', '1']) {
+      harness.remount();
+      const malformedQuantity = await harness.mount(
+        props({
+          activeTab: 'validation',
+          tool: tool({
+            repairRequirements: [
+              {
+                id: `quantity-${quantity}`,
+                options: [
+                  {
+                    quantity,
+                    match: { type: 'component', componentId: 'scrap' },
+                  },
+                ],
+              },
+            ],
+          }),
+        })
+      );
+
+      assert.equal(
+        malformedQuantity
+          .querySelector('[data-tool-validation-check="repair"]')
+          .classList.contains('is-invalid'),
+        true,
+        `repair quantity ${JSON.stringify(quantity)} should match model validation`
+      );
+    }
   });
 });
