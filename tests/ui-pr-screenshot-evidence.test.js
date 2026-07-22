@@ -28,6 +28,8 @@ import {
   publishScreenshotEvidence,
   readLabelList,
   resolveDefaultBase,
+  sanitizeLabel,
+  smokeLabelsForChangedFiles,
   upsertScreenshotsBlock,
   VIEW_RECIPES,
   validateChangedFilesForCheck,
@@ -888,6 +890,54 @@ describe('UI PR screenshot evidence', () => {
     // beneath a `## Screenshots` heading, which satisfies the check.
     assert.equal(hasScreenshotEvidence(md), false);
     assert.equal(hasScreenshotEvidence(upsertScreenshotsBlock('Body.', md)), true);
+  });
+
+  it('scopes changed files to the exact smoke-label target set for the capture profile', () => {
+    // The `targets` command / `screenshots` profile consume this — it must equal the
+    // same mapping collect/publish use, never the full catalogue.
+    assert.deepEqual(smokeLabelsForChangedFiles(['styles/theme.css']), [
+      'manager-default-selection',
+      'manager-components-normal',
+      'manager-environments-browse-normal',
+      'manager-gathering-task-editor-normal',
+      'manager-gathering-events-normal',
+      'manager-essences-normal',
+    ]);
+    assert.deepEqual(smokeLabelsForChangedFiles(['docs/readme.md']), []);
+  });
+
+  it('publish threads a head SHA into revision-addressed S3 keys', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-publish-sha-'));
+    try {
+      const dir = join(root, 'tmp/pr-screenshots/251');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'manager-tools.png'), 'a');
+      const puts = [];
+      const runGh = (args) => {
+        if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
+        if (args[0] === 'pr' && args[1] === 'view') return { status: 0, stdout: 'Body.', stderr: '' };
+        if (args[0] === 'pr' && args[1] === 'edit') return { status: 0, stdout: '', stderr: '' };
+        return { status: 1, stdout: '', stderr: `unexpected ${args.join(' ')}` };
+      };
+      const result = await publishScreenshotEvidence({
+        prNumber: 251,
+        headSha: 'deadbee',
+        root,
+        runGh,
+        putObject: async (o) => puts.push(o),
+        config: { bucket: 'b', baseUrl: 'https://b.example', prefix: 'pr-screenshots' },
+      });
+      assert.equal(result.skipped, false);
+      assert.equal(puts[0].key, 'pr-screenshots/251/deadbee/manager-tools.png');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sanitizeLabel is a no-op on every current view label (no over-escaping)', () => {
+    for (const view of VIEW_RECIPES) {
+      assert.equal(sanitizeLabel(view.label), view.label, `${view.id} label should pass through unchanged`);
+    }
   });
 
   it('upserts the screenshot block idempotently', () => {

@@ -46,6 +46,7 @@ import {
   assertExpectedSelectorsPresent,
   expectedSelectorsForManagerSurface
 } from './lib/managerLayoutGuards.js';
+import { isPhaseNeededForTargets } from './lib/screenshotCaptureMap.js';
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being
 // killed while a final screenshot click is still in flight) can leave a FLOATING page
@@ -72,18 +73,60 @@ const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 
-// Smoke profile selector. Three profiles:
+// Smoke profile selector. Four profiles:
 //   - `rc`   release-candidate happy path: real Foundry boot, fixture creation,
 //            one gathering success, craft a Healing Potion, console-error
 //            health. Minimal screenshot budget. Used by the CI workflow.
 //   - `ci`   alias for `rc`; kept for one release for back-compat.
 //   - `full` (default) every phase, full screenshot regen. Local + scheduled
 //            visual-regression workflow.
+//   - `screenshots` (issue #826) real-Foundry PR evidence, SCOPED: same rendering
+//            path and screenshot budget as `full`, but captures only the labels a
+//            PR's changed files affect (`FOUNDRY_SCREENSHOT_TARGET_LABELS`, fed from
+//            `mapChangedFilesToViews`) and skips a view-bearing phase whose labels are
+//            all off-target. It runs the SCREENSHOT phases but NOT the full-only
+//            behavioral assert phases — so `rc`/`ci`/`full` truth values are untouched.
 const RAW_SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
 const SMOKE_PROFILE = RAW_SMOKE_PROFILE === 'ci' ? 'rc' : RAW_SMOKE_PROFILE;
-const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full';
+const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full' || SMOKE_PROFILE === 'screenshots';
 const RUN_FULL_ONLY_BEHAVIORS = SMOKE_PROFILE === 'full';
 const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
+
+// The scoped `screenshots` profile target set (issue #826). A comma/whitespace-
+// separated list of smoke labels — exactly the `smokeLabels` of the views
+// `mapChangedFilesToViews(changedFiles)` returns — supplied via
+// `FOUNDRY_SCREENSHOT_TARGET_LABELS` or `--target-labels=<csv>`. When empty (a bare
+// `test:foundry:screenshots` debug run) the profile captures the FULL label set, so
+// scoping never silently drops evidence when the wiring is absent.
+function readScreenshotTargetLabels(argv = process.argv.slice(2), env = process.env) {
+  const FLAG = '--target-labels';
+  let csv = '';
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === FLAG) { csv = argv[i + 1] ?? ''; break; }
+    if (arg.startsWith(`${FLAG}=`)) { csv = arg.slice(FLAG.length + 1); break; }
+  }
+  if (!csv) csv = env.FOUNDRY_SCREENSHOT_TARGET_LABELS ?? '';
+  return new Set(csv.split(/[\s,]+/).map(label => label.trim()).filter(Boolean));
+}
+
+const SCREENSHOT_TARGET_LABELS = readScreenshotTargetLabels();
+// Scoping is active only under `screenshots` AND when a non-empty target set was
+// supplied. `rc`/`ci`/`full` never see it (dead condition), so their captured-frame
+// set and phase execution are provably unchanged.
+const SCREENSHOT_SCOPING_ACTIVE = SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
+
+/**
+ * Whether the given view-bearing phase must run for this invocation. Always true
+ * except under an actively-scoped `screenshots` run, where a phase whose labels are
+ * all off-target is skipped. Inert (returns true) for `rc`/`ci`/`full`.
+ * @param {string} phase
+ * @returns {boolean}
+ */
+function shouldRunScreenshotPhase(phase) {
+  if (!SCREENSHOT_SCOPING_ACTIVE) return true;
+  return isPhaseNeededForTargets(phase, SCREENSHOT_TARGET_LABELS);
+}
 
 // Exact set of screenshot labels the `rc` profile captures. Every other
 // `screenshot(page, label)` call is a no-op under `rc` (the surrounding
@@ -290,13 +333,18 @@ function formatSlowestViewsTable(timings, limit = 12) {
 
 /**
  * Take a screenshot with an auto-incrementing numeric prefix. Under the
- * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; all
- * other labels are no-ops (the surrounding assertions still run).
+ * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; under an
+ * actively-scoped `screenshots` run only labels in the PR's target set are captured;
+ * all other labels are no-ops (the surrounding assertions still run). Because scoping
+ * only FILTERS which labels are written — never reorders the walk — a captured view's
+ * frames keep their relative capture order, so `collect`'s `candidates[0]` still picks
+ * the intended (first-captured) frame.
  * @param {import('playwright').Page} page
  * @param {string} label
  */
 async function screenshot(page, label, options = {}) {
   if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
+  if (SCREENSHOT_SCOPING_ACTIVE && !SCREENSHOT_TARGET_LABELS.has(label)) return;
   screenshotCounter++;
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
@@ -7608,7 +7656,14 @@ async function main() {
       // page.isClosed?.() — a 'browser has been disconnected'-class teardown is
       // predicate-matched yet can leave page.isClosed() false, so isClosed alone
       // would let Phase E proceed and throw into the Phase C catch.
-      if (page.isClosed?.() || d0TeardownTolerated) {
+      if (!shouldRunScreenshotPhase('phase-E')) {
+        // Scoped `screenshots` run whose target set has no phase-E (player/craft/
+        // journal) label. Phase E is the last view-bearing phase and nothing earlier
+        // depends on its side effects, so skipping it is safe and drops the largest
+        // off-target cost for a manager-only PR. Inert for rc/ci/full.
+        process.stdout.write('Phase E: skipped (screenshots scope has no phase-E labels).\n');
+        results.steps.push({ step: 'craft-item-phase', passed: true, skipped: true });
+      } else if (page.isClosed?.() || d0TeardownTolerated) {
         process.stdout.write('Phase E: skipped (renderer teardown tolerated in Phase D0).\n');
         results.steps.push({ step: 'craft-item-phase', passed: true, skipped: true });
       } else {

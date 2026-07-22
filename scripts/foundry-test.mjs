@@ -43,12 +43,17 @@ function runScript(scriptPath, args = [], timeoutMs) {
 }
 
 async function main() {
-  // Optional --profile=<full|ci> CLI arg flows through to the child run script
-  // via FOUNDRY_SMOKE_PROFILE. Useful for cross-platform local CI emulation;
-  // POSIX users could also set the env var directly.
+  // Optional --profile=<full|rc|ci|screenshots> CLI arg flows through to the child run
+  // script via FOUNDRY_SMOKE_PROFILE. Useful for cross-platform local CI emulation;
+  // POSIX users could also set the env var directly. The scoped `screenshots` profile
+  // (issue #826) additionally reads --target-labels=<csv> (the smoke labels of the
+  // views a PR affects, from `ui-pr-screenshot-evidence.mjs targets`) and forwards it
+  // as FOUNDRY_SCREENSHOT_TARGET_LABELS; empty means capture the full label set.
   for (const arg of process.argv.slice(2)) {
-    const match = /^--profile=(.+)$/.exec(arg);
-    if (match) process.env.FOUNDRY_SMOKE_PROFILE = match[1];
+    const profile = /^--profile=(.+)$/.exec(arg);
+    if (profile) process.env.FOUNDRY_SMOKE_PROFILE = profile[1];
+    const targets = /^--target-labels=(.*)$/.exec(arg);
+    if (targets) process.env.FOUNDRY_SCREENSHOT_TARGET_LABELS = targets[1];
   }
 
   const up = join(__dirname, 'foundry-test-up.mjs');

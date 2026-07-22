@@ -546,6 +546,7 @@ npm run build
 - `npm run test:foundry:run` — run the Playwright smoke test against an already-running container.
 - `npm run test:foundry:down` — stop and remove the container (preserve the image).
 - `npm run test:foundry:rc` — release-candidate profile.
+- `npm run test:foundry:screenshots` — scoped PR screenshot evidence (issue 826): full real-Foundry frames for only the views a PR affects (pass `-- --target-labels=<csv>` from `npm run screenshots:ui:targets` to scope it; empty captures the full catalogue).
 
 To run the release-candidate CI profile locally:
 
@@ -628,9 +629,9 @@ Every profile boots a real Foundry instance, joins the `fabricate-smoke-ci` worl
 
 The `full` profile additionally captures Crafting System Manager v2 screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, asserts the seeded 0%-drop and scene-blocked gathers plus the hazardous "Bramble Snare" event firing, and runs document cleanup.
 
-### Smoke profiles (`rc` vs `full`)
+### Smoke profiles (`rc`, `full`, `screenshots`)
 
-A single orchestrator (`scripts/foundry-test.mjs`) and run script (`scripts/foundry-test-run.mjs`) handle both profiles.
+A single orchestrator (`scripts/foundry-test.mjs`) and run script (`scripts/foundry-test-run.mjs`) handle every profile.
 The profile is selected by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>` on `node scripts/foundry-test.mjs`).
 
 | Profile | When | Phases | Target |
@@ -638,8 +639,14 @@ The profile is selected by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>` on `n
 | `rc` | Release-candidate CI | Phase B → C → E (unified shell, one Gathering success, Healing Potion craft) → console-error check | < 25 min including cold setup |
 | `ci` | Deprecated alias for `rc` (removed after one release) | same as `rc` | same |
 | `full` (default) | Local and visual-regression runs | + Phase D0 (manager screenshots), extended Gathering states, non-GM redaction, no-selectable actors, Phase F (cleanup) | ~10–15 min locally |
+| `screenshots` | Scoped PR screenshot evidence (issue 826) | Same rendering path and budget as `full`, but captures ONLY the labels a PR's changed files affect and skips a view-bearing phase whose labels are all off-target; the full-only behavioral assert phases do NOT run | Modestly faster for a manager-only PR (phase E skipped, ~25% off) but ≈no win yet for player PRs since phase D0 still fully navigates — the per-view within-D0 scoping that yields the larger win is a follow-on |
 
 The `rc` profile captures a pinned screenshot budget (`world-loaded`, `fabricate-app-shell`, `post-craft`, `alara-post-craft-inventory`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run.
+
+The `screenshots` profile is the PR-evidence producer: it renders the same real-Foundry app windows as `full` but scopes the captured set to the views a PR touches.
+Its target label set comes from `mapChangedFilesToViews` — derive it with `npm run screenshots:ui:targets -- --base origin/main` (or `--changed-files <file>`) and pass it via `--target-labels=<csv>` / `FOUNDRY_SCREENSHOT_TARGET_LABELS`; an empty set (no UI change) means capture the full catalogue.
+Phase E (the player/craft/journal frames) is skipped when no target label maps to it, so a manager-only PR drops that whole phase.
+The label → phase registration lives in `scripts/lib/screenshotCaptureMap.js` (a pure, playwright-free module the harness and the unit tests share).
 
 The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`, default 18 minutes).
 The default keeps headroom over the observed rc run duration (~870-930s across all phases) so ordinary hosted-runner variance no longer trips the watchdog on an otherwise-passing smoke.

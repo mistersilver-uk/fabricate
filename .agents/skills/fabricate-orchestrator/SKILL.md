@@ -69,7 +69,7 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
    - verification plan
    - acceptance criteria
    - the canonical spec that owns any durable product behavior
-   - for UI work: screenshot acceptance criteria, representative smoke coverage, pointer hit-test needs, a UX review gate, expected smoke screenshot evidence from `npm run screenshots:ui:plan -- --base origin/main`, `npm run test:foundry`, `npm run screenshots:ui -- --base origin/main --pr <number>`, and `npm run screenshots:ui:publish -- --pr <number>`, expected S3-hosted screenshot image embeds in the PR description, and whether smoke data needs Foundry/dnd5e non-SVG raster imagery
+   - for UI work: screenshot acceptance criteria, representative smoke coverage, pointer hit-test needs, a UX review gate, expected smoke screenshot evidence from `npm run screenshots:ui:plan -- --base origin/main`, the scoped `npm run test:foundry:screenshots` producer (which captures only the changed-file-affected views; `full` stays the outer-loop suite), `npm run screenshots:ui -- --base origin/main --pr <number>`, and `npm run screenshots:ui:publish -- --pr <number>`, expected S3-hosted screenshot image embeds in the PR description, and whether smoke data needs Foundry/dnd5e non-SVG raster imagery
    - the resolved agent roster from step 4, including which roles will review the plan and which will review the implementation and docs
 7. **Plan review loop.** From a clean committed coordinator baseline, the driver may create detached planning and plan-review lanes using the preliminary roster derived from the current affected-file proposal; approval is not a prerequisite for these read-only lanes.
 The driver runs the plan-review agents in parallel against the issue delta.
@@ -125,6 +125,7 @@ Define what screenshots must prove: first visible state, image/content fidelity,
 - Keep screen-specific UI behavior in canonical specs (or, while still being planned, the issue's `openspec-delta` block).
 Skills and agents should point to those documents instead of carrying detailed product contracts.
 - For UI-changing PRs, plan real smoke-run screenshot evidence before PR creation or update.
+The producer is the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which captures the changed-file-affected views (from `mapChangedFilesToViews`, via `npm run screenshots:ui:targets`) as full real-Foundry app windows; `full` stays the occasional outer-loop suite.
 Screenshots are collected under `tmp/pr-screenshots/<number>/`, uploaded and embedded by `npm run screenshots:ui:publish -- --pr <number>` (which uploads to S3 and produces `![pr-<number> ...]` markdown in a managed PR-body block), then cleaned with `npm run screenshots:ui:clean -- --pr <number>`.
 The `check-screenshots` gate has no `SCREENSHOTS_NEEDED:` bypass; when capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label.
 - For smoke screenshot data, require Foundry VTT core or dnd5e non-SVG raster image paths when previews need imagery; do not invent SVG preview art.
