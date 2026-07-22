@@ -47,6 +47,7 @@ import {
   expectedSelectorsForManagerSurface
 } from './lib/managerLayoutGuards.js';
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
+import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being
 // killed while a final screenshot click is still in flight) can leave a FLOATING page
@@ -69,7 +70,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const RESULTS_DIR = join(ROOT, 'test-results');
 
-const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
+// Self-derive the endpoint so a standalone `test:foundry:run` (invoked as its own process
+// after `test:foundry:up`) targets the SAME per-worktree port up bound, instead of the old
+// fixed :30100 (issue #827). No free-port scan here — up.mjs also uses identity.port
+// directly without scanning, so deriving it the same way keeps them in agreement. When the
+// parent pipeline set FOUNDRY_URL/FOUNDRY_HOST_PORT, those win by env inheritance.
+const FOUNDRY_URL = reconcileFoundryEndpoint({
+  url: process.env.FOUNDRY_URL,
+  hostPort: process.env.FOUNDRY_HOST_PORT,
+  fallbackPort: deriveRunIdentity(ROOT).port
+}).url;
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 

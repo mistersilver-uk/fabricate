@@ -56,7 +56,7 @@ Use one valid type (`feat`/`fix`/`docs`/`refactor`/`test`/… — `i18n:`
 - MSYS path conversion mangles a `git` argument that looks like a path with a colon: `git show origin/main:<path>` has its colon and slashes rewritten, so the ref fails to resolve.
 Prefix such commands with `MSYS2_ARG_CONV_EXCL='*'` to disable the rewrite.
 - Docker Compose in many worktrees exhausts Docker's address pool, and the failure surfaces as a generic compose-up error rather than a pool message.
-Run `docker network prune -f` to clear the accumulated worktree compose networks.
+The Foundry smoke now uses a per-worktree-stable container identity (`scripts/lib/foundryRunIdentity.js`), so tear a disposed worktree down with `npm run test:foundry:down -- --clean` to reclaim its container and network at the source; `docker network prune -f` remains a safe fallback for accumulated worktree compose networks (it only frees networks with no attached container).
 
 ## OpenSpec
 

@@ -15,8 +15,19 @@ import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
+
+// Target the same per-worktree compose project the up phase created (issue #827). `down`
+// is compose-project-scoped, so pinning COMPOSE_PROJECT_NAME + the container-name env
+// (already set when invoked by the parent pipeline; derived here for a standalone
+// `test:foundry:down`) tears down THIS worktree's container, never a sibling's.
+const identity = deriveRunIdentity(ROOT);
+process.env.FOUNDRY_CONTAINER_NAME ||= identity.containerName;
+process.env.FOUNDRY_CONTAINER_HOSTNAME ||= identity.hostname;
+process.env.COMPOSE_PROJECT_NAME ||= identity.project;
 
 async function main() {
   const clean = process.argv.includes('--clean');

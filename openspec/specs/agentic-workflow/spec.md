@@ -231,6 +231,14 @@ Cleanup MUST preserve any lane whose integration or meaningful state has not bee
 - **AND** the driver runs required final gates from the fully integrated coordinator branch
 - **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
 
+#### Scenario: per-worktree-isolated real-Foundry capture
+
+- **WHEN** the driver runs the real-Foundry screenshot capture from a worktree
+- **THEN** the container identity (name, hostname, compose project, host port) is derived deterministically from the worktree root, so it is stable within a worktree yet distinct across worktrees and concurrent worktrees do not collide on the fixed name
+- **AND** the derivation preserves the container-reuse cache and the hostname-bound cached license within a worktree
+- **AND** — CONDITIONAL on the licensing probe passing and the prebaked world existing — the capture may be sharded across containers within a run, with the merged frame set required to equal the single-container scoped set
+- **AND** the evidence producer is unchanged: still real-Foundry scoped capture, never a Foundry-free render
+
 #### Scenario: cleaning integrated lanes
 
 - **WHEN** the workflow has accepted a lane's integrated output
