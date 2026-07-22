@@ -65,9 +65,20 @@ function clickEvent() {
   return new globalThis.window.Event('click', { bubbles: true });
 }
 
-before(() => harness.setup());
+// happy-dom does not implement scrollIntoView; stub it after the harness builds the
+// window so the copy path's "reveal the opened target" behaviour is observable.
+let scrollCalls = [];
+before(async () => {
+  await harness.setup();
+  globalThis.window.Element.prototype.scrollIntoView = function scrollIntoView() {
+    scrollCalls.push(this);
+  };
+});
 after(() => harness.teardown());
-afterEach(() => harness.remount());
+afterEach(() => {
+  scrollCalls = [];
+  return harness.remount();
+});
 
 describe('system-edit list ergonomics (mounted, issue 768)', () => {
   it('renders the shared IconPicker for a Character Modifier in edit mode', async () => {
@@ -136,6 +147,14 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
       'the newly-copied prerequisite is opened in edit mode'
     );
 
+    // A sighted GM needs a VISIBLE confirmation, not just the aria-live one: the
+    // opened target row is scrolled into view and its first field takes focus.
+    assert.ok(scrollCalls.includes(target), 'the opened prerequisite row is scrolled into view');
+    assert.ok(
+      target.contains(globalThis.window.document.activeElement),
+      'focus moves into the newly-opened prerequisite editor'
+    );
+
     const announcement = root.querySelector('[data-list-copy-announcement]');
     assert.ok(announcement && announcement.textContent.includes('Herbalism'), 'an aria-live confirmation is announced');
   });
@@ -166,6 +185,36 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.ok(
       target.querySelector('.manager-character-modifier-editor'),
       'the newly-copied modifier is opened in edit mode'
+    );
+    assert.ok(scrollCalls.includes(target), 'the opened modifier row is scrolled into view');
+    assert.ok(
+      target.contains(globalThis.window.document.activeElement),
+      'focus moves into the newly-opened modifier editor'
+    );
+  });
+
+  it('hides the Copy to Modifiers button (and the Modifiers section) when gathering is off', async () => {
+    const root = await harness.mount({
+      selectedSystem: { ...makeSystem(), features: { gathering: false } },
+      characterModifierLibrary: MODIFIERS,
+      characterPrerequisiteLibrary: PREREQUISITES
+    });
+
+    // Modifiers are gathering-scoped, so the whole section is gone...
+    assert.ok(
+      !root.querySelector('[data-system-character-modifiers]'),
+      'the Character Modifiers section is absent when gathering is off'
+    );
+    // ...but the Prerequisites card still renders. Its rows must NOT offer a
+    // Copy to Modifiers action (there is no modifier store to copy into).
+    assert.ok(
+      root.querySelector('[data-system-character-prerequisites]'),
+      'the Character Prerequisites card still renders'
+    );
+    assert.equal(
+      root.querySelectorAll('[data-copy-to-modifier]').length,
+      0,
+      'no Copy to Modifiers button when gathering is off'
     );
   });
 });

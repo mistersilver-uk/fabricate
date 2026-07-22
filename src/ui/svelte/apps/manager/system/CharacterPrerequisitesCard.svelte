@@ -161,6 +161,7 @@
                 type="button"
                 class="manager-icon-button"
                 aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers', 'Copy to modifiers')}
+                data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers', 'Copy to modifiers')}
                 data-copy-to-modifier={entry.id}
                 onclick={() => onCopyToModifier(entry)}
               >

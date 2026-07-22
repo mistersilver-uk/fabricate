@@ -9,6 +9,7 @@
   the whole crafting manager admin is GM-scoped.
 -->
 <script>
+  import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
@@ -248,6 +249,23 @@
     }
   }
 
+  // The copied entry opens in edit mode in the OTHER section (Prereqs sit below
+  // Modifiers, Modifiers above Prereqs), so for the long-list case this feature
+  // targets it can land off-screen — the aria-live confirmation would then be the
+  // ONLY signal (invisible to a sighted GM). After the target editor renders, scroll
+  // the new row into view and move focus to its first editable field so the visible
+  // confirmation matches the announced one. Scoped to this page's root (bound below)
+  // so a query never crosses into another mounted manager instance.
+  let pageRoot = $state(null);
+  async function revealCopiedEntry(selector) {
+    await tick();
+    const node = pageRoot?.querySelector?.(selector);
+    if (!node) return;
+    node.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    const focusTarget = node.querySelector?.('input, select, textarea');
+    focusTarget?.focus?.();
+  }
+
   async function handleCopyModifierToPrerequisite(entry) {
     const created = await onAddCharacterPrerequisite(mapModifierToPrerequisite(entry));
     if (!created?.id) return;
@@ -255,6 +273,7 @@
     prereqRequestOpenId = created.id;
     prereqRequestOpenNonce += 1;
     announceCopy(entry?.label);
+    await revealCopiedEntry(`[data-system-character-prerequisite="${created.id}"]`);
   }
 
   async function handleCopyPrerequisiteToModifier(entry) {
@@ -263,6 +282,7 @@
     expandSection('modifiers');
     characterModifierEditingId = created.id;
     announceCopy(entry?.name);
+    await revealCopiedEntry(`[data-system-character-modifier="${created.id}"]`);
   }
 
   const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
@@ -488,7 +508,7 @@
 </script>
 
 {#if selectedSystem}
-  <div class="manager-environment-edit-view manager-system-edit-view" data-system-editor>
+  <div class="manager-environment-edit-view manager-system-edit-view" data-system-editor bind:this={pageRoot}>
     <SystemEditorTabs {activeTab} badges={tabBadges} onSelect={(tab) => { activeTab = tab; }} />
 
     <div class="manager-environment-workspace manager-system-workspace is-inspector-hidden">
@@ -706,7 +726,7 @@
                       <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Edit', 'Edit character modifier')} onclick={() => characterModifierEditingId = entry.id}>
                         <i class="fa-solid fa-pen" aria-hidden="true"></i>
                       </button>
-                      <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-copy-to-prerequisite={entry.id} onclick={() => handleCopyModifierToPrerequisite(entry)}>
+                      <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-copy-to-prerequisite={entry.id} onclick={() => handleCopyModifierToPrerequisite(entry)}>
                         <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
                       </button>
                       <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
