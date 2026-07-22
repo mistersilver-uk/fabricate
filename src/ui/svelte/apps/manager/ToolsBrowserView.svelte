@@ -158,7 +158,7 @@
       <div class="manager-tools-library-list" role="list">
         {#each pagedTools as tool (tool.id)}
           {@const row = projectToolRow(tool, managedItemOptions, breakageAuthority)}
-          <article class:is-selected={selectedToolId === tool.id} data-manager-tool-id={tool.id} role="listitem">
+          <article class="manager-tools-row" class:is-selected={selectedToolId === tool.id} data-manager-tool-id={tool.id} role="listitem">
             <button
               type="button"
               class="manager-tools-select-target"

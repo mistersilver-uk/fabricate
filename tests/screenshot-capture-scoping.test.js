@@ -276,7 +276,7 @@ test('a Tool Studio target runs only the dedicated persisted-net-zero tools sect
 });
 
 test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer coverage, and restoration', () => {
-  assert.equal(HARNESS.includes('.manager-tools-row'), false);
+  assert.equal(HARNESS.includes('.manager-tools-row'), true);
   assert.ok(HARNESS.includes('[data-manager-tool-id]'));
   assert.ok(HARNESS.includes('exerciseToolStudioPointerTargets'));
   assert.ok(HARNESS.includes('verifyToolStudioLiveReplacement'));
