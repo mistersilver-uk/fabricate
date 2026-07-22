@@ -81,6 +81,22 @@ See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#
 
 Developers configuring a custom check for a non-D&D-5e system should refer to the API reference for the expected setup.
 
+### Natural tier stepping
+
+Relative Routed by check crafting and salvage checks offer **Natural tier stepping**.
+It is off by default.
+
+When enabled, a natural 20 on the kept die in the first d20 group steps the matched tier up once.
+A natural 1 steps it down once.
+The step happens after the roll is matched against the relative DC margins.
+
+A natural result at the highest or lowest tier does nothing because there is no next tier in that direction.
+A forced outcome takes priority and does not step.
+Fixed routed checks do not offer this setting.
+Gathering checks do not use natural tier stepping.
+
+When a tier changes, the crafting or salvage result explains the natural step in chat.
+
 ## Failure consumption policy
 
 When a crafting check fails, you decide what happens to the recipe's ingredients and its required Tools.
@@ -90,15 +106,15 @@ Two toggles on the **Crafting check** page set this policy for the whole system.
 The recipe's ingredients are used up even when the crafting check fails.
 Turn it off to return the ingredients on a failed check, so a failed attempt costs the crafter nothing.
 - **Break tools on a failed check** is off by default.
-Turn it on to break the required Tools whenever the crafting check fails.
+Turn it on to allow normal Tool breakage evaluation after the crafting check fails.
 
 This policy applies to every failed crafting check in the system, across the simple, Routed by ingredients, Routed by check, and Progressive modes.
 It does not appear in Alchemy mode, where a failed brew follows the system's own [Consume on Fail]({% link recipes/alchemy.md %}#consume-on-fail) setting instead.
 Salvage failures follow their own separate policy, so this control does not change what a failed salvage consumes.
 See [Salvage]({% link salvage.md %}).
 
-The **Break tools on a failed check** toggle is a system-wide rule that breaks every required Tool on any failed check.
-It is separate from the per-trigger **Tool breakage triggers** panel below, which decides breakage from the specifics of the roll.
+The **Break tools on a failed check** toggle permits breakage on the failure path.
+The system's breakage source still decides whether Tool-specific mechanics or matching check triggers determine the break.
 
 ## Tool breakage triggers
 
@@ -108,14 +124,11 @@ This is only available when the system's **Tool breakage source** is set to **Ch
 You set that on the system's **Tools** page (see [Tool breakage source]({% link tools.md %}#tool-breakage-source)).
 While the source is **Tool-specific**, each Tool decides for itself and this section does not appear.
 
-When the source is **Check-driven**, each check editor (crafting, salvage, and gathering) gains a **Tool breakage triggers** panel.
-Turn it on with the **Enabled** toggle.
-When you first enable it, Fabricate seeds a starter trigger for you: break the required Tools when the first d20 in the formula rolls a natural 1.
-If the formula has no d20, no starter trigger is seeded and you add your own.
+When the source is **Check-driven**, each check editor can include Tool breakage on its check triggers.
+An empty trigger list does nothing, so choose **Add trigger** to author the first condition.
 
 A check can hold any number of triggers.
 The Tools break when any one of them matches, so triggers stack as an "or".
-Give each trigger a label so the run and chat output can explain why the Tools broke.
 
 For each trigger you choose what to watch with the **When** setting:
 
@@ -124,7 +137,7 @@ For each trigger you choose what to watch with the **When** setting:
 | When | Matches on |
 |:-----|:-----------|
 | Roll total | The check's rolled total. |
-| Dice group | One group of dice in the formula. Pick the group, then a measure: the group total, any die, all dice, the lowest die, or the highest die. This is how the natural-1 starter works. |
+| Dice group | One group of dice in the formula. Pick the group, then a measure: the group total, any die, all dice, the lowest die, or the highest die. |
 | Awarded value | The numeric value a progressive check awards. Available on progressive checks only. On a critical roll this can differ from the raw roll total, so a roll-total trigger and an awarded-value trigger can resolve differently on the same roll. |
 | Outcome tier | One or more of the named outcome tiers. Available on routed checks only. A successful tier can break Tools just as a failing one can. |
 
@@ -132,9 +145,9 @@ For each trigger you choose what to watch with the **When** setting:
 
 Roll-total, awarded-value, and dice-group triggers then take a comparison (such as equals, at most, or at least) and a value to compare against.
 
-A trigger breaks every required Tool for the attempt.
+A trigger marked to break Tools breaks every required **Breakable** Tool for the attempt.
 There is no per-Tool targeting.
-An Immune Tool is the exception and never breaks, so set a Tool to Immune to keep it safe while the rest break.
+Set a Tool to **Immune** in its **Breakage** tab to exclude it while keeping its Tool-specific mechanic stored for a later authority change.
 
 The dice groups in a trigger come from the formula.
 When the same shape appears twice (for example two separate d20 rolls), Fabricate numbers them so you can tell them apart.

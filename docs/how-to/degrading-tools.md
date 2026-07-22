@@ -9,47 +9,49 @@ nav_order: 3
 
 ## Problem
 
-How do I make a tool or workstation wear out and eventually break after repeated crafting use?
+How do I make a Tool or workstation wear out and eventually break after repeated crafting use?
 
 ## Short answer
 
-Author the tool once in the crafting system's **Tools** library with the **Limited uses** breakage mode and a **Max uses** limit, choose what happens when it breaks (destroy it, mark it as broken, or replace it with a broken variant), then require the tool from the recipe (or a step or ingredient set).
-
-{: .note }
-> This replaces the old recipe-side **Catalyst** workflow.
-> The Catalyst concept was retired in version 0.6.0.
-> Existing catalyst data is converted to Tools automatically.
-> See [Tools]({% link tools.md %}#migration-from-catalysts).
+Create the Tool in the system's **Tools** library, choose **Limited uses**, set **Maximum uses**, and select an **On-break action**.
+Then add the saved Tool from the recipe's **Tools** tab.
 
 ## Steps
 
-1. **Add the tool component.** In your crafting system's **Components** tab, add the tool item as a managed component.
-   If you plan to replace the tool with a broken variant on break, also add that broken-tool variant as a separate component.
-   You only need a managed component when you use the **Replace with** action below.
-   For the other on-break actions you can skip this step and drop the Item straight onto the Tools page instead, creating an item-sourced tool.
-   See [Authoring a Tool]({% link tools.md %}#authoring-a-tool).
-2. **Open the Tools library** for the system and click *Add tool*.
-   Pick the tool component and optionally set a display label.
-3. **Pick the Limited uses breakage mode** and set **Max uses** to the number of crafts the tool survives (for example 50).
-   Leave it blank for unlimited uses (still tracked).
-4. **Pick what happens when it breaks:**
-   - **Destroy item**.
-The tool is removed from inventory when it breaks.
-   - **Mark as broken**.
-The tool stays but is flagged as broken and cannot be used until a GM clears that mark.
-Fabricate also appends " (broken)" to the tool's name so it reads as broken at a glance, and clearing the mark does not remove that suffix, so the GM renames the tool back as well.
-   - **Replace with...**.
-Swap the tool for a broken variant you can repair through a recipe.
-5. **Save**, then require the tool from the recipe (or from a step or ingredient set).
+1. Open the Crafting System Manager and select the crafting system.
+2. Open **Tools**.
+3. Select an Item under **Start unlinked or from an Item**, or drop an Item onto the creation area.
+4. Choose **Create from Item** to open the Tool editor.
+5. Open **Breakage** and choose **Limited uses**.
+6. Set **Maximum uses** to the number of successful uses the Tool allows before it breaks.
+7. Choose **Destroy item**, **Mark as broken**, or **Replace with item**.
+8. For **Replace with item**, choose either a managed Component or a direct Item as the replacement.
+9. Open **Validation** and resolve every issue.
+10. Choose **Save changes**.
+11. Edit the recipe and open its **Tools** tab.
+12. Add the Tool at the recipe, step, or ingredient-set scope where it is required.
 
 ## How usage is tracked
 
-A Limited uses tool counts how many times it has been used in crafting on the owned item.
-The count goes up before the break is checked, so a Max uses of 5 lets the tool survive its first five uses and break on the sixth.
+A **Limited uses** Tool stores its use count on the owned Item.
+The count increases before Fabricate checks the maximum.
+A maximum of 5 therefore breaks the Tool on its fifth tracked use.
+
+Leave **Maximum uses** blank for unlimited use with tracking.
+
+## Damaged and repairable Tools
+
+**Replace with item** is useful when a damaged variant should become a crafting ingredient.
+Choose a managed Component as the replacement, then create a separate repair recipe that consumes that Component and awards the working Tool Item.
+
+**Mark as broken** can store **Repair materials** made from Components, tags, essences, and currency.
+The editor saves and validates those materials, but repair execution is planned and is not yet available.
+
+If a replacement cannot be resolved or created, Fabricate keeps the original Tool.
 
 ## Learn more
 
 - [Tools]({% link tools.md %}).
-The full Tool model: requirement gate, breakage modes, and on-break actions.
+Learn about Tool sources, prerequisites, bonuses, breakage authority, and validation.
 - [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
-The gathering-side equivalent.
+Use the same Tool in a gathering task.
