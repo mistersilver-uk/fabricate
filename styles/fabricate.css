@@ -2466,7 +2466,7 @@
 }
 
 .fabricate-manager .manager-modifier-label {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
