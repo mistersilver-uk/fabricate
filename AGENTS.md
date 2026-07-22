@@ -278,6 +278,13 @@ A stateful default reporter (opens one toast, then drives it) must be built **pe
 See `createDefaultProgressReporter` (`src/systems/CompendiumImporter.js`).
 - **`CompendiumCollection#getIndex` already self-caches per pack**: a call whose `fields` are a subset of the pack's already-`#indexedFields` short-circuits to the cached index, and `clear()` does not reset it.
 So wrapping `getIndex` in a memo saves nothing — the residual cost of a per-item miss scan is the linear walk of the index, and the fix is a per-run `Map<nameLower, entry[]>` name→entry lookup, not memoizing the build.
+- **Item drop payloads onto a manager drop zone come in three item-bearing shapes**, all resolved by `services.collectImportFolderGroups` / `onDropItem` (`src/ui/SvelteCraftingSystemManagerApp.svelte.js`).
+A **world folder** is `{ type: 'Folder', uuid: 'Folder.<id>' }` (v13 drags carry the uuid, not a bare `id`) — resolve it with `fromUuidSync` and walk `folder.contents` + descendant folders.
+An **in-pack folder** is `{ type: 'Folder', uuid: 'Compendium.<pack>.Folder.<id>' }` (it carries a `folder.pack` packId).
+A **whole pack** is `{ type: 'Compendium', collection: '<packId>' }` (no folder in the payload).
+For BOTH compendium cases, read folder membership from `pack.index[].folder` — a **default-indexed** Item field, so grouping loads no documents — grouped by folder, with display names from `pack.folders`.
+Do **NOT** use `Folder#getSubfolders` for a packed folder: it filters `game.folders` (world-only) and returns `[]` for an in-pack folder, silently dropping nested items; derive the in-pack subtree from the `pack.folders` parent links instead (`descendantFolderIdSet` in `src/ui/svelte/util/importFolderGroups.js`).
+A compendium-**directory** world folder (resolved `folder.documentType === 'Compendium'`) groups packs, not items, and has no item-level grouping — skip it with a notice.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
