@@ -4539,7 +4539,8 @@ async function main() {
 
         // Showcase recipe whose single ingredient set exercises every requirement row
         // type so the Ingredients tab renders: a plain component, an OR group (one
-        // group with two component options), a tag requirement, and a currency cost.
+        // group with two component options), a tag requirement, an essence requirement,
+        // and a currency cost.
         // complex:true forces the full set-card render; allowIncomplete persists it as a
         // structurally-valid editor shell. Single result group → produced on any
         // non-failure outcome (single-group exemption); routed modes ignore resultSelection.
