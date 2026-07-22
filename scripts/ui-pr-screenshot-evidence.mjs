@@ -56,7 +56,13 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-system-edit',
     label: 'Manager system settings',
     smokeLabels: ['manager-system-edit-normal', 'manager-system-edit-narrow'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    // Issue 768: the settings-list child cards (CharacterPrerequisitesCard and any
+    // future `system/` card) render inside this frame, so a change to one maps to a
+    // system-edit screenshot rather than the generic fallback.
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/system\/.+\.svelte$/,
+    ],
   },
   {
     // Issue 767: the unsaved-changes chip + dirty-draft guard for the identity
@@ -70,6 +76,22 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+    ],
+  },
+  {
+    // Issue 768: the settings-list ergonomics proof frame — Character Modifiers,
+    // Character Prerequisites and Currency Units seeded with ≥2 entries, with the
+    // shared IconPicker open on a modifier, the Currency section collapsed, and the
+    // row-level copy buttons visible. Its OWN view id + single smokeLabel because
+    // `collect` publishes only candidates[0]; appending this label to
+    // `manager-system-edit` would keep publishing the clean settled frame instead.
+    id: 'manager-system-edit-lists',
+    label: 'Manager system settings — settings-list ergonomics (icon picker, collapse, copy)',
+    smokeLabels: ['manager-system-edit-lists'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/system\/.+\.svelte$/,
+      /^src\/systems\/characterModifierPrerequisiteCopy\.js$/,
     ],
   },
   {

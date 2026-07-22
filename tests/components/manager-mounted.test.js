@@ -336,6 +336,9 @@ function compileManagerRoot() {
     'src/config/flags.js',
     // CharacterPrerequisitesCard imports the pure prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',
+    // SystemEditView imports the pure modifier↔prerequisite copy-mapping helpers
+    // (issue 768); omitting it HANGS every mounted manager test as `# cancelled`.
+    'src/systems/characterModifierPrerequisiteCopy.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',

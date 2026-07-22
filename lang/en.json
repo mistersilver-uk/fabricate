@@ -3414,6 +3414,7 @@
             "NewLabel": "New character modifier",
             "Label": "Label",
             "Icon": "Icon",
+            "ChangeIcon": "Change icon",
             "Expression": "Expression",
             "SeedPresets": "Seed presets",
             "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
@@ -3451,6 +3452,12 @@
           "TaskDcOverrideHint": "Override the system gathering check DC for this task. Leave blank to use the system default.",
           "TaskDcOverride": "DC",
           "TaskDcOverridePlaceholder": "System default"
+        },
+        "ListErgonomics": {
+          "ToggleSection": "Collapse or expand this section",
+          "CopyToPrerequisites": "Copy to prerequisites",
+          "CopyToModifiers": "Copy to modifiers",
+          "CopiedAnnouncement": "Copied {name} and icon — set the condition."
         },
         "CharacterPrerequisites": {
           "Title": "Character prerequisites",

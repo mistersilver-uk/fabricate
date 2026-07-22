@@ -61,6 +61,7 @@ export const CLASS_B_LABELS = Object.freeze(
     'manager-components-description-repaired',
     'manager-components-description-ingested',
     'manager-system-edit-dirty',
+    'manager-system-edit-lists',
     'interactables-manager-promote',
     'interactables-manager-empty',
   ])
@@ -86,6 +87,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-system-edit-normal',
   'manager-system-edit-narrow',
   'manager-system-edit-dirty',
+  'manager-system-edit-lists',
   'currency-actor-property',
   'currency-macro',
   'currency-actor-inventory',

@@ -24,9 +24,31 @@
     onUpdate = async () => {},
     onDelete = async () => {},
     onSeedPresets = async () => {},
+    // Whole-section collapse (issue 768) — owned by the parent SystemEditView so
+    // all three list sections share one session Set and one reset-on-switch. This
+    // is distinct from the per-item accordion (`openId`) below.
+    collapsed = false,
+    onToggleCollapsed = () => {},
+    // Cross-list copy (issue 768). When set (parent gates on `features.gathering`),
+    // each row shows a "Copy to Modifiers" button that hands the entry back to the
+    // parent, which owns the destination store add + the aria-live announcement.
+    onCopyToModifier = null,
+    // The parent requests opening a freshly-copied entry in edit mode; the nonce
+    // forces the effect to re-fire even when the id-run is unchanged.
+    requestOpenId = '',
+    requestOpenNonce = 0,
   } = $props();
 
   let openId = $state('');
+
+  // Open the parent-requested entry (a just-copied prerequisite) in edit mode.
+  let appliedOpenNonce = $state(0);
+  $effect(() => {
+    if (requestOpenNonce !== appliedOpenNonce) {
+      appliedOpenNonce = requestOpenNonce;
+      if (requestOpenId) openId = requestOpenId;
+    }
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -50,10 +72,22 @@
 
 <section
   class="manager-edit-card manager-prerequisite-card"
+  class:is-section-collapsed={collapsed}
   data-system-character-prerequisites
   aria-label={text('FABRICATE.Admin.Manager.CharacterPrerequisites.Title', 'Character prerequisites')}
 >
   <header class="manager-character-modifier-card-header">
+    <button
+      type="button"
+      class="manager-section-collapse-toggle"
+      aria-expanded={!collapsed}
+      aria-controls="manager-section-body-prerequisites"
+      aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.ToggleSection', 'Collapse or expand this section')}
+      data-section-collapse="prerequisites"
+      onclick={() => onToggleCollapsed()}
+    >
+      <i class={`fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+    </button>
     <div class="manager-character-modifier-card-header-copy">
       <h3 class="manager-card-title">
         <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
@@ -89,6 +123,8 @@
     </div>
   </header>
 
+  {#if !collapsed}
+  <div id="manager-section-body-prerequisites" class="manager-section-body">
   {#if library.length === 0}
     <p class="manager-muted manager-prerequisite-empty">
       {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Empty', 'No character prerequisites yet.')}
@@ -120,6 +156,18 @@
                 {prerequisitePreview(entry)}
               </span>
             </button>
+            {#if onCopyToModifier}
+              <button
+                type="button"
+                class="manager-icon-button"
+                aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers', 'Copy to modifiers')}
+                data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers', 'Copy to modifiers')}
+                data-copy-to-modifier={entry.id}
+                onclick={() => onCopyToModifier(entry)}
+              >
+                <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
+              </button>
+            {/if}
             <button
               type="button"
               class="manager-icon-button is-danger"
@@ -213,5 +261,7 @@
         </li>
       {/each}
     </ul>
+  {/if}
+  </div>
   {/if}
 </section>
