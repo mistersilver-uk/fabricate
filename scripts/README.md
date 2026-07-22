@@ -118,8 +118,9 @@ The smoke test creates the following Foundry documents:
 
 All actors are imported from the dnd5e **Starter Heroes** compendium (`dnd5e.heroes`) and
 tagged `flags.fabricate.smokeSeed` for idempotent cleanup.
-Sorted by name, the first two are
-used by current flows; the rest fill the gathering actor-selection bar:
+The two heroes' ids are recorded at seed time, and Travel seeding selects the party's crafter and travel member by those stable ids rather than by name-sort position (#816), so grant-only actors can never displace the intended party.
+Grant-only actors seeded for the Access-tab grid are additionally namespaced with `flags.fabricate.smokeSeedRole = 'access-grant'` to distinguish them from the two hero fixtures; cleanup still keys solely on `smokeSeed` so both cohorts are torn down.
+Sorted by name, the first two heroes are used by current flows; the rest fill the gathering actor-selection bar:
 
 - crafter — first hero alphabetically (inventory: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale); owned by the Fabricate Gatherer user and remembered as the default gathering actor
 - travel-party member — second hero alphabetically (inventory: 3x Iron Ore, 1x Dragon Scale)
