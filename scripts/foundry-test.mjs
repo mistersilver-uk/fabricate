@@ -18,7 +18,12 @@ import { createServer } from 'node:net';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
+import {
+  deriveRunIdentity,
+  reconcileFoundryEndpoint,
+  PORT_BASE,
+  PORT_SPAN
+} from './lib/foundryRunIdentity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -48,10 +53,8 @@ function isPortFree(port) {
  * @returns {Promise<number>}
  */
 async function resolveHostPort(candidate) {
-  const base = 30100;
-  const span = 400;
-  for (let i = 0; i < span; i += 1) {
-    const port = base + ((candidate - base + i) % span);
+  for (let i = 0; i < PORT_SPAN; i += 1) {
+    const port = PORT_BASE + ((candidate - PORT_BASE + i) % PORT_SPAN);
     if (await isPortFree(port)) return port;
   }
   return candidate;
@@ -70,13 +73,22 @@ async function exportRunIdentity() {
   process.env.FOUNDRY_CONTAINER_HOSTNAME ||= identity.hostname;
   process.env.COMPOSE_PROJECT_NAME ||= identity.project;
 
-  if (!process.env.FOUNDRY_HOST_PORT) {
-    const port = await resolveHostPort(identity.port);
-    process.env.FOUNDRY_HOST_PORT = String(port);
+  // Only scan for a free port when NOTHING is pinned — a pinned URL or host port is an
+  // explicit choice the scan must not override (CI pins FOUNDRY_URL to :30100). The
+  // reconcile then keeps the URL and the container host port in lockstep so they can
+  // never diverge: an explicit URL's port wins, else an explicit host port derives the
+  // URL, else both come from the scanned/derived fallback.
+  let fallbackPort = identity.port;
+  if (!process.env.FOUNDRY_URL && !process.env.FOUNDRY_HOST_PORT) {
+    fallbackPort = await resolveHostPort(identity.port);
   }
-  if (!process.env.FOUNDRY_URL) {
-    process.env.FOUNDRY_URL = `http://localhost:${process.env.FOUNDRY_HOST_PORT}`;
-  }
+  const { hostPort, url } = reconcileFoundryEndpoint({
+    url: process.env.FOUNDRY_URL,
+    hostPort: process.env.FOUNDRY_HOST_PORT,
+    fallbackPort
+  });
+  process.env.FOUNDRY_HOST_PORT = hostPort;
+  process.env.FOUNDRY_URL = url;
   process.stdout.write(
     `Worktree container identity: ${process.env.FOUNDRY_CONTAINER_NAME} ` +
     `(host ${process.env.FOUNDRY_URL})\n`

@@ -26,9 +26,13 @@ import { createHash } from 'node:crypto';
 
 /** Hex characters of the sha256 digest used in the container name / hostname. */
 const HASH_LENGTH = 12;
-/** Base host port; the derived port lands in [PORT_BASE, PORT_BASE + PORT_SPAN). */
-const PORT_BASE = 30_100;
-const PORT_SPAN = 400;
+/**
+ * Base host port and span; the derived port lands in [PORT_BASE, PORT_BASE + PORT_SPAN).
+ * Exported so a caller's free-port scan window cannot silently drift from the derivation
+ * range (the scan must stay within the same bounded window this module hands out).
+ */
+export const PORT_BASE = 30_100;
+export const PORT_SPAN = 400;
 
 /** Docker object-name charset: `[a-zA-Z0-9][a-zA-Z0-9_.-]*`. */
 const DOCKER_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
@@ -89,4 +93,29 @@ export function isLegalDockerName(name) {
 /** True when `hostname` is a legal single RFC-1123 hostname label (<= 63 chars). */
 export function isLegalHostname(hostname) {
   return typeof hostname === 'string' && hostname.length <= 63 && HOSTNAME_RE.test(hostname);
+}
+
+/**
+ * Reconcile the Foundry base URL and the container host port so they can NEVER diverge —
+ * the exact CI regression class this guards (issue #827): the CI job pins `FOUNDRY_URL`
+ * to `http://localhost:30100` but leaves `FOUNDRY_HOST_PORT` unset, so a naive derive
+ * would bind the container to the derived port while Playwright still targeted 30100.
+ *
+ * Precedence: an explicit URL's port is the authority (parse it into the host port); else
+ * an explicit host port derives the URL; else fall back to the already-resolved derived
+ * port. Pinning EITHER one alone is therefore self-consistent. Pure and side-effect-free —
+ * the caller assigns the returned values into the environment.
+ *
+ * @param {{ url?: string, hostPort?: string | number, fallbackPort: string | number }} input
+ * @returns {{ hostPort: string, url: string }}
+ */
+export function reconcileFoundryEndpoint({ url, hostPort, fallbackPort }) {
+  let resolvedPort = hostPort;
+  if (url && !resolvedPort) {
+    const match = /:(\d+)(?:\/|$)/.exec(url);
+    if (match) resolvedPort = match[1];
+  }
+  if (!resolvedPort) resolvedPort = fallbackPort;
+  const resolvedUrl = url || `http://localhost:${resolvedPort}`;
+  return { hostPort: String(resolvedPort), url: resolvedUrl };
 }

@@ -13,6 +13,7 @@ import {
   deriveRunIdentity,
   isLegalDockerName,
   isLegalHostname,
+  reconcileFoundryEndpoint,
 } from '../scripts/lib/foundryRunIdentity.js';
 
 const ROOT_A = 'C:/Users/dev/WebstormProjects/fabricate/.worktrees/827/implement-r1';
@@ -78,4 +79,48 @@ test('deriveRunIdentity rejects an empty or non-string root', () => {
   assert.throws(() => deriveRunIdentity(''), TypeError);
   assert.throws(() => deriveRunIdentity(undefined), TypeError);
   assert.throws(() => deriveRunIdentity(42), TypeError);
+});
+
+// ── reconcileFoundryEndpoint: URL and host port can never diverge (the CI regression) ──
+
+test('a pinned URL alone drives the host port from its port (the CI :30100 case)', () => {
+  // The exact CI shape: FOUNDRY_URL pinned to :30100, FOUNDRY_HOST_PORT unset, a
+  // DIFFERENT derived fallback. The container must bind the URL's port, not the fallback.
+  const { hostPort, url } = reconcileFoundryEndpoint({
+    url: 'http://localhost:30100',
+    hostPort: undefined,
+    fallbackPort: 30283,
+  });
+  assert.equal(hostPort, '30100');
+  assert.equal(url, 'http://localhost:30100');
+});
+
+test('a pinned URL with a non-default port propagates that port to the host port', () => {
+  const { hostPort, url } = reconcileFoundryEndpoint({
+    url: 'http://localhost:30247/',
+    hostPort: undefined,
+    fallbackPort: 30283,
+  });
+  assert.equal(hostPort, '30247');
+  assert.equal(url, 'http://localhost:30247/');
+});
+
+test('a pinned host port alone derives a matching URL', () => {
+  const { hostPort, url } = reconcileFoundryEndpoint({
+    url: undefined,
+    hostPort: '30311',
+    fallbackPort: 30283,
+  });
+  assert.equal(hostPort, '30311');
+  assert.equal(url, 'http://localhost:30311');
+});
+
+test('with neither pinned, both come from the fallback port', () => {
+  const { hostPort, url } = reconcileFoundryEndpoint({
+    url: undefined,
+    hostPort: undefined,
+    fallbackPort: 30283,
+  });
+  assert.equal(hostPort, '30283');
+  assert.equal(url, 'http://localhost:30283');
 });
