@@ -96,17 +96,16 @@
   const applyDisabled = $derived(applying || selectedCount === 0 || !hasPendingChange);
 
   // The select-all checkbox reflects the current filter coverage as a tri-state: a full
-  // selection is checked, a partial one indeterminate, none unchecked.
-  function selectAllRef(node) {
-    node.indeterminate = someFilteredSelected && !allFilteredSelected;
-    return {
-      update() {
-        node.indeterminate = someFilteredSelected && !allFilteredSelected;
-      }
-    };
-  }
+  // selection is checked, a partial one indeterminate, none unchecked. `indeterminate` is
+  // a DOM property (not an attribute), so drive it from an $effect that tracks the flags —
+  // an argument-less `use:` action's update() never re-fires on reactive change.
+  let selectAllNode = $state(null);
+  $effect(() => {
+    if (selectAllNode) selectAllNode.indeterminate = someFilteredSelected && !allFilteredSelected;
+  });
 
   function setTagMode(mode) {
+    lastUpdated = null;
     tagMode = mode;
   }
 
@@ -217,7 +216,7 @@
         type="checkbox"
         data-bulk-select-all
         checked={allFilteredSelected}
-        use:selectAllRef
+        bind:this={selectAllNode}
         onchange={() => (allFilteredSelected ? onClearSelection() : onSelectAllFiltered())}
       />
       <span>{format('FABRICATE.Admin.Manager.Component.BulkSelectAllFiltered', 'Select all {count} filtered', { count: filteredCount })}</span>
