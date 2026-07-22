@@ -124,3 +124,15 @@ test('with neither pinned, both come from the fallback port', () => {
   assert.equal(hostPort, '30283');
   assert.equal(url, 'http://localhost:30283');
 });
+
+test('both pinned to different ports still yields a consistent pair (host port wins, URL rebuilt to match)', () => {
+  // The function advertises "never diverge": even a caller that pins BOTH to mismatched
+  // ports must get a URL whose port equals the bound host port.
+  const { hostPort, url } = reconcileFoundryEndpoint({
+    url: 'http://localhost:30100',
+    hostPort: '30247',
+    fallbackPort: 30283,
+  });
+  assert.equal(hostPort, '30247');
+  assert.equal(url, 'http://localhost:30247');
+});

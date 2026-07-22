@@ -101,10 +101,13 @@ export function isLegalHostname(hostname) {
  * to `http://localhost:30100` but leaves `FOUNDRY_HOST_PORT` unset, so a naive derive
  * would bind the container to the derived port while Playwright still targeted 30100.
  *
- * Precedence: an explicit URL's port is the authority (parse it into the host port); else
- * an explicit host port derives the URL; else fall back to the already-resolved derived
- * port. Pinning EITHER one alone is therefore self-consistent. Pure and side-effect-free —
- * the caller assigns the returned values into the environment.
+ * Precedence when both are pinned: the host port wins the bound port and the URL is
+ * rebuilt to match it (the URL always follows the actual bind). A URL pinned alone
+ * provides the port; a host port pinned alone derives the URL; else both come from the
+ * already-resolved fallback port. So the returned `url` and `hostPort` can NEVER diverge,
+ * whichever inputs are set — even a caller that pins both to different ports gets a
+ * consistent pair. Pure and side-effect-free — the caller assigns the returned values
+ * into the environment.
  *
  * @param {{ url?: string, hostPort?: string | number, fallbackPort: string | number }} input
  * @returns {{ hostPort: string, url: string }}
@@ -116,6 +119,16 @@ export function reconcileFoundryEndpoint({ url, hostPort, fallbackPort }) {
     if (match) resolvedPort = match[1];
   }
   if (!resolvedPort) resolvedPort = fallbackPort;
-  const resolvedUrl = url || `http://localhost:${resolvedPort}`;
-  return { hostPort: String(resolvedPort), url: resolvedUrl };
+  resolvedPort = String(resolvedPort);
+  // Rebuild the URL's port to match resolvedPort so the two are always in lockstep — a
+  // pinned URL with a stale/other port (or none) is corrected to the bound port.
+  let resolvedUrl;
+  if (url) {
+    resolvedUrl = /:\d+(?=\/|$)/.test(url)
+      ? url.replace(/:\d+(?=\/|$)/, `:${resolvedPort}`)
+      : url.replace(/^(https?:\/\/[^/]+)/, `$1:${resolvedPort}`);
+  } else {
+    resolvedUrl = `http://localhost:${resolvedPort}`;
+  }
+  return { hostPort: resolvedPort, url: resolvedUrl };
 }
