@@ -4296,15 +4296,33 @@ async function main() {
           // readiness warnings (issue 431 PR-2).
           craftingCheck: {
             enabled: true,
+            // Per-recipe check-modifier catalogue + default policy (issue 770). A
+            // crafting-owned aggregate feeding the `@craftingmod` formula placeholder,
+            // authored at the top level of the crafting check (sibling of `routed`), so
+            // the Checks → Crafting tab renders the populated CraftingModifierCatalogueCard
+            // beside the failure-consumption card (screenshot evidence). Each expression
+            // resolves against the crafter's dnd5e roll data; the `highest` default policy
+            // picks the single largest of the two default-eligible modifiers. The `alch`
+            // entry is the one the Brew Healing Potion recipe override selects below.
+            checkModifiers: [
+              { id: 'med', label: 'Medicine', icon: 'fas fa-staff-snake', expression: '@abilities.wis.mod' },
+              { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask', expression: '@abilities.int.mod' },
+              { id: 'herb', label: 'Herbalism', icon: 'fas fa-seedling', expression: '@abilities.dex.mod' }
+            ],
+            defaultModifierPolicy: 'highest',
+            defaultModifierIds: ['med', 'herb'],
             routed: {
               type: 'relative',
-              // `1d20 + 20` (total 21-40) always meets the Masterwork threshold, so the
-              // Phase-E Brew Healing Potion craft deterministically succeeds. Before #431
-              // the routed check was authored-only (never rolled); now that it is engine-
-              // evaluated a bare `1d20` vs dc 12 would fail the craft ~55% of the time
-              // (flaky smoke). The named tiers below are unchanged so the routed-check and
-              // validation-tab captures still render their authored outcomes.
-              rollFormula: '1d20 + 20',
+              // `1d20 + 20 + @craftingmod` (base total 21-40, plus a small ability mod) always
+              // meets the Masterwork threshold, so the Phase-E Brew Healing Potion craft
+              // deterministically succeeds. `@craftingmod` resolves to a scalar BEFORE the
+              // formula reaches Foundry's Roll (issue 770): the recipe's `byRecipe` override
+              // uses only the `alch` modifier (a starter-hero INT mod, roughly -1..+3), which
+              // the +20 base absorbs. Before #431 the routed check was authored-only (never
+              // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
+              // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
+              // the routed-check and validation-tab captures still render their authored outcomes.
+              rollFormula: '1d20 + 20 + @craftingmod',
               dc: 12,
               thresholdMode: 'meet',
               relativeOutcomes: [
@@ -4455,9 +4473,15 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
+          // Per-recipe check-modifier override (issue 770): this recipe overrides the
+          // system's `highest` default policy with `byRecipe`, drawing only the `alch`
+          // catalogue modifier into `@craftingmod`. It renders the recipe editor's
+          // Overview modifier control in its OVERRIDE (not inherit) state — the
+          // screenshot evidence for the per-recipe override half of #770.
+          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
           // Single result group → produced on any non-failure outcome. The Phase-E
-          // craft rolls `1d20 + 20` (always Masterwork), so this craft deterministically
-          // succeeds and yields the single "Brewed Potion" group.
+          // craft rolls `1d20 + 20 + @craftingmod` (always Masterwork), so this craft
+          // deterministically succeeds and yields the single "Brewed Potion" group.
           ingredientSets: [{
             ingredientGroups: [
               {
