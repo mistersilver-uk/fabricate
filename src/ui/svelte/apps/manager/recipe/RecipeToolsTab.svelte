@@ -24,10 +24,14 @@
     collapsed = false,
     toolIds = [],
     toolsLibrary = [],
+    toolBonusModes = {},
     onAddTool = () => {},
     onRemoveTool = () => {},
     onAddStepTool = () => {},
     onRemoveStepTool = () => {},
+    onAddIngredientSetTool = () => {},
+    onRemoveIngredientSetTool = () => {},
+    onSetToolBonusMode = () => {},
     onDeleteStep = () => {}
   } = $props();
 
@@ -40,6 +44,14 @@
 
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
+  }
+
+  function ingredientSets(scope) {
+    return Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+  }
+
+  function setToolIds(set) {
+    return Array.isArray(set?.toolIds) ? set.toolIds : [];
   }
 </script>
 
@@ -64,10 +76,12 @@
       <RecipeToolsSection
         {toolIds}
         {toolsLibrary}
+        {toolBonusModes}
         emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyGlobal', 'No global tools — add one that every step needs.')}
         addLabel={text('FABRICATE.Admin.Manager.Recipe.AddGlobalTool', 'Add global tool')}
         {onAddTool}
         {onRemoveTool}
+        {onSetToolBonusMode}
       />
     </div>
 
@@ -81,19 +95,53 @@
           idPrefix={`step-${step.id}-`}
           toolIds={stepToolIds(step)}
           {toolsLibrary}
+          {toolBonusModes}
           emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyStep', 'No tools needed for this step.')}
           onAddTool={(toolId) => onAddStepTool(step.id, toolId)}
           onRemoveTool={(toolId) => onRemoveStepTool(step.id, toolId)}
+          {onSetToolBonusMode}
         />
+        {#each ingredientSets(step) as set (set.id)}
+          <div class="manager-recipe-tools-ingredient-set" data-recipe-tools-ingredient-set={set.id}>
+            <h4>{set.name || text('FABRICATE.Admin.Manager.Recipe.IngredientSet', 'Ingredient set')}</h4>
+            <RecipeToolsSection
+              idPrefix={`step-${step.id}-set-${set.id}-`}
+              toolIds={setToolIds(set)}
+              {toolsLibrary}
+              {toolBonusModes}
+              emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyIngredientSet', 'No tools needed for this ingredient set.')}
+              onAddTool={(toolId) => onAddIngredientSetTool(step.id, set.id, toolId)}
+              onRemoveTool={(toolId) => onRemoveIngredientSetTool(step.id, set.id, toolId)}
+              {onSetToolBonusMode}
+            />
+          </div>
+        {/each}
       {/snippet}
     </RecipeStepAccordion>
   {:else}
     <RecipeToolsSection
       {toolIds}
       {toolsLibrary}
+      {toolBonusModes}
       emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyPanel', 'No tools required.')}
       {onAddTool}
       {onRemoveTool}
+      {onSetToolBonusMode}
     />
+    {#each ingredientSets(recipe) as set (set.id)}
+      <div class="manager-recipe-tools-ingredient-set" data-recipe-tools-ingredient-set={set.id}>
+        <h4>{set.name || text('FABRICATE.Admin.Manager.Recipe.IngredientSet', 'Ingredient set')}</h4>
+        <RecipeToolsSection
+          idPrefix={`set-${set.id}-`}
+          toolIds={setToolIds(set)}
+          {toolsLibrary}
+          {toolBonusModes}
+          emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyIngredientSet', 'No tools needed for this ingredient set.')}
+          onAddTool={(toolId) => onAddIngredientSetTool(null, set.id, toolId)}
+          onRemoveTool={(toolId) => onRemoveIngredientSetTool(null, set.id, toolId)}
+          {onSetToolBonusMode}
+        />
+      </div>
+    {/each}
   {/if}
 </section>

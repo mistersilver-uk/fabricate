@@ -1,5 +1,23 @@
 # Recipes and Steps
 
+## Tool Eligibility and Check Bonuses
+
+Every recipe, step, and ingredient set resolves its required Tool ids against the Crafting System's canonical `system.tools` library.
+The applicable set is the union of those three scopes, and the recipe's `toolBonusModes` map applies by Tool id at every scope with an absent entry treated as `always`.
+
+An enabled Tool shared-prerequisite gate resolves every selected id against `system.characterPrerequisites` and evaluates the resolved definitions with AND semantics.
+An unresolved selected id fails closed.
+For an owned Tool, presence matching, prerequisite evaluation, and bonus-expression evaluation bind to the same matched Item's owning actor, so multiple actors cannot collectively satisfy one Tool.
+A virtual-present Tool binds those evaluations to the primary acting or check actor.
+
+A failed `usability` gate makes the Tool absent at recipe, step, ingredient-set, salvage, and gathering availability gates and uses the existing missing-Tool feedback.
+A failed `bonus` gate preserves presence and suppresses only that Tool's numeric bonus.
+Crafting evaluates enabled eligible bonus expressions and composes every `always` value plus at most the numerically greatest `highestOnly` value, including when every candidate is negative; `never` contributes nothing.
+The resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
+Salvage ignores the recipe mode map and treats each enabled eligible Tool bonus as `always`.
+A missing evaluator, thrown evaluation, non-finite result, or otherwise failed bonus evaluation contributes zero without aborting the attempt.
+Gathering never applies numeric Tool bonuses.
+
 ## Purpose
 
 Define recipe structure, step execution lifecycle, and recipe-run behaviour.

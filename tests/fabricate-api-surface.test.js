@@ -35,6 +35,14 @@ test('Fabricate bridges replicated crafting-data setting changes into local refr
   );
 });
 
+test('Fabricate wires RecipeManager to the live crafting-system manager', () => {
+  assert.match(
+    mainSource,
+    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,?\s*\}\)/s,
+    'RecipeManager production initialization should receive the live crafting-system resolver'
+  );
+});
+
 test('Fabricate macro helper exposes deleteRecipe', () => {
   assert.ok(
     mainSource.includes('deleteRecipe: async (recipeId) => {'),

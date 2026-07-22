@@ -35,6 +35,16 @@ import {
 
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
+const TOOL_STUDIO_LABELS = [
+  'manager-tools-library',
+  'manager-tool-overview-linked',
+  'manager-tool-breakage-repair',
+  'manager-tool-breakage-replace-item',
+  'manager-tool-breakage-check-immune',
+  'manager-tool-requirements',
+  'manager-tool-validation',
+  'manager-tool-narrow',
+];
 
 // ── Scoping map: a changed-file set → the EXACT captured-label set ──────────────
 
@@ -252,6 +262,27 @@ test('a component-only target set runs ONLY components-checks; recipes is skippa
   assert.equal(isD0SectionNeededForTargets('components-checks', targets), true);
   assert.equal(isD0SectionNeededForTargets('recipes', targets), false);
   assert.equal(isD0SectionNeededForTargets('gathering', targets), false);
+});
+
+test('a Tool Studio target runs only the dedicated persisted-net-zero tools section', () => {
+  assert.equal(isD0SectionNeededForTargets('tools', TOOL_STUDIO_LABELS), true);
+  for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, TOOL_STUDIO_LABELS), false, name);
+  }
+  for (const label of TOOL_STUDIO_LABELS) {
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0);
+    assert.ok(HARNESS.includes(`'${label}'`), `${label} is not reachable in the harness`);
+  }
+});
+
+test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer coverage, and restoration', () => {
+  assert.equal(HARNESS.includes('.manager-tools-row'), false);
+  assert.ok(HARNESS.includes('[data-manager-tool-id]'));
+  assert.ok(HARNESS.includes('exerciseToolStudioPointerTargets'));
+  assert.ok(HARNESS.includes('verifyToolStudioLiveReplacement'));
+  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 1280, height: 720 })'));
+  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 900, height: 700 })'));
+  assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 
 test("theme-or-global-ui's multi-section target set keeps exactly the sections its labels touch (spine label rides the always-run spine)", () => {

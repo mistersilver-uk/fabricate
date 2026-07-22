@@ -17,7 +17,15 @@ import assert from 'node:assert/strict';
 
 globalThis.foundry = {
   utils: {
-    getProperty: (obj, path) => String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj)
+    getProperty: (obj, path) => String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj),
+    setProperty: (obj, path, value) => {
+      const parts = String(path).split('.');
+      const last = parts.pop();
+      let target = obj;
+      for (const part of parts) target = target[part] ??= {};
+      target[last] = value;
+    },
+    deepClone: (value) => JSON.parse(JSON.stringify(value)),
   }
 };
 
@@ -27,6 +35,7 @@ const {
   evaluateToolBreakagePlan,
   plannedToolBreakageOutcome,
   applyToolUsageAndBreakage,
+  createToolReplacementCreator,
   createToolBreakageRuntime,
   stampReplacementComponentIdentity
 } = await import('../src/toolBreakageRuntime.js');
@@ -129,7 +138,7 @@ test('plannedToolBreakageOutcome shapes each onBreak mode', () => {
   assert.deepEqual(plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'flagBroken' } })), { action: 'flagged' });
   assert.deepEqual(
     plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'replaceWith', replacementComponentId: 'r' } })),
-    { action: 'replaced', replacementComponentId: 'r' }
+    { action: 'replaced', replacementTarget: { type: 'component', componentId: 'r' } }
   );
 });
 
@@ -195,11 +204,31 @@ test('applyToolUsageAndBreakage: replaceWith deletes and invokes createReplaceme
     tool,
     item,
     buildItemRef: () => ({}),
-    createReplacement: async ({ componentId }) => { replacedWith = componentId; }
+    createReplacement: async ({ target }) => {
+      replacedWith = target;
+      return { documentName: 'Item' };
+    }
   });
   assert.equal(item.deleted, true);
-  assert.equal(replacedWith, 'r');
+  assert.deepEqual(replacedWith, { type: 'component', componentId: 'r' });
   assert.equal(entry.onBreak.action, 'replaced');
+});
+
+test('applyToolUsageAndBreakage: failed replacement preserves the original Tool', async () => {
+  const tool = Tool.fromJSON({
+    componentId: 'c',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: { mode: 'replaceWith', replacementTarget: { type: 'item', itemUuid: 'Item.r' } },
+  });
+  const item = new FakeItem({});
+  const entry = await applyToolUsageAndBreakage({
+    tool,
+    item,
+    createReplacement: async () => null,
+  });
+
+  assert.equal(item.deleted, false);
+  assert.deepEqual(entry.onBreak, { action: 'none' });
 });
 
 test('applyToolUsageAndBreakage: prefers a prior plan decision over re-evaluating', async () => {
@@ -347,7 +376,7 @@ async function runReplacement({ system, resolveReplacementSource }) {
     uuid: 'Actor.a',
     createEmbeddedDocuments: async (_type, data) => {
       captured.push(...data);
-      return data;
+      return data.map((entry) => ({ ...entry, documentName: 'Item' }));
     },
   };
   const item = new FakeItem({}, { uuid: 'Item.broken-tool' });
@@ -366,6 +395,116 @@ async function runReplacement({ system, resolveReplacementSource }) {
 }
 
 const resolveToReplacementSource = () => REPLACEMENT_SOURCE;
+
+test('target-aware replacement creates direct Items at quantity one without component identity', async () => {
+  const captured = [];
+  const source = {
+    documentName: 'Item',
+    uuid: 'Item.direct-source',
+    toObject: () => ({ name: 'Direct', type: 'loot', system: { quantity: 9 }, flags: {} }),
+  };
+  const creator = createToolReplacementCreator({
+    system: { id: 'sys-1', tools: [] },
+    resolveItemUuid: async (uuid) => (uuid === source.uuid ? source : null),
+  });
+  const created = await creator({
+    actor: {
+      async createEmbeddedDocuments(_type, data) {
+        captured.push(...data);
+        return data.map((entry) => ({ ...entry, documentName: 'Item' }));
+      },
+    },
+    target: { type: 'item', itemUuid: source.uuid },
+  });
+
+  assert.equal(created.documentName, 'Item');
+  assert.equal(captured[0].system.quantity, 1);
+  assert.equal(captured[0].flags.core.sourceId, source.uuid);
+  assert.equal(captured[0].flags.fabricate?.fabricate?.roles, undefined);
+});
+
+test('target-aware replacement rejects stale, index, non-Item, API, throw, and empty failures', async () => {
+  const invalidSources = [null, { uuid: 'Item.index' }, { documentName: 'Actor' }];
+  for (const source of invalidSources) {
+    let creates = 0;
+    const creator = createToolReplacementCreator({ resolveItemUuid: async () => source });
+    const result = await creator({
+      actor: { createEmbeddedDocuments: async () => { creates += 1; } },
+      target: { type: 'item', itemUuid: 'Item.bad' },
+    });
+    assert.equal(result, null);
+    assert.equal(creates, 0);
+  }
+
+  const source = {
+    documentName: 'Item',
+    toObject: () => ({ name: 'Direct', type: 'loot', system: {}, flags: {} }),
+  };
+  for (const createResult of [null, [], [{ documentName: 'Actor' }]]) {
+    const creator = createToolReplacementCreator({ resolveItemUuid: async () => source });
+    assert.equal(
+      await creator({
+        actor: { createEmbeddedDocuments: async () => createResult },
+        target: { type: 'item', itemUuid: 'Item.source' },
+      }),
+      null
+    );
+  }
+  const throwingResolver = createToolReplacementCreator({
+    resolveItemUuid: async () => { throw new Error('stale'); },
+  });
+  assert.equal(
+    await throwingResolver({
+      actor: { createEmbeddedDocuments: async () => [] },
+      target: { type: 'item', itemUuid: 'Item.source' },
+    }),
+    null
+  );
+  const throwingCreate = createToolReplacementCreator({ resolveItemUuid: async () => source });
+  assert.equal(
+    await throwingCreate({
+      actor: { createEmbeddedDocuments: async () => { throw new Error('create'); } },
+      target: { type: 'item', itemUuid: 'Item.source' },
+    }),
+    null
+  );
+  assert.equal(
+    await throwingCreate({ actor: {}, target: { type: 'item', itemUuid: 'Item.source' } }),
+    null
+  );
+});
+
+test('replacement is created successfully before the original Tool is deleted', async () => {
+  const events = [];
+  const item = new FakeItem({});
+  item.delete = async () => { events.push('delete'); item.deleted = true; };
+  const tool = Tool.fromJSON({
+    componentId: 'c-tool',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-replacement' },
+  });
+  const creator = createToolReplacementCreator({
+    system: { id: 'sys-1', tools: [] },
+    resolveComponentSource: async () => REPLACEMENT_SOURCE,
+  });
+  const entry = await applyToolUsageAndBreakage({
+    tool,
+    item,
+    createReplacement: async (args) => {
+      events.push('create');
+      return creator({
+        ...args,
+        actor: {
+          createEmbeddedDocuments: async (_type, data) =>
+            data.map((value) => ({ ...value, documentName: 'Item' })),
+        },
+      });
+    },
+  });
+
+  assert.deepEqual(events, ['create', 'delete']);
+  assert.equal(entry.onBreak.action, 'replaced');
+});
 
 test('780 replacement: always stamps roles[systemId].componentId = replacementComponentId', async () => {
   const system = { id: 'sys-1', tools: [] };

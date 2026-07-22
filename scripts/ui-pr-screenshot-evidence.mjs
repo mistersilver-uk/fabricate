@@ -23,7 +23,7 @@ const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 // manager-recipes recipe).
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/(?!RecipeTools(?:Tab|Section)\.svelte$).*\.svelte$/,
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
   // (issue 770); a change to it republishes the recipe-editor frames it appears in.
   /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
@@ -35,6 +35,12 @@ const RECIPE_EDIT_MATCHES = [
 // Sonar's Automatic Analysis counts repeated object literals (`cpd.exclusions` is ignored)
 // and a fresh sibling entry would otherwise trip the new-code duplication gate.
 const recipeEditFrame = (id, label) => ({ id, label, smokeLabels: [id], matches: RECIPE_EDIT_MATCHES });
+const toolStudioFrame = (id, label, smokeLabel, matches) => ({
+  id,
+  label,
+  smokeLabels: [smokeLabel],
+  matches,
+});
 
 export const VIEW_RECIPES = Object.freeze([
   {
@@ -311,12 +317,32 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-gathering-events-normal', 'manager-gathering-event-editor-normal'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEventEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringEventsBrowserView\.svelte$/],
   },
-  {
-    id: 'manager-tools',
-    label: 'Manager gathering tools',
-    smokeLabels: ['manager-tools-normal'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/],
-  },
+  toolStudioFrame('manager-tools', 'Tool Studio — library', 'manager-tools-library', [
+    /^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/,
+    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBrowserInspector\.svelte$/,
+  ]),
+  toolStudioFrame('manager-tool-overview-linked', 'Tool Studio — linked Item overview', 'manager-tool-overview-linked', [
+    /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+    /^src\/ui\/svelte\/apps\/manager\/tools\/(?:ToolOverviewTab|ToolBehaviorPreview)\.svelte$/,
+  ]),
+  toolStudioFrame('manager-tool-breakage-repair', 'Tool Studio — tool-specific breakage and repair OR group', 'manager-tool-breakage-repair', [
+    /^src\/ui\/svelte\/apps\/manager\/tools\/(?:ToolBreakageTab|ToolRepairRequirements)\.svelte$/,
+  ]),
+  toolStudioFrame('manager-tool-breakage-replace-item', 'Tool Studio — direct Item replacement target', 'manager-tool-breakage-replace-item', [
+    /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+  ]),
+  toolStudioFrame('manager-tool-breakage-check-immune', 'Tool Studio — check-driven immune state', 'manager-tool-breakage-check-immune', [
+    /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+  ]),
+  toolStudioFrame('manager-tool-requirements', 'Tool Studio — shared prerequisites and bonus', 'manager-tool-requirements', [
+    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+  ]),
+  toolStudioFrame('manager-tool-validation', 'Tool Studio — failing Validation tab', 'manager-tool-validation', [
+    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
+  ]),
+  toolStudioFrame('manager-tool-narrow', 'Tool Studio — narrow wrapping layout', 'manager-tool-narrow', [
+    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolEditorTabs\.svelte$/,
+  ]),
   {
     id: 'manager-travel',
     label: 'Manager travel and parties',
@@ -490,7 +516,10 @@ export const VIEW_RECIPES = Object.freeze([
   recipeEditFrame('manager-recipe-edit-collapsed', 'Manager recipe editor — collapsed multi-step (feature off)'),
   recipeEditFrame('manager-recipe-edit-results-progressive', 'Manager recipe editor — results (progressive ordered stages)'),
   recipeEditFrame('manager-recipe-edit-results-alchemy', 'Manager recipe editor — results (alchemy two-slot success/reserved-failure)'),
-  recipeEditFrame('manager-recipe-edit-tools', 'Manager recipe editor — tools (component-name fallback for unlabelled tools)'),
+  toolStudioFrame('manager-recipe-edit-tools', 'Manager recipe editor — tools and bonus modes', 'manager-recipe-edit-tools', [
+    /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+    /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeTools(?:Tab|Section)\.svelte$/,
+  ]),
   // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
   // rail). Every other recipe frame is captured against a system whose visibility mode
   // drives the Books & Scrolls branch, so without this frame the restricted (access)

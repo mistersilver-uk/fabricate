@@ -1,0 +1,106 @@
+<!-- Svelte 5 runes mode -->
+<script>
+  import { localize } from '../../../util/foundryBridge.js';
+  import ToolRepairRequirements from './ToolRepairRequirements.svelte';
+
+  let {
+    tool = null,
+    authority = 'toolSpecific',
+    componentOptions = [],
+    worldItems = [],
+    itemTags = [],
+    essenceOptions = [],
+    currencyUnits = [],
+    currencyEnabled = false,
+    onPatch = () => {},
+  } = $props();
+  function text(key, fallback) {
+    const translated = localize(key);
+    return translated && translated !== key ? translated : fallback;
+  }
+  const current = tool?.breakage || { mode: 'limitedUses', maxUses: null };
+  let configs = $state({
+    limitedUses: current.mode === 'limitedUses' ? { ...current } : { mode: 'limitedUses', maxUses: null },
+    breakageChance: current.mode === 'breakageChance' ? { ...current } : { mode: 'breakageChance', breakageChance: 0 },
+    diceExpression: current.mode === 'diceExpression' ? { ...current } : { mode: 'diceExpression', formula: '1d20', threshold: 1 },
+  });
+  const immune = $derived(authority === 'checkDriven' && tool?.checkBreakable === false);
+  const onBreak = $derived(tool?.onBreak || { mode: 'destroy' });
+
+  function changeMode(mode) {
+    onPatch({ breakage: { ...configs[mode] } });
+  }
+  function patchBreakage(patch) {
+    const mode = tool?.breakage?.mode || 'limitedUses';
+    configs = { ...configs, [mode]: { ...configs[mode], ...patch } };
+    onPatch({ breakage: configs[mode] });
+  }
+  function patchOnBreak(patch) {
+    onPatch({ onBreak: { ...onBreak, ...patch } });
+  }
+  function setOnBreakMode(mode) {
+    onPatch({ onBreak: mode === 'replaceWith' ? { mode, replacementTarget: onBreak.replacementTarget || null } : { mode } });
+  }
+  function setReplacement(type, value) {
+    patchOnBreak({ replacementTarget: type === 'component' ? { type, componentId: value } : { type, itemUuid: value } });
+  }
+</script>
+
+<div class="manager-tool-tab-stack" data-tool-breakage-tab>
+  <section class="manager-tool-editor-card manager-tool-authority-readonly">
+    <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</p><h3>{authority === 'checkDriven' ? text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven') : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')}</h3></div>
+    <span class="manager-chip is-neutral"><i class="fas fa-lock" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System setting')}</span>
+  </section>
+
+  <section class="manager-tool-editor-card">
+    <h3>{text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}</h3>
+    {#if authority === 'toolSpecific'}
+      <div class="manager-tool-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}>
+        {#each [['limitedUses', 'Limited uses'], ['breakageChance', 'Breakage chance'], ['diceExpression', 'Dice expression']] as mode}
+          <label class:is-selected={tool?.breakage?.mode === mode[0]}><input type="radio" name="tool-breakage-mode" value={mode[0]} checked={tool?.breakage?.mode === mode[0]} onchange={() => changeMode(mode[0])} /><span>{mode[1]}</span></label>
+        {/each}
+      </div>
+      {#if tool?.breakage?.mode === 'limitedUses'}
+        <label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')}</span><input data-tool-max-uses type="number" min="1" value={tool.breakage.maxUses ?? ''} placeholder={text('FABRICATE.Admin.Manager.Tools.BreakageMaxUsesHint', 'Blank = unlimited')} oninput={(event) => patchBreakage({ maxUses: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} /></label>
+      {:else if tool?.breakage?.mode === 'breakageChance'}
+        <label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageChancePercent', 'Break chance (%)')}</span><input data-tool-breakage-chance type="number" min="0" max="100" value={tool.breakage.breakageChance ?? 0} oninput={(event) => patchBreakage({ breakageChance: Number(event.currentTarget.value) })} /></label>
+      {:else}
+        <div class="manager-tool-inline-fields"><label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span><input data-tool-breakage-formula value={tool?.breakage?.formula || ''} oninput={(event) => patchBreakage({ formula: event.currentTarget.value })} /></label><label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}</span><input data-tool-breakage-threshold type="number" value={tool?.breakage?.threshold ?? 0} oninput={(event) => patchBreakage({ threshold: Number(event.currentTarget.value) })} /></label></div>
+      {/if}
+    {:else}
+      <div class="manager-tool-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}>
+        <label class:is-selected={tool?.checkBreakable !== false}><input type="radio" name="tool-check-breakable" value="breakable" checked={tool?.checkBreakable !== false} onchange={() => onPatch({ checkBreakable: true })} /><span>{text('FABRICATE.Admin.Manager.Tools.SummaryBreakable', 'Breakable')}</span></label>
+        <label class:is-selected={tool?.checkBreakable === false}><input type="radio" name="tool-check-breakable" value="immune" checked={tool?.checkBreakable === false} onchange={() => onPatch({ checkBreakable: false })} /><span>{text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune')}</span></label>
+      </div>
+    {/if}
+  </section>
+
+  <fieldset class="manager-tool-editor-card manager-tool-on-break" data-tool-on-break-controls disabled={immune}>
+    <legend>{text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}</legend>
+    {#if immune}<p class="manager-tool-info-strip"><i class="fas fa-shield" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.ImmuneHint', 'Immune Tools never run an on-break action.')}</p>{/if}
+    <div class="manager-tool-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}>
+      {#each [['destroy', 'Destroy item'], ['flagBroken', 'Mark as broken'], ['replaceWith', 'Replace with item']] as action}
+        <label class:is-selected={onBreak.mode === action[0]}><input type="radio" name="tool-on-break" value={action[0]} checked={onBreak.mode === action[0]} onchange={() => setOnBreakMode(action[0])} /><span>{action[1]}</span></label>
+      {/each}
+    </div>
+    {#if onBreak.mode === 'replaceWith'}
+      <div class="manager-tool-replacement-grid" data-tool-replacement-target>
+        <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponent', 'Managed Component')}</span><select value={onBreak.replacementTarget?.type === 'component' ? onBreak.replacementTarget.componentId : ''} onchange={(event) => setReplacement('component', event.currentTarget.value)}><option value="">{text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}</option>{#each componentOptions as option (option.id)}<option value={option.id}>{option.name}</option>{/each}</select></label>
+        <span>{text('FABRICATE.Admin.Manager.Tools.Editor.Or', 'or')}</span>
+        <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementItem', 'Direct Item')}</span><select value={onBreak.replacementTarget?.type === 'item' ? onBreak.replacementTarget.itemUuid : ''} onchange={(event) => setReplacement('item', event.currentTarget.value)}><option value="">{text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}</option>{#each worldItems as item (item.uuid)}<option value={item.uuid}>{item.name}</option>{/each}</select></label>
+      </div>
+    {/if}
+    {#if onBreak.mode === 'flagBroken'}
+      <ToolRepairRequirements
+        groups={tool?.repairRequirements || []}
+        {componentOptions}
+        {itemTags}
+        {essenceOptions}
+        {currencyUnits}
+        {currencyEnabled}
+        disabled={immune}
+        onChange={(repairRequirements) => onPatch({ repairRequirements })}
+      />
+    {/if}
+  </fieldset>
+</div>

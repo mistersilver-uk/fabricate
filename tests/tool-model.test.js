@@ -88,6 +88,76 @@ test('Tool defaults to limitedUses with unlimited maxUses and destroy on break',
   assert.deepEqual(tool.onBreak, { mode: 'destroy' });
 });
 
+test('Tool preserves inactive prerequisite, bonus, and check-driven configuration without Kind', () => {
+  const tool = new Tool({
+    componentId: 'comp-axe',
+    kind: 'handheld',
+    description: '<p>Forged for stone.</p>',
+    checkBreakable: false,
+    prerequisites: { enabled: false, ids: [' strong ', 'strong'], gateMode: 'bonus' },
+    bonus: { enabled: false, expression: '@prof' },
+  });
+
+  assert.equal(tool.description, '<p>Forged for stone.</p>');
+  assert.equal(tool.checkBreakable, false);
+  assert.deepEqual(tool.prerequisites, { enabled: false, ids: ['strong'], gateMode: 'bonus' });
+  assert.deepEqual(tool.bonus, { enabled: false, expression: '@prof' });
+  assert.equal('kind' in tool.toJSON(), false);
+});
+
+test('Tool reads legacy immune breakage forward without emitting immune', () => {
+  const tool = new Tool({ componentId: 'comp-axe', breakage: { mode: 'immune' } });
+
+  assert.deepEqual(tool.breakage, { mode: 'limitedUses', maxUses: null });
+  assert.equal(tool.checkBreakable, false);
+  assert.equal(tool.toJSON().breakage.mode, 'limitedUses');
+});
+
+test('Tool round-trips complete repair IngredientGroups and discriminated replacement targets', () => {
+  const repairRequirements = [
+    {
+      id: 'repair-1',
+      name: 'Binding',
+      options: [
+        { quantity: 2, match: { type: 'component', componentId: 'comp-binding' } },
+        { quantity: 1, match: { type: 'currency', unit: 'gp', amount: 5 } },
+      ],
+    },
+  ];
+  const componentTarget = new Tool({
+    componentId: 'comp-axe',
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'component', componentId: 'comp-broken-axe' },
+    },
+    repairRequirements,
+  });
+  const itemTarget = new Tool({
+    componentId: 'comp-axe',
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'item', itemUuid: 'Compendium.tools.broken-axe' },
+    },
+  });
+
+  const componentJson = componentTarget.toJSON();
+  assert.deepEqual(
+    componentJson.repairRequirements[0].options.map((option) => option.match),
+    repairRequirements[0].options.map((option) => option.match)
+  );
+  assert.deepEqual(Tool.fromJSON(componentJson).toJSON(), componentJson);
+  assert.deepEqual(componentTarget.onBreak.replacementTarget, {
+    type: 'component',
+    componentId: 'comp-broken-axe',
+  });
+  assert.deepEqual(itemTarget.onBreak.replacementTarget, {
+    type: 'item',
+    itemUuid: 'Compendium.tools.broken-axe',
+  });
+  assert.equal(componentTarget.validate().valid, true);
+  assert.equal(itemTarget.validate().valid, true);
+});
+
 test('Tool normalizes unknown enum values to defaults', () => {
   const tool = new Tool({
     componentId: 'comp-axe',
@@ -125,7 +195,11 @@ test('Tool accepts diceExpression configuration', () => {
   assert.equal(tool.breakage.formula, '1d20 + @abilities.str.mod');
   assert.equal(tool.breakage.threshold, 10);
   assert.equal(tool.onBreak.mode, 'replaceWith');
-  assert.equal(tool.onBreak.replacementComponentId, 'comp-pick-broken');
+  assert.deepEqual(tool.onBreak.replacementTarget, {
+    type: 'component',
+    componentId: 'comp-pick-broken',
+  });
+  assert.equal('replacementComponentId' in tool.toJSON().onBreak, false);
 });
 
 // ---------------------------------------------------------------------------
@@ -214,13 +288,13 @@ test('Tool.validate - diceExpression requires non-empty formula and finite thres
   assert.equal(ok.valid, true);
 });
 
-test('Tool.validate - replaceWith requires replacementComponentId distinct from componentId', () => {
+test('Tool.validate - replaceWith requires one discriminated target distinct from componentId', () => {
   const same = new Tool({
     componentId: 'comp-axe',
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe' },
   }).validate();
   assert.equal(same.valid, false);
-  assert.ok(same.errors.some(e => e.includes('replacementComponentId')));
+  assert.ok(same.errors.some(e => e.includes('replacementTarget')));
 
   const missing = new Tool({
     componentId: 'comp-axe',
@@ -233,6 +307,33 @@ test('Tool.validate - replaceWith requires replacementComponentId distinct from 
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' },
   }).validate();
   assert.equal(ok.valid, true);
+
+  const dual = new Tool({
+    componentId: 'comp-axe',
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: {
+        type: 'component',
+        componentId: 'comp-broken',
+        itemUuid: 'Item.broken',
+      },
+    },
+  }).validate();
+  assert.equal(dual.valid, false);
+});
+
+test('Tool.validate requires selected prerequisites, enabled bonus expression, and complete repair groups', () => {
+  const invalid = new Tool({
+    componentId: 'comp-axe',
+    prerequisites: { enabled: true, ids: [], gateMode: 'usability' },
+    bonus: { enabled: true, expression: '   ' },
+    repairRequirements: [{ id: 'empty', options: [] }],
+  }).validate();
+
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.some((error) => error.includes('prerequisites.ids')));
+  assert.ok(invalid.errors.some((error) => error.includes('bonus.expression')));
+  assert.ok(invalid.errors.some((error) => error.includes('repairRequirements[0]')));
 });
 
 // ---------------------------------------------------------------------------
@@ -498,59 +599,96 @@ test('applyBreakage flagBroken - uses the localized suffix when game.i18n resolv
   }
 });
 
-test('applyBreakage replaceWith - deletes original and invokes createReplacement', async () => {
+test('applyBreakage replaceWith - creates before deleting and passes the discriminated target', async () => {
   const tool = new Tool({
     componentId: 'comp-axe',
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' },
   });
   const item = new FakeItem({});
   const calls = [];
+  item.delete = async () => {
+    calls.push('delete');
+    item.deleted = true;
+  };
   const result = await tool.applyBreakage({
     item,
     actor: { id: 'actor-1' },
-    createReplacement: async (args) => { calls.push(args); },
+    createReplacement: async (args) => {
+      calls.push({ create: args });
+      return { success: true };
+    },
   });
   assert.equal(item.deleted, true);
   assert.equal(result.action, 'replaced');
-  assert.deepEqual(calls, [{ actor: { id: 'actor-1' }, componentId: 'comp-axe-broken' }]);
+  assert.deepEqual(calls, [
+    {
+      create: {
+        actor: { id: 'actor-1' },
+        target: { type: 'component', componentId: 'comp-axe-broken' },
+      },
+    },
+    'delete',
+  ]);
+});
+
+test('applyBreakage replaceWith - a failed creation preserves the original', async () => {
+  const tool = new Tool({
+    componentId: 'comp-axe',
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'item', itemUuid: 'Item.broken-axe' },
+    },
+  });
+  const item = new FakeItem({});
+
+  const result = await tool.applyBreakage({ item, createReplacement: async () => null });
+
+  assert.equal(item.deleted, false);
+  assert.deepEqual(result, { action: 'none' });
 });
 
 // ---------------------------------------------------------------------------
 // immune breakage mode (issue 419)
 // ---------------------------------------------------------------------------
 
-test('immune: normalizes to { mode: "immune" } with no breakage fields', () => {
+test('legacy immune: reads forward to unlimited limitedUses plus check-driven immunity', () => {
   const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune', maxUses: 5, breakageChance: 9 } });
-  assert.deepEqual(tool.breakage, { mode: 'immune' });
+  assert.deepEqual(tool.breakage, { mode: 'limitedUses', maxUses: null });
+  assert.equal(tool.checkBreakable, false);
 });
 
-test('immune: validates with no breakage field checks', () => {
+test('legacy immune: validates after read-forward conversion', () => {
   const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
   const { valid, errors } = tool.validate();
   assert.equal(valid, true, errors.join(', '));
 });
 
-test('immune: evaluateBreakage never breaks', async () => {
+test('legacy immune: unlimited specific configuration never breaks', async () => {
   const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
   const result = await tool.evaluateBreakage({ item: new FakeItem({}) });
-  assert.deepEqual(result, { broken: false, mode: 'immune', evidence: {} });
+  assert.deepEqual(result, {
+    broken: false,
+    mode: 'limitedUses',
+    evidence: { timesUsed: 0, maxUses: null },
+  });
 });
 
-test('immune: applyUsage writes no toolUsage flag (limitedUses-only)', async () => {
+test('legacy immune: canonical limitedUses configuration records usage safely', async () => {
   const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
   const item = new FakeItem({});
   await tool.applyUsage(item);
-  assert.equal(item._flags.fabricate.fabricate, undefined, 'no usage flag for immune tool');
+  assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 1 });
 });
 
-test('validate: unknown mode error string lists immune', () => {
+test('validate: unknown mode error string lists only canonical specific modes', () => {
   // normalizeBreakage coerces an unknown mode to limitedUses, so reach the
   // validation else-branch by mutating the normalized mode to an invalid value.
   const tool = new Tool({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: null } });
   tool.breakage.mode = 'bogus';
   const { errors } = tool.validate();
   assert.ok(
-    errors.some((e) => /immune/.test(e)),
-    'the breakage.mode error enumerates immune'
+    errors.some((e) => /limitedUses, breakageChance, or diceExpression/.test(e)),
+    'the breakage.mode error enumerates canonical specific modes'
   );
+  assert.equal(errors.some((error) => /immune/.test(error)), false);
 });

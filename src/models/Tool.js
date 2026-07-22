@@ -20,15 +20,12 @@
  *     mode === 'limitedUses':     maxUses:        number | null     (null = unlimited; usage tracked on the item)
  *     mode === 'breakageChance':  breakageChance: number (integer 0..100)
  *     mode === 'diceExpression':  formula:        string (Foundry roll), threshold: number
- *     mode === 'immune':          (no fields)     never breaks under either breakage authority;
- *                                                 still recorded as used (no toolUsage flag is written,
- *                                                 because that flag is limitedUses-only); under
- *                                                 checkDriven authority it is filtered out of the
- *                                                 force-break set.
+ *   checkBreakable:    boolean                    separate check-driven immunity switch
  *   onBreak:           { mode, ...mode-specific fields }
  *     mode === 'destroy':       (no fields)
  *     mode === 'flagBroken':    (no fields)
- *     mode === 'replaceWith':   replacementComponentId: string (must != componentId)
+ *     mode === 'replaceWith':   replacementTarget: { type: 'component', componentId }
+ *                                | { type: 'item', itemUuid }
  *
  * Item-flag conventions:
  *   Item.flags.fabricate.toolUsage  = { timesUsed: number }   // limitedUses only
@@ -43,9 +40,12 @@
  * restore the original name to regain damaged-tier recognition.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { IngredientGroup } from './IngredientGroup.js';
 
-const BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression', 'immune']);
+const BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
 const ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
+const PREREQUISITE_GATE_MODES = new Set(['bonus', 'usability']);
+const REPLACEMENT_TARGET_TYPES = new Set(['component', 'item']);
 
 function coerceMaxUses(value) {
   if ([null, undefined, ''].includes(value)) return null;
@@ -69,7 +69,39 @@ function normalizeRequirement(input) {
   return { formula };
 }
 
+function normalizeIdList(values) {
+  if (!Array.isArray(values)) return [];
+  return [
+    ...new Set(
+      values
+        .filter((value) => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function normalizePrerequisites(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  return {
+    enabled: source.enabled === true,
+    ids: normalizeIdList(source.ids),
+    gateMode: PREREQUISITE_GATE_MODES.has(source.gateMode) ? source.gateMode : 'usability',
+  };
+}
+
+function normalizeBonus(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  return {
+    enabled: source.enabled === true,
+    expression: typeof source.expression === 'string' ? source.expression.trim() : '',
+  };
+}
+
 function normalizeBreakage(input) {
+  if (input?.mode === 'immune') {
+    return { mode: 'limitedUses', maxUses: null };
+  }
   const mode = BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
   const out = { mode };
   switch (mode) {
@@ -94,18 +126,42 @@ function normalizeBreakage(input) {
   return out;
 }
 
+function normalizeReplacementTarget(input) {
+  if (!input || typeof input !== 'object') return null;
+  if (!REPLACEMENT_TARGET_TYPES.has(input.type)) return null;
+  const hasComponentId = typeof input.componentId === 'string' && !!input.componentId.trim();
+  const hasItemUuid = typeof input.itemUuid === 'string' && !!input.itemUuid.trim();
+  if (hasComponentId === hasItemUuid) return null;
+  if (input.type === 'component') {
+    return hasComponentId ? { type: 'component', componentId: input.componentId.trim() } : null;
+  }
+  return hasItemUuid ? { type: 'item', itemUuid: input.itemUuid.trim() } : null;
+}
+
 function normalizeOnBreak(input) {
   const mode = ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
   const out = { mode };
   if (mode === 'replaceWith') {
-    out.replacementComponentId =
-      typeof input?.replacementComponentId === 'string' ? input.replacementComponentId : null;
+    const legacyComponentId =
+      typeof input?.replacementComponentId === 'string' ? input.replacementComponentId.trim() : '';
+    out.replacementTarget =
+      normalizeReplacementTarget(input?.replacementTarget) ||
+      (legacyComponentId ? { type: 'component', componentId: legacyComponentId } : null);
   }
   return out;
 }
 
+function normalizeRepairRequirements(input) {
+  if (!Array.isArray(input)) return [];
+  return input.map((group) =>
+    group instanceof IngredientGroup ? group : IngredientGroup.fromJSON(group)
+  );
+}
+
 export class Tool {
   constructor(data = {}) {
+    this.id = typeof data.id === 'string' && data.id.trim() ? data.id.trim() : null;
+    this.enabled = data.enabled !== false;
     /**
      * @type {string|null} OPTIONAL managed-component link (issue 561). A first-class
      * tool registered from an Item uuid carries `componentId: null` and its own source
@@ -133,6 +189,9 @@ export class Tool {
 
     /** @type {string|null} Display-snapshot image, captured with {@link Tool#name}. */
     this.img = typeof data.img === 'string' && data.img ? data.img : null;
+
+    /** @type {string} Display-snapshot description captured with name/image. */
+    this.description = typeof data.description === 'string' ? data.description : '';
 
     /** @type {string|null} The tool's own registered source document uuid. */
     this.registeredItemUuid =
@@ -162,11 +221,28 @@ export class Tool {
         ? null
         : normalizeRequirement(data.requirement);
 
+    /** @type {{enabled: boolean, ids: string[], gateMode: 'bonus'|'usability'}} */
+    this.prerequisites = normalizePrerequisites(data.prerequisites);
+
+    /** @type {{enabled: boolean, expression: string}} */
+    this.bonus = normalizeBonus(data.bonus);
+
     /** @type {{mode: string, [key: string]: any}} Breakage mechanic configuration */
     this.breakage = normalizeBreakage(data.breakage);
 
+    // Legacy `immune` was overloaded across both breakage authorities. Read it forward
+    // without erasing the safe tool-specific configuration; canonical writes never emit it.
+    this.checkBreakable = data.breakage?.mode === 'immune' ? false : data.checkBreakable !== false;
+
     /** @type {{mode: string, [key: string]: any}} On-break action configuration */
     this.onBreak = normalizeOnBreak(data.onBreak);
+
+    /** @type {IngredientGroup[]} Authoring-only materials required to repair a flagged copy. */
+    this.repairRequirements = normalizeRepairRequirements(data.repairRequirements);
+  }
+
+  dispName(fallback = 'Untitled tool') {
+    return this.label.trim() || this.name || fallback;
   }
 
   /**
@@ -218,27 +294,41 @@ export class Tool {
 
           break;
         }
-        case 'immune': {
-          // No fields are required or permitted: an immune tool never breaks.
-          break;
-        }
         // No default
       }
     } else {
       errors.push(
-        'breakage.mode must be one of limitedUses, breakageChance, diceExpression, or immune'
+        'breakage.mode must be one of limitedUses, breakageChance, or diceExpression'
       );
     }
 
     if (!ON_BREAK_MODES.has(this.onBreak.mode)) {
       errors.push('onBreak.mode must be one of destroy, flagBroken, or replaceWith');
     } else if (this.onBreak.mode === 'replaceWith') {
-      if (!this.onBreak.replacementComponentId) {
-        errors.push('onBreak.replacementComponentId is required for replaceWith mode');
-      } else if (this.componentId && this.onBreak.replacementComponentId === this.componentId) {
+      const target = this.onBreak.replacementTarget;
+      if (!target) {
+        errors.push('onBreak.replacementTarget is required for replaceWith mode');
+      } else if (
+        target.type === 'component' &&
+        this.componentId &&
+        target.componentId === this.componentId
+      ) {
         // Only meaningful when the tool HAS a componentId; a null-component (item-sourced)
         // tool can never collide with its own component id, so the differ-check is skipped.
-        errors.push('onBreak.replacementComponentId must differ from componentId');
+        errors.push('onBreak.replacementTarget componentId must differ from componentId');
+      }
+    }
+
+    if (this.prerequisites.enabled && this.prerequisites.ids.length === 0) {
+      errors.push('prerequisites.ids must include at least one shared prerequisite when enabled');
+    }
+    if (this.bonus.enabled && !this.bonus.expression) {
+      errors.push('bonus.expression is required when bonus is enabled');
+    }
+    for (const [index, group] of this.repairRequirements.entries()) {
+      const result = group.validate({ requireComplete: true });
+      if (!result.valid) {
+        errors.push(...result.errors.map((error) => `repairRequirements[${index}]: ${error}`));
       }
     }
 
@@ -250,16 +340,28 @@ export class Tool {
    */
   toJSON() {
     return {
+      ...(this.id && { id: this.id }),
+      enabled: this.enabled,
       componentId: this.componentId,
       label: this.label,
       name: this.name,
       img: this.img,
+      description: this.description,
       registeredItemUuid: this.registeredItemUuid,
       originItemUuid: this.originItemUuid,
       aliasItemUuids: [...this.aliasItemUuids],
       requirement: this.requirement ? { ...this.requirement } : null,
+      prerequisites: { ...this.prerequisites, ids: [...this.prerequisites.ids] },
+      bonus: { ...this.bonus },
       breakage: { ...this.breakage },
-      onBreak: { ...this.onBreak },
+      checkBreakable: this.checkBreakable,
+      onBreak: {
+        ...this.onBreak,
+        ...(this.onBreak.replacementTarget && {
+          replacementTarget: { ...this.onBreak.replacementTarget },
+        }),
+      },
+      repairRequirements: this.repairRequirements.map((group) => group.toJSON()),
     };
   }
 
@@ -290,11 +392,6 @@ export class Tool {
    */
   async evaluateBreakage({ actor, item, evaluateExpression, random } = {}) {
     const mode = this.breakage.mode;
-
-    if (mode === 'immune') {
-      // An immune tool never breaks under either authority.
-      return { broken: false, mode, evidence: {} };
-    }
 
     if (mode === 'limitedUses') {
       // Prefer the authoritative `toolUsage` flag; fall back to the legacy catalyst usage
@@ -404,14 +501,22 @@ export class Tool {
     }
 
     if (mode === 'replaceWith') {
-      const replacementComponentId = this.onBreak.replacementComponentId;
-      if (item && typeof item.delete === 'function') {
-        await item.delete();
+      const replacementTarget = this.onBreak.replacementTarget;
+      if (!replacementTarget || typeof createReplacement !== 'function') {
+        return { action: 'none' };
       }
-      if (typeof createReplacement === 'function' && replacementComponentId) {
-        await createReplacement({ actor, componentId: replacementComponentId });
-      }
-      return { action: 'replaced', replacementComponentId };
+      const created = await createReplacement({ actor, target: { ...replacementTarget } });
+      const succeeded =
+        created === true || created?.success === true || created?.documentName === 'Item';
+      if (!succeeded) return { action: 'none' };
+      if (item && typeof item.delete === 'function') await item.delete();
+      return {
+        action: 'replaced',
+        replacementTarget: { ...replacementTarget },
+        ...(replacementTarget.type === 'component' && {
+          replacementComponentId: replacementTarget.componentId,
+        }),
+      };
     }
 
     return { action: 'none' };

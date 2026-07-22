@@ -366,7 +366,7 @@
           </section>
 
           {#if alchemyCheckMode === 'tiered'}
-            <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+            <CraftingCheckEditor value={craftingCheck} {resolutionMode} allowNatStepping breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
           {:else if alchemyCheckMode === 'simple'}
             <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
           {:else}
@@ -391,7 +391,7 @@
              which the routed test asserts is absent once the editor renders. -->
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if craftingRouted}
-            <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+            <CraftingCheckEditor value={craftingCheck} {resolutionMode} allowNatStepping breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
           {:else if craftingSimple}
             <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
           {:else}
@@ -438,7 +438,7 @@
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">
-          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckRouted} />
+          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} allowNatStepping breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckRouted} />
         </div>
       {:else if activeTab === 'salvage' && salvageProgressive}
         <div data-checks-panel="salvage">
