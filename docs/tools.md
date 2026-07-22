@@ -79,6 +79,7 @@ A loosely recognized copy can satisfy presence while being spared from usage and
 The **Requirements** tab can apply shared character prerequisites defined for the crafting system.
 Every selected prerequisite is required.
 The same actor that supplies the owned Tool must satisfy them.
+A Tool provided by a Tool station evaluates its prerequisites and bonus against the primary acting or check actor.
 
 Choose what happens when those prerequisites fail:
 

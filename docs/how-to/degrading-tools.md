@@ -23,7 +23,7 @@ Then add the saved Tool from the recipe's **Tools** tab.
 3. Select an Item under **Start unlinked or from an Item**, or drop an Item onto the creation area.
 4. Choose **Create from Item** to open the Tool editor.
 5. Open **Breakage** and choose **Limited uses**.
-6. Set **Maximum uses** to the number of successful uses the Tool allows before it breaks.
+6. Set **Maximum uses** to the number of tracked uses the Tool allows before it breaks.
 7. Choose **Destroy item**, **Mark as broken**, or **Replace with item**.
 8. For **Replace with item**, choose either a managed Component or a direct Item as the replacement.
 9. Open **Validation** and resolve every issue.
@@ -34,6 +34,8 @@ Then add the saved Tool from the recipe's **Tools** tab.
 ## How usage is tracked
 
 A **Limited uses** Tool stores its use count on the owned Item.
+Crafting, salvage, and gathering attempts can all count as tracked uses.
+Failed crafting or salvage attempts count when their **Break tools on a failed check** policy allows Tool breakage.
 The count increases before Fabricate checks the maximum.
 A maximum of 5 therefore breaks the Tool on its fifth tracked use.
 
