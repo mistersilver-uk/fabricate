@@ -82,9 +82,14 @@
             checked={breakageAuthority === authority}
             onchange={() => onSetBreakageAuthority(authority)}
           />
-          <span>{authority === 'toolSpecific'
-            ? text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')
-            : text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven')}</span>
+          <span class="manager-tools-authority-option">
+            <span>{authority === 'toolSpecific'
+              ? text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')
+              : text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven')}</span>
+            <small>{authority === 'toolSpecific'
+              ? text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecificDesc', "Each Tool's own breakage mode decides whether it breaks.")
+              : text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenDesc', 'The active check decides whether breakable required Tools break.')}</small>
+          </span>
         </label>
       {/each}
     </div>

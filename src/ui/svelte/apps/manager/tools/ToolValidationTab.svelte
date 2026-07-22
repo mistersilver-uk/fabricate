@@ -17,6 +17,12 @@
   };
   const checks = $derived(toolEditorChecks(tool, authority));
   const invalidCount = $derived(checks.filter((check) => !check.valid).length + (validation.errors?.length || 0));
+  const issueCountLabel = $derived(
+    text('FABRICATE.Admin.Manager.Tools.ValidationIssues', '{count} issues').replace(
+      '{count}',
+      String(invalidCount)
+    )
+  );
   function focusFirstFailure(node, enabled) {
     if (enabled) queueMicrotask(() => node.focus());
   }
@@ -25,7 +31,7 @@
 <div class="manager-tool-tab-stack" data-tool-validation-tab>
   <section class="manager-tool-editor-card">
     <div class="manager-tool-validation-summary">
-      <span class={`manager-chip ${invalidCount > 0 ? 'is-danger' : 'is-positive'}`}><i class={invalidCount > 0 ? 'fas fa-circle-exclamation' : 'fas fa-circle-check'} aria-hidden="true"></i>{invalidCount > 0 ? `${invalidCount} issues` : text('FABRICATE.Admin.Manager.Tools.ValidationValid', 'Ready to save')}</span>
+      <span class={`manager-chip ${invalidCount > 0 ? 'is-danger' : 'is-positive'}`} aria-label={invalidCount > 0 ? issueCountLabel : undefined}><i class={invalidCount > 0 ? 'fas fa-circle-exclamation' : 'fas fa-circle-check'} aria-hidden="true"></i>{invalidCount > 0 ? issueCountLabel : text('FABRICATE.Admin.Manager.Tools.ValidationValid', 'Ready to save')}</span>
     </div>
     <ul class="manager-tool-validation-checks" aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.ValidationChecks', 'Tool validation checks')}>
       {#each checks as check}

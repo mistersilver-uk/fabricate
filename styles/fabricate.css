@@ -18687,6 +18687,8 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-authority-card > div:first-child {
@@ -18695,7 +18697,8 @@
 
 .fabricate-manager .manager-tools-authority-segments {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
   gap: var(--fab-space-1);
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-mv2-border);
@@ -18704,11 +18707,23 @@
 
 .fabricate-manager .manager-tools-authority-segments label {
   display: flex;
+  flex: 1 1 190px;
   align-items: center;
   gap: var(--fab-space-1);
   padding: var(--fab-space-2) var(--fab-space-3);
   border-radius: 6px;
   cursor: pointer;
+}
+
+.fabricate-manager .manager-tools-authority-option {
+  display: grid;
+  gap: var(--fab-space-1);
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-tools-authority-option small {
+  color: var(--fab-mv2-text-muted);
+  font-weight: 400;
 }
 
 .fabricate-manager .manager-tools-authority-segments label.is-selected {
@@ -18956,6 +18971,10 @@
   .fabricate-manager .manager-tools-authority-segments,
   .fabricate-manager .manager-tools-create-actions > * {
     width: 100%;
+  }
+
+  .fabricate-manager .manager-tools-authority-segments {
+    flex-direction: column;
   }
 
   .fabricate-manager .manager-tools-library-list > article {

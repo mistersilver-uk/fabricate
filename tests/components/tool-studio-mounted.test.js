@@ -259,6 +259,10 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 5);
     assert.equal(root.querySelector('[data-tool-validation-check="breakage"]').classList.contains('is-invalid'), true);
     assert.equal(root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'), true);
+    assert.equal(
+      root.querySelector('.manager-tool-validation-summary .manager-chip').getAttribute('aria-label'),
+      '3 issues'
+    );
     assert.ok(root.querySelector('[role="alert"]'));
     assert.match(root.querySelector('[data-tool-behavior-preview]').textContent, /Smith Hammer/);
     assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /breakageChance/);

@@ -9860,6 +9860,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       ['authority', 'search', 'create', 'list']
     );
+    assert.match(
+      target.querySelector('[data-manager-tools-authority]').textContent,
+      /Each Tool's own breakage mode decides whether it breaks\./
+    );
+    assert.match(
+      target.querySelector('[data-manager-tools-authority]').textContent,
+      /The active check decides whether breakable required Tools break\./
+    );
 
     const select = target.querySelector('.manager-tools-select-target');
     select.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
