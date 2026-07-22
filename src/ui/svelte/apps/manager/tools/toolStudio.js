@@ -34,6 +34,46 @@ export function toolOnBreakSummary(tool) {
   return 'destroy';
 }
 
+const VALIDATION_ERROR_PROJECTIONS = [
+  ['requires either a componentId or its own source references', 'ValidationErrorSource'],
+  ['Item source is required', 'ValidationErrorSource'],
+  ['requirement.formula', 'ValidationErrorRequirement'],
+  ['breakage.maxUses', 'ValidationErrorMaxUses'],
+  ['breakage.breakageChance', 'ValidationErrorChance'],
+  ['breakage.formula', 'ValidationErrorFormula'],
+  ['breakage.threshold', 'ValidationErrorThreshold'],
+  ['breakage.mode', 'ValidationErrorBreakageMode'],
+  ['onBreak.mode', 'ValidationErrorOnBreakMode'],
+  ['onBreak.replacementTarget is required', 'ValidationErrorReplacement'],
+  ['onBreak.replacementTarget componentId', 'ValidationErrorReplacementSame'],
+  ['prerequisites.ids', 'ValidationErrorPrerequisites'],
+  ['bonus.expression', 'ValidationErrorBonus'],
+];
+
+/**
+ * Project model validation details onto stable presentation categories.
+ * Unknown model or service details deliberately collapse to a safe generic
+ * message instead of exposing field paths or implementation terminology.
+ */
+export function toolValidationPresentation(error) {
+  const message = String(error || '');
+  const repairMatch = /^repairRequirements\[(\d+)\]:/.exec(message);
+  if (repairMatch) {
+    return {
+      key: 'ValidationErrorRepair',
+      data: { group: Number(repairMatch[1]) + 1 },
+    };
+  }
+
+  const projection = VALIDATION_ERROR_PROJECTIONS.find(([fragment]) =>
+    message.includes(fragment)
+  );
+  return {
+    key: projection?.[1] || 'ValidationErrorGeneric',
+    data: {},
+  };
+}
+
 export function toolSearchText(tool, managedItems = []) {
   return [
     toolDisplayName(tool, managedItems),

@@ -10064,7 +10064,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tool-edit');
     assert.equal(target.querySelector('[role="tab"][aria-selected="true"]').textContent.trim().startsWith('Validation'), true);
     const firstFailure = target.querySelector('[data-tool-validation-errors] li');
-    assert.equal(firstFailure.textContent, 'Item source is required');
+    assert.equal(firstFailure.textContent, 'Link an Item or managed Component.');
     await Promise.resolve();
     assert.equal(document.activeElement, firstFailure);
   });

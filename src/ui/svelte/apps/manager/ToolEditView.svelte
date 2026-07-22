@@ -56,7 +56,7 @@
     </div>
     <div class="manager-tool-edit-actions">
       <button type="button" class="manager-button is-danger" data-tool-editor-delete onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete Tool')}</span></button>
-      <button type="button" class="manager-button is-primary" data-tool-editor-save onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : validation.errors.join('; ')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save changes')}</span></button>
+      <button type="button" class="manager-button is-primary" data-tool-editor-save onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save changes')}</span></button>
     </div>
   </header>
 
