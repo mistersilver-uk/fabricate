@@ -463,6 +463,23 @@ Folder
   drops are accepted from both the world Items directory and a compendium directory, and expand to
   every contained Item including nested subfolders; a compendium folder's items are resolved from
   the pack index entries.
+- Folder-aware categorization on bulk import: a folder drop, an in-pack-folder drop, or a
+  whole-compendium drop that contains at least one item-bearing folder opens a mapping step before
+  the import commits.
+The step lists each detected folder (the dropped folder plus every nested subfolder) with its item
+  count, and lets the GM assign a category and/or tags per folder, inline-create a category (reusing
+  the shared vocabulary model), or skip a folder.
+Tags are assigned from the existing vocabulary only; a new tag is created in the Tags & Categories
+  screen, not inline at import.
+Category assignment is single-valued and OVERWRITES the imported default; tag assignment is additive
+  (union).
+A "match-by-name" toggle, ON by default, pre-fills each folder's row when the folder name matches an
+  existing category (case-insensitive) and/or tag (lowercased), applying each axis independently.
+The primary action imports the non-skipped folders' items and applies each folder's mapping to that
+  freshly imported component set; the item count updates live as folders are skipped, and a skipped
+  folder's items are not imported.
+A single-item drop is unchanged, a folderless drop falls back to the one-shot import, and a
+  compendium-directory folder that groups packs (not items) is skipped with a notice.
 - Remove managed items.
 - Edit managed item tags (if enabled).
 - Edit managed item essences (if enabled).

@@ -56,6 +56,7 @@ export const CLASS_B_LABELS = Object.freeze(
     'player-crafting-alternatives-switched',
     'player-crafting-progressive-reordered',
     'manager-import-report',
+    'manager-import-folder-mapping',
     'manager-multistep-disable-confirm',
     'manager-components-description-repaired',
     'manager-components-description-ingested',
@@ -150,6 +151,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'interactables-manager-promote',
   'interactables-manager-empty',
   'manager-import-report',
+  'manager-import-folder-mapping',
   'manager-alchemy-settings',
   'manager-experimental-off',
   // ── phase-E: player apps + persisted-state craft/journal frames ─────

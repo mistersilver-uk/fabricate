@@ -13,6 +13,12 @@ import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sc
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
 import { tokenDocumentCenter } from '../canvas/regionHitTest.js';
 import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
+import {
+  collectWorldFolderGroups,
+  collectPackFolderGroups,
+  applyFolderImportDecisions,
+  hasRealFolderGroups,
+} from './svelte/util/importFolderGroups.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 import { buildImportReportContent } from '../systems/importReportContent.js';
 
@@ -614,6 +620,76 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         pickImagePath: this._services.pickImagePath,
         getSetting: this._services.getSetting,
         setSetting: this._services.setSetting,
+        // Folder-aware bulk-import (issue 771): resolve a folder / whole-pack drop into
+        // per-folder groups the mapping modal seeds from. Returns null for every drop
+        // that should keep today's one-shot behavior (single item, no real folders, an
+        // unresolved/empty/non-Item folder) so `dropComponent` falls through to
+        // `onDropItem`. Compendium membership is read from `pack.index[].folder` +
+        // `pack.folders` (no document load, no world-only `getSubfolders`).
+        collectImportFolderGroups: async (data) => {
+          const systemId = get(this._adminStore.selectedSystemId) || '';
+          if (!systemId) return null;
+          const unfiledName = localize('FABRICATE.Admin.Items.ImportMapping.Unfiled');
+          const groupsWithFolders = (groups) => (hasRealFolderGroups(groups) ? { groups } : null);
+
+          // Whole compendium pack drop.
+          if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
+            const pack = game.packs?.get?.(data.collection);
+            if (!pack || pack.metadata?.type !== 'Item') return null;
+            try { await pack.getIndex(); } catch { /* index may already be loaded */ }
+            return groupsWithFolders(collectPackFolderGroups(pack, { unfiledName }));
+          }
+
+          // Folder drop (world folder or in-pack folder).
+          if (data?.type === 'Folder') {
+            const folder = resolveDroppedFolder(data, game.folders);
+            if (!folder) return null;
+            const docType = folderDocumentType(folder);
+            // A compendium-DIRECTORY folder groups packs, not items (descope 2c): no
+            // item-level grouping exists, so skip it with a notice. Return the `handled`
+            // sentinel — NOT null — so `dropComponent` does not fall through to
+            // `onDropItem` and fire a SECOND (FolderEmpty) toast for the same drop.
+            if (docType === 'Compendium') {
+              ui.notifications.info(
+                localize('FABRICATE.Admin.Items.ImportMapping.CompendiumDirectorySkipped')
+              );
+              return { handled: true };
+            }
+            if (folder.pack) {
+              const pack = game.packs?.get?.(folder.pack);
+              if (!pack || pack.metadata?.type !== 'Item') return null;
+              try { await pack.getIndex(); } catch { /* best effort */ }
+              return groupsWithFolders(
+                collectPackFolderGroups(pack, { rootFolderId: folder.id, unfiledName })
+              );
+            }
+            if (docType && docType !== 'Item') return null;
+            return groupsWithFolders(collectWorldFolderGroups(folder, game.folders));
+          }
+
+          return null;
+        },
+        // Commit the mapping modal's per-folder decisions: import each non-skipped
+        // folder's items, then apply that folder's category/tags to the freshly imported
+        // component set via the shared set-apply primitive (one save() per folder).
+        commitImportFolderMapping: async (systemId, decisions) => {
+          const systemManager = game.fabricate.getCraftingSystemManager();
+          if (!systemId) {
+            ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+            return;
+          }
+          const summary = await applyFolderImportDecisions(systemManager, systemId, decisions || []);
+          ui.notifications.info(
+            localize('FABRICATE.Admin.Items.ImportMapping.Summary', {
+              added: summary.added,
+              updated: summary.updated,
+              skipped: summary.skipped,
+              total: summary.total,
+            })
+          );
+          notifyBulkSourceFallback(summary.sourceFallbacks);
+          await this._adminStore.refresh();
+        },
         onDropItem: async (data) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
           const systemId = get(this._adminStore.selectedSystemId) || '';

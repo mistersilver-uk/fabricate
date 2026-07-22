@@ -58,6 +58,7 @@
   import ItemPageInspector from './ItemPageInspector.svelte';
   import RecipeItemEditor from './RecipeItemEditor.svelte';
   import ItemPickerModal from './ItemPickerModal.svelte';
+  import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -147,6 +148,10 @@
   // Item picker modal (Create recipe item flow on Books & Scrolls / Overview tab).
   let itemPickerOpen = $state(false);
   let worldItemOptions = $state([]);
+  // Folder-aware import mapping modal (issue 771): opened before a folder / whole-pack
+  // component drop commits, seeded with the per-folder groups the drop resolved to.
+  let importMappingOpen = $state(false);
+  let importMappingFolders = $state([]);
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
@@ -2942,8 +2947,27 @@
     store.toggleRecipeEnabled?.(recipeId, enabled, options);
   }
 
-  function dropComponent(data) {
+  // A folder / whole-pack drop opens the mapping modal BEFORE importing so the GM can
+  // categorize + tag per folder; every other drop (single item, an empty or folderless
+  // drop) falls through to the unchanged one-shot import path in services.onDropItem.
+  async function dropComponent(data) {
+    const plan = (await services?.collectImportFolderGroups?.(data)) || null;
+    if (plan?.groups?.length) {
+      importMappingFolders = plan.groups;
+      importMappingOpen = true;
+      return;
+    }
+    // `handled` means the collector already notified (e.g. a compendium-directory folder
+    // groups packs, not items) and there is nothing to import — do NOT fall through to
+    // onDropItem, or it would fire a second toast for the same drop.
+    if (plan?.handled) return;
     services?.onDropItem?.(data);
+  }
+
+  async function commitImportFolderMapping(decisions) {
+    importMappingOpen = false;
+    if (!Array.isArray(decisions) || decisions.length === 0) return;
+    await services?.commitImportFolderMapping?.(selectedSystemId, decisions);
   }
 
   function editComponent(itemId = selectedComponent?.id) {
@@ -7143,5 +7167,15 @@
     titleFallback="Select an item"
     onPick={(uuid) => pickRecipeItemFromUuid(uuid)}
     onClose={() => itemPickerOpen = false}
+  />
+
+  <ImportFolderMappingModal
+    open={importMappingOpen}
+    folders={importMappingFolders}
+    componentCategories={selectedSystem?.componentCategories || []}
+    itemTags={selectedSystem?.itemTags || []}
+    onAddCategory={addComponentCategory}
+    onCommit={commitImportFolderMapping}
+    onClose={() => importMappingOpen = false}
   />
 </div>

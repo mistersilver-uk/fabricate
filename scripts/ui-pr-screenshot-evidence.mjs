@@ -338,6 +338,19 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/systems\/importReportContent\.js$/,
     ],
   },
+  // Issue 771: folder-aware categorization mapping modal, shown before a folder /
+  // whole-pack component drop commits. Its own single-frame view (collect publishes only
+  // candidates[0] per id). Mapped to the mapping component AND the drop-path service file
+  // that opens it, so a change to either republishes the frame.
+  {
+    id: 'manager-import-folder-mapping',
+    label: 'Manager import — folder-aware categorization mapping step (#771)',
+    smokeLabels: ['manager-import-folder-mapping'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
+      /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+    ],
+  },
   // The gated Crafting nav group (issue 511) publishes three distinct frames — the
   // expanded group rail, the Books & Scrolls surface, and the Settings placeholder.
   // `collect` emits one file per recipe id, so each frame is its own recipe.

@@ -7584,6 +7584,118 @@ async function main() {
           await closeOpenApplications(page).catch(() => {});
         }
 
+        // ── Folder-aware import categorization mapping step (#771) ─────────────
+        // The mapping modal exists only AFTER a folder / whole-pack component drop
+        // and is not representable in any world DB (Class B). Drive a WORLD-folder
+        // drop of a parent folder holding two Item subfolders — one named to match an
+        // existing component category (pre-filled by match-by-name), one matching
+        // nothing (then Skipped) — and capture the populated mapping step with >=2
+        // rows. Fully self-contained: the created folders/items and any temporary
+        // category are removed after the capture, and the modal is dismissed WITHOUT
+        // committing, so no component is imported into the smoke system.
+        try {
+          const mappingFixtures = await page.evaluate(async (sysId) => {
+            const csm = game.fabricate.getCraftingSystemManager();
+            const system = csm.getSystem(sysId);
+            const previousCategories = Array.isArray(system.componentCategories)
+              ? [...system.componentCategories]
+              : [];
+            const addedCategory = !previousCategories.some((c) => c.toLowerCase() === 'reagent');
+            if (addedCategory) {
+              await csm.updateSystem(sysId, {
+                componentCategories: [...previousCategories, 'Reagent'],
+              });
+            }
+            const itemType = Array.from(game.documentTypes.Item).find((t) => t !== 'base') || 'base';
+            const img = 'icons/commodities/metal/ingot-stack-steel.webp';
+            const parent = await Folder.create({ name: 'Smoke Bulk Import', type: 'Item' });
+            const reagentFolder = await Folder.create({
+              name: 'Reagent',
+              type: 'Item',
+              folder: parent.id,
+            });
+            const widgetsFolder = await Folder.create({
+              name: 'Widgets',
+              type: 'Item',
+              folder: parent.id,
+            });
+            await Item.create([
+              { name: 'Smoke Sage', type: itemType, img, folder: reagentFolder.id },
+              { name: 'Smoke Nightcap', type: itemType, img, folder: reagentFolder.id },
+              { name: 'Smoke Cog', type: itemType, img, folder: widgetsFolder.id },
+            ]);
+            return {
+              parentId: parent.id,
+              widgetsFolderId: widgetsFolder.id,
+              previousCategories,
+              addedCategory,
+            };
+          }, craftingSetup.systemId);
+
+          await page.evaluate(() => {
+            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          });
+          await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await setManagerWindowSize(page, { width: 1280, height: 820 });
+          await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
+          await settleManagerNav(page);
+          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="components"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+
+          // Dispatch a real world-folder drop onto the component drop zone (the drop
+          // handler reads dataTransfer text/plain the same way Foundry drags do).
+          await page.evaluate((parentId) => {
+            const zone = document.querySelector('.fabricate-manager .manager-component-drop-zone');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData(
+              'text/plain',
+              JSON.stringify({ type: 'Folder', uuid: `Folder.${parentId}` })
+            );
+            zone.dispatchEvent(new DragEvent('drop', { dataTransfer, bubbles: true, cancelable: true }));
+          }, mappingFixtures.parentId);
+
+          const mappingDialog = page.locator('.fabricate-manager [data-import-mapping]').first();
+          await mappingDialog.waitFor({ state: 'visible', timeout: 10_000 });
+          // Prove >=2 rows rendered (Reagent + Widgets); parent holds no items so it is
+          // not its own row.
+          await page.locator('.fabricate-manager [data-import-mapping-row]').nth(1)
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          // Skip the non-matching (Widgets) folder so the frame shows a skipped row.
+          await page.locator(
+            `.fabricate-manager [data-import-mapping-row="${mappingFixtures.widgetsFolderId}"] [data-import-mapping-skip]`
+          ).first().click();
+          // The modal IS the intended overlay here (like the import-report dialog), so
+          // clear bleed-over toasts but do NOT run assertNoScreenshotOverlays.
+          await dismissFoundryNotifications(page);
+          await screenshot(page, 'manager-import-folder-mapping');
+
+          // Dismiss without committing, then remove the fixtures + temporary category.
+          await page.locator('.fabricate-manager [data-import-mapping-cancel]').first().click().catch(() => {});
+          await mappingDialog.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+          await page.evaluate(async ({ parentId, previousCategories, addedCategory, sysId }) => {
+            const parent = game.folders.get(parentId);
+            if (parent) await parent.delete({ deleteSubfolders: true, deleteContents: true });
+            if (addedCategory) {
+              await game.fabricate
+                .getCraftingSystemManager()
+                .updateSystem(sysId, { componentCategories: previousCategories });
+            }
+          }, {
+            parentId: mappingFixtures.parentId,
+            previousCategories: mappingFixtures.previousCategories,
+            addedCategory: mappingFixtures.addedCategory,
+            sysId: craftingSetup.systemId,
+          });
+
+          await closeOpenApplications(page);
+          results.steps.push({ step: 'import-folder-mapping', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'import-folder-mapping', passed: false, error: err.message });
+          process.stderr.write(`Import folder mapping capture failed: ${err.message}\n`);
+          await closeOpenApplications(page).catch(() => {});
+        }
+
         // Manager alchemy-settings capture (issue #752 — evidence for #736's #713
         // half): the Crafting → Settings surface of an ALCHEMY-mode system (the
         // minimal "Smoke Alchemy Bench" seeded in Phase C). The Crafting nav group
