@@ -40,6 +40,7 @@
  * restore the original name to regain damaged-tier recognition.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+
 import { IngredientGroup } from './IngredientGroup.js';
 
 const BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);

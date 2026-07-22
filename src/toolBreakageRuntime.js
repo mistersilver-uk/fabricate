@@ -76,7 +76,7 @@ export function createToolReplacementCreator({
   return async ({ actor, target } = {}) => {
     if (typeof actor?.createEmbeddedDocuments !== 'function') return null;
 
-    let source = null;
+    let source;
     let componentId = null;
     try {
       if (target?.type === 'component') {

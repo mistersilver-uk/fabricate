@@ -153,8 +153,11 @@ test('composition sums always and selects the numeric maximum highestOnly includ
 });
 
 test('labeled formula terms strip bracket and control characters', () => {
+  const controlCharacters = String.fromCodePoint(0, 9, 10, 31, 127);
   assert.equal(
-    appendToolBonusTerms('1d20', [{ label: 'Odd [Tool]\nName', value: 3 }]),
+    appendToolBonusTerms('1d20', [
+      { label: `Odd${controlCharacters}[Tool]\nName`, value: 3 },
+    ]),
     '1d20 + 3[Odd Tool Name]'
   );
 });

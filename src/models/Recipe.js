@@ -1,7 +1,7 @@
+import { normalizeToolBonusModes } from '../systems/toolCheckBonus.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
-import { normalizeToolBonusModes } from '../systems/toolCheckBonus.js';
 
 import { Ingredient } from './Ingredient.js';
 import { IngredientSet } from './IngredientSet.js';

@@ -2173,7 +2173,7 @@ export class CraftingSystemManager {
   }
 
   async _resolveToolSourceItem(itemUuid) {
-    let source = null;
+    let source;
     try {
       source = await fromUuid(itemUuid);
     } catch {
@@ -2228,9 +2228,9 @@ export class CraftingSystemManager {
     );
     const staged = this._normalizeTool(
       {
-        ...(existing || {}),
-        ...(data && typeof data === 'object' ? data : {}),
-        ...(snapshot || {}),
+        ...existing,
+        ...(data && typeof data === 'object' ? data : null),
+        ...snapshot,
         id: existing?.id || data?.id || foundry.utils.randomID(),
         ...(source && { componentId: null }),
       },

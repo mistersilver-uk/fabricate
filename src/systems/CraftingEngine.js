@@ -21,13 +21,13 @@ import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
+import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import {
   awardedQuantityOf,
   createOrStackComponentItem,
   tagAwardedQuantity,
 } from './componentStacking.js';
-import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCurrencyAffordProbe,
@@ -2635,7 +2635,7 @@ export class CraftingEngine {
         ingredientSet,
       });
       const missingIndex = states.findIndex((state) => state?.available !== true);
-      if (missingIndex >= 0) {
+      if (missingIndex !== -1) {
         return {
           valid: false,
           message: `Missing required tool (${toolDisplayReference(
@@ -4370,8 +4370,8 @@ export class CraftingEngine {
         ...(Array.isArray(step?.toolIds) ? step.toolIds : []),
       ],
       toolBonusModes: {
-        ...(recipe?.toolBonusModes || {}),
-        ...(step?.toolBonusModes || {}),
+        ...recipe?.toolBonusModes,
+        ...step?.toolBonusModes,
       },
     };
   }
