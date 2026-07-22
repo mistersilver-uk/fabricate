@@ -31,7 +31,11 @@ const browser = createMountedComponentHarness({
     'src/utils/componentBrowserModel.js',
     // componentBrowserModel imports the shared category totals; omitting it HANGS this
     // suite (`# cancelled`) rather than failing it.
-    'src/utils/browserGroupCounts.js'
+    'src/utils/browserGroupCounts.js',
+    // The bulk bar's popover tree (issue 772) — omitting any of these HANGS the suite.
+    'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/iconPickerPopover.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
@@ -39,6 +43,13 @@ const browser = createMountedComponentHarness({
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
     'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
+    // Bulk-actions bar and its reused controls (issue 772). A rendered `.svelte` missing
+    // from this list HANGS the suite (`# cancelled`), never fails it.
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    'src/ui/svelte/apps/manager/BulkActionsBar.svelte',
     'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
@@ -164,6 +175,147 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
       ['2 components'],
       'a total that counted the unfiltered roster would report the whole library here'
     );
+  });
+});
+
+// Issue 772 — multi-select bulk edit. Checkbox rows drive a Set on the persisted browser
+// state via the pure `componentSelection` reducer; the sticky bulk bar appears only when
+// >1 is selected; Apply routes the selected ids through the injected onBulkApply and the
+// re-projected `itemCards` update the category-option counts.
+describe('ComponentsBrowserView multi-select bulk edit (issue 772)', () => {
+  function library() {
+    return [
+      makeComponent({ id: 'c1', name: 'Iron Ore', category: 'Metal' }),
+      makeComponent({ id: 'c2', name: 'Copper Ore', category: 'Metal' }),
+      makeComponent({ id: 'c3', name: 'Tin Ore', category: 'Metal' }),
+      makeComponent({ id: 'c4', name: 'Sage', category: 'general' })
+    ];
+  }
+
+  function selectRow(root, id, shiftKey = false) {
+    const box = root.querySelector(`[data-component-select="${id}"]`);
+    box.dispatchEvent(new globalThis.MouseEvent('click', { bubbles: true, shiftKey }));
+    flushSync();
+  }
+
+  // These DOM-driven tests mount WITHOUT a bound browserState so `ui` is the component's
+  // own `$state` proxy: a plain lifted object is not reactive (see the issue 806 note), so
+  // its mutations would never re-render the bar. The persisted-Set contract is asserted
+  // separately against a passed browserState below.
+
+  it('shows the bulk bar only once more than one row is selected', async () => {
+    const root = await browser.mount({ itemCards: library(), categoryVocabulary: ['Metal'] });
+    assert.equal(root.querySelector('[data-bulk-actions-bar]'), null, 'hidden with none selected');
+
+    selectRow(root, 'c1');
+    assert.equal(root.querySelector('[data-bulk-actions-bar]'), null, 'still hidden with one');
+
+    selectRow(root, 'c2');
+    assert.ok(root.querySelector('[data-bulk-actions-bar]'), 'shown once two are selected');
+    assert.equal(
+      root.querySelector('[data-bulk-selected-count]').textContent.trim(),
+      '2 selected'
+    );
+  });
+
+  it('the selection Set lives on the persisted browser state and shift-click ranges it', async () => {
+    const shared = createComponentBrowserState();
+    // Name-ascending flat order: Copper(c2), Iron(c1), Sage(c4), Tin(c3).
+    shared.groupByCategory = false;
+    const root = await browser.mount({
+      itemCards: library(),
+      categoryVocabulary: ['Metal'],
+      browserState: shared
+    });
+
+    selectRow(root, 'c2'); // Copper — the anchor
+    selectRow(root, 'c4', true); // shift to Sage selects the run Copper→Iron→Sage
+    assert.deepEqual([...shared.selection].sort(), ['c1', 'c2', 'c4']);
+  });
+
+  it('select-all-filtered adds only the filtered rows across pages, and Clear empties it', async () => {
+    const root = await browser.mount({ itemCards: library(), categoryVocabulary: ['Metal'] });
+
+    const categoryFilter = root.querySelector('[data-component-category-filter]');
+    categoryFilter.value = 'Metal';
+    categoryFilter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    // Seed two so the bar (and its Select-all control) render, then Select-all extends the
+    // set to every FILTERED row (the three Metal) — never the general Sage filtered out.
+    selectRow(root, 'c1');
+    selectRow(root, 'c2');
+    assert.equal(root.querySelector('[data-bulk-selected-count]').textContent.trim(), '2 selected');
+    root.querySelector('[data-bulk-select-all]').dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+    assert.equal(
+      root.querySelector('[data-bulk-selected-count]').textContent.trim(),
+      '3 selected',
+      'select-all reaches the 3 Metal rows, not the filtered-out general one'
+    );
+
+    root.querySelector('[data-bulk-clear]').click();
+    flushSync();
+    assert.equal(root.querySelector('[data-bulk-actions-bar]'), null, 'Clear empties the selection and hides the bar');
+  });
+
+  it('Apply passes the selected ids and mapping to onBulkApply, then reports N updated', async () => {
+    let received = null;
+    const root = await browser.mount({
+      itemCards: library(),
+      categoryVocabulary: ['Metal', 'Reagent'],
+      onBulkApply: (ids, mapping) => {
+        received = { ids: [...ids].sort(), mapping };
+        return Promise.resolve({ updated: ids.length, componentIds: ids });
+      }
+    });
+
+    selectRow(root, 'c1');
+    selectRow(root, 'c2');
+
+    const categorySelect = root.querySelector('[data-bulk-category]');
+    categorySelect.value = 'Reagent';
+    categorySelect.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    root.querySelector('[data-bulk-apply]').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    flushSync();
+
+    assert.deepEqual(received.ids, ['c1', 'c2']);
+    assert.equal(received.mapping.category, 'Reagent');
+    assert.equal(
+      root.querySelector('[data-bulk-result]').textContent.trim(),
+      '2 components updated'
+    );
+  });
+
+  it('re-projected itemCards update the category-option counts (the refresh contract)', async () => {
+    // The store's refresh() re-projects itemCards; feeding the post-apply cards must move
+    // the category-filter option counts — this is what the bulk bar depends on, mounted.
+    const shared = createComponentBrowserState();
+    const root = await browser.mount({
+      itemCards: library(),
+      categoryVocabulary: ['Metal', 'Reagent'],
+      browserState: shared
+    });
+    const optionCounts = (r) =>
+      [...r.querySelectorAll('[data-component-category-filter] option')].map((o) => o.textContent.trim());
+    assert.ok(optionCounts(root).some((label) => label.startsWith('Reagent (0)')), 'Reagent starts empty');
+
+    // Simulate refresh() re-publishing itemCards: c1 and c2 moved to Reagent.
+    browser.remount();
+    const after = await browser.mount({
+      itemCards: [
+        makeComponent({ id: 'c1', name: 'Iron Ore', category: 'Reagent' }),
+        makeComponent({ id: 'c2', name: 'Copper Ore', category: 'Reagent' }),
+        makeComponent({ id: 'c3', name: 'Sage', category: 'general' })
+      ],
+      categoryVocabulary: ['Metal', 'Reagent'],
+      browserState: shared
+    });
+    assert.ok(optionCounts(after).some((label) => label.startsWith('Reagent (2)')), 'the counts re-project');
   });
 });
 

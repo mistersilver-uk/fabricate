@@ -5,10 +5,12 @@
   import Pagination from '../../components/Pagination.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
+  import BulkActionsBar from './BulkActionsBar.svelte';
   import {
     COMPONENT_SORT_KEYS,
     componentCategoryOf,
     componentCategoryOptions,
+    componentSelection,
     createComponentBrowserState,
     describeActiveComponentFilters,
     filterComponents,
@@ -29,11 +31,17 @@
     selectedSystemId = '',
     selectedSystemResolutionMode = 'simple',
     categoryVocabulary = [],
+    // The system's tag vocabulary (itemTags), offered by the bulk bar's tag multi-assign.
+    tagVocabulary = [],
     dropEnabled = false,
     onSearchChange = () => {},
     onSelectComponent = () => {},
     onDropComponent = () => {},
     onEditComponent = () => {},
+    // Bulk edit (issue 772): apply(mapping) → Promise<{updated}|null>, routed through the
+    // store's issue-771 set-apply primitive + standard refresh; and inline category creation.
+    onBulkApply = async () => null,
+    onAddCategory = async () => {},
     // The filter / sort / group / paginate view-state (issue 676). The manager root
     // LIFTS this up and binds it here so it survives the editor round-trip: opening a
     // component unmounts this browser, and remounting it with the controls reset to
@@ -66,6 +74,11 @@
     ui.essenceFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
+    // The selection names components of the OLD system — clear it (and its anchor) on a
+    // genuine switch, alongside the filters, so a stale set can never bulk-edit the wrong
+    // system (issue 772).
+    ui.selection = new Set();
+    ui.selectionAnchor = null;
     ui.systemId = selectedSystemId;
   });
 
@@ -96,6 +109,45 @@
   // so a total can never ignore an active filter.
   const categoryTotals = $derived(countByCategory(filteredComponents, componentCategoryOf));
   const groups = $derived(ui.groupByCategory ? groupComponentsByCategory(page.components, categoryTotals) : []);
+
+  // ── Multi-select bulk edit (issue 772) ──────────────────────────────────────────────
+  // Selection is a `Set<componentId>` on the persisted `ui`; `sortedComponents` is the
+  // filtered, cross-page order the reducer ranges over and "select all" honours. All
+  // range/select-all reasoning lives in the pure `componentSelection` reducer.
+  const selection = $derived(ui.selection instanceof Set ? ui.selection : new Set());
+  const orderedIds = $derived(sortedComponents.map((component) => component.id));
+  const selectedCount = $derived(selection.size);
+  const allFilteredSelected = $derived(
+    orderedIds.length > 0 && orderedIds.every((id) => selection.has(id))
+  );
+  const someFilteredSelected = $derived(selectedCount > 0 && !allFilteredSelected);
+  const bulkBarVisible = $derived(selectedCount > 1);
+
+  function dispatchSelection(action) {
+    const result = componentSelection(ui.selection ?? new Set(), action, orderedIds);
+    ui.selection = result.selection;
+    ui.selectionAnchor = result.anchorId;
+  }
+
+  function toggleRowSelection(id, shiftKey) {
+    if (shiftKey && ui.selectionAnchor) {
+      dispatchSelection({ type: 'range', id, anchorId: ui.selectionAnchor });
+    } else {
+      dispatchSelection({ type: 'toggle', id });
+    }
+  }
+
+  function selectAllFiltered() {
+    dispatchSelection({ type: 'selectAllFiltered' });
+  }
+
+  function clearSelection() {
+    dispatchSelection({ type: 'clear' });
+  }
+
+  function isRowSelected(id) {
+    return selection.has(id);
+  }
 
   // The active-filter chips, derived by the pure model so the run and the "is anything
   // on?" question can never disagree.
@@ -307,6 +359,9 @@
       editLabel: format('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}', { name: item.name }),
       editTitle: text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component'),
       noDescriptionText: text('FABRICATE.Admin.Manager.NoDescription', 'No description'),
+      checked: isRowSelected(item.id),
+      selectLabel: format('FABRICATE.Admin.Manager.Component.BulkSelectNamed', 'Select {name}', { name: item.name }),
+      onToggleSelect: toggleRowSelection,
       onSelect: onSelectComponent,
       onEdit: onEditComponent
     };
@@ -462,6 +517,20 @@
   </section>
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}>
+    {#if bulkBarVisible}
+      <BulkActionsBar
+        selectedCount={selectedCount}
+        filteredCount={orderedIds.length}
+        allFilteredSelected={allFilteredSelected}
+        someFilteredSelected={someFilteredSelected}
+        categoryOptions={categoryOptions}
+        tagVocabulary={tagVocabulary}
+        onSelectAllFiltered={selectAllFiltered}
+        onClearSelection={clearSelection}
+        onApply={(mapping) => onBulkApply([...selection], mapping)}
+        onAddCategory={onAddCategory}
+      />
+    {/if}
     {#if (itemCards || []).length === 0}
       <div class="manager-empty">
         <div>

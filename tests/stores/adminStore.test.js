@@ -2207,6 +2207,74 @@ describe('createAdminStore', () => {
       assert.equal(result, false);
       assert.equal(updateCalled, false);
     });
+
+    // Issue 772 — bulk edit routes the whole selection through the #771 set-apply
+    // primitive and the STANDARD refresh(), so the re-projected viewState publishes a
+    // NEW selectedSystem reference (the two-phase-publish invariant) and the itemCards
+    // carry the new category — not a hand-patched partial viewState.
+    it('bulkApplyComponentCategoryAndTags applies once, then refresh re-projects a NEW selectedSystem reference', async () => {
+      let applyArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      sys.items = [
+        makeItem({ id: 'a', name: 'Iron', category: 'general', tags: [] }),
+        makeItem({ id: 'b', name: 'Copper', category: 'general', tags: [] }),
+      ];
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        applyCategoryAndTagsToComponents: async (sysId, ids, mapping) => {
+          applyArgs = { sysId, ids: [...ids], mapping };
+          for (const item of sys.items) {
+            if (ids.includes(item.id) && mapping.category) item.category = mapping.category;
+          }
+          return { updated: ids.length, componentIds: [...ids] };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const before = get(store.viewState).selectedSystem;
+      assert.ok(
+        get(store.viewState).itemCards.every((c) => c.category === 'general'),
+        'components start in general'
+      );
+
+      const result = await store.bulkApplyComponentCategoryAndTags(['a', 'b'], { category: 'Metal' });
+      assert.deepEqual(applyArgs, {
+        sysId: 'sys1',
+        ids: ['a', 'b'],
+        mapping: { category: 'Metal' },
+      });
+      assert.equal(result.updated, 2);
+
+      const after = get(store.viewState).selectedSystem;
+      assert.notEqual(after, before, 'refresh publishes a NEW selectedSystem reference');
+      assert.deepEqual(
+        get(store.viewState)
+          .itemCards.map((c) => c.category)
+          .sort(),
+        ['Metal', 'Metal'],
+        'the re-projected itemCards carry the new category'
+      );
+    });
+
+    it('bulkApplyComponentCategoryAndTags is a no-op for an empty id set (no manager call)', async () => {
+      let called = false;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        applyCategoryAndTagsToComponents: async () => {
+          called = true;
+          return { updated: 1, componentIds: ['x'] };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.bulkApplyComponentCategoryAndTags([], { category: 'Metal' });
+      assert.deepEqual(result, { updated: 0, componentIds: [] });
+      assert.equal(called, false, 'no persist for an empty selection');
+    });
   });
 
   // -------------------------------------------------------------------------

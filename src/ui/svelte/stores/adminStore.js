@@ -8131,6 +8131,35 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * Bulk-apply a category and/or tag edit to a SET of components (issue 772), routed
+   * through the shared set-apply primitive so the whole set lands in one persist, then
+   * the STANDARD `refresh()` so the re-projected `viewState` (itemCards, per-category
+   * counts, tag usage) publishes a NEW `selectedSystem` reference — exactly the
+   * single-edit `updateComponent` contract, never a hand-patched partial viewState.
+   *
+   * @param {string[]} componentIds
+   * @param {{category?: string, addTags?: string[], removeTags?: string[]}} mapping
+   * @returns {Promise<{updated: number, componentIds: string[]}|null>} the primitive
+   *   result on success (so the caller can report `N updated`), or null on failure.
+   */
+  async function bulkApplyComponentCategoryAndTags(componentIds, mapping = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    const ids = Array.isArray(componentIds) ? componentIds : [];
+    if (!sysId || ids.length === 0) return { updated: 0, componentIds: [] };
+
+    try {
+      const result = await systemManager.applyCategoryAndTagsToComponents(sysId, ids, mapping);
+      await refresh();
+      return result;
+    } catch (err) {
+      console.error('Fabricate | Failed to bulk-apply component category and tags:', err);
+      services.notify?.error?.(err?.message || 'Failed to update components');
+      return null;
+    }
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
@@ -8354,6 +8383,7 @@ export function createAdminStore(services) {
     importSystem,
     deleteComponent,
     updateComponent,
+    bulkApplyComponentCategoryAndTags,
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,

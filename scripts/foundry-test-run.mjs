@@ -6302,6 +6302,33 @@ async function main() {
         await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
+        // ── Issue 772 — multi-select bulk edit ───────────────────────────────
+        // Check two component rows so the sticky bulk-actions bar appears (its
+        // Set-category select, the Add/Remove tag toggle, and the tag add trigger),
+        // stage a pending category so the frame reads as a populated edit with Apply
+        // enabled, screenshot, then Clear the selection so the remaining component
+        // frames below render WITHOUT the bar (net-zero: selection is UI-only, never
+        // persisted to the world).
+        const bulkSelectBoxes = page.locator('.fabricate-manager .manager-component-row .manager-component-select-input');
+        if (await bulkSelectBoxes.count() >= 2) {
+          await bulkSelectBoxes.nth(0).check();
+          await bulkSelectBoxes.nth(1).check();
+          await page.locator('.fabricate-manager [data-bulk-actions-bar]').first().waitFor({ state: 'visible', timeout: 5_000 });
+          const bulkCategory = page.locator('.fabricate-manager [data-bulk-category]');
+          const bulkCategoryValues = await bulkCategory
+            .locator('option')
+            .evaluateAll((options) => options.map((option) => option.value).filter(Boolean));
+          if (bulkCategoryValues.length > 0) {
+            await bulkCategory.selectOption(bulkCategoryValues[0]);
+          }
+          await captureStableManagerView(page, { layout: 'components bulk select', label: 'manager-components-bulk-select' });
+          process.stdout.write('  D0: components bulk-select screenshotted\n');
+          await page.locator('.fabricate-manager [data-bulk-clear]').first().click();
+          await page.locator('.fabricate-manager [data-bulk-actions-bar]').first().waitFor({ state: 'detached', timeout: 5_000 });
+        } else {
+          process.stdout.write('  D0: components bulk-select SKIPPED (fewer than two components)\n');
+        }
+
         // ---------------------------------------------------------------------
         // Issue 800 — write-time RESOLUTION of source descriptions, in three frames.
         //

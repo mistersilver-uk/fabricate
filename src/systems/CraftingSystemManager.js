@@ -49,6 +49,34 @@ import { SignatureValidator } from './SignatureValidator.js';
 const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
 const TOOL_ON_BREAK_MODES = new Set(TOOL_ON_BREAK_MODE_LIST);
 
+/**
+ * Normalize a bulk tag list the way `applyCategoryAndTagsToComponents` needs both its
+ * `addTags` and `removeTags` axes normalized: trim, lowercase, drop blanks. Extracted so
+ * the two axes share one definition (the SonarCloud new-code duplication gate flags a
+ * copied span).
+ *
+ * @param {unknown} tags
+ * @returns {string[]}
+ */
+function normalizeBulkTagList(tags) {
+  return Array.isArray(tags)
+    ? tags
+        .map((tag) =>
+          String(tag || '')
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    : [];
+}
+
+/** Content equality for the ordered tag lists the bulk primitive builds. */
+function sameTagList(before, after) {
+  if (before === after) return true;
+  if (before.length !== after.length) return false;
+  return before.every((tag, index) => tag === after[index]);
+}
+
 export class CraftingSystemManager {
   /**
    * @param {object} recipeManager
@@ -4027,13 +4055,24 @@ export class CraftingSystemManager {
    *    untouched — a folder that maps to no category still applies its tags.
    *  - `tags` is many-valued and ADDITIVE, so `addTags` is unioned into each
    *    component's existing tags (case-insensitively de-duplicated, stored lowercase
-   *    to match the `itemTags` vocabulary) rather than replacing them.
+   *    to match the `itemTags` vocabulary) rather than replacing them. `removeTags`
+   *    STRIPS tags, matched CASE-INSENSITIVELY against the verbatim (possibly
+   *    mixed-case) stored tags, keeping the rest. A tag present in both axes is
+   *    removed (remove-wins; remove runs after add).
    *
-   * A call that resolves to neither a category nor any tag is a no-op (no save).
+   * "Clear category" is expressed by passing the reserved `general` category — there is
+   * no separate clear flag: `general` is a legitimate assignable value and the canonical
+   * reset target (data-models spec).
+   *
+   * A call that resolves to no category and no add/remove tags is a no-op (no save).
+   * Per component the actual before/after is compared, so `updated` counts (and the
+   * single `save()` covers) only components that genuinely changed — a `removeTags`
+   * over a component lacking the tag, or a category set to the value it already holds,
+   * is not a false "updated".
    *
    * @param {string} systemId
    * @param {Iterable<string>} componentIds ids of the components to mutate.
-   * @param {{category?: string, addTags?: string[]}} [mapping]
+   * @param {{category?: string, addTags?: string[], removeTags?: string[]}} [mapping]
    * @returns {Promise<{updated: number, componentIds: string[]}>} the ids actually changed.
    */
   async applyCategoryAndTagsToComponents(systemId, componentIds, mapping = {}) {
@@ -4046,16 +4085,11 @@ export class CraftingSystemManager {
 
     const rawCategory = typeof mapping.category === 'string' ? mapping.category.trim() : '';
     const hasCategory = rawCategory !== '';
-    const addTags = Array.isArray(mapping.addTags)
-      ? mapping.addTags
-          .map((tag) =>
-            String(tag || '')
-              .trim()
-              .toLowerCase()
-          )
-          .filter(Boolean)
-      : [];
-    if (!hasCategory && addTags.length === 0) return { updated: 0, componentIds: [] };
+    const addTags = normalizeBulkTagList(mapping.addTags);
+    const removeSet = new Set(normalizeBulkTagList(mapping.removeTags));
+    if (!hasCategory && addTags.length === 0 && removeSet.size === 0) {
+      return { updated: 0, componentIds: [] };
+    }
 
     const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
     const salvageContext = this._salvageNormalizationContext(system);
@@ -4065,16 +4099,10 @@ export class CraftingSystemManager {
       if (!targetIds.has(String(component.id))) continue;
 
       const currentTags = Array.isArray(component.tags) ? component.tags : [];
-      let nextTags = currentTags;
-      if (addTags.length > 0) {
-        const seen = new Set(currentTags.map((tag) => String(tag).toLowerCase()));
-        nextTags = [...currentTags];
-        for (const tag of addTags) {
-          if (seen.has(tag)) continue;
-          seen.add(tag);
-          nextTags.push(tag);
-        }
-      }
+      const nextTags = this._applyBulkTagEdit(currentTags, addTags, removeSet);
+      const categoryChanged = hasCategory && String(component.category) !== rawCategory;
+      const tagsChanged = !sameTagList(currentTags, nextTags);
+      if (!categoryChanged && !tagsChanged) continue;
 
       system.components[idx] = this._normalizeComponent(
         {
@@ -4090,6 +4118,31 @@ export class CraftingSystemManager {
 
     if (changedIds.length > 0) await this.save();
     return { updated: changedIds.length, componentIds: changedIds };
+  }
+
+  /**
+   * Build the next tag list for one component: union `addTags` (case-insensitive
+   * dedupe) then strip `removeSet` (case-insensitive), keeping order and remove-wins.
+   * Returns the same reference when neither axis is active so the caller can cheaply
+   * detect "unchanged".
+   *
+   * @param {string[]} currentTags verbatim stored tags (possibly mixed-case).
+   * @param {string[]} addTags already trimmed/lowercased.
+   * @param {Set<string>} removeSet already trimmed/lowercased.
+   * @returns {string[]}
+   */
+  _applyBulkTagEdit(currentTags, addTags, removeSet) {
+    if (addTags.length === 0 && removeSet.size === 0) return currentTags;
+    const seen = new Set(currentTags.map((tag) => String(tag).toLowerCase()));
+    const merged = [...currentTags];
+    for (const tag of addTags) {
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      merged.push(tag);
+    }
+    return removeSet.size > 0
+      ? merged.filter((tag) => !removeSet.has(String(tag).toLowerCase()))
+      : merged;
   }
 
   async deleteItem(systemId, itemId) {

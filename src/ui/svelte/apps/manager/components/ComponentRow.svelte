@@ -38,9 +38,23 @@
     editLabel = '',
     editTitle = '',
     noDescriptionText = '',
+    // Multi-select bulk edit (issue 772). A leading checkbox — the row's IDENTITY button
+    // still owns single-select for the inspector, so selection is a separate control, not
+    // an overload of that button. `onToggleSelect(id, shiftKey)` carries the modifier so
+    // the view can run a shift-range over its sorted order.
+    checked = false,
+    selectLabel = '',
+    onToggleSelect = () => {},
     onSelect = () => {},
     onEdit = () => {}
   } = $props();
+
+  // A native click carries shiftKey; a keyboard toggle (Space) does not, so a plain
+  // change falls back to a single toggle. The checkbox reflects `checked` from the store.
+  function handleSelectClick(event) {
+    event.stopPropagation();
+    onToggleSelect(component?.id, !!event.shiftKey);
+  }
 
   const essences = $derived(Array.isArray(component?.essences) ? component.essences : []);
 </script>
@@ -50,6 +64,17 @@
   data-component-id={component?.id}
   aria-current={selected ? 'true' : undefined}
 >
+  <label class="manager-component-select" title={selectLabel}>
+    <input
+      type="checkbox"
+      class="manager-component-select-input"
+      data-component-select={component?.id}
+      {checked}
+      aria-label={selectLabel}
+      onclick={handleSelectClick}
+    />
+  </label>
+
   <button
     type="button"
     class="manager-component-identity"
