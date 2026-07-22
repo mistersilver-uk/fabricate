@@ -2028,6 +2028,88 @@ describe('createAdminStore', () => {
       assert.equal(projected.resultGroups.length, 1, 'top-level resultGroups projected');
     });
 
+    it('viewState.recipes projects the per-recipe craftingModifier override for the editor (issue 770 allowlist)', async () => {
+      // The recipe list projection is a hand-built ALLOWLIST. Omitting craftingModifier
+      // makes the Overview override control seed from `undefined` → render "Inherit
+      // system default" → and (since the editor saves the whole draft) silently write the
+      // override back to null. Read the ACTUAL projection, not a prop-fed tab.
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipe = makeRecipe({
+        id: 'r-mod',
+        name: 'Brew Healing Potion',
+        craftingSystemId: 'sys1',
+        toJSON: () => ({
+          id: 'r-mod',
+          name: 'Brew Healing Potion',
+          craftingSystemId: 'sys1',
+          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
+        }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [recipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-mod');
+      assert.ok(projected, 'recipe should be projected');
+      assert.deepEqual(
+        projected.craftingModifier,
+        { policy: 'byRecipe', modifierIds: ['alch'] },
+        'the override surfaces so the editor renders OVERRIDE, not inherit'
+      );
+    });
+
+    it('viewState.recipes projects a null craftingModifier when the recipe inherits (issue 770)', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipe = makeRecipe({
+        id: 'r-inherit',
+        craftingSystemId: 'sys1',
+        toJSON: () => ({ id: 'r-inherit', name: 'Inheritor', craftingSystemId: 'sys1' }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: () => [recipe],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-inherit');
+      assert.equal(projected.craftingModifier, null, 'no override projects as null (inherit)');
+    });
+
+    it('updateRecipe threads a craftingModifier override through the save path (issue 770 round-trip)', async () => {
+      // The editor saves the whole draft (seeded from the projection above). Assert the
+      // store save path forwards craftingModifier to the recipe manager so an authored
+      // override survives save → reload rather than being dropped en route.
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateArgs = { id, updates, options };
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const ok = await store.updateRecipe('r1', {
+        name: 'Renamed',
+        craftingModifier: { policy: 'highest', modifierIds: ['med'] },
+      });
+      assert.equal(ok, true);
+      assert.deepEqual(
+        updateArgs.updates.craftingModifier,
+        { policy: 'highest', modifierIds: ['med'] },
+        'the override is threaded to recipeManager.updateRecipe, not stripped'
+      );
+    });
+
     it('addRecipeItemFromUuid passes through the manager result', async () => {
       const passthrough = { item: { id: 'item-x' }, action: 'created' };
       const services = createMockServices();

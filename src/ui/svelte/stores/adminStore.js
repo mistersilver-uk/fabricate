@@ -1675,6 +1675,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       outcomeRouting: raw.outcomeRouting || null,
       checkTierId: raw.checkTierId ?? null,
       minSuccessOutcomeId: raw.minSuccessOutcomeId ?? null,
+      // Per-recipe crafting-check modifier override (issue 770). This projection is a
+      // hand-built ALLOWLIST: omitting it makes the Overview override control seed from
+      // `undefined`, render "Inherit system default", and silently write the override
+      // back to null on the next save (data loss). `raw` is `recipe.toJSON()`, which
+      // carries `craftingModifier` per the model.
+      craftingModifier: raw.craftingModifier ?? null,
       complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),
