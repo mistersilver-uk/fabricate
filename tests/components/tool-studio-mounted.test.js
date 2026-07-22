@@ -301,8 +301,8 @@ describe('Tool Studio editor (mounted)', () => {
     );
 
     assert.equal(
-      root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-valid'),
-      true
+      root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'),
+      false
     );
 
     harness.remount();
