@@ -17,10 +17,12 @@
   let {
     toolIds = [],
     toolsLibrary = [],
+    toolBonusModes = {},
     emptyLabel = '',
     addLabel = '',
     onAddTool = () => {},
     onRemoveTool = () => {},
+    onSetToolBonusMode = () => {},
     idPrefix = ''
   } = $props();
 
@@ -54,6 +56,12 @@
     return toolImage(tool);
   }
 
+  function bonusMode(toolId) {
+    return ['highestOnly', 'never'].includes(toolBonusModes?.[toolId])
+      ? toolBonusModes[toolId]
+      : 'always';
+  }
+
   const availableToolOptions = $derived(
     (toolsLibrary || [])
       .filter(tool => !(toolIds || []).includes(tool.id))
@@ -79,6 +87,19 @@
           <span class="manager-recipe-tool-medallion" aria-hidden="true"><img src={toolImageById(toolId)} alt="" /></span>
           <span class="manager-recipe-tool-name">{toolLabel(toolId)}</span>
           <span class="manager-recipe-tool-note manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ToolNotConsumed', 'not consumed')}</span>
+          <label class="manager-recipe-tool-bonus-mode">
+            <span class="sr-only">{text('FABRICATE.Admin.Manager.Recipe.ToolBonusMode', 'Tool bonus mode')} — {toolLabel(toolId)}</span>
+            <select
+              data-recipe-tool-bonus-mode={toolId}
+              value={bonusMode(toolId)}
+              aria-label={`${text('FABRICATE.Admin.Manager.Recipe.ToolBonusMode', 'Tool bonus mode')} — ${toolLabel(toolId)}`}
+              onchange={(event) => onSetToolBonusMode(toolId, event.currentTarget.value)}
+            >
+              <option value="always">{text('FABRICATE.Admin.Manager.Recipe.ToolBonusAlways', 'Always')}</option>
+              <option value="highestOnly">{text('FABRICATE.Admin.Manager.Recipe.ToolBonusHighestOnly', 'Highest only')}</option>
+              <option value="never">{text('FABRICATE.Admin.Manager.Recipe.ToolBonusNever', 'Never')}</option>
+            </select>
+          </label>
           <button
             type="button"
             class="manager-recipe-tool-remove"

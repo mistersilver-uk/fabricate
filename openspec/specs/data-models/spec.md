@@ -31,7 +31,8 @@ CraftingSystem = {
   // breaks; a check NEVER breaks tools under this authority (force-break gated off,
   // though a trigger's forced outcome still applies).
   // "checkDriven": the active check's checkBreakage triggers decide whether ALL
-  // required tools break; each Tool's own mode is ignored except "immune".
+  // required tools break; each Tool's own mode is ignored and each Tool's
+  // separate checkBreakable flag decides whether it participates.
   // Normalized on read (no versioned migration): unknown/missing -> "toolSpecific".
   toolBreakage: {
     authority: "toolSpecific" | "checkDriven", // default "toolSpecific"
@@ -178,6 +179,8 @@ CraftingSystem = {
   //   }
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
+  //     natStepping?: boolean,                      // default false; emitted only for
+  //                                                // crafting/salvage relative routed checks
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],
@@ -371,11 +374,12 @@ Absent fields back-compat default to `""`/empty macros with no migration.
 The retired `inventoryMode` field is never emitted.
 21. **Tool-breakage authority** (`toolBreakage.authority`) is a per-system switch, normalized on read (no versioned migration): unknown or missing normalizes to `"toolSpecific"`, mirroring the inline `resolutionMode`/`salvageResolutionMode` defaulters.
 A system with no persisted `toolBreakage` reads as `{ authority: "toolSpecific" }`.
-The governing rule: authority decides WHETHER a tool breaks; `checkBreakage` triggers decide WHEN, under `checkDriven`; the Tool's `onBreak` decides what happens; an `immune` Tool never breaks under either authority.
+The governing rule is that authority decides WHETHER a Tool breaks, `checkBreakage` triggers decide WHEN under `checkDriven`, and the Tool's `onBreak` decides what happens.
+`checkBreakable: false` opts a Tool out of check-driven breakage without replacing or erasing its retained tool-specific mode.
 22. Authority is strictly either-or (issue 419 recombine): a check can break tools ONLY under `"checkDriven"`.
 Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
 A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
-23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, except `immune`, which is always honoured (filtered out of the force-break set and recorded as skipped-immune evidence).
+23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, and Tools with `checkBreakable: false` are filtered out of the force-break set as immune evidence.
 The decision is made by a single shared evaluator (`evaluateCheckBreakage`) that crafting, salvage, and gathering all route through, so the decision cannot drift between surfaces.
 The evaluator additionally reads the routed per-tier `data.breakTools` as an implicit always-on trigger (the only remaining legacy bridge), so a routed tier's `breakTools` needs no separate persistence, and only an engine-evaluated roll-formula check result can force-break (`engineEvaluated === true`); any other result never force-breaks.
 A configured trigger force-breaks only when it both opts in (`breakTools === true`) AND its condition matches.
@@ -822,6 +826,7 @@ Recipe = {
 
   transferEffects: boolean,
   toolIds: string[], // references library Tools that apply to all ingredient sets across all steps in this recipe
+  toolBonusModes: Record<string, "always" | "highestOnly" | "never">, // default {}
 
   // RETIRED result-group selection. `resultSelection.provider` is no longer a live
   // routing basis for any mode: alchemy now routes on the system-level
@@ -935,6 +940,7 @@ Catalogue membership of the ids is NOT enforced here — the resolver drops unkn
 The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
 A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
 It survives export/import (the importer re-stamps it) and is retained across GM edits (an edit that omits `importSource` inherits the stored value through the `{ ...recipe.toJSON(), ...updates }` merge in `updateRecipe`).
+15. `toolBonusModes` normalizes to a map whose non-empty Tool-id keys carry only `always`, `highestOnly`, or `never`; invalid entries are dropped, an absent map becomes `{}`, and an absent Tool-id entry evaluates as `always`.
 
 ### Validation Guidance
 
@@ -978,7 +984,7 @@ The raw-reference fall-through is load-bearing for multi-system worlds, stale fl
 The invariant is that within a single system's component set at most one component bears a given id; component ids are NOT globally unique, because independently-authored systems can coincidentally share an id and every world that copy-imported BEFORE issue 570 retains its origin's ids (copy-import itself no longer preserves origin ids — see the residual note below).
 The resolver is the single component matcher used across crafting ingredient and collection matching, recipe tool matching, essence resolution, the inventory used-by listing, owned-item repair, gathering award-stacking, alchemy signature matching, and canvas Item→Tool drop resolution.
 This closes the transitive-`_stats.duplicateSource` false positive on the source-reference path while preserving a system's recognition of its own component in multi-system worlds.
-Residual, CLOSED by issue 570: copy-mode import now regenerates every component id and atomically remaps every within-payload component reference (recipe ingredient and result refs including the `systemItemId` alias, the recursive `alternatives[]` refs, and the flat `ingredients`/`results` aliases; the retained `tool.componentId` alias in both the system and gathering-library tool slices; `onBreak.replacementComponentId`; `essence.sourceComponentId`; salvage result refs; gathering drop-row `componentId`; and legacy `catalysts[]`), so two systems copy-imported from the same origin no longer share a component id.
+Residual, CLOSED by issue 570: copy-mode import now regenerates every component id and atomically remaps every within-payload component reference (recipe ingredient and result refs including the `systemItemId` alias, the recursive `alternatives[]` refs, and the flat `ingredients`/`results` aliases; the retained `tool.componentId` alias in both the system and gathering-library tool slices; component-discriminated `onBreak.replacementTarget`; `essence.sourceComponentId`; salvage result refs; gathering drop-row `componentId`; and legacy `catalysts[]`), so two systems copy-imported from the same origin no longer share a component id.
 Issue 561 removed the blocker by giving Tools their own identity — a Tool no longer borrows `componentId` for cross-system matching — and issue 570 flipped regeneration on in `prepareForImport('copy')`.
 The per-system `roles` map and the resolver's `systemId` scoping remain load-bearing, because component ids stay per-system-unique only: independently-authored systems, and worlds that copy-imported BEFORE issue 570, can still share ids.
 
@@ -991,7 +997,8 @@ A legacy scalar `flags.fabricate.componentId` (components) or `flags.fabricate.r
 Registration stamps only the owning system's `roles[system.id]` leaf for the kind, and clears only that per-system leaf on re-point or repair, never the whole `roles` flag nor the whole `roles[systemId]` object (which would destroy the sibling leaves).
 A CRAFTED OUTPUT item carries the durable component identity of its result component: crafting stamps `flags.fabricate.roles[craftingSystemId].componentId` on the output item at creation, so a freshly crafted product resolves to its OWN component through the identity tier and never through the transitive `_stats.duplicateSource` it inherits from a source item duplicated off a sibling component (a result with no managed component, or a system id that is not a durable-flag-key segment, is left unstamped and degrades to raw-reference resolution).
 A GATHERED AWARD item carries the durable component identity of its awarded component: the gathering award creation path stamps `flags.fabricate.roles[systemId].componentId` (the awarding system's id) on the created item at creation, so a gathered part resolves to its OWN component through the identity tier; an award with no managed component (a bare `itemUuid` source), or a system id that is not a durable-flag-key segment, is left unstamped and degrades to raw-reference resolution.
-A TOOL-REPLACEMENT grant item (created when a broken tool's `onBreak.replaceWith` resolves its `replacementComponentId`) carries that replacement component's durable identity: the replacement creation path stamps `flags.fabricate.roles[systemId].componentId = replacementComponentId`, and ADDITIONALLY stamps `flags.fabricate.roles[systemId].toolId` with the linking tool's id when exactly one first-class tool in `system.tools` links the replacement component (`tool.componentId === replacementComponentId`), so a replacement that is itself a working tool stays durably matchable and breakable; on zero or multiple linking tools only `componentId` is stamped, and when the replacement component does not resolve, nothing is stamped.
+A TOOL-REPLACEMENT grant item created from a Component-discriminated `onBreak.replacementTarget` carries that replacement Component's durable identity: the creation path stamps `flags.fabricate.roles[systemId].componentId`, and additionally stamps `flags.fabricate.roles[systemId].toolId` when exactly one first-class Tool links that Component, so a replacement that is itself a working Tool stays durably matchable and breakable.
+A direct-Item replacement preserves the resolved Item source identity and never receives fabricated Component identity.
 These creation-time stamps write the same `roles[systemId]` leaves the one-shot component restamp and the **Repair item data** action write, with the same values, so they are idempotent-compatible; they add no migration and fix only items created after the one-shot back-fill has run.
 
 - A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
@@ -1252,32 +1259,45 @@ are always by id into the per-system library.
 
 ```js
 Tool = {
+  id: string,
+  enabled: boolean,
   componentId: string | null,      // OPTIONAL managed-component link; null for an item-sourced tool
   // Own source references (issue 561; renamed in issue 560), identical field shape to a component.
   registeredItemUuid: string | null, // the registered live source document uuid
   originItemUuid: string | null,     // the canonical/compendium source uuid
   aliasItemUuids: string[],          // additional source references for matching
-  // Registration/migration-time DISPLAY SNAPSHOT (name + img ONLY, never `label`).
+  // Registration/migration-time DISPLAY SNAPSHOT (name + img + description, never `label`).
   name: string | null,
   img: string | null,
+  description: string,
   label: string,                   // pre-existing, user-authored display override (distinct from the snapshot)
   requirement: null | {
     formula: string,
   },
+  prerequisites: {
+    enabled: boolean,
+    ids: string[],                 // shared CraftingSystem.characterPrerequisites ids
+    gateMode: "bonus" | "usability",
+  },
+  bonus: {
+    enabled: boolean,
+    expression: string,
+  },
   breakage: {
-    mode: "limitedUses" | "breakageChance" | "diceExpression" | "immune",
+    mode: "limitedUses" | "breakageChance" | "diceExpression",
     maxUses?: number | null,         // limitedUses; null means unlimited
     breakageChance?: number,         // breakageChance; integer 0..100
     formula?: string,                // diceExpression
     threshold?: number,              // diceExpression; broken when result < threshold
-    // "immune" carries no additional fields; the tool never breaks under EITHER
-    // breakage authority and is still recorded as used (no toolUsage flag, which is
-    // limitedUses-only). Under checkDriven authority it is the per-tool opt-out.
   },
+  checkBreakable: boolean,         // default true; check-driven immunity only
   onBreak: {
     mode: "destroy" | "flagBroken" | "replaceWith",
-    replacementComponentId?: string  // replaceWith; must !== componentId
-  }
+    replacementTarget?:
+      | { type: "component", componentId: string }
+      | { type: "item", itemUuid: string },
+  },
+  repairRequirements: IngredientGroup[], // flagBroken repair recipe; zero groups is valid
 }
 ```
 
@@ -1286,19 +1306,19 @@ Tool = {
 1. A Tool must carry EITHER a `componentId` (a managed-component link) OR its own source references (`registeredItemUuid` / `originItemUuid`); a Tool with NEITHER is invalid.
 A first-class tool registered from an Item uuid carries its own source references plus a `name` + `img` display snapshot and `componentId: null`; a whetstone that is also a component, or a tool migrated from a legacy componentId-tool, keeps `componentId` populated (for `onBreak.replaceWith` resolution and the UI's linked-component display) but `componentId` is no longer the matching basis.
 A component-linked tool that carries no own source references derives them and its `name` + `img` snapshot from its linked component on every `_normalizeSystem` load (`deriveToolSourceFromComponents`), not only at migration time — so a tool authored by dropping a managed component, a copy-imported tool, and a post-migration authored tool all match owned items by source reference, continuous with the `1.15.0` migration and idempotent (an item-sourced or already-derived tool is left untouched, and the derivation never overwrites the tool's own snapshot or `label`).
-The `name` + `img` display snapshot is captured at registration/migration time and is NOT auto-refreshed when the GM renames the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
+The `name` + `img` + `description` display snapshot is captured at registration or relinking time and is NOT auto-refreshed when the GM changes the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
 The pre-existing user-authored `label` is a DISTINCT field and is NEVER written by snapshot capture, migration, or any refresh.
 2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`).
 Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
 Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
 The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
-3. A referenced Tool is always required: it must be present and pass its optional `requirement` before crafting or a gathering attempt may proceed.
+3. A referenced Tool is always required: it must be present and pass its optional legacy gathering `requirement` plus any enabled shared-prerequisite usability gate before crafting or a gathering attempt may proceed.
 A reference whose id no longer resolves in its library, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED`.
 4. `requirement` is optional and formula-only.
 When present, it requires a non-empty `formula` — a Foundry roll expression evaluated against the actor's roll data.
 The actor satisfies the requirement when the result is truthy (a non-zero number or a `true` boolean).
 There is no provider discriminator and no macro support on this surface.
-5. Exactly one `breakage.mode` is configured per tool:
+5. Exactly one of the three tool-specific `breakage.mode` values is configured per Tool, and that configuration is retained while `checkDriven` authority is active:
    - `limitedUses`: `maxUses` is null or a positive integer.
 Tool usage is tracked on the owned item via `flags.fabricate.toolUsage = { timesUsed }`.
 The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
@@ -1306,15 +1326,21 @@ The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
 The tool breaks when `Math.random() * 100 < breakageChance` (so `0` never breaks and `100` always breaks).
    - `diceExpression`: `formula` is a non-empty Foundry roll formula evaluated against the actor's roll data; `threshold` is a finite number.
 The tool breaks when the numeric result is `< threshold`.
-   - `immune`: carries no breakage fields and never breaks under either authority.
-It is still recorded as used (no `toolUsage` flag is written, because that flag is `limitedUses`-only), and under `checkDriven` authority it is filtered out of the force-break set.
-`onBreak` stays configurable but is inert while immune.
-6. Exactly one `onBreak.mode` is configured per tool. `replaceWith` requires `replacementComponentId !== componentId`.
-7. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
-8. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
+Legacy `breakage.mode: "immune"` reads forward in both `Tool` construction and `_normalizeSystem` as `{ mode: "limitedUses", maxUses: null }` plus `checkBreakable: false`, and the next canonical write never emits `immune`.
+6. `prerequisites` always persists `{ enabled, ids, gateMode }`, and `bonus` always persists `{ enabled, expression }` even while either setting is inactive.
+The system normalizer processes `characterPrerequisites` before Tools, prunes unknown Tool prerequisite ids in every state, retains valid ids while disabled, and changes an enabled gate to disabled when pruning leaves no ids.
+7. Exactly one `onBreak.mode` is configured per Tool.
+`replaceWith` carries exactly one discriminator in `replacementTarget`: a managed Component id or a direct Item UUID; malformed, empty, or dual targets are invalid, and a Component target must differ from the Tool's own `componentId` when present.
+`flagBroken` permits zero or more repair `IngredientGroup`s; every present group must be complete canonical `IngredientGroup`/`Ingredient` JSON whose options use valid Component, Tag, Essence, or Currency match shapes.
+Every breakage consumer resolves and creates exactly one quantity-one replacement before deleting the original.
+Direct UUID resolution awaits `fromUuid` and accepts only a returned Document with `documentName === "Item"`; null, index entries, and non-Item Documents fail.
+Resolution failure, missing creation API, a throw, and null/empty creation preserve the original and are not reported as `replaced`.
+Component targets receive managed Component identity, while direct Item targets preserve source Item identity without fabricated Component identity.
+8. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
+9. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
 The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
 Canvas virtual-presence stays keyed by `componentId`: an item-sourced tool (`componentId: null`) does NOT participate in canvas virtual-presence in this change (re-keying virtual-presence onto `toolId` is tracked separately).
-9. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching** against the tool's OWN identity.
+10. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching** against the tool's OWN identity.
 Durable-identity matching means: (a) the durable per-system tool-identity flag `flags.fabricate.roles[systemId].toolId`, OR (b) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`) intersecting the tool's source references.
 Tools have no legacy scalar identity tier.
 An item is NEVER selected for usage or destruction by a transitive `_stats.duplicateSource` reference or by name alone, either of which still satisfies the non-destructive **presence** gate (the wide shared tool matcher).
@@ -1322,11 +1348,12 @@ An item that satisfies presence only via a transitive duplicate-source reference
 When an actor owns both a durable-identity match and a presence-only match for the same tool, the durable-identity item is the one used or broken.
 Because destroying the wrong item is irreversible, this is the shipped behaviour ("is"): a world-template copy lacking both a compendium source and a durable flag is spared until repaired, rather than risking an irreversible wrong-item destroy.
 A locked-compendium copy carries its own compendium source, matches durable identity (b), and still breaks.
-10. A Tool's durable identity is `flags.fabricate.roles[systemId].toolId`, stamped on its source Item at direct registration (`addToolFromUuid`) and by the one-shot `ready`-body restamp (`autoStampToolSources`, keyed by `TOOL_FLAG_STAMP_VERSION`), an additive SIBLING of `roles[systemId].componentId`.
+11. A Tool's durable identity is `flags.fabricate.roles[systemId].toolId`, stamped on its source Item by the atomic Tool upsert used by `addToolFromUuid` and by the one-shot `ready`-body restamp (`autoStampToolSources`, keyed by `TOOL_FLAG_STAMP_VERSION`), an additive SIBLING of `roles[systemId].componentId`.
 A whetstone that is both a component and a tool carries both leaves in one `roles[systemId]` object, and neither registration clobbers the other: deregistering or re-pointing a tool clears ONLY the `roles[systemId].toolId` leaf.
 A bulk-imported tool (via `createSystem`) matches by raw source references until a manual "Repair item data" stamps its owned copies, identical to imported components.
-11. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
-Tool **usage/breakage** selection matches by durable-identity against the tool's OWN identity per requirement 9.
+The upsert rejects non-Item Documents, stages the description/name/image/source snapshots, clears only a changed old Tool role leaf, stamps the new leaf, and persists one normalized Tool atomically.
+12. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
+Tool **usage/breakage** selection matches by durable identity against the Tool's own identity per requirement 10.
 
 ### Validation Matrix
 
@@ -1338,8 +1365,11 @@ Tool **usage/breakage** selection matches by durable-identity against the tool's
 | `breakage.breakageChance.breakageChance` | integer `0..100`                                 | non-integer, out of range |
 | `breakage.diceExpression.formula`      | non-empty string                                   | empty                     |
 | `breakage.diceExpression.threshold`    | finite number                                      | non-finite                |
-| `breakage.immune`                      | no breakage fields required or permitted           | —                         |
-| `onBreak.replaceWith.replacementComponentId` | non-empty, must differ from `componentId`    | empty, equal to `componentId` |
+| `prerequisites.ids`                    | known shared ids; at least one when enabled         | unknown or enabled-empty  |
+| `bonus.expression`                     | non-empty when enabled                              | enabled-empty             |
+| `checkBreakable`                       | boolean                                             | non-boolean canonical input |
+| `onBreak.replaceWith.replacementTarget` | exactly one valid Component id or Item UUID discriminator | absent, malformed, or dual |
+| `repairRequirements`                   | empty or complete canonical `IngredientGroup`s      | incomplete present group  |
 
 ## Gathering Drop Reference
 

@@ -36,6 +36,76 @@ export function stampReplacementComponentIdentity(itemData, system, componentId)
   }
 }
 
+function replacementItemData(source) {
+  if (!source || typeof source !== 'object') return null;
+  const fromDocument = source.toObject?.();
+  const itemData = fromDocument && typeof fromDocument === 'object'
+    ? fromDocument
+    : {
+        name: source.name ?? 'Replacement Item',
+        img: source.img ?? 'icons/svg/item-bag.svg',
+        type: source.type ?? 'loot',
+        system: source.system
+          ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
+          : {},
+      };
+  itemData.system ??= {};
+  itemData.system.quantity = 1;
+  if (source.uuid) {
+    globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+  }
+  return itemData;
+}
+
+/**
+ * Build the single lossless Tool replacement creator used by crafting, salvage,
+ * and gathering breakage consumers.
+ *
+ * @param {object} dependencies
+ * @param {object|null} dependencies.system
+ * @param {(args: {componentId: string, system: object}) => object|Promise<object|null>}
+ *   [dependencies.resolveComponentSource]
+ * @param {(uuid: string) => Promise<object|null>} [dependencies.resolveItemUuid]
+ * @returns {(args: {actor: object, target: object}) => Promise<object|null>}
+ */
+export function createToolReplacementCreator({
+  system = null,
+  resolveComponentSource,
+  resolveItemUuid,
+} = {}) {
+  return async ({ actor, target } = {}) => {
+    if (typeof actor?.createEmbeddedDocuments !== 'function') return null;
+
+    let source = null;
+    let componentId = null;
+    try {
+      if (target?.type === 'component') {
+        componentId = typeof target.componentId === 'string' ? target.componentId.trim() : '';
+        if (!componentId || typeof resolveComponentSource !== 'function') return null;
+        source = await resolveComponentSource({ componentId, system });
+      } else if (target?.type === 'item') {
+        const itemUuid = typeof target.itemUuid === 'string' ? target.itemUuid.trim() : '';
+        if (!itemUuid || typeof resolveItemUuid !== 'function') return null;
+        source = await resolveItemUuid(itemUuid);
+        if (source?.documentName !== 'Item') return null;
+      } else {
+        return null;
+      }
+
+      if (!source) return null;
+      const itemData = replacementItemData(source);
+      if (!itemData) return null;
+      if (componentId) stampReplacementComponentIdentity(itemData, system, componentId);
+
+      const created = await actor.createEmbeddedDocuments('Item', [itemData]);
+      const createdItem = Array.isArray(created) ? created[0] : null;
+      return createdItem?.documentName === 'Item' ? createdItem : null;
+    } catch {
+      return null;
+    }
+  };
+}
+
 /**
  * Shared Tool breakage PLAN/APPLY runtime.
  *
@@ -116,7 +186,9 @@ export function plannedToolBreakageOutcome(tool) {
   if (tool.onBreak?.mode === 'replaceWith') {
     return {
       action: 'replaced',
-      replacementComponentId: tool.onBreak.replacementComponentId,
+      replacementTarget: tool.onBreak.replacementTarget
+        ? { ...tool.onBreak.replacementTarget }
+        : null,
     };
   }
   return { action: 'none' };
@@ -356,6 +428,7 @@ export async function applyToolUsageAndBreakage({
  * @param {Function} deps.matchTools                  - ({ actor, system, task, tools }) => { items: [{ tool, item }], missing }
  * @param {Function} deps.buildItemRef                - (actor, item) => itemRef
  * @param {Function} [deps.resolveReplacementSource]  - ({ componentId, system }) => source|null
+ * @param {Function} [deps.resolveItemUuid]            - async (uuid) => Item|null
  * @param {Function} [deps.evaluateExpression]
  * @param {Function} [deps.planKey]                   - ({ actor, task }) => string (defaults to actor:task)
  * @returns {{ plan: Function, apply: Function }}
@@ -364,6 +437,7 @@ export function createToolBreakageRuntime({
   matchTools,
   buildItemRef,
   resolveReplacementSource,
+  resolveItemUuid,
   evaluateExpression,
   planKey,
 } = {}) {
@@ -373,30 +447,12 @@ export function createToolBreakageRuntime({
       ? planKey
       : ({ actor, task } = {}) => `${actor?.uuid ?? actor?.id ?? 'actor'}:${task?.id ?? 'task'}`;
 
-  function makeCreateReplacement(actor, system) {
-    if (typeof resolveReplacementSource !== 'function') return;
-    return async ({ actor: replacementActor, componentId }) => {
-      const source = resolveReplacementSource({ componentId, system });
-      if (!source || typeof replacementActor?.createEmbeddedDocuments !== 'function') return;
-      const itemData = source.toObject?.() ?? {
-        name: source.name ?? 'Replacement Item',
-        img: source.img ?? 'icons/svg/item-bag.svg',
-        type: source.type ?? 'loot',
-        system: source.system
-          ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
-          : {},
-      };
-      itemData.system ??= {};
-      if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
-      if (source.uuid) {
-        globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
-      }
-      // Stamp the replacement's durable per-system identity (issue 780) so it resolves to
-      // its own component — and, when it is itself a single linking first-class tool, stays
-      // durably breakable — once #601 removes the name-fallback tier.
-      stampReplacementComponentIdentity(itemData, system, componentId);
-      await replacementActor.createEmbeddedDocuments('Item', [itemData]);
-    };
+  function makeCreateReplacement(system) {
+    return createToolReplacementCreator({
+      system,
+      resolveComponentSource: resolveReplacementSource,
+      resolveItemUuid,
+    });
   }
 
   // Resolve the system's breakage authority (issue 419). Unknown / missing →
@@ -447,7 +503,7 @@ export function createToolBreakageRuntime({
           continue;
         }
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-        const isImmune = model.breakage?.mode === 'immune';
+        const isImmune = model.checkBreakable === false || model.breakage?.mode === 'immune';
         let breakageResult;
         let extra = {};
         if (authority === 'checkDriven') {
@@ -538,7 +594,7 @@ export function createToolBreakageRuntime({
           continue;
         }
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-        const isImmune = tool.breakage?.mode === 'immune';
+        const isImmune = tool.checkBreakable === false || tool.breakage?.mode === 'immune';
         let planned = plannedByItem.get(stringOrEmpty(itemRef?.itemUuid));
         let extra = {};
         if (authority === 'checkDriven') {
@@ -565,7 +621,7 @@ export function createToolBreakageRuntime({
           planned,
           evaluateExpression,
           buildItemRef,
-          createReplacement: makeCreateReplacement(actor, system),
+          createReplacement: makeCreateReplacement(system),
         });
         evidence.push({ ...entry, ...extra });
       }

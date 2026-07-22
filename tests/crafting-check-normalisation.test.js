@@ -90,6 +90,7 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.routed, {
     type: 'relative',
+    natStepping: false,
     rollFormula: '',
     dc: 15,
     thresholdMode: 'meet',
@@ -98,6 +99,36 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     fixedOutcomes: [],
     checkBreakage: { triggers: [] },
   });
+});
+
+test('_normalizeCraftingCheck and salvage default routed natural stepping off', () => {
+  const mgr = makeManager();
+
+  assert.equal(mgr._normalizeCraftingCheck({}).routed.natStepping, false);
+  assert.equal(mgr._normalizeSalvageCraftingCheck({}).routed.natStepping, false);
+  assert.equal(
+    mgr._normalizeCraftingCheck({ routed: { natStepping: true } }).routed.natStepping,
+    true
+  );
+  assert.equal(
+    mgr._normalizeSalvageCraftingCheck({ routed: { natStepping: true } }).routed.natStepping,
+    true
+  );
+});
+
+test('natural stepping is ignored by non-routed and gathering check shapes', () => {
+  const mgr = makeManager();
+  const crafting = mgr._normalizeCraftingCheck({
+    simple: { natStepping: true },
+    progressive: { natStepping: true },
+  });
+  const gathering = mgr._normalizeGatheringCraftingCheck({
+    routed: { natStepping: true },
+  });
+
+  assert.equal(crafting.simple.natStepping, undefined);
+  assert.equal(crafting.progressive.natStepping, undefined);
+  assert.equal(gathering.routed.natStepping, undefined);
 });
 
 test('_normalizeCraftingCheck routed migrates legacy crits into unified triggers', () => {

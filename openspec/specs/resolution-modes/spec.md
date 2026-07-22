@@ -1,5 +1,16 @@
 # Resolution Modes
 
+## Relative Routed Natural Stepping
+
+`craftingCheck.routed.natStepping` and `salvageCraftingCheck.routed.natStepping` are default-off booleans owned by their relative routed check configurations.
+Fixed routed checks ignore the setting, and gathering exposes and persists no corresponding setting.
+
+After relative-margin matching and before result delivery, the shared check runner inspects the kept active face of the first d20 dice group.
+A kept natural 20 steps the matched tier once toward the next higher tier, and a kept natural 1 steps it once toward the next lower tier.
+A forced outcome takes precedence and bypasses natural stepping.
+Fixed tiers never step, and a natural at the existing cap or floor is a no-op.
+Only an actual tier change records `data.natStep` evidence and produces the localized crafting or salvage chat note.
+
 ## Purpose
 
 Define semantics and validation rules for crafting-system resolution modes.

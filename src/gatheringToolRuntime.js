@@ -42,16 +42,36 @@ export function createGatheringToolAvailability({ craftingSystemManager, evaluat
     async check({ actor, viewer, system, environment, task, tools = [], presentTools = null } = {}) {
       const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager, presentTools });
       const failedRequirements = [];
-      for (const { tool } of matched.items) {
-        if (!tool?.requirement) continue;
-        const result = await evaluator?.evaluateRequirement?.({
-          requirement: tool.requirement,
-          actor,
-          environment,
-          task
+      for (const { tool, item, virtual } of matched.items) {
+        const boundActor = virtual === true ? actor : (item?.parent ?? actor);
+        const gate = await evaluateToolPrerequisiteGate({
+          tool,
+          actor: boundActor,
+          prerequisiteDefinitions: system?.characterPrerequisites,
+          evaluatePrerequisite: ({ actor: gateActor, prerequisite }) =>
+            evaluatePrerequisite(gateActor?.getRollData?.() ?? gateActor?.system ?? {}, prerequisite),
         });
-        if (result && result.allowed !== true) {
-          failedRequirements.push({ tool, diagnostic: result.diagnostic, reasonCode: result.reasonCode });
+        if (!gate.usable) {
+          failedRequirements.push({
+            tool,
+            diagnostic: null,
+            reasonCode: 'TOOL_PREREQUISITE_FAILED',
+          });
+        }
+        if (tool?.requirement) {
+          const result = await evaluator?.evaluateRequirement?.({
+            requirement: tool.requirement,
+            actor,
+            environment,
+            task
+          });
+          if (result && result.allowed !== true) {
+            failedRequirements.push({
+              tool,
+              diagnostic: result.diagnostic,
+              reasonCode: result.reasonCode,
+            });
+          }
         }
       }
       return {
@@ -166,10 +186,19 @@ export function classifyGatheringToolStates({ actor, system, task, tools = [], c
     // component above. When no working item matched, probe for it via the same
     // matcher and surface it as `damaged` (display-only).
     if (state === 'missing' && tool?.onBreak?.mode === 'replaceWith') {
-      const replacementComponentId = tool.onBreak.replacementComponentId;
-      if (typeof replacementComponentId === 'string' && replacementComponentId.trim()) {
-        const replacementTool = { componentId: replacementComponentId };
+      const target = tool.onBreak.replacementTarget || (
+        typeof tool.onBreak.replacementComponentId === 'string'
+          ? { type: 'component', componentId: tool.onBreak.replacementComponentId }
+          : null
+      );
+      if (target?.type === 'component' && target.componentId?.trim()) {
+        const replacementTool = { componentId: target.componentId.trim() };
         if (items.some(candidate => matcher(syntheticRecipe, replacementTool, candidate))) {
+          state = 'damaged';
+        }
+      } else if (target?.type === 'item' && target.itemUuid?.trim()) {
+        const itemUuid = target.itemUuid.trim();
+        if (items.some((candidate) => getItemSourceReferences(candidate).includes(itemUuid))) {
           state = 'damaged';
         }
       }
@@ -244,3 +273,6 @@ function normalizeFoundryCollection(collection) {
   if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
   return [];
 }
+import { getItemSourceReferences } from './utils/sourceUuid.js';
+import { evaluatePrerequisite } from './systems/characterPrerequisites.js';
+import { evaluateToolPrerequisiteGate } from './systems/toolCheckBonus.js';

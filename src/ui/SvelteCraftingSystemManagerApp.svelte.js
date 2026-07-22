@@ -147,6 +147,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   _adminStore = null;
   _services = null;
   _confirmDiscardDirtyEssenceDraft = null;
+  _confirmDiscardDirtyToolDraft = null;
   // Foundry user CRUD hook registrations, torn down on close, that keep the
   // per-recipe restriction allow-list current when players change while open.
   _userHooks = null;
@@ -339,6 +340,23 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter(item => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      resolveToolSource: async (uuid) => {
+        if (!uuid) return null;
+        try {
+          const item = await fromUuid(uuid);
+          if (item?.documentName !== 'Item') return null;
+          const rawDescription = item.system?.description?.value ?? item.system?.description ?? '';
+          return {
+            uuid: item.uuid || uuid,
+            name: item.name || '',
+            img: item.img || '',
+            type: item.type || '',
+            description: typeof rawDescription === 'string' ? rawDescription : '',
+          };
+        } catch {
+          return null;
+        }
+      },
       pickImagePath: async (currentPath = '') => {
         const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation
           || foundry?.applications?.apps?.FilePicker
@@ -844,7 +862,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             choices: [
               {
                 action: 'save',
-                label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll'),
+                label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Save'),
                 icon: 'fas fa-save'
               },
               {
@@ -854,7 +872,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               },
               {
                 action: 'cancel',
-                label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Cancel'),
+                label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.KeepEditing'),
                 icon: 'fas fa-times'
               }
             ],
@@ -862,8 +880,23 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           });
           return action === 'cancel' ? false : action;
         },
+        confirmDeleteTool: ({ tool } = {}) => confirmDialog({
+          title: localize('FABRICATE.Admin.Manager.Tools.DeleteConfirm.Title'),
+          content: `<p>${localize('FABRICATE.Admin.Manager.Tools.DeleteConfirm.Content').replace('{name}', tool?.label || tool?.name || '')}</p>`,
+          yes: {
+            label: localize('FABRICATE.Admin.Manager.Tools.Delete'),
+            callback: () => true
+          },
+          no: {
+            label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.KeepEditing'),
+            callback: () => false
+          }
+        }),
         registerEssenceDirtyGuard: (guard) => {
           this._confirmDiscardDirtyEssenceDraft = typeof guard === 'function' ? guard : null;
+        },
+        registerToolDirtyGuard: (guard) => {
+          this._confirmDiscardDirtyToolDraft = typeof guard === 'function' ? guard : null;
         },
         // Gathering economy authoring + manual state controls (GM-only).
         getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
@@ -1021,6 +1054,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   }
 
   async close(options) {
+    const canCloseTool = await this._confirmDiscardDirtyToolDraft?.();
+    if (canCloseTool === false) return this;
+
     const canCloseEssence = await this._confirmDiscardDirtyEssenceDraft?.();
     if (canCloseEssence === false) return this;
 
@@ -1034,6 +1070,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     }
 
     this._confirmDiscardDirtyEssenceDraft = null;
+    this._confirmDiscardDirtyToolDraft = null;
     this._unregisterUserHooks();
     if (this._adminStore) {
       this._adminStore.destroy();

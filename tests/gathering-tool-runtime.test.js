@@ -479,7 +479,13 @@ test('matchGatheringTools still collapses a broken matching tool into missing (a
 // ---------------------------------------------------------------------------
 
 function replaceWithTool() {
-  return { componentId: 'c-pick', onBreak: { mode: 'replaceWith', replacementComponentId: 'c-pick-broken' } };
+  return {
+    componentId: 'c-pick',
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'component', componentId: 'c-pick-broken' },
+    },
+  };
 }
 
 function classifyOne(actor, tool) {
@@ -501,6 +507,23 @@ test('classifyGatheringToolStates: replaceWith variant only → damaged; working
 test('classifyGatheringToolStates: holding both working tool and broken variant → present (working wins)', () => {
   const actor = { items: [inventoryItem('c-pick'), inventoryItem('c-pick-broken')] };
   assert.equal(classifyOne(actor, replaceWithTool()), 'present');
+});
+
+test('classifyGatheringToolStates recognizes a direct-Item replacement by preserved source identity', () => {
+  const directReplacement = {
+    uuid: 'Actor.a.Item.replacement',
+    flags: { core: { sourceId: 'Item.broken-pick-source' } },
+    getFlag: () => false,
+  };
+  const tool = {
+    componentId: 'c-pick',
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'item', itemUuid: 'Item.broken-pick-source' },
+    },
+  };
+
+  assert.equal(classifyOne({ items: [directReplacement] }, tool), 'damaged');
 });
 
 test('classifyGatheringToolStates: destroy/flagBroken onBreak does not trigger the broken-variant fallback', () => {
@@ -635,6 +658,98 @@ test('createGatheringToolAvailability: virtual-present tool reports available an
   assert.deepEqual(result.items, [], 'a virtual match contributes no owned item');
 });
 
+const TRAINED_PREREQUISITE = { id: 'trained', path: 'rank', op: 'gte', value: 2 };
+
+function prerequisiteTool(gateMode = 'usability', ids = ['trained']) {
+  return {
+    id: 'tool-axe',
+    componentId: 'c-axe',
+    prerequisites: { enabled: true, ids, gateMode },
+    bonus: { enabled: true, expression: '@bonus' },
+  };
+}
+
+function rollActor(rank, items = []) {
+  const actor = { items, system: { rank }, getRollData: () => ({ rank }) };
+  for (const item of items) item.parent = actor;
+  return actor;
+}
+
+test('gathering usability gates bind an owned Tool to its item actor without actor mixing', async () => {
+  const itemOwner = rollActor(0, [inventoryItem('c-axe')]);
+  const primaryActor = rollActor(5, itemOwner.items);
+  itemOwner.items[0].parent = itemOwner;
+  const availability = createGatheringToolAvailability({ craftingSystemManager: matcher });
+  const result = await availability.check({
+    actor: primaryActor,
+    system: { id: 's', characterPrerequisites: [TRAINED_PREREQUISITE] },
+    task: { id: 't' },
+    tools: [prerequisiteTool()],
+  });
+
+  assert.equal(result.available, false);
+  assert.equal(result.failedRequirements[0].reasonCode, 'TOOL_PREREQUISITE_FAILED');
+});
+
+test('gathering virtual Tool usability binds to the primary actor', async () => {
+  const actor = rollActor(3);
+  const availability = createGatheringToolAvailability({ craftingSystemManager: matcher });
+  const result = await availability.check({
+    actor,
+    system: { id: 's', characterPrerequisites: [TRAINED_PREREQUISITE] },
+    task: { id: 't' },
+    tools: [prerequisiteTool()],
+    presentTools: { systemId: 's', componentIds: ['c-axe'] },
+  });
+
+  assert.equal(result.available, true);
+});
+
+test('gathering stale usability ids fail closed while bonus-only failures remain usable', async () => {
+  const actor = rollActor(0, [inventoryItem('c-axe')]);
+  let numericEvaluations = 0;
+  const availability = createGatheringToolAvailability({
+    craftingSystemManager: matcher,
+    evaluator: {
+      evaluateExpression: async () => { numericEvaluations += 1; return 99; },
+    },
+  });
+  const system = { id: 's', characterPrerequisites: [TRAINED_PREREQUISITE] };
+  const stale = await availability.check({
+    actor,
+    system,
+    task: { id: 't' },
+    tools: [prerequisiteTool('usability', ['missing'])],
+  });
+  const bonusOnly = await availability.check({
+    actor,
+    system,
+    task: { id: 't' },
+    tools: [prerequisiteTool('bonus')],
+  });
+
+  assert.equal(stale.available, false);
+  assert.equal(bonusOnly.available, true);
+  assert.equal(numericEvaluations, 0, 'gathering never evaluates numeric Tool bonuses');
+});
+
+test('gathering preserves the legacy formula requirement gate', async () => {
+  const actor = rollActor(5, [inventoryItem('c-axe')]);
+  const availability = createGatheringToolAvailability({
+    craftingSystemManager: matcher,
+    evaluator: { evaluateRequirement: async () => ({ allowed: false, reasonCode: 'LEGACY' }) },
+  });
+  const result = await availability.check({
+    actor,
+    system: { id: 's' },
+    task: { id: 't' },
+    tools: [{ componentId: 'c-axe', requirement: { formula: '@legacy' } }],
+  });
+
+  assert.equal(result.available, false);
+  assert.equal(result.failedRequirements[0].reasonCode, 'LEGACY');
+});
+
 test('tool breakage runtime EXCLUDES a virtual-present tool from plan/apply (no item to mutate)', async () => {
   const applied = [];
   const runtime = createToolBreakageRuntime({
@@ -657,6 +772,43 @@ test('tool breakage runtime EXCLUDES a virtual-present tool from plan/apply (no 
   assert.deepEqual(planned, [], 'no plan entry for a virtual tool');
   assert.deepEqual(evidence, [], 'no usage/breakage evidence for a virtual tool');
   assert.equal(applied.length, 0, 'buildItemRef never runs for a virtual tool');
+});
+
+test('gathering direct-Item replacement failure preserves the original Tool', async () => {
+  const item = {
+    uuid: 'Item.original-tool',
+    deleted: false,
+    parent: null,
+    getFlag: () => undefined,
+    async delete() { this.deleted = true; },
+  };
+  const actor = {
+    uuid: 'Actor.a',
+    createEmbeddedDocuments: async () => [],
+  };
+  item.parent = actor;
+  const tool = {
+    componentId: 'c-axe',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'item', itemUuid: 'Item.replacement' },
+    },
+  };
+  const runtime = createToolBreakageRuntime({
+    matchTools: () => ({ items: [{ tool, item, breakable: true }], missing: [] }),
+    buildItemRef: () => ({ itemUuid: item.uuid, quantity: 1 }),
+    resolveItemUuid: async () => ({
+      documentName: 'Item',
+      uuid: 'Item.replacement',
+      toObject: () => ({ name: 'Replacement', type: 'loot', system: {}, flags: {} }),
+    }),
+  });
+
+  const evidence = await runtime.apply({ actor, system: { id: 's' }, task: { id: 't' }, tools: [tool] });
+
+  assert.equal(item.deleted, false);
+  assert.equal(evidence[0].onBreak.action, 'none');
 });
 
 test('classifyGatheringToolStates: a virtual-present tool displays as present', () => {

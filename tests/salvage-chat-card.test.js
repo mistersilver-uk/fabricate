@@ -113,6 +113,15 @@ test('omits the roll row for a guaranteed no-check salvage (null / absent value)
   );
 });
 
+test('renders a localized natural-step note only for an actual tier change', () => {
+  const stepped = buildSalvageChatContent(successModel({ natStep: { direction: 'down' } }));
+  assert.ok(stepped.includes('fabricate-craft-chat__nat-step'));
+  assert.ok(stepped.includes('FABRICATE.Chat.NaturalStepDown'));
+
+  const notStepped = buildSalvageChatContent(successModel({ natStep: {} }));
+  assert.ok(!notStepped.includes('fabricate-craft-chat__nat-step'));
+});
+
 test('escapes HTML in user-authored names', () => {
   const content = buildSalvageChatContent(
     successModel({ results: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }] })

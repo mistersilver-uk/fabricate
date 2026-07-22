@@ -17,6 +17,48 @@ function blockFor(selector) {
   return match?.[0] || '';
 }
 
+test('Tool Studio owns its three-column geometry and stacks at its responsive breakpoints', () => {
+  const wide = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-body');
+  const collapsed = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-body.is-rail-collapsed');
+  const toolStudioCss = css.slice(css.lastIndexOf('Manager — Tool Studio library'));
+  const main = toolStudioCss.match(/\.fabricate-manager \.manager-tools-main\s*\{[\s\S]*?\}/)?.[0] || '';
+  const rows = blockFor('.fabricate-manager .manager-tools-library-list > article');
+  const responsive = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const compact = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
+
+  assert.ok(wide.includes('grid-template-columns: 210px minmax(0, 1fr) 340px;'));
+  assert.ok(collapsed.includes('grid-template-columns: 56px minmax(0, 1fr) 340px;'));
+  assert.ok(main.includes('overflow-y: auto;'), 'the library center should own its wide-layout scrolling');
+  assert.ok(rows.includes('grid-template-columns: minmax(0, 1fr) max-content;'));
+  assert.match(responsive, /grid-template-columns:\s*minmax\(0, 1fr\);/);
+  assert.match(responsive, /overflow-y:\s*auto;/);
+  assert.match(compact, /\.fabricate-manager \.manager-tools-library-list > article\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);/);
+  assert.equal(
+    css.includes('\n.manager-tools-'),
+    false,
+    'Tool Studio selectors must remain namespaced beneath the Fabricate manager shell'
+  );
+});
+
+test('Tool editor keeps independent wide scrolling and visible wrapped actions when narrow', () => {
+  const editorCss = css.slice(css.lastIndexOf('Manager — Tool Studio editor'));
+  const body = blockFor('.fabricate-manager[data-manager-view="tool-edit"] .manager-body');
+  const collapsed = blockFor('.fabricate-manager[data-manager-view="tool-edit"] .manager-body.is-rail-collapsed');
+  const composition = editorCss.match(/\.fabricate-manager \.manager-tool-edit-composition\s*\{[\s\S]*?\}/)?.[0] || '';
+  const panel = editorCss.match(/\.fabricate-manager \.manager-tool-editor-panel,\s*\.fabricate-manager \.manager-tool-preview\s*\{[\s\S]*?\}/)?.[0] || '';
+  const stacked = editorCss.slice(editorCss.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const narrow = editorCss.slice(editorCss.indexOf('@container fabricate-manager (max-width: 680px)'));
+
+  assert.ok(body.includes('grid-template-columns: 210px minmax(0, 1fr);'));
+  assert.ok(collapsed.includes('grid-template-columns: 56px minmax(0, 1fr);'));
+  assert.ok(composition.includes('grid-template-columns: minmax(0, 1fr) 320px;'));
+  assert.ok(panel.includes('overflow-y: auto;'));
+  assert.match(stacked, /\.fabricate-manager\[data-manager-view="tool-edit"\] \.manager-body[\s\S]*?overflow-y:\s*auto;/);
+  assert.match(narrow, /\.manager-tool-edit-actions[\s\S]*?flex-wrap:\s*wrap;/);
+  assert.match(narrow, /\[data-tool-editor-save\][\s\S]*?display:\s*inline-flex;/);
+  assert.match(editorCss, /overflow-wrap:\s*anywhere;/, 'long Item UUIDs should wrap instead of widening the editor');
+});
+
 test('manager root defines a scoped responsive app container', () => {
   const block = blockFor('.fabricate-manager');
 

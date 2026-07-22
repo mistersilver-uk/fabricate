@@ -45,6 +45,7 @@
     showTiers = true,
     breakageAuthority = 'toolSpecific',
     resolutionMode = null,
+    allowNatStepping = false,
     onChange = () => {}
   } = $props();
 
@@ -173,6 +174,27 @@
       {/each}
     </div>
   </section>
+
+  {#if allowNatStepping && type === 'relative'}
+    <section class="manager-inspector-card" data-check-nat-stepping>
+      <div class="manager-checks-card-head">
+        <div>
+          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingTitle', 'Natural tier stepping')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingHint', 'A natural 20 steps the matched tier up once; a natural 1 steps it down once.')}</p>
+        </div>
+        <label class="manager-toggle-field">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={value?.natStepping === true}
+            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingToggle', 'Enable natural tier stepping')}
+            onchange={(event) => emit({ natStepping: event.currentTarget.checked })}
+          />
+          <span>{value?.natStepping === true ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+        </label>
+      </div>
+    </section>
+  {/if}
 
   <section class="manager-inspector-card">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}</h3>

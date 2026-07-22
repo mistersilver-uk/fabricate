@@ -86,6 +86,37 @@ function withScreenshotFixtures(fixtures, runAssert) {
 }
 
 describe('UI PR screenshot evidence', () => {
+  const toolStudioMappings = [
+    ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte', 'manager-tools', 'manager-tools-library'],
+    ['src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte', 'manager-tools', 'manager-tools-library'],
+    ['src/ui/svelte/apps/manager/ToolEditView.svelte', 'manager-tool-overview-linked', 'manager-tool-overview-linked'],
+    ['src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte', 'manager-tool-overview-linked', 'manager-tool-overview-linked'],
+    ['src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte', 'manager-tool-overview-linked', 'manager-tool-overview-linked'],
+    ['src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte', 'manager-tool-breakage-repair', 'manager-tool-breakage-repair'],
+    ['src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte', 'manager-tool-breakage-repair', 'manager-tool-breakage-repair'],
+    ['src/ui/svelte/apps/manager/tools/toolStudio.js', 'manager-tool-breakage-replace-item', 'manager-tool-breakage-replace-item'],
+    ['src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte', 'manager-tool-requirements', 'manager-tool-requirements'],
+    ['src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte', 'manager-tool-validation', 'manager-tool-validation'],
+    ['src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte', 'manager-tool-narrow', 'manager-tool-narrow'],
+  ];
+
+  it('maps every changed Tool Studio UI file to one publishable real-Foundry frame', () => {
+    for (const [file, viewId, smokeLabel] of toolStudioMappings) {
+      const toolViews = mapChangedFilesToViews([file]).filter((view) => view.id.startsWith('manager-tool'));
+      assert.deepEqual(toolViews.map((view) => view.id), [viewId], file);
+      assert.deepEqual(toolViews[0].smokeLabels, [smokeLabel], file);
+    }
+  });
+
+  it('maps recipe Tool authoring files only to the existing Tools-tab frame', () => {
+    for (const file of [
+      'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
+    ]) {
+      const views = mapChangedFilesToViews([file]);
+      assert.deepEqual(views.map((view) => view.id), ['manager-recipe-edit-tools'], file);
+    }
+  });
   it('detects UI changes with the same path rules as CI', () => {
     assert.equal(hasUiChanges(['src/ui/svelte/apps/FabricateAppRoot.svelte']), true);
     assert.equal(hasUiChanges(['styles/fabricate.css']), true);
@@ -478,7 +509,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
   });
 
-  it('maps a recipe editor file to all thirteen recipe-edit frame recipes', () => {
+  it('maps the recipe shell broadly while each focused recipe tab maps only its frames', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
@@ -507,17 +538,18 @@ describe('UI PR screenshot evidence', () => {
       'manager-recipe-edit-books-scrolls',
     ];
 
-    // The top-level editor view and any recipe sub-component all republish all thirteen
-    // frames. Every editor tab lives under `recipe/` so the glob covers it; the BROWSER
-    // inspector deliberately lives under `recipes/`.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/ui/svelte/apps/manager/RecipeEditView.svelte']).map((view) => view.id),
+      expected,
+    );
+    const withoutTools = expected.filter((id) => id !== 'manager-recipe-edit-tools');
     for (const file of [
-      'src/ui/svelte/apps/manager/RecipeEditView.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all thirteen recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), withoutTools, `${file} should not republish the unrelated Tools tab`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -653,7 +685,7 @@ describe('UI PR screenshot evidence', () => {
       { prNumber: 321 },
     );
 
-    assert.match(failure, /Manager gathering tools/);
+    assert.match(failure, /Tool Studio — library/);
     assert.match(failure, /## Screenshots/);
     assert.match(failure, /screenshots-exempt/);
   });
@@ -1036,7 +1068,7 @@ describe('UI PR screenshot evidence', () => {
       assert.match(written, /Original\./);
       assert.match(written, /##\s+Screenshots/);
       assert.match(written, /!\[pr-251 Manager gathering environments\]\(https:\/\/test-bucket\.s3\.eu-west-2\.amazonaws\.com\/pr-screenshots\/251\/manager-environments\.png\)/);
-      assert.match(written, /!\[pr-251 Manager gathering tools\]/);
+      assert.match(written, /!\[pr-251 Tool Studio — library\]/);
       assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
     } finally {
       rmSync(root, { recursive: true, force: true });

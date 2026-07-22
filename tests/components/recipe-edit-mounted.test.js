@@ -31,6 +31,7 @@ const RAW_MODULES = [
   'src/models/IngredientSet.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
+  'src/systems/toolCheckBonus.js',
   'src/utils/recipeCategories.js',
   'src/utils/routedOutcomeKeywords.js',
   'src/config/flags.js',
@@ -3517,6 +3518,80 @@ describe('RecipeEditView (mounted)', () => {
       ['tool-hammer'],
       'the chosen tool id is appended to the step toolIds'
     );
+    editHarness.remount();
+  });
+
+  it('authors the recipe-level Tool bonus map with absent meaning Always', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, toolIds: ['tool-hammer'] },
+        toolsLibrary: TOOLS_LIBRARY,
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    const mode = target.querySelector('[data-recipe-section="tools"] [data-recipe-tool-bonus-mode="tool-hammer"]');
+    assert.equal(mode.value, 'always', 'an absent map entry reads as Always');
+    assert.deepEqual(Array.from(mode.options).map((option) => option.value), ['always', 'highestOnly', 'never']);
+    mode.value = 'highestOnly';
+    mode.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(patches.at(-1).toolBonusModes, { 'tool-hammer': 'highestOnly' });
+    editHarness.remount();
+  });
+
+  it('round-trips Highest only and Never, while choosing Always removes the map entry', async () => {
+    for (const authored of ['highestOnly', 'never']) {
+      const patches = [];
+      const target = await editHarness.mount(
+        identityProps({
+          recipe: { ...RECIPE, toolIds: ['tool-hammer'], toolBonusModes: { 'tool-hammer': authored } },
+          toolsLibrary: TOOLS_LIBRARY,
+          onUpdateRecipe: (patch) => patches.push(patch),
+        })
+      );
+      clickTab(target, 'tools');
+      await flushRender();
+      const mode = target.querySelector('[data-recipe-tool-bonus-mode="tool-hammer"]');
+      assert.equal(mode.value, authored, `${authored} reads back from the recipe map`);
+      mode.value = 'always';
+      mode.dispatchEvent(new Event('change', { bubbles: true }));
+      assert.deepEqual(patches.at(-1).toolBonusModes, {}, 'Always is represented by an absent entry');
+      editHarness.remount();
+    }
+  });
+
+  it('uses one recipe-level bonus map across global, step, and ingredient-set Tool scopes', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          ...RECIPE,
+          toolIds: ['tool-hammer'],
+          toolBonusModes: { 'tool-hammer': 'never' },
+          steps: [{
+            id: 'sa',
+            name: 'Forge',
+            toolIds: ['tool-hammer'],
+            ingredientSets: [{ id: 'set-a', name: 'Hot forge', toolIds: ['tool-hammer'], ingredientGroups: [] }],
+          }],
+        },
+        multiStepEnabled: true,
+        toolsLibrary: TOOLS_LIBRARY,
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+
+    const selectors = target.querySelectorAll('[data-recipe-tool-bonus-mode="tool-hammer"]');
+    assert.equal(selectors.length, 3, 'global, step, and ingredient-set rows each expose the policy');
+    assert.ok(Array.from(selectors).every((select) => select.value === 'never'));
+    const ingredientSetMode = target.querySelector('[data-recipe-section="step-sa-set-set-a-tools"] [data-recipe-tool-bonus-mode="tool-hammer"]');
+    ingredientSetMode.value = 'highestOnly';
+    ingredientSetMode.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(patches.at(-1).toolBonusModes, { 'tool-hammer': 'highestOnly' });
     editHarness.remount();
   });
 

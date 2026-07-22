@@ -64,6 +64,7 @@ export const CLASS_B_LABELS = Object.freeze(
     'manager-system-edit-lists',
     'interactables-manager-promote',
     'interactables-manager-empty',
+    'manager-tool-validation',
   ])
 );
 
@@ -143,7 +144,14 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-gathering-event-editor-normal',
   'manager-gathering-travel-normal',
   'manager-gathering-travel-stacked',
-  'manager-tools-normal',
+  'manager-tools-library',
+  'manager-tool-overview-linked',
+  'manager-tool-breakage-repair',
+  'manager-tool-breakage-replace-item',
+  'manager-tool-breakage-check-immune',
+  'manager-tool-requirements',
+  'manager-tool-validation',
+  'manager-tool-narrow',
   'manager-components-progressive',
   'manager-component-edit-difficulty',
   'interactable-config-linked',
@@ -360,8 +368,13 @@ const D0_SECTION_SPANS = [
     to: 'manager-gathering-travel-stacked',
   },
   {
+    name: 'tools',
+    from: 'manager-tools-library',
+    to: 'manager-tool-narrow',
+  },
+  {
     name: 'overview-interactables',
-    from: 'manager-tools-normal',
+    from: 'manager-components-progressive',
     to: 'interactables-manager-empty',
   },
   {

@@ -1,6 +1,7 @@
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
+import { normalizeToolBonusModes } from '../systems/toolCheckBonus.js';
 
 import { Ingredient } from './Ingredient.js';
 import { IngredientSet } from './IngredientSet.js';
@@ -64,6 +65,9 @@ export class Recipe {
 
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
+    // One recipe-level policy map applies to every Tool scope. Missing entries read
+    // as `always` through getToolBonusMode, keeping legacy recipes unchanged.
+    this.toolBonusModes = normalizeToolBonusModes(data.toolBonusModes);
 
     // Recipe-level duration for the implicit (single) step. Multi-step recipes
     // carry their own per-step `timeRequirement`; this feeds the implicit step
@@ -546,6 +550,7 @@ export class Recipe {
         results: group.results.map((r) => r.toJSON()),
       })),
       toolIds: [...this.toolIds],
+      toolBonusModes: { ...this.toolBonusModes },
       timeRequirement: this.timeRequirement,
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map((r) => r.toJSON()),
@@ -840,6 +845,11 @@ export class Recipe {
       out.push(id);
     }
     return out;
+  }
+
+  getToolBonusMode(toolId) {
+    const id = typeof toolId === 'string' ? toolId.trim() : '';
+    return this.toolBonusModes[id] || 'always';
   }
 
   _normalizeVisibility(visibility) {
