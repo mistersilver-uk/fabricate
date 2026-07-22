@@ -12,6 +12,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tool-editor-',
   rawModules: [
+    'src/config/flags.js',
+    'src/models/match/matchTypes.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/recipeCurrency.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -266,5 +268,62 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(root.querySelector('[role="alert"]'));
     assert.match(root.querySelector('[data-tool-behavior-preview]').textContent, /Smith Hammer/);
     assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /breakageChance/);
+  });
+
+  it('accepts every complete repair match kind and rejects an incomplete option', async () => {
+    const completeRepairRequirements = [
+      {
+        id: 'component',
+        options: [{ quantity: 1, match: { type: 'component', componentId: 'scrap' } }],
+      },
+      {
+        id: 'tags',
+        options: [
+          { quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } },
+        ],
+      },
+      {
+        id: 'essence',
+        options: [
+          { quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } },
+        ],
+      },
+      {
+        id: 'currency',
+        options: [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 3 } }],
+      },
+    ];
+    const root = await harness.mount(
+      props({
+        activeTab: 'validation',
+        tool: tool({ repairRequirements: completeRepairRequirements }),
+      })
+    );
+
+    assert.equal(
+      root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-valid'),
+      true
+    );
+
+    harness.remount();
+    const incomplete = await harness.mount(
+      props({
+        activeTab: 'validation',
+        tool: tool({
+          repairRequirements: [
+            ...completeRepairRequirements,
+            {
+              id: 'incomplete',
+              options: [{ quantity: 1, match: { type: 'tags', tags: [] } }],
+            },
+          ],
+        }),
+      })
+    );
+
+    assert.equal(
+      incomplete.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'),
+      true
+    );
   });
 });
