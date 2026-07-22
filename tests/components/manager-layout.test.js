@@ -20,8 +20,7 @@ function blockFor(selector) {
 test('Tool Studio owns its three-column geometry and stacks at its responsive breakpoints', () => {
   const wide = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-body');
   const collapsed = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-body.is-rail-collapsed');
-  const toolStudioCss = css.slice(css.lastIndexOf('Manager — Tool Studio library'));
-  const main = toolStudioCss.match(/\.fabricate-manager \.manager-tools-main\s*\{[\s\S]*?\}/)?.[0] || '';
+  const main = blockFor('.fabricate-manager .manager-tools-main');
   const rows = blockFor('.fabricate-manager .manager-tools-library-list > article');
   const selectTarget = blockFor('.fabricate-manager .manager-tools-select-target');
   const responsive = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
