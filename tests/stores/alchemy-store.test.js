@@ -2,7 +2,10 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
+import { CraftingEngine } from '../../src/systems/CraftingEngine.js';
+import { SignatureValidator } from '../../src/systems/SignatureValidator.js';
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { toAlchemyRecords } from '../helpers/alchemySubmissionRecords.js';
 
 let compiler;
 let createAlchemyStore;
@@ -217,7 +220,10 @@ describe('alchemyStore', () => {
     assert.equal(store.mode, 'empty');
   });
 
-  it('duplicate/overlapping learned signatures resolve `ready` deterministically (first in order)', async () => {
+  it('duplicate/identical learned signatures fail safe to `untried` (issue 774 — engine fizzles)', async () => {
+    // Identical signatures are now rejected at enable time and, if two ever both
+    // match, the engine fizzles (a non-unique maximum). The client mirrors that: it
+    // does NOT promise a `ready` brew by iteration order, it fails safe to `untried`.
     const listing = baseListing({
       recipes: [
         concreteRecipe('first', 'First Brew', { emberroot: 1 }, 'A'),
@@ -227,8 +233,107 @@ describe('alchemyStore', () => {
     const { store } = await loadedStore({ listing });
     store.add('emberroot');
     flushSync();
+    assert.equal(store.mode, 'untried', 'a non-unique maximum yields no confident ready');
+    assert.equal(store.target, null);
+  });
+
+  it('a bench that is a superset of one concrete and EQUALS another reads `ready` for the most-specific (issue 774)', async () => {
+    // A={emberroot} ⊂ B={emberroot, springwater}. A bench {emberroot, springwater}
+    // contains both; the most-specific (B) must win — never a false ready for A.
+    const listing = baseListing({
+      recipes: [
+        concreteRecipe('base', 'Base Brew', { emberroot: 1 }, 'A'),
+        concreteRecipe('super', 'Super Brew', { emberroot: 1, springwater: 1 }, 'B'),
+      ],
+    });
+    const { store } = await loadedStore({ listing });
+    store.add('emberroot');
+    flushSync();
+    assert.equal(store.target?.id, 'base', '{emberroot} alone → the base recipe');
+    store.add('springwater');
+    flushSync();
     assert.equal(store.mode, 'ready');
-    assert.equal(store.target.id, 'first', 'first-in-listing wins deterministically');
+    assert.equal(store.target?.id, 'super', '{emberroot,springwater} → the most-specific superset recipe');
+  });
+
+  // The client prediction MUST name the same recipe the engine brews (issue 774).
+  // We drive the ACTUAL engine matcher and the ACTUAL store over parallel recipe
+  // definitions and assert they agree for every bench in a subset/superset family.
+  it('the store prediction agrees with the engine most-specific pick', async () => {
+    const componentIds = ['c1', 'c2', 'c3'];
+    // Engine side.
+    const engineComponents = componentIds.map((id) => ({
+      id,
+      name: id,
+      tags: [],
+      registeredItemUuid: `Item.${id}`,
+      originItemUuid: `Item.${id}`,
+    }));
+    const engineRecipe = (id, ids) => ({
+      id,
+      name: id,
+      craftingSystemId: 'sys-a',
+      enabled: true,
+      ingredientSets: [
+        {
+          id: `${id}-set`,
+          ingredientGroups: ids.map((cid) => ({
+            id: `${id}-${cid}`,
+            options: [{ match: { type: 'component', componentId: cid } }],
+          })),
+          essences: {},
+        },
+      ],
+      resultGroups: [{ id: 'rg1', name: 'Result', results: [] }],
+      getExecutionSteps: () => [],
+    });
+    const engineRecipes = [engineRecipe('base', ['c1', 'c2']), engineRecipe('super', ['c1', 'c2', 'c3'])];
+    const engine = new CraftingEngine({ getRecipes: () => [] });
+    const validator = new SignatureValidator({
+      getSystem: () => null,
+      getRecipesForSystem: () => [],
+      getComponentsForSystem: () => engineComponents,
+    });
+    const enginePick = (ids) => {
+      const submissions = ids.map((id) => ({
+        uuid: `Item.${id}`,
+        _stats: { compendiumSource: `Item.${id}` },
+        flags: {},
+      }));
+      const result = engine['_matchAlchemySignature'](
+        toAlchemyRecords(submissions, engineComponents, undefined),
+        engineRecipes,
+        engineComponents,
+        validator,
+        {}
+      );
+      return result.matched ? result.recipe.id : null;
+    };
+
+    // Store side: the same recipe family projected as concrete listing recipes.
+    const listing = baseListing({
+      recipes: [
+        concreteRecipe('base', 'Base Brew', { c1: 1, c2: 1 }, 'Base'),
+        concreteRecipe('super', 'Super Brew', { c1: 1, c2: 1, c3: 1 }, 'Super'),
+      ],
+      components: componentIds.map((id) => ({ componentId: id, name: id, img: null, held: 4 })),
+    });
+    const { store } = await loadedStore({ listing });
+
+    const storePick = (ids) => {
+      store.clear();
+      for (const id of ids) store.add(id);
+      flushSync();
+      return store.target?.id ?? null;
+    };
+
+    for (const bench of [['c1', 'c2'], ['c1', 'c2', 'c3']]) {
+      assert.equal(
+        storePick(bench),
+        enginePick(bench),
+        `client and engine must agree for bench {${bench.join(',')}}`
+      );
+    }
   });
 
   it('Switch discipline resets bench / selection / last-brew / search and reloads', async () => {
