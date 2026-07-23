@@ -522,7 +522,7 @@ You turn them on or off with the **Time requirements** toggle in the **Optional 
 {: .note }
 > Fabricate shows the duration editors on a recipe only while time requirements are enabled for the system.
 > Turning them off later does not delete the durations you have already authored.
-> Each one stays visible as a read-only value, and a step no longer waits on time until you re-enable time requirements.
+> The authored values stay visible as read-only values in GM authoring summaries, and a step no longer waits on time until you re-enable time requirements.
 
 ### Currency Requirements
 
