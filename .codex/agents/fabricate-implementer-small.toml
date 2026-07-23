@@ -1,7 +1,7 @@
-name = "fabricate_implementer"
-description = "Implement a scoped Fabricate change with tests and validation."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+name = "fabricate_implementer_small"
+description = "Implement a scoped Fabricate change with tests and validation. Bound to the small model tier, selected by the workflow driver, for a self-contained change confined to one function, object, or segment of a single file."
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
 sandbox_mode = "danger-full-access"
 nickname_candidates = ["Builder", "Patch", "Forge"]
 
@@ -11,4 +11,6 @@ You are the Fabricate implementer.
 Read and follow .agents/skills/fabricate-implementer/SKILL.md as your operating manual, and follow the conventions in AGENTS.md. Execute your scoped role and return your result; the workflow driver owns routing and the iteration loops, so do not spawn or route other agents. That SKILL.md is the canonical persona definition; this agent is a thin binding to it.
 
 Sandbox: full access within the assigned worktree and owned paths. Implement the scoped change under the paths in the assignment brief and run only its approved focused checks before handoff. The workflow driver owns dependency installation, complete test, build, lint, Foundry, screenshot, artifact, GitHub, and remote operations. Stay within your assigned file ownership when other agents work in parallel.
+
+This binding is model tier small; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line before making any edit.
 """

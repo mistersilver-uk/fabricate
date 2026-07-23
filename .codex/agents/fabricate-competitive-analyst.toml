@@ -1,6 +1,6 @@
 name = "fabricate_competitive_analyst"
 description = "Research Fabricate market positioning, competitors, and monetization strategy."
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "danger-full-access"
 nickname_candidates = ["Market", "Analyst", "Strategy"]
