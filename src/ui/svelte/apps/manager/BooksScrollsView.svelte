@@ -371,27 +371,31 @@
     min-height: 0;
   }
 
-  /* Creation drop-zone (issue 844). A dashed banner that owns its OWN vocabulary
-     rather than borrowing the components view's `.manager-component-drop-zone` — a
-     surface that borrows a neighbour's class silently inherits that neighbour's ramp
-     (the Books & Scrolls tab's own header comment records that trap). It accepts a
-     dragged world/compendium Item and turns amber on an invalid drop. */
+  /* Creation drop-zone (issue 844). A dashed banner deliberately styled to MATCH the
+     component-library drop-zone (`.manager-component-drop-zone`) — same grid, margin
+     whitespace, success-soft fill, radius and icon treatment — but kept as its own
+     scoped class so the amber invalid-drop state can override without touching the
+     shared component vocabulary. Accepts a dragged world/compendium Item. */
   .manager-books-scrolls-drop-zone {
     display: grid;
     grid-template-columns: 42px minmax(0, 1fr);
-    gap: var(--fab-space-3);
+    gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
-    padding: var(--fab-space-3);
+    /* Match the component-library drop-zone exactly (issue 844 follow-up): the
+       surrounding `margin` gives it whitespace off the panel edges, and the
+       success-soft fill + 8px radius mirror `.manager-component-drop-zone`. */
+    margin: var(--fab-space-3);
+    padding: var(--fab-space-3) var(--fab-space-3);
     border: 1px dashed var(--fab-mv2-border-strong);
-    border-radius: var(--fab-v2-radius-panel);
+    border-radius: 8px;
     color: var(--fab-mv2-text);
-    background: var(--fab-surface-soft);
+    background: var(--fab-success-soft);
   }
 
   .manager-books-scrolls-drop-zone.is-drop-active {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
+    border-color: var(--fab-success-border);
+    background: var(--fab-success-soft);
   }
 
   .manager-books-scrolls-drop-zone.is-error {
@@ -406,9 +410,9 @@
     width: 34px;
     height: 34px;
     border: 1px solid var(--fab-mv2-border);
-    border-radius: var(--fab-v2-radius-control);
+    border-radius: 6px;
     color: var(--fab-mv2-accent);
-    background: var(--fab-bg-3);
+    background: var(--fab-overlay-dark-16);
   }
 
   .manager-books-scrolls-drop-zone.is-error > i {
