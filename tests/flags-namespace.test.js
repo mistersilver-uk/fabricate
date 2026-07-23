@@ -100,23 +100,31 @@ test('setFabricateFlag preserves nested siblings through one flattened update', 
   });
 });
 
-test('setFabricateFlag fallback replaces the root flag without losing siblings', async () => {
-  const doc = new FakeDocument({
+test('setFabricateFlag preserves the dotted-key contract for non-DataModel collaborators', async () => {
+  const setFlagCalls = [];
+  const doc = {
     flags: {
-      fabricate: {
-        fabricate: { roles: { sysA: { componentId: 'component-1' } } },
-      },
+      fabricate: { fabricate: { roles: { sysA: { componentId: 'component-1' } } } },
     },
-  });
-  doc.updateSource = undefined;
+    getFlag(scope, key) {
+      return getPathValue(this.flags[scope], key);
+    },
+    async setFlag(scope, key, value) {
+      setFlagCalls.push({ scope, key, value });
+      setPathValue(this.flags[scope], key, value);
+      return value;
+    },
+  };
 
   await setFabricateFlag(doc, 'roles.sysA.toolId', 'tool-a');
 
+  assert.deepEqual(setFlagCalls, [
+    { scope: 'fabricate', key: 'fabricate.roles.sysA.toolId', value: 'tool-a' },
+  ]);
   assert.deepEqual(doc.flags.fabricate.fabricate.roles.sysA, {
     componentId: 'component-1',
     toolId: 'tool-a',
   });
-  assert.equal(doc.flags.fabricate['fabricate.roles.sysA.toolId'], undefined);
 });
 
 test('setFabricateFlag stores null as a value rather than treating it as deletion', async () => {

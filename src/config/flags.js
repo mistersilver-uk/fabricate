@@ -70,35 +70,6 @@ function normalizeFlagKey(key) {
   return rawKey.startsWith('fabricate.') ? rawKey : `fabricate.${rawKey}`;
 }
 
-function isObjectRecord(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function withNestedValue(source, path, value) {
-  const nextRoot = isObjectRecord(source) ? { ...source } : {};
-  let sourceNode = source;
-  let nextNode = nextRoot;
-  for (const segment of path.slice(0, -1)) {
-    const sourceChild = isObjectRecord(sourceNode?.[segment]) ? sourceNode[segment] : {};
-    const nextChild = { ...sourceChild };
-    nextNode[segment] = nextChild;
-    sourceNode = sourceChild;
-    nextNode = nextChild;
-  }
-  nextNode[path.at(-1)] = value;
-  return nextRoot;
-}
-
-async function setFabricateFlagFallback(document, normalizedKey, value) {
-  const [rootKey, ...nestedPath] = normalizedKey.split('.');
-  if (nestedPath.length === 0) {
-    return document.setFlag(FABRICATE_FLAG_NAMESPACE, rootKey, value);
-  }
-  const currentRoot = document.getFlag(FABRICATE_FLAG_NAMESPACE, rootKey);
-  const nextRoot = withNestedValue(currentRoot, nestedPath, value);
-  return document.setFlag(FABRICATE_FLAG_NAMESPACE, rootKey, nextRoot);
-}
-
 export function getFabricateFlag(document, key, defaultValue = null) {
   if (!document || typeof document.getFlag !== 'function') {
     return defaultValue;
@@ -116,10 +87,10 @@ export function getFabricateFlag(document, key, defaultValue = null) {
  * Write a Fabricate flag through the same nested path {@link getFabricateFlag} reads.
  * Foundry V13's `setFlag(scope, key, value)` stores a dotted key literally, so real
  * DataModel-backed Documents use one atomic flattened `update` path instead. Lightweight
- * collaborators without `updateSource` replace a cloned root flag through `setFlag`, which
- * preserves siblings without depending on dotted-key expansion. A `null` value remains a
- * value; callers that intend deletion must use Foundry's `unsetFlag` API. Write failures
- * reject so callers never report a flag as persisted when Foundry refused the update.
+ * collaborators without `updateSource` retain Fabricate's historical dotted-key `setFlag`
+ * contract. A `null` value remains a value; callers that intend deletion must use Foundry's
+ * `unsetFlag` API. Write failures reject so callers never report a flag as persisted when
+ * Foundry refused the update.
  */
 export async function setFabricateFlag(document, key, value) {
   const canUpdate =
@@ -134,7 +105,7 @@ export async function setFabricateFlag(document, key, value) {
     const path = `flags.${FABRICATE_FLAG_NAMESPACE}.${normalizedKey}`;
     return await document.update({ [path]: value });
   }
-  return await setFabricateFlagFallback(document, normalizedKey, value);
+  return await document.setFlag(FABRICATE_FLAG_NAMESPACE, normalizedKey, value);
 }
 
 /**
