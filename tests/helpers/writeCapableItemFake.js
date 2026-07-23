@@ -2,9 +2,9 @@
  * A WRITE-capable Foundry world-item fake for durable-flag write-path tests (component
  * restamp, tool stamp, whetstone coexistence). Faithfully models the double-nested flag
  * storage (`flags.fabricate.fabricate.<...>`) that `getFabricateFlag`/`setFabricateFlag`
- * use, with per-leaf `setFlag` deep-merge and `unsetFlag` leaf-delete — so a per-role clear
- * (`roles.<sys>.toolId`) preserves the sibling (`roles.<sys>.componentId`) and a whole-object
- * clear destroys it. The read-only `roleItem` fixture (`getFlag` only) cannot exercise these.
+ * use. Foundry V13 `setFlag` stores its dotted key literally, while a flattened
+ * `Document#update` path expands into nested data and `unsetFlag` deletes a dotted leaf.
+ * The read-only `roleItem` fixture (`getFlag` only) cannot exercise these write semantics.
  *
  * Hoisted from `tests/component-identity-wiring.test.js` so the write-fake lives in ONE place
  * (SonarCloud counts `tests/**` duplication like `src/`).
@@ -19,6 +19,20 @@ export function getProperty(object, path) {
   return String(path)
     .split('.')
     .reduce((value, key) => (value == null ? undefined : value[key]), object);
+}
+
+function applyFlattenedUpdate(object, path, value) {
+  const parts = String(path).split('.');
+  const last = parts.pop();
+  let node = object;
+  for (const part of parts) {
+    node = node[part] ??= {};
+  }
+  if (last.startsWith('-=')) {
+    delete node[last.slice(2)];
+  } else {
+    node[last] = value;
+  }
 }
 
 /**
@@ -40,18 +54,19 @@ export function makeWorldItem({
     updates: [],
     async update(patch) {
       this.updates.push(patch);
-      if ('_stats.duplicateSource' in patch) {
-        this._stats.duplicateSource = patch['_stats.duplicateSource'];
+      for (const [path, value] of Object.entries(patch)) {
+        applyFlattenedUpdate(this, path, value);
       }
+      return this;
     },
+    updateSource() {},
     getFlag(scope, key) {
       return getProperty(this.flags?.[scope], key);
     },
     async setFlag(scope, key, value) {
-      const parts = key.split('.');
-      let node = (this.flags[scope] ??= {});
-      while (parts.length > 1) node = node[parts.shift()] ??= {};
-      node[parts[0]] = value;
+      const namespace = (this.flags[scope] ??= {});
+      namespace[key] = value;
+      return this;
     },
     async unsetFlag(scope, key) {
       const parts = key.split('.');
