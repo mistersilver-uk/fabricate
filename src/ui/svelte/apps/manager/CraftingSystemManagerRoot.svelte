@@ -5002,6 +5002,25 @@
   </header>
   {/if}
 
+  {#if currentView === 'tools' && selectedSystem}
+    <header class="manager-header manager-tools-context-header" data-tool-library-context>
+      <div class="manager-heading">
+        <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
+          <button type="button" onclick={() => editSystem(selectedSystem.id)}>{selectedSystem.name}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
+        </nav>
+        <h1 class="manager-title">{text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}</h1>
+        <p class="manager-subtitle">{text(
+          'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
+          'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
+        )}</p>
+      </div>
+    </header>
+  {/if}
+
   <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
     <aside class="manager-rail" aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}>
       {#if !isToolStudioRoute}
@@ -5087,13 +5106,13 @@
             {/if}
           </button>
           <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
-          <div class={`manager-nav-group ${craftingMenuExpanded ? 'is-expanded' : ''}`}>
+          <div class={`manager-nav-group ${craftingMenuExpanded || isToolStudioRoute ? 'is-expanded' : ''}`}>
             <button
               type="button"
               class="manager-nav-button manager-nav-parent"
               id="manager-nav-crafting"
               aria-current={isCraftingRoute ? 'page' : undefined}
-              aria-expanded={craftingMenuExpanded}
+              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
               onclick={activateCraftingParent}
             >
               <i class="fas fa-hammer" aria-hidden="true"></i>
@@ -5103,16 +5122,16 @@
             <button
               type="button"
               class="manager-nav-toggle"
-              aria-label={craftingMenuExpanded
+              aria-label={craftingMenuExpanded || isToolStudioRoute
                 ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
                 : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
               aria-controls="manager-crafting-submenu"
-              aria-expanded={craftingMenuExpanded}
+              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
               onclick={toggleCraftingMenu}
             >
-              <i class={craftingMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+              <i class={craftingMenuExpanded || isToolStudioRoute ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
             </button>
-            {#if craftingMenuExpanded}
+            {#if craftingMenuExpanded || isToolStudioRoute}
               <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
                 {#each craftingNavItems as craftingItem (craftingItem.id)}
                   <button
@@ -7057,6 +7076,7 @@
         <ToolBrowserInspector
           tool={selectedLibraryTool}
           managedItems={selectedSystem?.managedItemOptions || []}
+          prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
           authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
           onEdit={openToolEditor}
         />

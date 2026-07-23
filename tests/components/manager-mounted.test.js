@@ -9840,6 +9840,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     const authorityChanges = [];
     const created = [];
     const dropped = [];
+    const edits = [];
+    const enabledChanges = [];
     const worldItem = {
       uuid: 'Item.hammer',
       name: 'Smith Hammer',
@@ -9858,6 +9860,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         onCreateFromItem: (item) => { created.push(['item', item.uuid]); },
         onCreateToolDrop: (data) => { dropped.push(data); },
         onSetBreakageAuthority: (authority) => { authorityChanges.push(authority); },
+        onEditTool: (id) => { edits.push(id); },
+        onToggleToolEnabled: (id, enabled) => { enabledChanges.push([id, enabled]); },
       },
     });
     flushSync();
@@ -9876,15 +9880,33 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     const authority = target.querySelector('[data-manager-tools-authority]');
     assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 2);
+    assert.deepEqual(
+      [...authority.children].map((element) =>
+        element.classList.contains('manager-tools-authority-heading')
+          ? 'heading'
+          : element.classList.contains('manager-tools-authority-segments')
+            ? 'segments'
+            : 'caption'
+      ),
+      ['heading', 'segments', 'caption']
+    );
     assert.match(
       authority.querySelector('.manager-tools-authority-caption').textContent,
-      /Applies to all 1 Tool/
+      /Each Tool tracks its own breakage.*applies to all 1 tool/
     );
     authority.querySelector('input[value="checkDriven"]').click();
     assert.deepEqual(authorityChanges, ['checkDriven']);
 
     const createCard = target.querySelector('[data-tool-create-card]');
     assert.ok(createCard.querySelector('[data-tool-create-drop-prompt]'));
+    assert.equal(
+      target.querySelector('[data-manager-tools-search] .manager-chip'),
+      null,
+      'the bare search control does not disguise the result count as a chip'
+    );
+    assert.equal(target.querySelector('[data-tool-result-count]').textContent.trim(), '1 tool');
+    assert.equal(createCard.querySelector('summary').textContent.trim(), '');
+    assert.equal(createCard.querySelector('summary').getAttribute('aria-label'), 'Create Tool');
     assert.equal(
       createCard.querySelectorAll(':scope > .manager-tools-item-shortcuts').length,
       0,
@@ -9909,6 +9931,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['item', worldItem.uuid],
     ]);
     assert.deepEqual(dropped, [{ type: 'Item', uuid: worldItem.uuid }]);
+
+    target.querySelector('.manager-tools-enabled-toggle').click();
+    target.querySelector('.manager-tools-library-actions .manager-icon-button').click();
+    assert.deepEqual(enabledChanges, [['tool-catalyst', false]]);
+    assert.deepEqual(edits, ['tool-catalyst']);
+    assert.deepEqual(selections, [], 'toggle and Edit do not activate the row identity target');
 
     const select = target.querySelector('.manager-tools-select-target');
     select.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -9995,9 +10023,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     const calls = await mountToolRoute();
 
     assert.equal(target.querySelector('.fabricate-manager > .manager-titlebar'), null);
-    assert.equal(target.querySelector('.fabricate-manager > .manager-header'), null);
+    const contextHeader = target.querySelector(
+      '.fabricate-manager > .manager-header[data-tool-library-context]'
+    );
+    assert.ok(contextHeader, 'the Tool library owns one full-shell context header');
+    assert.match(contextHeader.querySelector('.manager-breadcrumbs').textContent, /Alchemy.*Crafting.*Tools/);
+    assert.equal(contextHeader.querySelector('.manager-title').textContent, 'Tool Studio');
+    assert.match(
+      contextHeader.querySelector('.manager-subtitle').textContent,
+      /Tools that recipes can require/
+    );
     assert.equal(target.querySelector('[data-manager-scope-select]'), null);
     assert.equal(target.querySelector('.manager-rail-toggle'), null);
+    assert.equal(
+      target.querySelector('#manager-nav-crafting').getAttribute('aria-expanded'),
+      'true',
+      'the Tool library preserves its Crafting submenu context'
+    );
     assert.ok(target.querySelector('[data-tool-browser-inspector-empty]'));
     target.querySelector('[data-manager-tool-id="tool-catalyst"] .manager-tools-select-target').click();
     await tick();
@@ -10009,6 +10051,46 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(inspector.querySelector('[data-tool-inspector-edit]'));
     assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
+  });
+
+  it('projects configured Tool values into the compact library inspector', async () => {
+    await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: [{
+          ...toolRouteFixture,
+          label: "Smith's Hammer",
+          description: 'A well-balanced forge hammer.',
+          breakage: { mode: 'limitedUses', maxUses: 5 },
+          prerequisites: { enabled: true, ids: ['smith'], gateMode: 'usability' },
+          bonus: { enabled: true, expression: '@prof' },
+        }],
+        selectedSystemOverrides: {
+          characterPrerequisites: [
+            { id: 'smith', name: "Proficient with Smith's Tools", expression: '@skills.smith' },
+          ],
+        },
+      },
+    });
+    target.querySelector('[data-manager-tool-id="tool-catalyst"] .manager-tools-select-target').click();
+    await tick();
+    flushSync();
+
+    const inspector = target.querySelector('[data-tool-browser-inspector]');
+    assert.equal(
+      inspector.querySelector('[data-tool-inspector-description]').textContent,
+      'A well-balanced forge hammer.'
+    );
+    assert.equal(inspector.querySelector('[data-tool-inspector-breakage]').textContent, '5 uses');
+    assert.equal(inspector.querySelector('[data-tool-inspector-on-break]').textContent, 'Destroy');
+    assert.match(
+      inspector.querySelector('[data-tool-inspector-prerequisites]').textContent,
+      /1 prerequisite.*Proficient with Smith's Tools/
+    );
+    assert.match(
+      inspector.querySelector('[data-tool-inspector-bonus]').textContent,
+      /Adds to the check.*@prof/
+    );
+    assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
   });
 
   it('shows canonical validation context in the selected Tool inspector', async () => {
