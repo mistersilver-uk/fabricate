@@ -64,6 +64,8 @@ Every lane brief records:
 - the absolute worktree path;
 - the GitHub issue number;
 - the role, workflow stage, and revision number;
+- the resolved model tier for a model-tiered family;
+- the facts that model tier was resolved from — the keyed path set, the size metric, the rule 2 source, and the ladder rule or floor that decided it;
 - the assigned base SHA;
 - the expected mutable branch or detached target SHA;
 - the exclusively owned paths;
@@ -73,7 +75,15 @@ Every lane brief records:
 - the required handoff fields.
 
 For mutable lanes, use `agent/<issue>-<stage>-<role>-r<revision>` as the branch name.
+For a model-tiered family, `<role>` is the model-tiered token in hyphenated file form (`fabricate-implementer-small`), not the family name; for an untiered role it is the family token itself.
+Because an escalation does not consume a revision, a family-named lane would collide with itself at the same revision, so the same component appears in the lane **directory** name as well — including for detached read-only lanes, which have no branch to disambiguate them.
 The expected commit range begins at the assigned base and ends at the lane `HEAD`.
+
+```text
+agent/862-implement-fabricate-implementer-small-r1
+agent/862-implement-fabricate-implementer-medium-r1
+.worktrees/862/plan-review-fabricate-domain-expert-medium-r1
+```
 
 ## Lane identity checks
 
@@ -91,6 +101,20 @@ A mutable lane must be on the assigned branch and at the assigned base before it
 A read-only lane must be detached at the assigned target SHA.
 Every lane must start clean.
 An identity mismatch or unexpected existing change is `BLOCKED` and returns to the driver without editing.
+
+## Model tier escalation
+
+Immediately after those identity checks, and before its first edit, an agent of a model-tiered family whose assignment exceeds its assigned model tier returns `ESCALATE_TIER: <reason>` on its first line rather than guessing.
+An untiered role has no model tier above it to escalate into and returns `BLOCKED` with the reason instead.
+`ESCALATE_TIER` is not a verdict: it never satisfies a loop's acceptance condition, never counts as an approval, and is not a stop condition.
+
+The driver honours an escalation only after mechanically confirming the lane has zero commits, its `git status --short` is empty, and its `HEAD` equals the assigned base.
+Any other escalating lane is preserved and reported as `BLOCKED`.
+It then disposes that proven-clean lane under the guarded-cleanup exception below and creates a fresh lane at the same assigned base with the same owned paths, exactly one model tier up.
+An escalation does not consume a loop revision, and at most one escalation is permitted per `(family, stage, revision)` — the fresh lane inherits the spent budget, so a second escalation in the same revision is `BLOCKED`.
+`ESCALATE_TIER` returned by a lane already at the most capable model tier is a protocol error the driver converts to `BLOCKED`.
+
+The selection ladder, its stage thresholds, the model-tier floors, and the `HIGH_RISK_PATHS` list live in `AGENTS.md`.
 
 ## Mutable lane handoff
 
@@ -126,6 +150,9 @@ The agent adds local commits and returns only the new ordered commit SHAs for th
 
 Create a fresh revision lane from the current integration `HEAD` when ownership changes, the prior lane or agent is unavailable, or a conflict or stale dependency requires refreshed context.
 Use the next revision suffix in its branch and directory name.
+
+An escalated lane is not a feedback revision and is never a reused lane.
+It is recreated at the **same** assigned base with the **same** owned paths and the **same** revision number, differing only in model tier, so its branch and directory carry the new model-tiered token rather than the next revision suffix.
 
 ## Integration checks
 
@@ -187,6 +214,11 @@ The maintainer handoff is valid only when current-main ancestry, exact remote-he
 After acceptance, the driver inspects each lane's tracked, untracked, and ignored state and proves every returned source commit is integrated.
 Known generated content such as lane-local dependency installs may be discarded only after confirming that no meaningful untracked work is mixed with it.
 Dirty, unintegrated, blocked, interrupted, or ambiguous lanes are preserved and reported.
+
+An escalated lane is the one exception to that preservation rule.
+Because `ESCALATE_TIER` is returned before the lane's first edit, such a lane has nothing to integrate, and preserving it would leak one worktree per escalation.
+The driver may dispose it only after mechanically proving zero commits, an empty `git status --short`, and `HEAD` equal to the assigned base.
+An escalating lane that fails any part of that predicate is preserved and reported as `BLOCKED`.
 
 For a clean integrated lane, the driver:
 

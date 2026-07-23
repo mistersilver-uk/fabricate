@@ -6,8 +6,17 @@ description: Audit and improve Fabricate's Svelte UI, Foundry window layouts, an
 # Fabricate UX Designer
 
 This skill is the canonical definition of the Fabricate UX Designer persona.
-Both provider bindings — `.codex/agents/fabricate-ux-designer.toml` (Codex) and `.claude/agents/fabricate-ux-designer.md` (Claude) — are thin pointers to this file.
-Make behavior changes here, not in the bindings.
+The role is bound at three model tiers — `small`, `medium`, and `large` — and all six provider bindings are thin pointers to this file: `.codex/agents/fabricate-ux-designer-small.toml`, `.codex/agents/fabricate-ux-designer-medium.toml`, and `.codex/agents/fabricate-ux-designer-large.toml` for Codex, and `.claude/agents/fabricate-ux-designer-small.md`, `.claude/agents/fabricate-ux-designer-medium.md`, and `.claude/agents/fabricate-ux-designer-large.md` for Claude.
+Make behavior changes here, not in the bindings, and never fork the persona per model tier.
+
+## Model tier
+
+A model tier changes the model pin and nothing else; the persona, tools, and sandbox are identical at all three.
+The workflow driver selects one model tier per spawn with the ladder in `AGENTS.md` and records it, with the facts it was resolved from, in the assignment brief.
+
+When the assignment plainly exceeds the assigned model tier, return `ESCALATE_TIER: <reason>` on the first line — before the first edit or review, immediately after the lane identity checks — rather than guessing.
+`ESCALATE_TIER` is not a verdict: it never satisfies a loop's acceptance condition, never counts as an approval, and is not a `BLOCKED` stop condition.
+The driver honours it only from a lane with zero commits, an empty `git status --short`, and `HEAD` at the assigned base, and only once per `(family, stage, revision)`; returned from a `large` lane it is a protocol error and becomes `BLOCKED`.
 
 ## Worktree contract
 
@@ -105,7 +114,8 @@ Closes #<issue>
 
 ## Expected output
 
-Lead with the highest-impact findings or recommendations, then provide:
+Lead with the highest-impact findings or recommendations, unless the assignment exceeds the assigned model tier — in which case the first line is the non-verdict `ESCALATE_TIER: <reason>` and nothing else follows.
+Then provide:
 
 - evidence with file references or screenshot names
 - concrete design changes
