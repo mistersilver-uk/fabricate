@@ -24,6 +24,12 @@ import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
+  buildCraftingModifierChoice,
+  CRAFTING_MOD_TOKEN,
+  makeRollDataExpressionEvaluator,
+  resolveModifierPolicy,
+} from './craftingModifierResolver.js';
+import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
   spendCurrencySpends,
@@ -3105,6 +3111,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
+    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
     const result = await runFormulaPassFail({
       formula: checkConfig.rollFormula,
       dc,
@@ -3112,7 +3119,7 @@ export class CraftingEngine {
       triggers: checkConfig.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
-      craftingModifier: this._buildCraftingModifierContext(system, recipe),
+      craftingModifier,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
@@ -3120,6 +3127,12 @@ export class CraftingEngine {
         activity: 'Crafting',
         img: this._resolveRecipePromptImg(recipe),
         dc,
+        modifierChoice: this._buildInteractiveModifierChoice(
+          checkConfig.rollFormula,
+          craftingModifier,
+          craftingActor,
+          interactive
+        ),
       }),
     });
     return this._markEngineEvaluated(result);
@@ -3163,6 +3176,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
+    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
     const result = await runFormulaRouted({
       formula: routed.rollFormula,
       dc,
@@ -3173,7 +3187,7 @@ export class CraftingEngine {
       triggers: routed.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
-      craftingModifier: this._buildCraftingModifierContext(system, recipe),
+      craftingModifier,
       // A total below every relative threshold clamps to the lowest tier, so a
       // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
       clampToNearest: true,
@@ -3190,6 +3204,12 @@ export class CraftingEngine {
         // Fixed-type routed checks match by value range, not DC, so the prompt must
         // not advertise a (meaningless) DC. Undefined suppresses the chip + flavor.
         dc: routed.type === 'fixed' ? undefined : dc,
+        modifierChoice: this._buildInteractiveModifierChoice(
+          routed.rollFormula,
+          craftingModifier,
+          craftingActor,
+          interactive
+        ),
       }),
     });
     return this._markEngineEvaluated(result);
@@ -3223,6 +3243,32 @@ export class CraftingEngine {
       defaultModifierIds: check.defaultModifierIds,
       recipeModifier: recipe?.craftingModifier ?? null,
     };
+  }
+
+  /**
+   * Build the deferred interactive `playerPicks` modifier-choice descriptor (issue 770
+   * Phase 2) for an interactive craft. Returns the descriptor ONLY when the effective
+   * modifier policy is `playerPicks` AND this is an interactive roll AND the eligible
+   * set is non-empty; otherwise `undefined`, so every deterministic-policy and
+   * non-interactive craft threads a byte-identical `rollOptions` bag (no `modifierChoice`
+   * key). The descriptor is threaded onto `rollOptions.modifierChoice` and resolved to a
+   * single value inside the roll prompt — the non-interactive `playerPicks` path keeps
+   * resolving `@craftingmod` deterministically as `highest`.
+   * @private
+   */
+  _buildInteractiveModifierChoice(formula, craftingModifierContext, craftingActor, interactive) {
+    if (interactive !== true) return null;
+    // A formula that never references `@craftingmod` has nowhere to spend the picked
+    // modifier, so offering the player a radio would be a meaningless choice (the
+    // deterministic policies silently no-op the same case). Gate on token presence.
+    if (!String(formula ?? '').includes(CRAFTING_MOD_TOKEN)) return null;
+    if (resolveModifierPolicy(craftingModifierContext) !== 'playerPicks') return null;
+    // Returns the descriptor, or null when no modifier is eligible;
+    // `buildInteractiveRollOptions` omits the `modifierChoice` key for a falsy value.
+    return buildCraftingModifierChoice(
+      craftingModifierContext,
+      makeRollDataExpressionEvaluator(craftingActor)
+    );
   }
 
   /**
@@ -3260,18 +3306,25 @@ export class CraftingEngine {
    */
   async _runProgressiveCheck(system, recipe, craftingActor, { interactive = false } = {}) {
     const progressive = system?.craftingCheck?.progressive || {};
+    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
     const result = await runFormulaProgressive({
       formula: progressive.rollFormula,
       triggers: progressive.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
-      craftingModifier: this._buildCraftingModifierContext(system, recipe),
+      craftingModifier,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
         name: recipe?.name,
         activity: 'Crafting',
         img: this._resolveRecipePromptImg(recipe),
+        modifierChoice: this._buildInteractiveModifierChoice(
+          progressive.rollFormula,
+          craftingModifier,
+          craftingActor,
+          interactive
+        ),
       }),
     });
     return this._markEngineEvaluated(result);

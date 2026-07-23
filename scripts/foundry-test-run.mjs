@@ -6732,7 +6732,13 @@ async function main() {
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
             .first();
           await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
-          await modifierCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          // Scroll to the "Default combination" policy radio-group rather than the card
+          // top: the four policy options — Add all / Pick highest / By recipe / Player
+          // picks (issue 770 Phase 2, #855) — are the changed surface, and they sit
+          // below the (stable) IconPicker/label/@-expression rows. This keeps the bottom
+          // rows in view above the policy cards for context.
+          const policyGroup = modifierCard.locator('[data-crafting-modifier-policy]').first();
+          await policyGroup.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-checks-crafting-modifiers');
           process.stdout.write('  D0: checks crafting modifiers screenshotted\n');

@@ -125,8 +125,8 @@ export class Recipe {
    * Normalize the optional per-recipe crafting-check modifier override (issue 770) to
    * `{ policy?, modifierIds? } | null`. A non-object, or an object that carries neither
    * a known policy nor a non-empty `modifierIds` array, normalizes to `null` (inherit
-   * the system default). `policy` keeps only the three known values (`addAll`,
-   * `highest`, `byRecipe`); an unknown/absent policy is dropped. `modifierIds` keeps
+   * the system default). `policy` keeps only the four known values (`addAll`,
+   * `highest`, `byRecipe`, `playerPicks`); an unknown/absent policy is dropped. `modifierIds` keeps
    * only non-empty string ids, de-duplicated in order; catalogue membership is NOT
    * checked here (the resolver drops unknown ids against the live system catalogue).
    * @param {unknown} craftingModifier
@@ -135,7 +135,7 @@ export class Recipe {
    */
   _normalizeCraftingModifier(craftingModifier) {
     if (!craftingModifier || typeof craftingModifier !== 'object') return null;
-    const validPolicies = ['addAll', 'highest', 'byRecipe'];
+    const validPolicies = ['addAll', 'highest', 'byRecipe', 'playerPicks'];
     const policy = validPolicies.includes(craftingModifier.policy) ? craftingModifier.policy : null;
     const seen = new Set();
     const modifierIds = (

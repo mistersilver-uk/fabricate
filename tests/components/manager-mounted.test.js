@@ -170,11 +170,17 @@ function compileManagerRoot() {
   // Plain crafting modules imported by the nav model + Settings/nav wiring — copied
   // raw (NOT compiled), the same way recipe/recipeReadiness.js is.
   for (const craftingModule of ['craftingVisibility.js', 'craftingNav.js']) {
-    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/crafting/${craftingModule}`);
+    const moduleDestination = join(
+      tempRoot,
+      `src/ui/svelte/apps/manager/crafting/${craftingModule}`
+    );
     mkdirSync(dirname(moduleDestination), { recursive: true });
     writeFileSync(
       moduleDestination,
-      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/crafting/${craftingModule}`), 'utf8')
+      readFileSync(
+        resolve(repoRoot, `src/ui/svelte/apps/manager/crafting/${craftingModule}`),
+        'utf8'
+      )
     );
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipeEditView.svelte');
@@ -211,11 +217,17 @@ function compileManagerRoot() {
   // Plain modules under `component/` — copied raw (NOT compiled), the same way
   // recipe/recipeReadiness.js is (issue 676).
   for (const componentModule of ['salvageDcPresets.js']) {
-    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/component/${componentModule}`);
+    const moduleDestination = join(
+      tempRoot,
+      `src/ui/svelte/apps/manager/component/${componentModule}`
+    );
     mkdirSync(dirname(moduleDestination), { recursive: true });
     writeFileSync(
       moduleDestination,
-      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/component/${componentModule}`), 'utf8')
+      readFileSync(
+        resolve(repoRoot, `src/ui/svelte/apps/manager/component/${componentModule}`),
+        'utf8'
+      )
     );
   }
   for (const recipeModule of ['recipeReadiness.js']) {
@@ -961,67 +973,67 @@ function createStore(calls = [], options = {}) {
     recipes: options.recipes
       ? options.recipes
       : options.emptyRecipes
-      ? []
-      : [
-          {
-            id: 'r1',
-            name: 'Healing Draught',
-            img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
-            description: 'Restores a small amount of health.',
-            category: 'potions',
-            recipeItemId: 'ri1',
-            enabled: true,
-            locked: false,
-            isSimple: true,
-            structureLabel: 'Simple',
-            stepCount: 1,
-            resultGroupCount: 1,
-            ingredientCount: 2,
-            toolCount: 1,
-            requirementsPreview: [
-              {
-                id: 'step-1',
-                name: 'Step 1',
-                ingredientSetCount: 1,
-                ingredientCount: 2,
-                toolCount: 1,
-                resultGroupCount: 1,
-              },
-            ],
-            visibilitySummary: 'All players',
-            ingredients: new Array(2),
-            tools: new Array(1),
-          },
-          {
-            id: 'r2',
-            name: 'Locked Elixir',
-            img: 'icons/consumables/potions/potion-flask-corked-blue.webp',
-            description: 'Requires special access.',
-            category: 'elixirs',
-            enabled: false,
-            locked: true,
-            incomplete: true,
-            isSimple: false,
-            structureLabel: 'Single step',
-            stepCount: 1,
-            resultGroupCount: 2,
-            ingredientCount: 3,
-            toolCount: 0,
-            requirementsPreview: [
-              {
-                id: 'step-1',
-                name: 'Step 1',
-                ingredientSetCount: 2,
-                ingredientCount: 3,
-                toolCount: 0,
-                resultGroupCount: 2,
-              },
-            ],
-            visibilitySummary: 'Restricted (none selected)',
-            ingredients: new Array(3),
-            tools: [],
-          },
-        ],
+        ? []
+        : [
+            {
+              id: 'r1',
+              name: 'Healing Draught',
+              img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
+              description: 'Restores a small amount of health.',
+              category: 'potions',
+              recipeItemId: 'ri1',
+              enabled: true,
+              locked: false,
+              isSimple: true,
+              structureLabel: 'Simple',
+              stepCount: 1,
+              resultGroupCount: 1,
+              ingredientCount: 2,
+              toolCount: 1,
+              requirementsPreview: [
+                {
+                  id: 'step-1',
+                  name: 'Step 1',
+                  ingredientSetCount: 1,
+                  ingredientCount: 2,
+                  toolCount: 1,
+                  resultGroupCount: 1,
+                },
+              ],
+              visibilitySummary: 'All players',
+              ingredients: new Array(2),
+              tools: new Array(1),
+            },
+            {
+              id: 'r2',
+              name: 'Locked Elixir',
+              img: 'icons/consumables/potions/potion-flask-corked-blue.webp',
+              description: 'Requires special access.',
+              category: 'elixirs',
+              enabled: false,
+              locked: true,
+              incomplete: true,
+              isSimple: false,
+              structureLabel: 'Single step',
+              stepCount: 1,
+              resultGroupCount: 2,
+              ingredientCount: 3,
+              toolCount: 0,
+              requirementsPreview: [
+                {
+                  id: 'step-1',
+                  name: 'Step 1',
+                  ingredientSetCount: 2,
+                  ingredientCount: 3,
+                  toolCount: 0,
+                  resultGroupCount: 2,
+                },
+              ],
+              visibilitySummary: 'Restricted (none selected)',
+              ingredients: new Array(3),
+              tools: [],
+            },
+          ],
     recipeCategories: [
       { name: 'elixirs', count: 1 },
       { name: 'potions', count: 1 },
@@ -1245,7 +1257,11 @@ function createStore(calls = [], options = {}) {
           .toLowerCase()
           .includes(search) ||
         (Array.isArray(item.tags) &&
-          item.tags.some((tag) => String(tag || '').toLowerCase().includes(search)))
+          item.tags.some((tag) =>
+            String(tag || '')
+              .toLowerCase()
+              .includes(search)
+          ))
     );
   }
 
@@ -1974,10 +1990,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     // never a disabled "Soon" placeholder.
     const crafting = craftingParent();
     assert.ok(crafting, 'the Crafting group renders with the experimental toggle off');
-    assert.equal(crafting.disabled, false, 'the Crafting parent is a live route, not a placeholder');
+    assert.equal(
+      crafting.disabled,
+      false,
+      'the Crafting parent is a live route, not a placeholder'
+    );
 
     // The unimplemented Graph placeholder is hidden while experimental features are off.
-    assert.equal(navButton('Graph'), undefined, 'Graph placeholder is hidden with experimental features off');
+    assert.equal(
+      navButton('Graph'),
+      undefined,
+      'Graph placeholder is hidden with experimental features off'
+    );
 
     // Routing to Recipes works end to end without the experimental toggle.
     crafting.click();
@@ -2356,7 +2380,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const policy = target.querySelector(
       '[data-checks-panel="crafting"] [data-failure-consumption]'
     );
-    assert.ok(policy, 'the failure consumption policy card renders on the non-alchemy crafting tab');
+    assert.ok(
+      policy,
+      'the failure consumption policy card renders on the non-alchemy crafting tab'
+    );
     const consume = policy.querySelector('[data-recipe-field="consumeIngredientsOnFail"]');
     const breakTools = policy.querySelector('[data-recipe-field="breakToolsOnFail"]');
     assert.ok(consume && breakTools, 'both policy toggles render');
@@ -2508,7 +2535,13 @@ describe('CraftingSystemManager mounted behavior', () => {
           alchemyResolutionMode: 'routedByIngredients',
           // The RI check now lives on the shared simple pass/fail slot.
           craftingCheck: {
-            simple: { rollFormula: '1d20', dc: 14, thresholdMode: 'meet', dcMode: 'static', tiers: [] },
+            simple: {
+              rollFormula: '1d20',
+              dc: 14,
+              thresholdMode: 'meet',
+              dcMode: 'static',
+              tiers: [],
+            },
           },
         }),
         services: { openCurrentAdmin: () => {} },
@@ -2537,11 +2570,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'no relative/fixed type toggle'
     );
-    assert.equal(
-      craftingPanel.querySelector('[data-outcome-row]'),
-      null,
-      'no outcome-tiers table'
-    );
+    assert.equal(craftingPanel.querySelector('[data-outcome-row]'), null, 'no outcome-tiers table');
     // The DC + static/dynamic DC source are shown (pass/fail gate uses the DC).
     assert.ok(
       craftingPanel.querySelector('[data-dc-mode-option]'),
@@ -2679,7 +2708,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const saveButton = target.querySelector('[data-checks-save]');
     assert.ok(saveButton, 'the Save button is present');
-    assert.equal(saveButton.disabled, false, 'editing the salvage award mode enables the Save button');
+    assert.equal(
+      saveButton.disabled,
+      false,
+      'editing the salvage award mode enables the Save button'
+    );
 
     saveButton.click();
     await tick();
@@ -2805,7 +2838,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const saveButton = target.querySelector('[data-checks-save]');
     assert.ok(saveButton, 'the Save button is present');
-    assert.equal(saveButton.disabled, false, 'editing the gathering award mode enables the Save button');
+    assert.equal(
+      saveButton.disabled,
+      false,
+      'editing the gathering award mode enables the Save button'
+    );
 
     saveButton.click();
     await tick();
@@ -3098,8 +3135,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       // Two unified triggers: a forced failure and a forced success on the d20 total.
       checkBreakage: {
         triggers: [
-          { id: 'c1', condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 1 }, outcome: 'failure', breakTools: false },
-          { id: 'c2', condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 20 }, outcome: 'success', breakTools: false },
+          {
+            id: 'c1',
+            condition: {
+              type: 'diceGroup',
+              groupId: 0,
+              aggregate: 'total',
+              operator: '==',
+              value: 1,
+            },
+            outcome: 'failure',
+            breakTools: false,
+          },
+          {
+            id: 'c2',
+            condition: {
+              type: 'diceGroup',
+              groupId: 0,
+              aggregate: 'total',
+              operator: '==',
+              value: 20,
+            },
+            outcome: 'success',
+            breakTools: false,
+          },
         ],
       },
     };
@@ -3127,7 +3186,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-selected'),
       'the success trigger shows the Automatic success segment selected'
     );
-    assert.equal(triggers.querySelector('[data-trigger-break]'), null, 'no break pill under toolSpecific');
+    assert.equal(
+      triggers.querySelector('[data-trigger-break]'),
+      null,
+      'no break pill under toolSpecific'
+    );
 
     // Clicking a segment emits the new outcome.
     c2.querySelector('[data-trigger-outcome="none"]').click();
@@ -3194,13 +3257,25 @@ describe('CraftingSystemManager mounted behavior', () => {
         triggers: [
           {
             id: 'c1',
-            condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 12 },
+            condition: {
+              type: 'diceGroup',
+              groupId: 0,
+              aggregate: 'total',
+              operator: '==',
+              value: 12,
+            },
             outcome: 'success',
             breakTools: false,
           },
           {
             id: 'c2',
-            condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 2 },
+            condition: {
+              type: 'diceGroup',
+              groupId: 0,
+              aggregate: 'total',
+              operator: '==',
+              value: 2,
+            },
             outcome: 'failure',
             breakTools: false,
           },
@@ -3231,16 +3306,28 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(triggers, 'the unified trigger editor renders');
     const c1Triggers = triggers.querySelector('[data-trigger="c1"]');
     assert.ok(
-      c1Triggers.querySelector('[data-trigger-outcome="success"]').classList.contains('is-selected'),
+      c1Triggers
+        .querySelector('[data-trigger-outcome="success"]')
+        .classList.contains('is-selected'),
       'the success trigger selects the award-all segment'
     );
     const optionLabels = [...c1Triggers.querySelectorAll('[data-trigger-outcome]')].map(
       (b) => b.textContent
     );
-    assert.ok(optionLabels.some((label) => label.includes('Award all')), 'success reads "Award all"');
-    assert.ok(optionLabels.some((label) => label.includes('Award none')), 'failure reads "Award none"');
+    assert.ok(
+      optionLabels.some((label) => label.includes('Award all')),
+      'success reads "Award all"'
+    );
+    assert.ok(
+      optionLabels.some((label) => label.includes('Award none')),
+      'failure reads "Award none"'
+    );
     // Default toolSpecific authority hides the per-trigger break pill.
-    assert.equal(triggers.querySelector('[data-trigger-break]'), null, 'no break pill under toolSpecific');
+    assert.equal(
+      triggers.querySelector('[data-trigger-break]'),
+      null,
+      'no break pill under toolSpecific'
+    );
 
     // The award-mode selector renders, defaults to equal, and emits the chosen mode.
     const awardCard = target.querySelector('[data-award-mode]');
@@ -3260,7 +3347,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       'none',
       'clicking a segment emits the new outcome'
     );
-    assert.equal(emitted.at(-1).awardMode, 'equal', 'award settings are preserved on a trigger edit');
+    assert.equal(
+      emitted.at(-1).awardMode,
+      'equal',
+      'award settings are preserved on a trigger edit'
+    );
   });
 
   // Tool-breakage authority UI (issue 419 recombine). Each editor accepts a
@@ -3311,7 +3402,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       triggers: [
         {
           id: 'c1',
-          condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 2 },
+          condition: {
+            type: 'diceGroup',
+            groupId: 0,
+            aggregate: 'total',
+            operator: '==',
+            value: 2,
+          },
           outcome: 'failure',
           breakTools: false,
         },
@@ -3332,13 +3429,21 @@ describe('CraftingSystemManager mounted behavior', () => {
   // The unified trigger editor is ALWAYS rendered, regardless of authority; only the
   // per-trigger break pill is gated. Confirm across all three editors.
   const breakageEditorCases = [
-    { name: 'simple', component: () => SimpleCraftingCheckEditorComponent, value: () => simpleBreakageValue },
+    {
+      name: 'simple',
+      component: () => SimpleCraftingCheckEditorComponent,
+      value: () => simpleBreakageValue,
+    },
     {
       name: 'progressive',
       component: () => ProgressiveCraftingCheckEditorComponent,
       value: () => progressiveBreakageValue,
     },
-    { name: 'routed', component: () => CraftingCheckEditorComponent, value: () => routedBreakageValue },
+    {
+      name: 'routed',
+      component: () => CraftingCheckEditorComponent,
+      value: () => routedBreakageValue,
+    },
   ];
   for (const editorCase of breakageEditorCases) {
     it(`${editorCase.name} check editor: renders the unified triggers with no break pill under toolSpecific`, () => {
@@ -3403,7 +3508,12 @@ describe('CraftingSystemManager mounted behavior', () => {
         ...simpleBreakageValue,
         checkBreakage: {
           triggers: [
-            { id: 'c1', condition: { type: 'rollTotal', operator: '<=', value: 3 }, outcome: 'none', breakTools: true },
+            {
+              id: 'c1',
+              condition: { type: 'rollTotal', operator: '<=', value: 3 },
+              outcome: 'none',
+              breakTools: true,
+            },
           ],
         },
       },
@@ -3416,7 +3526,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const added = emitted.at(-1).checkBreakage.triggers;
     assert.equal(added.length, 2, 'adding appends a trigger');
     assert.equal(added[1].outcome, 'none', 'a new trigger forces no outcome by default');
-    assert.equal(added[1].breakTools, true, 'a new trigger breaks tools by default under checkDriven');
+    assert.equal(
+      added[1].breakTools,
+      true,
+      'a new trigger breaks tools by default under checkDriven'
+    );
 
     // The existing trigger's break pill renders (checkDriven) and toggles breakTools.
     const breakPill = target.querySelector('[data-trigger="c1"] [data-trigger-break]');
@@ -3539,16 +3653,33 @@ describe('CraftingSystemManager mounted behavior', () => {
       patches.some((p) => p.defaultModifierPolicy === 'addAll'),
       'selecting a policy radio emits defaultModifierPolicy'
     );
+    // The Phase-2 "Player picks" policy renders as a fourth radio and emits (issue 770 P2).
+    const playerPicksOption = card.querySelector(
+      '[data-crafting-modifier-policy-option="playerPicks"] input'
+    );
+    assert.ok(playerPicksOption, 'the playerPicks policy radio renders');
+    playerPicksOption.click();
+    flushSync();
+    assert.ok(
+      patches.some((p) => p.defaultModifierPolicy === 'playerPicks'),
+      'selecting playerPicks emits defaultModifierPolicy'
+    );
     // The expression field drops the leading `@` for display and restores it on write,
     // so the stored expression keeps the sigil the resolver's replaceFormulaData needs.
     const expression = card.querySelector('input[data-crafting-modifier-field="expression"]');
-    assert.equal(expression.value, 'abilities.med.mod', 'the expression editor hides the leading @');
+    assert.equal(
+      expression.value,
+      'abilities.med.mod',
+      'the expression editor hides the leading @'
+    );
     expression.value = 'abilities.arc.mod';
     expression.dispatchEvent(new Event('input', { bubbles: true }));
     flushSync();
     assert.ok(
       patches.some(
-        (p) => Array.isArray(p.checkModifiers) && p.checkModifiers[0]?.expression === '@abilities.arc.mod'
+        (p) =>
+          Array.isArray(p.checkModifiers) &&
+          p.checkModifiers[0]?.expression === '@abilities.arc.mod'
       ),
       'editing the expression re-adds the @ sigil for a roll-data path'
     );
@@ -3574,7 +3705,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     // an empty defaultModifierIds patch.
     const defaults = card.querySelector('[data-modifier-pill-select="crafting-modifier-defaults"]');
     assert.ok(defaults, 'the default set uses the shared pill multi-select');
-    assert.ok(defaults.querySelector('[data-modifier-pill="med"]'), 'the default modifier renders as a pill');
+    assert.ok(
+      defaults.querySelector('[data-modifier-pill="med"]'),
+      'the default modifier renders as a pill'
+    );
     defaults.querySelector('[data-modifier-pill-remove="med"]').click();
     flushSync();
     assert.ok(
@@ -3614,7 +3748,12 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('tools browser: tool-specific authority offers the original three mechanics (no immune)', () => {
     const emitted = mountToolsBrowser(
-      { id: 't1', name: 'Hammer', componentId: 'c1', breakage: { mode: 'limitedUses', maxUses: 3 } },
+      {
+        id: 't1',
+        name: 'Hammer',
+        componentId: 'c1',
+        breakage: { mode: 'limitedUses', maxUses: 3 },
+      },
       'toolSpecific'
     );
     for (const mode of ['limitedUses', 'breakageChance', 'diceExpression']) {
@@ -3643,7 +3782,12 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('tools browser: check-driven authority offers only breakable and immune with no fields', () => {
     const emitted = mountToolsBrowser(
-      { id: 't1', name: 'Hammer', componentId: 'c1', breakage: { mode: 'limitedUses', maxUses: 3 } },
+      {
+        id: 't1',
+        name: 'Hammer',
+        componentId: 'c1',
+        breakage: { mode: 'limitedUses', maxUses: 3 },
+      },
       'checkDriven'
     );
     assert.ok(
@@ -3666,7 +3810,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('input[name="tool-t1-breakage-mode"][value="breakable"]').checked,
       'a non-immune tool is shown as breakable'
     );
-    assert.equal(target.querySelector('.manager-tools-max-uses-input'), null, 'no limited-uses field');
+    assert.equal(
+      target.querySelector('.manager-tools-max-uses-input'),
+      null,
+      'no limited-uses field'
+    );
     assert.equal(target.querySelector('input[type="range"]'), null, 'no breakage-chance slider');
     // Selecting immune emits the fields-less immune block.
     target.querySelector('input[name="tool-t1-breakage-mode"][value="immune"]').click();
@@ -3730,9 +3878,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the standalone advisory line is gone'
     );
-    const checkDrivenDesc = target.querySelector(
-      '[data-breakage-authority="checkDriven"]'
-    )?.parentElement?.querySelector('.manager-radio-option-desc');
+    const checkDrivenDesc = target
+      .querySelector('[data-breakage-authority="checkDriven"]')
+      ?.parentElement?.querySelector('.manager-radio-option-desc');
     assert.ok(
       checkDrivenDesc && /immune/i.test(checkDrivenDesc.textContent),
       'the check-driven option description surfaces the immune exception'
@@ -3959,7 +4107,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountSystemEditView({
       selectedSystem: { id: 'sys1', name: 'System One', resolutionMode: 'simple', features: {} },
       characterPrerequisiteLibrary: [
-        { id: 'p1', name: 'Proficient in Arcana', icon: 'fa-solid fa-hat-wizard', path: 'skills.arc.prof.multiplier', op: 'gte', value: 1 },
+        {
+          id: 'p1',
+          name: 'Proficient in Arcana',
+          icon: 'fa-solid fa-hat-wizard',
+          path: 'skills.arc.prof.multiplier',
+          op: 'gte',
+          value: 1,
+        },
       ],
     });
     const card = target.querySelector('[data-system-character-prerequisites]');
@@ -4032,7 +4187,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     // 96px image-picker media stack (`.manager-task-core-status`), which centres its
     // copy and 14ch-clamps it (issue 643).
     assert.ok(
-      card.querySelector('.manager-recipe-status-card') || card.classList.contains('manager-recipe-status-card'),
+      card.querySelector('.manager-recipe-status-card') ||
+        card.classList.contains('manager-recipe-status-card'),
       'the Locked switch and its copy sit in a status card'
     );
     assert.ok(
@@ -4314,14 +4470,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
       ),
-      [
-        'System Overview',
-        'Crafting',
-        'Components',
-        'Tags & Categories',
-        'Tools',
-        'Checks',
-      ]
+      ['System Overview', 'Crafting', 'Components', 'Tags & Categories', 'Tools', 'Checks']
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
@@ -4386,7 +4535,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(scopeSelect.tagName, 'SELECT');
     assert.equal(scopeSelect.value, 'alchemy', 'the select names the selected system');
     assert.ok(
-      Array.from(scopeSelect.options).map((option) => option.value).includes('alchemy'),
+      Array.from(scopeSelect.options)
+        .map((option) => option.value)
+        .includes('alchemy'),
       'the select lists the systems the manager knows about'
     );
     assert.equal(
@@ -4535,7 +4686,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     offSegment.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 1, 'only the off recipe remains');
+    assert.equal(
+      target.querySelectorAll('.manager-recipe-row').length,
+      1,
+      'only the off recipe remains'
+    );
     const statusChip = target.querySelector('[data-recipe-filter-chip="status"]');
     assert.ok(statusChip, 'an active filter should surface a clearable chip');
     statusChip.querySelector('.manager-recipe-chip-clear').click();
@@ -4605,7 +4760,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     // below because it navigates to the recipe-edit route.
     target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
     flushSync();
-    target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="duplicate"]').click();
+    target
+      .querySelector('.manager-recipe-browser-inspector [data-recipe-action="duplicate"]')
+      .click();
     target.querySelector('.manager-recipe-browser-inspector [data-recipe-action="delete"]').click();
 
     assert.deepEqual(calls.slice(-2), [
@@ -4628,13 +4785,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       typeof enableCall[3]?.onBlocked,
       'function',
-      'the root must forward the row\'s blocked-message sink to the store — dropping it silently restores the Foundry toast'
+      "the root must forward the row's blocked-message sink to the store — dropping it silently restores the Foundry toast"
     );
-    assert.equal(
-      target.querySelector('[data-recipe-flash]'),
-      null,
-      'nothing has been refused yet'
-    );
+    assert.equal(target.querySelector('[data-recipe-flash]'), null, 'nothing has been refused yet');
     enableCall[3].onBlocked('This recipe has no result groups.');
     flushSync();
     const flash = target.querySelector('[data-recipe-flash]');
@@ -4661,7 +4814,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const editButton = target.querySelector(
       '.manager-recipe-browser-inspector [data-recipe-action="edit"]'
     );
-    assert.ok(editButton.querySelector('.fa-pen'), 'the inspector Edit action carries the pen icon');
+    assert.ok(
+      editButton.querySelector('.fa-pen'),
+      'the inspector Edit action carries the pen icon'
+    );
     editButton.click();
     await tick();
     flushSync();
@@ -4737,7 +4893,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
-    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2, 'both recipes at the default filter');
+    assert.equal(
+      target.querySelectorAll('.manager-recipe-row').length,
+      2,
+      'both recipes at the default filter'
+    );
 
     // Filter to OFF (leaves only the disabled r2) and flip the sort to descending.
     const offSegment = target.querySelector('[data-recipe-status-option="off"] input');
@@ -4749,11 +4909,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-recipe-row')).map((row) => row.dataset.recipeId),
       ['r2'],
-      'the OFF filter leaves only the disabled recipe',
+      'the OFF filter leaves only the disabled recipe'
     );
     assert.equal(
       target.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
-      'desc',
+      'desc'
     );
 
     // Open the editor from the ROW's own Edit pencil (the restored primary affordance).
@@ -4763,12 +4923,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       target.querySelector('.fabricate-manager').dataset.managerView,
       'recipe-edit',
-      'the row Edit pencil opens the recipe-edit route',
+      'the row Edit pencil opens the recipe-edit route'
     );
 
     // Return via Back to recipes.
     const backButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button'),
+      target.querySelectorAll('.manager-header-actions .manager-button')
     ).find((button) => button.textContent.includes('Back to recipes'));
     assert.ok(backButton, 'the editor offers Back to recipes');
     backButton.click();
@@ -4779,17 +4939,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
     assert.ok(
       target.querySelector('[data-recipe-filter-chip="status"]'),
-      'the status filter survived the edit round-trip',
+      'the status filter survived the edit round-trip'
     );
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-recipe-row')).map((row) => row.dataset.recipeId),
       ['r2'],
-      'the OFF filter is still applied after returning from the editor',
+      'the OFF filter is still applied after returning from the editor'
     );
     assert.equal(
       target.querySelector('[data-recipe-sort-direction]').dataset.recipeSortDirection,
       'desc',
-      'the descending sort survived the edit round-trip',
+      'the descending sort survived the edit round-trip'
     );
   });
 
@@ -4821,7 +4981,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       toolCount: 0,
       checkSummary: { kind: 'none', dc: null },
       requirementsPreview: [
-        { id: 'step-1', name: 'Step 1', ingredientSetCount: 1, ingredientCount: 2, toolCount: 0, resultGroupCount: 1 },
+        {
+          id: 'step-1',
+          name: 'Step 1',
+          ingredientSetCount: 1,
+          ingredientCount: 2,
+          toolCount: 0,
+          resultGroupCount: 1,
+        },
       ],
       visibilitySummary: 'All players',
       ingredients: new Array(2),
@@ -4861,7 +5028,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       target.querySelector('[data-recipe-count]').textContent.trim(),
       '11–12 of 12',
-      'the browser is on page 2 before opening the editor',
+      'the browser is on page 2 before opening the editor'
     );
 
     // Open the editor from a page-2 row, then return via Back to recipes.
@@ -4871,7 +5038,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
 
     const backButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button'),
+      target.querySelectorAll('.manager-header-actions .manager-button')
     ).find((button) => button.textContent.includes('Back to recipes'));
     backButton.click();
     await tick();
@@ -4880,12 +5047,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
     assert.ok(
       target.querySelector('[data-recipe-filter-chip="category"]'),
-      'the category filter survived the edit round-trip',
+      'the category filter survived the edit round-trip'
     );
     assert.equal(
       target.querySelector('[data-recipe-count]').textContent.trim(),
       '11–12 of 12',
-      'the browser returned to page 2, not page 1',
+      'the browser returned to page 2, not page 1'
     );
   });
 
@@ -5347,7 +5514,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no tag search control'
     );
     assert.equal(
-      target.querySelector('.manager-component-row .manager-chip-row .manager-chip:not(.manager-essence-compact-chip)'),
+      target.querySelector(
+        '.manager-component-row .manager-chip-row .manager-chip:not(.manager-essence-compact-chip)'
+      ),
       null,
       'rows render no tag chips'
     );
@@ -5373,7 +5542,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
-    assert.ok(target.textContent.includes('Glass Vial'), 'the uncategorized component falls into general');
+    assert.ok(
+      target.textContent.includes('Glass Vial'),
+      'the uncategorized component falls into general'
+    );
     assert.equal(
       target.querySelector('[data-component-id="c2"] [data-component-category]'),
       null,
@@ -5529,10 +5701,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
     // COLUMN — it rides in the row's badge run. The read-only parity it gives the GM
     // (issue 651) is preserved rather than dropped with the table scaffolding.
-    const c1Difficulty = target.querySelector('[data-component-id="c1"] [data-component-difficulty]');
+    const c1Difficulty = target.querySelector(
+      '[data-component-id="c1"] [data-component-difficulty]'
+    );
     assert.ok(c1Difficulty, 'a difficulty badge renders for a progressive system');
     assert.match(c1Difficulty.textContent, /2/, 'the set difficulty value is shown');
-    const c2Difficulty = target.querySelector('[data-component-id="c2"] [data-component-difficulty]');
+    const c2Difficulty = target.querySelector(
+      '[data-component-id="c2"] [data-component-difficulty]'
+    );
     assert.match(c2Difficulty.textContent, /None/, 'an unset difficulty shows "None"');
 
     target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
@@ -5706,7 +5882,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(
-      target.querySelector('[data-component-edit-tag-toggle="mineral"]').getAttribute('aria-pressed'),
+      target
+        .querySelector('[data-component-edit-tag-toggle="mineral"]')
+        .getAttribute('aria-pressed'),
       'true',
       'clicking the pill applies the tag'
     );
@@ -5809,7 +5987,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       card
         .querySelector('p')
-        .textContent.includes('shown read-only wherever this component appears as a progressive result')
+        .textContent.includes(
+          'shown read-only wherever this component appears as a progressive result'
+        )
     );
   });
 
@@ -6019,7 +6199,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     assert.ok(
-      target.querySelector('[data-salvage-section] [data-salvage-dc-override] [data-salvage-dc-preset]'),
+      target.querySelector(
+        '[data-salvage-section] [data-salvage-dc-override] [data-salvage-dc-preset]'
+      ),
       'routed mode should render the DC-override field'
     );
   });
@@ -6106,7 +6288,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       salvageResolutionMode: 'progressive',
       componentSalvage: {
         enabled: true,
-        resultGroups: [{ id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] }],
+        resultGroups: [
+          { id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] },
+        ],
       },
     });
 
@@ -6138,14 +6322,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       salvageResolutionMode: 'progressive',
       componentSalvage: {
         enabled: true,
-        resultGroups: [{ id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] }],
+        resultGroups: [
+          { id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c4', quantity: 1 }] },
+        ],
       },
     });
 
     // c4 (Coal) has difficulty 3 and is EXCLUDED by the "iron" search — so this also
     // proves the badge resolves through the unfiltered list rather than reading "DC —".
     assert.equal(
-      target.querySelector('[data-salvage-result-difficulty]').getAttribute('data-salvage-result-difficulty'),
+      target
+        .querySelector('[data-salvage-result-difficulty]')
+        .getAttribute('data-salvage-result-difficulty'),
       '3',
       'the yield row reads the referenced component difficulty from the picker source'
     );
@@ -6248,7 +6436,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     flushSync();
-    assert.ok(!calls.some((call) => call[0] === 'addCategory'), 'a blocked add never reaches the store');
+    assert.ok(
+      !calls.some((call) => call[0] === 'addCategory'),
+      'a blocked add never reaches the store'
+    );
 
     // A valid add shows a success hint and delegates with the authored icon.
     setInputValue(categoryInput, 'Elixirs');
@@ -6285,10 +6476,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-vocabulary-confirm="potions"]'),
       'a referenced delete opens an inline confirm strip'
     );
-    assert.ok(!calls.some((call) => call[0] === 'removeCategory'), 'nothing is removed before confirming');
-    target
-      .querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger')
-      .click();
+    assert.ok(
+      !calls.some((call) => call[0] === 'removeCategory'),
+      'nothing is removed before confirming'
+    );
+    target.querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger').click();
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'removeCategory' && call[1] === 'potions'));
@@ -6397,7 +6589,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     setInputValue(input, 'General');
     await tick();
     flushSync();
-    panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    panel
+      .querySelector('form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     flushSync();
     assert.ok(!calls.some((call) => call[0] === 'addComponentCategory'));
@@ -6406,7 +6600,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     setInputValue(input, 'Metal');
     await tick();
     flushSync();
-    panel.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    panel
+      .querySelector('form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await tick();
     await tick();
     flushSync();
@@ -6448,7 +6644,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     // The editable icon button on a custom category row opens an inline icon editor.
-    target.querySelector('[data-category-id="potions"] .manager-vocabulary-icon.is-editable').click();
+    target
+      .querySelector('[data-category-id="potions"] .manager-vocabulary-icon.is-editable')
+      .click();
     await tick();
     flushSync();
     const edit = target.querySelector('[data-vocabulary-icon-edit="potions"]');
@@ -7127,7 +7325,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     flushSync();
-    assert.ok(target.querySelector('#manager-nav-crafting'), 'Crafting group renders when experimental off');
+    assert.ok(
+      target.querySelector('#manager-nav-crafting'),
+      'Crafting group renders when experimental off'
+    );
     assert.ok(craftingParent(), 'Crafting parent button present when experimental off');
     assert.equal(navButton('Graph'), undefined, 'Graph placeholder hidden when experimental off');
 
@@ -7145,7 +7346,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     flushSync();
-    assert.ok(target.querySelector('#manager-nav-crafting'), 'Crafting group still renders when experimental on');
+    assert.ok(
+      target.querySelector('#manager-nav-crafting'),
+      'Crafting group still renders when experimental on'
+    );
     const graph = navButton('Graph');
     assert.ok(graph, 'Graph placeholder advertised when experimental on');
     assert.equal(graph.disabled, true, 'Graph is a disabled placeholder');
@@ -7185,7 +7389,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     const submenu = target.querySelector('#manager-crafting-submenu');
     assert.ok(submenu, 'crafting submenu renders when expanded');
     assert.equal(
-      target.querySelector('#manager-nav-crafting + .manager-nav-toggle').getAttribute('aria-label'),
+      target
+        .querySelector('#manager-nav-crafting + .manager-nav-toggle')
+        .getAttribute('aria-label'),
       'Collapse crafting menu'
     );
     // The Crafting sub-tabs are a conditional set keyed on the system's
@@ -7199,7 +7405,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.deepEqual(
       craftingItems.map((item) => item.id),
-      ['manager-crafting-nav-recipes', 'manager-crafting-nav-books-scrolls', 'manager-crafting-nav-settings']
+      [
+        'manager-crafting-nav-recipes',
+        'manager-crafting-nav-books-scrolls',
+        'manager-crafting-nav-settings',
+      ]
     );
     assert.equal(craftingSubitem('Recipes').getAttribute('aria-current'), 'page');
     assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), true);
@@ -7209,7 +7419,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     craftingSubitem('Settings').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'crafting-settings');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'crafting-settings'
+    );
     assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), 'page');
     assert.ok(target.querySelector('[data-crafting-settings]'), 'crafting settings page renders');
     assert.ok(
@@ -7251,7 +7464,10 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // The submenu is shown, but no subitem falsely reports the active/current page
     // (the state is guarded by isCraftingRoute, mirroring the Gathering group).
-    assert.ok(target.querySelector('#manager-crafting-submenu'), 'submenu expands from a non-crafting route');
+    assert.ok(
+      target.querySelector('#manager-crafting-submenu'),
+      'submenu expands from a non-crafting route'
+    );
     assert.equal(craftingSubitem('Recipes').getAttribute('aria-current'), null);
     assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), false);
     assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
@@ -7338,11 +7554,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     // Knowledge mode (default): the cap chip shows the learning limit.
     assert.equal(
-      target.querySelector('[data-books-scrolls-cap-chip="ri1"]').getAttribute('data-books-scrolls-cap-limited'),
+      target
+        .querySelector('[data-books-scrolls-cap-chip="ri1"]')
+        .getAttribute('data-books-scrolls-cap-limited'),
       'true'
     );
     assert.equal(
-      target.querySelector('[data-books-scrolls-cap-chip="ri2"]').getAttribute('data-books-scrolls-cap-limited'),
+      target
+        .querySelector('[data-books-scrolls-cap-chip="ri2"]')
+        .getAttribute('data-books-scrolls-cap-limited'),
       'false'
     );
 
@@ -7351,7 +7571,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(
-      calls.some((call) => call[0] === 'setRecipeItemEnabled' && call[1] === 'ri1' && call[2] === false),
+      calls.some(
+        (call) => call[0] === 'setRecipeItemEnabled' && call[1] === 'ri1' && call[2] === false
+      ),
       'toggling a row calls setRecipeItemEnabled'
     );
 
@@ -7359,7 +7581,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-books-scrolls-select="ri2"]').click();
     await tick();
     flushSync();
-    assert.ok(target.querySelector('[data-item-page-inspector]'), 'the item inspector renders on select');
+    assert.ok(
+      target.querySelector('[data-item-page-inspector]'),
+      'the item inspector renders on select'
+    );
     assert.equal(
       target.querySelector('[data-item-page-name]').textContent.trim(),
       'Scroll of Elixirs'
@@ -7375,8 +7600,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-books-scrolls-edit="ri1"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
-    assert.ok(target.querySelector('[data-recipe-item-editor]'), 'the recipe-item editor body renders');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit'
+    );
+    assert.ok(
+      target.querySelector('[data-recipe-item-editor]'),
+      'the recipe-item editor body renders'
+    );
     // The router owns the header + footer actions.
     assert.ok(target.querySelector('[data-recipe-item-back]'), 'Back action renders');
     assert.ok(target.querySelector('[data-recipe-item-delete]'), 'Delete action renders');
@@ -7384,14 +7615,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(save, 'Save action renders');
     assert.equal(save.disabled, true, 'Save is disabled until the draft is dirty');
     // The editor is fed the persisted linked recipe (r1) for ri1.
-    assert.ok(target.textContent.includes('Alchemist Cook Book'), 'the linked item name shows in the editor');
+    assert.ok(
+      target.textContent.includes('Alchemist Cook Book'),
+      'the linked item name shows in the editor'
+    );
 
     // Flipping the Overview Enabled toggle stages a draft change → dirty.
     target.querySelector('[data-recipe-item-enabled]').click();
     await tick();
     flushSync();
-    assert.ok(target.querySelector('[data-recipe-item-dirty]'), 'the Unsaved chip appears when dirty');
-    assert.equal(target.querySelector('[data-recipe-item-save]').disabled, false, 'Save enables when dirty');
+    assert.ok(
+      target.querySelector('[data-recipe-item-dirty]'),
+      'the Unsaved chip appears when dirty'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-item-save]').disabled,
+      false,
+      'Save enables when dirty'
+    );
 
     // Saving commits the whole draft in one saveRecipeItem call, then returns to
     // the Books & Scrolls surface.
@@ -7415,7 +7656,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-books-scrolls-edit="ri1"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit'
+    );
 
     // Make the draft dirty.
     target.querySelector('[data-recipe-item-enabled]').click();
@@ -7479,10 +7723,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(
-      calls.some((call) => call[0] === 'addRecipeItemFromUuid' && call[2] === 'Compendium.world.items.tome'),
+      calls.some(
+        (call) => call[0] === 'addRecipeItemFromUuid' && call[2] === 'Compendium.world.items.tome'
+      ),
       'picking an item adds it via addRecipeItemFromUuid'
     );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit'
+    );
   });
 
   it('exposes the Access sub-tab under restricted visibility and grants a recipe', async () => {
@@ -7507,7 +7756,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(craftingSubitem('Access'), 'the Access sub-tab is shown under restricted visibility');
-    assert.equal(craftingSubitem('Books & Scrolls'), undefined, 'Books & Scrolls is hidden under restricted');
+    assert.equal(
+      craftingSubitem('Books & Scrolls'),
+      undefined,
+      'Books & Scrolls is hidden under restricted'
+    );
 
     craftingSubitem('Access').click();
     await tick();
@@ -7520,7 +7773,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-access-row="r1"]').click();
     await tick();
     flushSync();
-    assert.ok(target.querySelector('[data-access-roster]'), 'the grant-access inspector renders on select');
+    assert.ok(
+      target.querySelector('[data-access-roster]'),
+      'the grant-access inspector renders on select'
+    );
   });
 
   it('shows the Books & Scrolls empty state when the system has no recipe items', async () => {
@@ -7592,7 +7848,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true'
     );
     assert.equal(
-      target.querySelector('#manager-nav-gathering').closest('.manager-nav-group').classList.contains('is-expanded'),
+      target
+        .querySelector('#manager-nav-gathering')
+        .closest('.manager-nav-group')
+        .classList.contains('is-expanded'),
       true
     );
 
@@ -11989,7 +12248,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
     assert.ok(target.textContent.includes('System Overview'));
     // The Settings tab is the default, so its form renders immediately.
-    assert.equal(target.querySelector('[data-system-tab="settings"]')?.getAttribute('aria-selected'), 'true');
+    assert.equal(
+      target.querySelector('[data-system-tab="settings"]')?.getAttribute('aria-selected'),
+      'true'
+    );
     assert.ok(target.querySelector('.manager-system-edit-form'));
     assert.deepEqual(calls.slice(-4), [
       ['selectSystem', 'smithing'],
@@ -12196,10 +12458,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-system-edit-form'),
       'Keep editing leaves the GM on the settings form'
     );
-    assert.ok(
-      !calls.some((call) => call[0] === 'saveSystemDetails'),
-      'Keep editing does not save'
-    );
+    assert.ok(!calls.some((call) => call[0] === 'saveSystemDetails'), 'Keep editing does not save');
   });
 
   it('saves the lifted system details draft when navigation chooses save', async () => {
@@ -12254,10 +12513,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
       'discard prompts'
     );
-    assert.ok(
-      !calls.some((call) => call[0] === 'saveSystemDetails'),
-      'discard does not save'
-    );
+    assert.ok(!calls.some((call) => call[0] === 'saveSystemDetails'), 'discard does not save');
     assert.equal(
       target.querySelector('.manager-system-edit-form'),
       null,
@@ -12587,11 +12843,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
 
     assert.ok(
-      target.querySelector('[data-feature-key="essences"] .manager-feature-tile-icon').classList.contains('is-on'),
+      target
+        .querySelector('[data-feature-key="essences"] .manager-feature-tile-icon')
+        .classList.contains('is-on'),
       'an enabled feature reads as on in the chip'
     );
     assert.ok(
-      target.querySelector('[data-feature-key="salvage"] .manager-feature-tile-icon').classList.contains('is-off'),
+      target
+        .querySelector('[data-feature-key="salvage"] .manager-feature-tile-icon')
+        .classList.contains('is-off'),
       'a disabled feature reads as off in the chip'
     );
   });
@@ -12619,7 +12879,10 @@ describe('CraftingSystemManager mounted behavior', () => {
         salvage: true,
       },
     });
-    assert.ok(chipClasses().contains('is-on'), 'the salvage chip reads on once the feature is enabled');
+    assert.ok(
+      chipClasses().contains('is-on'),
+      'the salvage chip reads on once the feature is enabled'
+    );
   });
 
   it('renders the currency spend-strategy control with three options and routes its change', async () => {

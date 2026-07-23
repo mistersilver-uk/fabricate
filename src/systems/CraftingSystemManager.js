@@ -557,7 +557,7 @@ export class CraftingSystemManager {
    * Normalize the crafting check-modifier catalogue + default resolution policy
    * (issue 770): `checkModifiers` is a named catalogue of `{id,label,icon?,expression}`
    * entries feeding the `@craftingmod` placeholder; `defaultModifierPolicy` is one of
-   * `addAll`/`highest`/`byRecipe` (default `addAll`); `defaultModifierIds` names the
+   * `addAll`/`highest`/`byRecipe`/`playerPicks` (default `addAll`); `defaultModifierIds` names the
    * catalogue entries applied by default. Malformed entries are dropped, a bad
    * expression coerces to an empty string, and a default id naming nothing in the
    * catalogue is dropped (order + de-dup preserved).
@@ -589,7 +589,7 @@ export class CraftingSystemManager {
       seenDefaults.add(id);
       return true;
     });
-    const defaultModifierPolicy = ['addAll', 'highest', 'byRecipe'].includes(
+    const defaultModifierPolicy = ['addAll', 'highest', 'byRecipe', 'playerPicks'].includes(
       check?.defaultModifierPolicy
     )
       ? check.defaultModifierPolicy

@@ -11,7 +11,7 @@
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
 import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
 
-import { applyCraftingModifier } from './craftingModifierResolver.js';
+import { applyCraftingModifier, substituteCraftingModifier } from './craftingModifierResolver.js';
 
 /**
  * Summarise an evaluated Roll's dice as
@@ -128,18 +128,51 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
  * @param {object} [options.craftingModifier] The `@craftingmod` modifier context
  *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`.
  *   Resolved to a scalar and substituted before the formula reaches Foundry's `Roll`.
+ * @param {{token: string, modifiers: Array<{id,label,icon,value}>, defaultSelectedId: string}}
+ *   [options.modifierChoice] The deferred interactive `playerPicks` descriptor (issue
+ *   770 Phase 2). Present only on an interactive `playerPicks` craft; when set, the
+ *   `@craftingmod` token is left unresolved until the prompt returns the chosen id, then
+ *   that single modifier's value substitutes it. Absent on every other path.
  * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
  *   resolvedFormula: string|null, cancelled?: boolean}>}
  */
+/**
+ * Look up an interactive `playerPicks` modifier's numeric value by id, coercing a
+ * missing/non-finite value to 0.
+ * @param {{modifiers?: Array<{id: string, value: number}>}} modifierChoice
+ * @param {string} id
+ * @returns {number}
+ */
+function modifierChoiceValue(modifierChoice, id) {
+  const found = (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : []).find(
+    (modifier) => modifier?.id === id
+  );
+  const value = Number(found?.value);
+  return Number.isFinite(value) ? value : 0;
+}
+
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  // Interactive `playerPicks` (issue 770 Phase 2): the `@craftingmod` value depends on
+  // a selection made INSIDE the prompt, so it cannot be pre-resolved here. When a
+  // deferred `modifierChoice` descriptor is present AND this is an interactive prompt
+  // roll, leave the token in place and substitute the chosen value after the prompt
+  // returns. Every other path (all Phase-1 policies, and non-interactive `playerPicks`)
+  // pre-resolves `@craftingmod` to a deterministic scalar, exactly as before.
+  const modifierChoice = options?.modifierChoice;
+  const useDeferredChoice =
+    Boolean(modifierChoice) &&
+    options?.interactive === true &&
+    typeof options.prompt === 'function';
   // Resolve the Fabricate-owned `@craftingmod` placeholder (issue 770) to a scalar
   // and substitute it BEFORE anything downstream reads the formula, so the dialog,
   // roll, and journal all agree (eval == display). A formula without `@craftingmod`
   // (or no modifier context) is returned unchanged — full single-formula back-compat.
-  const baseFormula = applyCraftingModifier(String(formula), actor, options?.craftingModifier);
+  const baseFormula = useDeferredChoice
+    ? String(formula)
+    : applyCraftingModifier(String(formula), actor, options?.craftingModifier);
   // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
   // can show the actual modifiers, not the authored `@abilities…` placeholders.
   // Recomputed from the COMBINED formula below when a valid situational bonus is
@@ -148,24 +181,61 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
 
   let effectiveFormula = baseFormula;
   let effectiveRollMode = options?.rollMode;
+  let effectiveFlavor = options?.flavor;
 
   // Interactive roll (opt-in): confirm with the player and optionally append a
   // situational modifier before rolling. A cancelled prompt short-circuits with
   // `cancelled: true` so the runner can abort with zero mutation.
   if (options?.interactive && typeof options.prompt === 'function') {
+    // For a deferred modifier choice the `@craftingmod` value is the player's radio
+    // pick, which isn't known until the dialog resolves. Show the modifier slot as a
+    // neutral `(modifier)` placeholder rather than a static default number — a specific
+    // number would misrepresent a non-default pick (and cleanHTML strips inline
+    // handlers, so a live-updating preview is not available). Other `@` placeholders
+    // still resolve to numbers; the per-radio value chips carry each option's value.
+    const promptFormula = useDeferredChoice
+      ? effectiveFormula.replaceAll(/@craftingmod\b/g, '(modifier)')
+      : effectiveFormula;
+    const promptResolved = useDeferredChoice
+      ? resolveCheckFormulaDisplay(promptFormula, actor)
+      : resolved;
     const choice = await options.prompt({
-      formula: effectiveFormula,
-      resolvedFormula: resolved?.display ?? null,
+      formula: promptFormula,
+      resolvedFormula: promptResolved?.display ?? null,
       dc: options.dc,
       label: options.flavor,
       name: options.name,
       activity: options.activity,
       img: options.img,
+      modifierChoice,
       // Advantage/Disadvantage are offered only for a plain-d20 check.
       allowAdvantage: hasPlainD20(effectiveFormula),
     });
     if (!choice || choice.confirmed === false) {
       return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
+    }
+    // Resolve the player's `@craftingmod` selection FIRST — before the advantage
+    // transform and situational-bonus append — so those compose on top of the chosen
+    // modifier and the same substituted formula feeds eval AND display (eval == display).
+    if (useDeferredChoice) {
+      // The `@craftingmod` token MUST be resolved here so it never reaches Foundry's
+      // `Roll` unresolved (Foundry would treat it as 0). Fall back to the pre-selected
+      // default when the prompt confirmed without a selection (headless confirm).
+      const chosenId = choice.chosenModifierId ?? modifierChoice.defaultSelectedId;
+      const value = modifierChoiceValue(modifierChoice, chosenId);
+      effectiveFormula = substituteCraftingModifier(effectiveFormula, value);
+      resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
+      // Best-effort: append the chosen modifier label to the chat flavor (e.g.
+      // `… · Herbalism`), riding the existing flavor thread.
+      const chosenLabel = (
+        Array.isArray(modifierChoice.modifiers) ? modifierChoice.modifiers : []
+      ).find((modifier) => modifier?.id === chosenId)?.label;
+      // Only join with the bullet when there is an existing flavor; an empty base must
+      // not leave an orphan `· ` (production always supplies a flavor, but direct
+      // callers/tests may not).
+      if (chosenLabel) {
+        effectiveFlavor = effectiveFlavor ? `${effectiveFlavor} · ${chosenLabel}` : chosenLabel;
+      }
     }
     // Advantage transform first (so the situational bonus appends AFTER the pool),
     // yielding e.g. `2d20kh1 + 3 + (2)`. Only a plain `1d20` is rewritten; any other
@@ -211,7 +281,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (options?.interactive && typeof globalThis.ChatMessage?.create === 'function') {
     try {
       await roll.toMessage(
-        { speaker: options.speaker, flavor: options.flavor },
+        { speaker: options.speaker, flavor: effectiveFlavor },
         { rollMode: effectiveRollMode, create: true }
       );
     } catch (error) {
