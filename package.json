@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node scripts/release.js --no-zip",
     "build:analyze": "node scripts/release.js --no-zip --analyze",
+    "verify:chunk-split": "node scripts/verify-manager-chunk-split.mjs",
     "dev": "vite serve",
     "setup:dev": "node scripts/setup-dev-module.mjs",
     "setup:dev:dist": "node scripts/setup-dev-module.mjs --dev --force",
