@@ -10031,6 +10031,63 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(editor.querySelector('footer'), null);
   });
 
+  it('hydrates world Items for Tool creation and direct-Item replacement', async () => {
+    const replacementItem = {
+      uuid: 'Item.replacement-hammer',
+      name: 'Replacement Hammer',
+      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
+      type: 'equipment',
+    };
+    const serviceCalls = [];
+    let resolveWorldItems;
+    const worldItems = new Promise((resolve) => {
+      resolveWorldItems = resolve;
+    });
+    const calls = await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: [
+          {
+            ...toolRouteFixture,
+            onBreak: { mode: 'replaceWith', replacementTarget: null },
+          },
+        ],
+      },
+      services: {
+        getWorldItemOptions: () => {
+          serviceCalls.push('getWorldItemOptions');
+          return worldItems;
+        },
+      },
+    });
+
+    assert.deepEqual(serviceCalls, ['getWorldItemOptions']);
+    resolveWorldItems([replacementItem]);
+    await tick();
+    flushSync();
+
+    const creationSelect = target.querySelector(
+      ':scope [data-tool-create-card] select[aria-label="Select an Item"]'
+    );
+    assert.equal(
+      creationSelect.querySelector(`:scope > option[value="${replacementItem.uuid}"]`)?.textContent,
+      replacementItem.name
+    );
+
+    await openFixtureToolEditor(calls);
+    target.querySelector('#tool-tab-breakage').click();
+    await tick();
+    flushSync();
+
+    const directItemSelect = target.querySelector(
+      ':scope [data-tool-replacement-target] label:last-of-type select'
+    );
+    assert.equal(
+      directItemSelect.querySelector(`:scope > option[value="${replacementItem.uuid}"]`)
+        ?.textContent,
+      replacementItem.name
+    );
+  });
+
   it('threads system repair vocabularies and enabled features into the Tool editor', async () => {
     const repairTool = {
       ...toolRouteFixture,
