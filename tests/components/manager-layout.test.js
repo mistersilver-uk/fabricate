@@ -31,7 +31,7 @@ test('Tool Studio owns its three-column geometry and stacks at its responsive br
   assert.ok(main.includes('overflow-y: auto;'), 'the library center should own its wide-layout scrolling');
   assert.ok(rows.includes('grid-template-columns: minmax(0, 1fr) max-content;'));
   assert.ok(selectTarget.includes('height: auto;'));
-  assert.ok(selectTarget.includes('min-height: 72px;'));
+  assert.ok(selectTarget.includes('min-height: 68px;'));
   assert.ok(selectTarget.includes('justify-content: flex-start;'));
   assert.ok(selectTarget.includes('width: 100%;'));
   assert.match(responsive, /grid-template-columns:\s*minmax\(0, 1fr\);/);

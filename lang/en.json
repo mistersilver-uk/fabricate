@@ -3840,6 +3840,8 @@
             "EffectiveRules": "Effective rules",
             "Source": "Linked Item",
             "NoSource": "No Item linked",
+            "HeaderLinked": "Linked game-world Item",
+            "HeaderUnlinked": "Unlinked Tool",
             "DropItem": "Drop an Item or choose one below",
             "ReplaceItem": "Replace linked Item",
             "LabelFallback": "Leave blank to use the linked Item name.",

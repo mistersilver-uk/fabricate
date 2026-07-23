@@ -61,8 +61,9 @@
       <img src={row.img} alt="" />
       <div>
         <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.SelectedKicker', 'Selected Tool')}</p>
-        <h2>{row.name}</h2>
+        <h2 title={row.name}>{row.name}</h2>
         <span class={`manager-chip ${row.enabled ? 'is-positive' : 'is-neutral'}`}>
+          <i class={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'} aria-hidden="true"></i>
           {row.enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
         </span>
         <span
