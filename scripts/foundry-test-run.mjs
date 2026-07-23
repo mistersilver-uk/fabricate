@@ -3887,7 +3887,11 @@ async function waitForToolBreakageAuthority(page, systemId) {
 }
 
 async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fixture }) {
-  await setManagerWindowSize(page, { width: 1280, height: 720 });
+  // ApplicationV2 contributes a 2px horizontal frame and a 38px title bar. Size
+  // the outer window so the captured `.fabricate-manager` product root matches the
+  // prototype crop exactly. This code path is shared by local and CI screenshot
+  // profiles, so both environments enforce the same product-space geometry.
+  await setManagerWindowSize(page, { width: 1214, height: 724 });
   await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
   await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   const liveManagerApp = await requireSingleLocator(page.locator('#fabricate-crafting-system-manager'), 'live Crafting System Manager app');
@@ -3925,12 +3929,12 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', { width: 1212, height: 686 });
 
-  await setManagerWindowSize(page, { width: 680, height: 700 });
+  await setManagerWindowSize(page, { width: 614, height: 704 });
   await resetToolStudioScroll(page);
   await assertSinglePointerDispatch(page, selectTarget, 'Tool row selection at 680px');
   await assertSinglePointerDispatch(page, enabledToggle, 'Tool enabled toggle at 680px');
   await assertSinglePointerDispatch(page, editButton, 'Tool Edit at 680px');
-  await setManagerWindowSize(page, { width: 1280, height: 720 });
+  await setManagerWindowSize(page, { width: 1214, height: 724 });
 
   await editButton.click();
   const editorManager = liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]');
@@ -4064,7 +4068,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await editor.locator('[data-tool-bonus-expression]').fill('@prof');
   await tab('breakage').click();
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
-  await setManagerWindowSize(page, { width: 900, height: 700 });
+  await setManagerWindowSize(page, { width: 834, height: 704 });
   await editor.locator('[data-tool-editor-header]').waitFor({ state: 'visible', timeout: 5_000 });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: false });
@@ -4077,7 +4081,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
   await assertSinglePointerDispatch(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 900px');
 
-  await setManagerWindowSize(page, { width: 680, height: 700 });
+  await setManagerWindowSize(page, { width: 614, height: 704 });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: true });
   await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 680px');
@@ -4085,7 +4089,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertSinglePointerDispatch(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 680px');
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-stress-wrapping-680');
-  await setManagerWindowSize(page, { width: 1280, height: 720 });
+  await setManagerWindowSize(page, { width: 1214, height: 724 });
 
   await page.evaluate(async () => globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.());
   await editor.locator('[data-tool-editor-back]').click();
