@@ -1312,7 +1312,8 @@ The pre-existing user-authored `label` is a DISTINCT field and is NEVER written 
 Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
 Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
 The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
-3. A referenced Tool is always required: it must be present and pass its optional legacy gathering `requirement` plus any enabled shared-prerequisite usability gate before crafting or a gathering attempt may proceed.
+3. A referenced Tool is always required: it must be present and pass any enabled shared-prerequisite usability gate before crafting, salvage, or gathering may proceed.
+   Its optional legacy gathering `requirement` formula is additionally enforced only for gathering attempts.
 A reference whose id no longer resolves in its library, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED`.
 4. `requirement` is optional and formula-only.
 When present, it requires a non-empty `formula` — a Foundry roll expression evaluated against the actor's roll data.

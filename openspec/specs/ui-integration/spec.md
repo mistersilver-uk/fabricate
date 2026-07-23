@@ -1028,7 +1028,7 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 ### Tools tab
 
 The recipe editor's Tools tab authors required Tools at recipe, step, and ingredient-set scope and applies the recipe's one `toolBonusModes` map by Tool id across every applicable scope.
-Each applicable Tool carries a segmented bonus-mode control that writes `recipe.toolBonusModes[toolId]` as `always`, `highestOnly`, or `never`, with an absent entry displayed and evaluated as `always`.
+Each applicable Tool carries a localized bonus-mode select that writes `recipe.toolBonusModes[toolId]` as `always`, `highestOnly`, or `never`, with an absent entry displayed and evaluated as `always`.
 The control has an associated localized label and remains reachable and wrapping at narrow widths.
 
 ### Ingredients tab
