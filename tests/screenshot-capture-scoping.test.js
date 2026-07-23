@@ -290,9 +290,10 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?680px/);
   assert.match(
     HARNESS,
-    /assertPointerTarget\(page,\s*page\.locator\('\.manager-recipe-or-trigger'\)\.first\(\),\s*'\.manager-recipe-or-trigger',\s*'Tool repair OR trigger'\)/,
+    /assertPointerTarget\(page,\s*page\.locator\('\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]'\)\.first\(\),\s*'\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]',\s*'Tool repair OR add-component control'\)/,
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
+  assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 
