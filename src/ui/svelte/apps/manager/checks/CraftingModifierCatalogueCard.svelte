@@ -59,12 +59,20 @@
       fallback: 'By recipe',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipeDesc',
       descFallback: 'Each recipe chooses its own modifier set; the chosen set is summed.'
+    },
+    {
+      value: 'playerPicks',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicks',
+      fallback: 'Player picks',
+      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicksDesc',
+      descFallback:
+        'The player picks one eligible modifier at roll time (highest pre-selected). A non-interactive craft uses the highest.'
     }
   ];
 
   const modifiers = $derived(Array.isArray(checkModifiers) ? checkModifiers : []);
   const selectedPolicy = $derived(
-    ['addAll', 'highest', 'byRecipe'].includes(defaultModifierPolicy)
+    ['addAll', 'highest', 'byRecipe', 'playerPicks'].includes(defaultModifierPolicy)
       ? defaultModifierPolicy
       : 'addAll'
   );
