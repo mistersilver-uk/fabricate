@@ -420,11 +420,19 @@ function fieldValue(text, pattern) {
   return null;
 }
 
+/**
+ * TOML block form is tried FIRST because the single-line pattern is not a guard
+ * against it: `description = """` satisfies `^description\s*=\s*"(.*)"$` — the
+ * literal quote takes the first `"`, the anchor takes the third, and the capture
+ * takes the second. That returned a lone `"` as the description and made the block
+ * branch unreachable, so a block-form binding silently failed the model-tier word
+ * check instead of being read. A `"""` opener is unambiguous, so matching it first
+ * is the guard.
+ */
 function codexDescription(text) {
-  const single = fieldValue(text, CODEX_DESCRIPTION_FIELD);
-  if (single !== null) return single;
   const block = CODEX_DESCRIPTION_BLOCK.exec(String(text ?? ''));
-  return block ? block[1].trim() : null;
+  if (block) return block[1].trim();
+  return fieldValue(text, CODEX_DESCRIPTION_FIELD);
 }
 
 function claudeBindingErrors(path, text, tier, pins, tiered) {

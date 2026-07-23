@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 import {
   HIGH_RISK_PATHS,
@@ -15,6 +19,7 @@ import {
   selectModelTier,
   splitTieredToken,
 } from '../scripts/lib/agentModelTiers.js';
+import { main } from '../scripts/validate-agent-bindings.mjs';
 
 // --- Fixtures ---------------------------------------------------------------
 // The canonical roster: 6 model-tiered families x 3 model tiers, plus 3 untiered
@@ -578,4 +583,380 @@ test('12. a description naming all three model tiers is rejected for every model
     }),
   });
   assert.deepEqual(untiered, []);
+});
+
+// --- 13. The AGENTS.md <-> module mirror ------------------------------------
+// `AGENTS.md` restates HIGH_RISK_PATHS, the SMALL_MAX/MEDIUM_MAX table, the model
+// pins, and the roster. That is a hand-maintained mirror of this module, so without
+// this test the two drift silently and the Design's claim that "a later AGENTS.md
+// edit contradicting them fails npm test" is false.
+
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const AGENTS_MD = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf8');
+
+const unbacktick = (cell) => cell.replaceAll('`', '').trim();
+const firstInt = (cell) => Number.parseInt(/\d+/.exec(cell)?.[0] ?? '', 10);
+
+/** Read the GitHub-flavoured Markdown table whose header row satisfies `isHeader`. */
+function readMarkdownTable(md, isHeader, label) {
+  const lines = md.split('\n');
+  const headerIndex = lines.findIndex((l) => l.trim().startsWith('|') && isHeader(l));
+  assert.ok(headerIndex >= 0, `AGENTS.md is missing the ${label} table`);
+  const rows = [];
+  for (let i = headerIndex + 1; i < lines.length; i += 1) {
+    if (!lines[i].trim().startsWith('|')) break;
+    if (lines[i].includes('---')) continue;
+    rows.push(
+      lines[i]
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim())
+    );
+  }
+  assert.ok(rows.length > 0, `AGENTS.md ${label} table has no rows`);
+  return rows;
+}
+
+/**
+ * The fenced `HIGH_RISK_PATHS` block holds prose then a blank line then the list, so
+ * the entries are the LAST blank-line-separated group. Reading the whole fence would
+ * pick up the prose line that deliberately names a path.
+ */
+function fencedHighRiskPaths(md) {
+  const marker = md.indexOf('**`HIGH_RISK_PATHS`.**');
+  assert.ok(marker >= 0, 'AGENTS.md is missing the HIGH_RISK_PATHS section');
+  const fenceStart = md.indexOf('```text', marker);
+  assert.ok(fenceStart >= 0, 'AGENTS.md HIGH_RISK_PATHS section has no fenced block');
+  const bodyStart = md.indexOf('\n', fenceStart) + 1;
+  const fenceEnd = md.indexOf('```', bodyStart);
+  assert.ok(fenceEnd > bodyStart, 'AGENTS.md HIGH_RISK_PATHS fence is unterminated');
+  const groups = md.slice(bodyStart, fenceEnd).trim().split(/\n\s*\n/);
+  return groups[groups.length - 1]
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+test('13. AGENTS.md mirrors HIGH_RISK_PATHS, the thresholds, the pins, and the roster', () => {
+  // (a) The fenced path list, entries AND order.
+  assert.deepEqual(fencedHighRiskPaths(AGENTS_MD), HIGH_RISK_PATHS);
+
+  // (b) SMALL_MAX / MEDIUM_MAX per stage. One AGENTS.md row covers two stage keys.
+  const thresholdRows = readMarkdownTable(
+    AGENTS_MD,
+    (l) => l.includes('`SMALL_MAX`') && l.includes('`MEDIUM_MAX`'),
+    'SMALL_MAX/MEDIUM_MAX'
+  );
+  const documented = {};
+  for (const [stageCell, smallCell, mediumCell] of thresholdRows) {
+    for (const stage of stageCell.split(',').map((s) => unbacktick(s))) {
+      documented[stage] = { smallMax: firstInt(smallCell), mediumMax: firstInt(mediumCell) };
+    }
+  }
+  assert.deepEqual(Object.keys(documented).sort(), Object.keys(STAGE_THRESHOLDS).sort());
+  for (const [stage, limits] of Object.entries(STAGE_THRESHOLDS)) {
+    assert.deepEqual(documented[stage], limits, `AGENTS.md ${stage} thresholds drifted`);
+  }
+  // The two post-implementation stages share one row, so they must share one object.
+  assert.deepEqual(documented['post-implementation'], documented.docs);
+
+  // (c) The provider pin table.
+  const pinRows = readMarkdownTable(
+    AGENTS_MD,
+    (l) => l.includes('Model tier') && l.includes('model_reasoning_effort'),
+    'model-tier pin'
+  );
+  const pins = {};
+  for (const [tierCell, claudeCell, modelCell, effortCell] of pinRows) {
+    pins[unbacktick(tierCell)] = {
+      claude: unbacktick(claudeCell),
+      codexModel: unbacktick(modelCell),
+      codexReasoningEffort: unbacktick(effortCell),
+    };
+  }
+  assert.deepEqual(pins, TIER_MODELS);
+
+  // (d) The roster, parsed by the validator's OWN parser. A 7th family added to
+  // AGENTS.md without updating FAMILIES here fails.
+  const parsed = parseBindingsTable(AGENTS_MD);
+  assert.deepEqual(parsed.skipped, [], 'a real AGENTS.md row is silently skipped by the parser');
+  assert.equal(parsed.rows.length, 22, 'the roster is 22 bindings-table rows');
+  const skillBacked = parsed.rows.filter((row) => row.cells.some((c) => c.includes('SKILL.md')));
+  assert.equal(skillBacked.length, 21, '21 skill-backed roles');
+  assert.equal(parsed.rows.length - skillBacked.length, 1, '+ 1 mapping role');
+
+  const byName = (a, b) => a.localeCompare(b);
+  const split = parsed.tokens.map((token) => splitTieredToken(token));
+  const families = [...new Set(split.filter((s) => s.tier).map((s) => s.base))].sort(byName);
+  assert.deepEqual(families, [...FAMILIES].sort(byName), 'AGENTS.md family set drifted');
+  const untiered = split.filter((s) => !s.tier).map((s) => s.base).sort(byName);
+  assert.deepEqual(untiered, [...UNTIERED, 'fabricate_pr_explorer'].sort(byName));
+
+  // Every declared family is complete against the real AGENTS.md, Family table included.
+  assert.deepEqual(
+    familyCompletenessErrors({ tokens: parsed.tokens, hasSkill, agentsMdText: AGENTS_MD }),
+    []
+  );
+});
+
+// --- 14. main() is actually wired to its gates ------------------------------
+// The gates are unit-covered above; this drives `main(root)` over an on-disk fixture
+// so a DELETED call site fails, not just a broken gate.
+
+const fixtureDescription = (tier) => `A ${tier} scoped fixture lane.`;
+
+/** Write the whole provider tree implied by a bindings table, plus AGENTS.md. */
+function seedRepo(write, bindingsMd) {
+  write(
+    'AGENTS.md',
+    `${bindingsMd}\n\n### Shared skills with no persona binding\n\nNone in this fixture.\n`
+  );
+  for (const row of parseBindingsTable(bindingsMd).rows) {
+    const { token } = row;
+    const roleBase = fileForm(token);
+    const { base, tier } = splitTieredToken(token);
+    const declaredTier = tier ?? UNTIERED_ROLE_TIERS[token];
+    const modelPins = TIER_MODELS[declaredTier];
+    const description = fixtureDescription(declaredTier);
+    const codex = codexBinding({
+      token,
+      model: modelPins.codexModel,
+      effort: modelPins.codexReasoningEffort,
+      description,
+    });
+
+    // Mapping role: Codex-only, read-only sandbox, no shared skill.
+    if (!row.cells.some((c) => c.includes('SKILL.md'))) {
+      write(
+        `.codex/agents/${roleBase}.toml`,
+        codex.replace('danger-full-access', 'read-only') + '\n'
+      );
+      continue;
+    }
+
+    const skillDir = fileForm(base);
+    const skillPath = `.agents/skills/${skillDir}/SKILL.md`;
+    write(
+      skillPath,
+      [
+        '---',
+        `name: ${skillDir}`,
+        `description: Fixture persona for the ${skillDir} role.`,
+        '---',
+        '',
+        '# Fixture persona',
+      ].join('\n')
+    );
+    write(`.codex/agents/${roleBase}.toml`, `${codex}\n# persona: \`${skillPath}\`\n`);
+    const claude = claudeBinding({ token, model: modelPins.claude, description });
+    write(`.claude/agents/${roleBase}.md`, `${claude}\n\nRead \`${skillPath}\`.\n`);
+  }
+}
+
+/** Seed a temp repo, optionally damage it, and return `main`'s accumulated errors. */
+function runValidator({ bindingsMd = agentsMd(), damage } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'fabricate-agent-bindings-'));
+  const write = (rel, text) => {
+    const abs = join(root, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, text, 'utf8');
+  };
+  const append = (rel, text) => write(rel, `${readFileSync(join(root, rel), 'utf8')}${text}`);
+  try {
+    seedRepo(write, bindingsMd);
+    damage?.({ write, append });
+    return main(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test('14. main() reports each seeded defect, so no gate call site can be deleted', () => {
+  assert.deepEqual(runValidator(), [], 'the clean fixture must produce no errors');
+
+  const cases = [
+    {
+      name: 'modelPinErrors for a skill-backed role',
+      expected: /pins model: opus, model tier small requires haiku/,
+      damage: ({ write }) =>
+        write(
+          '.claude/agents/fabricate-implementer-small.md',
+          `${claudeBinding({
+            token: 'fabricate_implementer_small',
+            model: 'opus',
+            description: fixtureDescription('small'),
+          })}\n\nRead \`.agents/skills/fabricate-implementer/SKILL.md\`.\n`
+        ),
+    },
+    {
+      name: 'the mapping role pin',
+      expected: /fabricate-pr-explorer\.toml: pins model gpt-5\.6-sol, must be gpt-5\.6-luna/,
+      damage: ({ write }) =>
+        write(
+          '.codex/agents/fabricate-pr-explorer.toml',
+          codexBinding({
+            token: 'fabricate_pr_explorer',
+            model: 'gpt-5.6-sol',
+            effort: 'low',
+            description: 'Map.',
+          }).replace('danger-full-access', 'read-only') + '\n'
+        ),
+    },
+    {
+      name: 'validateToolParity',
+      expected: /must allow Edit and Write to match/,
+      damage: ({ write }) =>
+        write(
+          '.claude/agents/fabricate-implementer-small.md',
+          [
+            '---',
+            'name: fabricate-implementer-small',
+            `description: ${fixtureDescription('small')}`,
+            'tools: Read, Grep, Glob',
+            'model: haiku',
+            '---',
+            '',
+            'Read `.agents/skills/fabricate-implementer/SKILL.md`.',
+          ].join('\n')
+        ),
+    },
+    {
+      name: 'validateHarnessDocs path existence',
+      expected: /AGENTS\.md: references missing path `src\/nowhere\/absent\.js`/,
+      damage: ({ append }) => append('AGENTS.md', '\nSee `src/nowhere/absent.js`.\n'),
+    },
+    {
+      name: 'validateSkills frontmatter',
+      expected: /frontmatter name must match its directory \(fabricate-implementer\)/,
+      damage: ({ write }) =>
+        write(
+          '.agents/skills/fabricate-implementer/SKILL.md',
+          ['---', 'name: wrong-name', 'description: Fixture persona.', '---', '', 'body'].join('\n')
+        ),
+    },
+    {
+      name: 'familyCompletenessErrors',
+      expected: /fabricate_implementer: model-tiered family is missing large/,
+      bindingsMd: agentsMd({ bindings: { tiers: ['small', 'medium'] } }),
+    },
+    {
+      name: 'the Family table gate (agentsMdText reaches familyCompletenessErrors)',
+      expected: /missing the Family to model tiers table/,
+      bindingsMd: bindingsTable(),
+    },
+    {
+      name: 'the hyphenated-token skipped report',
+      expected: /`fabricate-implementer-small` is not a bare/,
+      bindingsMd: agentsMd().replace(
+        '|---|---|---|---|',
+        '|---|---|---|---|\n' +
+          '| `fabricate-implementer-small` | `.agents/skills/fabricate-implementer/SKILL.md` ' +
+          '| `.codex/agents/fabricate-implementer-small.toml` | `fabricate-implementer-small` |'
+      ),
+    },
+  ];
+
+  for (const { name, expected, ...options } of cases) {
+    const errors = runValidator(options);
+    assert.ok(
+      errors.some((e) => expected.test(e)),
+      `${name}: no error matched ${expected}. Got:\n${errors.join('\n')}`
+    );
+  }
+});
+
+// --- 15. Rule 5 needs EXACTLY one path --------------------------------------
+
+test('15. a 2-path spawn at or below SMALL_MAX resolves to medium via rule 6, not small', () => {
+  // The Design's own case: a module plus its co-located test is one concern, and it
+  // is deliberately medium rather than small.
+  const pair = selectModelTier({
+    stage: 'implementation',
+    paths: ['src/systems/dnd5e.js', 'tests/systems/dnd5e.test.js'],
+    sizeMetric: STAGE_THRESHOLDS.implementation.smallMax,
+    ruleTwoSource: 'none',
+  });
+  assert.deepEqual([pair.rule, pair.tier], [6, 'medium']);
+
+  // The same facts with exactly one path DO reach rule 5, so the guard is what differs.
+  const single = selectModelTier({
+    stage: 'implementation',
+    paths: ['src/systems/dnd5e.js'],
+    sizeMetric: STAGE_THRESHOLDS.implementation.smallMax,
+    ruleTwoSource: 'none',
+  });
+  assert.deepEqual([single.rule, single.tier], [5, 'small']);
+});
+
+// --- 16. `skipped` is actually populated ------------------------------------
+
+test('16. a hyphenated model-tier token cell is reported as skipped, never parsed as a row', () => {
+  const withHyphenated = agentsMd().replace(
+    '|---|---|---|---|',
+    '|---|---|---|---|\n' +
+      '| `fabricate-implementer-small` | `.agents/skills/fabricate-implementer/SKILL.md` ' +
+      '| `.codex/agents/fabricate-implementer-small.toml` | `fabricate-implementer-small` |'
+  );
+  const parsed = parseBindingsTable(withHyphenated);
+  assert.deepEqual(parsed.skipped, ['`fabricate-implementer-small`']);
+  // It is genuinely invisible to every downstream gate — the row count is unchanged.
+  assert.equal(parsed.rows.length, 22);
+  assert.ok(!parsed.tokens.includes('fabricate-implementer-small'));
+});
+
+// --- 17. The Claude side of the pin gate is symmetric with the Codex side ----
+
+test('17. a superstring Claude pin and a missing tiered description both error', () => {
+  const superstring = modelPinErrors(bindingPair('small', { claudeModel: 'haiku-preview' }));
+  assert.equal(superstring.length, 1);
+  assert.match(superstring[0], /pins model: haiku-preview, model tier small requires haiku/);
+
+  const noDescription = modelPinErrors({
+    token: 'fabricate_implementer_small',
+    tier: 'small',
+    claudePath: '.claude/agents/fabricate-implementer-small.md',
+    claudeText: [
+      '---',
+      'name: fabricate-implementer-small',
+      'tools: Read, Grep, Glob, Edit, Write, Bash',
+      'model: haiku',
+      '---',
+      '',
+      'body',
+    ].join('\n'),
+  });
+  assert.deepEqual(noDescription, [
+    '.claude/agents/fabricate-implementer-small.md: must declare a description',
+  ]);
+});
+
+// --- 18. Codex block-form descriptions are read --------------------------------
+
+test('18. a TOML block description is parsed, not shadowed by the single-line pattern', () => {
+  const blockCodex = (body) =>
+    [
+      'name = "fabricate_implementer_small"',
+      'description = """',
+      body,
+      '"""',
+      'model = "gpt-5.6-luna"',
+      'model_reasoning_effort = "low"',
+      'sandbox_mode = "danger-full-access"',
+    ].join('\n');
+  const binding = (body) => ({
+    token: 'fabricate_implementer_small',
+    tier: 'small',
+    codexPath: '.codex/agents/fabricate-implementer-small.toml',
+    codexText: blockCodex(body),
+  });
+
+  assert.deepEqual(modelPinErrors(binding('A small scoped lane.')), []);
+
+  // The discriminating case: the single-line pattern also matches the `"""` opener and
+  // captures a lone quote, so before the block form was tried first this description
+  // read as `"` — naming no model tier at all, and the "must not name" half never fired.
+  const wrongTier = modelPinErrors(binding('A large scoped lane.'));
+  assert.equal(wrongTier.length, 2);
+  assert.match(wrongTier[0], /must name its own model tier \(small\)/);
+  assert.match(wrongTier[1], /must not name model tier large/);
 });
