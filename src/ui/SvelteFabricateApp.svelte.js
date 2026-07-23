@@ -267,6 +267,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // globals; these wrappers are the single Foundry-facing edge.
       listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
       advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
+      cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
       getWorldTimeComponents: (worldTime) =>
         game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,

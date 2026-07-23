@@ -89,8 +89,8 @@ const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
 
 /**
  * Ordered keys of the custom currency macro set (`requirements.currency.macros`). `canAfford` gates
- * the craft and `decrement` performs the spend; `increment` is reserved for a future refund flow
- * and is never invoked. Used by the normalizer and the macro spender to iterate the macro slots.
+ * the craft, `decrement` performs the spend, and `increment` performs the refund on a player-cancel
+ * reversal (issue 848). Used by the normalizer and the macro spender to iterate the macro slots.
  *
  * @type {string[]}
  */
@@ -347,8 +347,9 @@ function buildUnitResolver(byId, errors) {
 }
 
 // Macro spending drives the craft through GM macros, so the engine must be able to gate
-// (canAfford) and deduct (decrement); both are required. `increment` is reserved for a future
-// refund flow and stays optional.
+// (canAfford) and deduct (decrement); both are required. `increment` performs the player-cancel
+// refund (issue 848) and stays OPTIONAL — a system with no increment macro simply cannot refund a
+// macro-mode cancel (the reversal reports the failure rather than aborting).
 function collectMacroConfigErrors(macros, errors) {
   const safeMacros = macros && typeof macros === 'object' ? macros : {};
   if (!String(safeMacros.canAfford || '').trim()) {
@@ -609,6 +610,48 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
   return {
     valid: true,
     updates,
+    formatted: formatCurrencyRequirement(requirement, profile.units),
+  };
+}
+
+/**
+ * Compute the batched `actor.update(...)` payload that REFUNDS a currency requirement under the
+ * `actorProperty` strategy — the exact inverse of {@link buildCurrencySpendUpdates}. A refund makes
+ * no change: it simply adds `amount` of the requirement's own denomination back to the actor's
+ * held balance, so a `5 gp` spend refunds `5 gp` (net base-value neutral even if the original spend
+ * had to break higher coins for change). Used by the player-cancel reversal (issue 848) and shared
+ * with the GM cancel/reverse (issue 847).
+ *
+ * @param {object} actor
+ * @param {{ unit: string, amount: number }} requirement
+ * @param {object[]} [units]
+ * @returns {{ valid: boolean, message?: string, updates?: object, formatted?: string }}
+ */
+export function buildCurrencyRefundUpdates(actor, requirement, units = []) {
+  const profile = validateCurrencyProfile(units);
+  if (!profile.valid) {
+    return {
+      valid: false,
+      message: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
+    };
+  }
+  const unit = findCurrencyUnit(profile.units, requirement?.unit);
+  if (!unit) {
+    return {
+      valid: false,
+      message: `Currency unit "${requirement?.unit || ''}" is not configured.`,
+    };
+  }
+  const amount = Math.max(0, Math.trunc(Number(requirement?.amount || 0)));
+  if (amount <= 0) return { valid: true, updates: {} };
+
+  const balanceResult = readCurrencyBalances(actor, profile.units);
+  if (!balanceResult.valid) return { valid: false, message: balanceResult.message };
+
+  const current = balanceResult.balances.get(unit.id) || 0;
+  return {
+    valid: true,
+    updates: { [unit.actorPath]: current + amount },
     formatted: formatCurrencyRequirement(requirement, profile.units),
   };
 }

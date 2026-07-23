@@ -31,6 +31,7 @@ import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
+  refundCurrencySpends,
   spendCurrencySpends,
 } from './currencyAffordance.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
@@ -2193,6 +2194,279 @@ export class CraftingEngine {
     } catch (error) {
       console.error('Fabricate | Currency deduction error', error);
     }
+  }
+
+  /**
+   * Refund the currency that a craft spent at START — the inverse of
+   * {@link _spendCraftCurrency}. A failure is logged (never thrown) so a cancel that
+   * cannot refund currency still removes the run. Shared by the player-cancel path
+   * (issue 848) and reusable by the GM cancel/reverse (issue 847).
+   * @private
+   */
+  async _refundCraftCurrency(craftingActor, recipe, currencySpends) {
+    if (!currencySpends?.length) return { valid: true };
+    try {
+      const result = await refundCurrencySpends(
+        craftingActor,
+        recipe,
+        currencySpends,
+        this._currencySeams()
+      );
+      if (!result?.valid) {
+        console.error('Fabricate | Currency refund reported failure', result?.message);
+      }
+      return result;
+    } catch (error) {
+      console.error('Fabricate | Currency refund error', error);
+      return { valid: false };
+    }
+  }
+
+  /**
+   * Recreate a single consumed component's item back on an actor (issue 848). Mirrors
+   * the crafted-output creation path ({@link _createSingleResult}): the component is
+   * resolved from the recipe's crafting system and its `registeredItemUuid` source item
+   * is cloned, the quantity is set, and the durable per-system component identity is
+   * stamped so the restored item resolves to its OWN component. When no component/source
+   * resolves, a lightweight item is built from the consume-time name/img snapshot so the
+   * player still gets a stand-in back rather than nothing.
+   * @private
+   * @returns {Promise<object|null>} the created item, or null when creation is impossible
+   */
+  async _restoreComponentItem({ actor, system, componentId, quantity, name, img }) {
+    if (!actor || typeof actor.createEmbeddedDocuments !== 'function') return null;
+    const qty = Math.max(0, Math.trunc(Number(quantity) || 0));
+    if (qty <= 0) return null;
+
+    const component = (system?.components || []).find((entry) => entry.id === componentId) || null;
+    let sourceItem = null;
+    if (component?.registeredItemUuid) {
+      try {
+        sourceItem = (await fromUuid(component.registeredItemUuid)) ?? null;
+      } catch {
+        sourceItem = null;
+      }
+    }
+
+    let itemData;
+    if (sourceItem) {
+      itemData = sourceItem.toObject();
+    } else if (component) {
+      itemData = {
+        name: component.name || name || 'Restored Item',
+        img: component.img || img || 'icons/svg/item-bag.svg',
+        type: 'loot',
+        system: {},
+      };
+    } else if (name) {
+      // No managed component to resolve (e.g. an unmanaged submission): rebuild a
+      // stand-in from the consume-time snapshot so nothing is silently lost.
+      itemData = { name, img: img || 'icons/svg/item-bag.svg', type: 'loot', system: {} };
+    } else {
+      return null;
+    }
+
+    itemData.system ??= {};
+    itemData.system.quantity = qty;
+    if (component?.id) {
+      stampCraftedComponentIdentity(itemData, system?.id, component.id);
+    }
+    const [created] = await actor.createEmbeddedDocuments('Item', [itemData]);
+    return created ?? null;
+  }
+
+  /**
+   * Restore every consumed ingredient captured in a step's START-phase snapshot back
+   * onto its source actor (issue 848). Each `consumedSummary` entry carries the
+   * source `actorUuid`, `componentId`, `quantity`, and the consume-time `name`/`img`;
+   * the item is recreated on the resolved source actor (falling back to the crafting
+   * actor when the source actor no longer resolves).
+   * @private
+   * @returns {Promise<object[]>} the restored items
+   */
+  async _restoreConsumedIngredients(craftingActor, systemId, consumedSummary = []) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId) || null;
+    const restored = [];
+    let failures = 0;
+    for (const entry of Array.isArray(consumedSummary) ? consumedSummary : []) {
+      // Best-effort per entry: a create that throws (permission, invalid item type)
+      // must NOT abort the reversal or propagate out of cancelCraft — otherwise the
+      // run would stay active and re-cancelling it would double-restore the entries
+      // that already succeeded. Record the failure and continue.
+      // A degenerate zero-quantity entry is nothing to restore, not a failure.
+      const qty = Math.max(0, Math.trunc(Number(entry?.quantity) || 0));
+      if (qty <= 0) continue;
+      try {
+        const targetActor = this._resolveRestoreActor(craftingActor, entry?.actorUuid);
+        const item = await this._restoreComponentItem({
+          actor: targetActor,
+          system,
+          componentId: entry?.componentId ?? null,
+          quantity: qty,
+          name: entry?.name ?? null,
+          img: entry?.img ?? null,
+        });
+        if (item) restored.push(item);
+        else failures += 1;
+      } catch (error) {
+        console.error('Fabricate | Failed to restore a cancelled craft ingredient:', error);
+        failures += 1;
+      }
+    }
+    return { restored, failures };
+  }
+
+  /**
+   * Resolve the actor a consumed ingredient should be restored to: the recorded
+   * source actor uuid, or the crafting actor when it no longer resolves.
+   * @private
+   */
+  _resolveRestoreActor(craftingActor, actorUuid) {
+    if (actorUuid && typeof globalThis.fromUuidSync === 'function') {
+      try {
+        const resolved = globalThis.fromUuidSync(actorUuid);
+        if (resolved) return resolved;
+      } catch {
+        /* fall through to crafting actor */
+      }
+    }
+    return craftingActor;
+  }
+
+  /**
+   * Reverse the START-phase consumption of an in-progress run — restore the consumed
+   * ingredients and refund the spent currency for every step that was CONSUMED but not
+   * yet resolved (a succeeded/failed step already produced its outcome and is left
+   * untouched). This is the shared "un-consume" primitive: the player self-cancel path
+   * (issue 848) calls it, and the GM cancel/reverse (issue 847) can reuse it. It never
+   * touches the run record itself, so callers own removing/archiving the run.
+   *
+   * The restore is best-effort: {@link _restoreConsumedIngredients} catches per-entry
+   * failures (so a throw can never propagate out of a cancel and strand the run active),
+   * and the returned `ok` reports whether the reversal was COMPLETE — every consumed
+   * ingredient restored AND every attempted currency refund succeeded — so the caller can
+   * report the truthful outcome rather than the refund policy's intent.
+   *
+   * @param {Actor} craftingActor
+   * @param {object} run The active run whose consumption should be reversed.
+   * @returns {Promise<{ restored: object[], restoreFailures: number,
+   *   currencyAttempted: boolean, currencyRefunded: boolean, ok: boolean }>}
+   */
+  async reverseRunConsumption(craftingActor, run) {
+    const restored = [];
+    let restoreFailures = 0;
+    let currencyAttempted = false;
+    let currencyRefunded = true;
+    const recipe = this.recipeManager?.getRecipe?.(run?.recipeId) ?? {
+      craftingSystemId: run?.craftingSystemId ?? null,
+    };
+    const steps = Array.isArray(run?.steps) ? run.steps : [];
+    for (const step of steps) {
+      const prepared = step?.preparedConsumption;
+      // Only a consumed-but-not-produced step holds recoverable inputs. A resolved
+      // step (succeeded/failed) already turned its inputs into an outcome.
+      if (!prepared || step.status === 'succeeded' || step.status === 'failed') continue;
+      const outcome = await this._restoreConsumedIngredients(
+        craftingActor,
+        run?.craftingSystemId,
+        prepared.consumedSummary
+      );
+      restored.push(...outcome.restored);
+      restoreFailures += outcome.failures;
+      if (Array.isArray(prepared.currencySpends) && prepared.currencySpends.length > 0) {
+        currencyAttempted = true;
+        const refund = await this._refundCraftCurrency(
+          craftingActor,
+          recipe,
+          prepared.currencySpends
+        );
+        // Any failed refund makes the whole reversal incomplete (fail-closed on truth).
+        if (refund?.valid !== true) currencyRefunded = false;
+      }
+    }
+    // A refund that was never attempted is not a failure; the reversal is complete only
+    // when nothing failed to restore and no attempted currency refund reported failure.
+    const ok = restoreFailures === 0 && (!currencyAttempted || currencyRefunded);
+    return { restored, restoreFailures, currencyAttempted, currencyRefunded, ok };
+  }
+
+  /**
+   * Cancel a player's in-progress craft (issue 848). Owner-scoped: the craft engine
+   * writes items directly with no GM relay, so a player may cancel only a run on an
+   * OWNED actor. Semantics: remove the in-progress run (archived as `cancelled`),
+   * produce NOTHING, discard any rolled check outcome, and — when the system's
+   * `features.refundOnPlayerCancel` flag is on (default) — reverse the START-phase
+   * consumption via {@link reverseRunConsumption}, restoring ingredients and refunding
+   * currency. With the flag off, the inputs are forfeit and only the run is removed.
+   * The recipe becomes craftable again either way.
+   *
+   * @param {Actor} craftingActor
+   * @param {Actor[]} componentSourceActors Unused directly (restore targets resolve
+   *   from each consumed entry's recorded source actor), accepted for signature
+   *   parity with {@link craft}/the advance boundary.
+   * @param {string} runId
+   * @param {{ refund?: boolean }} [options] `refund` overrides the system flag (tests).
+   * @returns {Promise<{ success: boolean, cancelled?: boolean, refunded?: boolean,
+   *   partialRefund?: boolean, restoredCount?: number, message?: string }>}
+   */
+  async cancelCraft(craftingActor, componentSourceActors, runId, options = {}) {
+    // Owner scope: refuse a cancel on an actor the caller demonstrably does not own.
+    // The advance/cancel edge already guards via resolveAdvanceSources; this is a
+    // defensive fail-closed for a non-owner reaching the engine directly.
+    if (craftingActor?.isOwner === false) {
+      return { success: false, message: 'You must own this character to cancel its craft.' };
+    }
+    const runManager = this.craftingRunManager || game.fabricate?.getCraftingRunManager?.();
+    if (!runManager) {
+      return { success: false, message: 'Crafting runs are not available.' };
+    }
+    const run = runManager.getActiveRun(craftingActor, runId);
+    if (!run) {
+      return { success: false, message: 'There is no in-progress craft to cancel.' };
+    }
+
+    const refundIntended = this._shouldRefundOnCancel(run, options);
+    let restoredCount = 0;
+    let reversalOk = true;
+    let partialRefund = false;
+    try {
+      if (refundIntended) {
+        const reversal = await this.reverseRunConsumption(craftingActor, run);
+        restoredCount = reversal.restored.length;
+        reversalOk = reversal.ok;
+        // A partial reversal (some inputs back, some lost) is worth flagging distinctly
+        // from a total failure so callers can message honestly.
+        partialRefund = !reversal.ok && (reversal.restored.length > 0 || reversal.currencyRefunded);
+      }
+    } finally {
+      // Always archive the run, even if the reversal threw or partially failed, so the
+      // run can never be re-cancelled (which would double-restore the succeeded entries).
+      await runManager.cancelRun(craftingActor, runId);
+    }
+
+    // Report the ACTUAL outcome, not the policy intent: `refunded` is true only when a
+    // refund was intended AND the reversal completed fully.
+    return {
+      success: true,
+      cancelled: true,
+      refunded: refundIntended && reversalOk,
+      partialRefund,
+      restoredCount,
+    };
+  }
+
+  /**
+   * Whether a player cancel should refund the consumed inputs. An explicit
+   * `options.refund` boolean wins (tests / callers); otherwise the owning system's
+   * `features.refundOnPlayerCancel` flag decides, defaulting ON (an explicit `false`
+   * is honoured), mirroring the `features.salvage` default-on toggle.
+   * @private
+   */
+  _shouldRefundOnCancel(run, options = {}) {
+    if (typeof options.refund === 'boolean') return options.refund;
+    const system = game.fabricate?.getCraftingSystemManager?.()?.getSystem?.(run?.craftingSystemId);
+    return system?.features?.refundOnPlayerCancel !== false;
   }
 
   /**

@@ -57,7 +57,7 @@ function baseListing(overrides = {}) {
 }
 
 function makeServices(overrides = {}) {
-  const calls = { list: 0, advance: [], notify: [] };
+  const calls = { list: 0, advance: [], cancel: [], notify: [] };
   const state = { listing: overrides.listing ?? baseListing() };
   const services = {
     getWorldTime: () => overrides.worldTime ?? 200,
@@ -69,6 +69,10 @@ function makeServices(overrides = {}) {
     advanceCraftingRun: async (args) => {
       calls.advance.push(args);
       return overrides.advanceResult ?? { success: true, message: 'Done' };
+    },
+    cancelCraftingRun: async (args) => {
+      calls.cancel.push(args);
+      return overrides.cancelResult ?? { success: true, cancelled: true, message: 'Craft cancelled.' };
     },
     notify: (message) => calls.notify.push(message)
   };
@@ -186,6 +190,23 @@ describe('journalStore', () => {
     // A cancel is a user choice, not a failure: no error notification, no refetch.
     assert.deepEqual(setup.calls.notify, [], 'no notification on cancel');
     assert.equal(setup.calls.list, 1, 'listing NOT refetched after a cancel');
+    assert.equal(store.busyRunId, '', 'busy flag cleared');
+  });
+
+  it('cancel routes to cancelCraftingRun, notifies, clears selection, and refetches', async () => {
+    const setup = makeServices();
+    const store = await loadedStore(setup);
+    store.select('b');
+    flushSync();
+    assert.equal(store.selectedRunId, 'b');
+
+    await store.cancel({ id: 'b' });
+    flushSync();
+
+    assert.deepEqual(setup.calls.cancel, [{ actorId: 'actor-1', runId: 'b' }]);
+    assert.deepEqual(setup.calls.notify, ['Craft cancelled.']);
+    assert.equal(store.selectedRunId, '', 'the cancelled run is deselected');
+    assert.equal(setup.calls.list, 2, 'refetched after cancel');
     assert.equal(store.busyRunId, '', 'busy flag cleared');
   });
 
