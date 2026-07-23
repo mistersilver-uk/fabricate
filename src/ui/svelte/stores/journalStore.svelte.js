@@ -8,7 +8,7 @@ const RECENT_TERMINAL_LIMIT = 3;
  * Mirrors {@link createActorBarStore}: the factory is plain and never touches
  * Foundry globals (`game`/`ui`/`Hooks`). All data and side effects go through the
  * injected `services` bag (`listJournalForActor`, `advanceCraftingRun`,
- * `getWorldTime`, `getSelectedActorId`, `notify`), preserving the
+ * `cancelCraftingRun`, `getWorldTime`, `getSelectedActorId`, `notify`), preserving the
  * presentational-component boundary. Re-fetch effects (actor change, scene
  * change, `updateWorldTime`) live in the hosting view, not here.
  *
@@ -161,6 +161,35 @@ export function createJournalStore({ services } = {}) {
     }
   }
 
+  /**
+   * Cancel a player's in-progress crafting run (issue 848). Guards re-entrancy via
+   * `busyRunId` (shared with {@link advance} so a run can't be advanced and cancelled
+   * at once), surfaces the engine result message, clears the selection when the
+   * cancelled run was selected, then quietly re-fetches so the run leaves the active
+   * list. Threads the loaded listing's `selectedActorId` so the Foundry edge resolves
+   * the crafting actor (and its ownership guard) — without it the cancel returns
+   * NeedsOwner.
+   *
+   * @param {object} run The crafting RunModel to cancel.
+   * @returns {Promise<void>}
+   */
+  async function cancel(run) {
+    if (!run?.id || busyRunId) return;
+    busyRunId = run.id;
+    try {
+      const result = await services?.cancelCraftingRun?.({
+        actorId: listing?.selectedActorId ?? null,
+        runId: run.id,
+      });
+      const message = result?.message;
+      if (message) services?.notify?.(message);
+      if (selectedRunId === run.id) selectedRunId = '';
+      await load(true);
+    } finally {
+      busyRunId = '';
+    }
+  }
+
   function tickWorldTime() {
     worldTimeTick += 1;
   }
@@ -230,6 +259,7 @@ export function createJournalStore({ services } = {}) {
     setHistoryPage,
     setHistoryPageSize,
     advance,
+    cancel,
     tickWorldTime,
   };
 }

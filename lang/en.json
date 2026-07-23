@@ -829,7 +829,16 @@
           "FinishHint": "Resolve this run's final crafting check.",
           "AutoResolve": "Resolves automatically when the world time advances.",
           "WaitingHint": "Waiting for enough world time to pass before the next step can be triggered.",
-          "NeedsOwner": "You must own the source character (or ask your GM) to advance this run."
+          "NeedsOwner": "You must own the source character (or ask your GM) to advance this run.",
+          "CancelCraft": "Cancel craft",
+          "CancelConfirm": "Cancel this craft?",
+          "CancelConfirmRefund": "The consumed ingredients and currency will be returned.",
+          "CancelConfirmForfeit": "The consumed ingredients and currency will not be returned.",
+          "CancelConfirmYes": "Yes, cancel",
+          "CancelKeep": "Keep crafting",
+          "Cancelled": "Craft cancelled.",
+          "CancelledRefunded": "Craft cancelled; ingredients and currency returned.",
+          "CancelledPartial": "Craft cancelled; some ingredients or currency could not be returned."
         }
       },
       "Gathering": {
@@ -1449,6 +1458,7 @@
             "OutcomeRouting": "Enables routed outcome configuration where supported.",
             "EffectTransfer": "Allows crafted results to inherit effects from source components.",
             "ChatOutput": "Posts a summary chat card after crafting and gathering attempts.",
+            "RefundOnPlayerCancel": "Returns consumed ingredients and spent currency when a player cancels their in-progress craft. Turn off to forfeit inputs on cancel.",
             "Currency": "Enables the currency configuration for this system.",
             "Time": "Enables recipe and step duration (time requirement) authoring, and applies those durations when crafting."
           }
@@ -3556,6 +3566,7 @@
           "EffectTransfer": "Effect transfer",
           "PropertyMacros": "Property macros",
           "ChatOutput": "Chat output",
+          "RefundOnPlayerCancel": "Refund on player cancel",
           "Currency": "Currency",
           "Time": "Time requirements"
         },

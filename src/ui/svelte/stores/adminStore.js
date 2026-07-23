@@ -114,6 +114,7 @@ const FEATURE_MAP = {
   gathering: 'gathering',
   chatOutput: 'chatOutput',
   salvage: 'salvage',
+  refundOnPlayerCancel: 'refundOnPlayerCancel',
 };
 
 const RESOLUTION_MODE_LABEL_KEYS = {
@@ -2282,6 +2283,9 @@ function _buildSelectedSystemViewData(
       effectTransfer: selectedSystem.features?.effectTransfer === true,
       gathering: selectedSystem.features?.gathering === true,
       salvage: selectedSystem.features?.salvage === true,
+      // Default-ON policy flag (issue 848): an explicit false forfeits inputs on a
+      // player cancel; anything else (incl. a legacy system missing the key) refunds.
+      refundOnPlayerCancel: selectedSystem.features?.refundOnPlayerCancel !== false,
     },
 
     categories: selectedSystem.categories || [],

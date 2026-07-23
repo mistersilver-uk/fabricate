@@ -298,3 +298,57 @@ export async function spendCurrencySpends(craftingActor, recipe, currencySpends,
   }
   return { valid: true };
 }
+
+/**
+ * Async REFUND over previously spent `currencySpends`, aggregated cross-unit — the inverse of
+ * {@link spendCurrencySpends}. Used by the player-cancel reversal (issue 848) and shared with the
+ * GM cancel/reverse (issue 847) so the un-spend logic is defined once. Each aggregated group is
+ * handed back in its representative denomination, so the actor's total base value is restored. A
+ * mid-loop refund failure is logged; the first hard failure surfaces its message. Returns
+ * `{ valid: true }` when currency is disabled or there is nothing to refund.
+ *
+ * @returns {Promise<{ valid: boolean, message?: string }>}
+ */
+export async function refundCurrencySpends(craftingActor, recipe, currencySpends, seams = {}) {
+  if (!currencySpends?.length) return { valid: true };
+  const context = resolveCurrencyContext(recipe, seams);
+  if (!context.enabled) return { valid: true };
+  if (context.error) return { valid: false, message: context.error };
+  const { profile, config, spender } = context;
+  if (!spender?.refund) {
+    return { valid: false, message: 'Currency refund is not available on this actor.' };
+  }
+
+  for (const group of aggregateCurrencySpends(currencySpends, profile)) {
+    const ctx = buildSpendContext({
+      profile,
+      unit: group.unit,
+      amount: group.amount,
+      recipe,
+      config,
+    });
+    ctx.macroContext.actor = craftingActor;
+    try {
+      const result = await spender.refund(
+        craftingActor,
+        { unit: group.unit, amount: group.amount },
+        ctx
+      );
+      if (!result?.valid) {
+        return {
+          valid: false,
+          message:
+            result?.message ||
+            `Could not refund currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`,
+        };
+      }
+    } catch (error) {
+      console.error('Fabricate | Failed to refund currency', error);
+      return {
+        valid: false,
+        message: `Could not refund currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`,
+      };
+    }
+  }
+  return { valid: true };
+}

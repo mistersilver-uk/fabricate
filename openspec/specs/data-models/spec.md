@@ -49,6 +49,7 @@ CraftingSystem = {
     gathering: boolean, // default false
     salvage: boolean, // default true (absent key defaults on for backward compatibility; an explicit false is honoured)
     chatOutput: boolean, // default true; gates the crafting, salvage, and gathering result chat cards
+    refundOnPlayerCancel: boolean, // default true (absent key defaults on; an explicit false is honoured); when a player cancels an in-progress craft, ON restores the consumed ingredients + refunds the spent currency, OFF forfeits them
     itemPiles: boolean, // default false; the Item Piles integration toggle referenced by integrations/spec.md
   },
 
@@ -360,7 +361,8 @@ When no adapter is registered for the active system, the spend fails loudly with
     - `"macro"` drives currency through GM-supplied macros.
 Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`.
 A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
-The `increment` macro is configured and validated but reserved for a future refund flow — it is never invoked.
+The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
+It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
 The macro strategy is GM-only config with no separate feature flag (matching the property macros).
     - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
 20. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
@@ -1717,8 +1719,15 @@ RunModel = {
   createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
   createdResultCount: number,
   manualAdvance: boolean,                // true only for non-redacted crafting (the Trigger Next Step gate)
+  canCancel: boolean,                    // crafting only: true when the run is live (non-terminal), discovered (non-redacted), and the viewer OWNS the actor — a player may self-cancel only their own in-progress craft
+  refundOnCancel: boolean,               // mirrors the system's features.refundOnPlayerCancel (default true), so the cancel affordance can tell the player whether inputs will be returned
 }
 ```
+
+A **player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
+It is owner-scoped with no GM relay (the engine writes items directly), so the cancel edge blocks a non-owner exactly as the advance edge does.
+When the system's `features.refundOnPlayerCancel` policy is on (default), the reversal restores each consumed ingredient onto its recorded source actor and refunds the spent currency (the shared "un-consume" primitive, reused by the GM cancel/reverse); when off, the inputs are forfeit.
+The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
 
 ### StepModel
 
