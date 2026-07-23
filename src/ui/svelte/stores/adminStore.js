@@ -2005,8 +2005,9 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
 function _stableStringify(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(_stableStringify).join(',')}]`;
-  const keys = Object.keys(value).sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${_stableStringify(value[k])}`).join(',')}}`;
+  const keys = Object.keys(value).sort((a, b) => a.localeCompare(b));
+  const entries = keys.map((k) => `${JSON.stringify(k)}:${_stableStringify(value[k])}`);
+  return `{${entries.join(',')}}`;
 }
 
 // Per-item memo signature. The card is `{ ...item, ...overrides }`, so it ships
@@ -2019,7 +2020,7 @@ function _stableStringify(value) {
 // essence name/icon per essence id (an essence-catalog edit is system-level).
 function _itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
   const essenceResolution = Object.keys(item?.essences || {})
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((id) => [id, essenceDefinitionById.get(id)?.name || id, essenceDefinitionById.get(id)?.icon]);
   return _stableStringify({
     item,
@@ -2048,11 +2049,7 @@ async function _buildItemCards(
   systemManager,
   selectedSystem,
   itemSearchTerm,
-  showTags,
-  showEssences,
-  essenceDefinitionById,
-  enrichToHtml,
-  cache
+  { showTags, showEssences, essenceDefinitionById, enrichToHtml, cache }
 ) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
@@ -5065,16 +5062,13 @@ export function createAdminStore(services) {
         (selectedSystemData?.essenceDefinitions || []).map((def) => [def.id, def])
       );
 
-      itemCards = await _buildItemCards(
-        systemManager,
-        selectedSystem,
-        get(itemSearch),
+      itemCards = await _buildItemCards(systemManager, selectedSystem, get(itemSearch), {
         showTags,
         showEssences,
         essenceDefinitionById,
-        services?.enrichToHtml,
-        itemCardCache
-      );
+        enrichToHtml: services?.enrichToHtml,
+        cache: itemCardCache,
+      });
     }
 
     const environmentState = await _buildEnvironmentState(selectedSystem);
