@@ -46,22 +46,50 @@
     if (item) onCreateFromItem(item);
   }
 
-  function breakageLabel(kind) {
-    return {
-      immune: text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune'),
-      breakable: text('FABRICATE.Admin.Manager.Tools.SummaryBreakable', 'Breakable'),
-      breakageChance: text('FABRICATE.Admin.Manager.Tools.SummaryChance', 'Break chance'),
-      diceExpression: text('FABRICATE.Admin.Manager.Tools.SummaryDice', 'Dice expression'),
-      limitedUses: text('FABRICATE.Admin.Manager.Tools.SummaryUses', 'Limited uses'),
-    }[kind];
+  function countLabel(count) {
+    return text(
+      count === 1
+        ? 'FABRICATE.Admin.Manager.Tools.ResultCountOne'
+        : 'FABRICATE.Admin.Manager.Tools.ResultCount',
+      count === 1 ? '{count} tool' : '{count} tools'
+    ).replace('{count}', String(count));
+  }
+
+  function breakageLabel(tool, kind) {
+    if (kind === 'immune') return text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune');
+    if (kind === 'breakable') return text('FABRICATE.Admin.Manager.Tools.SummaryCheckDriven', 'Roll to break');
+    if (kind === 'breakageChance') {
+      return text('FABRICATE.Admin.Manager.Tools.SummaryChanceValue', '{count}% break')
+        .replace('{count}', String(tool?.breakage?.breakageChance ?? 0));
+    }
+    if (kind === 'diceExpression') {
+      return text('FABRICATE.Admin.Manager.Tools.SummaryDiceValue', '{formula} roll')
+        .replace('{formula}', String(tool?.breakage?.formula || '—'));
+    }
+    const maxUses = Number(tool?.breakage?.maxUses);
+    if (Number.isInteger(maxUses) && maxUses > 0) {
+      return text('FABRICATE.Admin.Manager.Tools.SummaryUseCount', '{count} uses')
+        .replace('{count}', String(maxUses));
+    }
+    return text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
   }
 
   function onBreakLabel(kind) {
     return {
-      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy item'),
-      flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlag', 'Mark as broken'),
-      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with item'),
+      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroys', 'Destroys'),
+      flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakMarksBroken', 'Marks broken'),
+      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplaces', 'Replaces'),
     }[kind];
+  }
+
+  function authorityCaption() {
+    const key = breakageAuthority === 'checkDriven'
+      ? 'FABRICATE.Admin.Manager.Tools.AuthorityCheckDrivenCaption'
+      : 'FABRICATE.Admin.Manager.Tools.AuthorityToolSpecificCaption';
+    const fallback = breakageAuthority === 'checkDriven'
+      ? 'The active check decides breakage · applies to all {count}'
+      : 'Each Tool tracks its own breakage · applies to all {count}';
+    return text(key, fallback).replace('{count}', countLabel(tools.length));
   }
 </script>
 
@@ -69,10 +97,9 @@
   <section class="manager-inspector-card manager-tools-authority-card" data-manager-tools-authority>
     <div class="manager-tools-authority-heading">
       <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
-      <div><strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</strong><p>{text('FABRICATE.Admin.Manager.Tools.AuthorityHint', 'Set how every Tool in this system handles wear and breakage.')}</p></div>
+      <div><strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</strong></div>
       <span class="manager-chip is-neutral">{text('FABRICATE.Admin.Manager.Tools.AllTools', 'ALL TOOLS')}</span>
     </div>
-    <small class="manager-tools-authority-caption">{text('FABRICATE.Admin.Manager.Tools.AuthorityCaption', 'Applies to all {count} Tools').replace('{count}', String(tools.length))}</small>
     <div class="manager-tools-authority-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}>
       {#each ['toolSpecific', 'checkDriven'] as authority (authority)}
         <label class:is-selected={breakageAuthority === authority} data-tool-authority-segment={authority}>
@@ -92,22 +119,20 @@
         </label>
       {/each}
     </div>
+    <small class="manager-tools-authority-caption">{authorityCaption()}</small>
   </section>
 
   <section class="manager-tools-library-card" data-manager-tools-search>
-    <div class="manager-tools-library-toolbar">
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          value={searchTerm}
-          oninput={(event) => { searchTerm = event.currentTarget.value; pageIndex = 0; }}
-          placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
-          aria-label={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
-        />
-      </label>
-      <span class="manager-chip is-neutral" data-tool-result-count>{filteredTools.length}</span>
-    </div>
+    <label class="manager-search">
+      <i class="fas fa-search" aria-hidden="true"></i>
+      <input
+        type="search"
+        value={searchTerm}
+        oninput={(event) => { searchTerm = event.currentTarget.value; pageIndex = 0; }}
+        placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+        aria-label={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+      />
+    </label>
   </section>
 
   <section class="manager-tools-create-card" data-tool-create-card use:dragDrop={{ onDrop: onCreateToolDrop, activeClass: 'is-drop-active' }}>
@@ -119,7 +144,10 @@
       </div>
     </div>
     <details class="manager-tools-create-disclosure">
-      <summary>{text('FABRICATE.Admin.Manager.Tools.MoreCreationPaths', 'More ways to create')}</summary>
+      <summary
+        aria-label={text('FABRICATE.Admin.Manager.Tools.Create', 'Create Tool')}
+        title={text('FABRICATE.Admin.Manager.Tools.Create', 'Create Tool')}
+      ><i class="fas fa-plus" aria-hidden="true"></i></summary>
       <div class="manager-tools-create-actions">
         <button type="button" class="manager-button" data-tool-create-unlinked onclick={() => onCreateTool({})}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -151,6 +179,7 @@
   </section>
 
   <section class="manager-tools-library-card" data-manager-tools-browser>
+    <p class="manager-tools-result-summary" data-tool-result-count>{countLabel(filteredTools.length)}</p>
     {#if tools.length === 0}
       <div class="manager-empty" data-tool-library-empty>
         <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
@@ -179,7 +208,7 @@
                 <small>{row.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}</small>
                 <span class="manager-tools-library-chips">
                   <span
-                    class={`manager-chip ${row.validation.valid ? 'is-positive' : 'is-danger'}`}
+                    class={`manager-chip manager-tools-validation-chip ${row.validation.valid ? 'is-positive is-ready' : 'is-danger'}`}
                     data-tool-validation-status={row.validation.valid ? 'ready' : 'needs-attention'}
                   >
                     <i class={row.validation.valid ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'} aria-hidden="true"></i>
@@ -187,7 +216,7 @@
                       ? text('FABRICATE.Admin.Manager.Tools.ValidationReady', 'Ready')
                       : text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
                   </span>
-                  <span class="manager-chip is-neutral">{breakageLabel(row.breakage)}</span>
+                  <span class="manager-chip is-neutral">{breakageLabel(tool, row.breakage)}</span>
                   <span class="manager-chip is-neutral">{onBreakLabel(row.onBreak)}</span>
                 </span>
               </span>
@@ -202,8 +231,7 @@
                   : text('FABRICATE.Admin.Manager.Tools.Enable', 'Enable Tool')}
                 onclick={() => onToggleToolEnabled(tool.id, !row.enabled)}
               >
-                <span aria-hidden="true"></span>
-                <span>{row.enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+                <span aria-hidden="true"><span></span></span>
               </button>
               <button
                 type="button"

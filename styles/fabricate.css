@@ -19231,12 +19231,43 @@
 }
 
 .fabricate-manager[data-manager-view="tools"] {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-tools-context-header {
+  align-items: flex-start;
+  padding: 14px var(--fab-space-6) var(--fab-space-4);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager .manager-tools-context-header .manager-breadcrumbs {
+  margin-bottom: var(--fab-space-2);
+  font-size: 0.68rem;
+}
+
+.fabricate-manager .manager-tools-context-header .manager-title {
+  font-size: 1.24rem;
+}
+
+.fabricate-manager .manager-tools-context-header .manager-subtitle {
+  max-width: 920px;
+  margin-top: var(--fab-space-chip);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.fabricate-manager[data-manager-view="tools"] .manager-tools-main {
+  gap: 14px;
+  padding: 18px var(--fab-space-5);
+}
+
+.fabricate-manager[data-manager-view="tools"] .manager-inspector {
+  padding: 18px;
+  background: var(--fab-mv2-surface-1);
 }
 
 .fabricate-manager .manager-tools-authority-card,
-.fabricate-manager .manager-tools-create-card,
-.fabricate-manager .manager-tools-library-card {
+.fabricate-manager .manager-tools-create-card {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -19244,6 +19275,15 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-tools-library-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .fabricate-manager .manager-tools-authority-card h2,
@@ -19271,13 +19311,13 @@
 .fabricate-manager .manager-tools-authority-card {
   flex-flow: column nowrap;
   align-items: stretch;
-  gap: var(--fab-space-3);
+  gap: var(--fab-space-2);
   padding: var(--fab-space-2) var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-authority-heading {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) max-content;
+  grid-template-columns: 20px minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--fab-space-2);
   color: var(--fab-mv2-text);
@@ -19288,18 +19328,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--fab-surface-active);
+  width: 20px;
+  height: 20px;
   color: var(--fab-mv2-accent);
 }
 
-.fabricate-manager .manager-tools-authority-heading p {
-  margin: var(--fab-space-2xs) 0 0;
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.64rem;
-  font-weight: 400;
+.fabricate-manager .manager-tools-authority-heading .manager-chip {
+  min-height: 18px;
+  padding: 0 var(--fab-space-chip);
+  font-size: 0.56rem;
 }
 
 .fabricate-manager .manager-tools-authority-segments {
@@ -19316,7 +19353,7 @@
 .fabricate-manager .manager-tools-authority-caption {
   color: var(--fab-mv2-text-muted);
   font-size: 0.62rem;
-  text-align: center;
+  text-align: left;
 }
 
 .fabricate-manager .manager-tools-authority-segments label {
@@ -19357,43 +19394,73 @@
 }
 
 .fabricate-manager .manager-tools-create-card {
+  position: relative;
   display: flex;
-  min-height: 68px;
-  flex-direction: column;
+  min-height: 66px;
+  flex-direction: row;
   align-items: center;
-  gap: var(--fab-space-3);
-  padding: var(--fab-space-2) var(--fab-space-3);
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) 48px var(--fab-space-2) var(--fab-space-3);
   border-style: dashed;
 }
 
 .fabricate-manager .manager-tools-create-disclosure {
-  align-self: flex-end;
+  position: absolute;
+  top: 50%;
+  right: var(--fab-space-3);
+  align-self: auto;
   font-size: 0.64rem;
+  transform: translateY(-50%);
 }
 
 .fabricate-manager .manager-tools-create-disclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
   color: var(--fab-mv2-accent);
   cursor: pointer;
+  list-style: none;
+}
+
+.fabricate-manager .manager-tools-create-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fabricate-manager .manager-tools-create-disclosure > summary:hover,
+.fabricate-manager .manager-tools-create-disclosure > summary:focus-visible {
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-manager .manager-tools-create-disclosure[open] {
-  align-self: stretch;
+  position: static;
+  width: 100%;
+  transform: none;
+}
+
+.fabricate-manager .manager-tools-create-disclosure[open] > summary {
+  position: absolute;
+  top: var(--fab-space-2);
+  right: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-create-prompt {
   display: flex;
   align-items: center;
-  gap: var(--fab-space-3);
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-tools-create-icon {
   display: inline-flex;
-  flex: 0 0 34px;
+  flex: 0 0 38px;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 8px;
   background: var(--fab-surface-active);
   color: var(--fab-mv2-accent);
@@ -19471,12 +19538,20 @@
   justify-content: space-between;
 }
 
-.fabricate-manager .manager-tools-library-toolbar .manager-search {
+.fabricate-manager [data-manager-tools-search] .manager-search {
   flex: 1 1 auto;
+  min-width: 0;
 }
 
-.fabricate-manager .manager-tools-library-toolbar .manager-search input {
+.fabricate-manager [data-manager-tools-search] .manager-search input {
   height: 36px;
+}
+
+.fabricate-manager .manager-tools-result-summary {
+  margin: 0 0 var(--fab-space-1);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.64rem;
+  line-height: 1.2;
 }
 
 .fabricate-manager .manager-tools-library-list {
@@ -19493,20 +19568,21 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
-  min-height: 72px;
+  min-height: 68px;
 }
 
 .fabricate-manager .manager-tools-library-list > article.is-selected {
-  border-color: var(--fab-mv2-accent);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-surface-soft);
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-tools-select-target {
   display: grid;
   width: 100%;
   height: auto;
-  min-height: 68px;
-  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 66px;
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
   justify-content: flex-start;
   gap: var(--fab-space-2);
@@ -19525,8 +19601,8 @@
 }
 
 .fabricate-manager .manager-tools-select-target > img {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   object-fit: cover;
@@ -19561,6 +19637,14 @@
   gap: var(--fab-space-1);
 }
 
+.fabricate-manager .manager-tools-library-chips .manager-tools-validation-chip.is-ready {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 .fabricate-manager .manager-tools-library-chips .manager-chip {
   min-height: 20px;
   padding: 0 var(--fab-space-chip);
@@ -19575,28 +19659,46 @@
 .fabricate-manager .manager-tools-enabled-toggle {
   display: inline-flex;
   align-items: center;
-  gap: var(--fab-space-1);
-  padding: var(--fab-space-1) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
+  justify-content: center;
+  width: 36px;
+  height: 24px;
+  padding: 0;
+  border: 0;
   background: transparent;
   color: inherit;
-  font-size: 0.68rem;
 }
 
 .fabricate-manager .manager-tools-enabled-toggle > span:first-child {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  position: relative;
+  display: block;
+  width: 34px;
+  height: 20px;
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 999px;
   background: var(--fab-mv2-text-muted);
 }
 
+.fabricate-manager .manager-tools-enabled-toggle > span:first-child > span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fab-mv2-bg);
+  transition: transform 120ms ease;
+}
+
 .fabricate-manager .manager-tools-enabled-toggle.is-on > span:first-child {
-  background: var(--fab-mv2-accent);
+  background: var(--fab-success);
+}
+
+.fabricate-manager .manager-tools-enabled-toggle.is-on > span:first-child > span {
+  transform: translateX(14px);
 }
 
 .fabricate-manager .manager-tool-browser-inspector {
-  gap: var(--fab-space-3);
+  gap: 14px;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -19670,6 +19772,10 @@
   border-radius: 6px;
 }
 
+.fabricate-manager .manager-tool-inspector-facts > div > strong {
+  order: -1;
+}
+
 .fabricate-manager .manager-tool-inspector-facts span,
 .fabricate-manager .manager-tool-inspector-mini-list {
   color: var(--fab-mv2-text-muted);
@@ -19685,19 +19791,58 @@
   line-height: 1.25;
 }
 
-.fabricate-manager .manager-tool-inspector-mini-list {
+.fabricate-manager .manager-tool-inspector-section-kicker {
+  margin: var(--fab-space-1) 0 0;
+}
+
+.fabricate-manager .manager-tool-inspector-details {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.fabricate-manager .manager-tool-inspector-mini-list li {
+.fabricate-manager .manager-tool-inspector-details > div {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
+  min-height: 42px;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+}
+
+.fabricate-manager .manager-tool-inspector-details > div > i {
+  width: 16px;
+  color: var(--fab-mv2-accent);
+  text-align: center;
+}
+
+.fabricate-manager .manager-tool-inspector-details > div > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-tool-inspector-details strong {
+  color: var(--fab-mv2-text);
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-tool-inspector-details small {
+  overflow: hidden;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-tool-inspector-edit {
+  min-height: 34px;
+  margin-top: auto;
+  border-color: var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  font-size: 0.7rem;
 }
 
 @container fabricate-manager (max-width: 831px) {
