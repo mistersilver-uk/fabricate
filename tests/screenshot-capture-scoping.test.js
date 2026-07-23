@@ -301,7 +301,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?680px/);
   assert.match(
     HARNESS,
-    /assertPointerTarget\(page,\s*page\.locator\('\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]'\)\.first\(\),\s*'\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]',\s*'Tool repair OR add-component control'\)/,
+    /assertPointerTarget\(page,\s*editor\.locator\('\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]'\),\s*'\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]',\s*'Tool repair OR add-component control'\)/,
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
@@ -310,9 +310,50 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /const itemOption = await itemTarget\.locator\('option:not\(\[value=""\]\)'\)\.first\(\)\.getAttribute\('value'\);\s*if \(!itemOption\) throw new Error\('Tool Studio direct Item picker has no world Item options'\);\s*await itemTarget\.selectOption\(itemOption\);\s*await itemTarget\.selectOption\(''\);\s*await itemTarget\.selectOption\(itemOption\);/,
   );
   assert.doesNotMatch(HARNESS, /itemTarget\.selectOption\(fixture\.replacementItemUuid\)/);
+  const authorityClickIndex = toolStudioWalk.indexOf('await checkDriven.click();');
+  const authorityWaitIndex = toolStudioWalk.indexOf(
+    'await waitForToolBreakageAuthority(page, systemId);',
+    authorityClickIndex,
+  );
+  const authorityEditIndex = toolStudioWalk.indexOf(
+    'await checkDrivenEditButton.click();',
+    authorityWaitIndex,
+  );
+  assert.ok(authorityClickIndex >= 0, 'the real check-driven pointer click is missing');
+  assert.ok(
+    authorityWaitIndex > authorityClickIndex,
+    'the persisted + projected authority wait must follow the real pointer click',
+  );
+  assert.ok(
+    authorityEditIndex > authorityWaitIndex,
+    'the scoped Edit click must wait for persisted + projected authority',
+  );
   assert.match(
     HARNESS,
-    /await tab\('breakage'\)\.click\(\);\s*await page\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\)\.first\(\)\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);\s*const onBreakFieldset = page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\);\s*if \(!\(await onBreakFieldset\.isDisabled\(\)\)\) throw new Error\('Check-driven immune on-break controls remained interactive'\);/,
+    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/,
+  );
+  assert.match(
+    toolStudioWalk,
+    /const liveManagerApp = await requireSingleLocator\(page\.locator\('#fabricate-crafting-system-manager'\), 'live Crafting System Manager app'\);[\s\S]*?const editorManager = liveManagerApp\.locator\('\.fabricate-manager\[data-manager-view="tool-edit"\]'\);/,
+  );
+  assert.match(
+    toolStudioWalk,
+    /const immuneOnBreakFieldset = editor\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/,
+  );
+  assert.match(
+    HARNESS,
+    /async function assertDisabledToolOnBreakFieldset[\s\S]*?element\.disabled === true[\s\S]*?element\.matches\(':disabled'\)[\s\S]*?fieldset\.locator\('button, input, select, textarea'\)[\s\S]*?controls\.nth\(index\)\.isDisabled\(\)/,
+  );
+  assert.doesNotMatch(
+    toolStudioWalk,
+    /await checkDriven\.click\(\);\s*await page\.locator\(`\.fabricate-manager \[data-manager-tool-id=/,
+  );
+  assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-edit-view\]'\)\.first\(\)/);
+  assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\)/);
+  assert.doesNotMatch(toolStudioWalk, /onBreakFieldset\.isDisabled\(\)/);
+  assert.match(
+    HARNESS,
+    /const fieldsetState = await fieldset\.evaluate\(\(element\) => \(\{[\s\S]*?disabled: element\.disabled === true,[\s\S]*?matchesDisabled: element\.matches\(':disabled'\),[\s\S]*?\}\)\);/,
   );
   assert.doesNotMatch(
     HARNESS,
