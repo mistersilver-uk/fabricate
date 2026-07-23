@@ -2660,7 +2660,6 @@
             "Label": "Gathering sections",
             "Environments": "Environments",
             "Tasks": "Tasks",
-            "Tools": "Tools",
             "ToolsTitle": "Gathering Tools",
             "ToolsHint": "Manage reusable gathering tools for this crafting system.",
             "Encounters": "Events",

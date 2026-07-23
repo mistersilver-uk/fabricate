@@ -1610,7 +1610,6 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!toolRequirementsSource.includes('ProviderExpressionInput'), 'Tool requirements should use shared prerequisites rather than provider selection');
     assert.ok(toolRequirementsSource.includes('manager-tool-prerequisite-list'), 'Tool requirements should expose the shared prerequisite picker');
     assert.ok(toolRequirementsSource.includes('data-tool-bonus-expression'), 'Tool requirements should expose the numeric bonus expression');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Tools, 'Tools');
   });
 
   it('wires a collapsible left rail persisted via the manager setting seam', () => {
