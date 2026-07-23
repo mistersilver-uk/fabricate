@@ -299,6 +299,10 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /const itemOption = await itemTarget\.locator\('option:not\(\[value=""\]\)'\)\.first\(\)\.getAttribute\('value'\);\s*if \(!itemOption\) throw new Error\('Tool Studio direct Item picker has no world Item options'\);\s*await itemTarget\.selectOption\(itemOption\);\s*await itemTarget\.selectOption\(''\);\s*await itemTarget\.selectOption\(itemOption\);/,
   );
   assert.doesNotMatch(HARNESS, /itemTarget\.selectOption\(fixture\.replacementItemUuid\)/);
+  assert.match(
+    HARNESS,
+    /await checkDriven\.click\(\);\s*await page\.locator\('\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)'\)\.first\(\)\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);\s*await page\.locator\(`\.fabricate-manager \[data-manager-tool-id="\$\{fixture\.toolId\}"\] \.manager-icon-button`\)\.first\(\)\.click\(\);/,
+  );
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 

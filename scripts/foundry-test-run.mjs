@@ -3846,6 +3846,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const checkDriven = page.locator('[data-manager-tools-authority] label:has(input[value="checkDriven"])').first();
   await assertPointerTarget(page, checkDriven, '[data-manager-tools-authority] label', 'check-driven authority');
   await checkDriven.click();
+  await page.locator('[data-manager-tools-authority] label.is-selected:has(input[value="checkDriven"])').first().waitFor({ state: 'visible', timeout: 10_000 });
   await page.locator(`.fabricate-manager [data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).first().click();
   await page.locator('[data-tool-edit-view]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await tab('breakage').click();
