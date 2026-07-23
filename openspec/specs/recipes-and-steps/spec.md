@@ -75,6 +75,7 @@ The same override threads through both the display (`RecipeManager.evaluateCraft
 - AND-across-ingredient-sets is not supported.
 - OR groups are always enabled and are not feature-toggled.
 - Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are always supported, including simple recipes, when their tag IDs exist in the crafting system's `itemTags` list.
+An owned item's craft-time tag membership derives from its resolved managed component's authored `tags` (unioned with any item-level `flags.fabricate.tags`), NOT from the item's own flags alone — so the display, shopping, and consumption paths match tagged ingredients against the same component tags the editor links them by.
 - An `IngredientGroup` option MAY be an essence alternative (`Ingredient.match.type === "essence"`), consuming essence-carrying items to meet `match.amount`, and participates in `optionOverrides` like any other option — so "component OR essence" is authorable.
 The legacy per-set `IngredientSet.essences` map is a back-compat read for one release (the 1.17.0 migration folds each positive entry into a single-option essence group).
 - **Tools** are the required-but-not-always-consumed, potentially-breakable prerequisite primitive (replacing recipe-side catalysts).
