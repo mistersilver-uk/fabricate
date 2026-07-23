@@ -6543,6 +6543,154 @@ describe('createAdminStore', () => {
       );
     });
 
+    // -----------------------------------------------------------------------
+    // Issue 148 — per-store item-card memo. Unchanged components skip their
+    // per-item `fromUuid`/`enrichHTML` on refresh; a signature over the WHOLE
+    // stored item plus the external flags (`showTags`/`showEssences`/`showSalvage`)
+    // and resolved essence catalog invalidates only what actually changed.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Seed `sys1` with `components`, instrument `globalThis.fromUuid` with a call
+     * counter, create the store, and run `body` with a `count()` reader and a
+     * `reset()`. Restores `fromUuid` afterwards. Shared by the memo tests so the
+     * seam swap is written once (Sonar new-code duplication).
+     */
+    async function withMemoStore(components, servicesOverrides, body) {
+      const services = createMockServices(servicesOverrides);
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = components;
+      delete sys.items;
+      let calls = 0;
+      const originalFromUuid = globalThis.fromUuid;
+      globalThis.fromUuid = async () => {
+        calls += 1;
+        return {};
+      };
+      try {
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        return await body({
+          store,
+          sys,
+          count: () => calls,
+          reset: () => {
+            calls = 0;
+          },
+        });
+      } finally {
+        globalThis.fromUuid = originalFromUuid;
+      }
+    }
+
+    it('memoizes item cards: a single-component edit re-resolves 1, a no-op refresh re-resolves 0 (issue 148)', async () => {
+      const components = Array.from({ length: 75 }, (_, i) =>
+        makeItem({
+          id: `comp-${i}`,
+          name: `Component ${i}`,
+          registeredItemUuid: `Item.live-${i}`,
+          description: '',
+        })
+      );
+      await withMemoStore(components, undefined, async ({ store, sys, count, reset }) => {
+        // Baseline: every one of the 75 components forces a source resolution.
+        assert.ok(count() >= 75, `initial selectSystem resolves all components (got ${count()})`);
+
+        // Mutate exactly ONE component (new object, same id, changed name).
+        reset();
+        sys.components = sys.components.map((item, i) =>
+          i === 0 ? makeItem({ ...item, name: 'Component 0 EDITED' }) : item
+        );
+        await store.refresh();
+        assert.equal(count(), 1, 'only the edited component re-resolves — not O(all)');
+
+        // A no-op refresh (nothing changed) hits the cache for every card.
+        reset();
+        await store.refresh();
+        assert.equal(count(), 0, 'an unchanged same-system refresh resolves nothing');
+      });
+    });
+
+    it('stale-card guard: editing ONLY a component category yields a fresh card with the new category (issue 148)', async () => {
+      // `category` is not read by `fromUuid`, so a hand-enumerated signature subset
+      // (name/description/tags/essences) would leave the signature unchanged and serve
+      // a STALE card. The whole-item serialization catches it.
+      const components = [makeItem({ id: 'comp-cat', name: 'Herb', category: 'herbs' })];
+      await withMemoStore(components, undefined, async ({ store, sys }) => {
+        assert.equal(get(store.viewState).itemCards[0].category, 'herbs');
+
+        sys.components = [makeItem({ id: 'comp-cat', name: 'Herb', category: 'potions' })];
+        await store.refresh();
+        assert.equal(
+          get(store.viewState).itemCards[0].category,
+          'potions',
+          'the whole-item signature invalidates on a category-only edit'
+        );
+      });
+    });
+
+    it('salvage toggle refreshes every card salvageSummary (issue 148)', async () => {
+      // `showSalvage = features.salvage` is neither an item field nor a system-id
+      // change, so it lives IN the signature: flipping it must miss every card.
+      const salvage = {
+        enabled: true,
+        ingredientQuantity: 2,
+        toolIds: ['hammer'],
+        resultGroups: [],
+        outcomeRouting: {},
+      };
+      const components = [
+        makeItem({ id: 'ore-a', name: 'Ore A', salvage }),
+        makeItem({ id: 'ore-b', name: 'Ore B', salvage }),
+      ];
+      await withMemoStore(components, undefined, async ({ store, sys }) => {
+        sys.features = { salvage: false };
+        await store.refresh();
+        for (const card of get(store.viewState).itemCards) {
+          assert.equal(card.salvageSummary, null, 'salvage off → no summary');
+        }
+
+        sys.features = { salvage: true };
+        await store.refresh();
+        for (const card of get(store.viewState).itemCards) {
+          assert.ok(card.salvageSummary, 'salvage on → every card gains a summary');
+          assert.equal(card.salvageSummary.quantityRequired, 2);
+        }
+      });
+    });
+
+    it('two-phase publish: the settled selectedSystem is a NEW reference carrying enriched recipeItemDefinitions (issue 148 invariant)', async () => {
+      // The memo must not touch `selectedSystem`: phase-2 still builds a NEW
+      // selectedSystemData object, or Svelte's `$derived` never re-propagates the
+      // enriched Books & Scrolls projection.
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.recipeItemDefinitions = [
+        { id: 'def-1', name: 'Tome', originItemUuid: '', recipeIds: [] },
+      ];
+
+      const store = createAdminStore(services);
+      const captured = [];
+      const unsub = store.viewState.subscribe((vs) => {
+        if (vs.selectedSystem) captured.push(vs.selectedSystem);
+      });
+      await store.selectSystem('sys1');
+      unsub();
+
+      const phase1 = captured[0];
+      const settled = get(store.viewState).selectedSystem;
+      assert.ok(phase1, 'phase-1 publishes a selectedSystem');
+      assert.notEqual(
+        phase1,
+        settled,
+        'phase-2 selectedSystem must be a different reference for $derived to re-propagate'
+      );
+      assert.ok(
+        Array.isArray(settled.recipeItemDefinitions),
+        'the settled reference carries the enriched recipeItemDefinitions'
+      );
+    });
+
     it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {
       // AC6 clause 3. This hand-built projection is an ALLOWLIST, and its failure mode
       // is silent: without the line, the Tags & Categories screen's component-categories
