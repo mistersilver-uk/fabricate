@@ -309,9 +309,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('[data-manager-tool-id]'));
   assert.ok(HARNESS.includes('exerciseToolStudioPointerTargets'));
   assert.ok(HARNESS.includes('verifyToolStudioLiveReplacement'));
-  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 1280, height: 720 })'));
-  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 900, height: 700 })'));
-  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 680, height: 700 })'));
+  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 1214, height: 724 })'));
+  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 834, height: 704 })'));
+  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 614, height: 704 })'));
+  assert.match(HARNESS, /ApplicationV2 contributes a 2px horizontal frame and a 38px title bar/);
+  assert.match(HARNESS, /shared by local and CI screenshot/);
   assert.ok(HARNESS.includes('resetToolStudioScroll(page)'));
   assert.ok(HARNESS.includes('assertToolStudioLibraryLayout(page)'));
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: false })'));
