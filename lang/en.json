@@ -2066,7 +2066,6 @@
           "CraftingModifierInherit": "Inherit system default",
           "CraftingModifierPick": "Eligible modifiers",
           "CraftingModifierAdd": "Add modifier",
-          "CraftingModifierNone": "No modifiers selected.",
           "CraftingModifierInheritDefaults": "Inheriting the system default modifiers.",
           "ChooseImage": "Choose recipe image",
           "EnabledHint": "Available to players while on.",
