@@ -3787,6 +3787,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await resetToolStudioScroll(page);
   await assertToolStudioLibraryLayout(page);
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tools-library');
 
   await setManagerWindowSize(page, { width: 680, height: 700 });
@@ -3808,6 +3809,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-overview-linked');
 
   const tab = (name) => page.locator(`#tool-tab-${name}`).first();
@@ -3819,6 +3821,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertPointerTarget(page, page.locator('[data-tool-repair-add-group]').first(), '[data-tool-repair-add-group]', 'Tool repair AND control');
   await assertPointerTarget(page, page.locator('[data-tool-repair-group] [data-recipe-add="alternative-component"]').first(), '[data-tool-repair-group] [data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-breakage-repair');
 
   await page.locator('input[name="tool-on-break"][value="replaceWith"]').first().check();
@@ -3837,6 +3840,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await itemTarget.selectOption('');
   await itemTarget.selectOption(itemOption);
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-breakage-replace-item');
   await page.locator('[data-tool-editor-save]').first().click();
   await page.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
@@ -3853,6 +3857,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const onBreakFieldset = page.locator('[data-tool-on-break-controls]').first();
   if (!(await onBreakFieldset.isDisabled())) throw new Error('Check-driven immune on-break controls remained interactive');
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-breakage-check-immune');
 
   await tab('requirements').click();
@@ -3860,6 +3865,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertPointerTarget(page, page.locator('[data-tool-prerequisites-enabled]').first(), '[data-tool-prerequisites-enabled]', 'Tool prerequisite toggle');
   await assertPointerTarget(page, page.locator('[data-tool-bonus-enabled]').first(), '[data-tool-bonus-enabled]', 'Tool bonus toggle');
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-requirements');
 
   await page.locator('[data-tool-bonus-expression]').first().fill('');
@@ -3867,12 +3873,14 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await page.locator('[data-tool-validation-tab]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('[data-first-validation-failure]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-validation');
   await setManagerWindowSize(page, { width: 900, height: 700 });
   await page.locator('[data-tool-editor-header]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: true });
   await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-narrow');
   await assertSinglePointerDispatch(page, page.locator('[data-tool-editor-back]').first(), 'Tool Back at 900px');
   await assertSinglePointerDispatch(page, tab('requirements'), 'Tool Requirements tab at 900px');

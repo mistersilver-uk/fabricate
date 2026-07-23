@@ -276,6 +276,17 @@ test('a Tool Studio target runs only the dedicated persisted-net-zero tools sect
 });
 
 test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer coverage, and restoration', () => {
+  const toolStudioWalk = HARNESS.match(
+    /async function exerciseToolStudioPointerTargets[\s\S]*?(?=\n\/\*\*\n \* Close Foundry application windows)/,
+  )?.[0];
+  assert.ok(toolStudioWalk, 'Tool Studio walk source was not found');
+  for (const label of TOOL_STUDIO_LABELS) {
+    assert.match(
+      toolStudioWalk,
+      new RegExp(`await resetToolStudioScroll\\(page\\);\\s*await screenshot\\(page, '${label}'\\);`),
+      `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
+    );
+  }
   assert.equal(HARNESS.includes('.manager-tools-row'), true);
   assert.ok(HARNESS.includes('[data-manager-tool-id]'));
   assert.ok(HARNESS.includes('exerciseToolStudioPointerTargets'));
