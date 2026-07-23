@@ -56,6 +56,10 @@
       : text('FABRICATE.Admin.Manager.Tools.Editor.HeaderUnlinked', 'Unlinked Tool')
   );
   const editorErrorCount = $derived(toolEditorChecks(tool, authority).filter((check) => !check.valid).length + (validation.errors?.length || 0));
+  const requirementCount = $derived(
+    (tool?.prerequisites?.enabled ? tool.prerequisites.ids?.length || 0 : 0) +
+      (tool?.bonus?.enabled ? 1 : 0)
+  );
 </script>
 
 <main class="manager-main manager-tool-edit-main" data-tool-edit-view>
@@ -85,12 +89,12 @@
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
         <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')}</span></button>
         <button type="button" class="manager-button is-danger" data-tool-editor-delete onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete Tool')}</span></button>
-        <button type="button" class="manager-button is-primary" data-tool-editor-save onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save changes')}</span></button>
+        <button type="button" class="manager-button is-primary" data-tool-editor-save onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save Tool')}</span></button>
       </div>
     </div>
   </header>
 
-  <ToolEditorTabs {activeTab} errorCount={editorErrorCount} onChange={onTabChange} />
+  <ToolEditorTabs {activeTab} errorCount={editorErrorCount} {requirementCount} onChange={onTabChange} />
 
   <div class="manager-tool-edit-composition">
     <div
@@ -102,7 +106,7 @@
       tabindex="0"
     >
       {#if activeTab === 'overview'}
-        <ToolOverviewTab {tool} {worldItems} {managedItems} {onPatch} {onStageSource} {onSourceDrop} {onUnlinkSource} />
+        <ToolOverviewTab {tool} {worldItems} {managedItems} {onPatch} {onStageSource} {onSourceDrop} {onUnlinkSource} onOpenTab={onTabChange} />
       {:else if activeTab === 'breakage'}
         <ToolBreakageTab
           {tool}

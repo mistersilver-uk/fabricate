@@ -17,48 +17,75 @@ function blockFor(selector) {
   return match?.[0] || '';
 }
 
-test('Tool Studio owns its three-column geometry and stacks at its responsive breakpoints', () => {
-  const wide = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-body');
-  const collapsed = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-body.is-rail-collapsed');
-  const main = blockFor('.fabricate-manager .manager-tools-main');
-  const rows = blockFor('.fabricate-manager .manager-tools-library-list > article');
-  const selectTarget = blockFor('.fabricate-manager .manager-tools-select-target');
-  const responsive = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
-  const compact = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
+async function readRenderedToolGeometry(width, view) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  try {
+    const editor = view === 'tool-edit'
+      ? `<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
+          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button">Back</button><button class="manager-button">Delete</button><button class="manager-button" data-tool-editor-save>Save Tool</button></div></div></header>
+          <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
+          <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack"><section style="height:540px">Editor</section></div></section><aside class="manager-tool-preview" data-tool-behavior-preview><div class="manager-tool-preview-identity"><div><h3>Smith's Hammer</h3></div></div></aside></div>
+        </main>`
+      : `<main class="manager-main manager-tools-main"><div class="manager-tools-library-list"><article data-manager-tool-id="hammer"><button class="manager-tools-select-target"><span></span><span class="manager-tools-library-copy"><strong>Smith's Hammer</strong></span></button><div class="manager-tools-library-actions"></div></article></div></main><aside class="manager-inspector"><section data-tool-browser-inspector>Inspector</section></aside>`;
+    await page.setContent(`<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="${view}"><div class="manager-body"><aside class="manager-rail">Rail</aside>${editor}</div></div></div>`);
+    return await page.evaluate(() => {
+      const rect = (selector) => {
+        const value = document.querySelector(selector)?.getBoundingClientRect();
+        return value ? { left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width } : null;
+      };
+      const root = document.querySelector('.fabricate-manager');
+      return {
+        root: rect('.fabricate-manager'),
+        rail: rect('.manager-rail'),
+        main: rect('.manager-main'),
+        inspector: rect('.manager-inspector'),
+        header: rect('[data-tool-editor-header]'),
+        actions: rect('.manager-tool-edit-actions'),
+        tabs: rect('.manager-tool-editor-tabs'),
+        panel: rect('[data-tool-editor-panel]'),
+        preview: rect('[data-tool-behavior-preview]'),
+        overflow: root.scrollWidth > root.clientWidth,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
 
-  assert.ok(wide.includes('grid-template-columns: 210px minmax(0, 1fr) 340px;'));
-  assert.ok(collapsed.includes('grid-template-columns: 56px minmax(0, 1fr) 340px;'));
-  assert.ok(main.includes('overflow-y: auto;'), 'the library center should own its wide-layout scrolling');
-  assert.ok(rows.includes('grid-template-columns: minmax(0, 1fr) max-content;'));
-  assert.ok(selectTarget.includes('height: auto;'));
-  assert.ok(selectTarget.includes('min-height: 68px;'));
-  assert.ok(selectTarget.includes('justify-content: flex-start;'));
-  assert.ok(selectTarget.includes('width: 100%;'));
-  assert.match(responsive, /grid-template-columns:\s*minmax\(0, 1fr\);/);
-  assert.match(responsive, /overflow-y:\s*auto;/);
-  assert.match(compact, /\.fabricate-manager \.manager-tools-library-list > article\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);/);
-  assert.equal(
-    css.includes('\n.manager-tools-'),
-    false,
-    'Tool Studio selectors must remain namespaced beneath the Fabricate manager shell'
-  );
+test('Tool library renders 210px and 340px fixed columns through the 832px product root', async () => {
+  for (const width of [1212, 832]) {
+    const report = await readRenderedToolGeometry(width, 'tools');
+    assert.equal(Math.round(report.rail.width), 210);
+    assert.equal(Math.round(report.inspector.width), 340);
+    assert.equal(report.overflow, false);
+    assert.ok(report.main.left >= report.rail.right - 1);
+    assert.ok(report.inspector.left >= report.main.right - 1);
+  }
+  const stacked = await readRenderedToolGeometry(831, 'tools');
+  assert.ok(stacked.main.top >= stacked.rail.bottom - 1);
+  assert.equal(stacked.overflow, false);
 });
 
-test('Tool editor keeps independent wide scrolling and visible wrapped actions when narrow', () => {
-  const editorCss = css.slice(css.lastIndexOf('Manager — Tool Studio editor'));
-  const body = blockFor('.fabricate-manager[data-manager-view="tool-edit"] .manager-body');
-  const collapsed = blockFor('.fabricate-manager[data-manager-view="tool-edit"] .manager-body.is-rail-collapsed');
-  const composition = editorCss.match(/\.fabricate-manager \.manager-tool-edit-composition\s*\{[\s\S]*?\}/)?.[0] || '';
-  const stacked = editorCss.slice(editorCss.indexOf('@container fabricate-manager (max-width: 1120px)'));
-  const narrow = editorCss.slice(editorCss.indexOf('@container fabricate-manager (max-width: 680px)'));
-
-  assert.ok(body.includes('grid-template-columns: 210px minmax(0, 1fr);'));
-  assert.ok(collapsed.includes('grid-template-columns: 56px minmax(0, 1fr);'));
-  assert.ok(composition.includes('grid-template-columns: minmax(0, 1fr) 320px;'));
-  assert.match(stacked, /\.fabricate-manager\[data-manager-view="tool-edit"\] \.manager-body[\s\S]*?overflow-y:\s*auto;/);
-  assert.match(narrow, /\.manager-tool-edit-actions[\s\S]*?flex-wrap:\s*wrap;/);
-  assert.match(narrow, /\[data-tool-editor-save\][\s\S]*?display:\s*inline-flex;/);
-  assert.match(editorCss, /overflow-wrap:\s*anywhere;/, 'long Item UUIDs should wrap instead of widening the editor');
+test('Tool editor header spans the 210px/editor/320px triptych and stacks only below 832px', async () => {
+  for (const width of [1212, 832]) {
+    const report = await readRenderedToolGeometry(width, 'tool-edit');
+    assert.equal(Math.round(report.rail.width), 210);
+    assert.equal(Math.round(report.preview.width), 320);
+    assert.ok(Math.abs(report.header.left - report.root.left) <= 1);
+    assert.ok(Math.abs(report.header.right - report.root.right) <= 1);
+    assert.ok(report.tabs.left >= report.rail.right - 1);
+    assert.ok(report.preview.left >= report.panel.right - 1);
+    assert.equal(report.overflow, false);
+  }
+  const stacked = await readRenderedToolGeometry(831, 'tool-edit');
+  assert.ok(stacked.rail.top >= stacked.header.bottom - 1);
+  assert.ok(stacked.tabs.top >= stacked.rail.bottom - 1);
+  assert.ok(stacked.preview.top >= stacked.panel.bottom - 1);
+  assert.equal(stacked.overflow, false);
+  const wrapped = await readRenderedToolGeometry(680, 'tool-edit');
+  assert.ok(wrapped.actions.bottom <= wrapped.header.bottom + 1);
+  assert.equal(wrapped.overflow, false);
 });
 
 test('manager root defines a scoped responsive app container', () => {

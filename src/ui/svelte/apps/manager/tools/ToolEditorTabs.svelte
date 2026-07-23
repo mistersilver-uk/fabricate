@@ -2,12 +2,12 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'overview', errorCount = 0, onChange = () => {} } = $props();
+  let { activeTab = 'overview', errorCount = 0, requirementCount = 0, onChange = () => {} } = $props();
   const tabs = [
-    ['overview', 'Overview'],
-    ['breakage', 'Breakage'],
-    ['requirements', 'Requirements'],
-    ['validation', 'Validation'],
+    ['overview', 'Overview', 'fas fa-circle-info'],
+    ['breakage', 'Breakage', 'fas fa-heart-crack'],
+    ['requirements', 'Requirements', 'fas fa-user-shield'],
+    ['validation', 'Validation', 'fas fa-clipboard-check'],
   ];
 
   function text(id, fallback, data = null) {
@@ -53,9 +53,12 @@
       onclick={() => onChange(tab[0])}
       onkeydown={(event) => handleKeydown(event, tabs.indexOf(tab))}
     >
+      <i class={tab[2]} aria-hidden="true"></i>
       {text(`Tab${tab[0][0].toUpperCase()}${tab[0].slice(1)}`, tab[1])}
-      {#if tab[0] === 'validation' && errorCount > 0}
-        <span aria-label={text('ErrorCount', '{count} errors', { count: errorCount })}>{errorCount}</span>
+      {#if tab[0] === 'requirements' && requirementCount > 0}
+        <span>{requirementCount}</span>
+      {:else if tab[0] === 'validation'}
+        <span class:is-valid={errorCount === 0} aria-label={errorCount > 0 ? text('ErrorCount', '{count} errors', { count: errorCount }) : text('AllValid', 'All checks pass')}>{errorCount > 0 ? errorCount : '✓'}</span>
       {/if}
     </button>
   {/each}

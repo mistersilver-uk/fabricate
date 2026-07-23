@@ -68,9 +68,11 @@
 <main class="manager-main manager-tools-main" aria-label={text('FABRICATE.Admin.Manager.Tools.Title', 'Tools')} data-tool-library>
   <section class="manager-inspector-card manager-tools-authority-card" data-manager-tools-authority>
     <div class="manager-tools-authority-heading">
-      <i class="fas fa-sliders" aria-hidden="true"></i>
-      <strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</strong>
+      <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
+      <div><strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</strong><p>{text('FABRICATE.Admin.Manager.Tools.AuthorityHint', 'Set how every Tool in this system handles wear and breakage.')}</p></div>
+      <span class="manager-chip is-neutral">{text('FABRICATE.Admin.Manager.Tools.AllTools', 'ALL TOOLS')}</span>
     </div>
+    <small class="manager-tools-authority-caption">{text('FABRICATE.Admin.Manager.Tools.AuthorityCaption', 'Applies to all {count} Tools').replace('{count}', String(tools.length))}</small>
     <div class="manager-tools-authority-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}>
       {#each ['toolSpecific', 'checkDriven'] as authority (authority)}
         <label class:is-selected={breakageAuthority === authority} data-tool-authority-segment={authority}>
@@ -112,37 +114,40 @@
     <div class="manager-tools-create-prompt" data-tool-create-drop-prompt>
       <span class="manager-tools-create-icon"><i class="fas fa-hand-pointer" aria-hidden="true"></i></span>
       <div>
-        <strong>{text('FABRICATE.Admin.Manager.Tools.CreateKicker', 'Create Tool')}</strong>
-        <span>{text('FABRICATE.Admin.Manager.Tools.CreateHint', 'Choose a world Item, drop an Item here, or start with an unlinked draft.')}</span>
+        <strong>{text('FABRICATE.Admin.Manager.Tools.CreateDropTitle', 'Drag an Item here to make it a Tool')}</strong>
+        <span>{text('FABRICATE.Admin.Manager.Tools.CreateDropHint', 'Drop from the Items directory or a compendium — or click to browse.')}</span>
       </div>
     </div>
-    <div class="manager-tools-create-actions">
-      <button type="button" class="manager-button" data-tool-create-unlinked onclick={() => onCreateTool({})}>
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Tools.CreateUnlinked', 'Create unlinked')}</span>
-      </button>
-      <select
-        value={selectedItemUuid}
-        aria-label={text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}
-        onchange={(event) => { selectedItemUuid = event.currentTarget.value; }}
-      >
-        <option value="">{text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}</option>
-        {#each worldItems as item (item.uuid)}<option value={item.uuid}>{item.name}</option>{/each}
-      </select>
-      <button type="button" class="manager-button is-primary" data-tool-create-selected-item onclick={createSelectedItem} disabled={!selectedItemUuid}>
-        {text('FABRICATE.Admin.Manager.Tools.CreateFromItem', 'Create from Item')}
-      </button>
-      {#if worldItems.length > 0}
-        <div class="manager-tools-item-shortcuts" aria-label={text('FABRICATE.Admin.Manager.Tools.ItemShortcuts', 'Item shortcuts')}>
-          {#each worldItems.slice(0, 4) as item (item.uuid)}
-            <button type="button" onclick={() => onCreateFromItem(item)} data-tool-item-shortcut={item.uuid} title={item.name}>
-              <img src={item.img || 'icons/svg/item-bag.svg'} alt="" />
-              <span>{item.name}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <details class="manager-tools-create-disclosure">
+      <summary>{text('FABRICATE.Admin.Manager.Tools.MoreCreationPaths', 'More ways to create')}</summary>
+      <div class="manager-tools-create-actions">
+        <button type="button" class="manager-button" data-tool-create-unlinked onclick={() => onCreateTool({})}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Tools.CreateUnlinked', 'Create unlinked')}</span>
+        </button>
+        <select
+          value={selectedItemUuid}
+          aria-label={text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}
+          onchange={(event) => { selectedItemUuid = event.currentTarget.value; }}
+        >
+          <option value="">{text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}</option>
+          {#each worldItems as item (item.uuid)}<option value={item.uuid}>{item.name}</option>{/each}
+        </select>
+        <button type="button" class="manager-button is-primary" data-tool-create-selected-item onclick={createSelectedItem} disabled={!selectedItemUuid}>
+          {text('FABRICATE.Admin.Manager.Tools.CreateFromItem', 'Create from Item')}
+        </button>
+        {#if worldItems.length > 0}
+          <div class="manager-tools-item-shortcuts" aria-label={text('FABRICATE.Admin.Manager.Tools.ItemShortcuts', 'Item shortcuts')}>
+            {#each worldItems.slice(0, 4) as item (item.uuid)}
+              <button type="button" onclick={() => onCreateFromItem(item)} data-tool-item-shortcut={item.uuid} title={item.name}>
+                <img src={item.img || 'icons/svg/item-bag.svg'} alt="" />
+                <span>{item.name}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </details>
   </section>
 
   <section class="manager-tools-library-card" data-manager-tools-browser>

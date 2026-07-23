@@ -4611,6 +4611,7 @@
     every screen, so the gold badge carries the SELECTED SYSTEM's name (user-authored
     text — hence max-width + ellipsis + title) and never a theme or product name.
   -->
+  {#if !isToolStudioRoute}
   <div class="manager-titlebar" data-manager-titlebar aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}>
     <!--
       The layer-group icon and "Crafting Systems" product label used to lead this
@@ -4636,8 +4637,9 @@
       </span>
     {/if}
   </div>
+  {/if}
 
-  {#if currentView !== 'tool-edit'}
+  {#if !isToolStudioRoute}
   <header class="manager-header">
     <div class="manager-heading">
       <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
@@ -5002,6 +5004,7 @@
 
   <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
     <aside class="manager-rail" aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}>
+      {#if !isToolStudioRoute}
       <button
         type="button"
         class="manager-rail-toggle"
@@ -5016,6 +5019,7 @@
       >
         <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
       </button>
+      {/if}
       <!--
         The rail's crafting-system card. The kicker names what the card CONTAINS
         ("Crafting system"), not the product — the product name is already on the
@@ -5024,6 +5028,7 @@
         The "GM management workspace" caption that used to hang below it is gone: the
         section label beneath the card already says GM management.
       -->
+      {#if !isToolStudioRoute}
       <section class="manager-rail-block" aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}>
         {#if selectedSystem}
           <div class="manager-scope-card">
@@ -5063,6 +5068,7 @@
           <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</h2>
         {/if}
       </section>
+      {/if}
 
       <!--
         The rail's uppercase section label. Hidden entirely in the 56px collapsed

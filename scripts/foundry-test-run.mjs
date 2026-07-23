@@ -29,6 +29,7 @@
  */
 
 import { chromium } from 'playwright';
+import { randomUUID } from 'node:crypto';
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -253,6 +254,12 @@ async function echoWaivedConsoleErrorsToStepSummary(waived) {
 
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
+const screenshotManifestEntries = [];
+const screenshotRunIdentity = {
+  runId: randomUUID(),
+  headSha: String(process.env.FOUNDRY_SCREENSHOT_HEAD_SHA || process.env.GITHUB_SHA || '').trim(),
+  targetLabels: [...SCREENSHOT_TARGET_LABELS].sort(),
+};
 
 // ── Phase timings ───────────────────────────────────────────────────────────
 /** @type {Array<{ phase: string, startedAt: string, durationMs: number }>} */
@@ -385,6 +392,12 @@ async function screenshot(page, label, options = {}) {
   // `options` forwards Playwright screenshot options (e.g. a `clip` box for a
   // region capture such as the chat sidebar); default is a full-page shot.
   await page.screenshot({ path, ...options });
+  screenshotManifestEntries.push({
+    label,
+    file: `screenshot-${num}-${label}.png`,
+    width: options.clip?.width ?? null,
+    height: options.clip?.height ?? null,
+  });
   markViewTiming(label);
 }
 
@@ -1721,6 +1734,24 @@ async function resetToolStudioScroll(page) {
   }
 }
 
+async function captureToolStudioProduct(page, label, { width, height }) {
+  const manager = await requireSingleLocator(
+    page.locator('#fabricate-crafting-system-manager .fabricate-manager'),
+    `${label} live Tool Studio manager`
+  );
+  const box = await manager.boundingBox();
+  if (!box) throw new Error(`${label} Tool Studio product rectangle is not measurable`);
+  const measured = { width: Math.round(box.width), height: Math.round(box.height) };
+  if (measured.width !== width || measured.height !== height) {
+    throw new Error(
+      `${label} Tool Studio product rectangle was ${measured.width}x${measured.height}; expected ${width}x${height}`
+    );
+  }
+  await screenshot(page, label, {
+    clip: { x: box.x, y: box.y, width, height },
+  });
+}
+
 async function readToolStudioLayout(page) {
   return page.evaluate(() => {
     const readRect = (selector) => {
@@ -1761,13 +1792,17 @@ async function readToolStudioLayout(page) {
     return {
       manager: readRect('.fabricate-manager'),
       body: readRect('.fabricate-manager .manager-body'),
-      main: readRect('.fabricate-manager .manager-main'),
+      main: readRect('[data-tool-edit-view]')?.width > 0
+        ? readRect('.fabricate-manager .manager-main')
+        : readRect('.fabricate-manager .manager-body'),
       inspector: readRect('.fabricate-manager .manager-inspector'),
       libraryRow: readRect('.fabricate-manager [data-manager-tool-id]'),
       editorHeader: readRect('[data-tool-editor-header]'),
       editorActions: readRect('.manager-tool-edit-actions'),
       tabs: readRect('.manager-tool-editor-tabs'),
-      composition: readRect('.manager-tool-edit-composition'),
+      composition: readRect('.manager-tool-edit-composition')?.width > 0
+        ? readRect('.manager-tool-edit-composition')
+        : readRect('.fabricate-manager .manager-body'),
       editorPanel: readRect('[data-tool-editor-panel]'),
       firstSection: readRect('[data-tool-editor-panel] > *'),
       preview: readRect('[data-tool-behavior-preview]'),
@@ -3620,14 +3655,25 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     const rm = game.fabricate.getRecipeManager();
     const system = csm.getSystem(systemId);
     const recipe = rm.getRecipe(recipeId);
-    const source = game.items.find((item) => item.name === 'Herbalist Sickle');
-    if (!system || !recipe || !source) {
+    const sourceTemplate = game.items.find((item) => item.name === 'Herbalist Sickle');
+    if (!system || !recipe || !sourceTemplate) {
       throw new Error('Tool Studio fixture requires Arcane Forge, Brew Healing Potion, and Herbalist Sickle');
     }
     const pack = game.packs.get('dnd5e.items');
     const index = await pack?.getIndex?.();
     const uncached = Array.from(index || []).find((entry) => entry?._id && !pack.get(entry._id));
     if (!uncached) throw new Error('Tool Studio fixture requires an uncached dnd5e.items entry');
+    const sourceSystem = clone(sourceTemplate.system);
+    if (sourceSystem?.description && typeof sourceSystem.description === 'object') {
+      sourceSystem.description.value = '<p>A well-balanced forge hammer. Durable, but the haft splinters when hard used.</p>';
+    }
+    const source = await Item.create({
+      name: "Smith's Hammer",
+      type: sourceTemplate.type,
+      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
+      system: sourceSystem,
+    });
+    if (!source) throw new Error("Tool Studio fixture could not create Smith's Hammer");
 
     const restore = {
       tools: clone(system.tools || []),
@@ -3636,34 +3682,44 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       recipeToolIds: clone(recipe.toolIds || []),
       recipeToolBonusModes: clone(recipe.toolBonusModes || {}),
       sourceRoles: clone(source.getFlag('fabricate', 'fabricate.roles') || null),
+      sourceCreated: true,
     };
     const prerequisiteId = 'smoke-tool-studio-training';
     const requestedToolId = 'smoke-tool-studio';
     const components = (system.components || []).filter((component) => component.id !== source.id);
     if (components.length < 2) throw new Error('Tool Studio repair fixture needs two managed Components');
+    const parityPrerequisites = [
+      [prerequisiteId, "Proficient with Smith's Tools", 'prof', 'gte', 1],
+      ['smoke-tool-studio-expert', 'Expert Crafter', 'prof', 'gte', 4],
+      ['smoke-tool-studio-strong', 'Strength 13 or higher', 'abilities.str.value', 'gte', 13],
+      ['smoke-tool-studio-weave', 'Attuned to the Weave', 'abilities.int.mod', 'gte', 2],
+      ['smoke-tool-studio-arena', 'Trained for Arenas', 'skills.arc.value', 'gte', 1],
+    ].map(([id, name, path, op, value]) => ({
+      id,
+      name,
+      icon: 'fa-solid fa-user-shield',
+      path,
+      op,
+      value,
+    }));
     await csm.updateSystem(systemId, {
       characterPrerequisites: [
-        ...(system.characterPrerequisites || []).filter((entry) => entry.id !== prerequisiteId),
-        {
-          id: prerequisiteId,
-          name: 'Trained herbalist with steady hands',
-          icon: 'fa-solid fa-user-shield',
-          path: 'abilities.wis.mod',
-          op: 'gte',
-          value: 1,
-        },
+        ...(system.characterPrerequisites || []).filter(
+          (entry) => !parityPrerequisites.some((fixtureEntry) => fixtureEntry.id === entry.id)
+        ),
+        ...parityPrerequisites,
       ],
       toolBreakage: { authority: 'toolSpecific' },
     });
     const { item: upsertedTool } = await csm.upsertTool(systemId, {
       id: requestedToolId,
       enabled: true,
-      label: 'Herbalist Sickle for careful moonpetal harvesting and field preparation',
+      label: "Smith's Hammer",
       prerequisites: { enabled: true, ids: [prerequisiteId], gateMode: 'usability' },
-      bonus: { enabled: true, expression: '+2' },
-      breakage: { mode: 'limitedUses', maxUses: 12 },
-      checkBreakable: false,
-      onBreak: { mode: 'flagBroken' },
+      bonus: { enabled: true, expression: '@prof' },
+      breakage: { mode: 'limitedUses', maxUses: 5 },
+      checkBreakable: true,
+      onBreak: { mode: 'destroy' },
       repairRequirements: [{
         id: 'smoke-tool-repair-group',
         name: 'Restore the working edge',
@@ -3676,6 +3732,29 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       }],
     }, { itemUuid: source.uuid });
     const toolId = upsertedTool.id;
+    const parityNames = [
+      'Arcane Forge',
+      "Alchemist's Supplies",
+      'Ley-Line Nexus',
+      "Master's Anvil",
+      'Moonwell',
+      'Volcanic Vent',
+      'Woodcarving Tools',
+    ];
+    for (const [index, label] of parityNames.entries()) {
+      await csm.upsertTool(systemId, {
+        id: `smoke-tool-studio-row-${index + 1}`,
+        enabled: true,
+        label,
+        componentId: components[index % components.length].id,
+        breakage: { mode: 'limitedUses', maxUses: 5 + index },
+        checkBreakable: true,
+        onBreak: { mode: index % 2 === 0 ? 'destroy' : 'flagBroken' },
+        prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+        bonus: { enabled: false, expression: '' },
+        repairRequirements: [],
+      });
+    }
     await rm.updateRecipe(recipeId, {
       toolIds: [...new Set([...(recipe.toolIds || []), toolId])],
       toolBonusModes: { ...(recipe.toolBonusModes || {}), [toolId]: 'highestOnly' },
@@ -3714,6 +3793,7 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
     if (source) {
       await source.unsetFlag('fabricate', 'fabricate.roles');
       if (fixture.sourceRoles) await source.setFlag('fabricate', 'fabricate.roles', fixture.sourceRoles);
+      if (fixture.sourceCreated) await source.delete();
     }
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
   }, { systemId, recipeId, fixture });
@@ -3814,6 +3894,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const manager = await requireSingleLocator(liveManagerApp.locator('.fabricate-manager'), 'live Fabricate manager');
   const row = await requireSingleLocator(manager.locator(`[data-manager-tool-id="${fixture.toolId}"]`), 'Tool Studio fixture row');
   await row.waitFor({ state: 'visible', timeout: 10_000 });
+  const visibleToolRows = manager.locator('.manager-tools-row');
+  const visibleToolRowCount = await visibleToolRows.count();
+  if (visibleToolRowCount !== 8) {
+    throw new Error(`Tool Studio parity library must render exactly 8 rows; found ${visibleToolRowCount}`);
+  }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
   const editButton = row.locator('.manager-icon-button');
@@ -3838,7 +3923,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertToolStudioLibraryLayout(page);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tools-library');
+  await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', { width: 1212, height: 686 });
 
   await setManagerWindowSize(page, { width: 680, height: 700 });
   await resetToolStudioScroll(page);
@@ -3859,7 +3944,12 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-overview-linked');
+  await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', { width: 1212, height: 686 });
+  const displayLabel = editor.locator('[data-tool-label]');
+  await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-stress-long-name', { width: 1212, height: 686 });
+  await displayLabel.fill("Smith's Hammer");
 
   const tab = (name) => editor.locator(`#tool-tab-${name}`);
   for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
@@ -3867,22 +3957,33 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   await tab('breakage').click();
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', { width: 1212, height: 686 });
+  await editor.locator('input[name="tool-on-break"][value="flagBroken"]').check();
+  await editor.locator('[data-tool-repair-add-group]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await assertPointerTarget(page, editor.locator('[data-tool-repair-add-group]').first(), '[data-tool-repair-add-group]', 'Tool repair AND control');
   await assertPointerTarget(page, editor.locator('[data-tool-repair-group] [data-recipe-add="alternative-component"]'), '[data-tool-repair-group] [data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-breakage-repair');
+  await captureToolStudioProduct(page, 'manager-tool-stress-repair', { width: 1212, height: 686 });
 
   await editor.locator('input[name="tool-on-break"][value="replaceWith"]').check();
   const replacementGrid = editor.locator('[data-tool-replacement-target]');
   await replacementGrid.waitFor({ state: 'visible', timeout: 5_000 });
-  const componentTarget = replacementGrid.locator('select').nth(0);
-  const itemTarget = replacementGrid.locator('select').nth(1);
+  const replacementType = replacementGrid.locator('[data-tool-replacement-type]');
+  await replacementType.selectOption('component');
+  let replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
+  await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
+  const componentTarget = replacementPicker;
   await assertPointerTarget(page, componentTarget, '[data-tool-replacement-target] select', 'Component replacement picker');
-  await assertPointerTarget(page, itemTarget, '[data-tool-replacement-target] select', 'direct Item replacement picker');
   const componentOption = await componentTarget.locator('option:not([value=""])').first().getAttribute('value');
+  if (!componentOption) throw new Error('Tool Studio Component picker has no managed Component options');
   await componentTarget.selectOption(componentOption);
-  await componentTarget.selectOption('');
+  await replacementType.selectOption('item');
+  replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
+  await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
+  const itemTarget = replacementPicker;
+  await assertPointerTarget(page, itemTarget, '[data-tool-replacement-target] select', 'direct Item replacement picker');
   const itemOption = await itemTarget.locator('option:not([value=""])').first().getAttribute('value');
   if (!itemOption) throw new Error('Tool Studio direct Item picker has no world Item options');
   await itemTarget.selectOption(itemOption);
@@ -3890,7 +3991,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await itemTarget.selectOption(itemOption);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-breakage-replace-item');
+  await captureToolStudioProduct(page, 'manager-tool-stress-replacement', { width: 1212, height: 686 });
   await editor.locator('[data-tool-editor-save]').click();
   await editor.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   await editor.locator('[data-tool-editor-back]').click();
@@ -3913,36 +4014,63 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
   await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
   await tab('breakage').click();
+  await editor.locator('input[name="tool-check-breakable"][value="immune"]').check();
   const immuneOnBreakFieldset = editor.locator('[data-tool-breakage-tab]:has(input[name="tool-check-breakable"][value="immune"]:checked) [data-tool-on-break-controls]:disabled');
   await immuneOnBreakFieldset.waitFor({ state: 'visible', timeout: 10_000 });
   await requireSingleLocator(immuneOnBreakFieldset, 'check-driven immune on-break fieldset');
   await assertDisabledToolOnBreakFieldset(immuneOnBreakFieldset);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-breakage-check-immune');
+  await captureToolStudioProduct(page, 'manager-tool-stress-immune', { width: 1212, height: 686 });
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  const toolSpecific = manager.locator('[data-manager-tools-authority] label:has(input[value="toolSpecific"])');
+  await toolSpecific.click();
+  await page.waitForFunction((systemId) => (
+    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.toolBreakage?.authority === 'toolSpecific'
+  ), systemId, { timeout: 10_000, polling: 'raf' });
+  await manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click();
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  await tab('breakage').click();
+  await editor.locator('input[name="tool-on-break"][value="destroy"]').check();
 
   await tab('requirements').click();
   await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  if (await editor.locator('[data-tool-prerequisite-row]').count() !== 5) {
+    throw new Error('Tool Studio parity Requirements must render exactly 5 prerequisite rows');
+  }
   await assertPointerTarget(page, editor.locator('[data-tool-prerequisites-enabled]'), '[data-tool-prerequisites-enabled]', 'Tool prerequisite toggle');
   await assertPointerTarget(page, editor.locator('[data-tool-bonus-enabled]'), '[data-tool-bonus-enabled]', 'Tool bonus toggle');
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-requirements');
+  await captureToolStudioProduct(page, 'manager-tool-parity-04-requirements-1280x720', { width: 1212, height: 686 });
 
-  await editor.locator('[data-tool-bonus-expression]').fill('');
   await tab('validation').click();
   await editor.locator('[data-tool-validation-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  if (await editor.locator('[data-first-validation-failure]').count() !== 0) {
+    throw new Error('Tool Studio parity Validation must be the all-pass state');
+  }
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', { width: 1212, height: 686 });
+  await tab('requirements').click();
+  await editor.locator('[data-tool-bonus-expression]').fill('');
+  await tab('validation').click();
   await editor.locator('[data-first-validation-failure]').waitFor({ state: 'visible', timeout: 5_000 });
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-validation');
+  await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', { width: 1212, height: 686 });
+  await tab('requirements').click();
+  await editor.locator('[data-tool-bonus-expression]').fill('@prof');
+  await tab('breakage').click();
+  await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
   await setManagerWindowSize(page, { width: 900, height: 700 });
   await editor.locator('[data-tool-editor-header]').waitFor({ state: 'visible', timeout: 5_000 });
   await resetToolStudioScroll(page);
-  await assertToolStudioEditorLayout(page, { stacked: true });
+  await assertToolStudioEditorLayout(page, { stacked: false });
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-narrow');
+  await captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', { width: 832, height: 666 });
   await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 900px');
   await assertSinglePointerDispatch(page, tab('requirements'), 'Tool Requirements tab at 900px');
   await tab('requirements').click();
@@ -3955,6 +4083,8 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 680px');
   await assertSinglePointerDispatch(page, tab('breakage'), 'Tool Breakage tab at 680px');
   await assertSinglePointerDispatch(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 680px');
+  await resetToolStudioScroll(page);
+  await screenshot(page, 'manager-tool-stress-wrapping-680');
   await setManagerWindowSize(page, { width: 1280, height: 720 });
 
   await page.evaluate(async () => globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.());
@@ -10066,6 +10196,7 @@ async function main() {
     // signals — see AGENTS.md for how to read them.
     results.degraded = degraded;
     results.rendererCrashed = Boolean(results.rendererCrashed);
+    results.screenshotRun = screenshotRunIdentity;
     results.waivedConsoleErrors = waivedConsoleErrors;
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
@@ -10100,6 +10231,13 @@ async function main() {
     await writeFile(
       join(RESULTS_DIR, 'summary.json'),
       JSON.stringify(results, null, 2)
+    );
+    await writeFile(
+      join(RESULTS_DIR, 'screenshot-manifest.json'),
+      JSON.stringify({
+        ...screenshotRunIdentity,
+        captures: screenshotManifestEntries,
+      }, null, 2)
     );
 
     // Write console log
