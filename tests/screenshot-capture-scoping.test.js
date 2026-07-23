@@ -301,7 +301,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(HARNESS, /itemTarget\.selectOption\(fixture\.replacementItemUuid\)/);
   assert.match(
     HARNESS,
-    /await checkDriven\.click\(\);\s*await page\.locator\('\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)'\)\.first\(\)\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);\s*await page\.locator\(`\.fabricate-manager \[data-manager-tool-id="\$\{fixture\.toolId\}"\] \.manager-icon-button`\)\.first\(\)\.click\(\);/,
+    /await tab\('breakage'\)\.click\(\);\s*await page\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\)\.first\(\)\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);\s*const onBreakFieldset = page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\);\s*if \(!\(await onBreakFieldset\.isDisabled\(\)\)\) throw new Error\('Check-driven immune on-break controls remained interactive'\);/,
+  );
+  assert.doesNotMatch(
+    HARNESS,
+    /\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)/,
   );
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
