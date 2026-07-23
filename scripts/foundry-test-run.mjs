@@ -3611,7 +3611,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       sourceRoles: clone(source.getFlag('fabricate', 'fabricate.roles') || null),
     };
     const prerequisiteId = 'smoke-tool-studio-training';
-    const toolId = 'smoke-tool-studio';
+    const requestedToolId = 'smoke-tool-studio';
     const components = (system.components || []).filter((component) => component.id !== source.id);
     if (components.length < 2) throw new Error('Tool Studio repair fixture needs two managed Components');
     await csm.updateSystem(systemId, {
@@ -3628,8 +3628,8 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       ],
       toolBreakage: { authority: 'toolSpecific' },
     });
-    await csm.upsertTool(systemId, {
-      id: toolId,
+    const { item: upsertedTool } = await csm.upsertTool(systemId, {
+      id: requestedToolId,
       enabled: true,
       label: 'Herbalist Sickle for careful moonpetal harvesting and field preparation',
       prerequisites: { enabled: true, ids: [prerequisiteId], gateMode: 'usability' },
@@ -3648,6 +3648,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
         })),
       }],
     }, { itemUuid: source.uuid });
+    const toolId = upsertedTool.id;
     await rm.updateRecipe(recipeId, {
       toolIds: [...new Set([...(recipe.toolIds || []), toolId])],
       toolBonusModes: { ...(recipe.toolBonusModes || {}), [toolId]: 'highestOnly' },
