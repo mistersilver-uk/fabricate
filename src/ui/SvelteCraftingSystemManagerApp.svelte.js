@@ -638,6 +638,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         pickImagePath: this._services.pickImagePath,
         getSetting: this._services.getSetting,
         setSetting: this._services.setSetting,
+        getWorldItemOptions: this._services.getWorldItemOptions,
+        resolveToolSource: this._services.resolveToolSource,
         // Folder-aware bulk-import (issue 771): resolve a folder / whole-pack drop into
         // per-folder groups the mapping modal seeds from. Returns null for every drop
         // that should keep today's one-shot behavior (single item, no real folders, an

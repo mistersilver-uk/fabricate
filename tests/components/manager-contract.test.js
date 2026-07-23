@@ -195,6 +195,31 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  it('forwards Tool Item services from the internal service set into prepared Svelte props', () => {
+    const buildServicesStart = appSource.indexOf('  _buildServices() {');
+    const preparePropsStart = appSource.indexOf('  _prepareSvelteProps(context) {');
+    const preparePropsEnd = appSource.indexOf('\n  // Foundry', preparePropsStart);
+    const buildServicesSource = appSource.slice(buildServicesStart, preparePropsStart);
+    const preparePropsSource = appSource.slice(preparePropsStart, preparePropsEnd);
+    const preparedServicesSource = preparePropsSource.slice(
+      preparePropsSource.indexOf('      services: {')
+    );
+
+    assert.ok(
+      buildServicesSource.includes('getWorldItemOptions: () =>') &&
+        buildServicesSource.includes('resolveToolSource: async (uuid) =>'),
+      'the internal service set should define the world Item projection and Tool source resolver'
+    );
+    assert.ok(
+      preparedServicesSource.includes('getWorldItemOptions: this._services.getWorldItemOptions,'),
+      'prepared Svelte props should forward world Item options into the root services'
+    );
+    assert.ok(
+      preparedServicesSource.includes('resolveToolSource: this._services.resolveToolSource,'),
+      'prepared Svelte props should forward Tool Item drop resolution into the root services'
+    );
+  });
+
   it('key-filters the noisy updateActor hook so an HP tick does not reproject', () => {
     assert.ok(appSource.includes("Hooks.on('updateActor'"), 'actor updates are hooked');
     assert.ok(
