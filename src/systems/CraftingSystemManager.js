@@ -3770,8 +3770,10 @@ export class CraftingSystemManager {
       tools: { stamped: 0, stripped: 0, cleared: 0 },
       recipeItems: { stamped: 0, stripped: 0, cleared: 0 },
       // Description refresh outcomes (issue 800), deliberately a bucket of its own so
-      // the identity counts above keep their existing meaning. Components and
-      // recipe-item definitions only — tools carry no description.
+      // the identity counts above keep their existing meaning. Repair-time component
+      // description refresh excludes Tools because first-class Tool source snapshots
+      // (name, image, and description) are captured at registration/relink and
+      // deliberately do not auto-refresh.
       // `skipped` is the flat total; `skippedUnresolved` (source item/pack/module gone
       // — actionable) and `skippedEmpty` (source resolved but carries no description —
       // nothing to do) split it by cause so the GM notice can name one.
