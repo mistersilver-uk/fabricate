@@ -472,20 +472,21 @@ export class CraftingListingBuilder {
   }
 
   /**
-   * The effective recipe-level duration shown before crafting. An explicit
-   * simple-mode sequence sums authored units field-wise; an implicit recipe uses
-   * its recipe-level requirement. Calendar-dependent unit conversion is left to
-   * the execution layer.
+   * The effective recipe-level duration shown before crafting. Authored shape is
+   * authoritative: an implicit recipe uses its recipe-level requirement, while an
+   * explicit simple-mode sequence sums authored step units field-wise. Other
+   * explicit shapes have no safe recipe-level projection. Calendar-dependent unit
+   * conversion is left to the execution layer.
    * @private
    */
   _buildDuration({ recipe, system, mode }) {
     if (system?.requirements?.time?.enabled === false) return null;
-    const steps = this._executionSteps(recipe);
-    if (mode !== 'simple' || steps.length <= 1) {
-      return this._durationOrNull(recipe?.timeRequirement);
-    }
+    const authoredSteps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    if (authoredSteps.length === 0) return this._durationOrNull(recipe?.timeRequirement);
+    if (mode !== 'simple' || authoredSteps.length <= 1) return null;
+
     const aggregate = Object.fromEntries(TIME_REQUIREMENT_FIELDS.map((field) => [field, 0]));
-    for (const step of steps) {
+    for (const step of authoredSteps) {
       const duration = this._durationOrNull(step?.timeRequirement);
       if (!duration) continue;
       for (const field of TIME_REQUIREMENT_FIELDS) aggregate[field] += duration[field];

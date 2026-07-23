@@ -349,6 +349,38 @@ test('projects an implicit recipe duration separately from its terminal result',
   assert.equal('time' in model.result, false);
 });
 
+test('does not project stale recipe-level duration for an explicit one-step recipe', () => {
+  const explicit = new Recipe({
+    id: 'recipe-explicit-single-timed',
+    name: 'Rope',
+    craftingSystemId: 'sys-survival',
+    complex: false,
+    timeRequirement: { minutes: 0, hours: 9, days: 0, months: 0, years: 0 },
+    ingredientSets: [],
+    resultGroups: [],
+    steps: [
+      {
+        id: 'step-rope',
+        name: 'Twist rope',
+        timeRequirement: { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+        ingredientSets: [
+          ingredientSet('set-rope', [{ componentId: 'c-cloth', quantity: 3 }]),
+        ],
+        resultGroups: [
+          { id: 'rg', name: 'Rope', results: [{ componentId: 'c-tent', quantity: 1 }] },
+        ],
+      },
+    ],
+  });
+  const model = buildOne({
+    recipe: explicit,
+    items: [new FakeItem('Cloth Scrap', 3)],
+  });
+
+  assert.equal(explicit.getExecutionSteps()[0].timeRequirement.minutes, 30);
+  assert.equal(model.duration, null, 'the stale recipe-level 9 hr duration is not advertised');
+});
+
 test('suppresses authored recipe and step durations when time requirements are disabled', () => {
   const source = tentRecipe({
     stepDurations: [
@@ -509,7 +541,7 @@ test('routedByCheck multi-step: first step evaluated, empty top-level result, st
   assert.deepEqual(recipe.steps, [], 'step-list body is simple-only');
 });
 
-test('progressive multi-step: steps: [] (step-list body is simple-only)', () => {
+test('progressive multi-step hides stale recipe duration and carries no simple step-list', () => {
   const system = simpleSystem({
     features: { multiStepRecipes: true },
     craftingCheck: {
@@ -520,6 +552,18 @@ test('progressive multi-step: steps: [] (step-list body is simple-only)', () => 
     },
   });
   system.resolutionMode = 'progressive';
-  const recipe = buildOne({ system, recipe: tentRecipe(), items: stockedActor() });
+  const recipe = buildOne({
+    system,
+    recipe: tentRecipe({
+      timeRequirement: { minutes: 0, hours: 9, days: 0, months: 0, years: 0 },
+      stepDurations: [
+        { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+        { minutes: 0, hours: 1, days: 0, months: 0, years: 0 },
+      ],
+    }),
+    items: stockedActor(),
+  });
+
+  assert.equal(recipe.duration, null, 'the stale recipe-level 9 hr duration is not advertised');
   assert.deepEqual(recipe.steps, [], 'progressive carries no simple step-list');
 });
