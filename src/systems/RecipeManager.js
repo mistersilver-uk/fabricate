@@ -1472,11 +1472,52 @@ export class RecipeManager {
         systemId: recipe?.craftingSystemId,
       });
       if (!byName) return false;
+    } else if (getMatchHandler(ingredient?.match).type === 'tags') {
+      // A by-TAG ingredient carries no managed component id, so it never took the
+      // component branch above — yet its authored tags live on the managed COMPONENT
+      // definition (the very source the recipe editor links tag ingredients from),
+      // NOT on the owned item's own flags. Resolve the item's component here (the one
+      // craft-time seam with system-component context) and match against its tags, so
+      // craft-time availability matches the editor's tag linking (issue 857).
+      if (!this._matchesTagIngredient(recipe, ingredient, item, features, resolveComponent)) {
+        return false;
+      }
     } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
     }
 
     return true;
+  }
+
+  /**
+   * Whether an owned item satisfies a by-TAG ingredient at craft time. Fabricate
+   * never stamps `flags.fabricate.tags` onto inventory items, so a tag ingredient
+   * cannot be matched off the item's own flags alone (that is why by-tag ingredients
+   * showed "no components available" while by-component ingredients worked — issue
+   * 857). Resolve the item to its managed component and evaluate the tag rule against
+   * the UNION of the component's authored tags and any item-level tag flag
+   * (back-compat / third-party tagging), reusing the shared tags-match handler so the
+   * any/all comparison stays single-sourced.
+   *
+   * @param {Recipe} recipe
+   * @param {Ingredient} ingredient - a tags-type ingredient option
+   * @param {Item} item
+   * @param {{enableTags: boolean}} features
+   * @param {Function} [resolveComponent] - the same component resolver threaded to
+   *   {@link ingredientMatchesItem}; defaults to {@link findMatchingComponent}.
+   * @returns {boolean}
+   * @private
+   */
+  _matchesTagIngredient(recipe, ingredient, item, features, resolveComponent) {
+    if (!features.enableTags) return false;
+    const handler = getMatchHandler(ingredient?.match);
+    const resolve =
+      typeof resolveComponent === 'function' ? resolveComponent : findMatchingComponent;
+    const component = resolve(item, this._getSystemComponents(recipe), recipe?.craftingSystemId);
+    const componentTags = Array.isArray(component?.tags) ? component.tags : [];
+    const flagTags = getFabricateFlag(item, 'tags', []);
+    const itemTags = [...new Set([...(Array.isArray(flagTags) ? flagTags : []), ...componentTags])];
+    return handler.matchesItem(ingredient.match, item, { features, itemTags });
   }
 
   /**
