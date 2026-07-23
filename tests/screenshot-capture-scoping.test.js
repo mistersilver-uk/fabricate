@@ -319,6 +319,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: false })'));
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: true })'));
   assert.ok(HARNESS.includes('visibleToolRowCount !== 8'));
+  assert.match(
+    HARNESS,
+    /The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}/,
+  );
+  assert.match(
+    HARNESS,
+    /sourceReplaceDisclosure\.click\(\);[\s\S]*?assertPointerTarget\(page, editor\.locator\('\[data-tool-source-picker\]'\)[\s\S]*?sourceReplaceDisclosure\.click\(\);/,
+    'the hidden replacement picker must be exercised through its compact disclosure and closed before parity capture',
+  );
   assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
   assert.ok(HARNESS.includes("editor.locator('[data-first-validation-failure]').count() !== 0"));
   for (const label of [

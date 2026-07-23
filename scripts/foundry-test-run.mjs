@@ -3709,6 +3709,9 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
         ),
         ...parityPrerequisites,
       ],
+      // The parity frame owns an exact eight-row fixture. Clear the unrelated
+      // smoke tools first; restoration below reinstates the original array.
+      tools: [],
       toolBreakage: { authority: 'toolSpecific' },
     });
     const { item: upsertedTool } = await csm.upsertTool(systemId, {
@@ -3941,9 +3944,13 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
   await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
-  await assertPointerTarget(page, editor.locator('[data-tool-source-picker]'), '[data-tool-source-picker]', 'Tool Item picker');
   await assertPointerTarget(page, editor.locator('[data-tool-source-card]'), '[data-tool-source-card]', 'Tool Item drop target');
   await assertPointerTarget(page, editor.locator('[data-tool-source-unlink]'), '[data-tool-source-unlink]', 'Tool Item unlink');
+  const sourceReplaceDisclosure = editor.locator('.manager-tool-source-replace > summary');
+  await assertPointerTarget(page, sourceReplaceDisclosure, '.manager-tool-source-replace > summary', 'Tool Item replacement disclosure');
+  await sourceReplaceDisclosure.click();
+  await assertPointerTarget(page, editor.locator('[data-tool-source-picker]'), '[data-tool-source-picker]', 'Tool Item picker');
+  await sourceReplaceDisclosure.click();
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
