@@ -627,6 +627,77 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-section="io"]'), 'the single IoTable renders');
   });
 
+  it('shows the authored craft duration chip before crafting for a timed recipe', async () => {
+    // Issue 846: a player choosing a timed recipe must see how long it takes BEFORE
+    // starting the craft, not only as a countdown once it is underway. The chip reads
+    // the recipe's authored duration (result.time) and formats it with the shared
+    // compact formatter the manager uses.
+    const timed = recipe({
+      result: {
+        items: [{ name: 'Healing Potion', img: null, qty: 1 }],
+        time: { minutes: 30, hours: 2, days: 0, months: 0, years: 0 },
+        timeLabel: null,
+        xp: null,
+      },
+    });
+    const target = await harness.mount({
+      recipe: timed,
+      selectedSetId: timed.defaultSetId,
+      craftability: timed.ingredientSets[0].craftability,
+    });
+
+    const chip = target.querySelector(
+      '.crafting-detail-header-meta [data-recipe-duration]'
+    );
+    assert.ok(chip, 'the pre-craft duration chip renders for a timed recipe');
+    // Largest-unit-first compact formatting (mirrors the manager Overview).
+    assert.equal(chip.textContent.replace(/\s+/g, ' ').trim(), '2 hr 30 min');
+  });
+
+  it('shows no duration chip for an instant (zero-duration) recipe', async () => {
+    // The default fixture has result.time === null (instant). An instant craft must not
+    // show a misleading "0 min" — the chip is omitted entirely.
+    const instant = recipe();
+    const target = await harness.mount({
+      recipe: instant,
+      selectedSetId: instant.defaultSetId,
+      craftability: instant.ingredientSets[0].craftability,
+    });
+
+    assert.equal(
+      target.querySelector('[data-recipe-duration]'),
+      null,
+      'no duration chip on an instant recipe'
+    );
+  });
+
+  it('does not leak the craft duration on a redacted (discovery) teaser', async () => {
+    // A timed recipe that is still undiscovered must not reveal its timing — the chip
+    // is suppressed alongside the mode chip on a teaser.
+    const teaser = recipe({
+      redaction: { redacted: true, hiddenFields: ['ingredients', 'results', 'description'] },
+      browseStatus: 'discovery',
+      result: {
+        items: [],
+        time: { minutes: 0, hours: 4, days: 0, months: 0, years: 0 },
+        timeLabel: null,
+        xp: null,
+      },
+    });
+    const target = await harness.mount({
+      recipe: teaser,
+      selectedSetId: null,
+      craftability: null,
+    });
+
+    assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
+    assert.equal(
+      target.querySelector('[data-recipe-duration]'),
+      null,
+      'no duration chip leaks on a discovery teaser'
+    );
+  });
+
   it('shows a select-a-recipe hint when no recipe is provided', async () => {
     const target = await harness.mount({ recipe: null });
     assert.ok(target.querySelector('[data-crafting-detail-state="empty"]'), 'empty hint rendered');

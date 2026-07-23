@@ -93,6 +93,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
+  // RecipeDetailHeader surfaces the recipe's authored craft duration pre-craft (issue
+  // 846) via this formatter. RecipeDetailHeader is already in the compiled graph, so
+  // omitting this raw dep HANGS every mounted crafting test (# cancelled). It imports
+  // only foundryBridge.js (already listed above), so this single entry suffices.
+  'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
