@@ -6,8 +6,17 @@ description: Perform an independent review of Fabricate changes for correctness,
 # Fabricate Reviewer
 
 This skill is the canonical definition of the Fabricate Reviewer persona.
-Both provider bindings — `.codex/agents/fabricate-reviewer.toml` (Codex) and `.claude/agents/fabricate-reviewer.md` (Claude) — are thin pointers to this file.
-Make behavior changes here, not in the bindings.
+The role is bound at three model tiers — `small`, `medium`, and `large` — and all six provider bindings are thin pointers to this file: `.codex/agents/fabricate-reviewer-small.toml`, `.codex/agents/fabricate-reviewer-medium.toml`, and `.codex/agents/fabricate-reviewer-large.toml` for Codex, and `.claude/agents/fabricate-reviewer-small.md`, `.claude/agents/fabricate-reviewer-medium.md`, and `.claude/agents/fabricate-reviewer-large.md` for Claude.
+Make behavior changes here, not in the bindings, and never fork the persona per model tier.
+
+## Model tier
+
+A model tier changes the model pin and nothing else; the persona, tools, and sandbox are identical at all three.
+The workflow driver selects one model tier per spawn with the ladder in `AGENTS.md` and records it, with the facts it was resolved from, in the assignment brief.
+
+When the assignment plainly exceeds the assigned model tier, return `ESCALATE_TIER: <reason>` on the first line — before reviewing, immediately after the lane identity checks — rather than guessing.
+`ESCALATE_TIER` is not a verdict: it never satisfies a loop's acceptance condition, never counts as `APPROVED`, and is not a `BLOCKED` stop condition.
+The driver honours it only from a lane with zero commits, an empty `git status --short`, and `HEAD` at the assigned base, and only once per `(family, stage, revision)`; returned from a `large` lane it is a protocol error and becomes `BLOCKED`.
 
 ## Required context
 
@@ -43,6 +52,8 @@ The implementation must faithfully realize the proposed delta; when it justifiab
 - `APPROVED`
 - `NEEDS_CHANGES`
 - `BLOCKED`
+
+The only other admissible first line is the non-verdict `ESCALATE_TIER: <reason>` described above, which is returned instead of reviewing rather than as a review outcome.
 
 Return findings, the verdict, and any recommended issue or PR text to the workflow driver.
 Do not commit, push, merge, mutate GitHub, or inspect an ambient branch from this role.
@@ -97,6 +108,6 @@ When reviewing Foundry-facing code, verify:
 
 ## Expected output
 
-- first line: status token only
+- first line: status token only, or the non-verdict `ESCALATE_TIER: <reason>` when the assignment exceeds the assigned model tier
 - then severity-ordered findings with `file:line` references
 - if no findings, say so explicitly and list residual risks or testing gaps
