@@ -9835,8 +9835,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     onBreak: { mode: 'destroy' },
   };
 
-  it('orders Tool library controls by decision flow and selects a native-button row exactly once', () => {
+  it('keeps the compact Tool library hierarchy callback-complete and selects a row once', async () => {
     const selections = [];
+    const authorityChanges = [];
+    const created = [];
+    const dropped = [];
+    const worldItem = {
+      uuid: 'Item.hammer',
+      name: 'Smith Hammer',
+      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
+    };
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(ToolsBrowserViewComponent, {
@@ -9844,7 +9852,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         tools: [toolRouteFixture],
         managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
+        worldItems: [worldItem],
         onSelectTool: (id) => selections.push(id),
+        onCreateTool: (patch) => { created.push(['unlinked', patch]); },
+        onCreateFromItem: (item) => { created.push(['item', item.uuid]); },
+        onCreateToolDrop: (data) => { dropped.push(data); },
+        onSetBreakageAuthority: (authority) => { authorityChanges.push(authority); },
       },
     });
     flushSync();
@@ -9861,14 +9874,38 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       ['authority', 'search', 'create', 'list']
     );
-    assert.match(
-      target.querySelector('[data-manager-tools-authority]').textContent,
-      /Each Tool's own breakage mode decides whether it breaks\./
+    const authority = target.querySelector('[data-manager-tools-authority]');
+    assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 2);
+    assert.equal(authority.querySelector('small'), null, 'authority choices stay compact');
+    authority.querySelector('input[value="checkDriven"]').click();
+    assert.deepEqual(authorityChanges, ['checkDriven']);
+
+    const createCard = target.querySelector('[data-tool-create-card]');
+    assert.ok(createCard.querySelector('[data-tool-create-drop-prompt]'));
+    assert.equal(
+      createCard.querySelectorAll(':scope > .manager-tools-item-shortcuts').length,
+      0,
+      'one-click shortcuts stay inside the compact creation action row'
     );
-    assert.match(
-      target.querySelector('[data-manager-tools-authority]').textContent,
-      /The active check decides whether breakable required Tools break\./
-    );
+    createCard.querySelector('[data-tool-create-unlinked]').click();
+    const itemSelect = createCard.querySelector('select');
+    itemSelect.value = worldItem.uuid;
+    itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    createCard.querySelector('[data-tool-create-selected-item]').click();
+    createCard.querySelector(`[data-tool-item-shortcut="${worldItem.uuid}"]`).click();
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { getData: () => JSON.stringify({ type: 'Item', uuid: worldItem.uuid }) },
+    });
+    createCard.dispatchEvent(drop);
+    assert.deepEqual(created, [
+      ['unlinked', {}],
+      ['item', worldItem.uuid],
+      ['item', worldItem.uuid],
+    ]);
+    assert.deepEqual(dropped, [{ type: 'Item', uuid: worldItem.uuid }]);
 
     const select = target.querySelector('.manager-tools-select-target');
     select.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -10012,7 +10049,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       1,
       'the composed tool-edit route has one identity/action header'
     );
-    assert.match(target.querySelector('.manager-breadcrumbs').textContent, /Tools.*Artisan Catalyst/);
+    const editorHeader = target.querySelector('[data-tool-editor-header]');
+    assert.equal(
+      target.querySelector('.fabricate-manager > .manager-header'),
+      null,
+      'the editor does not pay for a separate root breadcrumb header'
+    );
+    assert.match(
+      editorHeader.querySelector('.manager-breadcrumbs').textContent,
+      /Crafting Systems.*Alchemy.*Tools.*Artisan Catalyst/
+    );
+    assert.ok(editorHeader.querySelector('[data-tool-editor-open-systems]'));
+    assert.ok(editorHeader.querySelector('[data-tool-editor-open-system]'));
+    assert.ok(editorHeader.querySelector('[data-tool-editor-open-tools]'));
     assert.equal(
       target.querySelector('.manager-heading > .manager-title'),
       null,

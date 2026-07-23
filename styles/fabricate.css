@@ -13629,14 +13629,33 @@
 }
 
 .fabricate-manager .manager-tool-edit-header {
+  display: grid;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-4) 10px;
+  border-bottom: 1px solid var(--fab-mv2-border);
+  background: var(--fab-mv2-surface-1);
+}
+
+.fabricate-manager .manager-tool-edit-header .manager-breadcrumbs {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-tool-edit-header .manager-breadcrumbs > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-tool-edit-header-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--fab-space-3);
   min-width: 0;
-  padding: 10px var(--fab-space-4);
-  border-bottom: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
 }
 
 .fabricate-manager .manager-tool-edit-identity,
@@ -13998,6 +14017,84 @@
   background: var(--fab-success-soft);
 }
 
+.fabricate-manager .manager-tool-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-choice-grid.is-two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fabricate-manager .manager-tool-choice-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-tool-choice-card.is-selected {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-accent-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-tool-choice-card > input {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.fabricate-manager .manager-tool-choice-card:has(input:focus-visible) {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-tool-choice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--fab-surface-active);
+  color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-tool-choice-copy {
+  display: grid;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-choice-copy strong {
+  color: var(--fab-mv2-text);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-tool-choice-copy small {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.64rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.fabricate-manager fieldset:disabled .manager-tool-choice-card {
+  cursor: not-allowed;
+}
+
 .fabricate-manager .manager-tool-inline-fields,
 .fabricate-manager .manager-tool-replacement-grid {
   display: grid;
@@ -14126,6 +14223,7 @@
 
 @container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-tool-edit-header,
+  .fabricate-manager .manager-tool-edit-header-main,
   .fabricate-manager .manager-tool-editor-card-heading,
   .fabricate-manager .manager-tool-authority-readonly {
     align-items: stretch;
@@ -14149,7 +14247,9 @@
   .fabricate-manager .manager-tool-source-card,
   .fabricate-manager .manager-tool-inline-fields,
   .fabricate-manager .manager-tool-replacement-grid,
-  .fabricate-manager .manager-tool-prerequisite-list {
+  .fabricate-manager .manager-tool-prerequisite-list,
+  .fabricate-manager .manager-tool-choice-grid,
+  .fabricate-manager .manager-tool-choice-grid.is-two-up {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -18837,53 +18937,60 @@
   flex-flow: row nowrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
 }
 
-.fabricate-manager .manager-tools-authority-card > div:first-child {
-  min-width: 0;
+.fabricate-manager .manager-tools-authority-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex: 0 0 auto;
+  color: var(--fab-mv2-text);
+  font-size: 0.72rem;
 }
 
 .fabricate-manager .manager-tools-authority-segments {
   display: flex;
-  flex: 1 1 400px;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
-  padding: var(--fab-space-1);
+  flex: 1 1 auto;
+  gap: var(--fab-space-2xs);
+  max-width: 560px;
+  padding: 3px;
   border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
+  border-radius: 9px;
+  background: var(--fab-overlay-dark-08);
 }
 
 .fabricate-manager .manager-tools-authority-segments label {
   display: flex;
-  flex: 1 1 170px;
+  flex: 1 1 0;
   align-items: center;
-  gap: var(--fab-space-1);
-  padding: var(--fab-space-1) var(--fab-space-2);
-  border-radius: 6px;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px var(--fab-space-2);
+  border-radius: 7px;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-tools-authority-option {
-  display: grid;
-  gap: var(--fab-space-2xs);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
   font-size: 0.72rem;
+  font-weight: 600;
   line-height: 1.2;
 }
 
-.fabricate-manager .manager-tools-authority-option small {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.64rem;
-  font-weight: 400;
-}
-
 .fabricate-manager .manager-tools-authority-segments label.is-selected {
-  background: var(--fab-success-soft);
-  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-accent);
+  color: var(--fab-on-accent);
 }
 
 .fabricate-manager .manager-tools-authority-segments input {
-  margin: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 
 .fabricate-manager .manager-tools-create-card.is-drop-active {
@@ -18893,8 +19000,46 @@
 
 .fabricate-manager .manager-tools-create-card {
   display: grid;
-  grid-template-columns: minmax(170px, 0.75fr) minmax(0, 1.25fr);
+  grid-template-columns: minmax(190px, 0.8fr) minmax(0, 1.2fr);
   align-items: center;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-style: dashed;
+}
+
+.fabricate-manager .manager-tools-create-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tools-create-icon {
+  display: inline-flex;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--fab-surface-active);
+  color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-tools-create-prompt > div {
+  display: grid;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tools-create-prompt strong {
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-tools-create-prompt span:not(.manager-tools-create-icon) {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.64rem;
+  line-height: 1.25;
 }
 
 .fabricate-manager .manager-tools-create-actions,
@@ -18923,8 +19068,8 @@
 }
 
 .fabricate-manager .manager-tools-item-shortcuts {
-  grid-column: 1 / -1;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .fabricate-manager .manager-tools-item-shortcuts button {
@@ -18932,9 +19077,9 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
-  max-width: 180px;
-  min-height: 28px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
+  max-width: 142px;
+  min-height: 24px;
+  padding: var(--fab-space-2xs) var(--fab-space-chip);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
@@ -18943,8 +19088,8 @@
 }
 
 .fabricate-manager .manager-tools-item-shortcuts img {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border-radius: 4px;
   object-fit: cover;
 }
@@ -19213,6 +19358,7 @@
 
   .fabricate-manager .manager-tools-authority-segments {
     flex-direction: column;
+    max-width: none;
   }
 
   .fabricate-manager .manager-tools-create-card {

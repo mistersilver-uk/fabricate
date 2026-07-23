@@ -99,9 +99,23 @@ afterEach(() => harness.remount());
 
 describe('Tool Studio editor (mounted)', () => {
   it('renders header-only actions, four accessible tabs, linked Item evidence, and no Kind', async () => {
-    const root = await harness.mount(props());
+    const navigation = [];
+    const root = await harness.mount(props({
+      systemName: 'The Herbalist',
+      onOpenSystems: () => { navigation.push('systems'); },
+      onOpenSystem: () => { navigation.push('system'); },
+      onOpenTools: () => { navigation.push('tools'); },
+    }));
 
     assert.equal(root.querySelectorAll('[data-tool-editor-header]').length, 1);
+    assert.match(
+      root.querySelector('[data-tool-editor-header] .manager-breadcrumbs').textContent,
+      /Crafting Systems.*The Herbalist.*Tools.*Smith Hammer/
+    );
+    root.querySelector('[data-tool-editor-open-systems]').click();
+    root.querySelector('[data-tool-editor-open-system]').click();
+    root.querySelector('[data-tool-editor-open-tools]').click();
+    assert.deepEqual(navigation, ['systems', 'system', 'tools']);
     assert.match(root.querySelector('[data-tool-editor-image]').getAttribute('src'), /hammer/);
     assert.equal(
       root.querySelector('[data-tool-editor-source-context]').textContent,
@@ -183,6 +197,14 @@ describe('Tool Studio editor (mounted)', () => {
       Array.from(root.querySelectorAll('input[name="tool-breakage-mode"]')).map((input) => input.value),
       ['limitedUses', 'breakageChance', 'diceExpression']
     );
+    const mechanicChoices = root.querySelectorAll('[data-tool-breakage-choice]');
+    assert.equal(mechanicChoices.length, 3);
+    for (const choice of mechanicChoices) {
+      assert.ok(choice.querySelector('input[type="radio"]'));
+      assert.ok(choice.querySelector('[data-tool-choice-icon]'));
+      assert.ok(choice.querySelector('[data-tool-choice-title]'));
+      assert.ok(choice.querySelector('[data-tool-choice-description]'));
+    }
     root.querySelector('input[value="breakageChance"]').click();
     root.querySelector('input[value="diceExpression"]').click();
     assert.equal(patches[0].breakage.mode, 'breakageChance');
@@ -194,7 +216,13 @@ describe('Tool Studio editor (mounted)', () => {
       Array.from(immune.querySelectorAll('input[name="tool-check-breakable"]')).map((input) => input.value),
       ['breakable', 'immune']
     );
+    assert.equal(immune.querySelectorAll('[data-tool-breakability-choice]').length, 2);
     assert.equal(immune.querySelector('[data-tool-on-break-controls]').disabled, true);
+    assert.equal(
+      immune.querySelectorAll('[data-tool-on-break-choice] input:disabled').length,
+      3,
+      'the immune fieldset removes every on-break radio from interaction'
+    );
   });
 
   it('resets inactive breakage mode values when the mounted editor switches Tools', async () => {
@@ -225,6 +253,13 @@ describe('Tool Studio editor (mounted)', () => {
       Array.from(root.querySelectorAll('input[name="tool-on-break"]')).map((input) => input.value),
       ['destroy', 'flagBroken', 'replaceWith']
     );
+    const onBreakChoices = root.querySelectorAll('[data-tool-on-break-choice]');
+    assert.equal(onBreakChoices.length, 3);
+    for (const choice of onBreakChoices) {
+      assert.ok(choice.querySelector('[data-tool-choice-icon]'));
+      assert.ok(choice.querySelector('[data-tool-choice-title]'));
+      assert.ok(choice.querySelector('[data-tool-choice-description]'));
+    }
     const selects = root.querySelectorAll('[data-tool-replacement-target] select');
     selects[0].value = 'scrap';
     selects[0].dispatchEvent(new Event('change', { bubbles: true }));

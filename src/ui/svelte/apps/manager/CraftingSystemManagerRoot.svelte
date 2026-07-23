@@ -4637,6 +4637,7 @@
     {/if}
   </div>
 
+  {#if currentView !== 'tool-edit'}
   <header class="manager-header">
     <div class="manager-heading">
       <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
@@ -4997,6 +4998,7 @@
     </div>
     {/if}
   </header>
+  {/if}
 
   <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
     <aside class="manager-rail" aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}>
@@ -5422,6 +5424,7 @@
     {:else if currentView === 'tool-edit' && selectedSystem && focusedToolDraft}
       <ToolEditView
         tool={focusedToolDraft}
+        systemName={selectedSystem.name}
         validation={focusedToolValidation}
         dirty={$viewState.toolDraftDirty === true}
         saving={$viewState.toolDraftSaving === true}
@@ -5436,6 +5439,9 @@
         currencyEnabled={selectedSystem?.requirements?.currency?.enabled === true}
         prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
         authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+        onOpenSystems={selectSystemAndShowBrowser}
+        onOpenSystem={() => editSystem(selectedSystem.id)}
+        onOpenTools={backToToolsBrowser}
         onBack={backToToolsBrowser}
         onDelete={deleteSelectedLibraryTool}
         onSave={saveSelectedToolDraft}
