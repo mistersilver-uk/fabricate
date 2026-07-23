@@ -2281,6 +2281,50 @@ class Fabricate {
   }
 
   /**
+   * Cancel a player's in-progress craft (issue 848) — the owner-scoped counterpart of
+   * {@link advanceCraftingRun}. Reuses the SAME ownership guard: because `cancelCraft`
+   * restores items to the source actors and reads/updates the crafting actor, a
+   * non-owner of any of them is blocked gracefully with a "needs owner" message rather
+   * than an ungraceful Foundry permission throw. On success the engine removes the run
+   * and — when the system's `features.refundOnPlayerCancel` flag is on (default) —
+   * restores the consumed ingredients and refunds the spent currency.
+   *
+   * @param {object} options
+   * @param {string} options.actorId World-actor id the run is keyed to.
+   * @param {string} options.runId Active run id to cancel.
+   * @returns {Promise<object>} The cancel result, or a `{ success: false, message }`.
+   */
+  async cancelCraftingRun({ actorId, runId } = {}) {
+    this._requireReady();
+    const actor = game.actors?.get(actorId);
+    const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
+    const resolved = resolveAdvanceSources({ actor, run, fromUuid: globalThis.fromUuidSync });
+    if (resolved.blocked) {
+      return {
+        success: false,
+        message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner'),
+      };
+    }
+    const result = await this.craftingEngine.cancelCraft(
+      actor,
+      resolved.componentSourceActors,
+      runId
+    );
+    if (result?.success && result.cancelled) {
+      let key = 'FABRICATE.App.Journal.Actions.Cancelled';
+      if (result.refunded) {
+        key = 'FABRICATE.App.Journal.Actions.CancelledRefunded';
+      } else if (result.partialRefund) {
+        // A partial reversal must not claim a full return: some inputs came back but
+        // others (or the currency refund) could not be restored.
+        key = 'FABRICATE.App.Journal.Actions.CancelledPartial';
+      }
+      return { ...result, message: localizeGathering(key) };
+    }
+    return result;
+  }
+
+  /**
    * Quick craft helper - craft a recipe for an actor
    * @param {Actor} actor - The actor performing the craft
    * @param {string|Recipe} recipe - Recipe ID or Recipe object

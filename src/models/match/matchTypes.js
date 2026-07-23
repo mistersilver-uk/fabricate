@@ -20,7 +20,7 @@
  * @property {(match: object, options: {requireComplete?: boolean}) => string[]} validate
  * @property {(match: object) => (string|null)} signature
  * @property {(match: object, systemComponents: object[]) => Set<string>} expandToComponentIds
- * @property {(match: object, item: object, options: {features?: object}) => boolean} matchesItem
+ * @property {(match: object, item: object, options: {features?: object, itemTags?: string[]}) => boolean} matchesItem
  * @property {(match: object) => (string|null)} getComponentId
  * @property {(match: object, options: {quantity?: number}) => string} describe
  * @property {(match: object, options: {affordCurrency?: (match: object) => boolean}) => boolean} affords
@@ -142,14 +142,19 @@ const tagsHandler = {
     );
   },
 
-  matchesItem(match, item, { features } = {}) {
+  matchesItem(match, item, { features, itemTags } = {}) {
     if (!features?.enableTags) return false;
     const requiredTags = Array.isArray(match?.tags) ? match.tags : [];
-    const itemTags = getFabricateFlag(item, 'tags', []);
+    // Authored tags live on the managed COMPONENT definition, not on the owned
+    // item's own flags — Fabricate never stamps `flags.fabricate.tags` onto
+    // inventory items (issue 857). A caller with component context (the craft-time
+    // matcher) resolves the item's component tags and passes them as `itemTags`;
+    // absent that (the model-only path) fall back to the item's own tag flag.
+    const resolvedTags = Array.isArray(itemTags) ? itemTags : getFabricateFlag(item, 'tags', []);
     const matched =
       match?.tagMatch === 'all'
-        ? requiredTags.every((tag) => itemTags.includes(tag))
-        : requiredTags.some((tag) => itemTags.includes(tag));
+        ? requiredTags.every((tag) => resolvedTags.includes(tag))
+        : requiredTags.some((tag) => resolvedTags.includes(tag));
     return matched;
   },
 

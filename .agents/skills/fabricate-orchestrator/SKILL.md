@@ -15,7 +15,8 @@ Make behavior changes here, not in the bindings.
 - `openspec/README.md` for the issue-based change-delta format and managed-block rules
 - the work's GitHub issue context supplied by the workflow driver, including any existing `openspec-delta` block
 - relevant canonical specs under `openspec/specs/`
-- the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills
+- the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills, together with its `Family` table for a model-tiered family
+- the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder, its stage thresholds, the model-tier floors, the `HIGH_RISK_PATHS` list, and the `ESCALATE_TIER` protocol
 - `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for isolated lane assignment, integration, artifacts, feedback, and cleanup
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
 
@@ -54,6 +55,7 @@ If the current branch is `main`, the driver creates or switches to a task branch
    - If the work originates from a prompt with no issue, the driver creates one from the `OpenSpec Change Delta` issue template (`.github/ISSUE_TEMPLATE/openspec_change.md`).
 4. Resolve the roster mechanically: apply the numbered procedure under `### Auto-spawn routing` in `AGENTS.md` — match the planned affected-file list against each row's path globs and take the union of every matching row's agents.
 Record the resolved roster in the delta block's `### Resolved Roster` section, split by stage.
+The roster records **family** tokens and stages, never model tiers: the resolved model tier is per-spawn and belongs in each lane's assignment brief, because the roster is authored at plan time when the post-implementation diff does not yet exist.
 5. Draft the complete `openspec-delta` managed block before any code changes happen.
 A spawned helper returns that draft or replacement text to the driver without mutating the issue.
 The driver alone applies it to the issue, preserving reporter text outside the markers and replacing the block **in place** on later iterations rather than appending a second block.
@@ -65,6 +67,7 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
    - implementation/design decisions
    - dependency boundaries, split points, and test seams when JavaScript structure is part of the task
    - affected files
+   - a literal `Lane surface: new-module | new-export | persisted-shape | none` field on every `### Tasks` entry, so model-tier rule 2 reads a lookup rather than prose
    - the canonical `openspec/specs/<domain>/spec.md` requirement changes, written under `### Spec Deltas` with `##### Added/Modified/Removed Requirements` so reviewers can compare them against the real `openspec/specs/` diff (include this section only when canonical requirements change)
    - verification plan
    - acceptance criteria
@@ -79,6 +82,7 @@ Treat any `BLOCKED` verdict as a stop condition.
 Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once all plan reviewers approve.
 9. Before mutable implementation fan-out, require an approved delta, the final roster, a clean committed coordinator baseline, disjoint path ownership, and integrated dependencies, then create each assigned lane according to `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
+For every spawn of a model-tiered family, resolve exactly one model tier first, keyed on the `(family token, stage, revision)` triple, by applying the ladder in `AGENTS.md` to the facts already held at that point, then record the resolved model tier and those facts in the lane brief.
 10. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
 When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster, supplying them the issue delta alongside the diff.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta and confirm a faithful realization (or flag a justified deviation for reconciliation).
@@ -105,6 +109,11 @@ Return the PR to draft and repeat the mandatory delivery steps after any failure
 Only the driver may apply planning changes to the issue's `openspec-delta` block or mutate other workflow state.
 - Reviewers in every loop return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
 They must not post verdicts (or other workflow notes) as GitHub issue or PR comments.
+- Treat `ESCALATE_TIER: <reason>` as a non-verdict return, available only to the six model-tiered families.
+It never satisfies a loop's acceptance condition and is not a stop condition; an untiered role returns `BLOCKED` with the reason instead.
+Honour it only for a lane proven clean at its assigned base with zero commits, dispose that lane, and respawn the same assignment one model tier up without consuming a revision, at most once per `(family, stage, revision)`.
+A second escalation in the same revision, or one from a lane already at the most capable model tier, is `BLOCKED`.
+- When a `small` spawn escalates on a recurring assignment shape, recommend moving that shape up the ladder in `AGENTS.md` rather than absorbing the repeat cost each time.
 - Do not allow mutable agent work to continue on `main`.
 - Do not let spawned agents share the coordinator checkout or another lane, push, mutate GitHub state, integrate commits, or manage worktrees.
 - Require the full assignment and handoff contract from `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for every spawned role.

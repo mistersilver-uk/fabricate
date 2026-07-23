@@ -1,6 +1,7 @@
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 
 import {
+  buildCurrencyRefundUpdates,
   buildCurrencySpendUpdates,
   currencyTotalForBase,
   formatCurrencyRequirement,
@@ -168,6 +169,27 @@ export class ActorPropertyCoinSpender {
     }
     return { valid: true, formatted: spend.formatted };
   }
+
+  /**
+   * Refund a previously spent requirement (issue 848) — adds `amount` of the unit's own
+   * denomination back to the actor's balance via a single batched `actor.update(...)`.
+   * @param {object} actor
+   * @param {{ unit: object, amount: number }} requirement
+   * @param {{ profile: object }} profileContext
+   * @returns {Promise<{ valid: boolean, message?: string }>}
+   */
+  async refund(actor, { unit, amount } = {}, { profile } = {}) {
+    const refund = buildCurrencyRefundUpdates(
+      actor,
+      { unit: unit?.id, amount },
+      profile?.units || []
+    );
+    if (!refund.valid) return { valid: false, message: refund.message };
+    if (Object.keys(refund.updates || {}).length > 0) {
+      await actor.update(refund.updates);
+    }
+    return { valid: true, formatted: refund.formatted };
+  }
 }
 
 /**
@@ -260,16 +282,45 @@ export class ActorInventoryCoinSpender {
       };
     }
   }
+
+  /**
+   * Refund a previously spent requirement (issue 848). Delegates to the per-system coin adapter's
+   * `refund` (falling back to an `addCoins` capability when present). When the adapter offers no
+   * refund capability the refund fails loudly with a clear message rather than silently losing coins.
+   * @param {object} actor
+   * @param {{ unit: object, amount: number }} requirement
+   * @param {{ profile: object }} profileContext
+   * @returns {Promise<{ valid: boolean, message?: string }>}
+   */
+  async refund(actor, requirement, { profile } = {}) {
+    const { systemId, adapter } = this._resolveAdapter();
+    const refund = adapter?.refund ?? adapter?.addCoins;
+    if (typeof refund !== 'function') {
+      return {
+        valid: false,
+        message: `No currency inventory refund is available for system "${systemId || 'unknown'}".`,
+      };
+    }
+    try {
+      return (await refund.call(adapter, actor, requirement)) ?? { valid: true };
+    } catch (error) {
+      console.error('Fabricate | Failed to refund inventory currency', error);
+      return {
+        valid: false,
+        message: `Could not refund currency (${formatCurrencyRequirement(requirement, profile?.units || [])}).`,
+      };
+    }
+  }
 }
 
 /**
  * Macro-backed actor-inventory spender. Under the `actorInventory` strategy's `macro` mode the
- * GM supplies their own currency macros: `canAfford` gates the craft and `decrement` spends. The
- * configured `increment` macro is stored for a future refund flow but is NEVER invoked here (no
- * dead `refund()` method). Both `check` and `spend` build the agreed context (supplied by the
- * engine via `ctx.macroContext`) and pass the macro's return value through the shared, pure
- * {@link interpretMacroSpendResult}, so a `false`/`null`/throw aborts the craft loudly rather than
- * granting a silent free craft.
+ * GM supplies their own currency macros: `canAfford` gates the craft, `decrement` spends, and
+ * `increment` refunds. The `increment` macro is invoked by {@link refund} on the player-cancel
+ * reversal (issue 848) — the refund flow it was always reserved for. Every macro path builds the
+ * agreed context (supplied by the engine via `ctx.macroContext`) and passes the macro's return
+ * value through the shared, pure {@link interpretMacroSpendResult}, so a `false`/`null`/throw
+ * aborts loudly rather than silently granting a free craft or dropping a refund.
  */
 export class MacroCoinSpender {
   /**
@@ -316,5 +367,14 @@ export class MacroCoinSpender {
    */
   async spend(actor, requirement, ctx = {}) {
     return this._runMacroKey('decrement', actor, requirement, ctx);
+  }
+
+  /**
+   * Refund (issue 848) — runs the GM-supplied `increment` macro. This is the refund flow the
+   * `increment` macro was always reserved for; a missing macro fails loudly via {@link _runMacroKey}.
+   * @returns {Promise<{ valid: boolean, message?: string }>}
+   */
+  async refund(actor, requirement, ctx = {}) {
+    return this._runMacroKey('increment', actor, requirement, ctx);
   }
 }

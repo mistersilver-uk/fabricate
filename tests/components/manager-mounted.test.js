@@ -3983,6 +3983,45 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('SystemEditView: refund-on-player-cancel renders after Time requirements and is disabled while it is off (issue 848)', () => {
+    // A player can only cancel a TIMED craft, so the refund toggle is inapplicable —
+    // greyed + non-interactive — while Time requirements is off.
+    mountSystemEditView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'System One',
+        resolutionMode: 'simple',
+        features: { refundOnPlayerCancel: true },
+        requirements: { time: { enabled: false } },
+      },
+    });
+    const refund = target.querySelector('[data-system-refund-toggle]');
+    assert.ok(refund, 'the refund-on-player-cancel toggle renders');
+    assert.equal(refund.disabled, true, 'the toggle is disabled while Time requirements is off');
+    const tile = target.querySelector('[data-feature-key="refundOnPlayerCancel"]');
+    assert.ok(tile.classList.contains('is-feature-disabled'), 'the tile is greyed while disabled');
+    const timeTile = target.querySelector('[data-feature-key="time"]');
+    assert.ok(
+      timeTile.compareDocumentPosition(tile) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the refund tile is rendered AFTER the Time requirements tile'
+    );
+  });
+
+  it('SystemEditView: refund-on-player-cancel is interactive when Time requirements is on (issue 848)', () => {
+    mountSystemEditView({
+      selectedSystem: {
+        id: 'sys1',
+        name: 'System One',
+        resolutionMode: 'simple',
+        features: { refundOnPlayerCancel: true },
+        requirements: { time: { enabled: true } },
+      },
+    });
+    const refund = target.querySelector('[data-system-refund-toggle]');
+    assert.ok(refund, 'the refund toggle renders');
+    assert.equal(refund.disabled, false, 'the toggle is interactive when Time requirements is on');
+  });
+
   // The per-recipe visibility card is GONE (issue 643 §2c). It was a legacy surface
   // editing legacy fields: gated on the superseded `recipeVisibility.listMode`, writing
   // `recipe.visibility { restricted, allowedUserIds }` whose canonical successor is

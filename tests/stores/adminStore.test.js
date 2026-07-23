@@ -88,7 +88,7 @@ function createMockServices(overrides = {}) {
     lastManagedCraftingSystem: '',
   };
 
-  let systems = [makeSystem({ id: 'sys1', name: 'System One' })];
+  let systems = overrides.systems || [makeSystem({ id: 'sys1', name: 'System One' })];
   let recipes = [makeRecipe({ id: 'r1', name: 'Recipe One', craftingSystemId: 'sys1' })];
 
   const mockSystemManager = {
@@ -264,6 +264,38 @@ describe('createAdminStore', () => {
       assert.equal(get(store.selectedSystemId), 'sys1');
       assert.equal(vs.selectedSystem?.id, 'sys1');
       assert.equal(vs.systems[0].selected, true);
+    });
+
+    it('projects features.refundOnPlayerCancel (default ON) into the selected system', async () => {
+      // The projection is a hand-built allowlist: without the projected field the
+      // player-cancel refund toggle (issue 848) would be invisible to the manager UI.
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.refresh();
+      await store.selectSystem('sys1');
+      const selected = get(store.viewState).selectedSystem;
+      assert.equal(
+        selected.features.refundOnPlayerCancel,
+        true,
+        'a system with no explicit flag defaults to refunding on cancel'
+      );
+    });
+
+    it('projects an explicit features.refundOnPlayerCancel:false as forfeit-on-cancel', async () => {
+      const services = createMockServices({
+        systems: [
+          makeSystem({ id: 'sys1', name: 'System One', features: { refundOnPlayerCancel: false } }),
+        ],
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+      await store.selectSystem('sys1');
+      const selected = get(store.viewState).selectedSystem;
+      assert.equal(
+        selected.features.refundOnPlayerCancel,
+        false,
+        'an explicit false projects through as forfeit-on-cancel'
+      );
     });
 
     it('restores selected system from lastManagedCraftingSystem setting', () => {

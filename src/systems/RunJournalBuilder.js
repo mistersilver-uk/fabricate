@@ -361,6 +361,13 @@ export class RunJournalBuilder {
       // A redacted run hides its recipe identity, so it cannot offer a manual
       // "Trigger Next Step" advance — only a discovered crafting run can.
       manualAdvance: !redacted,
+      // A player may cancel their own in-progress craft (issue 848) only on an OWNED
+      // actor (the engine writes items with no GM relay), and only while the run is
+      // live (not terminal) and discovered (not redacted). `refundOnCancel` mirrors
+      // the owning system's `features.refundOnPlayerCancel` (default ON) so the UI can
+      // tell the player whether inputs will be returned before they confirm.
+      canCancel: !terminal && !redacted && actor?.isOwner === true,
+      refundOnCancel: system?.features?.refundOnPlayerCancel !== false,
     };
   }
 

@@ -1,7 +1,7 @@
 name = "fabricate_orchestrator"
 description = "Plan and coordinate Fabricate issue work into an OpenSpec change delta in the issue, without changing production code."
-model = "gpt-5.5"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Planner", "Coordinator", "Router"]
 

@@ -204,6 +204,44 @@ test('projects a crafting RunModel with stepLabel, per-step timeGate, and stepNa
   assert.deepEqual(run.steps[1].timeGate, run.timeGate);
 });
 
+test('canCancel is true only for an owned, live, discovered crafting run (issue 848)', () => {
+  const ownedActor = { ...ACTOR, isOwner: true };
+  const owned = makeBuilder({ active: [activeCraftingRun()] }).buildListing({
+    actor: ownedActor,
+    viewer: PLAYER,
+  }).activeRuns[0];
+  assert.equal(owned.canCancel, true, 'an owned in-progress run is cancellable');
+  // SYSTEM carries no explicit refundOnPlayerCancel, so it defaults to refunding.
+  assert.equal(owned.refundOnCancel, true, 'default-ON refund policy projects through');
+});
+
+test('canCancel is false for a run on an actor the viewer does not own', () => {
+  const notOwnedActor = { ...ACTOR, isOwner: false };
+  const notOwned = makeBuilder({ active: [activeCraftingRun()] }).buildListing({
+    actor: notOwnedActor,
+    viewer: PLAYER,
+  }).activeRuns[0];
+  assert.equal(notOwned.canCancel, false, 'a non-owner cannot cancel');
+});
+
+test('canCancel is false for a terminal (history) crafting run', () => {
+  const ownedActor = { ...ACTOR, isOwner: true };
+  const terminal = makeBuilder({ history: [terminalCraftingRun()] }).buildListing({
+    actor: ownedActor,
+    viewer: PLAYER,
+  }).history[0];
+  assert.equal(terminal.canCancel, false, 'a finished run is not cancellable');
+});
+
+test('refundOnCancel mirrors the system features.refundOnPlayerCancel toggle', () => {
+  const forfeitSystem = { ...SYSTEM, features: { ...SYSTEM.features, refundOnPlayerCancel: false } };
+  const ownedActor = { ...ACTOR, isOwner: true };
+  const run = makeBuilder({ active: [activeCraftingRun()], system: forfeitSystem })
+    .buildListing({ actor: ownedActor, viewer: PLAYER })
+    .activeRuns[0];
+  assert.equal(run.refundOnCancel, false, 'an explicit false projects as forfeit-on-cancel');
+});
+
 test('derivedStatus is waiting before the gate matures and ready after (not from run.status)', () => {
   const waiting = makeBuilder({ active: [activeCraftingRun()], worldTime: 200 }).buildListing({
     actor: ACTOR,
@@ -363,6 +401,12 @@ test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () =
   assert.equal(redacted.stepLabel, '');
   // A hidden-identity run offers no "Trigger Next Step" advance.
   assert.equal(redacted.manualAdvance, false);
+  // ...nor a player cancel (issue 848): a redacted run cannot be self-cancelled even by
+  // an owner, since surfacing the affordance would leak that a run exists to cancel.
+  const redactedOwned = makeBuilder({ active: [activeCraftingRun()], recipeVisibility })
+    .buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER })
+    .activeRuns[0];
+  assert.equal(redactedOwned.canCancel, false, 'a redacted run is never cancellable');
 
   const visible = makeBuilder({ active: [activeCraftingRun()], recipeVisibility }).buildListing({
     actor: ACTOR,
