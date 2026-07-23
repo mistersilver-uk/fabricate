@@ -73,6 +73,7 @@ function simpleSystem(overrides = {}) {
     name: 'Survival',
     resolutionMode: 'simple',
     features: { multiStepRecipes: true, ...(overrides.features || {}) },
+    requirements: { time: { enabled: true }, ...(overrides.requirements || {}) },
     // The reported case: checks disabled with no authored simple formula.
     craftingCheck: {
       enabled: false,
@@ -98,7 +99,7 @@ function ingredientSet(id, options) {
 }
 
 // The Tent recipe from Gavin's export: two explicit steps, empty top-level arrays.
-function tentRecipe(extra = {}) {
+function tentRecipe({ stepDurations = [null, null], ...extra } = {}) {
   return new Recipe({
     id: 'recipe-tent',
     name: 'Tent',
@@ -110,6 +111,7 @@ function tentRecipe(extra = {}) {
       {
         id: 'step-1',
         name: 'Step 1',
+        timeRequirement: stepDurations[0],
         ingredientSets: [
           ingredientSet('set-1', [
             { componentId: 'c-leather', quantity: 5 },
@@ -123,6 +125,7 @@ function tentRecipe(extra = {}) {
       {
         id: 'step-2',
         name: 'Step 2',
+        timeRequirement: stepDurations[1],
         ingredientSets: [ingredientSet('set-2', [{ componentId: 'c-lumber', quantity: 1 }])],
         resultGroups: [
           { id: 'rg-2', name: 'Tent', results: [{ componentId: 'c-tent', quantity: 1 }] },
@@ -228,6 +231,53 @@ test('carries a steps[] projection with both steps requirements + per-step craft
   assert.deepEqual(stepTwoNames, ['Lumber']);
 });
 
+test('projects each timed step duration and a field-wise multi-step aggregate', () => {
+  const model = buildOne({
+    recipe: tentRecipe({
+      stepDurations: [
+        { minutes: 30, hours: 0, days: 1, months: 0, years: 0 },
+        { minutes: 0, hours: 1, days: 0, months: 2, years: 0 },
+      ],
+    }),
+    items: stockedActor(),
+  });
+
+  assert.deepEqual(model.steps.map((step) => step.duration), [
+    { minutes: 30, hours: 0, days: 1, months: 0, years: 0 },
+    { minutes: 0, hours: 1, days: 0, months: 2, years: 0 },
+  ]);
+  assert.deepEqual(
+    model.duration,
+    { minutes: 30, hours: 1, days: 1, months: 2, years: 0 },
+    'authored units are summed field-wise without calendar conversion'
+  );
+  assert.equal('time' in model.result, false, 'duration stays separate from terminal result');
+});
+
+test('omits instant step durations and aggregates only positive timed steps', () => {
+  const model = buildOne({
+    recipe: tentRecipe({
+      stepDurations: [
+        { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+        { minutes: 0, hours: 0, days: 0, months: 0, years: 0 },
+      ],
+    }),
+    items: stockedActor(),
+  });
+
+  assert.deepEqual(model.duration, {
+    minutes: 30,
+    hours: 0,
+    days: 0,
+    months: 0,
+    years: 0,
+  });
+  assert.deepEqual(model.steps.map((step) => step.duration), [
+    { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+    null,
+  ]);
+});
+
 test('labels an unnamed step by its 1-based position (never the id)', () => {
   const recipe = tentRecipe();
   recipe.steps[0].name = '';
@@ -277,6 +327,46 @@ test('a single-step simple recipe is unchanged: steps[] is empty', () => {
   assert.equal(recipe.result.items[0].name, 'Tent');
 });
 
+test('projects an implicit recipe duration separately from its terminal result', () => {
+  const single = new Recipe({
+    id: 'recipe-single-timed',
+    name: 'Rope',
+    craftingSystemId: 'sys-survival',
+    complex: false,
+    timeRequirement: { minutes: 15, hours: 2, days: 0, months: 0, years: 0 },
+    ingredientSets: [ingredientSet('set-rope', [{ componentId: 'c-cloth', quantity: 3 }])],
+    resultGroups: [{ id: 'rg', name: 'Rope', results: [{ componentId: 'c-tent', quantity: 1 }] }],
+  });
+  const model = buildOne({ recipe: single, items: [new FakeItem('Cloth Scrap', 3)] });
+
+  assert.deepEqual(model.duration, {
+    minutes: 15,
+    hours: 2,
+    days: 0,
+    months: 0,
+    years: 0,
+  });
+  assert.equal('time' in model.result, false);
+});
+
+test('suppresses authored recipe and step durations when time requirements are disabled', () => {
+  const source = tentRecipe({
+    stepDurations: [
+      { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+      { minutes: 0, hours: 1, days: 0, months: 0, years: 0 },
+    ],
+  });
+  const model = buildOne({
+    system: simpleSystem({ requirements: { time: { enabled: false } } }),
+    recipe: source,
+    items: stockedActor(),
+  });
+
+  assert.equal(model.duration, null);
+  assert.deepEqual(model.steps.map((step) => step.duration), [null, null]);
+  assert.equal(source.steps[0].timeRequirement.minutes, 30, 'projection does not mutate authoring');
+});
+
 // ---------------------------------------------------------------------------
 // Teaser redaction keeps steps: []
 // ---------------------------------------------------------------------------
@@ -317,6 +407,8 @@ test('teaser redaction: steps[] and detail are redacted for a non-GM teaser', ()
     viewer: { id: 'player-1', isGM: false },
   }).recipes[0];
   assert.deepEqual(model.steps, [], 'no step data leaks on a teaser');
+  assert.equal(model.duration, null, 'no aggregate or recipe duration leaks on a teaser');
+  assert.equal('time' in model.result, false, 'duration is not smuggled through terminal result');
   assert.equal(model.browseStatus, 'discovery');
 });
 

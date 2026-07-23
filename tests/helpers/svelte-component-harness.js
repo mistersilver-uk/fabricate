@@ -27,9 +27,13 @@ export function rewriteClientImports(code) {
 export function installComponentTestGlobals() {
   globalThis.Text = document.createTextNode('').constructor;
   globalThis.Comment = document.createComment('').constructor;
+  const labels = {
+    'FABRICATE.App.Crafting.Detail.Duration': 'Duration',
+    'FABRICATE.App.Crafting.Detail.TotalDuration': 'Total duration'
+  };
   globalThis.game = {
     i18n: {
-      localize: (key) => key,
+      localize: (key) => labels[key] ?? key,
       format: (key, data) => `${key}:${JSON.stringify(data)}`
     }
   };

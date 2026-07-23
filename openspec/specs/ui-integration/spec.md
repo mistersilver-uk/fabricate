@@ -1287,10 +1287,13 @@ Alchemy is the only conditional entry; the others are always present.
 - Each `RecipeListingModel` carries `modeToken` plus a localized `modeLabel`
   (resolved through the resolution-mode label keys — the raw `simple` token is
   never surfaced to the UI), `browseStatus`, per-set `ingredientSets[].craftability`,
-  an optional `check` descriptor, `outcomeTiers`, and `result`.
+  an optional `check` descriptor, `outcomeTiers`, a presentation-only `duration`,
+  and `result`.
   `result` reflects the recipe's terminal execution step in `simple` mode, and a
   `simple` multi-step model additionally carries a `steps[]` per-step requirement
   projection (empty for single-step recipes and outside `simple` mode).
+  `duration` is separate from the terminal `result` projection and never changes
+  persisted recipe or run data.
 - The `check` descriptor's `dc` is resolved per-recipe, not per-system: the
   recipe's selected difficulty tier (`recipe.checkTierId` → the matching
   `craftingCheck.*` slot's `tiers[].dc`) wins, falling back to the slot's static
@@ -1329,10 +1332,25 @@ Because an explicit multi-step recipe holds its sets on `steps[]` and leaves the
 A single-step recipe is unaffected: its implicit step shares the top-level arrays.
 - When a recipe resolves to more than one execution step in `simple` mode, the `RecipeListingModel` carries a `steps[]` array.
 Each entry surfaces the step's label (author name or 1-based position, never its id), its required materials with per-step craftability (Have / Need / Missing), and the components that step produces.
+Each entry also carries its effective authored `duration` when the step is timed.
 The `simple`-mode detail body renders these as an ordered list of per-step requirement blocks — a static preview of the whole recipe, not a live run-progress tracker.
 Each block renders inputs only; intermediate step yields are not shown.
 A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
 A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
+- A fully revealed timed implicit recipe projects its positive authored
+  `timeRequirement` as `RecipeListingModel.duration`.
+  For a fully revealed `simple` recipe with more than one execution step, each
+  `steps[]` entry projects that step's positive authored requirement as `duration`,
+  and `RecipeListingModel.duration` is the field-wise sum of the five authored
+  fields (`minutes`, `hours`, `days`, `months`, and `years`).
+  The projection preserves authored units and does not perform calendar-dependent
+  conversion.
+  Missing, non-positive, and instant durations project as `null`.
+- When `requirements.time.enabled === false`, recipe and step durations project as
+  `null`, because crafting resolves immediately even when preserved authoring still
+  contains time requirements.
+  A Discovery-Mode teaser always exposes `duration: null` and `steps: []`, so timing
+  cannot leak through either the aggregate or a step.
 - In `simple` mode the listing's top-level expected output (`result`) is resolved from the recipe's **terminal** execution step's result groups (against that step's own set), so a multi-step recipe's PRODUCES is its final product rather than the first step's intermediate output.
 Single-step recipes are unaffected (their only step is both first and terminal).
 `routedByCheck` continues to emit an empty top-level `result` (its output is per outcome tier); `routedByIngredients` and `progressive` multi-step PRODUCES is unchanged and must not be mis-routed.
@@ -1483,6 +1501,13 @@ It is offered only when the rendered order actually **differs** from the authore
   its own body (ingredient sets, routed-by-check outcome-tier table, progressive
   body, etc.).
 - Show the `modeLabel` rather than the raw mode token.
+- Before crafting begins, the detail header visibly shows a fully revealed timed
+  implicit recipe as localized `Duration: <value>`.
+  A fully revealed `simple` multi-step recipe instead shows the aggregate once as
+  localized `Total duration: <value>`, while every timed ordered step shows its
+  compact duration in a non-shrinking clock chip at the end of the label row.
+  Instant recipes and steps, time-feature-disabled systems, and Discovery-Mode
+  teasers show no duration value.
 - Show an ingredient-set selector when the recipe has more than one set; the
   detail reflects the chosen set's per-set craftability.
 - Show the `check` descriptor (DC / skill / roll formula) when present, marking it

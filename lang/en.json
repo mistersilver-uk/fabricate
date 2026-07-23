@@ -599,6 +599,7 @@
         "Detail": {
           "SelectHint": "Select a recipe to see how to craft it.",
           "Duration": "Duration",
+          "TotalDuration": "Total duration",
           "IngredientSetsTitle": "Ingredient options",
           "OutcomesTitle": "Outcomes",
           "NoOutcomes": "This recipe has no routable outcomes configured.",

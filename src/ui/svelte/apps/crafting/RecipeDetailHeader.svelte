@@ -24,14 +24,23 @@
   // Reuse the manager's compact formatter so both surfaces render durations identically.
   // A zero/absent duration is an instant craft — the chip is omitted entirely rather than
   // labelled, so an instant recipe shows no misleading time.
-  const durationTime = $derived(recipe?.result?.time ?? null);
+  const durationTime = $derived(recipe?.duration ?? null);
   const hasDuration = $derived(
     !!durationTime &&
       typeof durationTime === 'object' &&
       TIME_UNITS.some((unit) => Number(durationTime[unit] || 0) > 0)
   );
   const durationLabel = $derived(hasDuration ? formatTimeRequirementCompact(durationTime) : '');
-  const durationTitle = $derived(localize('FABRICATE.App.Crafting.Detail.Duration'));
+  const isMultiStep = $derived(
+    recipe?.modeToken === 'simple' && Array.isArray(recipe?.steps) && recipe.steps.length > 1
+  );
+  const durationTitle = $derived(
+    localize(
+      isMultiStep
+        ? 'FABRICATE.App.Crafting.Detail.TotalDuration'
+        : 'FABRICATE.App.Crafting.Detail.Duration'
+    )
+  );
   const descriptor = $derived(craftingRecipeStatus(status));
   // Danger tone === the player cannot craft this (missing materials). Gate on the
   // tone so the presentation map stays the single source of truth, mirroring the
@@ -79,11 +88,12 @@
           <span
             class="crafting-detail-duration-chip"
             data-recipe-duration
+            data-recipe-duration-kind={isMultiStep ? 'total' : 'recipe'}
             title={durationTitle}
             aria-label={`${durationTitle}: ${durationLabel}`}
           >
             <i class="fas fa-clock" aria-hidden="true"></i>
-            <span>{durationLabel}</span>
+            <span>{durationTitle}: {durationLabel}</span>
           </span>
         {/if}
         <!-- Uncraftable moves the status onto the thumbnail pip, so the labelled
