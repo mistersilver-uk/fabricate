@@ -25,11 +25,22 @@
    - selectedRecipeItemId: the row currently open in the inspector.
    - onSelectRecipeItem(id): select a row (opens the inspector).
    - onOpenRecipeItem(id): open the per-item editor (Edit pencil).
-   - onCreateRecipeItem(): create a new recipe item.
+   - onDropRecipeItem(uuid): create a recipe item from a dropped world/compendium
+     Item's resolved UUID (the drop-zone creation path — issue 844).
+   - dropEnabled: whether the creation drop-zone accepts drops (a system is selected).
    - onToggleEnabled(id, enabled): flip a recipe item's enabled flag.
+
+  Creation is a DROP-ZONE, not a modal (issue 844). The former "Create recipe item"
+  button opened a picker seeded ONLY from `game.items` (world items), which is empty
+  in a fresh world, so it rendered an unusable/blank window and a GM in a new world
+  could never make a recipe item. Dragging a world OR compendium Item onto the zone
+  resolves its UUID (`resolveDropData`, the same helper the components view and the
+  recipe-item Overview tab use) and hands it upstream to create + link the definition.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { dragDrop } from '../../actions/dragDrop.js';
+  import { resolveDropData } from '../../util/dropUtils.js';
   import Pagination from '../../components/Pagination.svelte';
 
   let {
@@ -39,7 +50,8 @@
     selectedRecipeItemId = '',
     onSelectRecipeItem = () => {},
     onOpenRecipeItem = () => {},
-    onCreateRecipeItem = () => {},
+    onDropRecipeItem = () => {},
+    dropEnabled = false,
     onToggleEnabled = () => {}
   } = $props();
 
@@ -48,10 +60,27 @@
   let capFilter = $state('all');
   let pageIndex = $state(0);
   let pageSize = $state(10);
+  // A malformed drop (a non-Item document, or an unpersisted Item with no UUID)
+  // flips this so the zone shows an inline error rather than silently no-opping —
+  // never a blank/crashed window.
+  let dropError = $state(false);
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // Dropping a persisted world or compendium Item carries a resolvable UUID; a
+  // non-Item document or an unpersisted { type: 'Item' } drop with no uuid surfaces
+  // the error state instead of creating anything.
+  function handleRecipeItemDrop(data) {
+    const { uuid, type } = resolveDropData(data);
+    if (type !== 'Item' || !uuid) {
+      dropError = true;
+      return;
+    }
+    dropError = false;
+    onDropRecipeItem(uuid);
   }
 
   const isItemMode = $derived(visibilityMode === 'item');
@@ -174,15 +203,23 @@
       <h2 class="manager-title">{text('FABRICATE.Admin.Manager.BooksScrolls.Library', 'Books & Scrolls')}</h2>
       <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.BooksScrolls.LibraryHint', 'Recipe items that grant recipes when read. Set their contents, uses and learning limits.')}</p>
     </div>
-    <button
-      type="button"
-      class="manager-button is-primary manager-books-scrolls-create"
-      data-books-scrolls-create
-      onclick={() => onCreateRecipeItem()}
-    >
-      <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.BooksScrolls.Create', 'Create recipe item')}</span>
-    </button>
+  </section>
+
+  <section
+    class={`manager-books-scrolls-drop-zone ${dropError ? 'is-error' : ''}`}
+    data-books-scrolls-drop-zone
+    use:dragDrop={{ onDrop: handleRecipeItemDrop, disabled: !dropEnabled, activeClass: 'is-drop-active' }}
+    aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneLabel', 'Drop a world or compendium item to create a recipe item')}
+  >
+    <i class={dropError ? 'fas fa-triangle-exclamation' : 'fas fa-hand-pointer'} aria-hidden="true"></i>
+    <span class="manager-books-scrolls-drop-copy">
+      <strong>{text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneTitle', 'Drop an item to create a recipe item')}</strong>
+      {#if dropError}
+        <small class="manager-books-scrolls-drop-error" data-books-scrolls-drop-error>{text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneError', 'That drop was not a game-world or compendium item. Drag an Item (book, scroll, or any item) here.')}</small>
+      {:else}
+        <small>{text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneHint', 'Drag a world or compendium item here to make it a book or scroll that teaches recipes.')}</small>
+      {/if}
+    </span>
   </section>
 
   <section class="manager-toolbar" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}>
@@ -226,11 +263,7 @@
         <div>
           <i class="fas fa-book-sparkles" aria-hidden="true"></i>
           <h3>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyHint', 'Create a recipe item and link recipes to it, and it will appear here.')}</p>
-          <button type="button" class="manager-button is-primary" data-books-scrolls-empty-create onclick={() => onCreateRecipeItem()}>
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.BooksScrolls.Create', 'Create recipe item')}</span>
-          </button>
+          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyHint', 'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.')}</p>
         </div>
       </div>
     {:else if filteredItems.length === 0}
@@ -336,6 +369,74 @@
   .manager-books-scrolls-main {
     gap: var(--fab-space-3);
     min-height: 0;
+  }
+
+  /* Creation drop-zone (issue 844). A dashed banner that owns its OWN vocabulary
+     rather than borrowing the components view's `.manager-component-drop-zone` — a
+     surface that borrows a neighbour's class silently inherits that neighbour's ramp
+     (the Books & Scrolls tab's own header comment records that trap). It accepts a
+     dragged world/compendium Item and turns amber on an invalid drop. */
+  .manager-books-scrolls-drop-zone {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: var(--fab-space-3);
+    align-items: center;
+    min-width: 0;
+    padding: var(--fab-space-3);
+    border: 1px dashed var(--fab-mv2-border-strong);
+    border-radius: var(--fab-v2-radius-panel);
+    color: var(--fab-mv2-text);
+    background: var(--fab-surface-soft);
+  }
+
+  .manager-books-scrolls-drop-zone.is-drop-active {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+  }
+
+  .manager-books-scrolls-drop-zone.is-error {
+    border-color: var(--fab-warning-border);
+    background: var(--fab-warning-soft);
+  }
+
+  .manager-books-scrolls-drop-zone > i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: var(--fab-v2-radius-control);
+    color: var(--fab-mv2-accent);
+    background: var(--fab-bg-3);
+  }
+
+  .manager-books-scrolls-drop-zone.is-error > i {
+    color: var(--fab-warning-text);
+  }
+
+  .manager-books-scrolls-drop-copy {
+    display: block;
+    min-width: 0;
+  }
+
+  .manager-books-scrolls-drop-copy strong {
+    display: block;
+    font-size: 0.86rem;
+    line-height: 1.25;
+  }
+
+  .manager-books-scrolls-drop-copy small {
+    display: block;
+    margin-top: var(--fab-space-2xs);
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: var(--fab-text-muted);
+    overflow-wrap: break-word;
+  }
+
+  .manager-books-scrolls-drop-copy small.manager-books-scrolls-drop-error {
+    color: var(--fab-warning-text);
   }
 
   .manager-books-scrolls-scroll {

@@ -7438,7 +7438,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('opens the item picker to create a recipe item and then opens its editor', async () => {
+  it('creates a recipe item by dropping a world/compendium item and then opens its editor', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -7451,9 +7451,6 @@ describe('CraftingSystemManager mounted behavior', () => {
         }),
         services: {
           openCurrentAdmin: () => {},
-          getWorldItemOptions: () => [
-            { uuid: 'Compendium.world.items.tome', name: 'Tome of Wonders', img: '', type: 'book' },
-          ],
         },
       },
     });
@@ -7465,22 +7462,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    // Create opens the router-owned item picker modal.
-    target.querySelector('[data-books-scrolls-create]').click();
-    await tick();
-    flushSync();
-    const pickerRow = document.querySelector('[data-item-picker-row]');
-    assert.ok(pickerRow, 'the item picker lists world items');
+    // Creation is a drop-zone now (issue 844) — the blank-window create dialog is gone.
+    assert.equal(target.querySelector('[data-books-scrolls-create]'), null, 'no create button');
+    const dropZone = target.querySelector('[data-books-scrolls-drop-zone]');
+    assert.ok(dropZone, 'the Books & Scrolls surface has a creation drop-zone');
 
-    // Picking an item adds the definition and opens its editor.
-    pickerRow.click();
+    // Dropping a compendium item (pack + id) resolves to a Compendium UUID and adds
+    // the definition, then routes to its editor.
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    dropEvent.dataTransfer = { getData: () => JSON.stringify({ type: 'Item', pack: 'world.items', id: 'tome' }) };
+    dropZone.dispatchEvent(dropEvent);
     await tick();
     flushSync();
     await tick();
     flushSync();
     assert.ok(
       calls.some((call) => call[0] === 'addRecipeItemFromUuid' && call[2] === 'Compendium.world.items.tome'),
-      'picking an item adds it via addRecipeItemFromUuid'
+      'dropping an item adds it via addRecipeItemFromUuid with the resolved uuid'
     );
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
   });
