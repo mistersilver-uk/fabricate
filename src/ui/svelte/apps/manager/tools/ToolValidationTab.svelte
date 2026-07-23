@@ -54,8 +54,9 @@
 </script>
 
 <div class="manager-tool-tab-stack" data-tool-validation-tab>
-  <section class="manager-tool-editor-card">
-    <div class="manager-tool-validation-summary">
+  <section class="manager-tool-validation">
+    <div class="manager-tool-validation-heading manager-tool-validation-summary" data-tool-validation-heading>
+      <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}</p><h3>{text('FABRICATE.Admin.Manager.Tools.Editor.ValidationHint', 'Check this Tool before saving')}</h3></div>
       <span class={`manager-chip ${invalidCount > 0 ? 'is-danger' : 'is-positive'}`} aria-label={invalidCount > 0 ? issueCountLabel : undefined}><i class={invalidCount > 0 ? 'fas fa-circle-exclamation' : 'fas fa-circle-check'} aria-hidden="true"></i>{invalidCount > 0 ? issueCountLabel : text('FABRICATE.Admin.Manager.Tools.ValidationValid', 'Ready to save')}</span>
     </div>
     <ul class="manager-tool-validation-checks" aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.ValidationChecks', 'Tool validation checks')}>
@@ -68,7 +69,7 @@
     </ul>
   </section>
   {#if validation.errors?.length}
-    <section class="manager-tool-editor-card manager-validation-error" role="alert" aria-live="assertive">
+    <section class="manager-validation-error manager-tool-validation-errors" role="alert" aria-live="assertive">
       <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.DomainErrors', 'Save blockers')}</h3>
       <ul data-tool-validation-errors>
         {#each validation.errors as error, index}

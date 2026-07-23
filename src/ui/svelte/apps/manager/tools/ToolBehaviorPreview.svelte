@@ -94,6 +94,40 @@
           text('FABRICATE.Admin.Manager.Tools.Editor.StatusIncomplete', 'Incomplete')
       : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
   );
+  const rules = $derived([
+    {
+      id: 'breakage',
+      icon: authority === 'checkDriven' ? 'fas fa-dice-d20' : 'fas fa-hourglass-half',
+      title: breakageLabel,
+      subtitle: authority === 'checkDriven'
+        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewCheckDriven', 'Check-driven · follows the crafting roll')
+        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewToolSpecific', 'Tool-specific · tracked per copy'),
+    },
+    {
+      id: 'on-break',
+      icon: immune ? 'fas fa-shield' : 'fas fa-heart-crack',
+      title: onBreakLabel,
+      subtitle: immune
+        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewInactive', 'Inactive while this Tool is immune')
+        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak', 'Runs immediately after breakage'),
+    },
+    {
+      id: 'prerequisites',
+      icon: 'fas fa-user-shield',
+      title: prerequisiteLabel,
+      subtitle: tool?.prerequisites?.enabled
+        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisites', 'A character must satisfy every selected prerequisite')
+        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoPrerequisites', 'Any character may use it'),
+    },
+    {
+      id: 'bonus',
+      icon: 'fas fa-plus-minus',
+      title: bonusLabel,
+      subtitle: tool?.bonus?.enabled
+        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus', 'Added to the crafting check')
+        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus', 'Adds nothing to the crafting check'),
+    },
+  ]);
 </script>
 
 <aside class="manager-tool-preview" data-tool-behavior-preview aria-label={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}>
@@ -108,12 +142,27 @@
       <i class={tool?.enabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check'} aria-hidden="true"></i>
       {tool?.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
     </span>
+    <div class="manager-tool-preview-chips">
+      <span class="manager-chip is-neutral"><i class="fas fa-heart-crack" aria-hidden="true"></i>{breakageLabel}</span>
+      <span class="manager-chip is-neutral"><i class="fas fa-plus-minus" aria-hidden="true"></i>{bonusLabel}</span>
+    </div>
   </div>
   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}</p>
-  <dl class="manager-tool-preview-rules">
-    <div><dt>{text('FABRICATE.Admin.Manager.Tools.Breakage', 'Breakage')}</dt><dd data-tool-preview-breakage>{breakageLabel}</dd></div>
-    <div><dt>{text('FABRICATE.Admin.Manager.Tools.OnBreak', 'On break')}</dt><dd data-tool-preview-on-break>{onBreakLabel}</dd></div>
-    <div><dt>{text('FABRICATE.Admin.Manager.Tools.Editor.Prerequisites', 'Prerequisites')}</dt><dd data-tool-preview-prerequisites>{prerequisiteLabel}</dd></div>
-    <div><dt>{text('FABRICATE.Admin.Manager.Tools.Editor.Bonus', 'Bonus')}</dt><dd data-tool-preview-bonus>{bonusLabel}</dd></div>
-  </dl>
+  <ul class="manager-tool-preview-rules">
+    {#each rules as rule (rule.id)}
+      <li data-tool-preview-rule={rule.id}>
+        <i class={rule.icon} aria-hidden="true"></i>
+        <div>
+          <strong
+            data-tool-preview-breakage={rule.id === 'breakage' ? '' : undefined}
+            data-tool-preview-on-break={rule.id === 'on-break' ? '' : undefined}
+            data-tool-preview-prerequisites={rule.id === 'prerequisites' ? '' : undefined}
+            data-tool-preview-bonus={rule.id === 'bonus' ? '' : undefined}
+          >{rule.title}</strong>
+          <small>{rule.subtitle}</small>
+        </div>
+      </li>
+    {/each}
+  </ul>
+  <aside class="manager-tool-preview-live" data-tool-preview-live-update><i class="fas fa-circle-info" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate', 'This preview updates live as you change the controls on the left.')}</span></aside>
 </aside>

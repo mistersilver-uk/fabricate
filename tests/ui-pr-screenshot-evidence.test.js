@@ -85,26 +85,76 @@ function withScreenshotFixtures(fixtures, runAssert) {
   }
 }
 
+const TOOL_STUDIO_VIEWS = [
+  ['01-library-1280x720', 'manager-tool-parity-01-library-1280x720', 1212, 686],
+  ['02-overview-1280x720', 'manager-tool-parity-02-overview-1280x720', 1212, 686],
+  ['03-breakage-1280x720', 'manager-tool-parity-03-breakage-1280x720', 1212, 686],
+  ['04-requirements-1280x720', 'manager-tool-parity-04-requirements-1280x720', 1212, 686],
+  ['05-validation-1280x720', 'manager-tool-parity-05-validation-1280x720', 1212, 686],
+  ['06-breakage-900x700', 'manager-tool-parity-06-breakage-900x700', 832, 666],
+  ['stress-long-name', 'manager-tool-stress-long-name', 1212, 686],
+  ['stress-repair', 'manager-tool-stress-repair', 1212, 686],
+  ['stress-replacement', 'manager-tool-stress-replacement', 1212, 686],
+  ['stress-immune', 'manager-tool-stress-immune', 1212, 686],
+  ['stress-invalid-validation', 'manager-tool-stress-invalid-validation', 1212, 686],
+  ['stress-wrapping-680', 'manager-tool-stress-wrapping-680', 612, 666],
+];
+
+function toolStudioEvidenceFixtures({
+  runId = 'tool-run-1',
+  headSha = 'abc1234',
+  targetLabels = TOOL_STUDIO_VIEWS.map(([, label]) => label),
+  summaryPatch = {},
+  capturePatch = () => ({}),
+} = {}) {
+  const captures = TOOL_STUDIO_VIEWS.map(([, label, width, height], index) => ({
+    label,
+    file: `screenshot-${String(index + 1).padStart(2, '0')}-${label}.png`,
+    width,
+    height,
+    ...capturePatch({ label, index }),
+  }));
+  return {
+    ...Object.fromEntries(captures.map(({ file }) => [file, 'png'])),
+    'summary.json': JSON.stringify({
+      passed: true,
+      stepFailures: 0,
+      consoleErrorCount: 0,
+      degraded: false,
+      rendererCrashed: false,
+      screenshotRun: { runId, headSha, targetLabels },
+      ...summaryPatch,
+    }),
+    'screenshot-manifest.json': JSON.stringify({ runId, headSha, targetLabels, captures }),
+  };
+}
+
 describe('UI PR screenshot evidence', () => {
-  const toolStudioMappings = [
-    ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte', 'manager-tools', 'manager-tools-library'],
-    ['src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte', 'manager-tools', 'manager-tools-library'],
-    ['src/ui/svelte/apps/manager/ToolEditView.svelte', 'manager-tool-overview-linked', 'manager-tool-overview-linked'],
-    ['src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte', 'manager-tool-overview-linked', 'manager-tool-overview-linked'],
-    ['src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte', 'manager-tool-overview-linked', 'manager-tool-overview-linked'],
-    ['src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte', 'manager-tool-breakage-repair', 'manager-tool-breakage-repair'],
-    ['src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte', 'manager-tool-breakage-repair', 'manager-tool-breakage-repair'],
-    ['src/ui/svelte/apps/manager/tools/toolStudio.js', 'manager-tool-breakage-replace-item', 'manager-tool-breakage-replace-item'],
-    ['src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte', 'manager-tool-requirements', 'manager-tool-requirements'],
-    ['src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte', 'manager-tool-validation', 'manager-tool-validation'],
-    ['src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte', 'manager-tool-narrow', 'manager-tool-narrow'],
+  const toolStudioFiles = [
+    'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
+    'src/ui/svelte/apps/manager/ToolEditView.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
+    'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
   ];
 
-  it('maps every changed Tool Studio UI file to one publishable real-Foundry frame', () => {
-    for (const [file, viewId, smokeLabel] of toolStudioMappings) {
-      const toolViews = mapChangedFilesToViews([file]).filter((view) => view.id.startsWith('manager-tool'));
-      assert.deepEqual(toolViews.map((view) => view.id), [viewId], file);
-      assert.deepEqual(toolViews[0].smokeLabels, [smokeLabel], file);
+  it('maps every changed Tool Studio UI file to six parity frames and separate stress evidence', () => {
+    for (const file of toolStudioFiles) {
+      const toolViews = mapChangedFilesToViews([file]).filter((view) =>
+        TOOL_STUDIO_VIEWS.some(([id]) => id === view.id)
+      );
+      assert.deepEqual(toolViews.map((view) => view.id), TOOL_STUDIO_VIEWS.map(([id]) => id), file);
+      assert.deepEqual(
+        toolViews.map((view) => view.smokeLabels),
+        TOOL_STUDIO_VIEWS.map(([, label]) => [label]),
+        file,
+      );
     }
   });
 
@@ -726,21 +776,100 @@ describe('UI PR screenshot evidence', () => {
     );
   });
 
-  it('reports missing collection screenshots and supports allowMissing', () => {
+  it('requires run metadata before collecting Tool Studio screenshots', () => {
     withScreenshotFixtures({}, (root) => {
       assert.throws(() => collectScreenshotEvidence({
         changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
         prNumber: 456,
         root,
-      }), /manager-tools/);
+        headSha: 'abc1234',
+      }), /Missing Tool Studio smoke summary/);
+    });
+  });
 
+  it('collects the exact Tool Studio parity and stress set from one green current-head run', () => {
+    withScreenshotFixtures(toolStudioEvidenceFixtures(), (root) => {
       const result = collectScreenshotEvidence({
         changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
         prNumber: 456,
         root,
+        headSha: 'abc1234',
+      });
+      assert.deepEqual(result.copied.map(({ view }) => view.id), TOOL_STUDIO_VIEWS.map(([id]) => id));
+      assert.equal(result.missing.length, 0);
+    });
+  });
+
+  it('rejects failed, stale-head, and wrong-label-set Tool Studio runs', () => {
+    const cases = [
+      [
+        toolStudioEvidenceFixtures({ summaryPatch: { passed: false } }),
+        'abc1234',
+        /failed or degraded smoke summary/,
+      ],
+      [toolStudioEvidenceFixtures({ headSha: 'stale123' }), 'abc1234', /stale for the requested PR head SHA/],
+      [
+        toolStudioEvidenceFixtures({ targetLabels: TOOL_STUDIO_VIEWS.slice(1).map(([, label]) => label) }),
+        'abc1234',
+        /another target-label set/,
+      ],
+    ];
+    for (const [fixtures, headSha, message] of cases) {
+      withScreenshotFixtures(fixtures, (root) => {
+        assert.throws(() => collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
+          prNumber: 456,
+          root,
+          headSha,
+        }), message);
+      });
+    }
+  });
+
+  it('rejects duplicate candidates, wrong parity dimensions, and stress-substituted parity evidence', () => {
+    const duplicateLabel = TOOL_STUDIO_VIEWS[0][1];
+    const cases = [
+      [
+        {
+          ...toolStudioEvidenceFixtures(),
+          [`duplicate-${duplicateLabel}.png`]: 'duplicate',
+        },
+        /Duplicate Tool Studio screenshot evidence/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ index }) => index === 0 ? { width: 1200 } : {},
+        }),
+        /Wrong Tool Studio dimensions/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ index }) => index === 0 ? { label: 'manager-tool-stress-repair' } : {},
+        }),
+        /Stress evidence cannot substitute/,
+      ],
+    ];
+    for (const [fixtures, message] of cases) {
+      withScreenshotFixtures(fixtures, (root) => {
+        assert.throws(() => collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
+          prNumber: 456,
+          root,
+          headSha: 'abc1234',
+        }), message);
+      });
+    }
+  });
+
+  it('reports missing non-Tool screenshots and supports allowMissing', () => {
+    withScreenshotFixtures({}, (root) => {
+      const result = collectScreenshotEvidence({
+        changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
+        prNumber: 456,
+        root,
         allowMissing: true,
       });
-      assert.deepEqual(result.missing.map(view => view.id), ['manager-tools']);
+      assert.deepEqual(result.missing.map(view => view.id), ['manager-environments']);
     });
   });
 
@@ -804,7 +933,7 @@ describe('UI PR screenshot evidence', () => {
 
     // A recipe-matching view drives the mapping; the lang file adds nothing.
     assert.equal(hasUiChanges(['lang/en.json', view]), true);
-    assert.deepEqual(ids(['lang/en.json', view]), ['manager-tools']);
+    assert.deepEqual(ids(['lang/en.json', view]), TOOL_STUDIO_VIEWS.map(([id]) => id));
 
     // A render file that matches no recipe still trips the generic fallback.
     assert.equal(hasUiChanges(['lang/en.json', logicOnly]), true);
@@ -827,6 +956,9 @@ describe('UI PR screenshot evidence', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
     const emitted = new Set();
     for (const match of harness.matchAll(/screenshot\(\s*page\s*,\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
+    for (const match of harness.matchAll(/captureToolStudioProduct\(\s*page\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
@@ -1068,7 +1200,7 @@ describe('UI PR screenshot evidence', () => {
       assert.match(written, /Original\./);
       assert.match(written, /##\s+Screenshots/);
       assert.match(written, /!\[pr-251 Manager gathering environments\]\(https:\/\/test-bucket\.s3\.eu-west-2\.amazonaws\.com\/pr-screenshots\/251\/manager-environments\.png\)/);
-      assert.match(written, /!\[pr-251 Tool Studio — library\]/);
+      assert.match(written, /!\[pr-251 manager-tools\]/);
       assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -1190,7 +1322,7 @@ describe('UI PR screenshot evidence', () => {
     const readChangedFiles = () => ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
     const lines = await captureLog(() => main(['plan'], { resolveBase, readChangedFiles }));
     assert.match(lines[0], /UI smoke screenshot artifacts required:/);
-    assert.ok(lines.some(line => /manager-tools/.test(line)));
+    assert.ok(lines.some(line => /manager-tool-parity-01-library-1280x720/.test(line)));
   });
 
   it('never resolves a default base for publish or clean (command scoping)', async () => {

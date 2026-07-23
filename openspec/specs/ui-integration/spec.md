@@ -581,8 +581,10 @@ Delete uses a separate destructive DialogV2 confirmation; cancellation preserves
 
 Tabs expose `tablist`, `tab`, and `tabpanel` relationships with selected/error state that is not color-only.
 Item creation/drop targets and every icon-only unlink, remove, and menu control have button semantics and localized accessible names.
-The wide Tool Studio header stays outside the scrolling body; center workspace and inspector own vertical scrolling with `min-width: 0` and `min-height: 0`.
-At the existing `1120px` Manager container breakpoint, rail, main, and inspector stack in reading order with max-content rows, the body becomes the single vertical scroller, the bounded rail remains independently scrollable, and main/inspector overflow becomes visible.
+The Tool editor's sole identity/action header spans the complete Tool shell above the rail, editor, and preview.
+Tool routes suppress the generic system status ribbon, generic edit heading, rail scope card, and rail-collapse control so they do not precede the Tool content.
+At product-root widths of `832px` and wider, the library preserves `210px | minmax(0, 1fr) | 340px` and the editor preserves `210px | minmax(0, 1fr) | 320px`; center workspace and inspector own vertical scrolling with `min-width: 0` and `min-height: 0`.
+Only below `832px` do rail, main, and inspector stack in reading order with max-content rows, the body becoming the single vertical scroller while the bounded rail remains independently scrollable and main/inspector overflow becomes visible.
 At `680px` and below, header actions and tab/action clusters wrap without overlap, and Back, Delete, Save, validation state, replacement controls, and repair-row actions remain visible and reachable.
 
 ### Recipes Tab

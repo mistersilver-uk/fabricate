@@ -9876,7 +9876,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     const authority = target.querySelector('[data-manager-tools-authority]');
     assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 2);
-    assert.equal(authority.querySelector('small'), null, 'authority choices stay compact');
+    assert.match(
+      authority.querySelector('.manager-tools-authority-caption').textContent,
+      /Applies to all 1 Tool/
+    );
     authority.querySelector('input[value="checkDriven"]').click();
     assert.deepEqual(authorityChanges, ['checkDriven']);
 
@@ -9991,6 +9994,10 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('wires Tool library selection to the shell inspector without restoring an inline editor', async () => {
     const calls = await mountToolRoute();
 
+    assert.equal(target.querySelector('.fabricate-manager > .manager-titlebar'), null);
+    assert.equal(target.querySelector('.fabricate-manager > .manager-header'), null);
+    assert.equal(target.querySelector('[data-manager-scope-select]'), null);
+    assert.equal(target.querySelector('.manager-rail-toggle'), null);
     assert.ok(target.querySelector('[data-tool-browser-inspector-empty]'));
     target.querySelector('[data-manager-tool-id="tool-catalyst"] .manager-tools-select-target').click();
     await tick();
@@ -10054,6 +10061,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager > .manager-header'),
       null,
       'the editor does not pay for a separate root breadcrumb header'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager > .manager-titlebar'),
+      null,
+      'Tool parity routes suppress the generic system status ribbon'
+    );
+    assert.equal(
+      target.querySelector('[data-manager-scope-select]'),
+      null,
+      'the Tool editor rail begins with GM navigation rather than the large scope card'
+    );
+    assert.equal(
+      target.querySelector('.manager-rail-toggle'),
+      null,
+      'the Tool editor rail does not spend the first frame on a collapse control'
     );
     assert.match(
       editorHeader.querySelector('.manager-breadcrumbs').textContent,
@@ -10187,7 +10209,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     await openFixtureToolEditor(calls);
-    const input = target.querySelector('[data-tool-editor-panel="overview"] input');
+    const input = target.querySelector('[data-tool-label]');
     input.value = 'Changed';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -10206,7 +10228,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       services: { confirmDirtyToolsNavigation: () => 'discard' },
     });
     await openFixtureToolEditor(calls);
-    const input = target.querySelector('[data-tool-editor-panel="overview"] input');
+    const input = target.querySelector('[data-tool-label]');
     input.value = 'Changed';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -10230,7 +10252,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     await openFixtureToolEditor(calls);
-    const input = target.querySelector('[data-tool-editor-panel="overview"] input');
+    const input = target.querySelector('[data-tool-label]');
     input.value = 'Changed';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -10272,16 +10294,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tools');
   });
 
-  it('maps a Tool editor scope change back to the Tools library', async () => {
+  it('keeps system navigation in the spanning Tool header while suppressing the rail scope control', async () => {
     const calls = await mountToolRoute();
     await openFixtureToolEditor(calls);
-    const scope = target.querySelector('[data-manager-scope-select]');
-    scope.value = 'smithing';
-    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.equal(target.querySelector('[data-manager-scope-select]'), null);
+    target.querySelector('[data-tool-editor-open-system]').click();
     await Promise.resolve();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tools');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

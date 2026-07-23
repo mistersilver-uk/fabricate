@@ -41,6 +41,12 @@ const toolStudioFrame = (id, label, smokeLabel, matches) => ({
   smokeLabels: [smokeLabel],
   matches,
 });
+const TOOL_STUDIO_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/(?:CraftingSystemManagerRoot|ToolsBrowserView|ToolEditView)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+  /^styles\/fabricate\.css$/,
+];
 
 export const VIEW_RECIPES = Object.freeze([
   {
@@ -317,32 +323,18 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-gathering-events-normal', 'manager-gathering-event-editor-normal'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEventEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringEventsBrowserView\.svelte$/],
   },
-  toolStudioFrame('manager-tools', 'Tool Studio — library', 'manager-tools-library', [
-    /^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/,
-    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBrowserInspector\.svelte$/,
-  ]),
-  toolStudioFrame('manager-tool-overview-linked', 'Tool Studio — linked Item overview', 'manager-tool-overview-linked', [
-    /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
-    /^src\/ui\/svelte\/apps\/manager\/tools\/(?:ToolOverviewTab|ToolBehaviorPreview)\.svelte$/,
-  ]),
-  toolStudioFrame('manager-tool-breakage-repair', 'Tool Studio — tool-specific breakage and repair OR group', 'manager-tool-breakage-repair', [
-    /^src\/ui\/svelte\/apps\/manager\/tools\/(?:ToolBreakageTab|ToolRepairRequirements)\.svelte$/,
-  ]),
-  toolStudioFrame('manager-tool-breakage-replace-item', 'Tool Studio — direct Item replacement target', 'manager-tool-breakage-replace-item', [
-    /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
-  ]),
-  toolStudioFrame('manager-tool-breakage-check-immune', 'Tool Studio — check-driven immune state', 'manager-tool-breakage-check-immune', [
-    /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
-  ]),
-  toolStudioFrame('manager-tool-requirements', 'Tool Studio — shared prerequisites and bonus', 'manager-tool-requirements', [
-    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
-  ]),
-  toolStudioFrame('manager-tool-validation', 'Tool Studio — failing Validation tab', 'manager-tool-validation', [
-    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
-  ]),
-  toolStudioFrame('manager-tool-narrow', 'Tool Studio — narrow wrapping layout', 'manager-tool-narrow', [
-    /^src\/ui\/svelte\/apps\/manager\/tools\/ToolEditorTabs\.svelte$/,
-  ]),
+  toolStudioFrame('01-library-1280x720', 'Tool Studio — library parity', 'manager-tool-parity-01-library-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('02-overview-1280x720', 'Tool Studio — Overview parity', 'manager-tool-parity-02-overview-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('03-breakage-1280x720', 'Tool Studio — Breakage parity', 'manager-tool-parity-03-breakage-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('04-requirements-1280x720', 'Tool Studio — Requirements parity', 'manager-tool-parity-04-requirements-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('05-validation-1280x720', 'Tool Studio — all-pass Validation parity', 'manager-tool-parity-05-validation-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('06-breakage-900x700', 'Tool Studio — 900px Breakage parity', 'manager-tool-parity-06-breakage-900x700', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-long-name', 'Tool Studio stress — long display name', 'manager-tool-stress-long-name', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-repair', 'Tool Studio stress — populated repair', 'manager-tool-stress-repair', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-replacement', 'Tool Studio stress — replacement target', 'manager-tool-stress-replacement', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-immune', 'Tool Studio stress — check-driven Immune', 'manager-tool-stress-immune', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-invalid-validation', 'Tool Studio stress — failing Validation', 'manager-tool-stress-invalid-validation', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-wrapping-680', 'Tool Studio stress — 680px wrapping', 'manager-tool-stress-wrapping-680', TOOL_STUDIO_MATCHES),
   {
     id: 'manager-travel',
     label: 'Manager travel and parties',
@@ -983,6 +975,7 @@ export function collectScreenshotEvidence({
   sourceDir = 'test-results',
   outputDir,
   allowMissing = false,
+  headSha,
   root = ROOT,
 } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'collect');
@@ -992,6 +985,10 @@ export function collectScreenshotEvidence({
   const copied = [];
   const missing = [];
   const allImages = existsSync(sourceRoot) ? listImages(sourceRoot).sort((a, b) => a.localeCompare(b)) : [];
+  const toolViews = views.filter((view) => /^(?:0[1-6]-|stress-)/.test(view.id));
+  const toolEvidence = toolViews.length > 0
+    ? validateToolStudioRunEvidence({ sourceRoot, views, headSha })
+    : null;
 
   mkdirSync(destinationRoot, { recursive: true });
   for (const view of views) {
@@ -1000,7 +997,13 @@ export function collectScreenshotEvidence({
       missing.push(view);
       continue;
     }
+    if (toolEvidence && /^(?:0[1-6]-|stress-)/.test(view.id) && candidates.length !== 1) {
+      throw new Error(`Duplicate Tool Studio screenshot evidence for ${view.id}: ${candidates.length} candidates`);
+    }
     const source = candidates[0];
+    if (toolEvidence && /^(?:0[1-6]-|stress-)/.test(view.id)) {
+      validateToolStudioCapture(view, source, toolEvidence);
+    }
     const destination = join(destinationRoot, `${view.id}${extensionOf(source)}`);
     copyFileSync(source, destination);
     copied.push({ view, source, destination });
@@ -1012,6 +1015,78 @@ export function collectScreenshotEvidence({
   }
 
   return { views, copied, missing, destinationRoot };
+}
+
+const TOOL_PARITY_DIMENSIONS = new Map([
+  ['01-library-1280x720', [1212, 686]],
+  ['02-overview-1280x720', [1212, 686]],
+  ['03-breakage-1280x720', [1212, 686]],
+  ['04-requirements-1280x720', [1212, 686]],
+  ['05-validation-1280x720', [1212, 686]],
+  ['06-breakage-900x700', [832, 666]],
+]);
+
+function readJsonEvidence(path, label) {
+  if (!existsSync(path)) throw new Error(`Missing ${label}: ${relative(ROOT, path)}`);
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(`Invalid ${label}: ${error.message}`);
+  }
+}
+
+function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
+  const summary = readJsonEvidence(join(sourceRoot, 'summary.json'), 'Tool Studio smoke summary');
+  const manifest = readJsonEvidence(
+    join(sourceRoot, 'screenshot-manifest.json'),
+    'Tool Studio screenshot manifest'
+  );
+  if (
+    summary.passed !== true ||
+    summary.stepFailures !== 0 ||
+    summary.consoleErrorCount !== 0 ||
+    summary.degraded !== false ||
+    summary.rendererCrashed !== false
+  ) {
+    throw new Error('Tool Studio screenshot evidence comes from a failed or degraded smoke summary');
+  }
+  const summaryRun = summary.screenshotRun || {};
+  if (!summaryRun.runId || summaryRun.runId !== manifest.runId) {
+    throw new Error('Tool Studio summary and manifest do not share one run identity');
+  }
+  const expectedHead = normalizeHeadShaSegment(headSha);
+  if (!expectedHead || summaryRun.headSha !== expectedHead || manifest.headSha !== expectedHead) {
+    throw new Error('Tool Studio screenshot evidence is stale for the requested PR head SHA');
+  }
+  const expectedLabels = views.flatMap((view) => view.smokeLabels).sort();
+  const summaryLabels = [...(summaryRun.targetLabels || [])].sort();
+  const manifestLabels = [...(manifest.targetLabels || [])].sort();
+  if (
+    JSON.stringify(summaryLabels) !== JSON.stringify(expectedLabels) ||
+    JSON.stringify(manifestLabels) !== JSON.stringify(expectedLabels)
+  ) {
+    throw new Error('Tool Studio screenshot evidence belongs to another target-label set');
+  }
+  return { manifest, capturesByFile: new Map((manifest.captures || []).map((entry) => [entry.file, entry])) };
+}
+
+function validateToolStudioCapture(view, source, evidence) {
+  const file = basename(source);
+  const capture = evidence.capturesByFile.get(file);
+  if (TOOL_PARITY_DIMENSIONS.has(view.id) && capture?.label?.includes('stress')) {
+    throw new Error(`Stress evidence cannot substitute for Tool Studio parity frame ${view.id}`);
+  }
+  if (!capture || !view.smokeLabels.includes(capture.label)) {
+    throw new Error(`Tool Studio manifest does not bind ${file} to ${view.id}`);
+  }
+  if (TOOL_PARITY_DIMENSIONS.has(view.id)) {
+    const [width, height] = TOOL_PARITY_DIMENSIONS.get(view.id);
+    if (capture.width !== width || capture.height !== height) {
+      throw new Error(
+        `Wrong Tool Studio dimensions for ${view.id}: ${capture.width}x${capture.height}; expected ${width}x${height}`
+      );
+    }
+  }
 }
 
 export function cleanPrScreenshotEvidence({ prNumber, root = ROOT } = {}) {
@@ -1457,6 +1532,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       sourceDir: args.sourceDir || 'test-results',
       outputDir: args.outputDir,
       allowMissing: args.allowMissing === true,
+      headSha: args.headSha,
     });
     for (const item of result.copied) {
       console.log(`${relative(ROOT, item.destination).replaceAll(sep, '/')} <= ${relative(ROOT, item.source).replaceAll(sep, '/')}`);

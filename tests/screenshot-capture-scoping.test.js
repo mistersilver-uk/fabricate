@@ -36,14 +36,18 @@ import {
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const TOOL_STUDIO_LABELS = [
-  'manager-tools-library',
-  'manager-tool-overview-linked',
-  'manager-tool-breakage-repair',
-  'manager-tool-breakage-replace-item',
-  'manager-tool-breakage-check-immune',
-  'manager-tool-requirements',
-  'manager-tool-validation',
-  'manager-tool-narrow',
+  'manager-tool-parity-01-library-1280x720',
+  'manager-tool-parity-02-overview-1280x720',
+  'manager-tool-stress-long-name',
+  'manager-tool-parity-03-breakage-1280x720',
+  'manager-tool-stress-repair',
+  'manager-tool-stress-replacement',
+  'manager-tool-stress-immune',
+  'manager-tool-parity-04-requirements-1280x720',
+  'manager-tool-parity-05-validation-1280x720',
+  'manager-tool-stress-invalid-validation',
+  'manager-tool-parity-06-breakage-900x700',
+  'manager-tool-stress-wrapping-680',
 ];
 
 // ── Scoping map: a changed-file set → the EXACT captured-label set ──────────────
@@ -65,11 +69,23 @@ test('a broad styles/theme.css change scopes to theme-or-global-ui (6 labels), N
   assert.ok(labels.length < SCREENSHOT_CAPTURE_ORDER.length);
 });
 
-test('styles/fabricate.css scopes to exactly three views (the two rail frames + the global fallback)', () => {
+test('styles/fabricate.css scopes to the Tool parity/stress set, two rail frames, and global fallback', () => {
   const views = mapChangedFilesToViews(['styles/fabricate.css']);
   assert.deepEqual(views.map(v => v.id).sort(), [
+    '01-library-1280x720',
+    '02-overview-1280x720',
+    '03-breakage-1280x720',
+    '04-requirements-1280x720',
+    '05-validation-1280x720',
+    '06-breakage-900x700',
     'manager-rail-collapsed',
     'manager-rail-expanded',
+    'stress-immune',
+    'stress-invalid-validation',
+    'stress-long-name',
+    'stress-repair',
+    'stress-replacement',
+    'stress-wrapping-680',
     'theme-or-global-ui',
   ]);
 });
@@ -283,7 +299,9 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   for (const label of TOOL_STUDIO_LABELS) {
     assert.match(
       toolStudioWalk,
-      new RegExp(`await resetToolStudioScroll\\(page\\);\\s*await screenshot\\(page, '${label}'\\);`),
+      new RegExp(
+        `await resetToolStudioScroll\\(page\\);\\s*await (?:captureToolStudioProduct\\(page, '${label}', \\{[^}]+\\}\\)|screenshot\\(page, '${label}'\\));`
+      ),
       `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
     );
   }
@@ -296,7 +314,29 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 680, height: 700 })'));
   assert.ok(HARNESS.includes('resetToolStudioScroll(page)'));
   assert.ok(HARNESS.includes('assertToolStudioLibraryLayout(page)'));
+  assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: false })'));
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: true })'));
+  assert.ok(HARNESS.includes('visibleToolRowCount !== 8'));
+  assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
+  assert.ok(HARNESS.includes("editor.locator('[data-first-validation-failure]').count() !== 0"));
+  for (const label of [
+    'manager-tool-parity-01-library-1280x720',
+    'manager-tool-parity-02-overview-1280x720',
+    'manager-tool-parity-03-breakage-1280x720',
+    'manager-tool-parity-04-requirements-1280x720',
+    'manager-tool-parity-05-validation-1280x720',
+  ]) {
+    assert.ok(
+      HARNESS.includes(`captureToolStudioProduct(page, '${label}', { width: 1212, height: 686 })`),
+      `${label} must capture the exact 1212x686 product frame`,
+    );
+  }
+  assert.ok(
+    HARNESS.includes(
+      "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', { width: 832, height: 666 })"
+    ),
+    'the 900px parity frame must capture the exact 832x666 product frame',
+  );
   assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?900px/);
   assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?680px/);
   assert.match(
@@ -312,7 +352,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
   assert.match(
     HARNESS,
-    /const itemOption = await itemTarget\.locator\('option:not\(\[value=""\]\)'\)\.first\(\)\.getAttribute\('value'\);\s*if \(!itemOption\) throw new Error\('Tool Studio direct Item picker has no world Item options'\);\s*await itemTarget\.selectOption\(itemOption\);\s*await itemTarget\.selectOption\(''\);\s*await itemTarget\.selectOption\(itemOption\);/,
+    /await replacementType\.selectOption\('component'\);[\s\S]*?const componentTarget = replacementPicker;[\s\S]*?await replacementType\.selectOption\('item'\);[\s\S]*?const itemTarget = replacementPicker;[\s\S]*?if \(!itemOption\) throw new Error\('Tool Studio direct Item picker has no world Item options'\);/,
   );
   assert.doesNotMatch(HARNESS, /itemTarget\.selectOption\(fixture\.replacementItemUuid\)/);
   const authorityClickIndex = toolStudioWalk.indexOf('await checkDriven.click();');
@@ -367,14 +407,27 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 
+test('the Tool Studio run writes one summary/manifest identity with head, target labels, and measured clips', () => {
+  assert.match(HARNESS, /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha:[\s\S]*?targetLabels:/);
+  assert.match(HARNESS, /results\.screenshotRun = screenshotRunIdentity/);
+  assert.match(
+    HARNESS,
+    /await writeFile\([\s\S]*?'screenshot-manifest\.json'[\s\S]*?\.\.\.screenshotRunIdentity,[\s\S]*?captures: screenshotManifestEntries/,
+  );
+  assert.match(
+    HARNESS,
+    /screenshotManifestEntries\.push\(\{[\s\S]*?label,[\s\S]*?file: `screenshot-\$\{num\}-\$\{label\}\.png`,[\s\S]*?width:[\s\S]*?height:/,
+  );
+});
+
 test('the Tool Studio fixture composes durable Tool identity through the canonical flag path', () => {
   assert.match(HARNESS, /source\.getFlag\('fabricate', 'fabricate\.roles'\)/);
   assert.match(HARNESS, /source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\)/);
   assert.match(HARNESS, /source\.unsetFlag\('fabricate', 'fabricate\.roles'\)/);
   assert.match(
     HARNESS,
-    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\) await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*\}/,
-    'restoration must clear the fixture leaf before restoring a recursively merged roles snapshot',
+    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\) await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*if \(fixture\.sourceCreated\) await source\.delete\(\);\s*\}/,
+    'restoration must clear the fixture leaf, restore any prior roles snapshot, and delete the owned Smith fixture',
   );
   assert.match(
     HARNESS,
