@@ -539,6 +539,22 @@ describe('UI PR screenshot evidence', () => {
     ]);
   });
 
+  it('maps the issue-770 check-modifier UI to its Checks and recipe-edit frames', () => {
+    const idsFor = (file) => mapChangedFilesToViews([file]).map(view => view.id);
+    // The catalogue card lives in the crafting-check frame.
+    assert.ok(
+      idsFor('src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte').includes(
+        'manager-checks-crafting-consumption',
+      ),
+    );
+    // The shared pill multi-select renders in BOTH the Checks default set and the
+    // recipe Overview override, so it maps to the crafting-check frame and every
+    // recipe-edit frame.
+    const pillIds = idsFor('src/ui/svelte/components/ModifierPillSelect.svelte');
+    assert.ok(pillIds.includes('manager-checks-crafting-consumption'));
+    assert.ok(pillIds.includes('manager-recipe-edit-normal'));
+  });
+
   it('collects the thirteen recipe-edit frames into thirteen separate files', () => {
     withScreenshotFixtures(
       {

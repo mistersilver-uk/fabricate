@@ -25,6 +25,7 @@
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
+  import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
 
   let {
     recipe = null,
@@ -289,20 +290,16 @@
       {#if hasModifierOverride}
         <div class="manager-recipe-field" data-recipe-crafting-modifier-picker>
           <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.CraftingModifierPick', 'Eligible modifiers')}</span>
-          <div class="manager-recipe-modifier-options">
-            {#each craftingModifierOptions as modifier (modifier.id)}
-              <label class="manager-recipe-modifier-option">
-                <input
-                  type="checkbox"
-                  data-recipe-crafting-modifier-id={modifier.id}
-                  checked={overrideModifierIds.includes(modifier.id)}
-                  disabled={saving}
-                  onchange={(event) => toggleModifierId(modifier.id, event.currentTarget.checked)}
-                />
-                <span>{modifier.label || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')}</span>
-              </label>
-            {/each}
-          </div>
+          <ModifierPillSelect
+            options={craftingModifierOptions}
+            selectedIds={overrideModifierIds}
+            disabled={saving}
+            testId="recipe-crafting-modifier"
+            menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
+            allSelectedLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected', 'All modifiers selected.')}
+            noneSelectedLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierInheritDefaults', 'Inheriting the system default modifiers.')}
+            onToggle={toggleModifierId}
+          />
         </div>
       {/if}
     {/if}
@@ -415,16 +412,7 @@
 </section>
 
 <style>
-  .manager-recipe-modifier-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+  [data-recipe-crafting-modifier-picker] {
     margin-top: 0.25rem;
-  }
-
-  .manager-recipe-modifier-option {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
   }
 </style>

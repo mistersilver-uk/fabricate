@@ -73,6 +73,9 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
+  // The Overview tab's eligible-modifier override renders the shared pill multi-select
+  // (issue 770). A `.svelte` the tree renders but the harness omits HANGS the suite.
+  'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
@@ -473,19 +476,25 @@ describe('RecipeEditView (mounted)', () => {
       [...select.querySelectorAll('option')].map((o) => o.value),
       ['', 'addAll', 'highest', 'byRecipe']
     );
-    // The per-modifier picker shows the catalogue with the recipe's set pre-checked.
+    // The per-modifier picker shows the catalogue as cancellable pills, with the
+    // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
     assert.ok(picker, 'the eligible-modifier picker shows for an active override');
-    assert.equal(picker.querySelector('[data-recipe-crafting-modifier-id="med"]').checked, true);
-    assert.equal(picker.querySelector('[data-recipe-crafting-modifier-id="alch"]').checked, false);
-    // Toggling alch on stages the combined set.
-    const alch = picker.querySelector('[data-recipe-crafting-modifier-id="alch"]');
-    alch.checked = true;
-    alch.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.ok(picker.querySelector('[data-modifier-pill="med"]'), 'the selected modifier renders as a pill');
+    assert.equal(picker.querySelector('[data-modifier-pill="alch"]'), null, 'an unselected modifier is not a pill');
+    // Opening the menu and picking alch stages the combined set.
+    picker.querySelector('[data-modifier-pill-menu-button]').click();
+    await flushRender();
+    picker.querySelector('[data-modifier-pill-option="alch"]').click();
     await flushRender();
     assert.deepEqual(patches.at(-1), {
       craftingModifier: { policy: 'byRecipe', modifierIds: ['med', 'alch'] },
     });
+    // Removing the (only pre-selected) pill leaves a policy-only override. The control
+    // is controlled, so each toggle acts on the original `['med']` prop.
+    picker.querySelector('[data-modifier-pill-remove="med"]').click();
+    await flushRender();
+    assert.deepEqual(patches.at(-1), { craftingModifier: { policy: 'byRecipe' } });
     // Switching the policy select back to "inherit" clears the whole override.
     select.value = '';
     select.dispatchEvent(new Event('change', { bubbles: true }));

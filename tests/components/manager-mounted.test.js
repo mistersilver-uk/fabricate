@@ -25,6 +25,10 @@ const sharedComponentNames = [
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',
+  // The check-modifier catalogue's default set + a recipe's eligible-modifier override
+  // both render the shared pill multi-select (issue 770). A `.svelte` the tree renders
+  // but the allowlist omits HANGS the suite (# cancelled) rather than failing it.
+  'ModifierPillSelect',
 ];
 
 let tempRoot;
@@ -3534,6 +3538,48 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       patches.some((p) => p.defaultModifierPolicy === 'addAll'),
       'selecting a policy radio emits defaultModifierPolicy'
+    );
+    // The expression field drops the leading `@` for display and restores it on write,
+    // so the stored expression keeps the sigil the resolver's replaceFormulaData needs.
+    const expression = card.querySelector('input[data-crafting-modifier-field="expression"]');
+    assert.equal(expression.value, 'abilities.med.mod', 'the expression editor hides the leading @');
+    expression.value = 'abilities.arc.mod';
+    expression.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.ok(
+      patches.some(
+        (p) => Array.isArray(p.checkModifiers) && p.checkModifiers[0]?.expression === '@abilities.arc.mod'
+      ),
+      'editing the expression re-adds the @ sigil for a roll-data path'
+    );
+    // A function/compound expression is stored VERBATIM — no spurious leading @ that
+    // would make the resolver read `@min` as an unknown roll-data key (contributes 0).
+    expression.value = 'min(@abilities.med.mod,@abilities.int.mod)';
+    expression.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.ok(
+      patches.some(
+        (p) =>
+          Array.isArray(p.checkModifiers) &&
+          p.checkModifiers[0]?.expression === 'min(@abilities.med.mod,@abilities.int.mod)'
+      ),
+      'a function-leading expression is stored without a corrupting @ prefix'
+    );
+    // The icon field renders the shared IconPicker trigger (not a raw class input).
+    assert.ok(
+      card.querySelector('[data-crafting-modifier-field="icon"] .essence-icon-picker-trigger'),
+      'the modifier row uses the searchable IconPicker for its icon'
+    );
+    // The default set renders as cancellable pills; removing the pre-selected one emits
+    // an empty defaultModifierIds patch.
+    const defaults = card.querySelector('[data-modifier-pill-select="crafting-modifier-defaults"]');
+    assert.ok(defaults, 'the default set uses the shared pill multi-select');
+    assert.ok(defaults.querySelector('[data-modifier-pill="med"]'), 'the default modifier renders as a pill');
+    defaults.querySelector('[data-modifier-pill-remove="med"]').click();
+    flushSync();
+    assert.ok(
+      patches.some((p) => Array.isArray(p.defaultModifierIds) && p.defaultModifierIds.length === 0),
+      'removing a default pill emits an empty defaultModifierIds set'
     );
   });
 

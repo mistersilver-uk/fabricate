@@ -20,6 +20,11 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import IconPicker from '../../../components/IconPicker.svelte';
+  import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
+  import { stripExpressionSigil } from '../../../../../systems/characterModifierPrerequisiteCopy.js';
+
+  const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
 
   let {
     checkModifiers = [],
@@ -74,7 +79,25 @@
   }
 
   function addModifier() {
-    emitModifiers([...modifiers, { id: newId(), label: '', expression: '' }]);
+    emitModifiers([...modifiers, { id: newId(), label: '', icon: DEFAULT_MODIFIER_ICON, expression: '' }]);
+  }
+
+  // A bare roll-data path with no leading `@`, e.g. `abilities.med.mod`. ONLY these
+  // get the sigil re-added on write; anything else is stored verbatim.
+  const BARE_ROLL_DATA_PATH = /^[A-Za-z_][\w.]*$/;
+
+  // The expression editor drops the leading `@` sigil for display (shown as a fixed
+  // adornment) and restores it on write, so a stored path stays `@`-prefixed — the
+  // crafting-modifier resolver feeds it straight to `Roll.replaceFormulaData`, where a
+  // missing `@` leaves the roll-data key unresolved (contributing 0). We re-add `@`
+  // ONLY for a pure path: a compound/function/constant expression (`@a.b + 2`,
+  // `min(@a,@b)`, `floor(@a/2)`, `2`) is stored verbatim, so a leading `min`/`floor`
+  // is never mistaken for a roll-data key and corrupted into `@min(...)`.
+  function toStoredExpression(input) {
+    const raw = String(input ?? '').trim();
+    if (raw === '') return '';
+    if (raw.startsWith('@')) return raw;
+    return BARE_ROLL_DATA_PATH.test(raw) ? `@${raw}` : raw;
   }
 
   function updateModifier(id, patch) {
@@ -121,47 +144,52 @@
       </p>
     {/if}
     {#each modifiers as modifier (modifier.id)}
-      <div class="manager-modifier-row" data-crafting-modifier-row={modifier.id}>
-        <label class="manager-modifier-field">
-          <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabel', 'Label')}</span>
-          <input
-            type="text"
-            data-crafting-modifier-field="label"
-            value={modifier.label || ''}
-            placeholder={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabelPlaceholder', 'Medicine')}
-            oninput={(event) => updateModifier(modifier.id, { label: event.currentTarget.value })}
-          />
-        </label>
-        <label class="manager-modifier-field">
-          <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierIcon', 'Icon (optional)')}</span>
-          <input
-            type="text"
-            data-crafting-modifier-field="icon"
-            value={modifier.icon || ''}
-            placeholder="fas fa-staff-snake"
-            oninput={(event) => updateModifier(modifier.id, { icon: event.currentTarget.value })}
-          />
-        </label>
-        <label class="manager-modifier-field manager-modifier-field-expression">
-          <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierExpression', 'Expression')}</span>
-          <input
-            type="text"
-            data-crafting-modifier-field="expression"
-            value={modifier.expression || ''}
-            placeholder="@abilities.med.mod"
-            oninput={(event) => updateModifier(modifier.id, { expression: event.currentTarget.value })}
-          />
-        </label>
-        <button
-          type="button"
-          class="manager-icon-button is-danger"
-          data-crafting-modifier-remove={modifier.id}
-          title={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove', 'Remove modifier')}
-          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove', 'Remove modifier')}
-          onclick={() => removeModifier(modifier.id)}
-        >
-          <i class="fas fa-trash" aria-hidden="true"></i>
-        </button>
+      <div class="manager-character-modifier-row" data-crafting-modifier-row={modifier.id}>
+        <div class="manager-modifier-name-row">
+          <div class="manager-field manager-modifier-icon-field" data-crafting-modifier-field="icon">
+            <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierIcon', 'Icon')}</span>
+            <IconPicker
+              value={modifier.icon || DEFAULT_MODIFIER_ICON}
+              buttonTitle={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierChangeIcon', 'Change icon')}
+              onChange={(iconClass) => updateModifier(modifier.id, { icon: iconClass })}
+            />
+          </div>
+          <label class="manager-field manager-modifier-label-field">
+            <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabel', 'Label')}</span>
+            <input
+              type="text"
+              data-crafting-modifier-field="label"
+              value={modifier.label || ''}
+              placeholder={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabelPlaceholder', 'Medicine')}
+              oninput={(event) => updateModifier(modifier.id, { label: event.currentTarget.value })}
+            />
+          </label>
+        </div>
+        <div class="manager-modifier-expression-row">
+          <label class="manager-field manager-modifier-field-expression">
+            <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierExpression', 'Expression')}</span>
+            <div class="manager-prerequisite-path-input">
+              <span class="manager-prerequisite-at" aria-hidden="true">@</span>
+              <input
+                type="text"
+                data-crafting-modifier-field="expression"
+                value={stripExpressionSigil(modifier.expression)}
+                placeholder="abilities.med.mod"
+                oninput={(event) => updateModifier(modifier.id, { expression: toStoredExpression(event.currentTarget.value) })}
+              />
+            </div>
+          </label>
+          <button
+            type="button"
+            class="manager-icon-button is-danger manager-modifier-remove"
+            data-crafting-modifier-remove={modifier.id}
+            title={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove', 'Remove modifier')}
+            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove', 'Remove modifier')}
+            onclick={() => removeModifier(modifier.id)}
+          >
+            <i class="fas fa-trash" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>
     {/each}
     <button
@@ -215,17 +243,15 @@
       )}
     </p>
     <div class="manager-modifier-defaults" data-crafting-modifier-defaults>
-      {#each modifiers as modifier (modifier.id)}
-        <label class="manager-modifier-default-option">
-          <input
-            type="checkbox"
-            data-crafting-modifier-default={modifier.id}
-            checked={defaultIds.includes(modifier.id)}
-            onchange={(event) => toggleDefault(modifier.id, event.currentTarget.checked)}
-          />
-          <span>{modifier.label || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')}</span>
-        </label>
-      {/each}
+      <ModifierPillSelect
+        options={modifiers}
+        selectedIds={defaultIds}
+        testId="crafting-modifier-defaults"
+        menuLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsAdd', 'Add default modifier')}
+        allSelectedLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsAllSelected', 'All modifiers are on by default.')}
+        noneSelectedLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsNone', 'No modifiers on by default.')}
+        onToggle={toggleDefault}
+      />
     </div>
   {/if}
 </section>
@@ -238,23 +264,30 @@
     margin-block: 0.5rem 1rem;
   }
 
-  .manager-modifier-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.5rem;
-  }
-
+  /* The row container, the icon/label name-row, and the `@` expression field all reuse
+     the global manager-character-modifier-row / manager-modifier-name-row /
+     manager-prerequisite-path-input classes (styles/fabricate.css) so the Checks-tab
+     catalogue reads as the same design language as the System-tab modifier list. Only
+     the expression + delete line needs a local rule. */
   .manager-modifier-field {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    flex: 1 1 8rem;
     min-width: 0;
   }
 
+  .manager-modifier-expression-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
   .manager-modifier-field-expression {
-    flex: 2 1 12rem;
+    flex: 1 1 auto;
+  }
+
+  .manager-modifier-remove {
+    flex: 0 0 auto;
   }
 
   .manager-modifier-subheading {
@@ -262,14 +295,6 @@
   }
 
   .manager-modifier-defaults {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-
-  .manager-modifier-default-option {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
+    margin-top: 0.35rem;
   }
 </style>
