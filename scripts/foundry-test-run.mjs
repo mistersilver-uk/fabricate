@@ -1669,6 +1669,34 @@ async function assertSinglePointerDispatch(page, locator, label) {
   }
 }
 
+async function requireSingleLocator(locator, label) {
+  const count = await locator.count();
+  if (count !== 1) {
+    throw new Error(`${label} expected exactly one match, found ${count}`);
+  }
+  return locator;
+}
+
+async function assertDisabledToolOnBreakFieldset(fieldset) {
+  const fieldsetState = await fieldset.evaluate((element) => ({
+    disabled: element.disabled === true,
+    matchesDisabled: element.matches(':disabled'),
+  }));
+  if (!fieldsetState.disabled || !fieldsetState.matchesDisabled) {
+    throw new Error(`Check-driven immune fieldset did not expose native disabled state: ${JSON.stringify(fieldsetState)}`);
+  }
+  const controls = fieldset.locator('button, input, select, textarea');
+  const controlCount = await controls.count();
+  if (controlCount === 0) {
+    throw new Error('Check-driven immune fieldset exposed no actionable controls');
+  }
+  for (let index = 0; index < controlCount; index += 1) {
+    if (!(await controls.nth(index).isDisabled())) {
+      throw new Error(`Check-driven immune on-break control ${index + 1} remained interactive`);
+    }
+  }
+}
+
 async function resetToolStudioScroll(page) {
   const scroll = await page.evaluate(() => {
     const selectors = [
@@ -3758,11 +3786,33 @@ async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actor
   }, { systemId, recipeId, actorId, fixture });
 }
 
+async function waitForToolBreakageAuthority(page, systemId) {
+  try {
+    await page.waitForFunction((systemId) => {
+      const persistedAuthority = game.fabricate.getCraftingSystemManager().getSystem(systemId)?.toolBreakage?.authority;
+      let projectedAuthority = null;
+      const unsubscribe = globalThis.__fabricateSmokeManagerApp?._adminStore?.viewState?.subscribe?.((state) => {
+        projectedAuthority = state?.selectedSystem?.toolBreakage?.authority ?? null;
+      });
+      if (typeof unsubscribe === 'function') unsubscribe();
+      globalThis.__fabricateToolAuthorityObservation = { persistedAuthority, projectedAuthority };
+      return persistedAuthority === 'checkDriven' && projectedAuthority === 'checkDriven';
+    }, systemId, { timeout: 10_000, polling: 'raf' });
+  } catch (error) {
+    const observed = await page.evaluate(() => globalThis.__fabricateToolAuthorityObservation ?? null);
+    throw new Error(`Tool breakage authority did not settle to checkDriven: ${JSON.stringify(observed)}`, { cause: error });
+  } finally {
+    await page.evaluate(() => { delete globalThis.__fabricateToolAuthorityObservation; }).catch(() => {});
+  }
+}
+
 async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fixture }) {
   await setManagerWindowSize(page, { width: 1280, height: 720 });
   await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
   await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  const row = page.locator(`.fabricate-manager [data-manager-tool-id="${fixture.toolId}"]`).first();
+  const liveManagerApp = await requireSingleLocator(page.locator('#fabricate-crafting-system-manager'), 'live Crafting System Manager app');
+  const manager = await requireSingleLocator(liveManagerApp.locator('.fabricate-manager'), 'live Fabricate manager');
+  const row = await requireSingleLocator(manager.locator(`[data-manager-tool-id="${fixture.toolId}"]`), 'Tool Studio fixture row');
   await row.waitFor({ state: 'visible', timeout: 10_000 });
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
@@ -3781,7 +3831,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (await enabledToggle.getAttribute('aria-pressed') !== enabledBefore) {
     throw new Error('Tool enabled toggle did not persist and restore independently');
   }
-  if (await page.locator('.fabricate-manager[data-manager-view="tool-edit"]').count() > 0) {
+  if (await liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]').count() > 0) {
     throw new Error('Tool toggle incorrectly opened the editor');
   }
   await resetToolStudioScroll(page);
@@ -3798,34 +3848,33 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await setManagerWindowSize(page, { width: 1280, height: 720 });
 
   await editButton.click();
-  await page.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-edit-view]').first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  if (await page.locator('.fabricate-manager [data-tool-edit-view]').count() !== 1) {
-    throw new Error('Tool Edit did not open exactly one editor');
-  }
-  await assertPointerTarget(page, page.locator('[data-tool-source-picker]').first(), '[data-tool-source-picker]', 'Tool Item picker');
-  await assertPointerTarget(page, page.locator('[data-tool-source-card]').first(), '[data-tool-source-card]', 'Tool Item drop target');
-  await assertPointerTarget(page, page.locator('[data-tool-source-unlink]').first(), '[data-tool-source-unlink]', 'Tool Item unlink');
+  const editorManager = liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]');
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
+  const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
+  await assertPointerTarget(page, editor.locator('[data-tool-source-picker]'), '[data-tool-source-picker]', 'Tool Item picker');
+  await assertPointerTarget(page, editor.locator('[data-tool-source-card]'), '[data-tool-source-card]', 'Tool Item drop target');
+  await assertPointerTarget(page, editor.locator('[data-tool-source-unlink]'), '[data-tool-source-unlink]', 'Tool Item unlink');
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-overview-linked');
 
-  const tab = (name) => page.locator(`#tool-tab-${name}`).first();
+  const tab = (name) => editor.locator(`#tool-tab-${name}`);
   for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
     await assertPointerTarget(page, tab(name), `#tool-tab-${name}`, `Tool ${name} tab`);
   }
   await tab('breakage').click();
-  await page.locator('[data-tool-breakage-tab]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await assertPointerTarget(page, page.locator('[data-tool-repair-add-group]').first(), '[data-tool-repair-add-group]', 'Tool repair AND control');
-  await assertPointerTarget(page, page.locator('[data-tool-repair-group] [data-recipe-add="alternative-component"]').first(), '[data-tool-repair-group] [data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
+  await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await assertPointerTarget(page, editor.locator('[data-tool-repair-add-group]'), '[data-tool-repair-add-group]', 'Tool repair AND control');
+  await assertPointerTarget(page, editor.locator('[data-tool-repair-group] [data-recipe-add="alternative-component"]'), '[data-tool-repair-group] [data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-breakage-repair');
 
-  await page.locator('input[name="tool-on-break"][value="replaceWith"]').first().check();
-  const replacementGrid = page.locator('[data-tool-replacement-target]').first();
+  await editor.locator('input[name="tool-on-break"][value="replaceWith"]').check();
+  const replacementGrid = editor.locator('[data-tool-replacement-target]');
   await replacementGrid.waitFor({ state: 'visible', timeout: 5_000 });
   const componentTarget = replacementGrid.locator('select').nth(0);
   const itemTarget = replacementGrid.locator('select').nth(1);
@@ -3842,62 +3891,74 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-breakage-replace-item');
-  await page.locator('[data-tool-editor-save]').first().click();
-  await page.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
-  await page.locator('[data-tool-editor-back]').first().click();
-  await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
 
-  const checkDriven = page.locator('[data-manager-tools-authority] label:has(input[value="checkDriven"])').first();
+  const checkDriven = await requireSingleLocator(
+    manager.locator('[data-manager-tools-authority] label:has(input[value="checkDriven"])'),
+    'check-driven authority control',
+  );
   await assertPointerTarget(page, checkDriven, '[data-manager-tools-authority] label', 'check-driven authority');
   await checkDriven.click();
-  await page.locator(`.fabricate-manager [data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).first().click();
-  await page.locator('[data-tool-edit-view]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await waitForToolBreakageAuthority(page, systemId);
+  await requireSingleLocator(manager, 'live Fabricate manager before check-driven Edit');
+  const checkDrivenEditButton = await requireSingleLocator(
+    manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`),
+    'check-driven Tool Edit button',
+  );
+  await checkDrivenEditButton.click();
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
+  await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
   await tab('breakage').click();
-  await page.locator('[data-tool-breakage-tab]:has(input[name="tool-check-breakable"][value="immune"]:checked) [data-tool-on-break-controls]:disabled').first().waitFor({ state: 'visible', timeout: 10_000 });
-  const onBreakFieldset = page.locator('[data-tool-on-break-controls]').first();
-  if (!(await onBreakFieldset.isDisabled())) throw new Error('Check-driven immune on-break controls remained interactive');
+  const immuneOnBreakFieldset = editor.locator('[data-tool-breakage-tab]:has(input[name="tool-check-breakable"][value="immune"]:checked) [data-tool-on-break-controls]:disabled');
+  await immuneOnBreakFieldset.waitFor({ state: 'visible', timeout: 10_000 });
+  await requireSingleLocator(immuneOnBreakFieldset, 'check-driven immune on-break fieldset');
+  await assertDisabledToolOnBreakFieldset(immuneOnBreakFieldset);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-breakage-check-immune');
 
   await tab('requirements').click();
-  await page.locator('[data-tool-requirements-tab]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await assertPointerTarget(page, page.locator('[data-tool-prerequisites-enabled]').first(), '[data-tool-prerequisites-enabled]', 'Tool prerequisite toggle');
-  await assertPointerTarget(page, page.locator('[data-tool-bonus-enabled]').first(), '[data-tool-bonus-enabled]', 'Tool bonus toggle');
+  await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await assertPointerTarget(page, editor.locator('[data-tool-prerequisites-enabled]'), '[data-tool-prerequisites-enabled]', 'Tool prerequisite toggle');
+  await assertPointerTarget(page, editor.locator('[data-tool-bonus-enabled]'), '[data-tool-bonus-enabled]', 'Tool bonus toggle');
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-requirements');
 
-  await page.locator('[data-tool-bonus-expression]').first().fill('');
+  await editor.locator('[data-tool-bonus-expression]').fill('');
   await tab('validation').click();
-  await page.locator('[data-tool-validation-tab]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator('[data-first-validation-failure]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await editor.locator('[data-tool-validation-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await editor.locator('[data-first-validation-failure]').waitFor({ state: 'visible', timeout: 5_000 });
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-validation');
   await setManagerWindowSize(page, { width: 900, height: 700 });
-  await page.locator('[data-tool-editor-header]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await editor.locator('[data-tool-editor-header]').waitFor({ state: 'visible', timeout: 5_000 });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: true });
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-narrow');
-  await assertSinglePointerDispatch(page, page.locator('[data-tool-editor-back]').first(), 'Tool Back at 900px');
+  await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 900px');
   await assertSinglePointerDispatch(page, tab('requirements'), 'Tool Requirements tab at 900px');
   await tab('requirements').click();
-  await page.locator('[data-tool-requirements-tab]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await assertSinglePointerDispatch(page, page.locator('[data-tool-bonus-enabled]').first(), 'Tool bonus control at 900px');
+  await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await assertSinglePointerDispatch(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 900px');
 
   await setManagerWindowSize(page, { width: 680, height: 700 });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: true });
-  await assertSinglePointerDispatch(page, page.locator('[data-tool-editor-back]').first(), 'Tool Back at 680px');
+  await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 680px');
   await assertSinglePointerDispatch(page, tab('breakage'), 'Tool Breakage tab at 680px');
-  await assertSinglePointerDispatch(page, page.locator('[data-tool-bonus-enabled]').first(), 'Tool bonus control at 680px');
+  await assertSinglePointerDispatch(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 680px');
   await setManagerWindowSize(page, { width: 1280, height: 720 });
 
   await page.evaluate(async () => globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.());
-  await page.locator('[data-tool-editor-back]').first().click();
+  await editor.locator('[data-tool-editor-back]').click();
   await openManagerRecipeEditor(page, recipeName);
   await page.locator('[data-recipe-tab-button="tools"]').first().click();
   const bonusMode = page.locator(`[data-recipe-tool-bonus-mode="${fixture.toolId}"]`).first();
