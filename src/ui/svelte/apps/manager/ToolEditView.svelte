@@ -63,6 +63,7 @@
   <ToolEditorTabs {activeTab} errorCount={editorErrorCount} onChange={onTabChange} />
 
   <div class="manager-tool-edit-composition">
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex (The active ARIA tabpanel is intentionally keyboard-focusable.) -->
     <section
       class="manager-tool-editor-panel"
       role="tabpanel"

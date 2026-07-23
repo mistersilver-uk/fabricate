@@ -70,7 +70,12 @@
   {#if validation.errors?.length}
     <section class="manager-tool-editor-card manager-validation-error" role="alert" aria-live="assertive">
       <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.DomainErrors', 'Save blockers')}</h3>
-      <ul data-tool-validation-errors>{#each validation.errors as error, index}<li use:focusFirstFailure={index === 0 && focusValidationNonce > 0} data-first-validation-failure={index === 0 ? '' : undefined} tabindex={index === 0 ? -1 : undefined}>{validationErrorText(error)}</li>{/each}</ul>
+      <ul data-tool-validation-errors>
+        {#each validation.errors as error, index}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex (The first error receives tabindex=-1 solely for programmatic focus after invalid Save.) -->
+          <li use:focusFirstFailure={index === 0 && focusValidationNonce > 0} data-first-validation-failure={index === 0 ? '' : undefined} tabindex={index === 0 ? -1 : undefined}>{validationErrorText(error)}</li>
+        {/each}
+      </ul>
     </section>
   {/if}
   {#if saveError && saveError !== 'invalid'}<p class="manager-validation-error" role="alert" data-tool-save-error tabindex="-1">{text('FABRICATE.Admin.Manager.Tools.Editor.SaveFailed', 'The Tool could not be saved. Try again.')}</p>{/if}
