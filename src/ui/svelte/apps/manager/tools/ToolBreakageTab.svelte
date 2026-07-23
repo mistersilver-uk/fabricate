@@ -28,7 +28,7 @@
   }
   let configs = $state(createBreakageConfigs());
   let cachedToolId = $state(Symbol('uncached-tool'));
-  let replacementTypeChoice = $state(tool?.onBreak?.replacementTarget?.type || 'component');
+  let replacementTypeChoice = $state('component');
   const immune = $derived(authority === 'checkDriven' && tool?.checkBreakable === false);
   const onBreak = $derived(tool?.onBreak || { mode: 'destroy' });
 
