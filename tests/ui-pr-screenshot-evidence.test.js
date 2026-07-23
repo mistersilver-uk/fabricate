@@ -1646,6 +1646,14 @@ describe('UI PR screenshot evidence', () => {
     for (const match of harness.matchAll(/captureSelectedGatheringTask\(\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
       emitted.add(match[1]);
     }
+    // Issue 855: the interactive crafting-check roll prompt routes through
+    // handleRollPromptIfPresent(page, '<label>'), which forwards `label` to screenshot()
+    // as a variable — so the literal lives in the helper CALL, not in a screenshot() call.
+    // Until this pattern was registered the label was invisible to this guard, so no
+    // VIEW_RECIPES entry could reference the only frame that shows the prompt.
+    for (const match of harness.matchAll(/handleRollPromptIfPresent\(\s*page\s*,\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
     assert.ok(emitted.size > 0, 'expected to parse smoke labels from foundry-test-run.mjs');
     for (const recipe of VIEW_RECIPES) {
       for (const label of recipe.smokeLabels) {

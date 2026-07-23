@@ -51,6 +51,12 @@ export const CLASS_A_LABELS = Object.freeze(
 
 export const CLASS_B_LABELS = Object.freeze(
   new Set([
+    // The interactive crafting-check roll prompt. Captured by
+    // `handleRollPromptIfPresent` between the Craft click and the run summary, so its
+    // label reaches `screenshot()` through a parameter rather than a literal
+    // `screenshot(page, '<label>')` call — which is why it went unregistered here
+    // until issue 855.
+    'player-crafting-roll-prompt',
     'player-crafting-run-summary',
     'player-crafting-roll-result',
     'player-crafting-alternatives-switched',
@@ -210,6 +216,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'player-crafting-simple',
   'player-crafting-ingredient-routed',
   'player-crafting-routed-by-check',
+  'player-crafting-roll-prompt',
   'player-crafting-run-summary',
   'player-crafting-roll-result',
   'player-crafting-essence-alternative',
