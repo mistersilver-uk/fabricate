@@ -13776,8 +13776,7 @@
 .fabricate-manager .manager-tool-preview {
   min-width: 0;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden auto;
 }
 
 .fabricate-manager .manager-tool-editor-panel {
@@ -13887,6 +13886,8 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .fabricate-manager .manager-tool-editor-card h2,
@@ -13897,12 +13898,6 @@
   font-size: 0.9rem;
   font-weight: 600;
   line-height: 1.2;
-}
-
-.fabricate-manager .manager-tool-editor-card,
-.fabricate-manager .manager-tool-repair {
-  font-size: 0.78rem;
-  line-height: 1.35;
 }
 
 .fabricate-manager .manager-tool-editor-card-heading {
@@ -14684,9 +14679,10 @@
 .fabricate-manager .manager-tools-main {
   display: flex;
   flex-direction: column;
-  gap: var(--fab-space-3);
+  gap: var(--fab-space-2);
   min-width: 0;
   min-height: 0;
+  padding: var(--fab-space-3);
   overflow-y: auto;
 }
 
@@ -18801,11 +18797,6 @@
 
 .fabricate-manager[data-manager-view="tools"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr) 340px;
-}
-
-.fabricate-manager .manager-tools-main {
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-authority-card,
