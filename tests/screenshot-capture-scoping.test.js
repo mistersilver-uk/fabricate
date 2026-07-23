@@ -294,6 +294,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
+  assert.match(
+    HARNESS,
+    /const itemOption = await itemTarget\.locator\('option:not\(\[value=""\]\)'\)\.first\(\)\.getAttribute\('value'\);\s*if \(!itemOption\) throw new Error\('Tool Studio direct Item picker has no world Item options'\);\s*await itemTarget\.selectOption\(itemOption\);\s*await itemTarget\.selectOption\(''\);\s*await itemTarget\.selectOption\(itemOption\);/,
+  );
+  assert.doesNotMatch(HARNESS, /itemTarget\.selectOption\(fixture\.replacementItemUuid\)/);
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 

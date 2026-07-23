@@ -3593,9 +3593,8 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     const system = csm.getSystem(systemId);
     const recipe = rm.getRecipe(recipeId);
     const source = game.items.find((item) => item.name === 'Herbalist Sickle');
-    const replacement = game.items.find((item) => item.name === 'Healing Potion');
-    if (!system || !recipe || !source || !replacement) {
-      throw new Error('Tool Studio fixture requires Arcane Forge, Brew Healing Potion, Herbalist Sickle, and Healing Potion');
+    if (!system || !recipe || !source) {
+      throw new Error('Tool Studio fixture requires Arcane Forge, Brew Healing Potion, and Herbalist Sickle');
     }
     const pack = game.packs.get('dnd5e.items');
     const index = await pack?.getIndex?.();
@@ -3663,7 +3662,6 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       ...restore,
       toolId,
       sourceItemUuid: source.uuid,
-      replacementItemUuid: replacement.uuid,
       uncachedReplacementUuid: `Compendium.dnd5e.items.Item.${uncached._id}`,
     };
   }, { systemId, recipeId });
@@ -3833,9 +3831,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const componentOption = await componentTarget.locator('option:not([value=""])').first().getAttribute('value');
   await componentTarget.selectOption(componentOption);
   await componentTarget.selectOption('');
-  await itemTarget.selectOption(fixture.replacementItemUuid);
+  const itemOption = await itemTarget.locator('option:not([value=""])').first().getAttribute('value');
+  if (!itemOption) throw new Error('Tool Studio direct Item picker has no world Item options');
+  await itemTarget.selectOption(itemOption);
   await itemTarget.selectOption('');
-  await itemTarget.selectOption(fixture.replacementItemUuid);
+  await itemTarget.selectOption(itemOption);
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-tool-breakage-replace-item');
   await page.locator('[data-tool-editor-save]').first().click();
