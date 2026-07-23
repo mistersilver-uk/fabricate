@@ -125,6 +125,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-checks-gathering',
   'manager-checks-validation',
   'manager-checks-crafting-consumption',
+  'manager-checks-crafting-modifiers',
   'manager-components-stacked',
   'manager-components-grouped-continuation',
   'manager-tags-categories-normal',

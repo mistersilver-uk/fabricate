@@ -247,12 +247,22 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-checks-crafting-consumption',
     label: 'Manager Checks tab — crafting failure-consumption controls',
     smokeLabels: ['manager-checks-crafting-consumption'],
-    // The same crafting-check frame carries the check-modifier catalogue card (issue
-    // 770), so a change to the card or the shared pill multi-select it renders (used
-    // for the default-modifier set) republishes this frame.
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
+    ],
+  },
+  {
+    // Issue 770: the check-modifier catalogue card — its OWN frame (the crafting tab
+    // scrolls to the failure-consumption card for the frame above, so the modifier card
+    // needs a dedicated capture to show its IconPicker + label + `@`-expression rows and
+    // the default-modifier pill multi-select un-cropped). One published frame; the card
+    // and the shared pill control both republish it.
+    id: 'manager-checks-crafting-modifiers',
+    label: 'Manager Checks tab — crafting check-modifier catalogue',
+    smokeLabels: ['manager-checks-crafting-modifiers'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingModifierCatalogueCard\.svelte$/,
       /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
     ],

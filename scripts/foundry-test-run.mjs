@@ -6708,6 +6708,28 @@ async function main() {
           process.stderr.write(`Checks crafting consumption capture failed: ${err.message}\n`);
         }
 
+        // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
+        // 770). The seed authors a populated catalogue (Medicine / Alchemy / Herbalism)
+        // with a "Pick highest" default policy on the crafting check, so the frame shows
+        // the redesigned rows — IconPicker + label + the `@`-adorned expression field —
+        // plus the default-modifier pill multi-select. A DEDICATED frame (not the
+        // failure-consumption one above, which the same tab scrolls elsewhere for) so
+        // both cards get exact, un-cropped evidence.
+        try {
+          const modifierCard = page
+            .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
+            .first();
+          await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+          await modifierCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-checks-crafting-modifiers');
+          process.stdout.write('  D0: checks crafting modifiers screenshotted\n');
+          results.steps.push({ step: 'checks-crafting-modifiers', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'checks-crafting-modifiers', passed: false, error: err.message });
+          process.stderr.write(`Checks crafting modifiers capture failed: ${err.message}\n`);
+        }
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
