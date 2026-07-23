@@ -288,6 +288,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: true })'));
   assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?900px/);
   assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?680px/);
+  assert.match(
+    HARNESS,
+    /assertPointerTarget\(page,\s*page\.locator\('\.manager-recipe-or-trigger'\)\.first\(\),\s*'\.manager-recipe-or-trigger',\s*'Tool repair OR trigger'\)/,
+  );
+  assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 
