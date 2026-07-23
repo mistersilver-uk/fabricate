@@ -3867,7 +3867,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   await tab('breakage').click();
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
-  await assertPointerTarget(page, editor.locator('[data-tool-repair-add-group]'), '[data-tool-repair-add-group]', 'Tool repair AND control');
+  await assertPointerTarget(page, editor.locator('[data-tool-repair-add-group]').first(), '[data-tool-repair-add-group]', 'Tool repair AND control');
   await assertPointerTarget(page, editor.locator('[data-tool-repair-group] [data-recipe-add="alternative-component"]'), '[data-tool-repair-group] [data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
