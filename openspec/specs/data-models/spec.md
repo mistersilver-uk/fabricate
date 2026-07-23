@@ -153,6 +153,15 @@ CraftingSystem = {
       rollFormula: string,         // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,
     },
+
+    // Per-recipe check-modifier catalogue (issue 770). A crafting-owned named
+    // catalogue (NOT gathering's characterModifiers — a different aggregate) feeding
+    // the `@craftingmod` roll-formula placeholder. Each `expression` is a roll-data
+    // fragment evaluated against the crafter (missing/failed → 0). Absent = empty
+    // catalogue + addAll policy = a no-op for a single-formula check (back-compat).
+    checkModifiers?: { id: string, label: string, icon?: string, expression: string }[], // default []
+    defaultModifierPolicy?: "addAll" | "highest" | "byRecipe",  // default "addAll"
+    defaultModifierIds?: string[],  // default []; catalogue entries applied by default
   },
 
   // Shared check sub-object shapes, reused by craftingCheck / salvageCraftingCheck /
@@ -828,6 +837,15 @@ Recipe = {
   // otherwise. Semantics in resolution-modes/spec.md.
   minSuccessOutcomeId?: string | null,
 
+  // Optional per-recipe crafting-check modifier override (issue 770). Absent (null) =
+  // inherit the system's `craftingCheck.defaultModifierPolicy` + `defaultModifierIds`.
+  // Present = override the policy and/or the eligible id subset resolved into the
+  // `@craftingmod` placeholder (unknown ids dropped at resolution against the live
+  // catalogue). `byRecipe` at recipe level means "use exactly this recipe's modifierIds".
+  // The normalizer drops a malformed value to null and a policy-less + id-less object to
+  // null (nothing to override). Semantics in resolution-modes/spec.md §Check Source.
+  craftingModifier?: { policy?: "addAll" | "highest" | "byRecipe", modifierIds?: string[] } | null,
+
   // Per-recipe access grants for the `restricted` visibility mode (issue 511, PR-B).
   // Which specific player-characters and players may see/read this recipe. Each is a
   // deduped list of non-empty id strings. Read-forward: when both lists are empty, the
@@ -908,6 +926,9 @@ The legacy scalar `recipeItemId` requirements below still hold for un-migrated s
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
 It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
 An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
+13a. `craftingModifier` is an optional per-recipe crafting-check modifier override (issue 770): `{ policy?, modifierIds? } | null`, defaulting to `null` (inherit the system default policy + `defaultModifierIds`).
+The normalizer keeps only a known `policy` (`addAll`/`highest`/`byRecipe`) and a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object with neither a valid policy nor a non-empty id list, round-trips to `null`.
+Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
 The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
 A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).

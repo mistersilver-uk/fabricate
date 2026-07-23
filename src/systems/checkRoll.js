@@ -11,6 +11,8 @@
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
 import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
 
+import { applyCraftingModifier } from './craftingModifierResolver.js';
+
 /**
  * Summarise an evaluated Roll's dice as
  * `{ groupId, group: "NdS", sum, results: number[] }` entries.
@@ -123,6 +125,9 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
  * @param {string} [options.flavor] Chat message flavor / dialog label.
  * @param {object} [options.speaker] Chat message speaker.
  * @param {*} [options.dc] The DC surfaced to the prompt (display only).
+ * @param {object} [options.craftingModifier] The `@craftingmod` modifier context
+ *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`.
+ *   Resolved to a scalar and substituted before the formula reaches Foundry's `Roll`.
  * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
  *   resolvedFormula: string|null, cancelled?: boolean}>}
  */
@@ -130,13 +135,18 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  // Resolve the Fabricate-owned `@craftingmod` placeholder (issue 770) to a scalar
+  // and substitute it BEFORE anything downstream reads the formula, so the dialog,
+  // roll, and journal all agree (eval == display). A formula without `@craftingmod`
+  // (or no modifier context) is returned unchanged — full single-formula back-compat.
+  const baseFormula = applyCraftingModifier(String(formula), actor, options?.craftingModifier);
   // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
   // can show the actual modifiers, not the authored `@abilities…` placeholders.
   // Recomputed from the COMBINED formula below when a valid situational bonus is
   // applied, so the journal display reconciles with the rolled total (FIX 3).
-  let resolved = resolveCheckFormulaDisplay(formula, actor);
+  let resolved = resolveCheckFormulaDisplay(baseFormula, actor);
 
-  let effectiveFormula = String(formula);
+  let effectiveFormula = baseFormula;
   let effectiveRollMode = options?.rollMode;
 
   // Interactive roll (opt-in): confirm with the player and optionally append a
@@ -229,16 +239,26 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
  * or a non-numeric substitution) — `missing: 'NaN'` makes those detectable, since
  * Foundry would otherwise silently leave or zero an unmatched key.
  *
+ * The optional `craftingModifier` context (issue 770) resolves the Fabricate-owned
+ * `@craftingmod` placeholder to a scalar FIRST — using the SAME pure resolver the
+ * eval path uses — so the displayed formula equals what evaluates (eval == display).
+ *
  * @param {string} formula
  * @param {object|null} actor
+ * @param {object|null} [craftingModifier] The `@craftingmod` modifier context
+ *   (`{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`); omit for
+ *   salvage/gathering or a formula with no `@craftingmod` token.
  * @returns {{ display: string, resolved: boolean }|null}
  */
-export function resolveCheckFormulaDisplay(formula, actor) {
+export function resolveCheckFormulaDisplay(formula, actor, craftingModifier = null) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   const Roll = globalThis.Roll;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  const display = Roll.replaceFormulaData(String(formula), rollData, {
+  // Substitute `@craftingmod` before Foundry's placeholder pass — Foundry would treat
+  // an unresolved `@craftingmod` as 0 and silently swallow it.
+  const substituted = applyCraftingModifier(String(formula), actor, craftingModifier, Roll);
+  const display = Roll.replaceFormulaData(substituted, rollData, {
     missing: 'NaN',
     warn: false,
   });
@@ -269,6 +289,7 @@ export async function runFormulaPassFail({
   actor,
   label = 'Crafting',
   rollOptions = null,
+  craftingModifier = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -277,7 +298,7 @@ export async function runFormulaPassFail({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc });
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc, craftingModifier });
     } catch (error) {
       console.error(`Fabricate | ${label} check roll failed (${formula})`, error);
       return {
@@ -347,6 +368,7 @@ export async function runFormulaProgressive({
   actor,
   label = 'Crafting',
   rollOptions = null,
+  craftingModifier = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -355,7 +377,7 @@ export async function runFormulaProgressive({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions });
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
     } catch (error) {
       console.error(`Fabricate | ${label} progressive check roll failed (${formula})`, error);
       return {
@@ -559,6 +581,7 @@ export async function runFormulaRouted({
   rollOptions = null,
   clampToNearest = false,
   minOutcomeId = null,
+  craftingModifier = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -573,7 +596,7 @@ export async function runFormulaRouted({
       // so the prompt shows no DC chip; numeric otherwise). Re-adding `dc` would
       // clobber that and re-surface the meaningless DC on a fixed check (mirrors
       // `runFormulaProgressive`, which also spreads `rollOptions` with no `dc`).
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions });
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
     } catch (error) {
       console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
       return {

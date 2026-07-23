@@ -3112,6 +3112,7 @@ export class CraftingEngine {
       triggers: checkConfig.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
+      craftingModifier: this._buildCraftingModifierContext(system, recipe),
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
@@ -3172,6 +3173,7 @@ export class CraftingEngine {
       triggers: routed.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
+      craftingModifier: this._buildCraftingModifierContext(system, recipe),
       // A total below every relative threshold clamps to the lowest tier, so a
       // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
       clampToNearest: true,
@@ -3203,6 +3205,24 @@ export class CraftingEngine {
    */
   _markEngineEvaluated(result) {
     return { ...result, engineEvaluated: true };
+  }
+
+  /**
+   * Build the `@craftingmod` modifier context (issue 770) from the system's crafting
+   * check catalogue + default policy and the recipe's optional override. Threaded to
+   * the shared check runners, which resolve `@craftingmod` to a scalar against the
+   * crafter's roll data before the formula reaches Foundry's `Roll`. A formula with no
+   * `@craftingmod` token ignores this context entirely (full back-compat).
+   * @private
+   */
+  _buildCraftingModifierContext(system, recipe) {
+    const check = system?.craftingCheck || {};
+    return {
+      catalogue: check.checkModifiers,
+      systemPolicy: check.defaultModifierPolicy,
+      defaultModifierIds: check.defaultModifierIds,
+      recipeModifier: recipe?.craftingModifier ?? null,
+    };
   }
 
   /**
@@ -3245,6 +3265,7 @@ export class CraftingEngine {
       triggers: progressive.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
+      craftingModifier: this._buildCraftingModifierContext(system, recipe),
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,

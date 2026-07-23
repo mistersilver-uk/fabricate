@@ -539,6 +539,25 @@ describe('UI PR screenshot evidence', () => {
     ]);
   });
 
+  it('maps the issue-770 check-modifier UI to its Checks and recipe-edit frames', () => {
+    const idsFor = (file) => mapChangedFilesToViews([file]).map(view => view.id);
+    // The catalogue card has its OWN dedicated modifier frame (not the failure-
+    // consumption one, which the crafting tab scrolls elsewhere for).
+    assert.deepEqual(
+      idsFor('src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'),
+      ['manager-checks-crafting-modifiers'],
+    );
+    // The dedicated frame carries exactly its own single smoke label.
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-checks-crafting-modifiers'], ['manager-checks-crafting-modifiers']);
+    // The shared pill multi-select renders in BOTH the Checks default set and the
+    // recipe Overview override, so it maps to the dedicated modifier frame and every
+    // recipe-edit frame.
+    const pillIds = idsFor('src/ui/svelte/components/ModifierPillSelect.svelte');
+    assert.ok(pillIds.includes('manager-checks-crafting-modifiers'));
+    assert.ok(pillIds.includes('manager-recipe-edit-normal'));
+  });
+
   it('collects the thirteen recipe-edit frames into thirteen separate files', () => {
     withScreenshotFixtures(
       {

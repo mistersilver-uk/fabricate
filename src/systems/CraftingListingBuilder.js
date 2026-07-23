@@ -610,7 +610,14 @@ export class CraftingListingBuilder {
     // false when the formula does not reduce to a number for this actor (error state).
     const resolution =
       rollFormula.length > 0 && craftingActor
-        ? this._resolveCheckFormula(rollFormula, craftingActor)
+        ? this._resolveCheckFormula(rollFormula, craftingActor, {
+            // The `@craftingmod` context (issue 770): resolve the same scalar the
+            // engine rolls, so the displayed formula matches what evaluates.
+            catalogue: checks.checkModifiers,
+            systemPolicy: checks.defaultModifierPolicy,
+            defaultModifierIds: checks.defaultModifierIds,
+            recipeModifier: recipe?.craftingModifier ?? null,
+          })
         : null;
     // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
     // range, not DC, so it has no meaningful DC — null it so the player card hides
