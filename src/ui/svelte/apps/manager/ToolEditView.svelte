@@ -16,6 +16,7 @@
 
   let {
     tool = null,
+    systemName = '',
     validation = { valid: false, errors: [] },
     dirty = false,
     saving = false,
@@ -30,6 +31,9 @@
     currencyEnabled = false,
     prerequisiteOptions = [],
     authority = 'toolSpecific',
+    onOpenSystems = () => {},
+    onOpenSystem = () => {},
+    onOpenTools = () => {},
     onBack = () => {},
     onDelete = () => {},
     onSave = () => {},
@@ -56,22 +60,33 @@
 
 <main class="manager-main manager-tool-edit-main" data-tool-edit-view>
   <header class="manager-tool-edit-header" data-tool-editor-header>
-    <div class="manager-tool-edit-identity">
-      <img src={displayImage} alt="" data-tool-editor-image />
-      <div class="manager-tool-edit-identity-copy">
-        <h2 title={displayName}>{displayName}</h2>
-        <p data-tool-editor-source-context>{sourceContext}</p>
+    <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
+      <button type="button" data-tool-editor-open-systems onclick={onOpenSystems}>{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button>
+      <i class="fas fa-chevron-right" aria-hidden="true"></i>
+      <button type="button" data-tool-editor-open-system onclick={onOpenSystem}>{systemName}</button>
+      <i class="fas fa-chevron-right" aria-hidden="true"></i>
+      <button type="button" data-tool-editor-open-tools onclick={onOpenTools}>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button>
+      <i class="fas fa-chevron-right" aria-hidden="true"></i>
+      <span title={displayName}>{displayName}</span>
+    </nav>
+    <div class="manager-tool-edit-header-main">
+      <div class="manager-tool-edit-identity">
+        <img src={displayImage} alt="" data-tool-editor-image />
+        <div class="manager-tool-edit-identity-copy">
+          <h2 title={displayName}>{displayName}</h2>
+          <p data-tool-editor-source-context>{sourceContext}</p>
+        </div>
       </div>
-    </div>
-    <div class="manager-tool-edit-actions">
-      <span class={`manager-tool-edit-status ${dirty ? 'is-warning' : 'is-positive'}`} data-tool-editor-status>
-        <i class={dirty ? 'fas fa-pen' : 'fas fa-circle-check'} aria-hidden="true"></i>
-        {dirty ? text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved') : text('FABRICATE.Admin.Manager.Tools.Editor.Saved', 'Saved')}
-      </span>
-      {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
-      <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')}</span></button>
-      <button type="button" class="manager-button is-danger" data-tool-editor-delete onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete Tool')}</span></button>
-      <button type="button" class="manager-button is-primary" data-tool-editor-save onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save changes')}</span></button>
+      <div class="manager-tool-edit-actions">
+        <span class={`manager-tool-edit-status ${dirty ? 'is-warning' : 'is-positive'}`} data-tool-editor-status>
+          <i class={dirty ? 'fas fa-pen' : 'fas fa-circle-check'} aria-hidden="true"></i>
+          {dirty ? text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved') : text('FABRICATE.Admin.Manager.Tools.Editor.Saved', 'Saved')}
+        </span>
+        {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
+        <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')}</span></button>
+        <button type="button" class="manager-button is-danger" data-tool-editor-delete onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete Tool')}</span></button>
+        <button type="button" class="manager-button is-primary" data-tool-editor-save onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save changes')}</span></button>
+      </div>
     </div>
   </header>
 
