@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import {
   buildEssenceIconOptions,
   DEFAULT_ESSENCE_ICON,
-  ESSENCE_ALL_ICON_OPTIONS,
-  ESSENCE_ICON_OPTIONS,
   filterEssenceIconOptions,
+  getEssenceAllIconOptions,
   getEssenceIconOption,
+  getEssenceIconOptions,
   getEssenceIconPrefix,
   normalizeEssenceIcon
 } from '../src/ui/svelte/util/essenceIcons.js';
@@ -282,7 +282,7 @@ describe('essenceIcons utility', () => {
   it('builds the fantasy-safe picker catalog by default', () => {
     const options = buildEssenceIconOptions();
 
-    assert.equal(options, ESSENCE_ICON_OPTIONS);
+    assert.equal(options, getEssenceIconOptions());
     assert.ok(options.some(option => option.iconClass === 'fas fa-fire'));
     assert.ok(options.some(option => option.iconClass === 'fas fa-flask'));
     assert.ok(options.some(option => option.iconClass === 'fas fa-wine-glass'));
@@ -308,7 +308,7 @@ describe('essenceIcons utility', () => {
     assert.ok(options.some(option => option.iconClass === 'far fa-address-book'));
     assert.ok(options.every(option => option.iconClass.startsWith('fas ') || option.iconClass.startsWith('far ')));
     assert.ok(!options.some(option => option.iconClass === 'fab fa-github'));
-    assert.equal(options, ESSENCE_ALL_ICON_OPTIONS);
+    assert.equal(options, getEssenceAllIconOptions());
   });
 
   it('builds custom icon definitions into solid and regular picker options', () => {
@@ -325,10 +325,10 @@ describe('essenceIcons utility', () => {
   });
 
   it('filters icon options by icon name, class text, and style', () => {
-    const wineMatches = filterEssenceIconOptions(ESSENCE_ICON_OPTIONS, 'wine glass');
+    const wineMatches = filterEssenceIconOptions(getEssenceIconOptions(), 'wine glass');
     assert.ok(wineMatches.some(option => option.iconClass === 'fas fa-wine-glass'));
 
-    const regularMatches = filterEssenceIconOptions(ESSENCE_ICON_OPTIONS, 'bell regular');
+    const regularMatches = filterEssenceIconOptions(getEssenceIconOptions(), 'bell regular');
     assert.ok(regularMatches.some(option => option.iconClass === 'far fa-bell'));
     assert.ok(!regularMatches.some(option => option.iconClass === 'fas fa-bell'));
   });
@@ -340,12 +340,54 @@ describe('essenceIcons utility', () => {
   });
 
   it('returns a catalog match when one exists and a humanized passthrough otherwise', () => {
-    const known = getEssenceIconOption('fas fa-fire', ESSENCE_ICON_OPTIONS);
+    const known = getEssenceIconOption('fas fa-fire', getEssenceIconOptions());
     assert.equal(known.label, 'Fire');
     assert.equal(known.variant, 'solid');
 
-    const custom = getEssenceIconOption('fas fa-dragon', ESSENCE_ICON_OPTIONS);
+    const custom = getEssenceIconOption('fas fa-dragon', getEssenceIconOptions());
     assert.equal(custom.label, 'Dragon');
     assert.equal(custom.iconClass, 'fas fa-dragon');
+  });
+
+  it('memoizes both catalogs so accessors and builders share one frozen array', () => {
+    assert.equal(getEssenceIconOptions(), getEssenceIconOptions());
+    assert.equal(getEssenceAllIconOptions(), getEssenceAllIconOptions());
+    assert.equal(buildEssenceIconOptions(), getEssenceIconOptions());
+    assert.equal(buildEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS), getEssenceAllIconOptions());
+  });
+});
+
+describe('essenceIcons lazy initialization', () => {
+  it('freezes no icon option at import and defers construction to the first accessor call', async () => {
+    const originalFreeze = Object.freeze;
+    const optionFreezeCount = { value: 0 };
+
+    // An icon option is the only frozen object carrying a `searchText` field, so this
+    // fingerprint ignores the module-load frozen STYLE_PREFIXES/NON_ICON_TOKENS/PREFIX_ALIASES.
+    Object.freeze = function trackingFreeze(target) {
+      if (target && typeof target === 'object' && Object.hasOwn(target, 'searchText')) {
+        optionFreezeCount.value += 1;
+      }
+      return originalFreeze(target);
+    };
+
+    try {
+      // A fresh, cache-busted module instance has its own empty memo caches. Date.now is
+      // permitted here because this is a node --test file, not a build/runtime script.
+      const fresh = await import(`../src/ui/svelte/util/essenceIcons.js?fresh=${Date.now()}`);
+
+      assert.equal(optionFreezeCount.value, 0, 'importing essenceIcons.js must not build any icon option');
+
+      const options = fresh.getEssenceIconOptions();
+      assert.ok(options.length > 0, 'the first accessor call must build the fantasy-safe catalog');
+      assert.ok(optionFreezeCount.value > 0, 'building the catalog must freeze option-shaped objects');
+
+      // The fresh instance memoizes independently of the shared module under test.
+      assert.equal(fresh.getEssenceIconOptions(), fresh.getEssenceIconOptions());
+      assert.equal(fresh.getEssenceAllIconOptions(), fresh.getEssenceAllIconOptions());
+      assert.equal(fresh.buildEssenceIconOptions(), fresh.getEssenceIconOptions());
+    } finally {
+      Object.freeze = originalFreeze;
+    }
   });
 });

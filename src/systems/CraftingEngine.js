@@ -29,7 +29,44 @@ import {
   spendCurrencySpends,
 } from './currencyAffordance.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
-import { SignatureValidator } from './SignatureValidator.js';
+import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
+
+/**
+ * Resolve the winning alchemy match from ALL sets that matched a submission by
+ * picking the unique MOST-SPECIFIC set (issue 774). Each candidate carries its
+ * `{ recipe, ingredientSetId, signature, groupOptions }`; a set A is more specific
+ * than B when it {@link signatureDominates} B (its required-group structure is a
+ * proper superset). The winner is the unique maximum of that partial order — the
+ * single candidate no other candidate dominates. When no unique maximum exists
+ * (two incomparable co-matching sets, e.g. siblings both matched by an ambiguous
+ * over-submission), this FAILS SAFE to no-match so the caller fizzles rather than
+ * silently brewing one by iteration order. This is the runtime counterpart of the
+ * enable-time inseparability guard (`SignatureValidator.signaturesOverlap`); both
+ * consume the SAME `signatureDominates` predicate so they can never disagree.
+ *
+ * Pure (reads no `this`) and exported so a call-site test can pin that reverting
+ * to a first-match short-circuit changes the result.
+ *
+ * @param {Array<{recipe: object, ingredientSetId: string, signature: Set<string>[], groupOptions: object[][]}>} candidates
+ * @returns {{ matched: true, recipe: object, ingredientSetId: string } | { matched: false }}
+ */
+export function resolveMostSpecificSignatureMatch(candidates) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return { matched: false };
+  const pick = (candidate) => ({
+    matched: true,
+    recipe: candidate.recipe,
+    ingredientSetId: candidate.ingredientSetId,
+  });
+  if (candidates.length === 1) return pick(candidates[0]);
+
+  // The maximal candidates: those no other candidate strictly dominates. With a
+  // transitive domination relation, exactly one maximal element IS the unique
+  // maximum (the greatest); two or more means an incomparable tie → fail safe.
+  const maximal = candidates.filter((candidate) =>
+    candidates.every((other) => other === candidate || !signatureDominates(other, candidate))
+  );
+  return maximal.length === 1 ? pick(maximal[0]) : { matched: false };
+}
 
 /**
  * A human-readable reference for a Tool in a missing-tool diagnostic (issue 777). The
@@ -1950,6 +1987,12 @@ export class CraftingEngine {
       });
     };
 
+    // Collect EVERY set that matches this submission, then resolve the unique
+    // most-specific one (issue 774) instead of early-returning the first authored
+    // match. A superset submission can satisfy several nested sets; the runtime
+    // must brew the most specific and fail safe (fizzle) on an incomparable tie —
+    // never pick by iteration order.
+    const candidates = [];
     for (const recipe of recipes) {
       if (!recipe.enabled) continue;
       const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
@@ -1980,7 +2023,7 @@ export class CraftingEngine {
             groupSatisfied(groups[index], signature[index], true)
           );
           if (allGroupsSatisfied) {
-            return { matched: true, recipe, ingredientSetId: set.id };
+            candidates.push({ recipe, ingredientSetId: set.id, signature, set });
           }
           continue;
         }
@@ -2005,11 +2048,20 @@ export class CraftingEngine {
         }
 
         if (allGroupsSatisfied && essencesSatisfied) {
-          return { matched: true, recipe, ingredientSetId: set.id };
+          candidates.push({ recipe, ingredientSetId: set.id, signature, set });
         }
       }
     }
-    return { matched: false };
+
+    // The specificity tiebreak is only consulted when more than one set matched, so
+    // defer computing each candidate's `groupOptions` (the domination input) until
+    // then — a single match returns directly and never needs it.
+    if (candidates.length > 1) {
+      for (const candidate of candidates) {
+        candidate.groupOptions = signatureValidator.computeGroupOptions(candidate.set, components);
+      }
+    }
+    return resolveMostSpecificSignatureMatch(candidates);
   }
 
   /**
