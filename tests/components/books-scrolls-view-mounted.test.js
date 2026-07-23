@@ -1,6 +1,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -8,13 +9,31 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-books-scrolls-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [
+    'src/ui/svelte/util/foundryBridge.js',
+    // The creation drop-zone (issue 844) resolves a drop via resolveDropData and
+    // wires the drop listeners through the dragDrop action. Omitting either raw
+    // module from the allowlist does not fail the mount — it HANGS (# cancelled).
+    'src/ui/svelte/util/dropUtils.js',
+    'src/ui/svelte/actions/dragDrop.js'
+  ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/apps/manager/BooksScrollsView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte'
 });
+
+// Dispatch a Foundry-style drop on a node. getDragEventData (no `foundry` global in
+// the harness) falls back to parsing `dataTransfer.getData('text/plain')`, so a
+// JSON payload here round-trips exactly as a real world/compendium item drag would.
+// Passing `data: null` simulates a drop with no payload.
+function fireDrop(node, data) {
+  const raw = data === undefined ? null : JSON.stringify(data);
+  const event = new Event('drop', { bubbles: true, cancelable: true });
+  event.dataTransfer = { getData: () => raw };
+  node.dispatchEvent(event);
+}
 
 function makeItem(overrides = {}) {
   return {
@@ -105,18 +124,16 @@ describe('BooksScrollsView (mounted)', () => {
     assert.equal(capChipText(free, 'primer'), 'Learn freely');
   });
 
-  it('fires select, edit, toggle, and create callbacks', async () => {
+  it('fires select, edit, and toggle callbacks', async () => {
     let selected = null;
     let edited = null;
     let toggled = null;
-    let created = 0;
     const root = await harness.mount({
       recipeItems: [makeItem()],
       visibilityMode: 'knowledge',
       onSelectRecipeItem: (id) => { selected = id; },
       onOpenRecipeItem: (id) => { edited = id; },
-      onToggleEnabled: (id, enabled) => { toggled = { id, enabled }; },
-      onCreateRecipeItem: () => { created += 1; }
+      onToggleEnabled: (id, enabled) => { toggled = { id, enabled }; }
     });
 
     root.querySelector('[data-books-scrolls-select="primer"]').click();
@@ -129,8 +146,76 @@ describe('BooksScrollsView (mounted)', () => {
     root.querySelector('[data-books-scrolls-toggle="primer"]').click();
     assert.deepEqual(toggled, { id: 'primer', enabled: false });
 
-    root.querySelector('[data-books-scrolls-create]').click();
-    assert.equal(created, 1);
+    // The blank-window "Create recipe item" dialog is gone (issue 844) — creation is
+    // the drop-zone below. There is no create button.
+    assert.equal(root.querySelector('[data-books-scrolls-create]'), null);
+    assert.equal(root.querySelector('[data-books-scrolls-empty-create]'), null);
+  });
+
+  describe('creation drop-zone (issue 844)', () => {
+    it('renders the drop-zone as the creation entry point (not a create button)', async () => {
+      const root = await harness.mount({ recipeItems: [makeItem()], visibilityMode: 'item', dropEnabled: true });
+      const zone = root.querySelector('[data-books-scrolls-drop-zone]');
+      assert.ok(zone, 'expected the creation drop-zone');
+      assert.equal(root.querySelector('[data-books-scrolls-create]'), null, 'the blank-dialog create button is gone');
+      assert.equal(root.querySelector('[data-books-scrolls-drop-error]'), null, 'no error before any drop');
+    });
+
+    it('creates a recipe item from a dropped world Item uuid', async () => {
+      const dropped = [];
+      const root = await harness.mount({
+        recipeItems: [],
+        visibilityMode: 'item',
+        dropEnabled: true,
+        onDropRecipeItem: (uuid) => dropped.push(uuid)
+      });
+      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Item', uuid: 'Item.abc123' });
+      assert.deepEqual(dropped, ['Item.abc123']);
+      assert.equal(root.querySelector('[data-books-scrolls-drop-error]'), null);
+    });
+
+    it('creates a recipe item from a dropped compendium Item (pack + id, no uuid)', async () => {
+      const dropped = [];
+      const root = await harness.mount({
+        recipeItems: [],
+        visibilityMode: 'item',
+        dropEnabled: true,
+        onDropRecipeItem: (uuid) => dropped.push(uuid)
+      });
+      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Item', pack: 'dnd5e.items', id: 'xyz789' });
+      assert.deepEqual(dropped, ['Compendium.dnd5e.items.xyz789']);
+    });
+
+    it('surfaces an error state (never a blank window) on a non-Item drop', async () => {
+      const dropped = [];
+      const root = await harness.mount({
+        recipeItems: [],
+        visibilityMode: 'item',
+        dropEnabled: true,
+        onDropRecipeItem: (uuid) => dropped.push(uuid)
+      });
+      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Actor', uuid: 'Actor.def456' });
+      flushSync();
+      assert.deepEqual(dropped, [], 'a non-Item drop creates nothing');
+      const errorNote = root.querySelector('[data-books-scrolls-drop-error]');
+      assert.ok(errorNote, 'expected the inline error note');
+      assert.ok(root.querySelector('[data-books-scrolls-drop-zone]').classList.contains('is-error'));
+    });
+
+    it('surfaces an error state on an unpersisted Item drop (type Item, no uuid)', async () => {
+      const dropped = [];
+      const root = await harness.mount({
+        recipeItems: [],
+        visibilityMode: 'item',
+        dropEnabled: true,
+        onDropRecipeItem: (uuid) => dropped.push(uuid)
+      });
+      // An unpersisted item drag carries `{ type: 'Item' }` with no resolvable uuid.
+      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Item' });
+      flushSync();
+      assert.deepEqual(dropped, []);
+      assert.ok(root.querySelector('[data-books-scrolls-drop-error]'), 'expected the inline error note');
+    });
   });
 
   it('dims disabled rows', async () => {

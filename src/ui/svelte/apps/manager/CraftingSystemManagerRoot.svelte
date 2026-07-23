@@ -57,7 +57,6 @@
   import GrantAccessInspector from './GrantAccessInspector.svelte';
   import ItemPageInspector from './ItemPageInspector.svelte';
   import RecipeItemEditor from './RecipeItemEditor.svelte';
-  import ItemPickerModal from './ItemPickerModal.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import {
     buildCraftingNavItems,
@@ -145,8 +144,9 @@
   let recipeItemEditSaving = $state(false);
   let recipeItemSaveFailed = $state(false);
   let recipeItemActiveTab = $state('overview');
-  // Item picker modal (Create recipe item flow on Books & Scrolls / Overview tab).
-  let itemPickerOpen = $state(false);
+  // World-item options fed to the recipe-item editor's Overview link picker. (The
+  // Books & Scrolls creation flow is a drop-zone now — issue 844 — so this no longer
+  // backs a create-recipe-item modal.)
   let worldItemOptions = $state([]);
   // Folder-aware import mapping modal (issue 771): opened before a folder / whole-pack
   // component drop commits, seeded with the per-folder groups the drop resolved to.
@@ -3894,15 +3894,12 @@
     patchRecipeItemDraft({ recipeIds: next });
   }
 
-  // Create a new recipe item: open the world-item picker, add the picked item as a
-  // definition, then open its editor. Live side effect + navigation.
-  async function createRecipeItem() {
-    worldItemOptions = (await services?.getWorldItemOptions?.()) || [];
-    itemPickerOpen = true;
-  }
-
-  async function pickRecipeItemFromUuid(uuid) {
-    itemPickerOpen = false;
+  // Create a recipe item from a dropped world/compendium Item (issue 844). The
+  // Books & Scrolls surface resolves the drop to a UUID via `resolveDropData` and
+  // hands it here; we add + link the definition, then open its editor. This replaced
+  // the former picker modal, which was seeded only from the world-item list and so
+  // rendered an empty/unusable window in a fresh world with no world items.
+  async function dropRecipeItem(uuid) {
     if (!uuid) return;
     const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
     const newId = typeof created === 'string' ? created : created?.item?.id || created?.id;
@@ -5495,7 +5492,8 @@
         {selectedRecipeItemId}
         onSelectRecipeItem={(id) => selectRecipeItem(id)}
         onOpenRecipeItem={(id) => editRecipeItem(id)}
-        onCreateRecipeItem={createRecipeItem}
+        onDropRecipeItem={(uuid) => dropRecipeItem(uuid)}
+        dropEnabled={!!selectedSystemId}
         onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
       />
     {:else if currentView === 'recipe-item-edit' && selectedSystem}
@@ -7180,15 +7178,6 @@
     </aside>
     {/if}
   </div>
-
-  <ItemPickerModal
-    open={itemPickerOpen}
-    items={worldItemOptions}
-    titleKey="FABRICATE.Admin.Manager.BooksScrolls.PickItemTitle"
-    titleFallback="Select an item"
-    onPick={(uuid) => pickRecipeItemFromUuid(uuid)}
-    onClose={() => itemPickerOpen = false}
-  />
 
   <ImportFolderMappingModal
     open={importMappingOpen}
