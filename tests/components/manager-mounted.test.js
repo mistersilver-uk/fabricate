@@ -4018,6 +4018,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       patches.some((p) => p.defaultModifierPolicy === 'addAll'),
       'selecting a policy radio emits defaultModifierPolicy'
     );
+    // The Phase-2 "Player picks" policy renders as a fourth radio and emits (issue 770 P2).
+    const playerPicksOption = card.querySelector(
+      '[data-crafting-modifier-policy-option="playerPicks"] input'
+    );
+    assert.ok(playerPicksOption, 'the playerPicks policy radio renders');
+    playerPicksOption.click();
+    flushSync();
+    assert.ok(
+      patches.some((p) => p.defaultModifierPolicy === 'playerPicks'),
+      'selecting playerPicks emits defaultModifierPolicy'
+    );
     // The expression field drops the leading `@` for display and restores it on write,
     // so the stored expression keeps the sigil the resolver's replaceFormulaData needs.
     const expression = card.querySelector('input[data-crafting-modifier-field="expression"]');

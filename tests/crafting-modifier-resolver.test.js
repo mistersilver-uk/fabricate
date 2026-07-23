@@ -8,6 +8,7 @@ const {
   resolveModifierPolicy,
   resolveEligibleModifierIds,
   resolveCraftingModifierScalar,
+  buildCraftingModifierChoice,
   substituteCraftingModifier,
   evaluateNumericExpression,
   makeRollDataExpressionEvaluator,
@@ -27,11 +28,12 @@ function evaluatorFor(values) {
 
 // ── policy normalization ─────────────────────────────────────────────────────
 
-test('normalizeModifierPolicy keeps only the three known policies', () => {
+test('normalizeModifierPolicy keeps only the four known policies', () => {
   assert.equal(normalizeModifierPolicy('addAll'), 'addAll');
   assert.equal(normalizeModifierPolicy('highest'), 'highest');
   assert.equal(normalizeModifierPolicy('byRecipe'), 'byRecipe');
-  assert.equal(normalizeModifierPolicy('playerPicks'), null, 'Phase 2 policy is unknown here');
+  assert.equal(normalizeModifierPolicy('playerPicks'), 'playerPicks', 'Phase 2 policy is known');
+  assert.equal(normalizeModifierPolicy('bogus'), null);
   assert.equal(normalizeModifierPolicy(undefined), null);
 });
 
@@ -94,6 +96,45 @@ test('resolveCraftingModifierScalar highest returns the max scalar (not a dice p
   assert.equal(scalar, 4);
 });
 
+test('resolveCraftingModifierScalar playerPicks resolves as highest (deterministic fallback)', () => {
+  const context = {
+    catalogue: CATALOGUE,
+    systemPolicy: 'playerPicks',
+    defaultModifierIds: ['med', 'alch', 'herb'],
+  };
+  const values = { '@med': 3, '@alch': 2, '@herb': 4 };
+  const asPlayerPicks = resolveCraftingModifierScalar(context, evaluatorFor(values));
+  const asHighest = resolveCraftingModifierScalar(
+    { ...context, systemPolicy: 'highest' },
+    evaluatorFor(values)
+  );
+  assert.equal(asPlayerPicks, 4, 'non-interactive playerPicks == max(3,2,4)');
+  assert.equal(asPlayerPicks, asHighest, 'playerPicks scalar is byte-identical to highest');
+});
+
+test('resolveCraftingModifierScalar playerPicks==highest through a narrowing recipe override', () => {
+  // The eligible set differs from the system default via a recipe modifierIds subset;
+  // non-interactive playerPicks must still equal highest ON THAT NARROWED SET.
+  const context = {
+    catalogue: CATALOGUE,
+    systemPolicy: 'playerPicks',
+    defaultModifierIds: ['med', 'alch', 'herb'],
+    recipeModifier: { policy: 'playerPicks', modifierIds: ['med', 'alch'] },
+  };
+  const values = { '@med': 3, '@alch': 2, '@herb': 9 };
+  const asPlayerPicks = resolveCraftingModifierScalar(context, evaluatorFor(values));
+  const asHighest = resolveCraftingModifierScalar(
+    {
+      ...context,
+      systemPolicy: 'highest',
+      recipeModifier: { policy: 'highest', modifierIds: ['med', 'alch'] },
+    },
+    evaluatorFor(values)
+  );
+  assert.equal(asPlayerPicks, 3, 'max over the narrowed {med:3, alch:2} set — herb:9 is excluded');
+  assert.equal(asPlayerPicks, asHighest, 'equivalence holds on the recipe-narrowed set');
+});
+
 test('resolveCraftingModifierScalar byRecipe sums the recipe-supplied set', () => {
   const scalar = resolveCraftingModifierScalar(
     {
@@ -123,6 +164,94 @@ test('resolveCraftingModifierScalar: an empty eligible set is 0', () => {
     ),
     0
   );
+});
+
+// ── interactive playerPicks descriptor ───────────────────────────────────────
+
+const ICON_CATALOGUE = [
+  { id: 'med', label: 'Medicine', icon: 'fa-med', expression: '@med' },
+  { id: 'alch', label: 'Alchemy', icon: 'fa-alch', expression: '@alch' },
+  { id: 'herb', label: 'Herbalism', icon: 'fa-herb', expression: '@herb' },
+];
+
+test('buildCraftingModifierChoice maps eligible modifiers + default-selects the highest', () => {
+  const choice = buildCraftingModifierChoice(
+    { catalogue: ICON_CATALOGUE, defaultModifierIds: ['med', 'alch', 'herb'] },
+    evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 })
+  );
+  assert.equal(choice.token, CRAFTING_MOD_TOKEN);
+  assert.deepEqual(choice.modifiers, [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
+    { id: 'alch', label: 'Alchemy', icon: 'fa-alch', value: 2 },
+    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 4 },
+  ]);
+  assert.equal(choice.defaultSelectedId, 'herb', 'herb (4) is the highest');
+});
+
+test('buildCraftingModifierChoice tie-breaks equal-max by eligible-set order (first wins)', () => {
+  const choice = buildCraftingModifierChoice(
+    { catalogue: ICON_CATALOGUE, defaultModifierIds: ['med', 'alch', 'herb'] },
+    evaluatorFor({ '@med': 4, '@alch': 2, '@herb': 4 })
+  );
+  assert.equal(choice.defaultSelectedId, 'med', 'med precedes herb in the eligible set');
+});
+
+test('buildCraftingModifierChoice honours the recipe eligible-set order for the tie-break', () => {
+  const choice = buildCraftingModifierChoice(
+    {
+      catalogue: ICON_CATALOGUE,
+      defaultModifierIds: ['med', 'alch', 'herb'],
+      recipeModifier: { policy: 'playerPicks', modifierIds: ['herb', 'med'] },
+    },
+    evaluatorFor({ '@med': 4, '@alch': 2, '@herb': 4 })
+  );
+  assert.deepEqual(
+    choice.modifiers.map((modifier) => modifier.id),
+    ['herb', 'med'],
+    'recipe subset order preserved'
+  );
+  assert.equal(choice.defaultSelectedId, 'herb', 'herb is first in the recipe set among equal-max');
+});
+
+test('buildCraftingModifierChoice coerces a missing/failed value to 0', () => {
+  const choice = buildCraftingModifierChoice(
+    { catalogue: ICON_CATALOGUE, defaultModifierIds: ['med', 'alch'] },
+    (expression) => (expression === '@med' ? NaN : 5)
+  );
+  assert.equal(choice.modifiers[0].value, 0, 'NaN → 0');
+  assert.equal(choice.defaultSelectedId, 'alch', 'alch (5) beats the coerced-0 med');
+});
+
+test('buildCraftingModifierChoice default-selects the least-negative when all values are negative', () => {
+  // Guards the `bestValue = modifiers[0].value` seed: a refactor to `let bestValue = 0`
+  // would silently default to the first option instead of the true (negative) max.
+  const choice = buildCraftingModifierChoice(
+    { catalogue: CATALOGUE, defaultModifierIds: ['med', 'alch', 'herb'] },
+    evaluatorFor({ '@med': -3, '@alch': -1, '@herb': -5 })
+  );
+  assert.equal(choice.defaultSelectedId, 'alch', 'max(-3,-1,-5) = -1 → alch, not the first option');
+  assert.deepEqual(
+    choice.modifiers.map((modifier) => modifier.value),
+    [-3, -1, -5]
+  );
+});
+
+test('buildCraftingModifierChoice returns null when no modifier is eligible', () => {
+  assert.equal(
+    buildCraftingModifierChoice(
+      { catalogue: ICON_CATALOGUE, defaultModifierIds: [] },
+      evaluatorFor({})
+    ),
+    null
+  );
+});
+
+test('buildCraftingModifierChoice defaults absent label/icon to empty strings', () => {
+  const choice = buildCraftingModifierChoice(
+    { catalogue: [{ id: 'bare', expression: '@bare' }], defaultModifierIds: ['bare'] },
+    evaluatorFor({ '@bare': 1 })
+  );
+  assert.deepEqual(choice.modifiers, [{ id: 'bare', label: '', icon: '', value: 1 }]);
 });
 
 // ── token substitution ───────────────────────────────────────────────────────
@@ -173,7 +302,11 @@ test('makeRollDataExpressionEvaluator resolves @-paths then reduces to a number'
   const evaluate = makeRollDataExpressionEvaluator(actor, Roll);
   assert.equal(evaluate('@abilities.med.mod'), 3);
   assert.equal(evaluate('@abilities.med.mod + @prof'), 5);
-  assert.equal(evaluate('@abilities.ghost.mod'), 0, 'a missing key resolves to 0 (missing sentinel)');
+  assert.equal(
+    evaluate('@abilities.ghost.mod'),
+    0,
+    'a missing key resolves to 0 (missing sentinel)'
+  );
   assert.equal(evaluate(''), 0);
 });
 
@@ -201,7 +334,10 @@ test('applyCraftingModifier substitutes the resolved scalar before Foundry sees 
 test('applyCraftingModifier leaves a formula without the token unchanged', () => {
   const Roll = stubReplaceRoll();
   const actor = { getRollData: () => ({}) };
-  assert.equal(applyCraftingModifier('1d20 + @prof', actor, { catalogue: [] }, Roll), '1d20 + @prof');
+  assert.equal(
+    applyCraftingModifier('1d20 + @prof', actor, { catalogue: [] }, Roll),
+    '1d20 + @prof'
+  );
 });
 
 test('applyCraftingModifier substitutes 0 when the token appears without a context', () => {
