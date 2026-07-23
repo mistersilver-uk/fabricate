@@ -285,6 +285,29 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 
+test('the Tool Studio fixture composes durable Tool identity through the canonical flag path', () => {
+  assert.match(HARNESS, /source\.getFlag\('fabricate', 'fabricate\.roles'\)/);
+  assert.match(HARNESS, /source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\)/);
+  assert.match(HARNESS, /source\.unsetFlag\('fabricate', 'fabricate\.roles'\)/);
+  assert.match(
+    HARNESS,
+    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\) await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*\}/,
+    'restoration must clear the fixture leaf before restoring a recursively merged roles snapshot',
+  );
+  assert.match(
+    HARNESS,
+    /flags\.fabricate\.fabricate\.roles\.\$\{systemId\}\.toolId/,
+    'the owned replacement fixture must seed the same durable identity shape runtime readers use',
+  );
+  assert.match(
+    HARNESS,
+    /flags\.fabricate\.fabricate\.roles\.\$\{systemId\}\.componentId/,
+    'replacement evidence must inspect the canonical component-identity path',
+  );
+  assert.doesNotMatch(HARNESS, /source\.(?:get|set|unset)Flag\('fabricate', 'roles'/);
+  assert.doesNotMatch(HARNESS, /flags\.fabricate\.roles\.\$\{systemId\}\.(?:toolId|componentId)/);
+});
+
 test("theme-or-global-ui's multi-section target set keeps exactly the sections its labels touch (spine label rides the always-run spine)", () => {
   const themeView = VIEW_RECIPES.find((v) => v.id === 'theme-or-global-ui');
   const targets = themeView.smokeLabels;

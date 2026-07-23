@@ -3410,7 +3410,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       toolBreakage: clone(system.toolBreakage || { authority: 'toolSpecific' }),
       recipeToolIds: clone(recipe.toolIds || []),
       recipeToolBonusModes: clone(recipe.toolBonusModes || {}),
-      sourceRoles: clone(source.getFlag('fabricate', 'roles') || null),
+      sourceRoles: clone(source.getFlag('fabricate', 'fabricate.roles') || null),
     };
     const prerequisiteId = 'smoke-tool-studio-training';
     const toolId = 'smoke-tool-studio';
@@ -3455,7 +3455,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       toolBonusModes: { ...(recipe.toolBonusModes || {}), [toolId]: 'highestOnly' },
     }, { allowIncomplete: true });
     const registered = csm.getSystem(systemId).tools.find((tool) => tool.id === toolId);
-    const stampedToolId = source.getFlag('fabricate', 'roles')?.[systemId]?.toolId;
+    const stampedToolId = source.getFlag('fabricate', 'fabricate.roles')?.[systemId]?.toolId;
     if (!registered || stampedToolId !== toolId) {
       throw new Error(`Tool Studio Item registration did not stamp roles.${systemId}.toolId`);
     }
@@ -3487,8 +3487,8 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
     }, { allowIncomplete: true });
     const source = await fromUuid(fixture.sourceItemUuid);
     if (source) {
-      if (fixture.sourceRoles) await source.setFlag('fabricate', 'roles', fixture.sourceRoles);
-      else await source.unsetFlag('fabricate', 'roles');
+      await source.unsetFlag('fabricate', 'fabricate.roles');
+      if (fixture.sourceRoles) await source.setFlag('fabricate', 'fabricate.roles', fixture.sourceRoles);
     }
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
   }, { systemId, recipeId, fixture });
@@ -3514,7 +3514,7 @@ async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actor
     const itemData = source.toObject();
     delete itemData._id;
     itemData.name = 'Smoke Tool Studio Owned Sickle';
-    foundry.utils.setProperty(itemData, `flags.fabricate.roles.${systemId}.toolId`, fixture.toolId);
+    foundry.utils.setProperty(itemData, `flags.fabricate.fabricate.roles.${systemId}.toolId`, fixture.toolId);
     const [owned] = await actor.createEmbeddedDocuments('Item', [itemData]);
     const order = [];
     const createdItems = [];
@@ -3547,7 +3547,7 @@ async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actor
     }
     const created = createdItems[0];
     const createdData = createdPayloads[0]?.[0];
-    const componentIdentity = foundry.utils.getProperty(createdData, `flags.fabricate.roles.${systemId}.componentId`);
+    const componentIdentity = foundry.utils.getProperty(createdData, `flags.fabricate.fabricate.roles.${systemId}.componentId`);
     const sourceId = foundry.utils.getProperty(createdData, 'flags.core.sourceId');
     if (order.join(',') !== 'create,delete') throw new Error(`Tool replacement order was ${order.join(',')}`);
     if (createdData?.system?.quantity !== 1) throw new Error('Tool replacement did not create quantity one');
