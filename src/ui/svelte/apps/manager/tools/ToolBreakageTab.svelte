@@ -18,14 +18,23 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-  const current = tool?.breakage || { mode: 'limitedUses', maxUses: null };
-  let configs = $state({
-    limitedUses: current.mode === 'limitedUses' ? { ...current } : { mode: 'limitedUses', maxUses: null },
-    breakageChance: current.mode === 'breakageChance' ? { ...current } : { mode: 'breakageChance', breakageChance: 0 },
-    diceExpression: current.mode === 'diceExpression' ? { ...current } : { mode: 'diceExpression', formula: '1d20', threshold: 1 },
-  });
+  function createBreakageConfigs(breakage = { mode: 'limitedUses', maxUses: null }) {
+    return {
+      limitedUses: breakage.mode === 'limitedUses' ? { ...breakage } : { mode: 'limitedUses', maxUses: null },
+      breakageChance: breakage.mode === 'breakageChance' ? { ...breakage } : { mode: 'breakageChance', breakageChance: 0 },
+      diceExpression: breakage.mode === 'diceExpression' ? { ...breakage } : { mode: 'diceExpression', formula: '1d20', threshold: 1 },
+    };
+  }
+  let configs = $state(createBreakageConfigs());
+  let cachedToolId = $state(Symbol('uncached-tool'));
   const immune = $derived(authority === 'checkDriven' && tool?.checkBreakable === false);
   const onBreak = $derived(tool?.onBreak || { mode: 'destroy' });
+
+  $effect(() => {
+    if (tool?.id === cachedToolId) return;
+    configs = createBreakageConfigs(tool?.breakage);
+    cachedToolId = tool?.id ?? null;
+  });
 
   function changeMode(mode) {
     onPatch({ breakage: { ...configs[mode] } });

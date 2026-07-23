@@ -105,7 +105,10 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(root.querySelector('[data-tool-editor-delete]'));
     assert.ok(root.querySelector('[data-tool-editor-save]'));
     assert.equal(root.querySelectorAll('[role="tab"]').length, 4);
-    assert.equal(root.querySelector('[role="tabpanel"]').getAttribute('aria-labelledby'), 'tool-tab-overview');
+    const tabPanel = root.querySelector('[role="tabpanel"]');
+    assert.equal(tabPanel.id, 'tool-panel-overview');
+    assert.equal(tabPanel.getAttribute('aria-labelledby'), 'tool-tab-overview');
+    assert.equal(tabPanel.getAttribute('tabindex'), '0');
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Smith Hammer/);
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Item\.hammer/);
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /trusted workshop hammer/);
@@ -186,6 +189,27 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(immune.querySelector('[data-tool-on-break-controls]').disabled, true);
   });
 
+  it('resets inactive breakage mode values when the mounted editor switches Tools', async () => {
+    const patches = [];
+    const firstTool = tool({
+      id: 'first-hammer',
+      breakage: { mode: 'breakageChance', breakageChance: 72 },
+    });
+    const root = await harness.mount(props({
+      activeTab: 'breakage',
+      tool: firstTool,
+      onPatch: (patch) => patches.push(patch),
+    }));
+
+    root.querySelector('input[value="limitedUses"]').click();
+    await harness.setProps({
+      tool: tool({ id: 'second-hammer', breakage: { mode: 'limitedUses', maxUses: 3 } }),
+    });
+    root.querySelector('input[value="breakageChance"]').click();
+
+    assert.deepEqual(patches.at(-1).breakage, { mode: 'breakageChance', breakageChance: 0 });
+  });
+
   it('supports all on-break actions and Component or direct Item replacement targets', async () => {
     const patches = [];
     const root = await harness.mount(props({ activeTab: 'breakage', tool: tool({ onBreak: { mode: 'replaceWith', replacementTarget: null } }), onPatch: (patch) => patches.push(patch) }));
@@ -260,7 +284,12 @@ describe('Tool Studio editor (mounted)', () => {
 
   it('renders five validation checks, range/repair failures, live preview, and alert semantics', async () => {
     const invalidTool = tool({ breakage: { mode: 'breakageChance', breakageChance: 101 }, repairRequirements: [{ id: 'empty', options: [] }] });
-    const root = await harness.mount(props({ activeTab: 'validation', tool: invalidTool, validation: { valid: false, errors: ['breakage.breakageChance must be an integer between 0 and 100'] } }));
+    const root = await harness.mount(props({
+      activeTab: 'validation',
+      tool: invalidTool,
+      validation: { valid: false, errors: ['breakage.breakageChance must be an integer between 0 and 100'] },
+      focusValidationNonce: 1,
+    }));
     assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 5);
     assert.equal(root.querySelector('[data-tool-validation-check="breakage"]').classList.contains('is-invalid'), true);
     assert.equal(root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'), true);
@@ -272,6 +301,8 @@ describe('Tool Studio editor (mounted)', () => {
     assert.match(root.querySelector('[data-tool-behavior-preview]').textContent, /Smith Hammer/);
     assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /101% break chance/);
     assert.match(root.querySelector('[data-tool-validation-errors]').textContent, /Break chance must be between 0% and 100%/);
+    assert.equal(root.querySelector('[data-first-validation-failure]').getAttribute('tabindex'), '-1');
+    assert.equal(document.activeElement, root.querySelector('[data-first-validation-failure]'));
     assert.doesNotMatch(root.textContent, /breakage\.breakageChance|breakageChance/);
   });
 
