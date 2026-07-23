@@ -51,16 +51,88 @@ class FakeDocument {
     if (!this._flags[scope] || typeof this._flags[scope] !== 'object') {
       this._flags[scope] = {};
     }
-    setPathValue(this._flags[scope], key, value);
+    this._flags[scope][key] = value;
     return value;
   }
+
+  async update(changes) {
+    for (const [path, value] of Object.entries(changes)) {
+      const [root, scope] = String(path).split('.');
+      if (root === 'flags' && !this.activeScopes.has(scope)) {
+        throw new Error(`Flag scope "${scope}" is not valid or not currently active`);
+      }
+      setPathValue({ flags: this._flags }, path, value);
+    }
+    return this;
+  }
+
+  updateSource() {}
 }
 
-test('setFabricateFlag writes under fabricate namespace and fabricate.* key', async () => {
+test('setFabricateFlag writes a nested value that Foundry V13 getFlag can read', async () => {
   const doc = new FakeDocument();
   const payload = { recipe1: { learnedAt: 123 } };
   await setFabricateFlag(doc, 'learnedRecipes', payload);
   assert.deepEqual(doc.flags.fabricate.fabricate.learnedRecipes, payload);
+  assert.deepEqual(getFabricateFlag(doc, 'learnedRecipes'), payload);
+  assert.equal(doc.flags.fabricate['fabricate.learnedRecipes'], undefined);
+});
+
+test('setFabricateFlag preserves nested siblings through one flattened update', async () => {
+  const doc = new FakeDocument({
+    flags: {
+      fabricate: {
+        fabricate: {
+          roles: {
+            sysA: { componentId: 'component-1' },
+            sysB: { toolId: 'tool-b' },
+          },
+        },
+      },
+    },
+  });
+
+  await setFabricateFlag(doc, 'roles.sysA.toolId', 'tool-a');
+
+  assert.deepEqual(doc.flags.fabricate.fabricate.roles, {
+    sysA: { componentId: 'component-1', toolId: 'tool-a' },
+    sysB: { toolId: 'tool-b' },
+  });
+});
+
+test('setFabricateFlag fallback replaces the root flag without losing siblings', async () => {
+  const doc = new FakeDocument({
+    flags: {
+      fabricate: {
+        fabricate: { roles: { sysA: { componentId: 'component-1' } } },
+      },
+    },
+  });
+  doc.updateSource = undefined;
+
+  await setFabricateFlag(doc, 'roles.sysA.toolId', 'tool-a');
+
+  assert.deepEqual(doc.flags.fabricate.fabricate.roles.sysA, {
+    componentId: 'component-1',
+    toolId: 'tool-a',
+  });
+  assert.equal(doc.flags.fabricate['fabricate.roles.sysA.toolId'], undefined);
+});
+
+test('setFabricateFlag stores null as a value rather than treating it as deletion', async () => {
+  const doc = new FakeDocument({
+    flags: {
+      fabricate: {
+        fabricate: { roles: { sysA: { componentId: 'component-1', toolId: 'tool-a' } } },
+      },
+    },
+  });
+
+  await setFabricateFlag(doc, 'roles.sysA.toolId', null);
+
+  assert.equal(Object.hasOwn(doc.flags.fabricate.fabricate.roles.sysA, 'toolId'), true);
+  assert.equal(doc.flags.fabricate.fabricate.roles.sysA.toolId, null);
+  assert.equal(doc.flags.fabricate.fabricate.roles.sysA.componentId, 'component-1');
 });
 
 test('getFabricateFlag reads fabricate.* key from fabricate namespace', () => {
@@ -83,11 +155,13 @@ test('getFabricateFlag returns default for missing value', () => {
   assert.equal(getFabricateFlag(doc, 'missing', 'fallback'), 'fallback');
 });
 
-test('getFabricateFlag and setFabricateFlag fail closed when scope is invalid', async () => {
+test('getFabricateFlag fails closed but setFabricateFlag surfaces an invalid scope', async () => {
   const doc = new FakeDocument({ activeScopes: [] });
   assert.equal(getFabricateFlag(doc, 'craftingRuns', 'fallback'), 'fallback');
-  const result = await setFabricateFlag(doc, 'craftingRuns', { active: {}, history: [] });
-  assert.equal(result, null);
+  await assert.rejects(
+    () => setFabricateFlag(doc, 'craftingRuns', { active: {}, history: [] }),
+    /not valid or not currently active/,
+  );
 });
 
 // ---------------------------------------------------------------------------
