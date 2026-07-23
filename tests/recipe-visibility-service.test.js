@@ -1078,10 +1078,16 @@ test('AC6.10b - learnRecipesFromOwnedItem does not delete when learned-flag writ
       knowledge: {
         mode: 'learned',
         item: { limitUses: false },
-        learn: { consumeOnLearn: true, dragDropEnabled: true }
+        learn: { dragDropEnabled: true }
       }
     },
-    recipeItemDefinitions: [{ id: 'book', originItemUuid: 'Compendium.world.items.book' }]
+    recipeItemDefinitions: [
+      {
+        id: 'book',
+        originItemUuid: 'Compendium.world.items.book',
+        caps: { learn: { consumeOnLearn: true } }
+      }
+    ]
   });
   const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
   const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
@@ -1094,7 +1100,9 @@ test('AC6.10b - learnRecipesFromOwnedItem does not delete when learned-flag writ
   const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
 
   assert.equal(result.notificationKind, 'silent');
+  assert.equal(result.learnedRecipes.length, 0);
   assert.equal(item.deleted, false);
+  assert.equal(item.deleteCount, 0);
 });
 
 test('AC6.11 - owned-item learning matches canonical recipeItemId definitions and source UUID variants', async () => {
