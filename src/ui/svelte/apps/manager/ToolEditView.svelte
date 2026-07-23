@@ -63,8 +63,7 @@
   <ToolEditorTabs {activeTab} errorCount={editorErrorCount} onChange={onTabChange} />
 
   <div class="manager-tool-edit-composition">
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex (The active ARIA tabpanel is intentionally keyboard-focusable.) -->
-    <section
+    <div
       class="manager-tool-editor-panel"
       role="tabpanel"
       id={`tool-panel-${activeTab}`}
@@ -91,7 +90,7 @@
       {:else}
         <ToolValidationTab {tool} {authority} {validation} {saveError} {focusValidationNonce} />
       {/if}
-    </section>
+    </div>
     <ToolBehaviorPreview {tool} {authority} {managedItems} />
   </div>
 </main>
