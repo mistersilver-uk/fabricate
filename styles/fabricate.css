@@ -13617,7 +13617,7 @@
 }
 
 .fabricate-manager[data-manager-view="tool-edit"] .manager-body.is-rail-collapsed {
-  grid-template-columns: 210px minmax(0, 1fr) 320px;
+  grid-template-columns: 56px minmax(0, 1fr) 320px;
 }
 
 .fabricate-manager[data-manager-view="tool-edit"] .manager-rail,
@@ -13632,6 +13632,7 @@
 }
 
 .fabricate-manager .manager-tool-edit-main {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
   display: contents;
   min-width: 0;
   min-height: 0;
@@ -13799,6 +13800,7 @@
 }
 
 .fabricate-manager .manager-tool-edit-composition {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
   display: contents;
 }
 
@@ -13878,6 +13880,8 @@
   display: grid;
   gap: var(--fab-space-2);
   margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .fabricate-manager .manager-tool-preview-rules > div {
@@ -14003,9 +14007,14 @@
 }
 
 .fabricate-manager .manager-tool-authority-readonly {
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) max-content;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager .manager-tool-segments {
@@ -14050,7 +14059,8 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
-  padding: var(--fab-space-2);
+  min-height: 92px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -14080,8 +14090,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 7px;
   background: var(--fab-surface-active);
   color: var(--fab-mv2-accent);
@@ -14164,18 +14174,23 @@
 
 .fabricate-manager .manager-tool-prerequisite-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--fab-space-2);
   margin: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  padding: 0;
+  border: 0;
   border-radius: 8px;
 }
 
 .fabricate-manager .manager-tool-prerequisite-list > label {
   display: flex;
   flex-direction: row;
+  align-items: center;
   gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 7px;
+  background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-tool-prerequisite-list small {
@@ -14214,11 +14229,6 @@
   flex-wrap: wrap;
   grid-column: 1 / -1;
   gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-tool-preview-rules {
-  padding: 0;
-  list-style: none;
 }
 
 .fabricate-manager .manager-tool-preview-rules > li {
@@ -14348,17 +14358,6 @@
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-tool-authority-readonly {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: var(--fab-space-3);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-04);
-}
-
 .fabricate-manager .manager-tool-authority-readonly h3,
 .fabricate-manager .manager-tool-section-heading h3,
 .fabricate-manager .manager-tool-requirements-section h3,
@@ -14393,16 +14392,6 @@
   align-items: end;
   justify-content: space-between;
   gap: var(--fab-space-4);
-}
-
-.fabricate-manager .manager-tool-choice-card {
-  min-height: 92px;
-  padding: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-tool-choice-icon {
-  width: 34px;
-  height: 34px;
 }
 
 .fabricate-manager .manager-tool-breakage-config {
@@ -14454,20 +14443,6 @@
 
 .fabricate-manager .manager-tool-replacement-grid {
   grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1fr);
-}
-
-.fabricate-manager .manager-tool-prerequisite-list {
-  grid-template-columns: minmax(0, 1fr);
-  padding: 0;
-  border: 0;
-}
-
-.fabricate-manager .manager-tool-prerequisite-list > label {
-  align-items: center;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 7px;
-  background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-tool-prerequisite-check {
@@ -19252,7 +19227,7 @@
 }
 
 .fabricate-manager[data-manager-view="tools"] .manager-body.is-rail-collapsed {
-  grid-template-columns: 210px minmax(0, 1fr) 340px;
+  grid-template-columns: 56px minmax(0, 1fr) 340px;
 }
 
 .fabricate-manager[data-manager-view="tools"] {

@@ -60,7 +60,7 @@
       <span class={`manager-chip ${invalidCount > 0 ? 'is-danger' : 'is-positive'}`} aria-label={invalidCount > 0 ? issueCountLabel : undefined}><i class={invalidCount > 0 ? 'fas fa-circle-exclamation' : 'fas fa-circle-check'} aria-hidden="true"></i>{invalidCount > 0 ? issueCountLabel : text('FABRICATE.Admin.Manager.Tools.ValidationValid', 'Ready to save')}</span>
     </div>
     <ul class="manager-tool-validation-checks" aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.ValidationChecks', 'Tool validation checks')}>
-      {#each checks as check}
+      {#each checks as check (check.id)}
         <li class:is-invalid={!check.valid} data-tool-validation-check={check.id}>
           <i class={check.valid ? 'fas fa-circle-check' : 'fas fa-circle-xmark'} aria-hidden="true"></i>
           <span>{text(`FABRICATE.Admin.Manager.Tools.Editor.Check${check.id[0].toUpperCase()}${check.id.slice(1)}`, labels[check.id])}</span>
@@ -72,7 +72,7 @@
     <section class="manager-validation-error manager-tool-validation-errors" role="alert" aria-live="assertive">
       <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.DomainErrors', 'Save blockers')}</h3>
       <ul data-tool-validation-errors>
-        {#each validation.errors as error, index}
+        {#each validation.errors as error, index (index)}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex (The first error receives tabindex=-1 solely for programmatic focus after invalid Save.) -->
           <li use:focusFirstFailure={index === 0 && focusValidationNonce > 0} data-first-validation-failure={index === 0 ? '' : undefined} tabindex={index === 0 ? -1 : undefined}>{validationErrorText(error)}</li>
         {/each}

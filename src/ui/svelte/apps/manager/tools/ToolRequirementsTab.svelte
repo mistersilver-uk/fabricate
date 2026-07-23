@@ -13,9 +13,12 @@
     onPatch({ prerequisites: { ...prerequisites, ...patch } });
   }
   function togglePrerequisite(id, checked) {
-    const ids = new Set(prerequisites.ids || []);
-    if (checked) ids.add(id); else ids.delete(id);
-    patchPrerequisites({ ids: [...ids] });
+    const ids = prerequisites.ids || [];
+    patchPrerequisites({
+      ids: checked
+        ? (ids.includes(id) ? ids : [...ids, id])
+        : ids.filter((candidate) => candidate !== id),
+    });
   }
   function patchBonus(patch) {
     onPatch({ bonus: { ...bonus, ...patch } });
@@ -52,7 +55,7 @@
     <fieldset disabled={!bonus.enabled}>
       <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpression', 'Bonus expression')}</span><input data-tool-bonus-expression value={bonus.expression || ''} placeholder="+1" oninput={(event) => patchBonus({ expression: event.currentTarget.value })} /></label>
       <div class="manager-tool-bonus-presets" aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BonusPresets', 'Bonus presets')}>
-        {#each ['@prof', '@abilities.str.mod', '@abilities.dex.mod', '1d4'] as preset}<button type="button" class="manager-chip is-neutral" data-tool-bonus-preset={preset} onclick={() => patchBonus({ expression: preset })}>{preset}</button>{/each}
+        {#each ['@prof', '@abilities.str.mod', '@abilities.dex.mod', '1d4'] as preset (preset)}<button type="button" class="manager-chip is-neutral" data-tool-bonus-preset={preset} onclick={() => patchBonus({ expression: preset })}>{preset}</button>{/each}
       </div>
     </fieldset>
   </section>

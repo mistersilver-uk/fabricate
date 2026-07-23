@@ -10149,8 +10149,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    const replacementTypeSelect = target.querySelector('[data-tool-replacement-type]');
+    replacementTypeSelect.value = 'item';
+    replacementTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
     const directItemSelect = target.querySelector(
-      ':scope [data-tool-replacement-target] label:last-of-type select'
+      ':scope [data-tool-replacement-picker]'
     );
     assert.equal(
       directItemSelect.querySelector(`:scope > option[value="${replacementItem.uuid}"]`)

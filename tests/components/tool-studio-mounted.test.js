@@ -134,7 +134,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(tabPanel.getAttribute('tabindex'), '0');
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Smith's Hammer/);
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Item\.hammer/);
-    assert.match(root.querySelector('[data-tool-source-card]').textContent, /well-balanced forge hammer/);
+    assert.match(root.querySelector('[data-tool-description]').value, /well-balanced forge hammer/);
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Smith's Hammer/);
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Linked game-world Item/);
     assert.doesNotMatch(root.textContent, /\bKind\b/);
@@ -299,8 +299,11 @@ describe('Tool Studio editor (mounted)', () => {
     picker.value = 'Item.replacement';
     picker.dispatchEvent(new Event('change', { bubbles: true }));
     assert.equal(root.querySelectorAll('[data-tool-replacement-target] select:not([data-tool-replacement-type])').length, 1);
-    assert.deepEqual(patches.at(-2).onBreak.replacementTarget, { type: 'component', componentId: 'scrap' });
-    assert.deepEqual(patches.at(-1).onBreak.replacementTarget, { type: 'item', itemUuid: 'Item.replacement' });
+    const selectedTargets = patches
+      .map((patch) => patch.onBreak?.replacementTarget)
+      .filter((target) => target?.componentId || target?.itemUuid);
+    assert.deepEqual(selectedTargets.at(-2), { type: 'component', componentId: 'scrap' });
+    assert.deepEqual(selectedTargets.at(-1), { type: 'item', itemUuid: 'Item.replacement' });
   });
 
   it('authors all Recipe-compatible repair match kinds and a cross-type OR group', async () => {
