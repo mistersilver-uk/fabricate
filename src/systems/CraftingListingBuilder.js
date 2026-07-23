@@ -65,6 +65,7 @@ const BLOCKING_REASON_KEYS = {
 
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
+const TIME_REQUIREMENT_FIELDS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 /**
  * Non-alchemy modes whose crafting check is mandatory (the attempt fails without an
@@ -333,6 +334,7 @@ export class CraftingListingBuilder {
       defaultSetId,
       check: this._buildCheck(system, mode, recipe, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
+      duration: this._buildDuration({ recipe, system, mode }),
       result: this._buildResult({ recipe, system, mode, defaultSet }),
       // Per-step requirement projection (`simple` multi-step only; [] otherwise). Each
       // entry carries the step's label, its per-set craftability (tool union applied)
@@ -380,6 +382,9 @@ export class CraftingListingBuilder {
           }))
         : [],
       defaultSetId: null,
+      // Timing is always spoiler detail for a Discovery-Mode teaser, independent
+      // of the configurable result-field redaction list.
+      duration: null,
       // A teaser surfaces no step data, redacted exactly as `result`/`outcomeTiers`.
       steps: [],
       check: showResults ? this._buildCheck(system, mode, recipe) : null,
@@ -451,6 +456,45 @@ export class CraftingListingBuilder {
   }
 
   /**
+   * Project a positive authored duration into the listing's canonical five-field
+   * shape. Zero-only and absent requirements are instant and surface as null.
+   * @private
+   */
+  _durationOrNull(timeRequirement) {
+    if (!timeRequirement || typeof timeRequirement !== 'object') return null;
+    const duration = Object.fromEntries(
+      TIME_REQUIREMENT_FIELDS.map((field) => [
+        field,
+        Math.max(0, Number(timeRequirement[field] || 0) || 0),
+      ])
+    );
+    return TIME_REQUIREMENT_FIELDS.some((field) => duration[field] > 0) ? duration : null;
+  }
+
+  /**
+   * The effective recipe-level duration shown before crafting. Authored shape is
+   * authoritative: an implicit recipe uses its recipe-level requirement, while an
+   * explicit simple-mode sequence sums authored step units field-wise. Other
+   * explicit shapes have no safe recipe-level projection. Calendar-dependent unit
+   * conversion is left to the execution layer.
+   * @private
+   */
+  _buildDuration({ recipe, system, mode }) {
+    if (system?.requirements?.time?.enabled === false) return null;
+    const authoredSteps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    if (authoredSteps.length === 0) return this._durationOrNull(recipe?.timeRequirement);
+    if (mode !== 'simple' || authoredSteps.length <= 1) return null;
+
+    const aggregate = Object.fromEntries(TIME_REQUIREMENT_FIELDS.map((field) => [field, 0]));
+    for (const step of authoredSteps) {
+      const duration = this._durationOrNull(step?.timeRequirement);
+      if (!duration) continue;
+      for (const field of TIME_REQUIREMENT_FIELDS) aggregate[field] += duration[field];
+    }
+    return this._durationOrNull(aggregate);
+  }
+
+  /**
    * The per-step requirement projection surfaced to the `simple`-mode detail body.
    * Empty for single-step recipes and for every non-`simple` mode. `simple` enforces
    * exactly one ingredient set per step, so each entry carries exactly one set.
@@ -465,6 +509,10 @@ export class CraftingListingBuilder {
       return {
         id: stringOrNull(step?.id),
         label: this._stepLabel(step, index),
+        duration:
+          system?.requirements?.time?.enabled === false
+            ? null
+            : this._durationOrNull(step?.timeRequirement),
         ingredientSets: sets.map((set, setIdx) => ({
           id: stringOrNull(set.id),
           label:
@@ -744,11 +792,8 @@ export class CraftingListingBuilder {
    * @private
    */
   _buildResult({ recipe, system, mode, defaultSet }) {
-    // timeLabel is calendar-aware and deferred to the UI slice; the raw duration
-    // requirement is surfaced for that formatting step.
     return {
       items: this._resultItems({ recipe, system, mode, defaultSet }),
-      time: recipe.timeRequirement ?? null,
       timeLabel: null,
       xp: null,
     };

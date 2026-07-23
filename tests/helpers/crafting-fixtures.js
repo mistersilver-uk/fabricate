@@ -44,7 +44,8 @@ export function recipe(overrides = {}) {
     defaultSetId: setId,
     check: null,
     outcomeTiers: null,
-    result: { items: [{ name: 'Healing Potion', img: null, qty: 1 }], time: null, timeLabel: null, xp: null },
+    duration: null,
+    result: { items: [{ name: 'Healing Potion', img: null, qty: 1 }], timeLabel: null, xp: null },
     ...overrides
   };
 }
@@ -57,6 +58,7 @@ export function multiStepRecipe(overrides = {}) {
   const stepOne = {
     id: 'step-1',
     label: 'Cut',
+    duration: { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
     ingredientSets: [
       {
         id: 'set-1',
@@ -91,6 +93,7 @@ export function multiStepRecipe(overrides = {}) {
   const stepTwo = {
     id: 'step-2',
     label: 'Raise',
+    duration: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 },
     ingredientSets: [
       {
         id: 'set-2',
@@ -122,9 +125,9 @@ export function multiStepRecipe(overrides = {}) {
     ingredientSets: stepOne.ingredientSets,
     defaultSetId: 'set-1',
     steps: [stepOne, stepTwo],
+    duration: { minutes: 30, hours: 1, days: 0, months: 0, years: 0 },
     result: {
       items: [{ name: 'Tent', img: 'icons/environment/settlement/tent.webp', qty: 1 }],
-      time: null,
       timeLabel: null,
       xp: null
     },

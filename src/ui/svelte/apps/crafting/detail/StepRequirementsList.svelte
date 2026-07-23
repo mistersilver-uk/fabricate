@@ -19,11 +19,13 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { formatTimeRequirementCompact } from '../../../util/recipeDuration.js';
   import IoTable from './IoTable.svelte';
 
   let { steps = [] } = $props();
 
   const items = $derived(Array.isArray(steps) ? steps : []);
+  const durationTitle = $derived(localize('FABRICATE.App.Crafting.Detail.Duration'));
 </script>
 
 <div class="crafting-steps" data-recipe-section="steps">
@@ -44,6 +46,17 @@
         <p class="crafting-step-label" data-recipe-step-label>
           <span class="crafting-step-ordinal" aria-hidden="true">{index + 1}</span>
           <span class="crafting-step-name">{step.label}</span>
+          {#if step.duration}
+            <span
+              class="crafting-step-duration"
+              data-recipe-step-duration
+              title={durationTitle}
+              aria-label={`${durationTitle}: ${formatTimeRequirementCompact(step.duration)}`}
+            >
+              <i class="fas fa-clock" aria-hidden="true"></i>
+              <span>{formatTimeRequirementCompact(step.duration)}</span>
+            </span>
+          {/if}
         </p>
         <!-- INPUTS ONLY: result={null} suppresses IoTable's Output group. Intermediate
              step yields are not shown; the terminal PRODUCES row is rendered once by
@@ -120,8 +133,33 @@
 
   .crafting-step-name {
     min-width: 0;
+    flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .crafting-step-duration {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 5px;
+    padding: 2px 7px;
+    border: 1px solid var(--fab-border);
+    border-radius: 999px;
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-muted);
+    font-size: 10px;
+    font-family: var(--fab-font-mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  .crafting-step-duration i {
+    font-size: 9px;
+    line-height: 1;
   }
 </style>

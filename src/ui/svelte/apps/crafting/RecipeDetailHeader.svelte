@@ -10,6 +10,7 @@
   import CraftingThumb from './CraftingThumb.svelte';
   import CraftingStatusBadge from './CraftingStatusBadge.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
+  import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
   let { recipe = null } = $props();
 
@@ -18,6 +19,28 @@
   const flavor = $derived(String(recipe?.flavor ?? ''));
   const status = $derived(String(recipe?.browseStatus ?? ''));
   const redacted = $derived(recipe?.redaction?.redacted === true);
+  // Pre-craft duration: the recipe's authored time requirement, surfaced read-only so a
+  // player can see how long a timed recipe takes BEFORE starting the craft (issue 846).
+  // Reuse the manager's compact formatter so both surfaces render durations identically.
+  // A zero/absent duration is an instant craft — the chip is omitted entirely rather than
+  // labelled, so an instant recipe shows no misleading time.
+  const durationTime = $derived(recipe?.duration ?? null);
+  const hasDuration = $derived(
+    !!durationTime &&
+      typeof durationTime === 'object' &&
+      TIME_UNITS.some((unit) => Number(durationTime[unit] || 0) > 0)
+  );
+  const durationLabel = $derived(hasDuration ? formatTimeRequirementCompact(durationTime) : '');
+  const isMultiStep = $derived(
+    recipe?.modeToken === 'simple' && Array.isArray(recipe?.steps) && recipe.steps.length > 1
+  );
+  const durationTitle = $derived(
+    localize(
+      isMultiStep
+        ? 'FABRICATE.App.Crafting.Detail.TotalDuration'
+        : 'FABRICATE.App.Crafting.Detail.Duration'
+    )
+  );
   const descriptor = $derived(craftingRecipeStatus(status));
   // Danger tone === the player cannot craft this (missing materials). Gate on the
   // tone so the presentation map stays the single source of truth, mirroring the
@@ -57,6 +80,21 @@
              when no label resolved. -->
         {#if !redacted && modeLabel}
           <span class="crafting-detail-mode-chip">{modeLabel}</span>
+        {/if}
+        <!-- Authored craft duration (timed recipes only). Suppressed for a redacted
+             teaser (a hidden recipe's timing is a spoiler) and omitted for instant
+             recipes so no misleading "0 min" is shown. -->
+        {#if !redacted && hasDuration}
+          <span
+            class="crafting-detail-duration-chip"
+            data-recipe-duration
+            data-recipe-duration-kind={isMultiStep ? 'total' : 'recipe'}
+            title={durationTitle}
+            aria-label={`${durationTitle}: ${durationLabel}`}
+          >
+            <i class="fas fa-clock" aria-hidden="true"></i>
+            <span>{durationTitle}: {durationLabel}</span>
+          </span>
         {/if}
         <!-- Uncraftable moves the status onto the thumbnail pip, so the labelled
              badge is dropped here to avoid a duplicate icon; the blocking-reasons
@@ -196,6 +234,28 @@
     border: 1px solid var(--fab-border);
     background: var(--fab-surface-raised);
     color: var(--fab-text-muted);
+  }
+
+  /* Duration chip: a sibling of the mode chip in the meta row, distinguished by a
+     leading clock icon. Shares the pill shape/border so the metadata reads as one row. */
+  .crafting-detail-duration-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: var(--fab-font-mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid var(--fab-border);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-muted);
+  }
+
+  .crafting-detail-duration-chip i {
+    font-size: 10px;
+    line-height: 1;
   }
 
   .crafting-detail-flavor {

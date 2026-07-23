@@ -837,7 +837,7 @@ describe('CraftingListingBuilder — default result projection', () => {
     assert.deepEqual(recipe.result.items, [
       { name: 'Iron Sword', img: 'icons/sword.webp', qty: 2 },
     ]);
-    assert.deepEqual(recipe.result.time, { hours: 2 });
+    assert.deepEqual(recipe.duration, { minutes: 0, hours: 2, days: 0, months: 0, years: 0 });
   });
 
   it('falls back to the unknown-component label for an unresolved component id', () => {

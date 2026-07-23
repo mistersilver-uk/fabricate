@@ -573,8 +573,18 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(steps.length, 2, 'both step blocks rendered as list items');
     assert.equal(
       steps[0].querySelector('[data-recipe-step-label]').textContent.replace(/\s+/g, ' ').trim(),
-      '1 Cut',
-      'first step shows its ordinal + label'
+      '1 Cut 30 min',
+      'first step shows its ordinal, label, and duration'
+    );
+    assert.equal(
+      steps[1].querySelector('[data-recipe-step-duration]').textContent.replace(/\s+/g, ' ').trim(),
+      '1 hr',
+      'second step shows its distinct authored duration'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-duration]').textContent.replace(/\s+/g, ' ').trim(),
+      'Total duration: 1 hr 30 min',
+      'the header visibly identifies the aggregate duration once'
     );
 
     // Step 1 lists BOTH of its required materials.
@@ -625,6 +635,87 @@ describe('RecipeDetail mounted behavior', () => {
       'no ordered step list when steps is empty'
     );
     assert.ok(target.querySelector('[data-recipe-section="io"]'), 'the single IoTable renders');
+  });
+
+  it('shows the authored craft duration chip before crafting for a timed recipe', async () => {
+    // Issue 846: a player choosing a timed recipe must see how long it takes BEFORE
+    // starting the craft, not only as a countdown once it is underway. The chip reads
+    // the recipe's dedicated authored duration and formats it with the shared
+    // compact formatter the manager uses.
+    const timed = recipe({
+      duration: { minutes: 30, hours: 2, days: 0, months: 0, years: 0 },
+    });
+    const target = await harness.mount({
+      recipe: timed,
+      selectedSetId: timed.defaultSetId,
+      craftability: timed.ingredientSets[0].craftability,
+    });
+
+    const chip = target.querySelector(
+      '.crafting-detail-header-meta [data-recipe-duration]'
+    );
+    assert.ok(chip, 'the pre-craft duration chip renders for a timed recipe');
+    // Largest-unit-first compact formatting (mirrors the manager Overview).
+    assert.equal(chip.textContent.replace(/\s+/g, ' ').trim(), 'Duration: 2 hr 30 min');
+  });
+
+  it('shows no duration chip for an instant (zero-duration) recipe', async () => {
+    // The default fixture has result.time === null (instant). An instant craft must not
+    // show a misleading "0 min" — the chip is omitted entirely.
+    const instant = recipe();
+    const target = await harness.mount({
+      recipe: instant,
+      selectedSetId: instant.defaultSetId,
+      craftability: instant.ingredientSets[0].craftability,
+    });
+
+    assert.equal(
+      target.querySelector('[data-recipe-duration]'),
+      null,
+      'no duration chip on an instant recipe'
+    );
+  });
+
+  it('does not leak the craft duration on a redacted (discovery) teaser', async () => {
+    // A timed recipe that is still undiscovered must not reveal its timing — the chip
+    // is suppressed alongside the mode chip on a teaser.
+    const teaser = recipe({
+      redaction: { redacted: true, hiddenFields: ['ingredients', 'results', 'description'] },
+      browseStatus: 'discovery',
+      duration: { minutes: 0, hours: 4, days: 0, months: 0, years: 0 },
+    });
+    const target = await harness.mount({
+      recipe: teaser,
+      selectedSetId: null,
+      craftability: null,
+    });
+
+    assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
+    assert.equal(
+      target.querySelector('[data-recipe-duration]'),
+      null,
+      'no duration chip leaks on a discovery teaser'
+    );
+  });
+
+  it('omits a zero-duration step chip from a mixed timed and instant sequence', async () => {
+    const fixture = multiStepRecipe();
+    fixture.steps[1].duration = null;
+    fixture.duration = { minutes: 30, hours: 0, days: 0, months: 0, years: 0 };
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: fixture.steps,
+    });
+
+    const stepChips = target.querySelectorAll('[data-recipe-step-duration]');
+    assert.equal(stepChips.length, 1, 'only the timed step renders a duration chip');
+    assert.equal(stepChips[0].textContent.replace(/\s+/g, ' ').trim(), '30 min');
+    assert.equal(
+      target.querySelector('[data-recipe-duration]').textContent.replace(/\s+/g, ' ').trim(),
+      'Total duration: 30 min'
+    );
   });
 
   it('shows a select-a-recipe hint when no recipe is provided', async () => {

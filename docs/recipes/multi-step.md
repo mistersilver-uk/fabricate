@@ -41,6 +41,9 @@ When a player opens a multi-step recipe in the **Crafting** tab, its required ma
 Each step appears as a numbered block, in order, and each block lists that step's own required materials.
 A block shows what the player has, what the step needs, and what is still missing.
 A short hint at the top of the list reminds players that the recipe is made in several steps and that each one is crafted in order.
+When time requirements are enabled, a fully revealed timed multi-step recipe shows the total duration in the recipe header before you start crafting.
+Each timed step also shows its own duration beside the step name.
+Instant steps do not show a duration.
 
 The intermediate items a step produces along the way are not listed as separate results.
 Only the recipe's final product is shown, as a single **Produces** row beneath the steps.

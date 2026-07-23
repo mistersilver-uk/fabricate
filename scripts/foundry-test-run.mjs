@@ -2241,6 +2241,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       steps: [
         {
           name: 'Cut Planks',
+          timeRequirement: { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
           ingredientSets: [{
             ingredientGroups: [{
               name: 'Plank',
@@ -2251,6 +2252,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         },
         {
           name: 'Raise Frame',
+          timeRequirement: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 },
           ingredientSets: [{
             ingredientGroups: [{
               name: 'Dowel',
@@ -8652,6 +8654,28 @@ async function main() {
             const stepBlocks = await appShell.locator('[data-recipe-section="steps"] [data-recipe-step]').count();
             const hasHint = await appShell.locator('[data-recipe-section="steps-hint"]').count();
             const hasCheck = await appShell.locator('[data-recipe-section="check"]').count();
+            const totalDuration = String(
+              await appShell.locator('[data-recipe-duration][data-recipe-duration-kind="total"]')
+                .first().textContent()
+            ).replace(/\s+/g, ' ').trim();
+            const stepDurationLabels = await appShell
+              .locator('[data-recipe-section="steps"] [data-recipe-step]')
+              .evaluateAll((steps) =>
+                steps.map((step) =>
+                  String(step.querySelector('[data-recipe-step-duration]')?.textContent ?? '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                )
+              );
+            if (
+              totalDuration !== 'Total duration: 1 hr 30 min' ||
+              stepDurationLabels[0] !== '30 min' ||
+              stepDurationLabels[1] !== '1 hr'
+            ) {
+              throw new Error(
+                `Unexpected multi-step durations: total="${totalDuration}", steps=${JSON.stringify(stepDurationLabels)}`
+              );
+            }
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-multistep');
             // Restore the unfiltered recipe list for the subsequent frames.
@@ -8662,7 +8686,9 @@ async function main() {
               passed: stepBlocks >= 2 && hasHint > 0 && hasCheck === 0,
               stepBlocks,
               hasHint: hasHint > 0,
-              checkCardShown: hasCheck > 0
+              checkCardShown: hasCheck > 0,
+              totalDuration,
+              stepDurationLabels
             });
           } catch (multiStepError) {
             results.steps.push({
