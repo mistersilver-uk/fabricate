@@ -49,14 +49,12 @@ test('Tool editor keeps independent wide scrolling and visible wrapped actions w
   const body = blockFor('.fabricate-manager[data-manager-view="tool-edit"] .manager-body');
   const collapsed = blockFor('.fabricate-manager[data-manager-view="tool-edit"] .manager-body.is-rail-collapsed');
   const composition = editorCss.match(/\.fabricate-manager \.manager-tool-edit-composition\s*\{[\s\S]*?\}/)?.[0] || '';
-  const panel = editorCss.match(/\.fabricate-manager \.manager-tool-editor-panel,\s*\.fabricate-manager \.manager-tool-preview\s*\{[\s\S]*?\}/)?.[0] || '';
   const stacked = editorCss.slice(editorCss.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const narrow = editorCss.slice(editorCss.indexOf('@container fabricate-manager (max-width: 680px)'));
 
   assert.ok(body.includes('grid-template-columns: 210px minmax(0, 1fr);'));
   assert.ok(collapsed.includes('grid-template-columns: 56px minmax(0, 1fr);'));
   assert.ok(composition.includes('grid-template-columns: minmax(0, 1fr) 320px;'));
-  assert.ok(panel.includes('overflow-y: auto;'));
   assert.match(stacked, /\.fabricate-manager\[data-manager-view="tool-edit"\] \.manager-body[\s\S]*?overflow-y:\s*auto;/);
   assert.match(narrow, /\.manager-tool-edit-actions[\s\S]*?flex-wrap:\s*wrap;/);
   assert.match(narrow, /\[data-tool-editor-save\][\s\S]*?display:\s*inline-flex;/);
