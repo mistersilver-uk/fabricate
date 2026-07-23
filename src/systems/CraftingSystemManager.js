@@ -545,7 +545,56 @@ export class CraftingSystemManager {
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
       routed: this._normalizeRoutedCraftingCheck(check?.routed),
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
+      // Per-recipe check-modifier catalogue + default policy (issue 770). A crafting-
+      // owned aggregate (NOT gathering's `characterModifiers`), feeding the
+      // `@craftingmod` formula placeholder. Absent → an empty catalogue with the
+      // `addAll` default, a no-op for a single-formula check (full back-compat).
+      ...this._normalizeCheckModifierConfig(check),
     };
+  }
+
+  /**
+   * Normalize the crafting check-modifier catalogue + default resolution policy
+   * (issue 770): `checkModifiers` is a named catalogue of `{id,label,icon?,expression}`
+   * entries feeding the `@craftingmod` placeholder; `defaultModifierPolicy` is one of
+   * `addAll`/`highest`/`byRecipe` (default `addAll`); `defaultModifierIds` names the
+   * catalogue entries applied by default. Malformed entries are dropped, a bad
+   * expression coerces to an empty string, and a default id naming nothing in the
+   * catalogue is dropped (order + de-dup preserved).
+   * @private
+   */
+  _normalizeCheckModifierConfig(check) {
+    const rawCatalogue = Array.isArray(check?.checkModifiers) ? check.checkModifiers : [];
+    const seenIds = new Set();
+    const checkModifiers = [];
+    for (const entry of rawCatalogue) {
+      if (!entry || typeof entry !== 'object') continue;
+      const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      const normalized = {
+        id,
+        label: typeof entry.label === 'string' ? entry.label : '',
+        expression: typeof entry.expression === 'string' ? entry.expression.trim() : '',
+      };
+      if (typeof entry.icon === 'string' && entry.icon.trim()) normalized.icon = entry.icon.trim();
+      checkModifiers.push(normalized);
+    }
+    const validIds = new Set(checkModifiers.map((entry) => entry.id));
+    const seenDefaults = new Set();
+    const defaultModifierIds = (
+      Array.isArray(check?.defaultModifierIds) ? check.defaultModifierIds : []
+    ).filter((id) => {
+      if (typeof id !== 'string' || !validIds.has(id) || seenDefaults.has(id)) return false;
+      seenDefaults.add(id);
+      return true;
+    });
+    const defaultModifierPolicy = ['addAll', 'highest', 'byRecipe'].includes(
+      check?.defaultModifierPolicy
+    )
+      ? check.defaultModifierPolicy
+      : 'addAll';
+    return { checkModifiers, defaultModifierPolicy, defaultModifierIds };
   }
 
   // Simple pass/fail crafting check authored in the Checks editor for simple and

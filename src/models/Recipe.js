@@ -93,6 +93,13 @@ export class Recipe {
       typeof data.minSuccessOutcomeId === 'string' && data.minSuccessOutcomeId.trim()
         ? data.minSuccessOutcomeId.trim()
         : null;
+    // Optional per-recipe crafting-check modifier override (issue 770). Absent → the
+    // recipe inherits the system's default policy + default eligible modifier ids.
+    // Present → overrides the policy and/or the eligible id subset resolved into the
+    // `@craftingmod` formula placeholder. Unknown catalogue ids are dropped at
+    // resolution time (the resolver validates against the system catalogue), so this
+    // normalizer only shape-guards; a malformed value becomes null (inherit).
+    this.craftingModifier = this._normalizeCraftingModifier(data.craftingModifier);
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
 
@@ -112,6 +119,38 @@ export class Recipe {
     // the never-prune guard for GM-authored recipes is a structural absence enforced
     // here at the normalizer, not at a UI control.
     this.importSource = this._normalizeImportSource(data.importSource);
+  }
+
+  /**
+   * Normalize the optional per-recipe crafting-check modifier override (issue 770) to
+   * `{ policy?, modifierIds? } | null`. A non-object, or an object that carries neither
+   * a known policy nor a non-empty `modifierIds` array, normalizes to `null` (inherit
+   * the system default). `policy` keeps only the three known values (`addAll`,
+   * `highest`, `byRecipe`); an unknown/absent policy is dropped. `modifierIds` keeps
+   * only non-empty string ids, de-duplicated in order; catalogue membership is NOT
+   * checked here (the resolver drops unknown ids against the live system catalogue).
+   * @param {unknown} craftingModifier
+   * @returns {{ policy?: string, modifierIds?: string[] } | null}
+   * @private
+   */
+  _normalizeCraftingModifier(craftingModifier) {
+    if (!craftingModifier || typeof craftingModifier !== 'object') return null;
+    const validPolicies = ['addAll', 'highest', 'byRecipe'];
+    const policy = validPolicies.includes(craftingModifier.policy) ? craftingModifier.policy : null;
+    const seen = new Set();
+    const modifierIds = (
+      Array.isArray(craftingModifier.modifierIds) ? craftingModifier.modifierIds : []
+    ).filter((id) => {
+      if (typeof id !== 'string' || id.trim() === '' || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    // Neither a policy override nor an id subset → nothing to override, so inherit.
+    if (!policy && modifierIds.length === 0) return null;
+    const normalized = {};
+    if (policy) normalized.policy = policy;
+    if (modifierIds.length > 0) normalized.modifierIds = modifierIds;
+    return normalized;
   }
 
   /**
@@ -516,6 +555,7 @@ export class Recipe {
       resultSelection: this.resultSelection,
       checkTierId: this.checkTierId,
       minSuccessOutcomeId: this.minSuccessOutcomeId,
+      craftingModifier: this.craftingModifier,
       currencyCost: this.currencyCost,
       teaser: this.teaser,
       metadata: this.metadata,

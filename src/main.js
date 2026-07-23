@@ -117,13 +117,32 @@ import {
 } from './canvas/regions/interactableConfigSheet.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
-import './ui/SvelteCraftingSystemManagerApp.svelte.js';
 import './ui/InteractableBrowserApp.svelte.js';
 import './ui/InteractionPromptApp.svelte.js';
 import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
 
 let gatheringEngine = null;
+
+// The GM-only crafting system manager app is deferred to a lazy chunk so
+// non-GM players never download/parse its subtree at module init. The dynamic
+// import runs the module's bottom-of-file registerCraftingSystemManagerApp(...)
+// side effect exactly once; subsequent opens reuse the memoized promise.
+let _craftingSystemManagerAppLoad = null;
+
+/**
+ * Lazily load and register the GM crafting system manager app class.
+ * Memoizes the dynamic import so repeated opens do not re-enter import().
+ * @returns {Promise<Function>} the registered app class
+ */
+function loadCraftingSystemManagerAppClass() {
+  if (!_craftingSystemManagerAppLoad) {
+    _craftingSystemManagerAppLoad = import('./ui/SvelteCraftingSystemManagerApp.svelte.js').then(
+      () => getCraftingSystemManagerAppClass()
+    );
+  }
+  return _craftingSystemManagerAppLoad;
+}
 
 /**
  * Resolve a stored gathering actor preference against Foundry's actor collection.
@@ -1195,7 +1214,8 @@ class Fabricate {
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
       nowWorldTime: () => game.time?.worldTime ?? 0,
-      resolveCheckFormula: (formula, actor) => resolveCheckFormulaDisplay(formula, actor),
+      resolveCheckFormula: (formula, actor, craftingModifier) =>
+        resolveCheckFormulaDisplay(formula, actor, craftingModifier),
     });
     return this._craftingListingBuilder;
   }
@@ -2395,6 +2415,7 @@ function bindFabricateGlobal() {
     RecipeManager,
     CraftingEngine,
     getFabricateAppClass,
+    loadCraftingSystemManagerAppClass,
     getCraftingSystemManagerAppClass,
     getInteractableConfigAppClass,
     getInteractablesManagerAppClass,
@@ -3087,7 +3108,9 @@ function addModuleButtonsToItemsDirectory() {
         'Manage Crafting Systems',
         'fas fa-book',
         'manage',
-        () => getCraftingSystemManagerAppClass().show()
+        () => {
+          void loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
+        }
       );
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
     }
@@ -3221,7 +3244,7 @@ globalThis.fabricate = {
    * Open the GM crafting system manager
    */
   openRecipeManager: () => {
-    return getCraftingSystemManagerAppClass().show();
+    return loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
   },
 
   /**

@@ -1675,6 +1675,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       outcomeRouting: raw.outcomeRouting || null,
       checkTierId: raw.checkTierId ?? null,
       minSuccessOutcomeId: raw.minSuccessOutcomeId ?? null,
+      // Per-recipe crafting-check modifier override (issue 770). This projection is a
+      // hand-built ALLOWLIST: omitting it makes the Overview override control seed from
+      // `undefined`, render "Inherit system default", and silently write the override
+      // back to null on the next save (data loss). `raw` is `recipe.toJSON()`, which
+      // carries `craftingModifier` per the model.
+      craftingModifier: raw.craftingModifier ?? null,
       complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),
@@ -2352,6 +2358,20 @@ function _buildSelectedSystemViewData(
           (selectedSystem.craftingCheck?.consumption?.breakToolsOnFail ??
             selectedSystem.craftingCheck?.consumption?.consumeCatalystsOnFail) === true,
       },
+      // Per-recipe check-modifier catalogue + default policy (issue 770). This
+      // hand-built projection is an allowlist: a field omitted here is INVISIBLE to
+      // the UI, so the catalogue editor + recipe override control would read empty.
+      checkModifiers: Array.isArray(selectedSystem.craftingCheck?.checkModifiers)
+        ? selectedSystem.craftingCheck.checkModifiers.map((modifier) => _clonePlain(modifier))
+        : [],
+      defaultModifierPolicy: ['addAll', 'highest', 'byRecipe'].includes(
+        selectedSystem.craftingCheck?.defaultModifierPolicy
+      )
+        ? selectedSystem.craftingCheck.defaultModifierPolicy
+        : 'addAll',
+      defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
+        ? [...selectedSystem.craftingCheck.defaultModifierIds]
+        : [],
     },
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -7534,6 +7554,27 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Persist the crafting check-modifier catalogue + default policy (issue 770). MUST
+  // spread the existing craftingCheck block: `updateSystem` shallow-merges only the
+  // top level, so a naive `{ craftingCheck: { checkModifiers } }` would drop every
+  // sibling check field (simple/routed/progressive/consumption) which the normalizer
+  // then re-defaults (silent data loss). The whole `checkModifiers`/`defaultModifierIds`
+  // arrays are REPLACED by `game.settings.set` (array replace, not merge), so removing a
+  // catalogue entry persists without any `-=` deletion. Callers pass a partial patch of
+  // { checkModifiers?, defaultModifierPolicy?, defaultModifierIds? }.
+  async function saveCraftingCheckModifiers(patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: { ...existing, ...patch },
+    });
+    await refresh();
+  }
+
   // Shallow-merge a patch into the selected system's salvageCraftingCheck and
   // persist (the manager normalizes the whole check on write). Shared by every
   // salvage check saver below so the boilerplate lives in one place.
@@ -8484,6 +8525,7 @@ export function createAdminStore(services) {
     saveCraftingCheckProgressive,
     saveCraftingCheckActive,
     saveCraftingCheckConsumption,
+    saveCraftingCheckModifiers,
     saveSalvageCheckActive,
     saveSalvageCheckProgressive,
     saveSalvageCheckSimple,

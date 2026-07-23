@@ -4214,7 +4214,7 @@ async function main() {
             await csm.deleteSystem(system.id);
           }
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -4300,15 +4300,33 @@ async function main() {
           // readiness warnings (issue 431 PR-2).
           craftingCheck: {
             enabled: true,
+            // Per-recipe check-modifier catalogue + default policy (issue 770). A
+            // crafting-owned aggregate feeding the `@craftingmod` formula placeholder,
+            // authored at the top level of the crafting check (sibling of `routed`), so
+            // the Checks → Crafting tab renders the populated CraftingModifierCatalogueCard
+            // beside the failure-consumption card (screenshot evidence). Each expression
+            // resolves against the crafter's dnd5e roll data; the `highest` default policy
+            // picks the single largest of the two default-eligible modifiers. The `alch`
+            // entry is the one the Brew Healing Potion recipe override selects below.
+            checkModifiers: [
+              { id: 'med', label: 'Medicine', icon: 'fas fa-staff-snake', expression: '@abilities.wis.mod' },
+              { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask', expression: '@abilities.int.mod' },
+              { id: 'herb', label: 'Herbalism', icon: 'fas fa-seedling', expression: '@abilities.dex.mod' }
+            ],
+            defaultModifierPolicy: 'highest',
+            defaultModifierIds: ['med', 'herb'],
             routed: {
               type: 'relative',
-              // `1d20 + 20` (total 21-40) always meets the Masterwork threshold, so the
-              // Phase-E Brew Healing Potion craft deterministically succeeds. Before #431
-              // the routed check was authored-only (never rolled); now that it is engine-
-              // evaluated a bare `1d20` vs dc 12 would fail the craft ~55% of the time
-              // (flaky smoke). The named tiers below are unchanged so the routed-check and
-              // validation-tab captures still render their authored outcomes.
-              rollFormula: '1d20 + 20',
+              // `1d20 + 20 + @craftingmod` (base total 21-40, plus a small ability mod) always
+              // meets the Masterwork threshold, so the Phase-E Brew Healing Potion craft
+              // deterministically succeeds. `@craftingmod` resolves to a scalar BEFORE the
+              // formula reaches Foundry's Roll (issue 770): the recipe's `byRecipe` override
+              // uses only the `alch` modifier (a starter-hero INT mod, roughly -1..+3), which
+              // the +20 base absorbs. Before #431 the routed check was authored-only (never
+              // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
+              // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
+              // the routed-check and validation-tab captures still render their authored outcomes.
+              rollFormula: '1d20 + 20 + @craftingmod',
               dc: 12,
               thresholdMode: 'meet',
               relativeOutcomes: [
@@ -4459,9 +4477,15 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
+          // Per-recipe check-modifier override (issue 770): this recipe overrides the
+          // system's `highest` default policy with `byRecipe`, drawing only the `alch`
+          // catalogue modifier into `@craftingmod`. It renders the recipe editor's
+          // Overview modifier control in its OVERRIDE (not inherit) state — the
+          // screenshot evidence for the per-recipe override half of #770.
+          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
           // Single result group → produced on any non-failure outcome. The Phase-E
-          // craft rolls `1d20 + 20` (always Masterwork), so this craft deterministically
-          // succeeds and yields the single "Brewed Potion" group.
+          // craft rolls `1d20 + 20 + @craftingmod` (always Masterwork), so this craft
+          // deterministically succeeds and yields the single "Brewed Potion" group.
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -5335,8 +5359,8 @@ async function main() {
         }, craftingSetup.systemId);
         await seedSmokeGatheringLibrary(page, craftingSetup);
 
-        await page.evaluate(() => {
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
 
@@ -5491,8 +5515,8 @@ async function main() {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, { features: { essences: true, gathering: false } });
         }, craftingSetup.systemId);
-        await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -5608,8 +5632,8 @@ async function main() {
           crafterId: cleanup.crafterId,
           travelMemberId: cleanup.travelMemberId
         });
-        await page.evaluate(() => {
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -6696,6 +6720,28 @@ async function main() {
           process.stderr.write(`Checks crafting consumption capture failed: ${err.message}\n`);
         }
 
+        // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
+        // 770). The seed authors a populated catalogue (Medicine / Alchemy / Herbalism)
+        // with a "Pick highest" default policy on the crafting check, so the frame shows
+        // the redesigned rows — IconPicker + label + the `@`-adorned expression field —
+        // plus the default-modifier pill multi-select. A DEDICATED frame (not the
+        // failure-consumption one above, which the same tab scrolls elsewhere for) so
+        // both cards get exact, un-cropped evidence.
+        try {
+          const modifierCard = page
+            .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
+            .first();
+          await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+          await modifierCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-checks-crafting-modifiers');
+          process.stdout.write('  D0: checks crafting modifiers screenshotted\n');
+          results.steps.push({ step: 'checks-crafting-modifiers', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'checks-crafting-modifiers', passed: false, error: err.message });
+          process.stderr.write(`Checks crafting modifiers capture failed: ${err.message}\n`);
+        }
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
@@ -7590,8 +7636,8 @@ async function main() {
             game.fabricate.getCraftingSystemManager().getSystems().map((s) => s.id)
           );
 
-          await page.evaluate(() => {
-            globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -7705,8 +7751,8 @@ async function main() {
             };
           }, craftingSetup.systemId);
 
-          await page.evaluate(() => {
-            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -7780,8 +7826,8 @@ async function main() {
         if (alchemyBenchSystemId) {
           try {
             await closeOpenApplications(page);
-            await page.evaluate(() => {
-              game.fabricate.api.getCraftingSystemManagerAppClass().show();
+            await page.evaluate(async () => {
+              (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
             });
             await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
             await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -7836,8 +7882,8 @@ async function main() {
           await page.evaluate(async () => {
             await game.settings.set('fabricate', 'experimentalFeatures', false);
           });
-          await page.evaluate(() => {
-            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });

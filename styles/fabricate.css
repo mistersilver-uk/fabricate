@@ -5319,10 +5319,17 @@
    get the mapping the other three facets already have. */
 .fabricate-manager .manager-availability-pill.is-tag { --fab-chip-color: var(--fab-purple); }
 
+/* A check modifier (issue 770). Like a component tag, this pill reuses Gathering's
+   vehicle; left unmapped it would inherit the AMBER `--fab-warning` fill, which reads
+   as a warning on a plain authored catalogue entry. A modifier is a neutral, additive
+   concept, so it gets the informational (blue) accent. */
+.fabricate-manager .manager-availability-pill.is-modifier { --fab-chip-color: var(--fab-info); }
+
 .fabricate-manager .manager-availability-pill.is-realm,
 .fabricate-manager .manager-availability-pill.is-weather,
 .fabricate-manager .manager-availability-pill.is-timeOfDay,
 .fabricate-manager .manager-availability-pill.is-tag,
+.fabricate-manager .manager-availability-pill.is-modifier,
 .fabricate-manager .manager-availability-pill.is-biome {
   background: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 16%, var(--fab-mv2-surface-2));
   border-color: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 50%, transparent);
