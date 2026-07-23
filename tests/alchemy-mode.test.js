@@ -1395,6 +1395,191 @@ test('_matchAlchemySignature resolves a cross-group multi-overlap submission to 
 });
 
 // ---------------------------------------------------------------------------
+// Most-specific signature resolution (issue 774): the runtime picks the unique
+// dominator among ALL matching sets and fails safe (fizzle) on an incomparable
+// tie — it no longer early-returns the first authored match.
+// ---------------------------------------------------------------------------
+
+// A component whose source ref is `Item.<id>`, plus a matching per-unit submission.
+function specComponent(id) {
+  return buildComponent(id, `Item.${id}`);
+}
+function specSubmission(id) {
+  return { uuid: `Item.${id}`, _stats: { compendiumSource: `Item.${id}` }, flags: {} };
+}
+// A single-set recipe whose one ingredient set requires each of `componentIds` as
+// its own single-component group.
+function multiGroupRecipe(id, componentIds) {
+  return buildRecipe(
+    id,
+    [buildIngredientSet(componentIds.map((cid) => buildIngredientGroup(cid)))],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+}
+
+test('_matchAlchemySignature picks the most-specific set for a strict subset/superset pair (issue 774)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = ['c1', 'c2', 'c3'].map(specComponent);
+  const validator = buildSignatureValidator(components);
+  // A={c1,c2} authored BEFORE B={c1,c2,c3}: a first-match matcher would return A
+  // for a {c1,c2,c3} submission (A matches, superset-tolerant) — this pins that the
+  // most-specific matcher returns B instead. This is the call-site test that FAILS
+  // if the matcher reverts to an early-return first match.
+  const recipeA = multiGroupRecipe('brew-a', ['c1', 'c2']);
+  const recipeB = multiGroupRecipe('brew-b', ['c1', 'c2', 'c3']);
+  const recipes = [recipeA, recipeB];
+
+  const base = matchSig(engine, [specSubmission('c1'), specSubmission('c2')], recipes, components, validator);
+  assert.equal(base.matched, true);
+  assert.equal(base.recipe.id, 'brew-a', '{c1,c2} matches only the base set A');
+
+  const superset = matchSig(
+    engine,
+    [specSubmission('c1'), specSubmission('c2'), specSubmission('c3')],
+    recipes,
+    components,
+    validator
+  );
+  assert.equal(superset.matched, true);
+  assert.equal(
+    superset.recipe.id,
+    'brew-b',
+    '{c1,c2,c3} matches A and B; the most-specific (B) wins — NOT the first-authored A'
+  );
+});
+
+test('_matchAlchemySignature resolves the MIDDLE of a 3-level chain A⊂B⊂C (issue 774)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = ['c1', 'c2', 'c3', 'c4'].map(specComponent);
+  const validator = buildSignatureValidator(components);
+  const recipes = [
+    multiGroupRecipe('brew-a', ['c1', 'c2']),
+    multiGroupRecipe('brew-b', ['c1', 'c2', 'c3']),
+    multiGroupRecipe('brew-c', ['c1', 'c2', 'c3', 'c4']),
+  ];
+
+  const middle = matchSig(
+    engine,
+    [specSubmission('c1'), specSubmission('c2'), specSubmission('c3')],
+    recipes,
+    components,
+    validator
+  );
+  assert.equal(middle.recipe.id, 'brew-b', '{c1,c2,c3} matches A and B (not C) → middle pick B');
+
+  const top = matchSig(
+    engine,
+    ['c1', 'c2', 'c3', 'c4'].map(specSubmission),
+    recipes,
+    components,
+    validator
+  );
+  assert.equal(top.recipe.id, 'brew-c', '{c1,c2,c3,c4} matches all three → C');
+});
+
+test('_matchAlchemySignature fizzles on an incomparable-sibling over-submission (issue 774)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = ['s', 'v', 'e', 'r'].map(specComponent);
+  const validator = buildSignatureValidator(components);
+  const recipes = [
+    multiGroupRecipe('brew-b', ['s', 'v', 'e']),
+    multiGroupRecipe('brew-c', ['s', 'v', 'r']),
+  ];
+
+  // Each sibling is reachable distinctly.
+  assert.equal(
+    matchSig(engine, ['s', 'v', 'e'].map(specSubmission), recipes, components, validator).recipe.id,
+    'brew-b'
+  );
+  assert.equal(
+    matchSig(engine, ['s', 'v', 'r'].map(specSubmission), recipes, components, validator).recipe.id,
+    'brew-c'
+  );
+
+  // The ambiguous over-submission matches BOTH and neither dominates → fail-safe
+  // fizzle, NOT a resolution by iteration order.
+  const over = matchSig(engine, ['s', 'v', 'e', 'r'].map(specSubmission), recipes, components, validator);
+  assert.equal(over.matched, false, 'an over-submission of two incomparable siblings must fizzle');
+});
+
+test('_matchAlchemySignature returns the LONGEST matching set within one recipe (issue 774)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = ['c1', 'c2'].map(specComponent);
+  const validator = buildSignatureValidator(components);
+  // One recipe, a base set and an additive set. A {c1,c2} submission satisfies both;
+  // the additive set is more specific and must win, or the wrong result group fires.
+  const baseSet = { id: 'set-base', ingredientGroups: [buildIngredientGroup('c1')], essences: {} };
+  const addSet = {
+    id: 'set-additive',
+    ingredientGroups: [buildIngredientGroup('c1'), buildIngredientGroup('c2')],
+    essences: {},
+  };
+  const recipe = buildRecipe(
+    'dual-set-brew',
+    [baseSet, addSet],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+
+  const result = matchSig(engine, [specSubmission('c1'), specSubmission('c2')], [recipe], components, validator);
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'dual-set-brew');
+  assert.equal(result.ingredientSetId, 'set-additive', 'the longest matching set wins within the recipe');
+});
+
+test('_matchAlchemySignature: an essence-group set is dominated by a set that adds a component group (issue 774)', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'restorative';
+  const components = [
+    {
+      id: 'red-herb',
+      name: 'Red Herb',
+      tags: [],
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
+      essences: { [essenceId]: 1 },
+    },
+    specComponent('c2'),
+  ];
+  const validator = buildSignatureValidator(components);
+  // A = essence-only {restorative≥1}; B = {restorative≥1} + {c2}. B's required-group
+  // structure is a proper superset of A's, so a submission carrying the essence AND
+  // c2 must brew B, not the essence-only A.
+  const recipeA = buildRecipe(
+    'essence-only',
+    [buildIngredientSet([{ id: 'ge', options: [{ quantity: 1, match: { type: 'essence', essenceId, amount: 1 } }] }])],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const recipeB = buildRecipe(
+    'essence-plus-component',
+    [
+      buildIngredientSet([
+        { id: 'ge2', options: [{ quantity: 1, match: { type: 'essence', essenceId, amount: 1 } }] },
+        buildIngredientGroup('c2'),
+      ]),
+    ],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+
+  const redHerb = buildSubmittedItem('Item.red-herb', {});
+  redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
+
+  const result = matchSig(
+    engine,
+    [redHerb, specSubmission('c2')],
+    [recipeA, recipeB],
+    components,
+    validator,
+    { system: essenceSystem }
+  );
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'essence-plus-component', 'the essence+component superset dominates the essence-only set');
+});
+
+// ---------------------------------------------------------------------------
 // Essence as a first-class ingredient GROUP option (issue 649): differential
 // parity vs the legacy per-set map, and the group-granular essences-disabled rule.
 // ---------------------------------------------------------------------------

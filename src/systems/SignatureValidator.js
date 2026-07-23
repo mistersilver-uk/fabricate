@@ -13,6 +13,138 @@
  */
 import { getMatchHandler } from '../models/match/matchTypes.js';
 
+/**
+ * All coverage masks an option can contribute: every union of between 1 and
+ * `capacity` DISTINCT component coverage masks drawn from the option. A
+ * `capacity: 1` option contributes each component's mask singly; a
+ * `capacity: 2` option additionally contributes the pairwise unions, and so on.
+ *
+ * Module-level pure primitive (reads no `this`) so the enable-time guard
+ * (`signaturesOverlap`) and the runtime specificity tiebreak
+ * ({@link signatureDominates}) derive from ONE notion of "a transversal covers a
+ * signature" and can never drift into two conflicting definitions of specificity.
+ *
+ * @param {{ ids: Set<string>, capacity: number }} option
+ * @param {(id: string) => number} coverageOf
+ * @returns {Set<number>}
+ */
+function optionCoverageMasks(option, coverageOf) {
+  const distinct = new Set();
+  for (const id of option.ids) {
+    distinct.add(coverageOf(id));
+  }
+  // BFS over unions of ≤ capacity distinct masks. `achievable` accumulates every
+  // union achievable so far; each round unions one more distinct mask in.
+  const achievable = new Set(distinct);
+  let frontier = new Set(distinct);
+  for (let picks = 2; picks <= option.capacity && frontier.size > 0; picks++) {
+    const nextFrontier = new Set();
+    for (const partial of frontier) {
+      for (const mask of distinct) {
+        const combined = partial | mask;
+        if (!achievable.has(combined)) {
+          achievable.add(combined);
+          nextFrontier.add(combined);
+        }
+      }
+    }
+    frontier = nextFrontier;
+  }
+  return achievable;
+}
+
+/**
+ * Whether some transversal of `fromGroupOptions` (one option chosen per group,
+ * supplying up to its `capacity` distinct components) satisfies every group of
+ * `toSignature` (each `toSignature` group contains at least one supplied
+ * component).
+ *
+ * A supplied component's only relevance to `toSignature` is which of its groups
+ * contain the component — its **coverage mask**. So each chosen option
+ * contributes the union of up to `capacity` distinct component coverage masks;
+ * we enumerate the achievable per-group masks and DP over the reachable set of
+ * covered-`toSignature` masks. Feasible iff the fully-covered mask is reachable.
+ *
+ * @param {{ ids: Set<string>, capacity: number }[][]} fromGroupOptions
+ * @param {Set<string>[]} toSignature - the groups that must all be covered
+ * @returns {boolean}
+ */
+export function someTransversalSatisfies(fromGroupOptions, toSignature) {
+  const fullMask = (1 << toSignature.length) - 1;
+
+  // Coverage mask of a component id: which toSignature groups contain it.
+  const coverageOf = (id) => {
+    let mask = 0;
+    for (const [i, group] of toSignature.entries()) {
+      if (group.has(id)) mask |= 1 << i;
+    }
+    return mask;
+  };
+
+  let reachable = new Set([0]);
+  for (const options of fromGroupOptions) {
+    // The distinct masks this whole group can contribute: for each of its
+    // options, every union of up to `capacity` distinct component masks.
+    const groupMasks = new Set();
+    for (const option of options) {
+      for (const mask of optionCoverageMasks(option, coverageOf)) {
+        groupMasks.add(mask);
+      }
+    }
+    const next = new Set();
+    for (const covered of reachable) {
+      for (const mask of groupMasks) {
+        const combined = covered | mask;
+        if (combined === fullMask) return true;
+        next.add(combined);
+      }
+    }
+    reachable = next;
+  }
+  return reachable.has(fullMask);
+}
+
+/**
+ * A signature entry is unsatisfiable — it can never match any runtime submission —
+ * when it has no groups or carries a group no component can satisfy. Such a set is
+ * inert for both overlap and domination reasoning.
+ *
+ * @param {{ signature: Set<string>[] }} entry
+ * @returns {boolean}
+ */
+function isInertSignature(entry) {
+  const signature = entry?.signature;
+  if (!Array.isArray(signature) || signature.length === 0) return true;
+  return signature.some((group) => group.size === 0);
+}
+
+/**
+ * The runtime specificity partial order (LOAD-BEARING, issue 774). Entry `A`
+ * **dominates** entry `B` — is strictly MORE SPECIFIC — iff a natural transversal
+ * of `A` also satisfies every group of `B` (so `A`'s required-group structure
+ * CONTAINS `B`'s) while no transversal of `B` satisfies `A` (so `B` is strictly
+ * smaller). This is exactly the asymmetric half of the enable-time inseparability
+ * test: {@link SignatureValidator#signaturesOverlap} rejects the SYMMETRIC case
+ * (both directions satisfy — identical signatures, or the tag/OR case), and the
+ * runtime matcher ({@link resolveMostSpecificSignatureMatch}) breaks a multi-match
+ * tie by picking the unique dominator. Both consume this same
+ * {@link someTransversalSatisfies} primitive so the guard and the runtime can never
+ * disagree about which of two matching sets is more specific.
+ *
+ * Domination is a proper-superset relation on required-group structure, NOT on
+ * units consumed (alchemy consumes ALL submitted units regardless).
+ *
+ * @param {{ signature: Set<string>[], groupOptions: object[][] }} entryA
+ * @param {{ signature: Set<string>[], groupOptions: object[][] }} entryB
+ * @returns {boolean}
+ */
+export function signatureDominates(entryA, entryB) {
+  if (isInertSignature(entryA) || isInertSignature(entryB)) return false;
+  const aCoversB = someTransversalSatisfies(entryA.groupOptions, entryB.signature);
+  const bCoversA = someTransversalSatisfies(entryB.groupOptions, entryA.signature);
+  return aCoversB && !bCoversA;
+}
+
 export class SignatureValidator {
   constructor(craftingSystemManager) {
     this._csm = craftingSystemManager;
@@ -104,139 +236,54 @@ export class SignatureValidator {
   }
 
   /**
-   * Check whether two ingredient sets overlap — i.e. whether they are genuinely
-   * ambiguous because a single plausible submission satisfies BOTH sets'
-   * group requirements at once.
+   * Check whether two ingredient sets are INSEPARABLE — genuinely ambiguous in a
+   * way no added or different ingredient can ever resolve, so the runtime could
+   * never distinguish them (issue 774).
    *
-   * The runtime signature matcher (`CraftingEngine._matchAlchemySignature`)
-   * requires **every** group of a set to be satisfied and is superset-tolerant
-   * (`>= required`, no leftover guard; extras are consumed as essence
-   * contributors). It returns the FIRST set that fully matches. So a pair is only
-   * ambiguous when a submission a player would plausibly make to craft one set
-   * ALSO fully satisfies the other — then the runtime silently shadows one.
+   * The runtime signature matcher (`CraftingEngine._matchAlchemySignature`) is
+   * superset-tolerant (`>= required`, extras consumed) and, since issue 774, picks
+   * the MOST-SPECIFIC matching set (the unique dominator under
+   * {@link signatureDominates}), fizzling safely when no unique maximum exists.
+   * That runtime disambiguates any pair related by strict subset/superset (the
+   * superset dominates) and safely fizzles an ambiguous over-submission of
+   * incomparable siblings. So a pair is only unenablable when it is INSEPARABLE:
+   * a plausible submission of EACH set also fully satisfies the OTHER — the
+   * SYMMETRIC transversal case, where neither dominates and no ingredient choice
+   * can pick a winner.
    *
    * The plausible submissions for a set are its **transversals**: for each group,
    * pick one satisfying option and supply exactly its required quantity of units
    * (the natural "the ingredients each requirement calls for" craft), choosing
    * WHICH components those units are to maximise the chance of also matching the
    * other set. A `quantity: N` option can therefore contribute up to N distinct
-   * components. Merely sharing a base component is NOT enough — Healing
-   * `{Water},{Herb}` and Mana `{Water},{Mineral}` share Water, but no transversal
-   * of one (`Water+Herb` / `Water+Mineral`) satisfies the other, so they are
-   * distinguishable and must both be enablable. By contrast a set whose group
-   * requirements are a subset of another's IS ambiguous; two single-group sets
-   * sharing a component that satisfies both (e.g. a `mithril` tagged both `rare`
-   * and `metal`) are ambiguous via the one-item `{mithril}` submission; and a set
-   * with a `quantity: 2` "metal" group crafted as iron + gold is ambiguous with a
-   * `{iron},{gold}` set, because that same two-item craft matches both.
+   * components. Symmetric-transversal overlap covers exactly: identical signatures;
+   * the tag/OR case where one item satisfies both (a `mithril` tagged both `rare`
+   * and `metal` for `A={rare}` / `B={metal}`, ambiguous via the one-item
+   * `{mithril}` submission); and an OR-option set that fully shadows a narrower one.
+   * By contrast a strict subset/superset pair (`{Water}` vs `{Water},{Herb}`) is
+   * ONE-directional and now ALLOWED — the runtime brews the superset when Herb is
+   * added and the base when it is not — and incomparable siblings
+   * (`{S,V,E}` / `{S,V,R}`) satisfy neither direction and are also allowed.
    *
    * @param {object} entryA - `{ signature: Set<string>[], groupOptions }`
    * @param {object} entryB - `{ signature: Set<string>[], groupOptions }`
    * @returns {boolean}
    */
   signaturesOverlap(entryA, entryB) {
-    const sigA = entryA.signature;
-    const sigB = entryB.signature;
-    if (sigA.length === 0 || sigB.length === 0) return false;
+    // A set carrying no groups, or a group no component can satisfy, is
+    // unsatisfiable: it can never match a submission at runtime, so it cannot be
+    // the source of any ambiguity and never conflicts with another set.
+    if (isInertSignature(entryA) || isInertSignature(entryB)) return false;
 
-    // A set carrying a group that no component can satisfy is unsatisfiable: it
-    // can never match a submission at runtime, so it cannot be the source of any
-    // ambiguity and never conflicts with another set.
-    if (sigA.some((group) => group.size === 0)) return false;
-    if (sigB.some((group) => group.size === 0)) return false;
-
+    // Inseparable == SYMMETRIC transversal satisfaction: a natural craft of EACH
+    // set also satisfies the OTHER. One-directional satisfaction (strict
+    // subset/superset) is disambiguated by the runtime's most-specific pick, and
+    // neither-directional (incomparable siblings) fizzles safely, so only the
+    // symmetric (`&&`) case is rejected at enable time (issue 774).
     return (
-      this._someTransversalSatisfies(entryA.groupOptions, sigB) ||
-      this._someTransversalSatisfies(entryB.groupOptions, sigA)
+      someTransversalSatisfies(entryA.groupOptions, entryB.signature) &&
+      someTransversalSatisfies(entryB.groupOptions, entryA.signature)
     );
-  }
-
-  /**
-   * Whether some transversal of `fromGroupOptions` (one option chosen per group,
-   * supplying up to its `capacity` distinct components) satisfies every group of
-   * `toSignature` (each `toSignature` group contains at least one supplied
-   * component).
-   *
-   * A supplied component's only relevance to `toSignature` is which of its groups
-   * contain the component — its **coverage mask**. So each chosen option
-   * contributes the union of up to `capacity` distinct component coverage masks;
-   * we enumerate the achievable per-group masks and DP over the reachable set of
-   * covered-`toSignature` masks. Feasible iff the fully-covered mask is reachable.
-   *
-   * @param {{ ids: Set<string>, capacity: number }[][]} fromGroupOptions
-   * @param {Set<string>[]} toSignature - the groups that must all be covered
-   * @returns {boolean}
-   * @private
-   */
-  _someTransversalSatisfies(fromGroupOptions, toSignature) {
-    const fullMask = (1 << toSignature.length) - 1;
-
-    // Coverage mask of a component id: which toSignature groups contain it.
-    const coverageOf = (id) => {
-      let mask = 0;
-      for (const [i, group] of toSignature.entries()) {
-        if (group.has(id)) mask |= 1 << i;
-      }
-      return mask;
-    };
-
-    let reachable = new Set([0]);
-    for (const options of fromGroupOptions) {
-      // The distinct masks this whole group can contribute: for each of its
-      // options, every union of up to `capacity` distinct component masks.
-      const groupMasks = new Set();
-      for (const option of options) {
-        for (const mask of this._optionCoverageMasks(option, coverageOf)) {
-          groupMasks.add(mask);
-        }
-      }
-      const next = new Set();
-      for (const covered of reachable) {
-        for (const mask of groupMasks) {
-          const combined = covered | mask;
-          if (combined === fullMask) return true;
-          next.add(combined);
-        }
-      }
-      reachable = next;
-    }
-    return reachable.has(fullMask);
-  }
-
-  /**
-   * All coverage masks an option can contribute: every union of between 1 and
-   * `capacity` DISTINCT component coverage masks drawn from the option. A
-   * `capacity: 1` option contributes each component's mask singly; a
-   * `capacity: 2` option additionally contributes the pairwise unions, and so on.
-   *
-   * @param {{ ids: Set<string>, capacity: number }} option
-   * @param {(id: string) => number} coverageOf
-   * @returns {Set<number>}
-   * @private
-   */
-  _optionCoverageMasks(option, coverageOf) {
-    const distinct = new Set();
-    for (const id of option.ids) {
-      distinct.add(coverageOf(id));
-    }
-    // BFS over unions of ≤ capacity distinct masks. `reachable` accumulates every
-    // union achievable so far; each round unions one more distinct mask in.
-    const achievable = new Set(distinct);
-    let frontier = new Set(distinct);
-    for (let picks = 2; picks <= option.capacity && frontier.size > 0; picks++) {
-      const nextFrontier = new Set();
-      for (const partial of frontier) {
-        for (const mask of distinct) {
-          const combined = partial | mask;
-          if (!achievable.has(combined)) {
-            achievable.add(combined);
-            nextFrontier.add(combined);
-          }
-        }
-      }
-      frontier = nextFrontier;
-    }
-    return achievable;
   }
 
   /**
