@@ -282,6 +282,12 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('verifyToolStudioLiveReplacement'));
   assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 1280, height: 720 })'));
   assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 900, height: 700 })'));
+  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 680, height: 700 })'));
+  assert.ok(HARNESS.includes('resetToolStudioScroll(page)'));
+  assert.ok(HARNESS.includes('assertToolStudioLibraryLayout(page)'));
+  assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: true })'));
+  assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?900px/);
+  assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?680px/);
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
 });
 

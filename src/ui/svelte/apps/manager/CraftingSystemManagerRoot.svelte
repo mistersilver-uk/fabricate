@@ -4758,7 +4758,7 @@
             <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
           </div>
         </div>
-      {:else}
+      {:else if currentView !== 'tool-edit'}
         <h1 class="manager-title">{viewTitle()}</h1>
         <p class="manager-subtitle">{viewSubtitle()}</p>
       {/if}

@@ -10007,6 +10007,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
     const editor = target.querySelector('[data-tool-edit-view]');
     assert.ok(editor);
+    assert.equal(
+      target.querySelectorAll('[data-tool-editor-header]').length,
+      1,
+      'the composed tool-edit route has one identity/action header'
+    );
+    assert.match(target.querySelector('.manager-breadcrumbs').textContent, /Tools.*Artisan Catalyst/);
+    assert.equal(
+      target.querySelector('.manager-heading > .manager-title'),
+      null,
+      'the manager shell must not restore its generic Edit Tool heading above the editor'
+    );
+    assert.equal(
+      target.querySelector('.manager-heading > .manager-subtitle'),
+      null,
+      'the manager shell must not restore its generic Tool subtitle above the editor'
+    );
     assert.equal(editor.querySelectorAll('[role="tab"]').length, 4);
     assert.ok(editor.querySelector('[data-tool-editor-back]'));
     assert.ok(editor.querySelector('[data-tool-editor-delete]'));

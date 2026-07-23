@@ -167,7 +167,7 @@
             >
               <img src={row.img} alt="" />
               <span class="manager-tools-library-copy">
-                <strong>{row.name}</strong>
+                <strong title={row.name}>{row.name}</strong>
                 <small>{row.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}</small>
                 <span class="manager-tools-library-chips">
                   <span

@@ -1638,6 +1638,204 @@ async function assertPointerTarget(page, locator, targetSelector, label) {
   }
 }
 
+async function assertSinglePointerDispatch(page, locator, label) {
+  await locator.evaluate((element) => element.setAttribute('data-tool-pointer-probe', ''));
+  await assertPointerTarget(page, locator, '[data-tool-pointer-probe]', label);
+  await locator.evaluate(() => {
+    globalThis.__fabricateToolPointerProbeCleanup?.();
+    globalThis.__fabricateToolPointerProbeCount = 0;
+    const listener = (event) => {
+      if (!event.target?.closest?.('[data-tool-pointer-probe]')) return;
+      globalThis.__fabricateToolPointerProbeCount += 1;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    document.addEventListener('click', listener, true);
+    globalThis.__fabricateToolPointerProbeCleanup = () => {
+      document.removeEventListener('click', listener, true);
+      delete globalThis.__fabricateToolPointerProbeCleanup;
+    };
+  });
+  await locator.click();
+  const dispatchCount = await page.evaluate(() => {
+    const count = globalThis.__fabricateToolPointerProbeCount;
+    globalThis.__fabricateToolPointerProbeCleanup?.();
+    document.querySelector('[data-tool-pointer-probe]')?.removeAttribute('data-tool-pointer-probe');
+    delete globalThis.__fabricateToolPointerProbeCount;
+    return count;
+  });
+  if (dispatchCount !== 1) {
+    throw new Error(`${label} dispatched ${dispatchCount} pointer clicks instead of exactly one`);
+  }
+}
+
+async function resetToolStudioScroll(page) {
+  const scroll = await page.evaluate(() => {
+    const selectors = [
+      '.fabricate-manager .manager-body',
+      '.fabricate-manager .manager-main',
+      '.fabricate-manager [data-tool-editor-panel]',
+      '.fabricate-manager [data-tool-behavior-preview]',
+      '.fabricate-manager .manager-inspector',
+    ];
+    const positions = {};
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (!element) continue;
+      element.scrollTop = 0;
+      positions[selector] = element.scrollTop;
+    }
+    return positions;
+  });
+  const unsettled = Object.entries(scroll).filter(([, top]) => top !== 0);
+  if (unsettled.length > 0) {
+    throw new Error(`Tool Studio scroll reset failed: ${JSON.stringify(unsettled)}`);
+  }
+}
+
+async function readToolStudioLayout(page) {
+  return page.evaluate(() => {
+    const readRect = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const readType = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        fontSize: Number.parseFloat(style.fontSize),
+        lineHeight: style.lineHeight,
+        overflow: style.overflow,
+        textOverflow: style.textOverflow,
+        whiteSpace: style.whiteSpace,
+      };
+    };
+    const readOverflow = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        overflowY: style.overflowY,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      };
+    };
+    return {
+      manager: readRect('.fabricate-manager'),
+      body: readRect('.fabricate-manager .manager-body'),
+      main: readRect('.fabricate-manager .manager-main'),
+      inspector: readRect('.fabricate-manager .manager-inspector'),
+      libraryRow: readRect('.fabricate-manager [data-manager-tool-id]'),
+      editorHeader: readRect('[data-tool-editor-header]'),
+      editorActions: readRect('.manager-tool-edit-actions'),
+      tabs: readRect('.manager-tool-editor-tabs'),
+      composition: readRect('.manager-tool-edit-composition'),
+      editorPanel: readRect('[data-tool-editor-panel]'),
+      firstSection: readRect('[data-tool-editor-panel] > *'),
+      preview: readRect('[data-tool-behavior-preview]'),
+      previewIdentity: readRect('[data-tool-preview-identity]'),
+      libraryNameType: readType('.manager-tools-library-copy > strong'),
+      inspectorNameType: readType('.manager-tool-inspector-hero h2'),
+      editorNameType: readType('.manager-tool-edit-identity h2'),
+      previewNameType: readType('.manager-tool-preview-identity h3'),
+      bodyOverflow: readOverflow('.fabricate-manager .manager-body'),
+      mainOverflow: readOverflow('.fabricate-manager .manager-main'),
+      panelOverflow: readOverflow('[data-tool-editor-panel]'),
+      previewOverflow: readOverflow('[data-tool-behavior-preview]'),
+      headerCount: document.querySelectorAll('[data-tool-editor-header]').length,
+      genericTitleCount: document.querySelectorAll('.manager-heading > .manager-title, .manager-heading > .manager-subtitle').length,
+    };
+  });
+}
+
+function assertHorizontalContainment(parent, child, label) {
+  if (!parent || !child || child.left < parent.left - 1 || child.right > parent.right + 1) {
+    throw new Error(`${label} escapes horizontal containment: ${JSON.stringify({ parent, child })}`);
+  }
+}
+
+function assertToolStudioTypography(report, pairs) {
+  for (const [key, maximum, label] of pairs) {
+    const type = report[key];
+    if (!type || !Number.isFinite(type.fontSize) || type.fontSize > maximum) {
+      throw new Error(`${label} typography is not compact: ${JSON.stringify(type)}`);
+    }
+    if (type.whiteSpace !== 'nowrap' || !['hidden', 'clip'].includes(type.overflow)) {
+      throw new Error(`${label} does not bound long identity copy: ${JSON.stringify(type)}`);
+    }
+  }
+}
+
+async function assertToolStudioLibraryLayout(page) {
+  const report = await readToolStudioLayout(page);
+  assertHorizontalContainment(report.body, report.main, 'Tool library center');
+  assertHorizontalContainment(report.body, report.inspector, 'Tool library inspector');
+  assertHorizontalContainment(report.main, report.libraryRow, 'Tool library row');
+  if (!report.inspector || report.inspector.width < 330 || report.inspector.width > 342) {
+    throw new Error(`Tool library inspector is not the complete 340px rail: ${JSON.stringify(report.inspector)}`);
+  }
+  assertToolStudioTypography(report, [
+    ['libraryNameType', 14, 'Tool library name'],
+    ['inspectorNameType', 17, 'Tool inspector name'],
+  ]);
+}
+
+async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
+  const report = await readToolStudioLayout(page);
+  if (report.headerCount !== 1 || report.genericTitleCount !== 0) {
+    throw new Error(`Tool editor identity chrome drifted: ${JSON.stringify({ headerCount: report.headerCount, genericTitleCount: report.genericTitleCount })}`);
+  }
+  for (const [parent, child, label] of [
+    [report.main, report.editorHeader, 'Tool editor header'],
+    [report.editorHeader, report.editorActions, 'Tool editor actions'],
+    [report.main, report.tabs, 'Tool editor tabs'],
+    [report.composition, report.editorPanel, 'Tool editor panel'],
+    [report.composition, report.preview, 'Tool behavior preview'],
+    [report.preview, report.previewIdentity, 'Tool preview identity'],
+    [report.editorPanel, report.firstSection, 'Tool editor first section'],
+  ]) {
+    assertHorizontalContainment(parent, child, label);
+  }
+  assertToolStudioTypography(report, [
+    ['editorNameType', 20, 'Tool editor name'],
+    ['previewNameType', 17, 'Tool preview name'],
+  ]);
+  if (!stacked) {
+    if (!report.preview || report.preview.width < 318 || report.preview.width > 322) {
+      throw new Error(`Tool preview is not the complete 320px rail: ${JSON.stringify(report.preview)}`);
+    }
+    if (report.preview.top < report.composition.top - 1 || report.preview.bottom > report.composition.bottom + 1) {
+      throw new Error(`Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`);
+    }
+    return;
+  }
+  if (report.preview.height <= 0 || report.preview.top < report.editorPanel.top) {
+    throw new Error(`Tool preview is clipped or precedes the editor in stacked reading order: ${JSON.stringify(report.preview)}`);
+  }
+  if (report.bodyOverflow?.overflowY !== 'auto') {
+    throw new Error(`Tool stacked body does not own scrolling: ${JSON.stringify(report.bodyOverflow)}`);
+  }
+  for (const [key, label] of [
+    ['mainOverflow', 'main'],
+    ['panelOverflow', 'panel'],
+    ['previewOverflow', 'preview'],
+  ]) {
+    if (['auto', 'scroll'].includes(report[key]?.overflowY)) {
+      throw new Error(`Tool stacked ${label} unexpectedly owns nested scrolling: ${JSON.stringify(report[key])}`);
+    }
+  }
+}
+
 function managerSystemRowSelector(systemId) {
   return `.fabricate-manager .manager-system-row[data-system-id="${systemId}"]`;
 }
@@ -3587,8 +3785,17 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (await page.locator('.fabricate-manager[data-manager-view="tool-edit"]').count() > 0) {
     throw new Error('Tool toggle incorrectly opened the editor');
   }
+  await resetToolStudioScroll(page);
+  await assertToolStudioLibraryLayout(page);
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-tools-library');
+
+  await setManagerWindowSize(page, { width: 680, height: 700 });
+  await resetToolStudioScroll(page);
+  await assertSinglePointerDispatch(page, selectTarget, 'Tool row selection at 680px');
+  await assertSinglePointerDispatch(page, enabledToggle, 'Tool enabled toggle at 680px');
+  await assertSinglePointerDispatch(page, editButton, 'Tool Edit at 680px');
+  await setManagerWindowSize(page, { width: 1280, height: 720 });
 
   await editButton.click();
   await page.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-edit-view]').first()
@@ -3599,6 +3806,8 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertPointerTarget(page, page.locator('[data-tool-source-picker]').first(), '[data-tool-source-picker]', 'Tool Item picker');
   await assertPointerTarget(page, page.locator('[data-tool-source-card]').first(), '[data-tool-source-card]', 'Tool Item drop target');
   await assertPointerTarget(page, page.locator('[data-tool-source-unlink]').first(), '[data-tool-source-unlink]', 'Tool Item unlink');
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-tool-overview-linked');
 
@@ -3659,8 +3868,22 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await screenshot(page, 'manager-tool-validation');
   await setManagerWindowSize(page, { width: 900, height: 700 });
   await page.locator('[data-tool-editor-header]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page, { stacked: true });
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-tool-narrow');
+  await assertSinglePointerDispatch(page, page.locator('[data-tool-editor-back]').first(), 'Tool Back at 900px');
+  await assertSinglePointerDispatch(page, tab('requirements'), 'Tool Requirements tab at 900px');
+  await tab('requirements').click();
+  await page.locator('[data-tool-requirements-tab]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await assertSinglePointerDispatch(page, page.locator('[data-tool-bonus-enabled]').first(), 'Tool bonus control at 900px');
+
+  await setManagerWindowSize(page, { width: 680, height: 700 });
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page, { stacked: true });
+  await assertSinglePointerDispatch(page, page.locator('[data-tool-editor-back]').first(), 'Tool Back at 680px');
+  await assertSinglePointerDispatch(page, tab('breakage'), 'Tool Breakage tab at 680px');
+  await assertSinglePointerDispatch(page, page.locator('[data-tool-bonus-enabled]').first(), 'Tool bonus control at 680px');
   await setManagerWindowSize(page, { width: 1280, height: 720 });
 
   await page.evaluate(async () => globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.());

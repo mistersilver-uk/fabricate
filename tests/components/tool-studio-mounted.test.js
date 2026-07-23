@@ -101,6 +101,12 @@ describe('Tool Studio editor (mounted)', () => {
   it('renders header-only actions, four accessible tabs, linked Item evidence, and no Kind', async () => {
     const root = await harness.mount(props());
 
+    assert.equal(root.querySelectorAll('[data-tool-editor-header]').length, 1);
+    assert.match(root.querySelector('[data-tool-editor-image]').getAttribute('src'), /hammer/);
+    assert.equal(
+      root.querySelector('[data-tool-editor-source-context]').textContent,
+      'Linked game-world Item'
+    );
     assert.ok(root.querySelector('[data-tool-editor-back][aria-label="Back to Tools"]'));
     assert.ok(root.querySelector('[data-tool-editor-delete]'));
     assert.ok(root.querySelector('[data-tool-editor-save]'));
@@ -112,6 +118,8 @@ describe('Tool Studio editor (mounted)', () => {
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Smith Hammer/);
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Item\.hammer/);
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /trusted workshop hammer/);
+    assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Smith Hammer/);
+    assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Linked game-world Item/);
     assert.doesNotMatch(root.textContent, /\bKind\b/);
     assert.equal(root.querySelector('footer'), null);
   });
