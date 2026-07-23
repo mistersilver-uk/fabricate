@@ -375,6 +375,27 @@
   const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
+  const isToolStudioRoute = $derived(currentView === 'tools' || currentView === 'tool-edit');
+
+  $effect(() => {
+    if (!isToolStudioRoute) return;
+    let active = true;
+    const applyOptions = (options) => {
+      if (active) worldItemOptions = Array.isArray(options) ? options : [];
+    };
+    let request;
+    try {
+      request = services?.getWorldItemOptions?.();
+    } catch {
+      applyOptions([]);
+      return;
+    }
+    if (isPromise(request)) request.then(applyOptions, () => applyOptions([]));
+    else applyOptions(request);
+    return () => {
+      active = false;
+    };
+  });
 
   // The pure `evaluateSystemValidation` report, computed in the admin store from
   // the selected system's recipes/environments/components. Drives the GM system
