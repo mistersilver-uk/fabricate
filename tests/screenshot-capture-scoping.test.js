@@ -303,6 +303,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     HARNESS,
     /assertPointerTarget\(page,\s*editor\.locator\('\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]'\),\s*'\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]',\s*'Tool repair OR add-component control'\)/,
   );
+  assert.match(
+    HARNESS,
+    /assertPointerTarget\(page,\s*editor\.locator\('\[data-tool-repair-add-group\]'\)\.first\(\),\s*'\[data-tool-repair-add-group\]',\s*'Tool repair AND control'\)/,
+    'the intentionally plural repair add-type selector must choose one strict-safe pointer target',
+  );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
   assert.match(
