@@ -323,6 +323,14 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     HARNESS,
     /The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}/,
   );
+  assert.match(HARNESS, /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/);
+  assert.match(HARNESS, /const expectedToolNames = \[[\s\S]*?"Smith's Hammer"[\s\S]*?'Woodcarving Tools'/);
+  assert.match(HARNESS, /visibleToolRows\.first\(\)[\s\S]*?Tool Studio parity library must select Smith's Hammer in the first row/);
+  assert.match(HARNESS, /data-tool-inspector-description[\s\S]*?well-balanced forge hammer/);
+  assert.match(
+    HARNESS,
+    /route transition asks ApplicationV2[\s\S]*?setManagerWindowSize\(page, \{ width: 1214, height: 724 \}\)/,
+  );
   assert.match(
     HARNESS,
     /sourceReplaceDisclosure\.click\(\);[\s\S]*?assertPointerTarget\(page, editor\.locator\('\[data-tool-source-picker\]'\)[\s\S]*?sourceReplaceDisclosure\.click\(\);/,

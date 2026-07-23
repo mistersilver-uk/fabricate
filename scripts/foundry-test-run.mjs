@@ -3664,8 +3664,13 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     const uncached = Array.from(index || []).find((entry) => entry?._id && !pack.get(entry._id));
     if (!uncached) throw new Error('Tool Studio fixture requires an uncached dnd5e.items entry');
     const sourceSystem = clone(sourceTemplate.system);
-    if (sourceSystem?.description && typeof sourceSystem.description === 'object') {
-      sourceSystem.description.value = '<p>A well-balanced forge hammer. Durable, but the haft splinters when hard used.</p>';
+    const parityDescription = '<p>A well-balanced forge hammer. Durable, but the haft splinters when hard used.</p>';
+    if (typeof sourceSystem?.description === 'string') {
+      sourceSystem.description = parityDescription;
+    } else if (sourceSystem?.description && typeof sourceSystem.description === 'object') {
+      sourceSystem.description.value = parityDescription;
+    } else {
+      sourceSystem.description = { value: parityDescription };
     }
     const source = await Item.create({
       name: "Smith's Hammer",
@@ -3906,6 +3911,20 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (visibleToolRowCount !== 8) {
     throw new Error(`Tool Studio parity library must render exactly 8 rows; found ${visibleToolRowCount}`);
   }
+  const expectedToolNames = [
+    "Smith's Hammer",
+    'Arcane Forge',
+    "Alchemist's Supplies",
+    'Ley-Line Nexus',
+    "Master's Anvil",
+    'Moonwell',
+    'Volcanic Vent',
+    'Woodcarving Tools',
+  ];
+  const visibleToolNames = await visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
+  if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
+    throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
+  }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
   const editButton = row.locator('.manager-icon-button');
@@ -3916,6 +3935,13 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await row.waitFor({ state: 'visible' });
   if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
     throw new Error('Tool row selection did not expose selected state');
+  }
+  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
+    throw new Error("Tool Studio parity library must select Smith's Hammer in the first row");
+  }
+  const inspectorDescription = await manager.locator('[data-tool-inspector-description]').textContent();
+  if (!inspectorDescription?.includes('well-balanced forge hammer')) {
+    throw new Error(`Tool Studio parity inspector has the wrong source description: ${inspectorDescription}`);
   }
   const enabledBefore = await enabledToggle.getAttribute('aria-pressed');
   await enabledToggle.click();
@@ -3942,6 +3968,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await editButton.click();
   const editorManager = liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]');
   await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  // The route transition asks ApplicationV2 to adopt the editor's default size;
+  // re-apply the parity window so the editor product root remains 1212x686.
+  await setManagerWindowSize(page, { width: 1214, height: 724 });
   await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
   await assertPointerTarget(page, editor.locator('[data-tool-source-card]'), '[data-tool-source-card]', 'Tool Item drop target');
