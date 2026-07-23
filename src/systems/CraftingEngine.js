@@ -22,6 +22,11 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import {
+  awardedQuantityOf,
+  createOrStackComponentItem,
+  tagAwardedQuantity,
+} from './componentStacking.js';
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCurrencyAffordProbe,
@@ -924,7 +929,7 @@ export class CraftingEngine {
           createdResults: (resultItems || []).map((item) => ({
             actorUuid: craftingActor.uuid,
             itemUuid: item.uuid,
-            quantity: Number(item.system?.quantity || 1),
+            quantity: awardedQuantityOf(item),
             name: item.name ?? null,
             img: item.img ?? null,
           })),
@@ -1444,7 +1449,7 @@ export class CraftingEngine {
       createdResults: (resultItems || []).map((item) => ({
         actorUuid: craftingActor.uuid,
         itemUuid: item.uuid,
-        quantity: Number(item.system?.quantity || 1),
+        quantity: awardedQuantityOf(item),
         name: item.name ?? null,
         img: item.img ?? null,
       })),
@@ -2596,7 +2601,11 @@ export class CraftingEngine {
           { step, precomputedEssences, resolveComponent }
         );
 
-        if (resultItem) {
+        // De-dup: when two result rows produce the SAME managed component, the second
+        // stacks onto the first and `_createSingleResult` returns the same item object.
+        // The award tag accumulates both amounts, so the item is reported ONCE with the
+        // summed quantity rather than twice (issue 858 review).
+        if (resultItem && !createdItems.includes(resultItem)) {
           createdItems.push(resultItem);
         }
       }
@@ -2624,9 +2633,15 @@ export class CraftingEngine {
     // Get the source item
     let sourceItem;
     let managedItem = null;
+    // Resolve the crafting system once for the whole method: the stacking gate
+    // (issue 858) and the effect-transfer gate below both read it, and a bare
+    // `itemUuid` output (no managed component) still transfers effects, so this
+    // must not be scoped to the managed-component branch.
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = recipe.craftingSystemId
+      ? (systemManager?.getSystem(recipe.craftingSystemId) ?? null)
+      : null;
     if ((result.componentId || result.systemItemId) && recipe.craftingSystemId) {
-      const systemManager = game.fabricate?.getCraftingSystemManager?.();
-      const system = systemManager?.getSystem(recipe.craftingSystemId);
       const managedItems = system?.components || [];
       managedItem =
         managedItems.find((i) => i.id === (result.componentId || result.systemItemId)) || null;
@@ -2677,7 +2692,11 @@ export class CraftingEngine {
       precomputedEssences,
       resolveComponent
     );
-    if (propertyUpdates && typeof propertyUpdates === 'object') {
+    const hasPropertyUpdates =
+      propertyUpdates &&
+      typeof propertyUpdates === 'object' &&
+      Object.keys(propertyUpdates).length > 0;
+    if (hasPropertyUpdates) {
       for (const [path, value] of Object.entries(propertyUpdates)) {
         foundry.utils.setProperty(itemData, path, value);
       }
@@ -2691,25 +2710,53 @@ export class CraftingEngine {
     // via the raw-reference fall-through.
     stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
-    // Create the item in crafting actor's inventory
-    const [createdItem] = await craftingActor.createEmbeddedDocuments('Item', [itemData]);
+    // Whether this output transfers per-craft active effects (both the recipe- and
+    // system-level flags must be set). A transferring output is materially distinct
+    // per craft, so it must never merge into an existing stack.
+    const transfersEffects =
+      recipe.transferEffects === true && system?.features?.effectTransfer === true;
 
-    // Transfer active effects if configured (requires both recipe-level and system-level flags)
-    if (recipe.transferEffects) {
-      const systemManager = game.fabricate?.getCraftingSystemManager?.();
-      const system = systemManager?.getSystem(recipe.craftingSystemId);
-      if (system?.features?.effectTransfer === true) {
-        await this._transferEffects(
-          createdItem,
-          consumedItems,
-          recipe,
-          precomputedEssences,
-          resolveComponent
-        );
-      }
+    // Stack onto a matching inventory item instead of spawning a duplicate (issue 858).
+    // Only a PLAIN component output stacks: it must resolve to a managed component,
+    // carry no per-craft property-macro customization, and transfer no per-craft
+    // effects — any of which makes the produced item materially distinct from an
+    // existing stack. Matches are resolved through the same system-scoped resolver
+    // salvage/craft already use to find component items on the actor.
+    const awardedQuantity = Number(result.quantity) || 1;
+    const itemsIterable =
+      craftingActor?.items != null && typeof craftingActor.items[Symbol.iterator] === 'function';
+    let matchingItems = [];
+    if (managedItem && system && itemsIterable && !hasPropertyUpdates && !transfersEffects) {
+      matchingItems = this._findComponentItems(craftingActor, managedItem, system) || [];
     }
 
-    return createdItem;
+    const resultItem = await createOrStackComponentItem({
+      actor: craftingActor,
+      itemData,
+      matchingItems,
+      awardedQuantity,
+    });
+    if (!resultItem) return null;
+
+    const stacked = matchingItems.includes(resultItem);
+    // Record THIS award's contribution so chat/run reporting shows the amount
+    // produced now, not the merged stack total after a stack.
+    tagAwardedQuantity(resultItem, awardedQuantity);
+
+    // Transfer active effects if configured (requires both recipe- and system-level
+    // flags). Only ever applies to a freshly created item — a stacked item keeps its
+    // own effects and, by construction, `transfersEffects` is false when stacking.
+    if (!stacked && transfersEffects) {
+      await this._transferEffects(
+        resultItem,
+        consumedItems,
+        recipe,
+        precomputedEssences,
+        resolveComponent
+      );
+    }
+
+    return resultItem;
   }
 
   /**
@@ -3574,7 +3621,7 @@ export class CraftingEngine {
         results: (createdResults || []).map((item) => ({
           name: item?.name || '',
           img: item?.img || '',
-          quantity: Number(item?.system?.quantity || 1),
+          quantity: awardedQuantityOf(item),
         })),
         consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
           name: item?.name || '',
@@ -3717,7 +3764,7 @@ export class CraftingEngine {
         results: (results || []).map((item) => ({
           name: item?.name || '',
           img: item?.img || '',
-          quantity: Number(item?.system?.quantity || 1),
+          quantity: awardedQuantityOf(item),
         })),
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
@@ -4312,7 +4359,9 @@ export class CraftingEngine {
           salvageRecipeView,
           checkResult
         );
-        if (created) {
+        // De-dup a stacked-twice component (same object returned): the award tag
+        // accumulates, so one record carries the summed quantity (issue 858 review).
+        if (created && !resultItems.includes(created)) {
           resultItems.push(created);
           createdRecords.push({
             item: created,
@@ -4332,7 +4381,7 @@ export class CraftingEngine {
         createdResults: createdRecords.map(({ item, componentId }) => ({
           itemUuid: item.uuid,
           componentId,
-          quantity: Number(item.system?.quantity || 1),
+          quantity: awardedQuantityOf(item),
           // Capture name/img at award time (mirroring the crafting award record) so a
           // salvage record is self-describing in the Journal even if the item is later
           // deleted. Older records without these fall back to the componentId resolver.

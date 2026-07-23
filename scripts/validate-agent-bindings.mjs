@@ -13,214 +13,44 @@
 //     intentional exceptions, each with a reason);
 //   - line-number code citations (file.js:NNN / "~line NNN") are rejected —
 //     cite the symbol and file instead, locatable with `grep -n`;
-//   - every skill-backed role pins a model in both provider bindings;
+//   - every skill-backed role pins its declared model tier's model in both
+//     provider bindings, and a model-tiered binding's description names its own
+//     model tier and neither of the other two;
+//   - a model-tiered family declares all three model tiers, resolves to its BASE
+//     family skill, and the AGENTS.md `Family` table names exactly those tokens;
 //   - the AGENTS.md "Shared skills with no persona binding" list must equal the
 //     set of .agents/skills/ subdirectories containing a SKILL.md minus the role
 //     directories derived from the bindings table.
 //   - every repository skill has valid matching frontmatter and directly cites
 //     each Markdown reference bundled under its references/ directory.
 //
+// This file is a THIN CALLER over scripts/lib/agentModelTiers.js, which holds the
+// model-tier tables and the pure, error-returning gates over them. `main(root)`
+// returns `errors[]` and never exits, so a test can import and drive it; only the
+// entry-point guard at the bottom exits non-zero.
+//
 // Pure Node, no dependencies, no Docker/network — behaves identically in CI and
 // local dev. Run with `npm run validate:agents`. Exits non-zero on any mismatch.
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SKILLS_ROOT = ".agents/skills";
+import {
+  familyCompletenessErrors,
+  isReadonlyBashAllowed,
+  modelPinErrors,
+  parseBindingsTable,
+  resolveRole,
+} from './lib/agentModelTiers.js';
+
+const SKILLS_ROOT = '.agents/skills';
 
 // Tools that let a role mutate the workspace. A Claude binding that mirrors a
 // Codex `sandbox_mode = "read-only"` must include none of these.
-const WRITE_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"];
-// Bash can mutate files/git state, so a read-only role must normally omit it
-// too. READONLY_BASH_ALLOWED lists the roles whose read-only Codex sandbox
-// still permits command execution and whose skill genuinely needs Bash for
-// read-only probes (e.g. foundry_integrator inspecting a local Foundry install
-// or the repo's Foundry container image). Edit/Write remain banned for them.
-const READONLY_BASH_ALLOWED = new Set(["foundry_integrator"]);
+const WRITE_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
 // Tools that let a role spawn/route sub-agents. Role agents must never nest.
-const SPAWN_TOOLS = ["Agent", "Task"];
-
-const errors = [];
-const read = (rel) => (existsSync(join(root, rel)) ? readFileSync(join(root, rel), "utf8") : null);
-const require_ = (cond, msg) => { if (!cond) errors.push(msg); };
-
-const normalizeToolsValue = (value) => value
-  .replace(/\s+#.*$/, "")
-  .trim()
-  .replace(/^\[/, "")
-  .replace(/\]$/, "")
-  .split(",")
-  .map((t) => t.trim().replace(/^["'`]|["'`]$/g, ""))
-  .filter(Boolean);
-
-const parseTools = (md) => {
-  const m = md && md.match(/^tools:\s*(.+)$/m);
-  return m ? normalizeToolsValue(m[1]) : null;
-};
-
-const agentsMd = read("AGENTS.md");
-require_(agentsMd, "AGENTS.md is missing");
-
-// --- Parse the bindings table out of AGENTS.md ----------------------------
-const lines = (agentsMd || "").split("\n");
-const headerIdx = lines.findIndex((l) => l.includes("Routing token") && l.includes("Claude"));
-require_(headerIdx >= 0, "AGENTS.md is missing the Agent Roles & Bindings table (header with 'Routing token' and 'Claude')");
-
-const rows = [];
-for (let i = headerIdx + 1; headerIdx >= 0 && i < lines.length; i++) {
-  const l = lines[i];
-  if (!l.trim().startsWith("|")) break; // table ended
-  if (l.includes("---")) continue; // separator row
-  const cells = l.split("|").slice(1, -1).map((c) => c.trim());
-  const tokenCell = cells.find((c) => /^`(fabricate|foundry)_\w+`$/.test(c));
-  if (!tokenCell) continue;
-  rows.push({ cells, token: tokenCell.replace(/`/g, "") });
-}
-require_(rows.length > 0, "AGENTS.md bindings table has no role rows");
-
-const expectedCodex = new Set();
-const expectedClaude = new Set();
-const roleDirs = new Set();
-let fullRoles = 0;
-let mappingRoles = 0;
-
-for (const { cells, token } of rows) {
-  // Every path is derived from the token itself (fabricate_* AND foundry_*),
-  // so a role outside the fabricate- prefix is validated identically.
-  const roleBase = token.replace(/_/g, "-");
-  const codexPath = `.codex/agents/${roleBase}.toml`;
-  const claudeCol = cells[cells.length - 1];
-  const skillCell = cells.find((c) => c.includes("SKILL.md"));
-
-  // Mapping role: no shared skill, no Claude binding — Claude uses Explore.
-  if (!skillCell) {
-    mappingRoles++;
-    expectedCodex.add(`${roleBase}.toml`);
-    const codex = read(codexPath);
-    require_(codex, `${codexPath} (Codex binding for ${token}) is missing`);
-    if (codex) {
-      require_(/sandbox_mode\s*=\s*"read-only"/.test(codex), `${codexPath} must remain sandbox_mode = "read-only" for mapping role ${token}`);
-    }
-    require_(/Explore/.test(claudeCol), `AGENTS.md ${token} row Claude column must be the built-in Explore agent, got "${claudeCol}"`);
-    continue;
-  }
-
-  fullRoles++;
-  expectedCodex.add(`${roleBase}.toml`);
-  expectedClaude.add(`${roleBase}.md`);
-  roleDirs.add(roleBase);
-
-  const skillPath = `${SKILLS_ROOT}/${roleBase}/SKILL.md`;
-  const claudePath = `.claude/agents/${roleBase}.md`;
-  const skill = read(skillPath);
-  const codex = read(codexPath);
-  const claude = read(claudePath);
-
-  require_(skill, `${skillPath} (canonical persona) is missing`);
-  require_(codex, `${codexPath} (Codex binding) is missing`);
-  require_(claude, `${claudePath} (Claude binding) is missing`);
-
-  // Table cells cite the right skill + Codex paths, and the Claude column names the subagent.
-  require_(skillCell.includes(skillPath), `AGENTS.md ${token} row must cite ${skillPath}, got "${skillCell}"`);
-  require_(cells.some((c) => c.includes(codexPath)), `AGENTS.md ${token} row must cite ${codexPath}`);
-  require_(claudeCol.includes(roleBase), `AGENTS.md ${token} row Claude column must be \`${roleBase}\`, got "${claudeCol}"`);
-
-  if (codex) {
-    require_(codex.includes(`name = "${token}"`), `${codexPath} must declare name = "${token}"`);
-    require_(codex.includes(skillPath), `${codexPath} must reference ${skillPath}`);
-    require_(/^model\s*=\s*"\S+"/m.test(codex), `${codexPath} must pin a model (model = "...")`);
-  }
-  if (claude) {
-    require_(new RegExp(`^name:\\s*${roleBase}\\s*$`, "m").test(claude), `${claudePath} frontmatter must declare name: ${roleBase}`);
-    require_(claude.includes(skillPath), `${claudePath} must reference ${skillPath}`);
-    require_(/^model:\s*\S+/m.test(claude), `${claudePath} frontmatter must pin a model (model: ...)`);
-  }
-
-  // Tool allowlist + sandbox parity.
-  if (claude && codex) {
-    const tools = parseTools(claude);
-    require_(tools, `${claudePath} must declare an explicit tools: allowlist (no default inheritance)`);
-    if (tools) {
-      for (const banned of SPAWN_TOOLS) {
-        require_(!tools.includes(banned), `${claudePath} must not include ${banned} — role agents must not spawn or route`);
-      }
-      const writeTools = tools.filter((t) => WRITE_TOOLS.includes(t));
-      const codexReadOnly = /sandbox_mode\s*=\s*"read-only"/.test(codex);
-      if (codexReadOnly) {
-        require_(
-          writeTools.length === 0,
-          `${claudePath} must omit all mutation tools (${WRITE_TOOLS.join("/")}) to match ${codexPath} sandbox_mode = "read-only"; found ${writeTools.join(", ") || "none"}`,
-        );
-        require_(
-          !tools.includes("Bash") || READONLY_BASH_ALLOWED.has(token),
-          `${claudePath} must omit Bash to match ${codexPath} sandbox_mode = "read-only" (or add ${token} to READONLY_BASH_ALLOWED with a reason)`,
-        );
-      } else {
-        require_(
-          tools.includes("Edit") && tools.includes("Write"),
-          `${claudePath} must allow Edit and Write to match ${codexPath} full-access sandbox`,
-        );
-      }
-    }
-  }
-}
-
-// --- Orphan detection on BOTH provider directories ------------------------
-const scanOrphans = (dir, ext, expected, label) => {
-  const abs = join(root, dir);
-  if (!existsSync(abs)) return;
-  for (const file of readdirSync(abs)) {
-    if (/^(fabricate|foundry)-/.test(file) && file.endsWith(ext)) {
-      require_(expected.has(file), `${dir}/${file} (${label}) has no matching role row in the AGENTS.md bindings table`);
-    }
-  }
-};
-scanOrphans(".claude/agents", ".md", expectedClaude, "Claude binding");
-scanOrphans(".codex/agents", ".toml", expectedCodex, "Codex binding");
-
-// --- Harness reference integrity -------------------------------------------
-// The harness documents: the exact, closed set of files whose repo-path
-// references and code citations this script gates. Mirrors the set named in
-// openspec/specs/agentic-workflow/spec.md (Harness reference integrity).
-const listDir = (rel, filter) => {
-  const abs = join(root, rel);
-  if (!existsSync(abs)) return [];
-  return readdirSync(abs).filter(filter).map((f) => `${rel}/${f}`);
-};
-const listTree = (rel, filter) => {
-  const abs = join(root, rel);
-  if (!existsSync(abs)) return [];
-
-  return readdirSync(abs, { withFileTypes: true })
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .flatMap((entry) => {
-      const child = `${rel}/${entry.name}`;
-      if (entry.isDirectory()) return listTree(child, filter);
-      return entry.isFile() && filter(entry.name) ? [child] : [];
-    });
-};
-const skillDirs = () => {
-  const abs = join(root, SKILLS_ROOT);
-  if (!existsSync(abs)) return [];
-  return readdirSync(abs, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
-};
-const harnessDocs = [
-  "AGENTS.md",
-  "CLAUDE.md",
-  "CONTRIBUTING.md",
-  "openspec/README.md",
-  `${SKILLS_ROOT}/README.md`,
-  ...skillDirs().flatMap((d) => {
-    const docs = [];
-    if (existsSync(join(root, SKILLS_ROOT, d, "SKILL.md"))) docs.push(`${SKILLS_ROOT}/${d}/SKILL.md`);
-    docs.push(...listTree(`${SKILLS_ROOT}/${d}/references`, (f) => f.endsWith(".md")));
-    return docs;
-  }),
-  ...listDir(".claude/agents", (f) => f.endsWith(".md")),
-  ...listDir(".codex/agents", (f) => f.endsWith(".toml")),
-].filter((rel) => existsSync(join(root, rel)));
+const SPAWN_TOOLS = ['Agent', 'Task'];
 
 // A backtick token is treated as a checkable repo path only when it is
 // conservative: a known root file, or slash-joined under a known top-level
@@ -228,34 +58,53 @@ const harnessDocs = [
 // (commands, code identifiers, templated paths like a SKILL.md under a
 // placeholder role directory) is skipped, never guessed at.
 const KNOWN_SEGMENTS = [
-  "src/", "tests/", "styles/", "lang/", "docs/", "scripts/", "skills/",
-  ".agents/",
-  "openspec/", "examples/", "assets/", ".claude/", ".codex/", ".github/",
+  'src/',
+  'tests/',
+  'styles/',
+  'lang/',
+  'docs/',
+  'scripts/',
+  'skills/',
+  '.agents/',
+  'openspec/',
+  'examples/',
+  'assets/',
+  '.claude/',
+  '.codex/',
+  '.github/',
 ];
 const ROOT_FILES = new Set([
-  "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "DOMAIN.md", "README.md",
-  "COMPETITIVE_ANALYSIS.md", "module.json", "package.json", "main.js",
-  "vite.config.js", "svelte.config.js", "eslint.config.js",
-  "stylelint.config.js", "commitlint.config.js", "release.config.js",
-  "docker-compose.foundry.yml", "sonar-project.properties",
-  "release.s3.config.json", ".markdownlint-cli2.jsonc", ".prettierrc.json",
-  ".nvmrc", ".node-version",
+  'AGENTS.md',
+  'CLAUDE.md',
+  'CONTRIBUTING.md',
+  'DOMAIN.md',
+  'README.md',
+  'COMPETITIVE_ANALYSIS.md',
+  'module.json',
+  'package.json',
+  'main.js',
+  'vite.config.js',
+  'svelte.config.js',
+  'eslint.config.js',
+  'stylelint.config.js',
+  'commitlint.config.js',
+  'release.config.js',
+  'docker-compose.foundry.yml',
+  'sonar-project.properties',
+  'release.s3.config.json',
+  '.markdownlint-cli2.jsonc',
+  '.prettierrc.json',
+  '.nvmrc',
+  '.node-version',
 ]);
 // Paths that are intentionally absent. Each entry needs a reason.
 const ALLOW_MISSING = new Set([
   // Created at the repo root by the competitive analyst on its first run.
-  "COMPETITIVE_ANALYSIS.md",
+  'COMPETITIVE_ANALYSIS.md',
   // Deliberately removed; harness docs cite it to say deltas are NOT versioned there.
-  "openspec/changes/",
+  'openspec/changes/',
 ]);
 const TEMPLATE_CHARS = /[*<>{}$|()\\"'\s,;!?=]|…/;
-
-const isCheckablePath = (token) => {
-  if (TEMPLATE_CHARS.test(token)) return false;
-  if (token.includes("://")) return false;
-  if (ROOT_FILES.has(token)) return true;
-  return token.includes("/") && KNOWN_SEGMENTS.some((seg) => token.startsWith(seg));
-};
 
 // Line-number citations rot silently as code moves; cite symbol + file instead.
 // A bare backticked `:NNN` is NOT banned — it cannot be told apart from a port
@@ -267,47 +116,302 @@ const LINE_CITATION_PATTERNS = [
   /\(line\s+\d+\)/i, // parenthesised line references
 ];
 
-for (const doc of harnessDocs) {
-  const text = read(doc);
-  if (!text) continue;
+const skillNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const yamlNonStringPattern = /^(?:null|~|true|false|yes|no|on|off)$/i;
+const yamlPlainStringPattern = /^[A-Za-z][A-Za-z0-9 _.,;!?\/()'"`*+=-]*$/;
 
-  for (const match of text.matchAll(/`([^`\n]+)`/g)) {
-    const token = match[1].trim();
-    if (!isCheckablePath(token)) continue;
-    if (ALLOW_MISSING.has(token)) continue;
-    const rel = token.replace(/\/$/, "");
-    require_(existsSync(join(root, rel)), `${doc}: references missing path \`${token}\``);
+const normalizeToolsValue = (value) =>
+  value
+    .replace(/\s+#.*$/, '')
+    .trim()
+    .replace(/^\[/, '')
+    .replace(/\]$/, '')
+    .split(',')
+    .map((t) => t.trim().replace(/^["'`]|["'`]$/g, ''))
+    .filter(Boolean);
+
+const parseTools = (md) => {
+  const m = md && md.match(/^tools:\s*(.+)$/m);
+  return m ? normalizeToolsValue(m[1]) : null;
+};
+
+const isCheckablePath = (token) => {
+  if (TEMPLATE_CHARS.test(token)) return false;
+  if (token.includes('://')) return false;
+  if (ROOT_FILES.has(token)) return true;
+  return token.includes('/') && KNOWN_SEGMENTS.some((seg) => token.startsWith(seg));
+};
+
+// --- Filesystem port --------------------------------------------------------
+// Every filesystem read is funnelled through here so `main(root)` is the only
+// thing that knows where the repository is.
+function createIo(root) {
+  const abs = (rel) => join(root, rel);
+  const exists = (rel) => existsSync(abs(rel));
+  const read = (rel) => (exists(rel) ? readFileSync(abs(rel), 'utf8') : null);
+  const listDir = (rel, filter) => {
+    if (!exists(rel)) return [];
+    return readdirSync(abs(rel))
+      .filter(filter)
+      .map((f) => `${rel}/${f}`);
+  };
+  const listTree = (rel, filter) => {
+    if (!exists(rel)) return [];
+    return readdirSync(abs(rel), { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap((entry) => {
+        const child = `${rel}/${entry.name}`;
+        if (entry.isDirectory()) return listTree(child, filter);
+        return entry.isFile() && filter(entry.name) ? [child] : [];
+      });
+  };
+  const skillDirs = () => {
+    if (!exists(SKILLS_ROOT)) return [];
+    return readdirSync(abs(SKILLS_ROOT), { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+  };
+  const hasSkill = (family) => exists(`${SKILLS_ROOT}/${family.replaceAll('_', '-')}/SKILL.md`);
+  return { abs, exists, read, listDir, listTree, skillDirs, hasSkill };
+}
+
+// --- Role rows --------------------------------------------------------------
+
+function validateMappingRole(ctx, row, resolved) {
+  const { req, io } = ctx;
+  const { token, roleBase, declaredTier } = resolved;
+  const codexPath = `.codex/agents/${roleBase}.toml`;
+  const claudeCol = row.cells[row.cells.length - 1];
+  const codex = io.read(codexPath);
+  req(codex, `${codexPath} (Codex binding for ${token}) is missing`);
+  if (codex) {
+    req(
+      /sandbox_mode\s*=\s*"read-only"/.test(codex),
+      `${codexPath} must remain sandbox_mode = "read-only" for mapping role ${token}`
+    );
+  }
+  req(
+    /Explore/.test(claudeCol),
+    `AGENTS.md ${token} row Claude column must be the built-in Explore agent, got "${claudeCol}"`
+  );
+  // Gated on its Codex pin only: Claude's built-in Explore has no repository
+  // binding and this repository cannot set its model.
+  ctx.errors.push(
+    ...modelPinErrors({
+      token,
+      tier: declaredTier,
+      codexPath,
+      codexText: codex,
+      requireClaude: false,
+    })
+  );
+}
+
+function validateToolParity(ctx, { token, claudePath, claude, codexPath, codex }) {
+  const { req } = ctx;
+  const tools = parseTools(claude);
+  req(tools, `${claudePath} must declare an explicit tools: allowlist (no default inheritance)`);
+  if (!tools) return;
+  for (const banned of SPAWN_TOOLS) {
+    req(
+      !tools.includes(banned),
+      `${claudePath} must not include ${banned} — role agents must not spawn or route`
+    );
+  }
+  const writeTools = tools.filter((t) => WRITE_TOOLS.includes(t));
+  if (/sandbox_mode\s*=\s*"read-only"/.test(codex)) {
+    req(
+      writeTools.length === 0,
+      `${claudePath} must omit all mutation tools (${WRITE_TOOLS.join('/')}) to match ${codexPath} sandbox_mode = "read-only"; found ${writeTools.join(', ') || 'none'}`
+    );
+    // Resolved against the BASE FAMILY token, so foundry_integrator keeps its
+    // read-only Bash exemption at all three model tiers and no other family gains it.
+    req(
+      !tools.includes('Bash') || isReadonlyBashAllowed(token),
+      `${claudePath} must omit Bash to match ${codexPath} sandbox_mode = "read-only" (or add its base family to READONLY_BASH_ALLOWED in scripts/lib/agentModelTiers.js with a reason)`
+    );
+  } else {
+    req(
+      tools.includes('Edit') && tools.includes('Write'),
+      `${claudePath} must allow Edit and Write to match ${codexPath} full-access sandbox`
+    );
+  }
+}
+
+function validateSkillBackedRole(ctx, row, resolved, skillCell) {
+  const { req, io } = ctx;
+  const { token, roleBase, skillDir, declaredTier } = resolved;
+  const cells = row.cells;
+  const claudeCol = cells[cells.length - 1];
+
+  const skillPath = `${SKILLS_ROOT}/${skillDir}/SKILL.md`;
+  const codexPath = `.codex/agents/${roleBase}.toml`;
+  const claudePath = `.claude/agents/${roleBase}.md`;
+  const skill = io.read(skillPath);
+  const codex = io.read(codexPath);
+  const claude = io.read(claudePath);
+
+  req(skill, `${skillPath} (canonical persona) is missing`);
+  req(codex, `${codexPath} (Codex binding) is missing`);
+  req(claude, `${claudePath} (Claude binding) is missing`);
+
+  // Table cells cite the right skill + Codex paths, and the Claude column names the subagent.
+  req(skillCell.includes(skillPath), `AGENTS.md ${token} row must cite ${skillPath}, got "${skillCell}"`);
+  req(
+    cells.some((c) => c.includes(codexPath)),
+    `AGENTS.md ${token} row must cite ${codexPath}`
+  );
+  req(
+    claudeCol.includes(roleBase),
+    `AGENTS.md ${token} row Claude column must be \`${roleBase}\`, got "${claudeCol}"`
+  );
+
+  if (codex) {
+    req(codex.includes(`name = "${token}"`), `${codexPath} must declare name = "${token}"`);
+    req(codex.includes(skillPath), `${codexPath} must reference ${skillPath}`);
+  }
+  if (claude) {
+    req(
+      new RegExp(`^name:\\s*${roleBase}\\s*$`, 'm').test(claude),
+      `${claudePath} frontmatter must declare name: ${roleBase}`
+    );
+    req(claude.includes(skillPath), `${claudePath} must reference ${skillPath}`);
   }
 
-  const docLines = text.split("\n");
-  for (let i = 0; i < docLines.length; i++) {
-    for (const pattern of LINE_CITATION_PATTERNS) {
-      if (pattern.test(docLines[i])) {
-        errors.push(`${doc}:${i + 1}: line-number code citation — cite the symbol and file instead (grep -n locates it)`);
-        break;
+  ctx.errors.push(
+    ...modelPinErrors({
+      token,
+      tier: declaredTier,
+      claudePath,
+      claudeText: claude,
+      codexPath,
+      codexText: codex,
+    })
+  );
+
+  if (claude && codex) {
+    validateToolParity(ctx, { token, claudePath, claude, codexPath, codex });
+  }
+}
+
+function validateRoles(ctx, table) {
+  const { req, io } = ctx;
+  const tokens = table.tokens;
+  const expectedCodex = new Set();
+  const expectedClaude = new Set();
+  const roleDirs = new Set();
+  let fullRoles = 0;
+  let mappingRoles = 0;
+
+  for (const cell of table.skipped) {
+    req(
+      false,
+      `AGENTS.md bindings table row ${cell} is not a bare \`(fabricate|foundry)_\\w+\` routing token — a hyphenated model-tier suffix is silently skipped by the parser`
+    );
+  }
+
+  ctx.errors.push(
+    ...familyCompletenessErrors({ tokens, hasSkill: io.hasSkill, agentsMdText: ctx.agentsMd ?? '' })
+  );
+
+  for (const row of table.rows) {
+    // Every path is derived from the token itself (fabricate_* AND foundry_*),
+    // so a role outside the fabricate- prefix is validated identically.
+    const resolved = resolveRole(row.token, { tokens, hasSkill: io.hasSkill });
+    expectedCodex.add(`${resolved.roleBase}.toml`);
+    const skillCell = row.cells.find((c) => c.includes('SKILL.md'));
+
+    // Mapping role: no shared skill, no Claude binding — Claude uses Explore.
+    if (!skillCell) {
+      mappingRoles++;
+      validateMappingRole(ctx, row, resolved);
+      continue;
+    }
+
+    fullRoles++;
+    expectedClaude.add(`${resolved.roleBase}.md`);
+    // The BASE FAMILY directory, so the six persona skills are not misclassified
+    // as unbound shared skills.
+    roleDirs.add(resolved.skillDir);
+    validateSkillBackedRole(ctx, row, resolved, skillCell);
+  }
+
+  return { expectedCodex, expectedClaude, roleDirs, fullRoles, mappingRoles };
+}
+
+// --- Orphan detection on BOTH provider directories --------------------------
+function scanOrphans(ctx, dir, ext, expected, label) {
+  const { req, io } = ctx;
+  if (!io.exists(dir)) return;
+  for (const file of readdirSync(io.abs(dir))) {
+    if (/^(fabricate|foundry)-/.test(file) && file.endsWith(ext)) {
+      req(
+        expected.has(file),
+        `${dir}/${file} (${label}) has no matching role row in the AGENTS.md bindings table`
+      );
+    }
+  }
+}
+
+// --- Harness reference integrity --------------------------------------------
+// The harness documents: the exact, closed set of files whose repo-path
+// references and code citations this script gates. Mirrors the set named in
+// openspec/specs/agentic-workflow/spec.md (Harness reference integrity).
+function harnessDocList(io) {
+  return [
+    'AGENTS.md',
+    'CLAUDE.md',
+    'CONTRIBUTING.md',
+    'openspec/README.md',
+    `${SKILLS_ROOT}/README.md`,
+    ...io.skillDirs().flatMap((d) => {
+      const docs = [];
+      if (io.exists(`${SKILLS_ROOT}/${d}/SKILL.md`)) docs.push(`${SKILLS_ROOT}/${d}/SKILL.md`);
+      docs.push(...io.listTree(`${SKILLS_ROOT}/${d}/references`, (f) => f.endsWith('.md')));
+      return docs;
+    }),
+    ...io.listDir('.claude/agents', (f) => f.endsWith('.md')),
+    ...io.listDir('.codex/agents', (f) => f.endsWith('.toml')),
+  ].filter((rel) => io.exists(rel));
+}
+
+function validateHarnessDocs(ctx, harnessDocs) {
+  const { req, io, errors } = ctx;
+  for (const doc of harnessDocs) {
+    const text = io.read(doc);
+    if (!text) continue;
+
+    for (const match of text.matchAll(/`([^`\n]+)`/g)) {
+      const token = match[1].trim();
+      if (!isCheckablePath(token)) continue;
+      if (ALLOW_MISSING.has(token)) continue;
+      const rel = token.replace(/\/$/, '');
+      req(io.exists(rel), `${doc}: references missing path \`${token}\``);
+    }
+
+    const docLines = text.split('\n');
+    for (const [i, docLine] of docLines.entries()) {
+      if (LINE_CITATION_PATTERNS.some((pattern) => pattern.test(docLine))) {
+        errors.push(
+          `${doc}:${i + 1}: line-number code citation — cite the symbol and file instead (grep -n locates it)`
+        );
       }
     }
   }
 }
 
-// --- Repository skill discovery and progressive disclosure ----------------
+// --- Repository skill discovery and progressive disclosure ------------------
 // Codex scans .agents/skills from the working directory to the repository root.
 // Validate the metadata it initially sees and ensure every bundled Markdown
 // reference is named by its owning SKILL.md so the full material is reachable
 // after that skill activates.
-require_(existsSync(join(root, SKILLS_ROOT)), `${SKILLS_ROOT}/ (Codex repository skill root) is missing`);
-require_(!existsSync(join(root, "skills")), "skills/ is a legacy repository skill root; keep a single canonical tree under .agents/skills/");
-
-const skillNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const yamlNonStringPattern = /^(?:null|~|true|false|yes|no|on|off)$/i;
-const yamlPlainStringPattern = /^[A-Za-z][A-Za-z0-9 _.,;!?\/()'"`*+=-]*$/;
-const parseYamlString = (raw) => {
+function parseYamlString(raw) {
   const value = raw.trim();
   if (!value) return null;
   if (value.startsWith('"')) {
     try {
       const parsed = JSON.parse(value);
-      return typeof parsed === "string" ? parsed : null;
+      return typeof parsed === 'string' ? parsed : null;
     } catch {
       return null;
     }
@@ -315,85 +419,181 @@ const parseYamlString = (raw) => {
   if (value.startsWith("'")) {
     if (!value.endsWith("'") || value.length < 2) return null;
     const inner = value.slice(1, -1);
-    if (inner.replaceAll("''", "").includes("'")) return null;
+    if (inner.replaceAll("''", '').includes("'")) return null;
     return inner.replaceAll("''", "'");
   }
   // Keep plain values inside a conservative lexical subset that YAML parsers
   // consistently resolve as strings. Other valid strings can use quotes.
   if (!yamlPlainStringPattern.test(value) || yamlNonStringPattern.test(value)) return null;
   return value;
-};
-const parseSkillFrontmatter = (frontmatter, skillPath) => {
+}
+
+function parseSkillFrontmatter(ctx, frontmatter, skillPath) {
+  const { req } = ctx;
   const fields = new Map();
   for (const line of frontmatter.split(/\r?\n/)) {
     if (!line.trim()) continue;
     const match = line.match(/^([a-z][a-z0-9-]*):\s*(.*)$/);
-    require_(match, `${skillPath} frontmatter must contain only single-line key/value fields`);
+    req(match, `${skillPath} frontmatter must contain only single-line key/value fields`);
     if (!match) continue;
     const [, field, raw] = match;
-    require_(["name", "description"].includes(field), `${skillPath} frontmatter contains unsupported field ${field}`);
-    require_(!fields.has(field), `${skillPath} frontmatter contains duplicate field ${field}`);
+    req(
+      ['name', 'description'].includes(field),
+      `${skillPath} frontmatter contains unsupported field ${field}`
+    );
+    req(!fields.has(field), `${skillPath} frontmatter contains duplicate field ${field}`);
     const value = parseYamlString(raw);
-    require_(value !== null, `${skillPath} frontmatter ${field} must be a valid YAML string`);
-    if (["name", "description"].includes(field) && !fields.has(field)) fields.set(field, value);
+    req(value !== null, `${skillPath} frontmatter ${field} must be a valid YAML string`);
+    if (['name', 'description'].includes(field) && !fields.has(field)) fields.set(field, value);
   }
   return fields;
-};
+}
 
-for (const dir of skillDirs()) {
-  const skillPath = `${SKILLS_ROOT}/${dir}/SKILL.md`;
-  const skill = read(skillPath);
-  require_(skill, `${skillPath} is missing from repository skill directory ${dir}`);
-  if (!skill) continue;
-
+function validateSkillFrontmatter(ctx, dir, skill, skillPath) {
+  const { req } = ctx;
   const frontmatterMatch = skill.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  require_(frontmatterMatch, `${skillPath} must start with YAML frontmatter`);
-  if (frontmatterMatch) {
-    const fields = parseSkillFrontmatter(frontmatterMatch[1], skillPath);
-    const name = fields.get("name");
-    const description = fields.get("description");
-    require_(name === dir, `${skillPath} frontmatter name must match its directory (${dir}), got ${JSON.stringify(name)}`);
-    require_(name && name.length <= 64 && skillNamePattern.test(name), `${skillPath} frontmatter name must use at most 64 lowercase letters, digits, and hyphens`);
-    require_(description && description.length <= 1024, `${skillPath} frontmatter description must contain 1-1024 characters`);
-    require_(description && !/[<>]/.test(description), `${skillPath} frontmatter description must not contain angle brackets`);
-  }
+  req(frontmatterMatch, `${skillPath} must start with YAML frontmatter`);
+  if (!frontmatterMatch) return;
+  const fields = parseSkillFrontmatter(ctx, frontmatterMatch[1], skillPath);
+  const name = fields.get('name');
+  const description = fields.get('description');
+  req(
+    name === dir,
+    `${skillPath} frontmatter name must match its directory (${dir}), got ${JSON.stringify(name)}`
+  );
+  req(
+    name && name.length <= 64 && skillNamePattern.test(name),
+    `${skillPath} frontmatter name must use at most 64 lowercase letters, digits, and hyphens`
+  );
+  req(
+    description && description.length <= 1024,
+    `${skillPath} frontmatter description must contain 1-1024 characters`
+  );
+  req(
+    description && !/[<>]/.test(description),
+    `${skillPath} frontmatter description must not contain angle brackets`
+  );
+}
 
-  const citedPaths = [...skill.matchAll(/`([^`\n]+)`/g)].map((match) => match[1].replaceAll("\\", "/"));
-  for (const reference of listTree(`${SKILLS_ROOT}/${dir}/references`, (file) => file.endsWith(".md"))) {
-    const skillRelativeReference = reference.slice(`${SKILLS_ROOT}/${dir}/`.length);
-    const isDirectlyCited = citedPaths.some((path) => path === skillRelativeReference || path.endsWith(`/${skillRelativeReference}`));
-    require_(isDirectlyCited, `${reference} is not cited directly by its owning ${skillPath} with full relative path \`${skillRelativeReference}\``);
+function validateSkills(ctx) {
+  const { req, io } = ctx;
+  req(io.exists(SKILLS_ROOT), `${SKILLS_ROOT}/ (Codex repository skill root) is missing`);
+  req(
+    !io.exists('skills'),
+    'skills/ is a legacy repository skill root; keep a single canonical tree under .agents/skills/'
+  );
+
+  for (const dir of io.skillDirs()) {
+    const skillPath = `${SKILLS_ROOT}/${dir}/SKILL.md`;
+    const skill = io.read(skillPath);
+    req(skill, `${skillPath} is missing from repository skill directory ${dir}`);
+    if (!skill) continue;
+
+    validateSkillFrontmatter(ctx, dir, skill, skillPath);
+
+    const citedPaths = [...skill.matchAll(/`([^`\n]+)`/g)].map((m) => m[1].replaceAll('\\', '/'));
+    const references = io.listTree(`${SKILLS_ROOT}/${dir}/references`, (f) => f.endsWith('.md'));
+    for (const reference of references) {
+      const rel = reference.slice(`${SKILLS_ROOT}/${dir}/`.length);
+      const cited = citedPaths.some((p) => p === rel || p.endsWith(`/${rel}`));
+      req(
+        cited,
+        `${reference} is not cited directly by its owning ${skillPath} with full relative path \`${rel}\``
+      );
+    }
   }
 }
 
-// --- Shared-skills list parity ---------------------------------------------
+// --- Shared-skills list parity ----------------------------------------------
 // AGENTS.md "Shared skills with no persona binding" must equal the .agents/skills/
 // subdirectories that contain a SKILL.md minus the role directories from the
 // bindings table. Deleting or adding a shared skill without updating the list
 // (or vice versa) fails here.
-const sharedHeadingIdx = lines.findIndex((l) => l.trim().startsWith("### Shared skills with no persona binding"));
-require_(sharedHeadingIdx >= 0, "AGENTS.md is missing the '### Shared skills with no persona binding' section");
-const listedShared = new Set();
-for (let i = sharedHeadingIdx + 1; sharedHeadingIdx >= 0 && i < lines.length; i++) {
-  const l = lines[i];
-  if (/^#{1,6}\s/.test(l)) break; // next heading
-  const m = l.match(/^-\s+`\.agents\/skills\/([^/`]+)\/SKILL\.md`/);
-  if (m) listedShared.add(m[1]);
-}
-const actualShared = new Set(
-  skillDirs().filter((d) => existsSync(join(root, SKILLS_ROOT, d, "SKILL.md")) && !roleDirs.has(d)),
-);
-for (const name of actualShared) {
-  require_(listedShared.has(name), `${SKILLS_ROOT}/${name}/SKILL.md exists but is not listed under AGENTS.md '### Shared skills with no persona binding' (and is not a bound role)`);
-}
-for (const name of listedShared) {
-  require_(actualShared.has(name), `AGENTS.md shared-skills list names ${SKILLS_ROOT}/${name}/SKILL.md, which ${roleDirs.has(name) ? "is a bound role, not a shared skill" : "does not exist"}`);
+function validateSharedSkills(ctx, roleDirs) {
+  const { req, io } = ctx;
+  const lines = (ctx.agentsMd ?? '').split('\n');
+  const headingIdx = lines.findIndex((l) =>
+    l.trim().startsWith('### Shared skills with no persona binding')
+  );
+  req(
+    headingIdx >= 0,
+    "AGENTS.md is missing the '### Shared skills with no persona binding' section"
+  );
+  const listedShared = new Set();
+  for (let i = headingIdx + 1; headingIdx >= 0 && i < lines.length; i++) {
+    const l = lines[i];
+    if (/^#{1,6}\s/.test(l)) break; // next heading
+    const m = l.match(/^-\s+`\.agents\/skills\/([^/`]+)\/SKILL\.md`/);
+    if (m) listedShared.add(m[1]);
+  }
+  const actualShared = new Set(
+    io.skillDirs().filter((d) => io.exists(`${SKILLS_ROOT}/${d}/SKILL.md`) && !roleDirs.has(d))
+  );
+  for (const name of actualShared) {
+    req(
+      listedShared.has(name),
+      `${SKILLS_ROOT}/${name}/SKILL.md exists but is not listed under AGENTS.md '### Shared skills with no persona binding' (and is not a bound role)`
+    );
+  }
+  for (const name of listedShared) {
+    const why = roleDirs.has(name) ? 'is a bound role, not a shared skill' : 'does not exist';
+    req(
+      actualShared.has(name),
+      `AGENTS.md shared-skills list names ${SKILLS_ROOT}/${name}/SKILL.md, which ${why}`
+    );
+  }
+  return actualShared;
 }
 
-if (errors.length) {
-  console.error(`Agent binding validation failed (${errors.length}):`);
-  for (const e of errors) console.error(`  - ${e}`);
-  process.exit(1);
+/**
+ * Run every gate against a repository root and RETURN the accumulated errors.
+ * Never throws, never exits — the entry-point guard owns the exit code, so a test
+ * can import this without hard-killing the `node --test` process.
+ * @param {string} root Absolute path to the repository root.
+ * @returns {string[]}
+ */
+export function main(root) {
+  const io = createIo(root);
+  const errors = [];
+  const req = (cond, msg) => {
+    if (!cond) errors.push(msg);
+  };
+  const agentsMd = io.read('AGENTS.md');
+  req(agentsMd, 'AGENTS.md is missing');
+
+  const ctx = { io, errors, req, agentsMd };
+  const table = parseBindingsTable(agentsMd ?? '');
+  req(
+    table.headerIndex >= 0,
+    "AGENTS.md is missing the Agent Roles & Bindings table (header with 'Routing token' and 'Claude')"
+  );
+  req(table.rows.length > 0, 'AGENTS.md bindings table has no role rows');
+
+  const roles = validateRoles(ctx, table);
+  scanOrphans(ctx, '.claude/agents', '.md', roles.expectedClaude, 'Claude binding');
+  scanOrphans(ctx, '.codex/agents', '.toml', roles.expectedCodex, 'Codex binding');
+
+  const harnessDocs = harnessDocList(io);
+  validateHarnessDocs(ctx, harnessDocs);
+  validateSkills(ctx);
+  const actualShared = validateSharedSkills(ctx, roles.roleDirs);
+
+  if (errors.length === 0) {
+    const mapping = `${roles.mappingRoles} mapping role${roles.mappingRoles === 1 ? '' : 's'}`;
+    console.log(
+      `Agent bindings OK: ${roles.fullRoles} skill-backed roles + ${mapping} derived from AGENTS.md, consistent across ${io.skillDirs().length} Codex-discoverable repository skills, both providers, model-tier pins, tool/sandbox parity, no orphan bindings; ${harnessDocs.length} harness docs pass path-existence and citation checks; skill metadata, bundled-reference reachability, and shared-skills list parity hold (${actualShared.size} shared skills).`
+    );
+  }
+  return errors;
 }
 
-console.log(`Agent bindings OK: ${fullRoles} skill-backed roles + ${mappingRoles} mapping role(s) derived from AGENTS.md, consistent across ${skillDirs().length} Codex-discoverable repository skills, both providers, tool/sandbox parity, no orphan bindings; ${harnessDocs.length} harness docs pass path-existence and citation checks; skill metadata, bundled-reference reachability, and shared-skills list parity hold (${actualShared.size} shared skills).`);
+const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : null;
+if (invokedPath === import.meta.url) {
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const errors = main(repoRoot);
+  if (errors.length) {
+    console.error(`Agent binding validation failed (${errors.length}):`);
+    for (const e of errors) console.error(`  - ${e}`);
+    process.exit(1);
+  }
+}

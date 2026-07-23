@@ -20,6 +20,7 @@ The repository MUST treat files under `openspec/specs/*/spec.md` as the canonica
 
 Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts.
 The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
+Each task entry MUST declare its lane surface as a literal field so model-tier selection has a mechanically available input rather than a reading of prose.
 
 #### Scenario: planning issue work
 
@@ -27,6 +28,7 @@ The delta is NOT versioned as files in the repository; it lives in a managed blo
 - **THEN** the workflow driver captures the change delta in the issue's managed `openspec-delta` block before code changes begin
 - **AND** when the work originates from an existing issue it appends the block, preserving the reporter's original text, and when the work originates from a prompt with no issue it creates an issue from the `OpenSpec Change Delta` template
 - **AND** it rewrites the block in place across plan-review iterations rather than appending duplicate blocks, and never edits outside the markers
+- **AND** every `### Tasks` entry carries a literal `Lane surface` field naming one of the declared values, which the driver reads as a lookup when it selects that lane's model tier
 - **AND** a spawned orchestrator helper remains read-only and returns draft or replacement managed-block text for the driver to apply
 
 #### Scenario: implementing the delta into canonical specs
@@ -153,6 +155,7 @@ Draft-head checks MUST be treated only as preflight evidence because required wo
 
 Every spawned agent MUST work from a unique repository-local Git worktree by default.
 Mutable lanes MUST use exclusive branches, and read-only lanes MUST use detached snapshots pinned to the exact commit being evaluated.
+A lane of a model-tiered family MUST carry its model-tiered token in both its branch name and its lane directory name, and an escalated lane MUST be a fresh lane at the same assigned base with the same owned paths rather than a reused feedback-revision lane.
 
 #### Scenario: preparing planning and plan-review lanes
 
@@ -167,13 +170,13 @@ Mutable lanes MUST use exclusive branches, and read-only lanes MUST use detached
 
 - **WHEN** the workflow driver is ready to fan out approved work
 - **THEN** it requires the approved issue delta, final resolved roster, dependency order, exclusive path ownership, and a clean committed coordinator baseline
-- **AND** it creates each lane beneath `.worktrees/<issue>/` with a unique directory
-- **AND** it assigns mutable branches named `agent/<issue>-<stage>-<role>-r<revision>`
+- **AND** it creates each lane beneath `.worktrees/<issue>/` with a unique directory that carries the same role component as the branch, including for detached read-only lanes
+- **AND** it assigns mutable branches named `agent/<issue>-<stage>-<role>-r<revision>`, where the role component is the model-tiered token in hyphenated file form for a model-tiered family
 
 #### Scenario: briefing a spawned agent
 
 - **WHEN** the driver assigns a mutable or read-only lane
-- **THEN** the brief supplies the absolute worktree path, issue, role, stage, revision, base SHA, expected branch or detached SHA, owned paths, dependency state, expected commit range, allowed focused checks, and handoff format
+- **THEN** the brief supplies the absolute worktree path, issue, role, stage, revision, base SHA, expected branch or detached SHA, owned paths, dependency state, expected commit range, allowed focused checks, handoff format, and — for a model-tiered family — the resolved model tier and the facts it was resolved from
 - **AND** the agent verifies its top-level path, branch or detached state, assigned SHA, and clean status before acting
 - **AND** an identity mismatch or unexpected existing change blocks the lane before edits begin
 
@@ -222,6 +225,7 @@ Spawned agents MUST return local work products to the driver and MUST NOT exerci
 
 The workflow driver MUST serialize resource-heavy validation and MUST treat only gates run from the fully integrated coordinator branch as authoritative acceptance evidence.
 Cleanup MUST preserve any lane whose integration or meaningful state has not been mechanically resolved.
+An escalated lane proven clean at its assigned base with zero commits MAY be disposed; any other escalating lane MUST be preserved and reported as `BLOCKED`.
 
 #### Scenario: running local and CI gates
 
@@ -246,6 +250,7 @@ Cleanup MUST preserve any lane whose integration or meaningful state has not bee
 - **AND** known generated content is discarded only after confirming it contains no meaningful work
 - **AND** forced worktree removal is allowed only after integration equivalence and meaningful-state checks succeed
 - **AND** `git branch -D` is allowed for a cherry-picked lane only after every source commit is mapped and patch-equivalent to its integrated commit
+- **AND** an escalated lane, which has nothing to integrate because it escalated before its first edit, is disposed only after the driver proves it has zero commits, a clean status, and `HEAD` at the assigned base
 - **AND** dirty, unintegrated, blocked, interrupted, ambiguous, or otherwise unverified lanes and branches are preserved and reported
 - **AND** the driver prunes worktree metadata only after eligible lanes are removed
 
@@ -267,8 +272,17 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 #### Scenario: resolving a routing token
 
 - **WHEN** the auto-spawn routing table in `AGENTS.md` names a role token such as `fabricate_orchestrator`
-- **THEN** it resolves to a registered agent in each active provider — `.codex/agents/<role>.toml` for Codex and the `.claude/agents/<role>.md` `subagent_type` for Claude
+- **THEN** an untiered role resolves directly to a registered agent in each active provider — `.codex/agents/<role>.toml` for Codex and the `.claude/agents/<role>.md` `subagent_type` for Claude
+- **AND** a model-tiered family resolves through per-spawn model-tier selection, and then through the `AGENTS.md` family table, to exactly one model-tiered binding in each active provider
 - **AND** the read-only mapping role `fabricate_pr_explorer`, which has no shared skill, resolves to `.codex/agents/fabricate-pr-explorer.toml` for Codex and to Claude's built-in `Explore` agent (no dedicated Claude binding)
+
+#### Scenario: resolving a model-tiered role to its persona
+
+- **WHEN** the validator or the driver resolves a model-tiered role name
+- **THEN** it first splits any model-tier suffix unconditionally into a candidate base family and model tier, so the family map is built even for an incomplete family
+- **AND** it then checks completeness over those candidates, reporting a family and its missing model tiers by name
+- **AND** it only then resolves the skill path, using the base family when that skill exists and the family declared all three model tiers, and otherwise treating the role name literally
+- **AND** all model tiers of one family share a single canonical `.agents/skills/<role>/SKILL.md` and differ only by model pin, with no per-model-tier skill directory
 
 #### Scenario: changing role behavior
 
@@ -285,6 +299,39 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 - **AND** a spawned orchestrator helper performs read-only planning and returns draft managed-block text rather than applying it
 - **AND** scoped role agents execute their role and return without spawning or routing further agents
 
+### Requirement: Model tier routing
+
+Executing roles MUST be bound at three model tiers ordered by capability, and the workflow driver MUST resolve exactly one model tier per spawn, keyed on the family token, stage, and revision, from a literal first-match-wins ladder whose default raises rather than lowers and whose reviewer inputs are scoped to the routing row that spawned it.
+An agent of a model-tiered family whose assignment exceeds its model tier MUST return a non-verdict escalation before its first edit rather than proceed, while an untiered role MUST return `BLOCKED` instead.
+An escalation MUST NOT consume a loop revision, MUST be bounded at one per family, stage, and revision, and MUST become `BLOCKED` when returned from the most capable model tier.
+A lane's model tier MUST NOT decrease across revisions, flooring on the model tier at which it actually executed, and the orchestrator MUST stay on the most capable model tier.
+Each model tier's provider model pins MUST be declared in exactly one place, and the agent-binding validator MUST fail any binding that drifts from them.
+
+#### Scenario: selecting a model tier for a spawn
+
+- **WHEN** the workflow driver spawns a role of a model-tiered family
+- **THEN** it resolves exactly one model tier from the ladder in `AGENTS.md`, keyed on that spawn's family token, stage, and revision, using only facts it mechanically holds at that point
+- **AND** it scores a reviewer spawned by a path-signal routing row only on the paths that row's globs matched, while a content-signal or always-row role scores on the unintersected set
+- **AND** any keyed path matching the high-risk path list resolves to the most capable model tier
+- **AND** an unavailable or otherwise unmatched input resolves to the middle model tier, so no spawn reaches the cheapest model tier by omission
+- **AND** it records the resolved model tier and the facts it was resolved from in the lane's assignment brief
+
+#### Scenario: escalating from a model tier
+
+- **WHEN** an agent of a model-tiered family determines that its assignment exceeds its assigned model tier
+- **THEN** it returns the non-verdict escalation on its first line before making any edit, immediately after its lane identity checks
+- **AND** the driver honours it only after mechanically confirming that lane has zero commits, a clean status, and `HEAD` at the assigned base, and otherwise preserves and reports the lane as `BLOCKED`
+- **AND** it disposes that proven-clean lane and creates a fresh lane at the same assigned base with the same owned paths, exactly one model tier up, without consuming a loop revision
+- **AND** a second escalation within the same family, stage, and revision, an escalation from the most capable model tier, or an escalation from an untiered role is `BLOCKED`
+
+#### Scenario: flooring a model tier across revisions
+
+- **WHEN** the driver re-resolves a model tier for a later revision of the same family and stage
+- **THEN** the result is never below the highest model tier at which that lane actually executed in a previous revision, rather than the model tier it was originally resolved to
+- **AND** a revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier
+- **AND** a lane whose keyed path set includes `openspec/specs/**` is floored at the middle model tier
+- **AND** every floor only ever raises the base model tier and clamps at the most capable one
+
 ### Requirement: Harness reference integrity
 
 Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `.agents/skills/README.md`, `.agents/skills/*/SKILL.md`, every Markdown file recursively beneath `.agents/skills/*/references/`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
@@ -295,6 +342,11 @@ Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/REA
 - **THEN** it verifies every conservatively path-shaped backtick reference in the harness documents resolves to an existing file or directory, allowing only entries in an explicit, commented allow-missing set
 - **AND** it rejects line-number-based code citations (such as `file.js:NNN` or approximate line references) in the harness documents
 - **AND** it verifies every skill-backed role's Claude binding declares a `model:` and its Codex binding declares a `model =`
+- **AND** it resolves a model-tiered binding to its base family skill, derives the shared-skills list from base families rather than from model-tiered role names, and resolves read-only tool exemptions against the base family token
+- **AND** it requires a model-tiered family to declare all three model tiers, reporting the family and its missing model tiers by name
+- **AND** it gates every skill-backed role's pin, model-tiered or not, against its declared model tier by exact comparison, covering the Codex reasoning-effort field as well as the model
+- **AND** it gates the `AGENTS.md` family table against the base families derived from the bindings table, treating failure to locate that table as an error rather than a skip
+- **AND** it requires each model-tiered binding's `description`, in both providers, to name its own model tier and neither of the other two
 - **AND** it verifies every `.agents/skills/<name>/SKILL.md` has only single-line string `name` and `description` frontmatter fields
 - **AND** the `name` matches its directory, contains at most 64 lowercase letters, digits, and hyphens, and the `description` contains 1-1024 characters without angle brackets
 - **AND** it recursively enumerates every Markdown file beneath a skill's `references/` directory, validates paths cited by those nested documents, and requires the owning `SKILL.md` to cite each one directly by its full relative `references/...` path
