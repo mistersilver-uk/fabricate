@@ -9460,6 +9460,14 @@
   background: var(--fab-surface);
 }
 
+/* A feature toggle that is inapplicable in the current config (issue 848: refund on
+   player cancel requires Time requirements). The icon + label/toggle row dim while the
+   hint stays legible so the reason is readable; the `:disabled` toggle is also greyed. */
+.fabricate-manager .manager-feature-tile.is-feature-disabled .manager-feature-tile-icon,
+.fabricate-manager .manager-feature-tile.is-feature-disabled .manager-feature-tile-head {
+  opacity: 0.55;
+}
+
 /* Mirrors the resolution mode card's 40px chip so the two surfaces read alike.
    Unlike that chip, this one also carries the feature's on/off state. */
 .fabricate-manager .manager-feature-tile-icon {

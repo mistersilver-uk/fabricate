@@ -1459,6 +1459,7 @@
             "EffectTransfer": "Allows crafted results to inherit effects from source components.",
             "ChatOutput": "Posts a summary chat card after crafting and gathering attempts.",
             "RefundOnPlayerCancel": "Returns consumed ingredients and spent currency when a player cancels their in-progress craft. Turn off to forfeit inputs on cancel.",
+            "RefundOnPlayerCancelDisabled": "Enable Time requirements to configure this — a player can only cancel a timed craft in progress.",
             "Currency": "Enables the currency configuration for this system.",
             "Time": "Enables recipe and step duration (time requirement) authoring, and applies those durations when crafting."
           }

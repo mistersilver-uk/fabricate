@@ -519,9 +519,20 @@
     { systemKey: 'multiStepRecipes', storeKey: 'multiStepRecipes', icon: 'fas fa-diagram-project', labelKey: 'FABRICATE.Admin.Manager.Feature.MultiStepRecipes', fallback: 'Multi-step recipes', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.MultiStepRecipes', hintFallback: 'Enables explicit recipe steps and step-level requirements.' },
     { systemKey: 'propertyMacros', storeKey: 'propertyMacros', icon: 'fas fa-code', labelKey: 'FABRICATE.Admin.Manager.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
     { systemKey: 'effectTransfer', storeKey: 'effectTransfer', icon: 'fas fa-wand-sparkles', labelKey: 'FABRICATE.Admin.Manager.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' },
-    { systemKey: 'chatOutput', storeKey: 'chatOutput', icon: 'fas fa-comment', labelKey: 'FABRICATE.Admin.Manager.Feature.ChatOutput', fallback: 'Chat output', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.ChatOutput', hintFallback: 'Posts a summary chat card after crafting and gathering attempts.' },
-    { systemKey: 'refundOnPlayerCancel', storeKey: 'refundOnPlayerCancel', icon: 'fas fa-rotate-left', labelKey: 'FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel', fallback: 'Refund on player cancel', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.RefundOnPlayerCancel', hintFallback: 'Returns consumed ingredients and spent currency when a player cancels their in-progress craft. Turn off to forfeit inputs on cancel.' }
+    { systemKey: 'chatOutput', storeKey: 'chatOutput', icon: 'fas fa-comment', labelKey: 'FABRICATE.Admin.Manager.Feature.ChatOutput', fallback: 'Chat output', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.ChatOutput', hintFallback: 'Posts a summary chat card after crafting and gathering attempts.' }
   ];
+
+  // Refund-on-player-cancel is authored NEXT TO Time requirements (rendered after it)
+  // and only applies to a TIMED craft — a player can only cancel an in-progress timed
+  // run — so its toggle is disabled while Time requirements is off (issue 848 follow-up).
+  const refundOnCancelFeature = {
+    systemKey: 'refundOnPlayerCancel',
+    storeKey: 'refundOnPlayerCancel',
+    labelKey: 'FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel',
+    fallback: 'Refund on player cancel',
+  };
+  const refundOnCancelVisible = $derived(hasFeatureKey(selectedSystem, 'refundOnPlayerCancel'));
+  const refundOnCancelEnabled = $derived(selectedSystem?.features?.refundOnPlayerCancel === true);
 
   const visibleFeatures = $derived(featureDefinitions.filter(feature => hasFeatureKey(selectedSystem, feature.systemKey)));
 
@@ -662,6 +673,33 @@
               <small>{text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Time', 'Enables recipe and step duration (time requirement) authoring, and applies those durations when crafting.')}</small>
             </div>
           </div>
+          {#if refundOnCancelVisible}
+            <div class="manager-feature-tile" class:is-feature-disabled={!timeRequirementsEnabled} data-feature-key="refundOnPlayerCancel">
+              <span class={`manager-feature-tile-icon ${refundOnCancelEnabled ? 'is-on' : 'is-off'}`} aria-hidden="true"><i class="fas fa-rotate-left"></i></span>
+              <div class="manager-feature-tile-body">
+                <div class="manager-feature-tile-head">
+                  <strong>{text('FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel', 'Refund on player cancel')}</strong>
+                  <button
+                    type="button"
+                    class={`manager-status-toggle ${refundOnCancelEnabled ? 'is-on' : 'is-off'}`}
+                    aria-pressed={refundOnCancelEnabled}
+                    aria-label={text('FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel', 'Refund on player cancel')}
+                    data-system-refund-toggle
+                    disabled={!timeRequirementsEnabled}
+                    onclick={() => { if (timeRequirementsEnabled) handleToggleFeature(refundOnCancelFeature); }}
+                  >
+                    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                    <span class="manager-status-toggle-label">{refundOnCancelEnabled
+                      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+                  </button>
+                </div>
+                <small>{timeRequirementsEnabled
+                  ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.RefundOnPlayerCancel', 'Returns consumed ingredients and spent currency when a player cancels their in-progress craft. Turn off to forfeit inputs on cancel.')
+                  : text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.RefundOnPlayerCancelDisabled', 'Enable Time requirements to configure this — a player can only cancel a timed craft in progress.')}</small>
+              </div>
+            </div>
+          {/if}
           <div class="manager-feature-tile" data-feature-key="currency">
             <span class={`manager-feature-tile-icon ${currencyEnabled ? 'is-on' : 'is-off'}`} aria-hidden="true"><i class="fas fa-coins"></i></span>
             <div class="manager-feature-tile-body">
