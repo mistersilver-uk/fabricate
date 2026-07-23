@@ -35,7 +35,7 @@ reconciles the canonical specs against.
 
 ### Proposal
 ### Design
-### Tasks
+### Tasks                  <!-- every entry declares a `Lane surface:` field -->
 ### Spec Deltas            <!-- only when canonical requirements change -->
 ### Resolved Roster
 ### Verification & Acceptance
@@ -50,6 +50,9 @@ Rules:
 - `### Spec Deltas` mirrors the canonical-spec delta headings (`##### Added Requirements`
   / `##### Modified Requirements` / `##### Removed Requirements`, per domain) so reviewers
   can compare it mechanically against the real `git diff` of `openspec/specs/`.
+- Every `### Tasks` entry ends with a literal `Lane surface: new-module | new-export | persisted-shape | none` field.
+It is authored at plan time so the driver can read it as a lookup when it selects a model tier for that lane's spawn (rule 2 of the ladder in `AGENTS.md`).
+A delta that omits it leaves that input permanently unavailable, so every lane defaults up to the `medium` model tier.
 - If `gh` is unavailable, an agent returns the delta block in its text output for the
   driver/user — there is no longer a versioned file to drop it in.
 

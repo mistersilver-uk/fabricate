@@ -7,8 +7,13 @@ Read `AGENTS.md` first for repo-wide rules.
 For non-trivial work, run the **Default Agentic Workflow** in `AGENTS.md` — the
 `plan → plan-review → implement → review → docs` state machine — without waiting to be asked.
 At each gate, spawn the roles matched by that file's auto-spawn routing table using the Agent
-tool: the `subagent_type` for each routing token is listed in the **Agent Roles & Bindings**
-table in `AGENTS.md` (e.g. `fabricate_orchestrator` → `fabricate-orchestrator`).
+tool: the `subagent_type` for each binding is listed in the **Agent Roles & Bindings**
+table in `AGENTS.md`.
+A routing token names a role family, so the join runs one of two ways.
+An untiered family resolves directly, as in `fabricate_orchestrator` → `fabricate-orchestrator`.
+A model-tiered family resolves through the **Model tier routing** ladder in `AGENTS.md` — which picks one of `small` / `medium` / `large` per spawn, from the `(family token, stage, revision)` triple — and then through the **Family to model tiers** table, as in `fabricate_implementer` at `small` → `fabricate_implementer_small` → `fabricate-implementer-small`.
+Record the resolved model tier and the facts it was resolved from in the lane's assignment brief.
+An agent of a model-tiered family may return `ESCALATE_TIER: <reason>` on its first line before its first edit; that is not a verdict, does not consume a revision, and is bounded at one escalation per family, stage, and revision.
 These
 subagents are registered in `.claude/agents/`; for the read-only `fabricate_pr_explorer` role,
 use the built-in `Explore` agent.

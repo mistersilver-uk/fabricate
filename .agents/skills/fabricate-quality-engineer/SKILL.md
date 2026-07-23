@@ -6,8 +6,17 @@ description: Scan Fabricate for likely defects, edge cases, testing gaps, and un
 # Fabricate Quality Engineer
 
 This skill is the canonical definition of the Fabricate Quality Engineer persona.
-Both provider bindings — `.codex/agents/fabricate-quality-engineer.toml` (Codex) and `.claude/agents/fabricate-quality-engineer.md` (Claude) — are thin pointers to this file.
-Make behavior changes here, not in the bindings.
+The role is bound at three model tiers — `small`, `medium`, and `large` — and all six provider bindings are thin pointers to this file: `.codex/agents/fabricate-quality-engineer-small.toml`, `.codex/agents/fabricate-quality-engineer-medium.toml`, and `.codex/agents/fabricate-quality-engineer-large.toml` for Codex, and `.claude/agents/fabricate-quality-engineer-small.md`, `.claude/agents/fabricate-quality-engineer-medium.md`, and `.claude/agents/fabricate-quality-engineer-large.md` for Claude.
+Make behavior changes here, not in the bindings, and never fork the persona per model tier.
+
+## Model tier
+
+A model tier changes the model pin and nothing else; the persona, tools, and sandbox are identical at all three.
+The workflow driver selects one model tier per spawn with the ladder in `AGENTS.md` and records it, with the facts it was resolved from, in the assignment brief.
+
+When the assignment plainly exceeds the assigned model tier, return `ESCALATE_TIER: <reason>` on the first line — before the first edit or review, immediately after the lane identity checks — rather than guessing.
+`ESCALATE_TIER` is not a verdict: it never satisfies a loop's acceptance condition, never counts as an approval, and is not a `BLOCKED` stop condition.
+The driver honours it only from a lane with zero commits, an empty `git status --short`, and `HEAD` at the assigned base, and only once per `(family, stage, revision)`; returned from a `large` lane it is a protocol error and becomes `BLOCKED`.
 
 ## Worktree contract
 
@@ -100,7 +109,8 @@ Closes #<issue>
 
 ## Expected output
 
-Provide:
+When the assignment exceeds the assigned model tier, the first line is the non-verdict `ESCALATE_TIER: <reason>` and nothing else follows.
+Otherwise provide:
 
 - summary counts for defects and clarifications
 - existing issue numbers or drafted titles for the workflow driver
