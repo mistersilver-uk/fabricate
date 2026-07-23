@@ -42,8 +42,7 @@ export class RecipeManager {
   constructor({ getCraftingSystem = null } = {}) {
     this.recipes = new Map();
     this.initialized = false;
-    this.getCraftingSystem =
-      typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
+    this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
   }
 
   /**
@@ -737,10 +736,15 @@ export class RecipeManager {
       }
 
       // A tool is needed if ANY set requires it; prefer an unavailable/repair reading.
-      const toolStates = this.resolveToolStates(recipe, this.getToolsForSet(recipe, set), sourceActors, {
-        primaryActor: craftingActor,
-        ingredientSet: set,
-      });
+      const toolStates = this.resolveToolStates(
+        recipe,
+        this.getToolsForSet(recipe, set),
+        sourceActors,
+        {
+          primaryActor: craftingActor,
+          ingredientSet: set,
+        }
+      );
       for (const tool of toolStates) {
         const key = tool.componentId ?? tool.name;
         const existing = toolByKey.get(key);
@@ -828,9 +832,10 @@ export class RecipeManager {
       const entry = matchedByTool.get(tool) ?? null;
       const componentId = tool?.componentId || tool?.systemItemId;
       const toolDisplayName = String(tool?.label || tool?.name || '').trim();
-      const actor = entry?.virtual === true
-        ? primaryActor
-        : this._resolveToolItemActor(entry?.item, sourceActors);
+      const actor =
+        entry?.virtual === true
+          ? primaryActor
+          : this._resolveToolItemActor(entry?.item, sourceActors);
       const gate = this._evaluateToolPrerequisiteGate(tool, actor, prerequisiteDefinitions);
       const bonusMode = setModes[tool?.id] || recipeModes[tool?.id] || 'always';
       const state = {

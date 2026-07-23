@@ -298,9 +298,7 @@ export class Tool {
         // No default
       }
     } else {
-      errors.push(
-        'breakage.mode must be one of limitedUses, breakageChance, or diceExpression'
-      );
+      errors.push('breakage.mode must be one of limitedUses, breakageChance, or diceExpression');
     }
 
     if (!ON_BREAK_MODES.has(this.onBreak.mode)) {

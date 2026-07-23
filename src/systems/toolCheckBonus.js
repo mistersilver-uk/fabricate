@@ -89,7 +89,12 @@ export async function evaluateToolPrerequisiteGate({
 async function evaluateEnabledBonus({ tool, actor, eligible, evaluateExpression }) {
   const bonus = tool?.bonus || {};
   const expression = typeof bonus.expression === 'string' ? bonus.expression.trim() : '';
-  if (bonus.enabled !== true || !eligible || !expression || typeof evaluateExpression !== 'function') {
+  if (
+    bonus.enabled !== true ||
+    !eligible ||
+    !expression ||
+    typeof evaluateExpression !== 'function'
+  ) {
     return 0;
   }
   try {

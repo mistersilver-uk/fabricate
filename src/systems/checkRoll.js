@@ -542,13 +542,7 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  * single kept face and is deliberately ineligible. Returns no evidence unless a
  * neighbouring tier actually exists.
  */
-function stepNaturalRoutedOutcome({
-  matched,
-  type,
-  natStepping,
-  diceGroups,
-  relativeOutcomes,
-}) {
+function stepNaturalRoutedOutcome({ matched, type, natStepping, diceGroups, relativeOutcomes }) {
   if (natStepping !== true || type !== 'relative' || !matched) {
     return { matched, natStep: null };
   }
