@@ -1682,6 +1682,14 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // back to null on the next save (data loss). `raw` is `recipe.toJSON()`, which
       // carries `craftingModifier` per the model.
       craftingModifier: raw.craftingModifier ?? null,
+      // Single-step recipe duration (issue 845). This projection is a hand-built
+      // ALLOWLIST: omitting it makes the Overview Duration steppers seed from
+      // `undefined` and render "Instant" on every editor open — the persisted value
+      // is NOT lost (RecipeManager.updateRecipe shallow-merges it back from the stored
+      // record when the draft omits the key), so craft time still applies, but the GM
+      // sees their authored duration reset to zero. Multi-step recipes carry their
+      // per-step duration inside the `steps` array projected wholesale below.
+      timeRequirement: raw.timeRequirement ?? null,
       complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),
