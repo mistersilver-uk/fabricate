@@ -16,10 +16,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeChange.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
-import {
-  Tool,
-  TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
-} from '../models/Tool.js';
+import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
 import {
   normalizeComponentCategory,
@@ -200,8 +197,7 @@ export class CraftingSystemManager {
       : [];
     for (const normalizedTool of normalizedTools) {
       if (deriveToolSourceFromComponents(normalizedTool, items) && !normalizedTool.description) {
-        normalizedTool.description =
-          itemById.get(normalizedTool.componentId)?.description || '';
+        normalizedTool.description = itemById.get(normalizedTool.componentId)?.description || '';
       }
     }
 
@@ -2180,7 +2176,9 @@ export class CraftingSystemManager {
       source = null;
     }
     if (!source || source.documentName !== 'Item') {
-      throw new Error(`Cannot register Tool source "${itemUuid}": resolved document is not an Item`);
+      throw new Error(
+        `Cannot register Tool source "${itemUuid}": resolved document is not an Item`
+      );
     }
     return source;
   }
@@ -2196,9 +2194,7 @@ export class CraftingSystemManager {
       const byDurableId = tools.find((entry) => String(entry?.id) === String(durableId));
       if (byDurableId) return byDurableId;
     }
-    const refs = new Set(
-      [snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean)
-    );
+    const refs = new Set([snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean));
     return (
       tools.find((entry) =>
         [entry?.registeredItemUuid, entry?.originItemUuid].some((ref) => refs.has(ref))

@@ -39,16 +39,17 @@ export function stampReplacementComponentIdentity(itemData, system, componentId)
 function replacementItemData(source) {
   if (!source || typeof source !== 'object') return null;
   const fromDocument = source.toObject?.();
-  const itemData = fromDocument && typeof fromDocument === 'object'
-    ? fromDocument
-    : {
-        name: source.name ?? 'Replacement Item',
-        img: source.img ?? 'icons/svg/item-bag.svg',
-        type: source.type ?? 'loot',
-        system: source.system
-          ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
-          : {},
-      };
+  const itemData =
+    fromDocument && typeof fromDocument === 'object'
+      ? fromDocument
+      : {
+          name: source.name ?? 'Replacement Item',
+          img: source.img ?? 'icons/svg/item-bag.svg',
+          type: source.type ?? 'loot',
+          system: source.system
+            ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
+            : {},
+        };
   itemData.system ??= {};
   itemData.system.quantity = 1;
   if (source.uuid) {
