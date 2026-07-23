@@ -1104,6 +1104,56 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('re-seeds the Overview Duration steppers from the recipe on tab switch away and back (issue 845)', async () => {
+    // The staging-editor re-seed contract: leaving the Overview tab UNMOUNTS it, and
+    // returning REMOUNTS it. The Duration steppers must seed from the recipe's
+    // timeRequirement on EVERY mount rather than falling back to their default ("Instant"),
+    // so a GM who authored a duration and navigated away still sees it on return. (The
+    // upstream cause was the store dropping timeRequirement from the projected recipe; this
+    // pins the tab-wiring half — the value must thread through RecipeEditView and be read on
+    // mount, not captured once.)
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: {
+          ...RECIPE,
+          timeRequirement: { minutes: 0, hours: 2, days: 3, months: 0, years: 0 },
+        },
+      })
+    );
+
+    const readUnit = (unit) =>
+      target.querySelector(
+        `[data-recipe-section="duration"] [data-recipe-duration-unit="${unit}"] [data-stepper-input]`
+      )?.value;
+
+    assert.equal(readUnit('days'), '3', 'the days stepper seeds from the authored duration');
+    assert.equal(readUnit('hours'), '2', 'the hours stepper seeds from the authored duration');
+
+    // Leave Overview (unmount the tab) and come back (remount it).
+    clickTab(target, 'ingredients');
+    await flushRender();
+    assert.equal(
+      target.querySelector('[data-recipe-section="duration"]'),
+      null,
+      'the Duration section is gone while another tab is active (the tab genuinely unmounts)'
+    );
+
+    clickTab(target, 'overview');
+    await flushRender();
+
+    assert.equal(
+      readUnit('days'),
+      '3',
+      'the days stepper still shows the authored value after returning — not reset to Instant/zero'
+    );
+    assert.equal(
+      readUnit('hours'),
+      '2',
+      'the hours stepper still shows the authored value after returning'
+    );
+    editHarness.remount();
+  });
+
   it('clears the single-step recipe duration to null when the only unit is zeroed', async () => {
     const patches = [];
     const target = await editHarness.mount(

@@ -88,6 +88,14 @@ const SILENT_RECIPE = Object.freeze({
   // 4. The legacy routing map: validated on save, not read by the live routing path.
   outcomeRouting: { success: 'grp-success' },
 
+  // 4b. Single-step duration (issue 845). UNLIKE the silent fields above this one HAS a
+  //     UI — the Overview Duration steppers — but the projection must still carry it or
+  //     the editor seeds the control from `undefined` and renders "Instant" on every
+  //     open. The persisted value is never lost (the shallow-merge floor restores it),
+  //     so its loss is DISPLAY-only and is guarded against the projected row, not the
+  //     byte-for-byte round trip.
+  timeRequirement: { minutes: 0, hours: 2, days: 3, months: 0, years: 0 },
+
   ingredientSets: [
     {
       id: 'set-1',
@@ -510,6 +518,22 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
       persisted(),
       { ...afterFirst, name: 'Pass two' },
       'the second pass moves nothing but the name either'
+    );
+  });
+
+  // The single-step DURATION display guard (issue 845). Unlike the silent fields above,
+  // this loss never reaches persistence (the shallow-merge floor restores a top-level
+  // key the draft omits), so the byte-for-byte round trip cannot see it — the craft time
+  // keeps applying. The defect is that `_buildRecipeList` dropped `timeRequirement` from
+  // the projected row, so the editor's draft seeded the Overview Duration steppers from
+  // `undefined` and rendered "Instant". This asserts the projection carries it.
+  it('projects the single-step recipe timeRequirement so the Overview Duration steppers seed (issue 845)', () => {
+    const row = projectedRow();
+    assert.ok(row, 'the recipe is projected into the browser list');
+    assert.deepEqual(
+      row.timeRequirement,
+      { minutes: 0, hours: 2, days: 3, months: 0, years: 0 },
+      'the projected row carries the persisted duration — without it the Duration control resets to Instant on every editor open'
     );
   });
 
