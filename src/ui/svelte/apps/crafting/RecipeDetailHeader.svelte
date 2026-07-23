@@ -230,9 +230,7 @@
     padding: 1px 8px;
     border-radius: 999px;
     font-size: 11px;
-    font-family: var(--fab-font-mono);
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
     border: 1px solid var(--fab-border);
     background: var(--fab-surface-raised);
     color: var(--fab-text-muted);
@@ -247,7 +245,9 @@
     padding: 1px 8px;
     border-radius: 999px;
     font-size: 11px;
+    font-family: var(--fab-font-mono);
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
     border: 1px solid var(--fab-border);
     background: var(--fab-surface-raised);
     color: var(--fab-text-muted);
