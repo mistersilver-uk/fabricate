@@ -1018,12 +1018,12 @@ export function collectScreenshotEvidence({
 }
 
 const TOOL_PARITY_DIMENSIONS = new Map([
-  ['01-library-1280x720', [1212, 686]],
-  ['02-overview-1280x720', [1212, 686]],
-  ['03-breakage-1280x720', [1212, 686]],
-  ['04-requirements-1280x720', [1212, 686]],
-  ['05-validation-1280x720', [1212, 686]],
-  ['06-breakage-900x700', [832, 666]],
+  ['01-library-1280x720', [1212, 682]],
+  ['02-overview-1280x720', [1212, 682]],
+  ['03-breakage-1280x720', [1212, 682]],
+  ['04-requirements-1280x720', [1212, 682]],
+  ['05-validation-1280x720', [1212, 682]],
+  ['06-breakage-900x700', [832, 662]],
 ]);
 
 function readJsonEvidence(path, label) {
