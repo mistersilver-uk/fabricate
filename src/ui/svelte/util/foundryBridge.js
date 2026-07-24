@@ -4,11 +4,6 @@
  * both the Foundry runtime and Node test environments.
  */
 
-import {
-  descriptionTextCandidate,
-  plainTextDescription
-} from '../../../utils/plainTextDescription.js';
-
 // A Fabricate-namespaced class so `styles/fabricate.css` can style the dialog
 // (button layout/padding) without bleeding into other modules' DialogV2s, and a
 // default width so multi-button confirm rows (e.g. "Unlink + delete marker") fit
@@ -559,6 +554,12 @@ export function getDragEventData(event) {
 }
 
 async function itemSourceDescription(item) {
+  // Most UI consumers need only the lightweight Foundry wrappers; load the
+  // description pipeline only when an Item snapshot actually requests it.
+  const {
+    descriptionTextCandidate,
+    plainTextDescription
+  } = await import('../../../utils/plainTextDescription.js');
   const candidates = [
     item?.system?.description?.value,
     item?.system?.description,
