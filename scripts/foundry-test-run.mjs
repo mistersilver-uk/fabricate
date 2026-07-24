@@ -1147,24 +1147,44 @@ async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {})
 
 async function waitForManagerApplicationRendered(page) {
   const outerSelector = '#fabricate-crafting-system-manager';
-  await page.locator(outerSelector).waitFor({ state: 'attached', timeout: 15_000 });
-  await page.locator(`${outerSelector} .fabricate-manager`).waitFor({
-    state: 'attached',
-    timeout: 15_000,
-  });
-  await page.waitForFunction(() => {
+  const inspectReadiness = (diagnostic = false) => {
     const app = globalThis.__fabricateSmokeManagerApp;
     const appElement = app?.element?.[0] ?? app?.element;
-    const outer = document.querySelector('#fabricate-crafting-system-manager');
-    const manager = outer?.querySelector('.fabricate-manager');
-    return Boolean(
-      appElement
-      && appElement === outer
-      && appElement.isConnected
-      && appElement.style
-      && manager?.isConnected
+    const manager = appElement?.matches?.('.fabricate-manager')
+      ? appElement
+      : appElement?.querySelector?.('.fabricate-manager')
+        ?? appElement?.closest?.('.fabricate-manager');
+    const report = {
+      ready: Boolean(appElement?.isConnected && appElement?.style && manager?.isConnected),
+      appRendered: app?.rendered ?? null,
+      elementType: appElement?.constructor?.name ?? typeof appElement,
+      elementId: appElement?.id ?? null,
+      elementConnected: Boolean(appElement?.isConnected),
+      elementHasStyle: Boolean(appElement?.style),
+      managerConnected: Boolean(manager?.isConnected),
+      selectorManagerConnected: Boolean(
+        document.querySelector('#fabricate-crafting-system-manager .fabricate-manager')?.isConnected
+      ),
+    };
+    if (diagnostic || report.ready) return report;
+    return false;
+  };
+  try {
+    await page.locator(outerSelector).waitFor({ state: 'attached', timeout: 15_000 });
+    await page.locator(`${outerSelector} .fabricate-manager`).waitFor({
+      state: 'attached',
+      timeout: 15_000,
+    });
+    await page.waitForFunction(inspectReadiness, false, { timeout: 15_000, polling: 'raf' });
+  } catch (error) {
+    const readiness = await page.evaluate(inspectReadiness, true).catch((diagnosticError) => ({
+      diagnosticError: diagnosticError.message,
+    }));
+    throw new Error(
+      `Crafting System Manager ApplicationV2 render readiness failed: ${JSON.stringify(readiness)}`,
+      { cause: error }
     );
-  }, undefined, { timeout: 15_000, polling: 'raf' });
+  }
 }
 
 /**
