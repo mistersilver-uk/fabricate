@@ -375,6 +375,9 @@ function compileManagerRoot() {
     'src/utils/browserGroupCounts.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
+    // foundryBridge imports the shared rich-text-to-plain-text normalizer when it
+    // resolves dropped source documents for the Tool Studio.
+    'src/utils/plainTextDescription.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
     'src/config/flags.js',
     // CharacterPrerequisitesCard imports the pure prerequisite engine (issue 544).

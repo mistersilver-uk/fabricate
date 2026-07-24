@@ -208,6 +208,7 @@ test('primeEnricherCache no-ops safely without Foundry, and stays linear on adve
 // ---------------------------------------------------------------------------
 
 const SOURCE_ITEM = Object.freeze({
+  documentName: 'Item',
   uuid: 'Compendium.dnd5e.equipment24.Item.supplies',
   name: "Alchemist's Supplies",
   img: 'icons/tools.webp',
