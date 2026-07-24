@@ -230,6 +230,76 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.deepEqual(rowByComponent(listing, 'c3').usedBy, []);
   });
 
+  it('indexes recipe, explicit-step, and active routed-set Tools under requiredFor', () => {
+    const explicitRecipe = {
+      id: 'r-steps',
+      name: 'Layered Forge',
+      img: 'icons/layered.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: ['t-recipe'],
+      steps: [
+        {
+          id: 'step-1',
+          toolIds: ['t-step'],
+          ingredientSets: [
+            {
+              id: 'step-set',
+              name: 'Forging route',
+              ingredientGroups: [],
+              toolIds: ['t-set'],
+            },
+          ],
+        },
+      ],
+    };
+    const build = (resolutionMode, setName = 'Forging route') => {
+      const recipeForMode = {
+        ...explicitRecipe,
+        steps: [
+          {
+            ...explicitRecipe.steps[0],
+            ingredientSets: [{ ...explicitRecipe.steps[0].ingredientSets[0], name: setName }],
+          },
+        ],
+      };
+      const system = makeSystem({
+        resolutionMode,
+        tools: [
+          { id: 't-recipe', componentId: 'c1' },
+          { id: 't-step', componentId: 'c2' },
+          { id: 't-set', componentId: 'c3' },
+        ],
+      });
+      const { builder } = makeBuilder({ systems: [system], recipes: [recipeForMode] });
+      return builder.buildListing({
+        craftingActor: actor('a1', 'Akra', [
+          item('Iron', 1),
+          item('Coal', 1),
+          item('Hammerhead', 1),
+        ]),
+      });
+    };
+    const expected = [
+      {
+        kind: 'recipe',
+        recipeId: 'r-steps',
+        name: 'Layered Forge',
+        img: 'icons/layered.webp',
+      },
+    ];
+
+    const routed = build('routedByIngredients');
+    assert.deepEqual(rowByComponent(routed, 'c1').requiredFor, expected);
+    assert.deepEqual(rowByComponent(routed, 'c2').requiredFor, expected);
+    assert.deepEqual(rowByComponent(routed, 'c3').requiredFor, expected);
+
+    for (const inactive of [build('simple'), build('routedByIngredients', '  ')]) {
+      assert.deepEqual(rowByComponent(inactive, 'c1').requiredFor, expected);
+      assert.deepEqual(rowByComponent(inactive, 'c2').requiredFor, expected);
+      assert.deepEqual(rowByComponent(inactive, 'c3').requiredFor, []);
+    }
+  });
+
   it('does not index stale per-set Tools outside named routed-by-ingredients sets', () => {
     for (const system of [
       makeSystem({ resolutionMode: 'simple' }),

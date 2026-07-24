@@ -42,6 +42,45 @@ test('manager Item drops resolve world and compendium Items to one shared snapsh
   assert.deepEqual(requested, ['Item.hammer', 'Compendium.mythwright.items.Item.hammer']);
 });
 
+test('manager Item snapshots normalize nested HTML and top-level description fallbacks', async () => {
+  const items = new Map([
+    [
+      'Item.nested',
+      {
+        documentName: 'Item',
+        uuid: 'Item.nested',
+        name: 'Nested',
+        system: {
+          description: {
+            value: '',
+            html: '<p>A <strong>nested</strong> description.</p>',
+          },
+        },
+      },
+    ],
+    [
+      'Item.top-level',
+      {
+        documentName: 'Item',
+        uuid: 'Item.top-level',
+        name: 'Top level',
+        system: { description: { value: '' } },
+        description: { value: '<p>A top-level <em>fallback</em>.</p>' },
+      },
+    ],
+  ]);
+  globalThis.fromUuid = async (uuid) => items.get(uuid) ?? null;
+
+  assert.equal(
+    (await resolveItemSourceSnapshot('Item.nested'))?.description,
+    'A nested description.'
+  );
+  assert.equal(
+    (await resolveItemSourceSnapshot('Item.top-level'))?.description,
+    'A top-level fallback.'
+  );
+});
+
 test('manager Item drops reject missing, malformed, and non-Item documents', async () => {
   globalThis.fromUuid = async (uuid) => {
     if (uuid === 'Actor.hero') return { documentName: 'Actor', uuid };

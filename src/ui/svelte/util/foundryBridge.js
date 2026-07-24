@@ -4,6 +4,11 @@
  * both the Foundry runtime and Node test environments.
  */
 
+import {
+  descriptionTextCandidate,
+  plainTextDescription
+} from '../../../utils/plainTextDescription.js';
+
 // A Fabricate-namespaced class so `styles/fabricate.css` can style the dialog
 // (button layout/padding) without bleeding into other modules' DialogV2s, and a
 // default width so multi-button confirm rows (e.g. "Unlink + delete marker") fit
@@ -553,6 +558,23 @@ export function getDragEventData(event) {
   return null;
 }
 
+async function itemSourceDescription(item) {
+  const candidates = [
+    item?.system?.description?.value,
+    item?.system?.description,
+    item?.description?.value,
+    item?.description
+  ];
+  for (const candidate of candidates) {
+    const raw = descriptionTextCandidate(candidate);
+    if (!raw) continue;
+    const enriched = await enrichToHtml(raw, { relativeTo: item });
+    const description = plainTextDescription(enriched);
+    if (description) return description;
+  }
+  return '';
+}
+
 /**
  * Resolve a Foundry UUID to the small, system-agnostic Item snapshot used by
  * manager drop zones. Non-Item documents, missing documents, and resolver
@@ -566,13 +588,12 @@ export async function resolveItemSourceSnapshot(uuid) {
   try {
     const item = await globalThis.fromUuid(uuid);
     if (item?.documentName !== 'Item') return null;
-    const rawDescription = item.system?.description?.value ?? item.system?.description ?? '';
     return {
       uuid: item.uuid || uuid,
       name: item.name || '',
       img: item.img || '',
       type: item.type || '',
-      description: typeof rawDescription === 'string' ? rawDescription : '',
+      description: await itemSourceDescription(item),
     };
   } catch {
     return null;

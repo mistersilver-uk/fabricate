@@ -44,6 +44,7 @@ import { SignatureValidator } from './SignatureValidator.js';
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
 // model and the adminStore editor without duplicating the literal lists.
 const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
+const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
 
 export class CraftingSystemManager {
   /**
@@ -2202,6 +2203,114 @@ export class CraftingSystemManager {
     );
   }
 
+  _sourceFlagState(source, flagKey) {
+    const provenance = {};
+    for (const key of ['duplicateSource', 'compendiumSource']) {
+      provenance[key] = {
+        present: Object.prototype.hasOwnProperty.call(source?._stats ?? {}, key),
+        value: source?._stats?.[key],
+      };
+    }
+    return {
+      source,
+      flagKey,
+      value: getFabricateFlag(source, flagKey, MISSING_SOURCE_FLAG),
+      provenance,
+    };
+  }
+
+  async _resolveStrictSourceFlagState(registeredItemUuid, flagKey) {
+    if (!registeredItemUuid) return null;
+    const source = await fromUuid(registeredItemUuid);
+    if (!source || source.pack || typeof source.unsetFlag !== 'function') return null;
+    return this._sourceFlagState(source, flagKey);
+  }
+
+  async _restoreSourceFlag({ source, flagKey, value }) {
+    const current = getFabricateFlag(source, flagKey, MISSING_SOURCE_FLAG);
+    if (current === value) return;
+    if (value !== MISSING_SOURCE_FLAG) {
+      await setFabricateFlag(source, flagKey, value);
+      return;
+    }
+    if (current === MISSING_SOURCE_FLAG || typeof source?.unsetFlag !== 'function') return;
+    await source.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
+  }
+
+  async _restoreSourceProvenance({ source, provenance }) {
+    if (!provenance || typeof source?.update !== 'function') return;
+    const patch = {};
+    for (const [key, previous] of Object.entries(provenance)) {
+      const present = Object.prototype.hasOwnProperty.call(source?._stats ?? {}, key);
+      const current = source?._stats?.[key];
+      if (previous.present) {
+        if (!present || current !== previous.value) patch[`_stats.${key}`] = previous.value;
+      } else if (present) {
+        patch[`_stats.-=${key}`] = null;
+      }
+    }
+    if (Object.keys(patch).length > 0) await source.update(patch);
+  }
+
+  async _rollbackToolTransaction(system, previousTools, sourceFlagStates, cause) {
+    const errors = [cause];
+    system.tools = previousTools;
+    for (const state of [...sourceFlagStates].reverse()) {
+      try {
+        await this._restoreSourceFlag(state);
+      } catch (error) {
+        errors.push(error);
+      }
+      try {
+        await this._restoreSourceProvenance(state);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    try {
+      await this.save();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'Tool transaction failed and rollback was incomplete');
+    }
+    throw cause;
+  }
+
+  async _applyToolSourceFlagChanges({
+    system,
+    previousTools,
+    source,
+    previousSourceUuid,
+    nextSourceUuid,
+    flagKey,
+    toolId,
+  }) {
+    if (!source || !flagKey) return;
+    const sourceFlagStates = [];
+    try {
+      const nextSourceState = this._sourceFlagState(source, flagKey);
+      const previousSourceState =
+        previousSourceUuid && previousSourceUuid !== nextSourceUuid
+          ? await this._resolveStrictSourceFlagState(previousSourceUuid, flagKey)
+          : null;
+      if (nextSourceState.value !== toolId) {
+        sourceFlagStates.push(nextSourceState);
+        await this._stampSourceIdentity(source, flagKey, toolId);
+      }
+      if (previousSourceState?.value === toolId) {
+        sourceFlagStates.push(previousSourceState);
+        await previousSourceState.source.unsetFlag(
+          FABRICATE_FLAG_NAMESPACE,
+          `fabricate.${flagKey}`
+        );
+      }
+    } catch (error) {
+      await this._rollbackToolTransaction(system, previousTools, sourceFlagStates, error);
+    }
+  }
+
   /**
    * Persist one normalized Tool, optionally registering or relinking its Item source.
    * Source resolution and snapshot construction finish before the system is mutated;
@@ -2248,12 +2357,15 @@ export class CraftingSystemManager {
     }
 
     const previousSourceUuid = existing?.registeredItemUuid || existing?.originItemUuid || null;
-    if (source && flagKey) {
-      await this._stampSourceIdentity(source, flagKey, staged.id);
-      if (previousSourceUuid && previousSourceUuid !== staged.registeredItemUuid) {
-        await this._clearSourceFlag(previousSourceUuid, flagKey, staged.id);
-      }
-    }
+    await this._applyToolSourceFlagChanges({
+      system,
+      previousTools,
+      source,
+      previousSourceUuid,
+      nextSourceUuid: staged.registeredItemUuid,
+      flagKey,
+      toolId: staged.id,
+    });
     return { item: staged, action: existing ? 'updated' : 'added' };
   }
 
@@ -2275,13 +2387,29 @@ export class CraftingSystemManager {
     const tool = tools.find((entry) => String(entry?.id) === String(toolId)) || null;
     if (!tool) return { deleted: false };
 
+    const previousTools = system.tools;
     system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));
-    const flagKey = this._toolRoleFlagKey(system.id);
-    const registeredItemUuid = tool.originItemUuid || tool.registeredItemUuid || null;
-    if (flagKey && registeredItemUuid) {
-      await this._clearSourceFlag(registeredItemUuid, flagKey, tool.id);
+    try {
+      await this.save();
+    } catch (error) {
+      system.tools = previousTools;
+      throw error;
     }
-    await this.save();
+
+    const flagKey = this._toolRoleFlagKey(system.id);
+    const registeredItemUuid = tool.registeredItemUuid || tool.originItemUuid || null;
+    if (flagKey && registeredItemUuid) {
+      const sourceFlagStates = [];
+      try {
+        const state = await this._resolveStrictSourceFlagState(registeredItemUuid, flagKey);
+        if (state?.value === tool.id) {
+          sourceFlagStates.push(state);
+          await state.source.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
+        }
+      } catch (error) {
+        await this._rollbackToolTransaction(system, previousTools, sourceFlagStates, error);
+      }
+    }
     return { deleted: true };
   }
 
