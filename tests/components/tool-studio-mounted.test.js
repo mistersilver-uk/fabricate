@@ -1,5 +1,6 @@
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tick } from 'svelte';
 import {
@@ -8,6 +9,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tool-editor-',
@@ -402,7 +404,11 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.match(
       chanceControl.getAttribute('style'),
-      /--fab-chance-slider-track-gradient: linear-gradient\(90deg, var\(--fab-success\) 0%, var\(--fab-warning\) 33%, var\(--fab-badge-gold\) 66%, var\(--fab-danger\) 100%\)/
+      /--fab-chance-slider-track-gradient: var\(--fab-tool-breakage-chance-track-gradient\)/
+    );
+    assert.match(
+      fabricateCss,
+      /\.fabricate-manager \.manager-tool-breakage-chance-control\s*\{\s*--fab-tool-breakage-chance-track-gradient:\s*linear-gradient\(\s*90deg,\s*var\(--fab-success\) 0%,\s*var\(--fab-warning\) 33%,\s*var\(--fab-badge-gold\) 66%,\s*var\(--fab-danger\) 100%\s*\);/
     );
     assert.ok(chanceControl.querySelector('.manager-drop-rate-fill'));
 
