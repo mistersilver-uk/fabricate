@@ -179,8 +179,9 @@ CraftingSystem = {
   //   }
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
-  //     natStepping?: boolean,                      // default false; emitted only for
-  //                                                // crafting/salvage relative routed checks
+  //     natStepping?: boolean,                      // default false; persisted for crafting/
+  //                                                // salvage routed checks, but affects only
+  //                                                // relative outcome matching
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],

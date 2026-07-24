@@ -676,7 +676,7 @@ effective `revealPolicy === 'never'`.
 - Craft execution, including alchemy attempts
 - Salvage execution against owned components
 - Active and historical crafting/salvage run management
-- Result creation, ingredient consumption, and Tool usage/breakage (`limitedUses` / `breakageChance` / `diceExpression` / `immune`; `destroy` / `flagBroken` / `replaceWith`), with breakage governed by **Tool-Breakage Authority** (`toolSpecific` per-tool mode only — a check never breaks tools, or `checkDriven` **Check Breakage** triggers over all required non-`immune` tools) through the shared `evaluateCheckBreakage` seam — crafting, salvage (now at parity), and gathering route the same decision so it cannot drift
+- Result creation, ingredient consumption, and Tool usage/breakage (`limitedUses` / `breakageChance` / `diceExpression`; `destroy` / `flagBroken` / `replaceWith`), with breakage governed by **Tool-Breakage Authority** (`toolSpecific` evaluates each Tool's configured mode and a check never breaks Tools, while `checkDriven` **Check Breakage** triggers over all required Tools whose independent `checkBreakable` flag is not `false`) through the shared `evaluateCheckBreakage` seam — crafting, salvage (now at parity), and gathering route the same decision so it cannot drift
 - Shared **Check** roll engine (`src/systems/checkRoll.js`: `runFormulaPassFail`/`runFormulaProgressive`/`runFormulaRouted` + unified check triggers / forced outcomes) driving crafting, salvage, and gathering checks alike; salvage routes a routed tier name through `component.salvage.outcomeRouting`; a per-component `salvage.dcOverride` shifts the simple/routed DC (no DC for progressive)
 - Shopping list derivation
 - Alchemy workbench management (session-scoped working set)
