@@ -10414,6 +10414,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await openFixtureToolEditor(calls);
     target.querySelector('[data-tool-editor-delete]').click();
     await Promise.resolve();
+    await Promise.resolve();
     await tick();
     flushSync();
 
