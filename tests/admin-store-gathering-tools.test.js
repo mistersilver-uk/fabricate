@@ -724,6 +724,24 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(get(store.viewState).toolDraft, null);
     });
 
+    it('persists a focused Tool enabled toggle without staging or dirtying the editor', async () => {
+      const services = createMockServices({
+        systemTools: [{ id: 'hammer', componentId: 'comp-hammer', enabled: true }],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.openToolDraft('hammer');
+
+      assert.equal(get(store.viewState).toolDraftDirty, false);
+      assert.equal(await store.toggleToolEnabled('hammer', false), true);
+
+      const state = get(store.viewState);
+      assert.equal(state.toolDraft.enabled, false);
+      assert.equal(state.toolDraftBaseline.enabled, false);
+      assert.equal(state.toolDraftDirty, false);
+      assert.equal(services._systemTools()[0].enabled, false);
+    });
+
     it('updates breakage authority and replaces the draft on a system-scope open', async () => {
       const services = createMockServices({
         systems: [

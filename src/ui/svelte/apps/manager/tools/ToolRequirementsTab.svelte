@@ -1,6 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
+  import { displayRollDataExpression } from '../../../../../systems/characterModifierPrerequisiteCopy.js';
+  import ChecklistCardRow from '../ChecklistCardRow.svelte';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
 
   let { tool = null, prerequisiteOptions = [], onPatch = () => {} } = $props();
   function text(key, fallback) {
@@ -23,6 +28,21 @@
   function patchBonus(patch) {
     onPatch({ bonus: { ...bonus, ...patch } });
   }
+  const gateModeOptions = $derived([
+    {
+      value: 'usability',
+      label: text('FABRICATE.Admin.Manager.Tools.Editor.GateUsability', 'Tool is unusable'),
+      description: text('FABRICATE.Admin.Manager.Tools.Editor.GateUsabilityHint', 'The character cannot use this Tool for crafting, salvage, or gathering.'),
+      icon: 'fas fa-ban',
+    },
+    {
+      value: 'bonus',
+      label: text('FABRICATE.Admin.Manager.Tools.Editor.GateBonus', 'Bonus is withheld'),
+      description: text('FABRICATE.Admin.Manager.Tools.Editor.GateBonusHint', 'The Tool still counts as present, but contributes no check bonus.'),
+      icon: 'fas fa-plus-minus',
+    },
+  ]);
+  const bonusPresets = ['@prof', '@abilities.str.mod', '@abilities.dex.mod', '1d4'];
 </script>
 
 <div class="manager-tool-tab-stack" data-tool-requirements-tab>
@@ -37,15 +57,28 @@
     <fieldset disabled={!prerequisites.enabled} class="manager-tool-prerequisite-list">
       {#if prerequisiteOptions.length === 0}<p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites', 'No shared prerequisites are defined for this system.')}</p>{/if}
       {#each prerequisiteOptions as option (option.id)}
-        <label data-tool-prerequisite-row><span class="manager-tool-prerequisite-check"><input type="checkbox" value={option.id} checked={(prerequisites.ids || []).includes(option.id)} onchange={(event) => togglePrerequisite(option.id, event.currentTarget.checked)} /><i class="fas fa-check" aria-hidden="true"></i></span><span><strong>{option.name || option.label || option.id}</strong>{#if option.expression}<small>{option.expression}</small>{/if}</span></label>
+        <ChecklistCardRow
+          value={option.id}
+          title={option.name || option.label || option.id}
+          detail={prerequisitePreview(option)}
+          icon={option.icon || 'fas fa-user-shield'}
+          checked={(prerequisites.ids || []).includes(option.id)}
+          disabled={!prerequisites.enabled}
+          onChange={(checked) => togglePrerequisite(option.id, checked)}
+        />
       {/each}
     </fieldset>
     <p class="manager-tool-requirements-summary">{text('FABRICATE.Admin.Manager.Tools.Editor.RequiredAll', 'All selected prerequisites are required (AND)')}</p>
-    <fieldset disabled={!prerequisites.enabled} class="manager-tool-segments">
-      <legend>{text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}</legend>
-      <label class:is-selected={prerequisites.gateMode === 'usability'}><input type="radio" name="tool-gate-mode" value="usability" checked={prerequisites.gateMode === 'usability'} onchange={() => patchPrerequisites({ gateMode: 'usability' })} /><span>{text('FABRICATE.Admin.Manager.Tools.Editor.GateUsability', 'Tool is unusable')}</span></label>
-      <label class:is-selected={prerequisites.gateMode === 'bonus'}><input type="radio" name="tool-gate-mode" value="bonus" checked={prerequisites.gateMode === 'bonus'} onchange={() => patchPrerequisites({ gateMode: 'bonus' })} /><span>{text('FABRICATE.Admin.Manager.Tools.Editor.GateBonus', 'Bonus is withheld')}</span></label>
-    </fieldset>
+    <RadioCardGroup
+      legend={text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}
+      options={gateModeOptions}
+      selectedValue={prerequisites.gateMode}
+      groupName="tool-gate-mode"
+      columns={2}
+      disabled={!prerequisites.enabled}
+      dataGroup="tool-gate-mode"
+      onChange={(gateMode) => patchPrerequisites({ gateMode })}
+    />
   </section>
 
   <hr data-tool-requirements-divider />
@@ -59,9 +92,9 @@
       </label>
     </div>
     <fieldset disabled={!bonus.enabled}>
-      <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpression', 'Bonus expression')}</span><input data-tool-bonus-expression value={bonus.expression || ''} placeholder="+1" oninput={(event) => patchBonus({ expression: event.currentTarget.value })} /></label>
+      <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpression', 'Bonus expression')}</span><RollDataExpressionInput dataField="tool-bonus" value={bonus.expression || ''} placeholder="prof" disabled={!bonus.enabled} onChange={(expression) => patchBonus({ expression })} /></label>
       <div class="manager-tool-bonus-presets" aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BonusPresets', 'Bonus presets')}>
-        {#each ['@prof', '@abilities.str.mod', '@abilities.dex.mod', '1d4'] as preset (preset)}<button type="button" class="manager-chip is-neutral" data-tool-bonus-preset={preset} onclick={() => patchBonus({ expression: preset })}>{preset}</button>{/each}
+        {#each bonusPresets as preset (preset)}<button type="button" class="manager-chip is-neutral" data-tool-bonus-preset={preset} onclick={() => patchBonus({ expression: preset })}>{displayRollDataExpression(preset)}</button>{/each}
       </div>
     </fieldset>
   </section>

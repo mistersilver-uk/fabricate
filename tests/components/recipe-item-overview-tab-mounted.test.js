@@ -1,7 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -13,23 +12,15 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
-    'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    'src/ui/svelte/actions/portal.js'
   ],
   compiledModules: [
-    'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/apps/manager/ItemPickerModal.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte'
 });
 
 const LINKED_ITEM = { uuid: 'Item.abc', name: 'Ashfall Compendium', img: 'a.png', type: 'Tome', description: 'A heavy tome.' };
-const WORLD_ITEMS = [
-  { uuid: 'Item.x', name: 'Scroll of Fire', img: '', type: 'Scroll' },
-  { uuid: 'Item.y', name: 'Journeyman Primer', img: '', type: 'Book' }
-];
-
 before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
@@ -50,7 +41,7 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     assert.equal(root.querySelector('[data-recipe-item-dropzone]'), null);
   });
 
-  it('shows a danger drop zone and placeholder name when unlinked', async () => {
+  it('shows a drag-only drop zone and placeholder name when unlinked', async () => {
     const root = await harness.mount({
       recipeItem: { id: 'ri1', enabled: true, caps: { item: {}, learn: {} } },
       linkedItem: null
@@ -61,21 +52,26 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     assert.equal(root.querySelector('[data-recipe-item-name]').textContent.trim(), 'Untitled recipe item');
   });
 
-  it('opens the item picker from the empty drop zone and links the picked uuid', async () => {
+  it('does not open a picker and links only from a dropped Item UUID', async () => {
     const calls = [];
     const root = await harness.mount({
       recipeItem: { id: 'ri1', enabled: true, caps: { item: {}, learn: {} } },
       linkedItem: null,
-      worldItems: WORLD_ITEMS,
       onLinkItem: (uuid) => calls.push(uuid)
     });
-    root.querySelector('[data-recipe-item-dropzone]').click();
-    flushSync();
-    const dialog = document.querySelector('.manager-item-picker-dialog');
-    assert.ok(dialog, 'expected the item picker dialog to open');
-    document.querySelector('[data-item-picker-row="Item.y"]').click();
-    flushSync();
-    assert.deepEqual(calls, ['Item.y']);
+    const dropzone = root.querySelector('[data-recipe-item-dropzone]');
+    dropzone.click();
+    assert.equal(document.querySelector('.manager-item-picker-dialog'), null);
+    assert.deepEqual(calls, []);
+
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: {
+        getData: () => JSON.stringify({ type: 'Item', pack: 'fabricate.items', id: 'primer' }),
+      },
+    });
+    dropzone.dispatchEvent(drop);
+    assert.deepEqual(calls, ['Compendium.fabricate.items.primer']);
   });
 
   it('fires onUnlinkItem when Unlink is clicked', async () => {

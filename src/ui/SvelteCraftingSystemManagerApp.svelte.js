@@ -7,7 +7,13 @@ import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
-import { localize, subscribeSceneChange, subscribeTravelMarkerMove, enrichToHtml } from './svelte/util/foundryBridge.js';
+import {
+  localize,
+  subscribeSceneChange,
+  subscribeTravelMarkerMove,
+  enrichToHtml,
+  resolveItemSourceSnapshot,
+} from './svelte/util/foundryBridge.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
@@ -328,8 +334,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .map(actor => this._describeAccessActor(actor))
           .filter(actor => actor.id && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
-      // Game-world Items ({ uuid, name, img, type }), name-sorted, for the
-      // ItemPickerModal (Books & Scrolls links a recipe item to a world Item).
+      // Game-world Items ({ uuid, name, img, type }), name-sorted, for resolving
+      // linked Item previews after drag-and-drop.
       getWorldItemOptions: () =>
         Array.from(game.items?.contents || [])
           .map(item => ({
@@ -340,23 +346,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter(item => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
-      resolveToolSource: async (uuid) => {
-        if (!uuid) return null;
-        try {
-          const item = await fromUuid(uuid);
-          if (item?.documentName !== 'Item') return null;
-          const rawDescription = item.system?.description?.value ?? item.system?.description ?? '';
-          return {
-            uuid: item.uuid || uuid,
-            name: item.name || '',
-            img: item.img || '',
-            type: item.type || '',
-            description: typeof rawDescription === 'string' ? rawDescription : '',
-          };
-        } catch {
-          return null;
-        }
-      },
+      resolveToolSource: (uuid) => resolveItemSourceSnapshot(uuid),
       pickImagePath: async (currentPath = '') => {
         const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation
           || foundry?.applications?.apps?.FilePicker

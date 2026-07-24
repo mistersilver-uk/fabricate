@@ -2,10 +2,9 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import {
-    toolBreakageSummary,
+    projectToolBehaviorFacts,
     toolDisplayImage,
     toolDisplayName,
-    toolOnBreakSummary,
     toolSourceUuid,
   } from './toolStudio.js';
 
@@ -22,53 +21,6 @@
       fallback
     );
   }
-  function localizedBreakage(currentTool, currentAuthority) {
-    const summary = toolBreakageSummary(currentTool, currentAuthority);
-    if (summary === 'immune') {
-      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryImmune', 'Never breaks');
-    }
-    if (summary === 'breakable') {
-      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryBreakable', 'Breakable');
-    }
-    if (summary === 'breakageChance') {
-      return formattedText(
-        'FABRICATE.Admin.Manager.Tools.BreakageSummaryChance',
-        { percent: currentTool?.breakage?.breakageChance ?? 0 },
-        '{percent}% break chance'
-      );
-    }
-    if (summary === 'diceExpression') {
-      return formattedText(
-        'FABRICATE.Admin.Manager.Tools.BreakageSummaryDice',
-        { threshold: currentTool?.breakage?.threshold ?? '' },
-        'Dice < {threshold}'
-      );
-    }
-    if (currentTool?.breakage?.maxUses == null) {
-      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryUnlimited', 'Unlimited uses');
-    }
-    return formattedText(
-      'FABRICATE.Admin.Manager.Tools.BreakageSummaryLimited',
-      { count: currentTool.breakage.maxUses },
-      '{count} uses'
-    );
-  }
-  function localizedOnBreak(currentTool, isImmune) {
-    if (isImmune) {
-      return text(
-        'FABRICATE.Admin.Manager.Tools.Editor.OnBreakNotApplicable',
-        'Not applicable while this Tool cannot break'
-      );
-    }
-    const summary = toolOnBreakSummary(currentTool);
-    const labels = {
-      destroy: ['OnBreakDestroy', 'Destroy the item'],
-      flagBroken: ['OnBreakFlag', 'Mark as broken'],
-      replaceWith: ['OnBreakReplace', 'Replace with item'],
-    };
-    const [key, fallback] = labels[summary] || labels.destroy;
-    return text(`FABRICATE.Admin.Manager.Tools.${key}`, fallback);
-  }
   const name = $derived(toolDisplayName(tool, managedItems, text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled Tool')));
   const image = $derived(toolDisplayImage(tool, managedItems));
   const sourceContext = $derived(
@@ -76,75 +28,9 @@
       ? text('FABRICATE.Admin.Manager.Tools.Editor.HeaderLinked', 'Linked game-world Item')
       : text('FABRICATE.Admin.Manager.Tools.Editor.HeaderUnlinked', 'Unlinked Tool')
   );
-  const immune = $derived(authority === 'checkDriven' && tool?.checkBreakable === false);
-  const breakageLabel = $derived(localizedBreakage(tool, authority));
-  const onBreakLabel = $derived(localizedOnBreak(tool, immune));
-  const prerequisiteLabel = $derived(
-    tool?.prerequisites?.enabled
-      ? formattedText(
-          tool.prerequisites.ids?.length === 1
-            ? 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteOne'
-            : 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteCount',
-          { count: tool.prerequisites.ids?.length || 0 },
-          tool.prerequisites.ids?.length === 1 ? '1 prerequisite' : '{count} prerequisites'
-        )
-      : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisitesDisabled', 'No prerequisites to use')
-  );
-  const bonusValue = $derived(
-    tool?.bonus?.enabled
-      ? tool.bonus.expression ||
-          text('FABRICATE.Admin.Manager.Tools.Editor.StatusIncomplete', 'Incomplete')
-      : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusDisabled', 'No check bonus')
-  );
-  const bonusLabel = $derived(
-    tool?.bonus?.enabled && String(tool.bonus.expression || '').trim()
-      ? formattedText(
-          'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue',
-          { expression: bonusValue },
-          'Adds {expression}'
-        )
-      : bonusValue
-  );
-  const rules = $derived([
-    {
-      id: 'breakage',
-      icon: authority === 'checkDriven' ? 'fas fa-dice-d20' : 'fas fa-hourglass-half',
-      title: breakageLabel,
-      subtitle: authority === 'checkDriven'
-        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewCheckDriven', 'Check-driven · follows the crafting roll')
-        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewToolSpecific', 'Tool-specific · tracked per copy'),
-    },
-    {
-      id: 'on-break',
-      icon: immune ? 'fas fa-shield' : 'fas fa-heart-crack',
-      title: immune
-        ? onBreakLabel
-        : formattedText(
-            'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
-            { action: onBreakLabel.toLocaleLowerCase() },
-            'On break: {action}'
-          ),
-      subtitle: immune
-        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewInactive', 'Inactive while this Tool is immune')
-        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak', 'Runs immediately after breakage'),
-    },
-    {
-      id: 'prerequisites',
-      icon: 'fas fa-user-shield',
-      title: prerequisiteLabel,
-      subtitle: tool?.prerequisites?.enabled
-        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisites', 'A character must satisfy every selected prerequisite')
-        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoPrerequisites', 'Any character may use it'),
-    },
-    {
-      id: 'bonus',
-      icon: 'fas fa-plus-minus',
-      title: bonusLabel,
-      subtitle: tool?.bonus?.enabled
-        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus', 'Added to the crafting check')
-        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus', 'Adds nothing to the crafting check'),
-    },
-  ]);
+  const rules = $derived(projectToolBehaviorFacts(tool, authority, text, formattedText));
+  const breakageLabel = $derived(rules.find((rule) => rule.id === 'breakage')?.title || '');
+  const bonusValue = $derived(rules.find((rule) => rule.id === 'bonus')?.title || '');
 </script>
 
 <aside class="manager-tool-preview" data-tool-behavior-preview aria-label={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}>

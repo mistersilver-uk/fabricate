@@ -2,6 +2,9 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Stepper from '../../../components/Stepper.svelte';
+  import ItemDropZone from '../ItemDropZone.svelte';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
   import ToolRepairRequirements from './ToolRepairRequirements.svelte';
 
   let {
@@ -14,6 +17,7 @@
     currencyUnits = [],
     currencyEnabled = false,
     onPatch = () => {},
+    onReplacementItemDrop = () => {},
   } = $props();
   function text(key, fallback) {
     const translated = localize(key);
@@ -60,6 +64,60 @@
     replacementTypeChoice = type;
     setReplacement(type, '');
   }
+  const breakageModeOptions = $derived(['limitedUses', 'breakageChance', 'diceExpression'].map((mode) => ({
+    value: mode,
+    label: breakageModeLabel(mode),
+    description: breakageModeDescription(mode),
+    icon: breakageModeIcon(mode),
+  })));
+  const breakabilityOptions = $derived([
+    {
+      value: 'breakable',
+      label: text('FABRICATE.Admin.Manager.Tools.SummaryBreakable', 'Breakable'),
+      description: text('FABRICATE.Admin.Manager.Tools.BreakageBreakableHint', 'The active check may break this Tool.'),
+      icon: 'fas fa-hammer',
+    },
+    {
+      value: 'immune',
+      label: text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune'),
+      description: text('FABRICATE.Admin.Manager.Tools.BreakageImmuneHint', 'This Tool ignores check-driven breakage.'),
+      icon: 'fas fa-shield',
+    },
+  ]);
+  const onBreakOptions = $derived(['destroy', 'flagBroken', 'replaceWith'].map((mode) => ({
+    value: mode,
+    label: onBreakModeLabel(mode),
+    description: onBreakModeDescription(mode),
+    icon: onBreakModeIcon(mode),
+  })));
+  const replacementTypeOptions = $derived([
+    {
+      value: 'component',
+      label: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponent', 'Managed Component'),
+      description: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponentHint', 'Replace with a Component managed by this crafting system.'),
+      icon: 'fas fa-cube',
+    },
+    {
+      value: 'item',
+      label: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementItem', 'Direct Item'),
+      description: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementItemHint', 'Replace with a dropped world or compendium Item.'),
+      icon: 'fas fa-box',
+    },
+  ]);
+  const componentPickerOptions = $derived(componentOptions.map((option) => ({
+    id: option.id,
+    label: option.name,
+    img: option.img,
+  })));
+  const selectedComponent = $derived(
+    componentOptions.find((option) => option.id === onBreak.replacementTarget?.componentId)
+  );
+  const replacementItem = $derived.by(() => {
+    if (onBreak.replacementTarget?.type !== 'item' || !onBreak.replacementTarget.itemUuid) return null;
+    const uuid = onBreak.replacementTarget.itemUuid;
+    const resolved = worldItems.find((item) => item.uuid === uuid);
+    return resolved || { uuid, name: uuid, img: 'icons/svg/item-bag.svg' };
+  });
   function breakageModeLabel(mode) {
     return {
       limitedUses: text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses'),
@@ -108,7 +166,7 @@
   <section class="manager-tool-authority-readonly" data-tool-breakage-authority-explanation>
     <span class="manager-tool-authority-icon"><i class="fas fa-sliders" aria-hidden="true"></i></span>
     <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</p><h3>{authority === 'checkDriven' ? text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven') : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')}</h3><p>{text('FABRICATE.Admin.Manager.Tools.Editor.AuthorityExplanation', 'Set for every Tool from the Tools library.')}</p></div>
-    <span class="manager-chip is-neutral"><i class="fas fa-lock" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System-wide')}</span>
+    <span class="manager-chip is-neutral"><i class="fas fa-lock" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System-wide')}</span></span>
   </section>
 
   <section class="manager-tool-breakage-method">
@@ -119,18 +177,16 @@
       </div>
     </div>
     {#if authority === 'toolSpecific'}
-      <div class="manager-tool-choice-grid" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}>
-        {#each ['limitedUses', 'breakageChance', 'diceExpression'] as mode (mode)}
-          <label class="manager-tool-choice-card" class:is-selected={tool?.breakage?.mode === mode} data-tool-breakage-choice={mode}>
-            <input type="radio" name="tool-breakage-mode" value={mode} checked={tool?.breakage?.mode === mode} onchange={() => changeMode(mode)} />
-            <span class="manager-tool-choice-icon" data-tool-choice-icon><i class={breakageModeIcon(mode)} aria-hidden="true"></i></span>
-            <span class="manager-tool-choice-copy">
-              <strong data-tool-choice-title>{breakageModeLabel(mode)}</strong>
-              <small data-tool-choice-description>{breakageModeDescription(mode)}</small>
-            </span>
-          </label>
-        {/each}
-      </div>
+      <RadioCardGroup
+        legend={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}
+        options={breakageModeOptions}
+        selectedValue={tool?.breakage?.mode}
+        groupName="tool-breakage-mode"
+        columns={3}
+        dataGroup="tool-breakage-mode"
+        optionDataAttr="data-tool-breakage-choice"
+        onChange={changeMode}
+      />
       {#if tool?.breakage?.mode === 'limitedUses'}
         <div class="manager-tool-breakage-config" data-tool-limited-uses-stepper>
           <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopy', 'Uses per copy')}</p><small>{text('FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopyHint', 'A fresh copy starts with this many uses.')}</small></div>
@@ -151,24 +207,16 @@
         <div class="manager-tool-inline-fields"><label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span><input data-tool-breakage-formula value={tool?.breakage?.formula || ''} oninput={(event) => patchBreakage({ formula: event.currentTarget.value })} /></label><label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}</span><input data-tool-breakage-threshold type="number" value={tool?.breakage?.threshold ?? 0} oninput={(event) => patchBreakage({ threshold: Number(event.currentTarget.value) })} /></label></div>
       {/if}
     {:else}
-      <div class="manager-tool-choice-grid is-two-up" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}>
-        <label class="manager-tool-choice-card" class:is-selected={tool?.checkBreakable !== false} data-tool-breakability-choice="breakable">
-          <input type="radio" name="tool-check-breakable" value="breakable" checked={tool?.checkBreakable !== false} onchange={() => onPatch({ checkBreakable: true })} />
-          <span class="manager-tool-choice-icon" data-tool-choice-icon><i class="fas fa-hammer" aria-hidden="true"></i></span>
-          <span class="manager-tool-choice-copy">
-            <strong data-tool-choice-title>{text('FABRICATE.Admin.Manager.Tools.SummaryBreakable', 'Breakable')}</strong>
-            <small data-tool-choice-description>{text('FABRICATE.Admin.Manager.Tools.BreakageBreakableHint', 'The active check may break this Tool.')}</small>
-          </span>
-        </label>
-        <label class="manager-tool-choice-card" class:is-selected={tool?.checkBreakable === false} data-tool-breakability-choice="immune">
-          <input type="radio" name="tool-check-breakable" value="immune" checked={tool?.checkBreakable === false} onchange={() => onPatch({ checkBreakable: false })} />
-          <span class="manager-tool-choice-icon" data-tool-choice-icon><i class="fas fa-shield" aria-hidden="true"></i></span>
-          <span class="manager-tool-choice-copy">
-            <strong data-tool-choice-title>{text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune')}</strong>
-            <small data-tool-choice-description>{text('FABRICATE.Admin.Manager.Tools.BreakageImmuneHint', 'This Tool ignores check-driven breakage.')}</small>
-          </span>
-        </label>
-      </div>
+      <RadioCardGroup
+        legend={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}
+        options={breakabilityOptions}
+        selectedValue={tool?.checkBreakable === false ? 'immune' : 'breakable'}
+        groupName="tool-check-breakable"
+        columns={2}
+        dataGroup="tool-breakability"
+        optionDataAttr="data-tool-breakability-choice"
+        onChange={(value) => onPatch({ checkBreakable: value === 'breakable' })}
+      />
     {/if}
   </section>
 
@@ -176,25 +224,51 @@
     <legend><span>{text('FABRICATE.Admin.Manager.Tools.Editor.WhenItBreaks', 'When it breaks')}</span><small>{immune ? text('FABRICATE.Admin.Manager.Tools.Editor.InactiveWhileImmune', 'Inactive while Immune') : text('FABRICATE.Admin.Manager.Tools.Editor.AlwaysFires', 'Always fires')}</small></legend>
     <p>{text('FABRICATE.Admin.Manager.Tools.Editor.WhenItBreaksHint', 'Every Tool has an on-break action. It runs the moment breakage is triggered.')}</p>
     {#if immune}<p class="manager-tool-info-strip"><i class="fas fa-shield" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.ImmuneHint', 'Immune Tools never run an on-break action.')}</p>{/if}
-    <div class="manager-tool-choice-grid" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}>
-      {#each ['destroy', 'flagBroken', 'replaceWith'] as action (action)}
-        <label class="manager-tool-choice-card" class:is-selected={onBreak.mode === action} data-tool-on-break-choice={action}>
-          <input type="radio" name="tool-on-break" value={action} checked={onBreak.mode === action} disabled={immune} onchange={() => setOnBreakMode(action)} />
-          <span class="manager-tool-choice-icon" data-tool-choice-icon><i class={onBreakModeIcon(action)} aria-hidden="true"></i></span>
-          <span class="manager-tool-choice-copy">
-            <strong data-tool-choice-title>{onBreakModeLabel(action)}</strong>
-            <small data-tool-choice-description>{onBreakModeDescription(action)}</small>
-          </span>
-        </label>
-      {/each}
-    </div>
+    <RadioCardGroup
+      legend={text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}
+      options={onBreakOptions}
+      selectedValue={onBreak.mode}
+      groupName="tool-on-break"
+      columns={3}
+      disabled={immune}
+      dataGroup="tool-on-break"
+      optionDataAttr="data-tool-on-break-choice"
+      onChange={setOnBreakMode}
+    />
     {#if onBreak.mode === 'replaceWith'}
-      <div class="manager-tool-replacement-grid" data-tool-replacement-target>
-        <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementType', 'Replacement target type')}</span><select data-tool-replacement-type value={replacementTypeChoice} onchange={(event) => setReplacementType(event.currentTarget.value)}><option value="component">{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponent', 'Managed Component')}</option><option value="item">{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementItem', 'Direct Item')}</option></select></label>
+      <div class="manager-tool-replacement-stack" data-tool-replacement-target>
+        <RadioCardGroup
+          legend={text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementType', 'Replacement target type')}
+          options={replacementTypeOptions}
+          selectedValue={replacementTypeChoice}
+          groupName="tool-replacement-type"
+          columns={2}
+          dataGroup="tool-replacement-type"
+          onChange={setReplacementType}
+        />
         {#if replacementTypeChoice === 'component'}
-          <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponent', 'Managed Component')}</span><select data-tool-replacement-picker value={onBreak.replacementTarget?.type === 'component' ? onBreak.replacementTarget.componentId : ''} onchange={(event) => setReplacement('component', event.currentTarget.value)}><option value="">{text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}</option>{#each componentOptions as option (option.id)}<option value={option.id}>{option.name}</option>{/each}</select></label>
+          <SearchablePopover
+            options={componentPickerOptions}
+            value={selectedComponent?.id || ''}
+            triggerClass="manager-button manager-tool-replacement-component-trigger"
+            triggerIcon="fas fa-cube"
+            triggerImg={selectedComponent?.img || ''}
+            triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+            triggerAriaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+            dialogAriaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+            onChoose={(value) => setReplacement('component', value)}
+          />
         {:else}
-          <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementItem', 'Direct Item')}</span><select data-tool-replacement-picker value={onBreak.replacementTarget?.type === 'item' ? onBreak.replacementTarget.itemUuid : ''} onchange={(event) => setReplacement('item', event.currentTarget.value)}><option value="">{text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}</option>{#each worldItems as item (item.uuid)}<option value={item.uuid}>{item.name}</option>{/each}</select></label>
+          <ItemDropZone
+            kind="tool-replacement"
+            item={replacementItem}
+            title={text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementDropTitle', 'Drop a replacement Item here')}
+            hint={text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementDropHint', 'Drop a world or compendium Item to replace the current target.')}
+            onDrop={onReplacementItemDrop}
+            unlinkLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ClearReplacement', 'Clear replacement Item')}
+            onUnlink={replacementItem ? () => setReplacement('item', '') : null}
+          />
         {/if}
       </div>
     {/if}

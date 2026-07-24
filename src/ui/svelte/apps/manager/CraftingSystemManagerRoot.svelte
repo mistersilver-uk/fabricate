@@ -6,6 +6,7 @@
     DEFAULT_GATHERING_TASK_IMG
   } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyWarn } from '../../util/foundryBridge.js';
+  import { resolveDropUuid } from '../../util/dropUtils.js';
   import {
     routedSuccessTierOptions,
     routedOutcomeTierOptions,
@@ -46,7 +47,6 @@
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import ToolBrowserInspector from './tools/ToolBrowserInspector.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
-  import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeBrowserInspector from './recipes/RecipeBrowserInspector.svelte';
   // The component library's inspector (issue 676) — the sibling of the above. It lives
@@ -3587,38 +3587,48 @@
 
   async function addToolFromDrop(data) {
     if (!data) return false;
-    if (data.type === 'FabricateManagedComponent') {
-      const componentId = data.componentId || data.id;
-      if (!componentId) return false;
-      return createToolEditor({ componentId });
-    }
-    if (!data.uuid) return false;
-    const source = await services?.resolveToolSource?.(data.uuid);
+    const uuid = resolveDropUuid(data);
+    if (!uuid) return false;
+    const source = await services?.resolveToolSource?.(uuid);
     if (!source) return false;
     const created = store.createToolDraft?.({}, selectedSystemId);
     if (!created) return false;
-    store.stageToolDraftSource?.(data.uuid, source);
+    store.stageToolDraftSource?.(source.uuid || uuid, source);
     toolEditorActiveTab = 'overview';
     activeView = 'tool-edit';
     return true;
   }
 
   async function stageToolEditorSourceDrop(data) {
-    if (!data?.uuid) return false;
-    const snapshot = worldItemOptions.find((item) => item.uuid === data.uuid)
-      || await services?.resolveToolSource?.(data.uuid);
+    const uuid = resolveDropUuid(data);
+    if (!uuid) return false;
+    const snapshot = worldItemOptions.find((item) => item.uuid === uuid)
+      || await services?.resolveToolSource?.(uuid);
     if (!snapshot) return false;
-    store.stageToolDraftSource?.(data.uuid, snapshot);
+    store.stageToolDraftSource?.(snapshot.uuid || uuid, snapshot);
     return true;
   }
 
-  function createToolFromWorldItem(item) {
-    if (!item?.uuid) return false;
-    const created = store.createToolDraft?.({}, selectedSystemId);
-    if (!created) return false;
-    store.stageToolDraftSource?.(item.uuid, item);
-    enterToolEditor();
+  async function stageToolReplacementItemDrop(data) {
+    const uuid = resolveDropUuid(data);
+    if (!uuid) return false;
+    const source = await services?.resolveToolSource?.(uuid);
+    if (!source || !focusedToolDraft) return false;
+    store.patchToolDraft?.({
+      onBreak: {
+        ...(focusedToolDraft.onBreak || {}),
+        replacementTarget: {
+          type: 'item',
+          itemUuid: source.uuid || uuid,
+        },
+      },
+    });
     return true;
+  }
+
+  async function toggleFocusedToolEnabled(enabled) {
+    if (!focusedToolDraft?.id || $viewState.toolDraftBaseline === null) return false;
+    return store.toggleToolEnabled?.(focusedToolDraft.id, enabled, selectedSystemId);
   }
 
   function gatheringConditionOptions(kind) {
@@ -3764,13 +3774,6 @@
   function enterToolEditor() {
     toolEditorActiveTab = 'overview';
     activeView = 'tool-edit';
-  }
-
-  function createToolEditor(initialPatch = {}) {
-    const created = store?.createToolDraft?.(initialPatch, selectedSystemId);
-    if (!created) return false;
-    enterToolEditor();
-    return true;
   }
 
   function openToolEditor(toolId) {
@@ -3961,8 +3964,12 @@
   }
 
   // Link / unlink the linked world item behind the edited recipe item (staged).
-  function linkRecipeItemSource(uuid) {
-    patchRecipeItemDraft({ originItemUuid: uuid || null });
+  async function linkRecipeItemSource(uuid) {
+    if (!uuid) return false;
+    const source = await services?.resolveToolSource?.(uuid);
+    if (!source) return false;
+    patchRecipeItemDraft({ originItemUuid: source.uuid || uuid });
+    return true;
   }
 
   function unlinkRecipeItemSource() {
@@ -5436,12 +5443,9 @@
         tools={libraryToolsList}
         selectedToolId={focusedToolDraft?.id || ''}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
-        worldItems={worldItemOptions}
         breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onSelectTool={selectLibraryTool}
         onEditTool={openToolEditor}
-        onCreateTool={(initialPatch) => createToolEditor(initialPatch || {})}
-        onCreateFromItem={createToolFromWorldItem}
         onCreateToolDrop={addToolFromDrop}
         onToggleToolEnabled={(id, enabled) => store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
         onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
@@ -5452,6 +5456,7 @@
         systemName={selectedSystem.name}
         validation={focusedToolValidation}
         dirty={$viewState.toolDraftDirty === true}
+        persisted={$viewState.toolDraftBaseline !== null}
         saving={$viewState.toolDraftSaving === true}
         saveError={$viewState.toolDraftSaveError}
         activeTab={toolEditorActiveTab}
@@ -5473,6 +5478,8 @@
         onTabChange={(tab) => { toolEditorActiveTab = tab; }}
         onPatch={(patch) => store.patchToolDraft?.(patch)}
         onSourceDrop={stageToolEditorSourceDrop}
+        onReplacementItemDrop={stageToolReplacementItemDrop}
+        onToggleEnabled={toggleFocusedToolEnabled}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
         onUnlinkSource={() => store.unlinkToolDraftSource?.()}
       />
@@ -5657,7 +5664,6 @@
         linkedRecipes={recipeItemEditorLinkedRecipes}
         availableRecipes={recipeItemEditorAvailableRecipes}
         characterPrerequisites={selectedCharacterPrerequisites}
-        worldItems={worldItemOptions}
         visibilityMode={craftingVisibilityMode}
         activeTab={recipeItemActiveTab}
         onSelectTab={(tab) => recipeItemActiveTab = tab}

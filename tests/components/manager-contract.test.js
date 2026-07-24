@@ -213,7 +213,7 @@ describe('CraftingSystemManager source contract', () => {
 
     assert.ok(
       buildServicesSource.includes('getWorldItemOptions: () =>') &&
-        buildServicesSource.includes('resolveToolSource: async (uuid) =>'),
+        buildServicesSource.includes('resolveToolSource: (uuid) => resolveItemSourceSnapshot(uuid)'),
       'the internal service set should define the world Item projection and Tool source resolver'
     );
     assert.ok(
@@ -1605,14 +1605,13 @@ describe('CraftingSystemManager source contract', () => {
       "currentView === 'tool-edit'",
       'focusedToolDraft',
       'focusedToolValidation',
-      'createToolEditor',
       'openToolEditor',
       'selectLibraryTool',
       'backToToolsBrowser',
       'saveSelectedToolDraft',
       'deleteSelectedLibraryTool',
       'confirmToolsRouteExit',
-      'store?.createToolDraft',
+      'store.createToolDraft?.',
       'store?.openToolDraft',
       'store?.saveToolDraft',
       'store?.deleteToolDraft',
@@ -1640,7 +1639,10 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(toolEditSource.includes('<ToolRequirementsTab'), 'focused editor should render its requirements tab');
     assert.ok(!toolRequirementsSource.includes('ProviderExpressionInput'), 'Tool requirements should use shared prerequisites rather than provider selection');
     assert.ok(toolRequirementsSource.includes('manager-tool-prerequisite-list'), 'Tool requirements should expose the shared prerequisite picker');
-    assert.ok(toolRequirementsSource.includes('data-tool-bonus-expression'), 'Tool requirements should expose the numeric bonus expression');
+    assert.ok(
+      toolRequirementsSource.includes('RollDataExpressionInput'),
+      'Tool requirements should reuse the roll-data expression input'
+    );
     assert.ok(
       /manager-tool-section-heading[\s\S]*?<h3><i class="fas fa-heart-crack"[\s\S]*?<\/h3>[\s\S]*?<p>/.test(toolBreakageSource),
       'Breakage should render its icon heading and immediate hint before the method cards'
@@ -1649,15 +1651,24 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(!toolOverviewSource.includes('compactSourceId'), 'Overview should not expose the raw or compact source UUID');
     assert.ok(!toolOverviewSource.includes('<code title={source.uuid'), 'Overview should not render the source UUID below the source name');
     assert.ok(
-      /data-tool-source-copy-uuid[\s\S]*?data-tool-source-unlink/.test(toolOverviewSource),
+      toolOverviewSource.includes('<ItemDropZone'),
+      'Overview should reuse the shared drag-only Item drop zone'
+    );
+    assert.ok(
+      /copyLabel=[\s\S]*?unlinkLabel=/.test(toolOverviewSource),
       'Overview should place the Copy source UUID action before Unlink'
     );
-    assert.ok(toolOverviewSource.includes('data-tool-source-drop-hint'), 'Overview should explain that dropping an Item replaces the linked source');
-    assert.ok(!toolOverviewSource.includes('data-tool-source-replace'), 'Overview should not offer the removed source picker');
-    assert.ok(toolOverviewSource.includes('manager-tool-source-actions'), 'Overview should retain compact trailing source actions');
     assert.ok(
-      /manager-tool-validation-errors[\s\S]*?<h3>\{text\('FABRICATE\.Admin\.Manager\.Tools\.Editor\.DomainErrors', 'Save blockers'\)\}<\/h3>/.test(toolValidationSource),
-      'Validation should scope the Save blockers hierarchy to its error section'
+      toolOverviewSource.includes('SourceDropHint'),
+      'Overview should explain that dropping an Item replaces the linked source'
+    );
+    assert.ok(
+      !toolOverviewSource.includes('data-tool-source-replace'),
+      'Overview should not offer the removed source picker'
+    );
+    assert.ok(
+      toolValidationSource.includes('<EditorValidationSurface'),
+      'Validation should reuse the recipe-style editor validation surface'
     );
   });
 

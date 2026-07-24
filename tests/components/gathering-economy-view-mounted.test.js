@@ -67,6 +67,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     writeFileSync(util, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js')).href);

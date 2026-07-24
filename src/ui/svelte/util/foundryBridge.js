@@ -552,3 +552,29 @@ export function getDragEventData(event) {
 
   return null;
 }
+
+/**
+ * Resolve a Foundry UUID to the small, system-agnostic Item snapshot used by
+ * manager drop zones. Non-Item documents, missing documents, and resolver
+ * failures are rejected before a caller mutates draft state.
+ *
+ * @param {string} uuid
+ * @returns {Promise<{uuid:string,name:string,img:string,type:string,description:string}|null>}
+ */
+export async function resolveItemSourceSnapshot(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return null;
+  try {
+    const item = await globalThis.fromUuid(uuid);
+    if (item?.documentName !== 'Item') return null;
+    const rawDescription = item.system?.description?.value ?? item.system?.description ?? '';
+    return {
+      uuid: item.uuid || uuid,
+      name: item.name || '',
+      img: item.img || '',
+      type: item.type || '',
+      description: typeof rawDescription === 'string' ? rawDescription : '',
+    };
+  } catch {
+    return null;
+  }
+}

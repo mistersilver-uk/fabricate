@@ -94,6 +94,11 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ChecklistCardRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EditorValidationSurface.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ItemDropZone.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RollDataExpressionInput.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
@@ -9838,7 +9843,6 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('keeps the compact Tool library hierarchy callback-complete and selects a row once', async () => {
     const selections = [];
     const authorityChanges = [];
-    const created = [];
     const dropped = [];
     const edits = [];
     const enabledChanges = [];
@@ -9854,10 +9858,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         tools: [toolRouteFixture],
         managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
-        worldItems: [worldItem],
         onSelectTool: (id) => selections.push(id),
-        onCreateTool: (patch) => { created.push(['unlinked', patch]); },
-        onCreateFromItem: (item) => { created.push(['item', item.uuid]); },
         onCreateToolDrop: (data) => { dropped.push(data); },
         onSetBreakageAuthority: (authority) => { authorityChanges.push(authority); },
         onEditTool: (id) => { edits.push(id); },
@@ -9867,7 +9868,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.deepEqual(
-      [...target.querySelector('[data-tool-library]').children].map((element) =>
+      [...target.querySelector('.manager-tools-main-content').children].map((element) =>
         element.hasAttribute('data-manager-tools-authority')
           ? 'authority'
           : element.hasAttribute('data-manager-tools-search')
@@ -9905,31 +9906,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the bare search control does not disguise the result count as a chip'
     );
     assert.equal(target.querySelector('[data-tool-result-count]').textContent.trim(), '1 tool');
-    assert.equal(createCard.querySelector('summary').textContent.trim(), '');
-    assert.equal(createCard.querySelector('summary').getAttribute('aria-label'), 'Create Tool');
-    assert.equal(
-      createCard.querySelectorAll(':scope > .manager-tools-item-shortcuts').length,
-      0,
-      'one-click shortcuts stay inside the compact creation action row'
-    );
-    createCard.querySelector('[data-tool-create-unlinked]').click();
-    const itemSelect = createCard.querySelector('select');
-    itemSelect.value = worldItem.uuid;
-    itemSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    createCard.querySelector('[data-tool-create-selected-item]').click();
-    createCard.querySelector(`[data-tool-item-shortcut="${worldItem.uuid}"]`).click();
+    assert.equal(createCard.querySelector('summary, select, button'), null);
     const drop = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(drop, 'dataTransfer', {
       value: { getData: () => JSON.stringify({ type: 'Item', uuid: worldItem.uuid }) },
     });
-    createCard.dispatchEvent(drop);
-    assert.deepEqual(created, [
-      ['unlinked', {}],
-      ['item', worldItem.uuid],
-      ['item', worldItem.uuid],
-    ]);
+    createCard.querySelector('[data-item-drop-zone="tool-create"]').dispatchEvent(drop);
+    await tick();
+    flushSync();
     assert.deepEqual(dropped, [{ type: 'Item', uuid: worldItem.uuid }]);
 
     target.querySelector('.manager-tools-enabled-toggle').click();
@@ -10118,15 +10102,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       inspector.querySelector('[data-tool-inspector-description]').textContent,
       'A well-balanced forge hammer.'
     );
-    assert.equal(inspector.querySelector('[data-tool-inspector-breakage]').textContent, '5 uses');
-    assert.equal(inspector.querySelector('[data-tool-inspector-on-break]').textContent, 'Destroy');
     assert.match(
-      inspector.querySelector('[data-tool-inspector-prerequisites]').textContent,
-      /1 prerequisite.*Proficient with Smith's Tools/
+      inspector.querySelector('[data-tool-inspector-rule="breakage"]').textContent,
+      /Breakage.*5 uses/
     );
     assert.match(
-      inspector.querySelector('[data-tool-inspector-bonus]').textContent,
-      /Adds to the check.*@prof/
+      inspector.querySelector('[data-tool-inspector-rule="on-break"]').textContent,
+      /On break.*destroy the item/i
+    );
+    assert.match(
+      inspector.querySelector('[data-tool-inspector-rule="prerequisites"]').textContent,
+      /Prerequisites.*1 prerequisite/
+    );
+    assert.match(
+      inspector.querySelector('[data-tool-inspector-rule="bonus"]').textContent,
+      /Check bonus.*Adds @prof/
     );
     assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
   });
@@ -10225,18 +10215,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(editor.querySelector('footer'), null);
   });
 
-  it('hydrates world Items for Tool creation and direct-Item replacement', async () => {
-    const replacementItem = {
-      uuid: 'Item.replacement-hammer',
-      name: 'Replacement Hammer',
-      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
-      type: 'equipment',
-    };
-    const serviceCalls = [];
-    let resolveWorldItems;
-    const worldItems = new Promise((resolve) => {
-      resolveWorldItems = resolve;
-    });
+  it('keeps Tool creation and direct-Item replacement drag-only', async () => {
     const calls = await mountToolRoute({
       storeOptions: {
         gatheringLibraryTools: [
@@ -10246,46 +10225,22 @@ describe('CraftingSystemManager mounted behavior', () => {
           },
         ],
       },
-      services: {
-        getWorldItemOptions: () => {
-          serviceCalls.push('getWorldItemOptions');
-          return worldItems;
-        },
-      },
     });
 
-    assert.deepEqual(serviceCalls, ['getWorldItemOptions']);
-    resolveWorldItems([replacementItem]);
-    await tick();
-    flushSync();
-
-    const creationSelect = target.querySelector(
-      ':scope [data-tool-create-card] select[aria-label="Select an Item"]'
-    );
-    assert.equal(
-      creationSelect.querySelector(`:scope > option[value="${replacementItem.uuid}"]`)?.textContent,
-      replacementItem.name
-    );
+    assert.ok(target.querySelector('[data-item-drop-zone="tool-create"]'));
+    assert.equal(target.querySelector('[data-tool-create-card] select'), null);
 
     await openFixtureToolEditor(calls);
     target.querySelector('#tool-tab-breakage').click();
     await tick();
     flushSync();
 
-    const replacementTypeSelect = target.querySelector('[data-tool-replacement-type]');
-    replacementTypeSelect.value = 'item';
-    replacementTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    target.querySelector('input[name="tool-replacement-type"][value="item"]').click();
     await tick();
     flushSync();
 
-    const directItemSelect = target.querySelector(
-      ':scope [data-tool-replacement-picker]'
-    );
-    assert.equal(
-      directItemSelect.querySelector(`:scope > option[value="${replacementItem.uuid}"]`)
-        ?.textContent,
-      replacementItem.name
-    );
+    assert.ok(target.querySelector('[data-item-drop-zone="tool-replacement"]'));
+    assert.equal(target.querySelector('[data-tool-replacement-target] select'), null);
   });
 
   it('threads system repair vocabularies and enabled features into the Tool editor', async () => {
@@ -10307,8 +10262,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.ok(target.querySelector('[data-tool-repair-add-group="essence"]'));
-    assert.ok(target.querySelector('[data-tool-repair-add-group="currency"]'));
+    assert.ok(target.querySelector('[data-recipe-add="essence-requirement"]'));
+    assert.ok(target.querySelector('[data-recipe-add="cost"]'));
     target.querySelector('.manager-recipe-or-trigger').click();
     await tick();
     flushSync();
@@ -10316,9 +10271,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(document.querySelector('[data-recipe-add="alternative-currency"]'));
   });
 
-  it('Create opens one unlinked focused Tool draft instead of an inline row editor', async () => {
-    const calls = await mountToolRoute();
-    target.querySelector('[data-tool-create-unlinked]').click();
+  it('a dropped Item opens one linked focused Tool draft instead of an inline row editor', async () => {
+    const calls = await mountToolRoute({
+      services: {
+        resolveToolSource: async (uuid) => ({
+          uuid,
+          name: 'Dropped Hammer',
+          img: 'icons/tools/hand/hammer-cobbler-steel.webp',
+          description: '',
+        }),
+      },
+    });
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.hammer' }) },
+    });
+    target.querySelector('[data-item-drop-zone="tool-create"]').dispatchEvent(drop);
+    await Promise.resolve();
     await tick();
     flushSync();
 
@@ -10373,7 +10342,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
   });
 
-  it('keeps failed Save mounted, opens Validation, and focuses the first failure', async () => {
+  it('keeps failed Save mounted and opens the recipe-style Validation surface', async () => {
     const calls = await mountToolRoute({
       storeOptions: {
         saveToolDraftResult: false,
@@ -10392,10 +10361,9 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tool-edit');
     assert.equal(target.querySelector('[role="tab"][aria-selected="true"]').textContent.trim().startsWith('Validation'), true);
-    const firstFailure = target.querySelector('[data-tool-validation-errors] li');
-    assert.equal(firstFailure.textContent, 'Link an Item or managed Component.');
-    await Promise.resolve();
-    assert.equal(document.activeElement, firstFailure);
+    const firstFailure = target.querySelector('[data-tool-validation-check="source"]');
+    assert.match(firstFailure.textContent, /Link an Item or managed Component/);
+    assert.equal(target.querySelector('[data-editor-validation-count="blocking"]').textContent, '1');
   });
 
   it('uses a separate destructive confirmation and returns to the library without a dirty prompt', async () => {

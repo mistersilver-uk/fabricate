@@ -65,7 +65,7 @@
       onkeydown={(event) => handleKeydown(event, tabs.indexOf(tab))}
     >
       <i class={tab[2]} aria-hidden="true"></i>
-      {text(`Tab${tab[0][0].toUpperCase()}${tab[0].slice(1)}`, tab[1])}
+      <span>{text(`Tab${tab[0][0].toUpperCase()}${tab[0].slice(1)}`, tab[1])}</span>
       {#if tab[0] === 'requirements' && requirementCount > 0}
         <span class="manager-chip is-neutral manager-editor-tab-badge">{requirementCount}</span>
       {:else if tab[0] === 'validation'}

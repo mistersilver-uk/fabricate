@@ -365,10 +365,14 @@ The GM admin must expose a recipe-item management surface for the selected craft
 
 Capabilities:
 
-- Add recipe item definitions from world or compendium items by drag/drop or picker
+- Add recipe item definitions from world or compendium Items by drag/drop only
 - Remove recipe item definitions
 - Show source-linked name and image preview
 - Warn when a recipe item definition's source item no longer resolves
+
+Every Manager surface that links or replaces a Foundry Item uses the same drag-only Item drop-zone primitive.
+It resolves world UUIDs and compendium `pack` + `id` drag payloads through Foundry before mutating state, accepts only a resolved `Item` document, and rejects missing, malformed, Folder, Actor, and compendium-index-only payloads without changing the current source or draft.
+The drop zone has no click-to-browse action, picker, shortcut list, select control, button role, or keyboard-operability claim.
 
 Recipe item definitions are distinct from components:
 
@@ -547,8 +551,9 @@ There is no Tool Kind field, filter, selector, pill, icon taxonomy, or persisted
 
 The library uses the Manager three-column shell at `210px | 1fr | 340px`.
 It owns the sole system-breakage-authority card above search, with self-describing `toolSpecific` and `checkDriven` options; changing authority persists live and never erases the inactive per-Tool settings.
-The center library accepts an Item drop or Item-picker selection to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
-Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state, and the right inspector presents selected-Tool detail and Edit.
+The center library accepts an Item drop to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
+Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state.
+The right inspector presents the selected Tool's identity and description followed by four headed card sections for breakage mode, on-break action, character prerequisites, and check bonus.
 The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
 When Tools exist and the current selection is absent or stale, the library selects the first Tool exactly once; a valid current selection is preserved and an empty library emits no selection.
@@ -556,7 +561,8 @@ The result list scrolls independently above a persistent, full-width pagination 
 
 Each row exposes selection through a keyboard-focusable identity target with explicit selected semantics and Enter/Space activation.
 Selection, Edit, and enabled toggle are distinct localized named hit targets.
-Activating Edit or the toggle does not select or open through the row handler, and the enabled toggle persists live.
+Activating Edit or the toggle does not select or open through the row handler.
+The enabled toggle persists live through the same immediate path as Recipe enabling, updating both the focused draft and its baseline without marking an otherwise-clean editor dirty; a newly-created, not-yet-persisted Tool cannot be enabled through this path.
 
 The editor uses `210px | 1fr | 320px` and exposes exactly four tabs: Overview, Breakage, Requirements, and Validation.
 The header alone owns Back, Delete, Save, and the dirty-state affordance; there is no footer save bar.
@@ -572,9 +578,10 @@ Changing authority or check-driven immunity does not clear the inactive tool-spe
 When `checkBreakable` is false under check-driven authority, on-break controls are actually disabled and removed from interaction while their retained values and the explanation remain readable; opacity or `pointer-events` alone is insufficient.
 
 `flagBroken` authors zero or more Recipe-compatible repair `IngredientGroup`s with the shared AND-groups/OR-options interaction model and Component, Tag, Essence, and Currency match types.
-`replaceWith` authors exactly one managed Component target or direct Item UUID target, with picker/drop and localized unlink controls.
+`replaceWith` authors exactly one managed Component target or direct Item UUID target.
+Managed Components use the shared searchable popover, while direct Items use the same drag-only Item drop-zone primitive as Overview with localized unlink controls.
 Requirements selects shared `system.characterPrerequisites` ids, the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
-Validation lists every failing model check, exposes the first failure for focus, and reports an all-clear state that is not color-only.
+Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Source, Breakage, and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
 
 Leaving a dirty `tool-edit` route through Back, rail or breadcrumb navigation, a system-scope change, another Tool selection, or application close invokes the standard DialogV2 Save / Discard / Keep editing guard.
 Save proceeds only after successful validation and persistence.

@@ -2880,11 +2880,15 @@ export function createAdminStore(services) {
       const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
       if (String(get(toolDraft)?.id || '') === String(saved.id)) {
         const draftWasDirty = get(toolDraftDirty);
-        toolDraft.update((draft) => ({ ...draft, enabled: saved.enabled }));
-        toolDraftBaseline.update((baseline) =>
-          baseline ? { ...baseline, enabled: saved.enabled } : baseline
-        );
-        if (!draftWasDirty) toolDraft.set(_clonePlain(saved));
+        if (draftWasDirty) {
+          toolDraft.update((draft) => ({ ...draft, enabled: saved.enabled }));
+          toolDraftBaseline.update((baseline) =>
+            baseline ? { ...baseline, enabled: saved.enabled } : baseline
+          );
+        } else {
+          toolDraft.set(_clonePlain(saved));
+          toolDraftBaseline.set(_clonePlain(saved));
+        }
         _recomputeToolsDraftDirty();
       }
       await refresh();

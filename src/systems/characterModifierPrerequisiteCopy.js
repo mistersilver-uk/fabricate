@@ -40,6 +40,36 @@ export function stripExpressionSigil(expression) {
     .replace(/^@/, '');
 }
 
+const BARE_ROLL_DATA_PATH = /^[A-Za-z_][\w.]*$/;
+const SIGIL_ROLL_DATA_PATH = /^@[A-Za-z_][\w.]*$/;
+
+/**
+ * Present a pure roll-data path without its leading sigil. Formulae remain
+ * byte-for-byte visible because a fixed adornment would otherwise corrupt their
+ * meaning on the next edit.
+ *
+ * @param {*} expression Stored roll expression.
+ * @returns {string} Display value for the expression input.
+ */
+export function displayRollDataExpression(expression) {
+  const clean = String(expression ?? '').trim();
+  return SIGIL_ROLL_DATA_PATH.test(clean) ? clean.slice(1) : clean;
+}
+
+/**
+ * Restore the Foundry roll-data sigil for a pure path while leaving dice,
+ * constants, functions, and compound expressions unchanged.
+ *
+ * @param {*} input Displayed expression value.
+ * @returns {string} Expression safe to persist and pass to Foundry Roll.
+ */
+export function toStoredRollDataExpression(input) {
+  const clean = String(input ?? '').trim();
+  if (!clean) return '';
+  if (clean.startsWith('@')) return clean;
+  return BARE_ROLL_DATA_PATH.test(clean) ? `@${clean}` : clean;
+}
+
 /**
  * Strip a single leading `@` from a modifier expression to yield a prerequisite
  * path.

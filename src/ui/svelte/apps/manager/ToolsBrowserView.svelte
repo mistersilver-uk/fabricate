@@ -1,20 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ItemDropZone from './ItemDropZone.svelte';
   import { filterTools, projectToolRow } from './tools/toolStudio.js';
 
   let {
     tools = [],
     selectedToolId = '',
     managedItemOptions = [],
-    worldItems = [],
     breakageAuthority = 'toolSpecific',
     onSelectTool = () => {},
     onEditTool = () => {},
-    onCreateTool = () => {},
-    onCreateFromItem = () => {},
     onCreateToolDrop = () => {},
     onToggleToolEnabled = () => {},
     onSetBreakageAuthority = () => {},
@@ -23,7 +20,6 @@
   let searchTerm = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(8);
-  let selectedItemUuid = $state('');
   let autoSelectedToolId = $state('');
 
   function text(key, fallback) {
@@ -51,11 +47,6 @@
 
   function chooseTool(tool) {
     onSelectTool(tool.id);
-  }
-
-  function createSelectedItem() {
-    const item = worldItems.find((entry) => entry.uuid === selectedItemUuid);
-    if (item) onCreateFromItem(item);
   }
 
   function countLabel(count) {
@@ -106,7 +97,8 @@
 </script>
 
 <main class="manager-main manager-tools-main" aria-label={text('FABRICATE.Admin.Manager.Tools.Title', 'Tools')} data-tool-library>
-  <section class="manager-inspector-card manager-tools-authority-card" data-manager-tools-authority>
+  <div class="manager-tools-main-content">
+    <section class="manager-inspector-card manager-tools-authority-card" data-manager-tools-authority>
     <div class="manager-tools-authority-heading">
       <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
       <div><strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</strong></div>
@@ -132,67 +124,33 @@
       {/each}
     </div>
     <small class="manager-tools-authority-caption">{authorityCaption()}</small>
-  </section>
+    </section>
 
-  <section class="manager-tools-library-card" data-manager-tools-search>
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        value={searchTerm}
-        oninput={(event) => { searchTerm = event.currentTarget.value; pageIndex = 0; }}
-        placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
-        aria-label={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+    <section class="manager-tools-library-card" data-manager-tools-search>
+      <label class="manager-search">
+        <i class="fas fa-search" aria-hidden="true"></i>
+        <input
+          type="search"
+          value={searchTerm}
+          oninput={(event) => { searchTerm = event.currentTarget.value; pageIndex = 0; }}
+          placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+          aria-label={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+        />
+      </label>
+    </section>
+
+    <section class="manager-tools-create-card" data-tool-create-card>
+      <ItemDropZone
+        kind="tool-create"
+        title={text('FABRICATE.Admin.Manager.Tools.CreateDropTitle', 'Drag an Item here to make it a Tool')}
+        hint={text('FABRICATE.Admin.Manager.Tools.CreateDropHint', 'Drop an Item from the Items directory or a compendium.')}
+        onDrop={onCreateToolDrop}
       />
-    </label>
-  </section>
+    </section>
 
-  <section class="manager-tools-create-card" data-tool-create-card use:dragDrop={{ onDrop: onCreateToolDrop, activeClass: 'is-drop-active' }}>
-    <div class="manager-tools-create-prompt" data-tool-create-drop-prompt>
-      <span class="manager-tools-create-icon"><i class="fas fa-hand-pointer" aria-hidden="true"></i></span>
-      <div>
-        <strong>{text('FABRICATE.Admin.Manager.Tools.CreateDropTitle', 'Drag an Item here to make it a Tool')}</strong>
-        <span>{text('FABRICATE.Admin.Manager.Tools.CreateDropHint', 'Drop from the Items directory or a compendium — or click to browse.')}</span>
-      </div>
-    </div>
-    <details class="manager-tools-create-disclosure">
-      <summary
-        aria-label={text('FABRICATE.Admin.Manager.Tools.Create', 'Create Tool')}
-        title={text('FABRICATE.Admin.Manager.Tools.Create', 'Create Tool')}
-      ><i class="fas fa-plus" aria-hidden="true"></i></summary>
-      <div class="manager-tools-create-actions">
-        <button type="button" class="manager-button" data-tool-create-unlinked onclick={() => onCreateTool({})}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Tools.CreateUnlinked', 'Create unlinked')}</span>
-        </button>
-        <select
-          value={selectedItemUuid}
-          aria-label={text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}
-          onchange={(event) => { selectedItemUuid = event.currentTarget.value; }}
-        >
-          <option value="">{text('FABRICATE.Admin.Manager.Tools.SelectItem', 'Select an Item')}</option>
-          {#each worldItems as item (item.uuid)}<option value={item.uuid}>{item.name}</option>{/each}
-        </select>
-        <button type="button" class="manager-button is-primary" data-tool-create-selected-item onclick={createSelectedItem} disabled={!selectedItemUuid}>
-          {text('FABRICATE.Admin.Manager.Tools.CreateFromItem', 'Create from Item')}
-        </button>
-        {#if worldItems.length > 0}
-          <div class="manager-tools-item-shortcuts" aria-label={text('FABRICATE.Admin.Manager.Tools.ItemShortcuts', 'Item shortcuts')}>
-            {#each worldItems.slice(0, 4) as item (item.uuid)}
-              <button type="button" onclick={() => onCreateFromItem(item)} data-tool-item-shortcut={item.uuid} title={item.name}>
-                <img src={item.img || 'icons/svg/item-bag.svg'} alt="" />
-                <span>{item.name}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </details>
-  </section>
-
-  <section class="manager-tools-library-card" data-manager-tools-browser>
-    <p class="manager-tools-result-summary" data-tool-result-count>{countLabel(filteredTools.length)}</p>
-    <div class="manager-tools-library-scroll" data-tool-library-scroll>
+    <section class="manager-tools-library-card" data-manager-tools-browser>
+      <p class="manager-tools-result-summary" data-tool-result-count>{countLabel(filteredTools.length)}</p>
+      <div class="manager-tools-library-scroll" data-tool-library-scroll>
       {#if tools.length === 0}
         <div class="manager-empty" data-tool-library-empty>
           <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
@@ -258,19 +216,20 @@
           {/each}
         </div>
       {/if}
-    </div>
-    {#if tools.length > 0}
-      <div class="manager-tools-browser-pagination" data-tool-browser-pagination>
-        <Pagination
-          totalCount={filteredTools.length}
-          {pageSize}
-          {pageIndex}
-          pageSizeOptions={[8, 16, 24]}
-          persistent
-          onPageChange={(next) => { pageIndex = next; }}
-          onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
-        />
       </div>
-    {/if}
-  </section>
+    </section>
+  </div>
+  {#if tools.length > 0}
+    <div class="manager-tools-browser-pagination" data-tool-browser-pagination>
+      <Pagination
+        totalCount={filteredTools.length}
+        {pageSize}
+        {pageIndex}
+        pageSizeOptions={[8, 16, 24]}
+        persistent
+        onPageChange={(next) => { pageIndex = next; }}
+        onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+      />
+    </div>
+  {/if}
 </main>

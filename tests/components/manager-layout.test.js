@@ -949,12 +949,16 @@ test('Tool Overview source remains a visible drag-only drop zone with first-line
 
 test('Tool library pins a full-width pagination footer outside its scrolling result region', () => {
   const mainBlock = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-tools-main');
+  const mainContentBlock = blockFor('.fabricate-manager .manager-tools-main-content');
   const libraryBlock = blockFor('.fabricate-manager .manager-tools-library-card');
   const scrollBlock = blockFor('.fabricate-manager .manager-tools-library-scroll');
   const footerBlock = blockFor('.fabricate-manager .manager-tools-browser-pagination');
   const paginationBlock = blockFor('.fabricate-manager .manager-tools-browser-pagination .manager-pagination');
 
-  assert.ok(mainBlock.includes('grid-template-rows: auto auto auto minmax(0, 1fr);'));
+  assert.ok(mainBlock.includes('padding: 0;'));
+  assert.ok(mainBlock.includes('overflow: hidden;'));
+  assert.ok(mainContentBlock.includes('flex: 1 1 auto;'));
+  assert.ok(mainContentBlock.includes('overflow: hidden;'));
   assert.ok(libraryBlock.includes('min-height: 0;'));
   assert.ok(scrollBlock.includes('flex: 1 1 auto;'));
   assert.ok(scrollBlock.includes('overflow: hidden auto;'));

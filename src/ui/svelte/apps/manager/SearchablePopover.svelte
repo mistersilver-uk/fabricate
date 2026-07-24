@@ -140,10 +140,25 @@
 
   function getHorizontalBounds(hostRect) {
     if (!pickerRoot) return {};
-    const mainPanel = pickerRoot.closest('.admin-main, .manager-main, .manager-table-scroll');
-    const rect = mainPanel?.getBoundingClientRect?.();
-    if (!rect) return {};
-    return { minLeft: rect.left - hostRect.left + 16, maxRight: rect.right - hostRect.left - 16 };
+    const selector = '.admin-main, .manager-main, .manager-table-scroll';
+    let candidate = pickerRoot.parentElement;
+    while (candidate) {
+      if (candidate.matches?.(selector)) {
+        const rect = candidate.getBoundingClientRect?.();
+        const display = globalThis.getComputedStyle?.(candidate)?.display;
+        if (rect && rect.width > 0 && rect.height > 0 && display !== 'contents') {
+          return {
+            minLeft: rect.left - hostRect.left + 16,
+            maxRight: rect.right - hostRect.left - 16,
+          };
+        }
+      }
+      candidate = candidate.parentElement;
+    }
+    return {
+      minLeft: 16,
+      maxRight: Math.max(16, hostRect.width - 16),
+    };
   }
 
   function updatePosition() {

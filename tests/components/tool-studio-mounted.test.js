@@ -17,6 +17,8 @@ const harness = createMountedComponentHarness({
     'src/models/IngredientGroup.js',
     'src/models/Tool.js',
     'src/models/match/matchTypes.js',
+    'src/systems/characterModifierPrerequisiteCopy.js',
+    'src/systems/characterPrerequisites.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/recipeCurrency.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -26,9 +28,15 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
+    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
@@ -125,8 +133,8 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-editor-source-context]').textContent,
       'Linked game-world Item'
     );
-    assert.equal(root.querySelector('[data-tool-editor-status]').textContent.trim(), 'All changes saved');
-    assert.equal(root.querySelector('[data-tool-editor-back][aria-label="Back to Tools"]').textContent.trim(), 'Back');
+    assert.equal(root.querySelector('[data-tool-editor-status]'), null);
+    assert.equal(root.querySelector('[data-tool-editor-back][aria-label="Back to Tools"]').textContent.trim(), 'Back to tools');
     assert.ok(root.querySelector('[data-tool-editor-delete]'));
     assert.ok(root.querySelector('[data-tool-editor-save]'));
     assert.equal(root.querySelector('[data-tool-editor-delete]').textContent.trim(), 'Delete');
@@ -138,7 +146,10 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(tabPanel.getAttribute('tabindex'), '0');
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Smith's Hammer/);
     assert.equal(root.querySelector('[data-tool-source-card] code'), null);
-    assert.match(root.querySelector('[data-tool-description]').value, /well-balanced forge hammer/);
+    assert.match(
+      root.querySelector('[data-tool-description]').textContent,
+      /well-balanced forge hammer/
+    );
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Smith's Hammer/);
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Linked game-world Item/);
     assert.doesNotMatch(root.textContent, /\bKind\b/);
@@ -158,7 +169,9 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(sourceCard.getAttribute('role'), null);
     assert.equal(sourceCard.getAttribute('tabindex'), null);
     assert.ok(sourceCard.querySelector('[data-tool-source-drop-hint]'));
-    const sourceActions = [...sourceCard.querySelectorAll('.manager-tool-source-actions > button')];
+    const sourceActions = [
+      ...sourceCard.querySelectorAll('.manager-item-drop-zone-actions > button'),
+    ];
     assert.deepEqual(
       sourceActions.map((button) =>
         button.hasAttribute('data-tool-source-copy-uuid') ? 'copy' : 'unlink'
@@ -167,7 +180,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(sourceCard.querySelector('[data-tool-source-picker]'), null);
     assert.equal(sourceCard.querySelector('.manager-tool-source-replace'), null);
-    assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 5);
+    assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 6);
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
       /supplies the name, art, and description/
@@ -178,19 +191,23 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(3)').textContent,
-      /character prerequisites/i
+      /salvaging components/i
     );
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(4)').textContent,
-      /check bonus/i
+      /character prerequisites/i
     );
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(5)').textContent,
+      /check bonus/i
+    );
+    assert.match(
+      root.querySelector('[data-tool-how-it-works] li:nth-child(6)').textContent,
       /breakage/i
     );
     assert.equal(root.querySelector('[data-tool-how-it-works] button'), null);
-    assert.equal(root.querySelector('[data-tool-name]').readOnly, true);
-    assert.equal(root.querySelector('[data-tool-description]').readOnly, true);
+    assert.equal(root.querySelector('[data-tool-name]'), null);
+    assert.equal(root.querySelector('[data-tool-description]').matches('input, textarea'), false);
     assert.ok(root.querySelector('[data-tool-label]').closest('.manager-recipe-field'));
     assert.ok(root.querySelector('[data-tool-enabled] .manager-recipe-status-card'));
   });
@@ -212,22 +229,25 @@ describe('Tool Studio editor (mounted)', () => {
     assert.deepEqual(calls, [['copy', 'Item.hammer'], ['unlink'], ['drop', 'Item.replacement']]);
   });
 
-  it('allows only Display label and Enabled to emit Overview draft patches', async () => {
+  it('stages only Display label and routes Enabled through immediate persistence', async () => {
     const patches = [];
-    const root = await harness.mount(props({ onPatch: (patch) => patches.push(patch) }));
+    const enabled = [];
+    const root = await harness.mount(
+      props({
+        onPatch: (patch) => patches.push(patch),
+        onToggleEnabled: (value) => enabled.push(value),
+      })
+    );
 
-    const name = root.querySelector('[data-tool-name]');
-    name.value = 'Changed source name';
-    name.dispatchEvent(new Event('input', { bubbles: true }));
-    const description = root.querySelector('[data-tool-description]');
-    description.value = 'Changed source description';
-    description.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.equal(root.querySelector('[data-tool-name]'), null);
+    assert.equal(root.querySelector('[data-tool-description]').matches('input, textarea'), false);
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
     label.dispatchEvent(new Event('input', { bubbles: true }));
     root.querySelector('[data-tool-enabled] .manager-status-toggle').click();
 
-    assert.deepEqual(patches, [{ label: 'Display-only name' }, { enabled: false }]);
+    assert.deepEqual(patches, [{ label: 'Display-only name' }]);
+    assert.deepEqual(enabled, [false]);
   });
 
   it('routes all four tab controls without moving actions into a footer', async () => {
@@ -249,7 +269,10 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(buttons[0].getAttribute('aria-controls'), 'tool-panel-overview');
     assert.equal(buttons.slice(1).every((button) => !button.hasAttribute('aria-controls')), true);
     assert.equal(root.querySelector('#tool-panel-overview')?.getAttribute('role'), 'tabpanel');
-    assert.equal(buttons[3].querySelector('span').getAttribute('aria-label'), '2 issues');
+    assert.equal(
+      buttons[3].querySelector('.manager-editor-tab-badge').getAttribute('aria-label'),
+      '1 issue'
+    );
 
     buttons[0].focus();
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
@@ -333,7 +356,13 @@ describe('Tool Studio editor (mounted)', () => {
 
   it('supports all on-break actions and Component or direct Item replacement targets', async () => {
     const patches = [];
-    const root = await harness.mount(props({ activeTab: 'breakage', tool: tool({ onBreak: { mode: 'replaceWith', replacementTarget: null } }), onPatch: (patch) => patches.push(patch) }));
+    const replacementDrops = [];
+    const root = await harness.mount(props({
+      activeTab: 'breakage',
+      tool: tool({ onBreak: { mode: 'replaceWith', replacementTarget: null } }),
+      onPatch: (patch) => patches.push(patch),
+      onReplacementItemDrop: (data) => replacementDrops.push(data.uuid),
+    }));
     assert.deepEqual(
       Array.from(root.querySelectorAll('input[name="tool-on-break"]')).map((input) => input.value),
       ['destroy', 'flagBroken', 'replaceWith']
@@ -345,25 +374,23 @@ describe('Tool Studio editor (mounted)', () => {
       assert.ok(choice.querySelector('[data-tool-choice-title]'));
       assert.ok(choice.querySelector('[data-tool-choice-description]'));
     }
-    const type = root.querySelector('[data-tool-replacement-type]');
-    type.value = 'component';
-    type.dispatchEvent(new Event('change', { bubbles: true }));
+    root.querySelector('.manager-tool-replacement-component-trigger').click();
     await tick();
-    let picker = root.querySelector('[data-tool-replacement-picker]');
-    picker.value = 'scrap';
-    picker.dispatchEvent(new Event('change', { bubbles: true }));
-    type.value = 'item';
-    type.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('.manager-travel-option[title="Iron Scrap"]').click();
+    root.querySelector('input[name="tool-replacement-type"][value="item"]').click();
     await tick();
-    picker = root.querySelector('[data-tool-replacement-picker]');
-    picker.value = 'Item.replacement';
-    picker.dispatchEvent(new Event('change', { bubbles: true }));
-    assert.equal(root.querySelectorAll('[data-tool-replacement-target] select:not([data-tool-replacement-type])').length, 1);
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: {
+        getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.replacement' }),
+      },
+    });
+    root.querySelector('[data-item-drop-zone="tool-replacement"]').dispatchEvent(drop);
     const selectedTargets = patches
       .map((patch) => patch.onBreak?.replacementTarget)
       .filter((target) => target?.componentId || target?.itemUuid);
-    assert.deepEqual(selectedTargets.at(-2), { type: 'component', componentId: 'scrap' });
-    assert.deepEqual(selectedTargets.at(-1), { type: 'item', itemUuid: 'Item.replacement' });
+    assert.deepEqual(selectedTargets.at(-1), { type: 'component', componentId: 'scrap' });
+    assert.deepEqual(replacementDrops, ['Item.replacement']);
   });
 
   it('authors all Recipe-compatible repair match kinds and a cross-type OR group', async () => {
@@ -375,14 +402,14 @@ describe('Tool Studio editor (mounted)', () => {
       { id: 'currency', options: [{ quantity: 1, match: { type: 'currency', unit: 'gp', amount: 3 } }] },
     ];
     const root = await harness.mount(props({ activeTab: 'breakage', tool: tool({ onBreak: { mode: 'flagBroken' }, repairRequirements }), onPatch: (patch) => patches.push(patch) }));
-    assert.ok(root.querySelector('[data-tool-repair-group="0"]'));
-    assert.equal(root.querySelectorAll('[data-tool-repair-group]').length, 4);
-    assert.ok(root.querySelector('[data-tool-repair-group="0"] .is-component'));
-    assert.ok(root.querySelector('[data-tool-repair-group="1"] .is-tag'));
-    assert.ok(root.querySelector('[data-tool-repair-group="2"] [data-recipe-option-essence]'));
-    assert.ok(root.querySelector('[data-tool-repair-group="3"] [data-recipe-option-currency]'));
+    assert.ok(root.querySelector('[data-recipe-group-id="component"]'));
+    assert.equal(root.querySelectorAll('[data-recipe-group]').length, 4);
+    assert.ok(root.querySelector('[data-recipe-group-id="component"] .is-component'));
+    assert.ok(root.querySelector('[data-recipe-group-id="tags"] .is-tag'));
+    assert.ok(root.querySelector('[data-recipe-group-id="essence"] [data-recipe-option-essence]'));
+    assert.ok(root.querySelector('[data-recipe-group-id="currency"] [data-recipe-option-currency]'));
 
-    root.querySelector('[data-tool-repair-group="0"] .manager-recipe-or-trigger').click();
+    root.querySelector('[data-recipe-group-id="component"] .manager-recipe-or-trigger').click();
     await tick();
     document.querySelector('[data-recipe-add="alternative-essence"]').click();
     await tick();
@@ -438,7 +465,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(patches.some((patch) => patch.bonus?.expression === '1d4'));
   });
 
-  it('renders six compact validation checks, a Validation-only live preview note, and alert semantics', async () => {
+  it('renders the recipe-style grouped validation surface and Validation-only live preview note', async () => {
     const invalidTool = tool({ breakage: { mode: 'breakageChance', breakageChance: 101 }, repairRequirements: [{ id: 'empty', options: [] }] });
     const root = await harness.mount(props({
       activeTab: 'validation',
@@ -448,41 +475,27 @@ describe('Tool Studio editor (mounted)', () => {
     }));
     assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 6);
     assert.deepEqual(
-      [...root.querySelectorAll('[data-tool-validation-check] span')].map((node) => node.textContent),
+      [...root.querySelectorAll('[data-tool-validation-check] .manager-recipe-val-title')].map((node) => node.textContent),
       [
         'A game-world Item is linked',
-        'Breakage roll has an expression',
-        'Replacement item is set',
-        'At least one prerequisite is selected',
-        'Bonus expression is set',
+        'Breakage settings are complete',
+        'On-break action is complete',
         'Repair requirements are complete',
+        'Character prerequisites are complete',
+        'Check bonus is complete',
       ]
     );
     assert.equal(root.querySelector('[data-tool-validation-check="breakage"]').classList.contains('is-invalid'), true);
     assert.equal(root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'), true);
-    assert.equal(
-      root.querySelector('.manager-tool-validation-chip').getAttribute('aria-label'),
-      '2 issues'
-    );
-    assert.equal(
-      root.querySelector('.manager-tool-validation-chip').textContent.trim(),
-      '2 issues'
-    );
-    assert.equal(
-      root.querySelector('.manager-tool-validation-summary .manager-chip'),
-      null,
-      'the sparse Validation heading does not pull the status chip back into its title row'
-    );
-    assert.ok(root.querySelector('[role="alert"]'));
+    assert.equal(root.querySelector('[data-editor-validation-count="blocking"]').textContent, '2');
+    assert.equal(root.querySelector('[data-editor-validation-count="passing"]').textContent, '4');
+    assert.match(root.querySelector('[data-editor-validation-summary="block"]').textContent, /Needs attention/);
     assert.match(root.querySelector('[data-tool-behavior-preview]').textContent, /Smith's Hammer/);
-    assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /101% break chance/);
-    assert.match(root.querySelector('[data-tool-validation-errors]').textContent, /Break chance must be between 0% and 100%/);
-    assert.equal(root.querySelector('[data-first-validation-failure]').getAttribute('tabindex'), '-1');
-    assert.equal(document.activeElement, root.querySelector('[data-first-validation-failure]'));
+    assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /101% break/);
+    assert.match(root.querySelector('[data-tool-validation-check="breakage"]').textContent, /Break chance must be between 0% and 100%/);
     assert.doesNotMatch(root.textContent, /breakage\.breakageChance|breakageChance/);
-    assert.ok(root.querySelector('[data-tool-validation-heading]'));
-    assert.equal(root.querySelector('[data-tool-validation-heading] h3').textContent.trim(), 'Validation');
-    assert.doesNotMatch(root.querySelector('[data-tool-validation-heading]').textContent, /Check this Tool before saving/);
+    assert.equal(root.querySelector('.manager-recipe-tab-title').textContent.trim(), 'Validation');
+    assert.match(root.querySelector('.manager-recipe-tab-intro').textContent, /blocking issue/);
     assert.equal(root.querySelector('[data-tool-validation-tab] > .manager-tool-editor-card'), null);
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
     assert.ok(root.querySelector('[data-tool-preview-live-update]'));
@@ -511,32 +524,33 @@ describe('Tool Studio editor (mounted)', () => {
       false
     );
     assert.equal(
-      root.querySelector('[data-tool-validation-check="prerequisites"] span').textContent,
-      'At least one prerequisite is selected'
+      root.querySelector('[data-tool-validation-check="prerequisites"] .manager-recipe-val-title')
+        .textContent,
+      'Character prerequisites are complete'
     );
     assert.equal(
-      root.querySelector('[data-tool-validation-check="bonus"] span').textContent,
-      'Bonus expression is set'
+      root.querySelector('[data-tool-validation-check="bonus"] .manager-recipe-val-title')
+        .textContent,
+      'Check bonus is complete'
     );
     assert.equal(
-      root.querySelector('[data-tool-validation-check="repair"] span').textContent,
+      root.querySelector('[data-tool-validation-check="repair"] .manager-recipe-val-title')
+        .textContent,
       'Repair requirements are complete'
     );
+    assert.equal(root.querySelector('[data-editor-validation-count="blocking"]').textContent, '1');
     assert.equal(
-      root.querySelector('.manager-tool-validation-chip').getAttribute('aria-label'),
-      '1 issue'
+      root.querySelector('#tool-tab-validation .manager-editor-tab-badge').textContent,
+      '1'
     );
     assert.equal(
-      root.querySelector('.manager-tool-validation-chip').textContent.trim(),
-      '1 issue'
-    );
-    assert.equal(root.querySelector('#tool-tab-validation span').textContent, '1');
-    assert.equal(
-      root.querySelector('#tool-tab-validation span').getAttribute('aria-label'),
+      root
+        .querySelector('#tool-tab-validation .manager-editor-tab-badge')
+        .getAttribute('aria-label'),
       '1 issue'
     );
     assert.match(
-      root.querySelector('[data-tool-validation-errors]').textContent,
+      root.querySelector('[data-tool-validation-check="bonus"]').textContent,
       /Enter a bonus expression or turn the bonus off/
     );
 
@@ -544,13 +558,18 @@ describe('Tool Studio editor (mounted)', () => {
     const validRoot = await harness.mount(props({ activeTab: 'validation' }));
     assert.equal(validRoot.querySelectorAll('[data-tool-validation-check]').length, 6);
     assert.equal(validRoot.querySelectorAll('[data-tool-validation-check].is-invalid').length, 0);
-    assert.equal(
-      validRoot.querySelector('.manager-tool-validation-chip').textContent.trim(),
-      'All checks pass'
+    assert.match(
+      validRoot.querySelector('[data-editor-validation-summary="pass"]').textContent,
+      /All clear/
     );
-    assert.equal(validRoot.querySelector('#tool-tab-validation span').textContent, '✓');
     assert.equal(
-      validRoot.querySelector('#tool-tab-validation span').getAttribute('aria-label'),
+      validRoot.querySelector('#tool-tab-validation .manager-editor-tab-badge').textContent,
+      '✓'
+    );
+    assert.equal(
+      validRoot
+        .querySelector('#tool-tab-validation .manager-editor-tab-badge')
+        .getAttribute('aria-label'),
       'All checks pass'
     );
   });
@@ -578,7 +597,7 @@ describe('Tool Studio editor (mounted)', () => {
       }),
     }));
 
-    assert.equal(root.querySelector('[data-tool-preview-breakage]').textContent, 'Never breaks');
+    assert.equal(root.querySelector('[data-tool-preview-breakage]').textContent, 'Immune');
     assert.equal(
       root.querySelector('[data-tool-preview-on-break]').textContent,
       'Not applicable while this Tool cannot break'
@@ -603,7 +622,7 @@ describe('Tool Studio editor (mounted)', () => {
       saveError: 'database adapter exploded',
     }));
 
-    const blockers = root.querySelector('[data-tool-validation-errors]').textContent;
+    const blockers = root.querySelector('[data-tool-validation-tab]').textContent;
     assert.match(blockers, /Link an Item or managed Component/);
     assert.match(blockers, /Repair group 3 is incomplete/);
     assert.match(blockers, /Some Tool settings are incomplete/);
