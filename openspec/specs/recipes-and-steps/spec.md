@@ -1,5 +1,24 @@
 # Recipes and Steps
 
+## Tool Eligibility and Check Bonuses
+
+Every recipe and step resolves its required Tool ids against the Crafting System's canonical `system.tools` library.
+An ingredient set contributes its own Tool ids only when the Crafting System uses `routedByIngredients` and the set has a non-blank authored name.
+Recipe-wide Tools apply to every step, active step Tools apply to that step, and active ingredient-set Tools apply only when that set is selected.
+Legacy recipe `toolBonusModes` data is ignored and omitted from canonical Recipe writes; Recipe data never owns Tool behavior.
+
+An enabled Tool shared-prerequisite gate resolves every selected id against `system.characterPrerequisites` and evaluates the resolved definitions with AND semantics.
+An unresolved selected id fails closed.
+For an owned Tool, presence matching, prerequisite evaluation, and bonus-expression evaluation bind to the same matched Item's owning actor, so multiple actors cannot collectively satisfy one Tool.
+A virtual-present Tool binds those evaluations to the primary acting or check actor.
+
+A failed `usability` gate makes the Tool absent at recipe, step, ingredient-set, salvage, and gathering availability gates and uses the existing missing-Tool feedback.
+A failed `bonus` gate preserves presence and suppresses only that Tool's numeric bonus.
+Crafting and salvage evaluate every distinct enabled eligible Tool's bonus expression once and compose every finite non-zero value additively.
+The resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
+A missing evaluator, thrown evaluation, non-finite result, or otherwise failed bonus evaluation contributes zero without aborting the attempt.
+Gathering never applies numeric Tool bonuses.
+
 ## Purpose
 
 Define recipe structure, step execution lifecycle, and recipe-run behaviour.
@@ -78,9 +97,15 @@ The same override threads through both the display (`RecipeManager.evaluateCraft
 An owned item's craft-time tag membership derives from its resolved managed component's authored `tags` (unioned with any item-level `flags.fabricate.tags`), NOT from the item's own flags alone — so the display, shopping, and consumption paths match tagged ingredients against the same component tags the editor links them by.
 - An `IngredientGroup` option MAY be an essence alternative (`Ingredient.match.type === "essence"`), consuming essence-carrying items to meet `match.amount`, and participates in `optionOverrides` like any other option — so "component OR essence" is authorable.
 The legacy per-set `IngredientSet.essences` map is a back-compat read for one release (the 1.17.0 migration folds each positive entry into a single-option essence group).
-- **Tools** are the required-but-not-always-consumed, potentially-breakable prerequisite primitive (replacing recipe-side catalysts).
-They are referenced by id at recipe level, step level, and ingredient-set level via `toolIds`; the applicable set for an ingredient set is the union of those ids resolved against the per-system Tools library (`RecipeManager.getToolsForSet`).
+- **Tools** are the reusable, potentially-breakable prerequisite primitive (replacing recipe-side catalysts).
+They are referenced by id at recipe and step level via `toolIds`.
+Named ingredient sets may additionally reference Tools when the Crafting System uses `routedByIngredients`; those same stored ids are inert for unnamed sets and every other resolution mode.
+The applicable set is the distinct union of the recipe-wide ids, the active step's ids, and the selected set's active ids, resolved against the per-system Tools library (`RecipeManager.getToolsForSet`).
 Every applicable Tool must be present (matched via the shared tool matcher) and pass its optional `requirement` before the recipe is craftable; `RecipeManager.evaluateCraftability` returns `toolStates` and `missing.tools`.
+- One physical owned Item document cannot satisfy an ingredient or salvage-source consumption and a Tool requirement in the same attempt.
+Ingredient and salvage-source selection reserve the concrete Item documents in their consumption plans before Tool matching.
+When the same managed component can serve both roles, the attempt requires a distinct matching Item document for the Tool; with only one matching document craftability and execution fail before mutation, while a second copy remains reusable and receives any Tool usage or breakage.
+Virtual-present Tools are unaffected because no owned Item document backs them.
 - `CraftingEngine` validates Tools (`_validateTools`) and, on a committed craft, applies tool usage/breakage through the shared breakage runtime (`src/toolBreakageRuntime.js`), recording `usedTools` evidence.
 Tool usage/breakage is tracked on owned item instances.
 - A `toolIds` entry resolves to a first-class per-system library Tool that carries its OWN source references and durable `flags.fabricate.roles[systemId].toolId` identity (issue 561); tool presence and breakage selection match the owned item against the Tool's own identity, not through a managed component.

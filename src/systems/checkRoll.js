@@ -535,6 +535,46 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
 }
 
 /**
+ * Step a naturally matched relative tier once for an active natural 20/1.
+ *
+ * Dice groups already contain active-only raw faces, so advantage/disadvantage
+ * pools expose only their kept face. A group with multiple active faces has no
+ * single kept face and is deliberately ineligible. Returns no evidence unless a
+ * neighbouring tier actually exists.
+ */
+function stepNaturalRoutedOutcome({ matched, type, natStepping, diceGroups, relativeOutcomes }) {
+  if (natStepping !== true || type !== 'relative' || !matched) {
+    return { matched, natStep: null };
+  }
+  const d20Group = (Array.isArray(diceGroups) ? diceGroups : []).find((group) =>
+    /^\d+d20$/i.test(String(group?.group || ''))
+  );
+  const activeFaces = Array.isArray(d20Group?.results) ? d20Group.results : [];
+  if (activeFaces.length !== 1 || (activeFaces[0] !== 1 && activeFaces[0] !== 20)) {
+    return { matched, natStep: null };
+  }
+
+  const ranked = (Array.isArray(relativeOutcomes) ? relativeOutcomes : [])
+    .filter((outcome) => outcome && Number.isFinite(Number(outcome.dc)))
+    .toSorted((left, right) => Number(left.dc) - Number(right.dc));
+  const matchedIndex = ranked.indexOf(matched);
+  const direction = activeFaces[0] === 20 ? 'up' : 'down';
+  const steppedIndex = matchedIndex + (direction === 'up' ? 1 : -1);
+  const stepped = ranked[steppedIndex];
+  if (matchedIndex < 0 || !stepped) return { matched, natStep: null };
+
+  return {
+    matched: stepped,
+    natStep: {
+      face: activeFaces[0],
+      direction,
+      fromOutcomeId: matched.id ?? null,
+      toOutcomeId: stepped.id ?? null,
+    },
+  };
+}
+
+/**
  * Run a routed formula check: roll the formula and map the total onto one of the
  * configured outcome tiers (relative DC deltas or fixed value ranges), returning
  * the matched tier's NAME as `outcome` for the activity's outcome→result-group
@@ -566,6 +606,9 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  *   not fire). Optional and no-op by default — only the crafting routedByCheck caller
  *   threads it, so salvage/gathering are unaffected. Ignored for relative type and
  *   bypassed by a forced (crit) outcome.
+ * @param {boolean} [params.natStepping] Relative-mode only: the active kept face of
+ *   the first d20 group steps a naturally matched tier once on a natural 20/1.
+ *   Forced outcomes win and no evidence is emitted at the tier cap/floor.
  * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
  */
 export async function runFormulaRouted({
@@ -582,6 +625,7 @@ export async function runFormulaRouted({
   clampToNearest = false,
   minOutcomeId = null,
   craftingModifier = null,
+  natStepping = false,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -658,6 +702,17 @@ export async function runFormulaRouted({
     });
   }
 
+  const naturalStep = forced
+    ? { matched, natStep: null }
+    : stepNaturalRoutedOutcome({
+        matched,
+        type,
+        natStepping,
+        diceGroups,
+        relativeOutcomes,
+      });
+  matched = naturalStep.matched;
+
   // Recipe minimum-success-tier gate (FIXED type only): when the naturally-rolled
   // tier ranks below the recipe's required tier (by `start`), the craft fails
   // outright. A forced (crit) outcome BYPASSES the gate — a natural crit must not be
@@ -707,6 +762,7 @@ export async function runFormulaRouted({
       success,
       breakTools,
       diceGroups,
+      ...(naturalStep.natStep && { natStep: naturalStep.natStep }),
       // Additive on a min-tier failure only: the tier that WAS rolled, for a richer
       // chat/journal explanation later. Absent on a normal route.
       ...(minTierFailed && { minTierFailed: true, rolledOutcomeId: matched?.id ?? null }),

@@ -33,6 +33,8 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   consumed: 'FABRICATE.Chat.Consumed',
   tools: 'FABRICATE.Chat.Tools',
   roll: 'FABRICATE.Chat.Roll',
+  natStepUp: 'FABRICATE.Chat.NaturalStepUp',
+  natStepDown: 'FABRICATE.Chat.NaturalStepDown',
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
 });
@@ -77,6 +79,13 @@ function renderRollTotal(value, label) {
   ].join('');
 }
 
+/** Render localized natural-step evidence only for a completed up/down step. */
+function renderNaturalStep(natStep, keys, localize) {
+  if (natStep?.direction !== 'up' && natStep?.direction !== 'down') return '';
+  const key = natStep.direction === 'up' ? keys.natStepUp : keys.natStepDown;
+  return `<div class="fabricate-craft-chat__notice fabricate-craft-chat__nat-step">${esc(localize(key))}</div>`;
+}
+
 /** Render a titled section with an icon grid; returns '' when there are no entries. */
 function renderSection({ heading, entries, modifier }) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
@@ -111,6 +120,7 @@ function renderSection({ heading, entries, modifier }) {
  * @param {Array<{name:string,img:string}>}                 [model.tools]
  * @param {number}  [model.rollValue] - The rolled check total; rendered only when
  *   finite (a no-check "Guaranteed" craft/salvage omits it).
+ * @param {{direction:'up'|'down'}} [model.natStep] - Actual routed natural step evidence.
  * @param {string}  [model.failureReason]
  * @param {object}  keys - The label-key map (e.g. {@link CRAFTING_CHAT_KEYS}).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
@@ -128,6 +138,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
   }
 
   const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
+  const naturalStep = renderNaturalStep(model.natStep, keys, loc);
 
   const notice =
     !succeeded && model.failureReason
@@ -168,6 +179,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
     rollTotal,
+    naturalStep,
     notice,
     ...sections,
     '</div>',
@@ -196,6 +208,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       consumed: model.consumed,
       tools: model.tools,
       rollValue: model.rollValue,
+      natStep: model.natStep,
       failureReason: model.failureReason,
     },
     CRAFTING_CHAT_KEYS,

@@ -16,12 +16,14 @@ import {
   itemIsToolByDurableIdentity,
 } from '../utils/sourceUuid.js';
 
+import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { ingredientSetToolsAreActive, resolveToolPrerequisites } from './toolCheckBonus.js';
 
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
@@ -34,12 +36,29 @@ const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
 const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
 
 /**
+ * The concrete owned Item documents reserved by an ingredient selection.
+ * A physical Item cannot simultaneously be consumed as an ingredient and
+ * participate as a reusable Tool in the same attempt.
+ *
+ * @param {object|null} selection
+ * @returns {Set<object>}
+ */
+function selectedIngredientItems(selection) {
+  return new Set(
+    (Array.isArray(selection?.plan) ? selection.plan : [])
+      .map((entry) => entry?.item)
+      .filter(Boolean)
+  );
+}
+
+/**
  * Manages recipe storage, retrieval, and CRUD operations
  */
 export class RecipeManager {
-  constructor() {
+  constructor({ getCraftingSystem = null } = {}) {
     this.recipes = new Map();
     this.initialized = false;
+    this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
   }
 
   /**
@@ -509,6 +528,10 @@ export class RecipeManager {
     // the fallback display path.
     let satisfiableSet = null;
     let satisfiableSetSelection = null;
+    let satisfiableToolStates = null;
+    let ingredientSatisfiableSet = null;
+    let ingredientSatisfiableSelection = null;
+    let ingredientSatisfiableToolStates = null;
 
     // Also keep the first-set selection for the "unsatisfied" display fallback.
     let firstSetSelection = null;
@@ -553,9 +576,25 @@ export class RecipeManager {
       }
 
       if (selection.success && essencesMet) {
-        satisfiableSet = ingredientSet;
-        satisfiableSetSelection = selection;
-        break;
+        const candidateTools = this.getToolsForSet(recipe, ingredientSet);
+        const candidateToolStates = this.resolveToolStates(recipe, candidateTools, sourceActors, {
+          presentTools,
+          primaryActor: craftingActor,
+          excludedItems: selectedIngredientItems(selection),
+        });
+
+        if (ingredientSatisfiableSet === null) {
+          ingredientSatisfiableSet = ingredientSet;
+          ingredientSatisfiableSelection = selection;
+          ingredientSatisfiableToolStates = candidateToolStates;
+        }
+
+        if (candidateToolStates.every((state) => state?.available === true)) {
+          satisfiableSet = ingredientSet;
+          satisfiableSetSelection = selection;
+          satisfiableToolStates = candidateToolStates;
+          break;
+        }
       }
     }
 
@@ -563,21 +602,29 @@ export class RecipeManager {
     // (or first set as fallback). Reuses the gathering tool matcher path so the
     // presence check agrees with attempt validation. Tools resolve from the
     // per-system library via `toolIds`.
-    const displaySet = satisfiableSet || firstSet;
+    const displaySet = satisfiableSet || ingredientSatisfiableSet || firstSet;
+    const displaySelection =
+      satisfiableSetSelection || ingredientSatisfiableSelection || firstSetSelection;
     const toolsForSet = this.getToolsForSet(recipe, displaySet);
-    const toolStates = this._buildToolStates(recipe, toolsForSet, availableItems, presentTools);
+    const toolStates =
+      satisfiableToolStates ||
+      ingredientSatisfiableToolStates ||
+      this.resolveToolStates(recipe, toolsForSet, sourceActors, {
+        presentTools,
+        primaryActor: craftingActor,
+        excludedItems: selectedIngredientItems(displaySelection),
+      });
     const missingTools = toolsForSet.filter((_tool, idx) => !toolStates[idx].available);
 
     // Final craftability: ingredients satisfied AND tools present.
-    const canCraft = satisfiableSet !== null && missingTools.length === 0;
+    const canCraft = satisfiableSet !== null;
 
     // Build ingredient display states from the selection result that matches
     // the craftability decision — ensuring they are always consistent.
     //
     // If craftable: use satisfiableSetSelection (all groups satisfied).
     // If not craftable: use firstSetSelection (shows what is missing from set 0).
-    const displaySelection = canCraft ? satisfiableSetSelection : firstSetSelection;
-    const displayIngredientSet = canCraft ? satisfiableSet : firstSet;
+    const displayIngredientSet = displaySet;
 
     const ingredientStates = this._buildIngredientStates(
       recipe,
@@ -729,11 +776,14 @@ export class RecipeManager {
       }
 
       // A tool is needed if ANY set requires it; prefer an unavailable/repair reading.
-      const toolStates = this._buildToolStates(
+      const toolStates = this.resolveToolStates(
         recipe,
         this.getToolsForSet(recipe, set),
-        availableItems,
-        null
+        sourceActors,
+        {
+          primaryActor: craftingActor,
+          excludedItems: selectedIngredientItems(selection),
+        }
       );
       for (const tool of toolStates) {
         const key = tool.componentId ?? tool.name;
@@ -770,7 +820,30 @@ export class RecipeManager {
    * @param {Array<Item>} availableItems - aggregated source-actor items
    * @returns {Array<{ name: string, available: boolean }>}
    */
-  _buildToolStates(recipe, tools, availableItems, presentTools = null) {
+  resolveToolStates(
+    recipe,
+    tools,
+    sourceActors,
+    { presentTools = null, primaryActor = null, excludedItems = null } = {}
+  ) {
+    const actors = Array.isArray(sourceActors) ? sourceActors : sourceActors ? [sourceActors] : [];
+    const excluded = excludedItems instanceof Set ? excludedItems : new Set(excludedItems);
+    const availableItems = actors
+      .flatMap((actor) => [...(actor?.items ?? [])])
+      .filter((item) => !excluded.has(item));
+    return this._buildToolStates(recipe, tools, availableItems, presentTools, {
+      sourceActors: actors,
+      primaryActor,
+    });
+  }
+
+  _buildToolStates(
+    recipe,
+    tools,
+    availableItems,
+    presentTools = null,
+    { sourceActors = [], primaryActor = null } = {}
+  ) {
     if (!Array.isArray(tools) || tools.length === 0) return [];
     // `matchGatheringTools` scopes the virtual-present set to the system passed
     // here (the recipe's crafting system), so a present tool from a different
@@ -794,18 +867,77 @@ export class RecipeManager {
     // virtual-present match has no owned item and must be excluded from
     // breakage/usage by the caller).
     const matchedByTool = new Map(matched.items.map((entry) => [entry.tool, entry]));
+    const prerequisiteDefinitions = this._getToolPrerequisiteDefinitions(recipe);
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
-      const toolId = tool?.componentId || tool?.systemItemId;
+      const componentId = tool?.componentId || tool?.systemItemId;
+      const toolDisplayName = String(tool?.label || tool?.name || '').trim();
+      const actor =
+        entry?.virtual === true
+          ? primaryActor
+          : this._resolveToolItemActor(entry?.item, sourceActors);
+      const gate = this._evaluateToolPrerequisiteGate(tool, actor, prerequisiteDefinitions);
       const state = {
-        name: this.resolveComponentName(recipe, toolId),
-        img: this.resolveComponentImg(recipe, toolId),
-        available: entry !== null,
+        name:
+          toolDisplayName ||
+          (componentId ? this.resolveComponentName(recipe, componentId) : String(tool?.id || '')),
+        img:
+          tool?.img ||
+          (componentId ? this.resolveComponentImg(recipe, componentId) : FALLBACK_COMPONENT_IMG),
+        available: tool?.enabled !== false && entry !== null && gate.usable,
         needsRepair: stateByTool.get(tool) === 'damaged',
+        actor,
+        bonusEligible: gate.bonusEligible,
+        bonusValue: gate.bonusEligible ? null : 0,
+        contributionInput: {
+          tool,
+          matchedItem: entry?.item ?? null,
+          primaryActor: actor,
+          prerequisiteDefinitions,
+        },
       };
       if (entry?.virtual === true) state.virtual = true;
       return state;
     });
+  }
+
+  _getToolPrerequisiteDefinitions(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId || !this.getCraftingSystem) return [];
+    const system = this.getCraftingSystem(systemId);
+    return Array.isArray(system?.characterPrerequisites) ? system.characterPrerequisites : [];
+  }
+
+  _resolveCraftingSystem(systemId) {
+    if (!systemId) return null;
+    if (this.getCraftingSystem) return this.getCraftingSystem(systemId) ?? null;
+    return game.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId) ?? null;
+  }
+
+  _resolveToolItemActor(item, sourceActors) {
+    if (!item) return null;
+    if (item.parent) return item.parent;
+    return sourceActors.find((actor) => [...(actor?.items ?? [])].includes(item)) || null;
+  }
+
+  _evaluateToolPrerequisiteGate(tool, actor, prerequisiteDefinitions) {
+    const settings = tool?.prerequisites || {};
+    if (settings.enabled !== true) return { usable: true, bonusEligible: true };
+
+    const { resolved, unresolvedIds } = resolveToolPrerequisites({
+      prerequisiteIds: settings.ids,
+      definitions: prerequisiteDefinitions,
+    });
+    const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+    const passed =
+      resolved.length > 0 &&
+      unresolvedIds.length === 0 &&
+      resolved.every((prerequisite) => evaluatePrerequisite(rollData, prerequisite));
+    const usabilityGate = settings.gateMode === 'usability';
+    return {
+      usable: !usabilityGate || passed,
+      bonusEligible: passed,
+    };
   }
 
   /**
@@ -1386,20 +1518,24 @@ export class RecipeManager {
   }
 
   /**
-   * Resolve the union of recipe-level and ingredient-set-level `toolIds` to
-   * library Tool objects from the recipe's crafting system. Unknown ids are
-   * skipped (resolved to nothing) rather than throwing. Ids are deduped across
-   * the recipe + set tiers so a tool referenced at both granularities resolves
-   * once.
+   * Resolve recipe-wide Tool ids plus any active ingredient-set Tool ids to
+   * library Tool objects from the recipe's crafting system. Set ids are active
+   * only for a named set in routed-by-ingredients mode. Unknown ids are skipped
+   * rather than throwing, and duplicate references resolve once.
    *
    * @param {Recipe} recipe
    * @param {IngredientSet} ingredientSet
    * @returns {Array<object>} resolved library Tool objects
    */
   getToolsForSet(recipe, ingredientSet) {
+    const system = this._resolveCraftingSystem(recipe?.craftingSystemId);
+    if (!system) return [];
+    const ingredientSetToolIds = ingredientSetToolsAreActive(system, ingredientSet)
+      ? ingredientSet?.toolIds
+      : [];
     const ids = [
       ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
-      ...(Array.isArray(ingredientSet?.toolIds) ? ingredientSet.toolIds : []),
+      ...(Array.isArray(ingredientSetToolIds) ? ingredientSetToolIds : []),
     ];
     const seen = new Set();
     const tools = [];
@@ -1407,7 +1543,7 @@ export class RecipeManager {
       const id = String(rawId ?? '').trim();
       if (!id || seen.has(id)) continue;
       seen.add(id);
-      const tool = this._getTool(recipe, id);
+      const tool = (system.tools || []).find((entry) => entry?.id === id) || null;
       if (tool) tools.push(tool);
     }
     return tools;
@@ -1420,8 +1556,7 @@ export class RecipeManager {
   _getTool(recipe, toolId) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId || !toolId) return null;
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(systemId);
+    const system = this._resolveCraftingSystem(systemId);
     if (!system) return null;
     return (system.tools || []).find((tool) => tool?.id === toolId) || null;
   }

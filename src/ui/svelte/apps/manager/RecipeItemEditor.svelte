@@ -15,7 +15,6 @@
    - linkedItem: `{ uuid, name, img, type, description? }|null` resolved game-world item.
    - linkedRecipes: `[{ id, name, category, img? }]` recipes linked to this item.
    - availableRecipes: `[{ id, name, category, img? }]` recipes that can be linked.
-   - worldItems: `[{ uuid, name, img, type }]` candidate items for the item picker.
    - visibilityMode: 'item' | 'knowledge' (drives the Limits card and the rail).
    - activeTab / onSelectTab(tabId): the router owns the active tab.
    - validation: optional `{ checks, criticalCount }`; when absent it is computed here.
@@ -45,7 +44,6 @@
     // System-owned character prerequisite library (issue 544), forwarded to the
     // Limits tab's "Character prerequisites to learn" picker.
     characterPrerequisites = [],
-    worldItems = [],
     visibilityMode = 'item',
     activeTab = 'overview',
     validation = null,
@@ -53,6 +51,7 @@
     onPatch = () => {},
     onLinkItem = () => {},
     onUnlinkItem = () => {},
+    onCopyItemUuid = () => {},
     onLinkRecipe = () => {},
     onRemoveRecipe = () => {}
   } = $props();
@@ -265,10 +264,10 @@
             <RecipeItemOverviewTab
               {recipeItem}
               {linkedItem}
-              {worldItems}
               {onPatch}
               {onLinkItem}
               {onUnlinkItem}
+              {onCopyItemUuid}
             />
           {:else if activeTab === 'contents'}
             <RecipeItemContentsTab

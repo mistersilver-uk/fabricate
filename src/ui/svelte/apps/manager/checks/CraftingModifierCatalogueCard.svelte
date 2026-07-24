@@ -22,7 +22,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
-  import { stripExpressionSigil } from '../../../../../systems/characterModifierPrerequisiteCopy.js';
+  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
 
   const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
 
@@ -84,22 +84,6 @@
 
   // A bare roll-data path with no leading `@`, e.g. `abilities.med.mod`. ONLY these
   // get the sigil re-added on write; anything else is stored verbatim.
-  const BARE_ROLL_DATA_PATH = /^[A-Za-z_][\w.]*$/;
-
-  // The expression editor drops the leading `@` sigil for display (shown as a fixed
-  // adornment) and restores it on write, so a stored path stays `@`-prefixed — the
-  // crafting-modifier resolver feeds it straight to `Roll.replaceFormulaData`, where a
-  // missing `@` leaves the roll-data key unresolved (contributing 0). We re-add `@`
-  // ONLY for a pure path: a compound/function/constant expression (`@a.b + 2`,
-  // `min(@a,@b)`, `floor(@a/2)`, `2`) is stored verbatim, so a leading `min`/`floor`
-  // is never mistaken for a roll-data key and corrupted into `@min(...)`.
-  function toStoredExpression(input) {
-    const raw = String(input ?? '').trim();
-    if (raw === '') return '';
-    if (raw.startsWith('@')) return raw;
-    return BARE_ROLL_DATA_PATH.test(raw) ? `@${raw}` : raw;
-  }
-
   function updateModifier(id, patch) {
     emitModifiers(modifiers.map((modifier) => (modifier.id === id ? { ...modifier, ...patch } : modifier)));
   }
@@ -168,16 +152,13 @@
         <div class="manager-modifier-expression-row">
           <label class="manager-field manager-modifier-field-expression">
             <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierExpression', 'Expression')}</span>
-            <div class="manager-prerequisite-path-input">
-              <span class="manager-prerequisite-at" aria-hidden="true">@</span>
-              <input
-                type="text"
-                data-crafting-modifier-field="expression"
-                value={stripExpressionSigil(modifier.expression)}
-                placeholder="abilities.med.mod"
-                oninput={(event) => updateModifier(modifier.id, { expression: toStoredExpression(event.currentTarget.value) })}
-              />
-            </div>
+            <RollDataExpressionInput
+              dataField="crafting-modifier"
+              inputAttrs={{ 'data-crafting-modifier-field': 'expression' }}
+              value={modifier.expression}
+              placeholder="abilities.med.mod"
+              onChange={(expression) => updateModifier(modifier.id, { expression })}
+            />
           </label>
           <button
             type="button"

@@ -456,6 +456,80 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(consumed[0].quantity, 2);
 });
 
+test('timed FINISH excludes partially consumed ingredient docs while revalidating replacement Tools', async () => {
+  const system = {
+    id: 'sys-timed-tool-revalidation',
+    resolutionMode: 'simple',
+    features: { craftingChecks: false, essences: false },
+    craftingCheck: { enabled: false, consumption: {} },
+    components: [{ id: 'hammer', name: 'Hammer' }],
+  };
+  setupGame(system, 1000);
+
+  const ingredientStack = new FakeItem('ingredient-hammer', 'Ingredient Hammer', 2);
+  ingredientStack.componentId = 'hammer';
+  const replacementTool = new FakeItem('replacement-hammer', 'Replacement Hammer', 1);
+  replacementTool.componentId = 'hammer';
+  const plank = new FakeItem('plank-result', 'Plank', 1);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [ingredientStack, replacementTool]);
+  const resultGroups = [
+    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
+  ];
+  const set = buildIngredientSet('set-1', [{ componentId: 'hammer', quantity: 1 }]);
+  const tool = {
+    componentId: 'hammer',
+    breakage: { mode: 'limitedUses', maxUses: null },
+    onBreak: { mode: 'flagBroken' },
+  };
+  const recipe = buildRecipe({
+    craftingSystemId: system.id,
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+  const recipeManager = {
+    ...buildRecipeManager({ ingredientSet: set }),
+    getToolsForSet: () => [tool],
+    toolMatchesItem: (_recipe, candidateTool, item) =>
+      candidateTool.componentId === item.componentId,
+    ingredientMatchesItem: (_recipe, ingredient, item) =>
+      (ingredient.componentId || ingredient.systemItemId) === item.componentId,
+  };
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(recipeManager, runManager, null);
+  let finishToolItem = null;
+  engine._runCraftingCheck = async (_recipe, _actor, _sources, _set, _step, options) => {
+    finishToolItem = options.toolItems[0]?.item ?? null;
+    return { success: true, outcome: null, value: null, data: {} };
+  };
+  engine._createSingleResult = async () => plank;
+
+  const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(startResult.success, false, 'START arms the timed gate');
+  assert.equal(
+    ingredientStack.system.quantity,
+    1,
+    'the ingredient stack remains live after partial consumption'
+  );
+  assert.equal(
+    runManager.getActiveRuns(craftingActor)[0].steps[0].preparedConsumption
+      .consumedSummary[0].itemUuid,
+    ingredientStack.uuid,
+    'START persists the consumed live document UUID'
+  );
+
+  game.time.worldTime = 1000 + 3600 + 1;
+  const finishResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(finishResult.success, true);
+  assert.equal(
+    finishToolItem,
+    replacementTool,
+    'FINISH rejects the consumed-stack UUID and selects the distinct live replacement Tool'
+  );
+});
+
 // ---------------------------------------------------------------------------
 // 3b. Disabling time requirements MID-RUN must still resume an already-armed
 //     gate — the flag gates arming a NEW gate only, never re-consumes (issue 714)

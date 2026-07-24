@@ -29,7 +29,9 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 globalThis.fromUuid = async () => null;
 globalThis.game = { user: { isGM: true }, items: [], packs: [], actors: [] };
 
-const { enrichToHtml, primeEnricherCache } = await import('../src/ui/svelte/util/foundryBridge.js');
+const { enrichToHtml, primeEnricherCache, resolveItemSourceSnapshot } = await import(
+  '../src/ui/svelte/util/foundryBridge.js'
+);
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const {
   REPORTER_ENRICHER_DESCRIPTION,
@@ -206,6 +208,7 @@ test('primeEnricherCache no-ops safely without Foundry, and stays linear on adve
 // ---------------------------------------------------------------------------
 
 const SOURCE_ITEM = Object.freeze({
+  documentName: 'Item',
   uuid: 'Compendium.dnd5e.equipment24.Item.supplies',
   name: "Alchemist's Supplies",
   img: 'icons/tools.webp',
@@ -251,6 +254,30 @@ test('_buildRecipeItemSourceSnapshot resolves through the same path', async () =
   const snapshot = await manager._buildRecipeItemSourceSnapshot(SOURCE_ITEM.uuid, SOURCE_ITEM);
 
   assert.equal(snapshot.description, REPORTER_RESOLVED_EXPECTED);
+});
+
+test('manager drop snapshots use the same enriched plain-text projection as persistence', async (t) => {
+  setupDOM();
+  const fakeEnricher = makeFakeEnricher();
+  globalThis.foundry.applications = {
+    ux: { TextEditor: { implementation: { enrichHTML: fakeEnricher } } },
+  };
+  globalThis.fromUuid = async (uuid) => (uuid === SOURCE_ITEM.uuid ? SOURCE_ITEM : null);
+  t.after(() => {
+    teardownDOM();
+    clearEnrichStub();
+    globalThis.fromUuid = async () => null;
+  });
+  const manager = new CraftingSystemManager(
+    { getRecipes: () => [] },
+    { enrichToHtml }
+  );
+
+  const persistedDescription = await manager._extractSourceDescription(SOURCE_ITEM);
+  const dropped = await resolveItemSourceSnapshot(SOURCE_ITEM.uuid);
+
+  assert.equal(dropped?.description, persistedDescription);
+  assert.equal(dropped?.description, REPORTER_RESOLVED_EXPECTED);
 });
 
 test('refreshComponentMetadataForUpdatedItem resolves the edited item description', async () => {

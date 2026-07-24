@@ -1,3 +1,4 @@
+import { ingredientSetToolsAreActive } from '../systems/toolCheckBonus.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
@@ -185,9 +186,10 @@ export class Recipe {
 
   /**
    * Check if this is a simple recipe (no advanced features)
+   * @param {object|null} [craftingSystem]
    * @returns {boolean}
    */
-  isSimpleRecipe() {
+  isSimpleRecipe(craftingSystem = null) {
     // Single ingredient set with exact item matching (no tags)
     const firstSet = this.ingredientSets[0];
     const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
@@ -211,7 +213,10 @@ export class Recipe {
 
     const hasNoTools =
       (this.toolIds?.length || 0) === 0 &&
-      this.ingredientSets.every((set) => (set.toolIds?.length || 0) === 0);
+      this.ingredientSets.every(
+        (set) =>
+          !ingredientSetToolsAreActive(craftingSystem, set) || (set.toolIds?.length || 0) === 0
+      );
     const hasNoVariableOutput = !this.isVariable;
     const hasNoEffectTransfer = !this.transferEffects;
 

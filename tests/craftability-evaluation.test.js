@@ -669,6 +669,83 @@ test('TC8c: evaluateCraftability supports iterable actor.items without Array.fil
   );
 });
 
+test('TC8e: one physical item cannot satisfy both ingredient consumption and a Tool requirement', () => {
+  const systemId = 'sys-tc8e';
+  const compId = 'comp-vial';
+  const registeredItemUuid = 'Item.vial-source';
+  const consumedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-consumed',
+    registeredItemUuid,
+    1
+  );
+  const set = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData(compId, 1)]),
+  ]);
+  const manager = makeRecipeManagerWithSystem(
+    systemId,
+    [{ id: compId, registeredItemUuid, name: 'Empty Vial' }],
+    [{ id: 'tool-vial', componentId: compId, enabled: true }]
+  );
+  const recipe = new Recipe({
+    name: 'Vial Tool Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    toolIds: ['tool-vial'],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability([makeActor([consumedVial])], recipe);
+
+  assert.equal(result.canCraft, false);
+  assert.equal(result.ingredientStates[0].satisfied, true, 'the ingredient itself is present');
+  assert.equal(result.toolStates[0].available, false, 'the consumed document is reserved');
+  assert.equal(result.missing.tools.length, 1);
+});
+
+test('TC8f: a second physical copy remains available as the Tool', () => {
+  const systemId = 'sys-tc8f';
+  const compId = 'comp-vial';
+  const registeredItemUuid = 'Item.vial-source';
+  const consumedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-consumed',
+    registeredItemUuid,
+    1
+  );
+  const retainedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-retained',
+    registeredItemUuid,
+    1
+  );
+  const set = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData(compId, 1)]),
+  ]);
+  const manager = makeRecipeManagerWithSystem(
+    systemId,
+    [{ id: compId, registeredItemUuid, name: 'Empty Vial' }],
+    [{ id: 'tool-vial', componentId: compId, enabled: true }]
+  );
+  const recipe = new Recipe({
+    name: 'Vial Tool Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    toolIds: ['tool-vial'],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability(
+    [makeActor([consumedVial, retainedVial])],
+    recipe
+  );
+
+  assert.equal(result.canCraft, true);
+  assert.equal(result.toolStates[0].available, true);
+  assert.equal(
+    result.toolStates[0].contributionInput.matchedItem,
+    retainedVial,
+    'Tool matching skips the concrete Item reserved by the ingredient plan'
+  );
+});
+
 // ---------------------------------------------------------------------------
 // TC9: Essence requirements
 // ---------------------------------------------------------------------------

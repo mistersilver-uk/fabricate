@@ -1295,12 +1295,16 @@ export class RecipeVisibilityService {
       };
     }
 
-    await this._setLearnedMap(actor, next);
-
-    const confirmedLearnedMap = this._getLearnedMap(actor);
-    const writeSucceeded = preview.learnedRecipes.every(
-      (recipe) => confirmedLearnedMap?.[recipe.id]?.sourceItemUuid === ownedItem.uuid
-    );
+    let writeSucceeded;
+    try {
+      await this._setLearnedMap(actor, next);
+      const confirmedLearnedMap = this._getLearnedMap(actor);
+      writeSucceeded = preview.learnedRecipes.every(
+        (recipe) => confirmedLearnedMap?.[recipe.id]?.sourceItemUuid === ownedItem.uuid
+      );
+    } catch {
+      writeSucceeded = false;
+    }
     if (!writeSucceeded) {
       return this._buildOwnedItemLearningResult({
         actor,

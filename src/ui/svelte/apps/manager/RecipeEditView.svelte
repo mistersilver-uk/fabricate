@@ -131,7 +131,6 @@
   // Current single-step requirement scopes default to empty arrays so an
   // unconfigured recipe still renders the empty-state sections.
   const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
-  const resultGroups = $derived(Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
   const toolIds = $derived(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
@@ -259,6 +258,28 @@
     const step = stepById(stepId);
     if (!step) return;
     onUpdateStep(stepId, { toolIds: stepToolIds(step).filter(id => id !== toolId) });
+  }
+
+  function updateIngredientSetTools(stepId, setId, update) {
+    const scope = stepId == null ? recipe : stepById(stepId);
+    const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+    if (!sets.some((set) => set.id === setId)) return;
+    const ingredientSets = sets.map((set) => {
+      if (set.id !== setId) return set;
+      const ids = Array.isArray(set.toolIds) ? set.toolIds : [];
+      return { ...set, toolIds: update(ids) };
+    });
+    if (stepId == null) onUpdateRecipe({ ingredientSets });
+    else onUpdateStep(stepId, { ingredientSets });
+  }
+
+  function addIngredientSetTool(stepId, setId, toolId) {
+    if (!toolId) return;
+    updateIngredientSetTools(stepId, setId, (ids) => ids.includes(toolId) ? ids : [...ids, toolId]);
+  }
+
+  function removeIngredientSetTool(stepId, setId, toolId) {
+    updateIngredientSetTools(stepId, setId, (ids) => ids.filter((id) => id !== toolId));
   }
 
   // Deleting a step removes the whole step (its ingredients, results, and tools).
@@ -462,10 +483,13 @@
             {collapsed}
             {toolIds}
             {toolsLibrary}
+            {routingProvider}
             onAddTool={addTool}
             onRemoveTool={removeTool}
             onAddStepTool={addStepTool}
             onRemoveStepTool={removeStepTool}
+            onAddIngredientSetTool={addIngredientSetTool}
+            onRemoveIngredientSetTool={removeIngredientSetTool}
             onDeleteStep={deleteStepFrom('tools')}
           />
         {:else if activeTab === 'access'}

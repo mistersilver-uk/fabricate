@@ -21,7 +21,7 @@ Every recipe brings together a few things.
 - An optional category that helps you organise recipes, when your crafting system groups recipes by category.
 - The ingredients it needs, made up of one or more sets of required materials.
 - The results it produces, made up of one or more groups of items.
-- Any tools it requires, such as a forge or a cauldron, which are needed but not consumed.
+- Any reusable tools it requires, such as a forge or a cauldron.
 - Whether active effects carried by the ingredients are copied onto the results.
 - Whether the recipe is enabled, which controls if it can be crafted.
 - Whether the recipe is locked, which lets players see it exists but stops anyone other than the GM from crafting it.
@@ -108,10 +108,22 @@ See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
 ## Tools
 
-Tools are items required for crafting but not consumed, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
-A recipe can require tools for the whole recipe, for a single step, or for a particular ingredient set.
+Tools are reusable items required for crafting, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
+A recipe can require Tools for the whole recipe or for a single step.
+In **Routed by ingredients**, each named ingredient set can also require its own Tools.
 
-See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage modes, and usage tracking. (Tools replaced the retired Catalyst concept in version 0.6.0.)
+See [Tools]({% link tools.md %}) for source linking, prerequisites, breakage, and usage tracking.
+
+### Tool behavior
+
+The recipe **Tools** tab selects required Tools; it does not configure how they behave.
+Tool Studio owns each Tool's prerequisites, bonus, wear, breakage, and on-break action.
+Crafting System check settings own check-driven breakage.
+
+Fabricate adds every distinct eligible Tool bonus to crafting and salvage checks.
+A Tool whose prerequisites use **Bonus is withheld** contributes nothing when those prerequisites fail, but it still satisfies the Tool requirement.
+A Tool whose prerequisites use **Tool is unusable** blocks crafting when those prerequisites fail.
+Gathering applies no numeric Tool bonus.
 
 ## Authoring and Crafting Surfaces
 

@@ -25,7 +25,7 @@
    - onChange(value): called with the selected option value on a real change.
 -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import RadioCardGroup from './RadioCardGroup.svelte';
 
   let {
     cardId = undefined,
@@ -47,57 +47,19 @@
   } = $props();
 
   const isConfigCard = $derived(variant === 'config-card');
-
-  function text(key, fallback) {
-    const value = localize(key);
-    return value && value !== key ? value : fallback;
-  }
-
-  function handleChange(option, event) {
-    if (option.disabled) return;
-    onChange(event.currentTarget.value);
-  }
 </script>
 
-<fieldset
-  id={cardId}
-  class={`manager-field is-wide manager-resolution-mode-card ${isConfigCard ? 'is-config-cards' : ''}`}
-  {...{ [dataAttr]: true }}
->
-  <legend class="manager-resolution-mode-legend">{text(legendKey, legendFallback)}</legend>
-  {#if hintKey || hintFallback}
-    <p class="manager-resolution-mode-note" role="note">
-      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{text(hintKey, hintFallback)}</span>
-    </p>
-  {/if}
-  <div class="manager-resolution-mode-options">
-    {#each options as option (option.value)}
-      <label
-        class={`manager-resolution-option ${option.value === selectedValue ? 'is-active' : ''} ${option.disabled ? 'is-disabled' : ''}`}
-        {...{ [optionDataAttr]: option.value }}
-      >
-        <input
-          type="radio"
-          name={groupName}
-          value={option.value}
-          checked={option.value === selectedValue}
-          disabled={option.disabled === true}
-          onchange={(event) => handleChange(option, event)}
-        />
-        {#if isConfigCard && option.icon}
-          <span class="manager-resolution-option-icon" aria-hidden="true"><i class={option.icon}></i></span>
-        {/if}
-        <span class="manager-resolution-option-body">
-          <span class="manager-resolution-option-name">
-            {text(option.labelKey, option.fallback)}
-            {#if option.disabled}
-              <span class="manager-resolution-option-badge">{text(option.badgeKey, option.badgeFallback)}</span>
-            {/if}
-          </span>
-          <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
-        </span>
-      </label>
-    {/each}
-  </div>
-</fieldset>
+<RadioCardGroup
+  {cardId}
+  legend={legendFallback}
+  {legendKey}
+  hint={hintFallback}
+  {hintKey}
+  {options}
+  {selectedValue}
+  {groupName}
+  {dataAttr}
+  {optionDataAttr}
+  configCards={isConfigCard}
+  {onChange}
+/>

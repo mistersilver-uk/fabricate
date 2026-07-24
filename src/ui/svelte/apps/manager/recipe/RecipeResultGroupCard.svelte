@@ -376,28 +376,6 @@
 </div>
 
 <style>
-  /* Alchemy Simple two-slot editor: a fixed header label replacing the free-text
-     result-set name input (issue 554). The reserved failure slot tones warning. */
-  .manager-recipe-result-set-static-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1 1 auto;
-    min-width: 0;
-    font-family: var(--font-primary);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--fab-mv2-text, var(--fab-text));
-  }
-
-  .manager-recipe-result-set-static-label.is-warning {
-    color: var(--fab-warning-text);
-  }
-
-  .manager-recipe-result-set-static-label i {
-    font-size: 0.8rem;
-  }
-
   .manager-recipe-ingredient-set.is-reserved {
     border-color: var(--fab-warning-border);
     background: var(--fab-warning-soft);

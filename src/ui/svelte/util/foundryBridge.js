@@ -552,3 +552,51 @@ export function getDragEventData(event) {
 
   return null;
 }
+
+async function itemSourceDescription(item) {
+  // Most UI consumers need only the lightweight Foundry wrappers; load the
+  // description pipeline only when an Item snapshot actually requests it.
+  const {
+    descriptionTextCandidate,
+    plainTextDescription
+  } = await import('../../../utils/plainTextDescription.js');
+  const candidates = [
+    item?.system?.description?.value,
+    item?.system?.description,
+    item?.description?.value,
+    item?.description
+  ];
+  for (const candidate of candidates) {
+    const raw = descriptionTextCandidate(candidate);
+    if (!raw) continue;
+    const enriched = await enrichToHtml(raw, { relativeTo: item });
+    const description = plainTextDescription(enriched);
+    if (description) return description;
+  }
+  return '';
+}
+
+/**
+ * Resolve a Foundry UUID to the small, system-agnostic Item snapshot used by
+ * manager drop zones. Non-Item documents, missing documents, and resolver
+ * failures are rejected before a caller mutates draft state.
+ *
+ * @param {string} uuid
+ * @returns {Promise<{uuid:string,name:string,img:string,type:string,description:string}|null>}
+ */
+export async function resolveItemSourceSnapshot(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return null;
+  try {
+    const item = await globalThis.fromUuid(uuid);
+    if (item?.documentName !== 'Item') return null;
+    return {
+      uuid: item.uuid || uuid,
+      name: item.name || '',
+      img: item.img || '',
+      type: item.type || '',
+      description: await itemSourceDescription(item),
+    };
+  } catch {
+    return null;
+  }
+}

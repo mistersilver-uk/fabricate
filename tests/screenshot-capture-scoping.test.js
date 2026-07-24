@@ -35,6 +35,55 @@ import {
 
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
+const TOOL_STUDIO_LABELS = [
+  'manager-tool-parity-01-library-1280x720',
+  'manager-tool-zero-state-empty-library-1280x720',
+  'manager-tool-parity-02-overview-1280x720',
+  'manager-tool-stress-long-name',
+  'manager-tool-parity-03-breakage-1280x720',
+  'manager-tool-stress-repair',
+  'manager-tool-stress-replacement',
+  'manager-tool-stress-immune',
+  'manager-tool-parity-04-requirements-1280x720',
+  'manager-tool-parity-05-validation-1280x720',
+  'manager-tool-stress-invalid-validation',
+  'manager-tool-parity-06-breakage-900x700',
+  'manager-tool-stress-wrapping-680',
+];
+
+function harnessFunctionSpan(start, end) {
+  const match = HARNESS.match(new RegExp(
+    String.raw`function ${start}[^]*?(?=\n(?:async )?function ${end})`,
+  ));
+  assert.ok(match, `${start} harness function was not found`);
+  return match[0];
+}
+
+const assertSingleToolMutation = new Function(
+  `"use strict"; ${harnessFunctionSpan('assertSingleToolMutation', 'beginToolStoreMutationProbe')}; `
+  + 'return assertSingleToolMutation;',
+)();
+const assertToolStudioHorizontalScrollSettled = new Function(
+  `"use strict"; ${harnessFunctionSpan('assertToolStudioHorizontalScrollSettled', 'readToolStudioHorizontalScroll')}; `
+  + 'return assertToolStudioHorizontalScrollSettled;',
+)();
+const toolTabContracts = new Function(
+  `"use strict"; ${harnessFunctionSpan('assertHorizontalContainment', 'assertToolStudioTypography')}; `
+  + 'return { assertToolStudioTabContainment };',
+)();
+
+test('Fabricate ApplicationV2 cleanup awaits close and guards Manager detachment', () => {
+  assert.match(
+    HARNESS,
+    /closePromises\.push\(Promise\.resolve\(app\.close\(\{ force: true \}\)\)\)/,
+    'ApplicationV2 close promises must be awaited before the next capture',
+  );
+  assert.match(
+    HARNESS,
+    /locator\('#fabricate-crafting-system-manager'\)[^]*?state: 'detached'/,
+    'the interactables capture must not begin until the Crafting System Manager detaches',
+  );
+});
 
 // ── Scoping map: a changed-file set → the EXACT captured-label set ──────────────
 
@@ -55,12 +104,25 @@ test('a broad styles/theme.css change scopes to theme-or-global-ui (6 labels), N
   assert.ok(labels.length < SCREENSHOT_CAPTURE_ORDER.length);
 });
 
-test('styles/fabricate.css scopes to exactly three views (the two rail frames + the global fallback)', () => {
+test('styles/fabricate.css scopes to the Tool parity/stress set, two rail frames, and global fallback', () => {
   const views = mapChangedFilesToViews(['styles/fabricate.css']);
   assert.deepEqual(views.map(v => v.id).sort(), [
+    '01-library-1280x720',
+    '02-overview-1280x720',
+    '03-breakage-1280x720',
+    '04-requirements-1280x720',
+    '05-validation-1280x720',
+    '06-breakage-900x700',
     'manager-rail-collapsed',
     'manager-rail-expanded',
+    'stress-immune',
+    'stress-invalid-validation',
+    'stress-long-name',
+    'stress-repair',
+    'stress-replacement',
+    'stress-wrapping-680',
     'theme-or-global-ui',
+    'zero-state-empty-library-1280x720',
   ]);
 });
 
@@ -252,6 +314,400 @@ test('a component-only target set runs ONLY components-checks; recipes is skippa
   assert.equal(isD0SectionNeededForTargets('components-checks', targets), true);
   assert.equal(isD0SectionNeededForTargets('recipes', targets), false);
   assert.equal(isD0SectionNeededForTargets('gathering', targets), false);
+});
+
+test('a Tool Studio target runs only the dedicated persisted-net-zero tools section', () => {
+  assert.equal(isD0SectionNeededForTargets('tools', TOOL_STUDIO_LABELS), true);
+  for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, TOOL_STUDIO_LABELS), false, name);
+  }
+  for (const label of TOOL_STUDIO_LABELS) {
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0);
+    assert.ok(HARNESS.includes(`'${label}'`), `${label} is not reachable in the harness`);
+  }
+});
+
+test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer coverage, and restoration', () => {
+  const toolStudioWalk = HARNESS.match(
+    /async function exerciseToolStudioPointerTargets[\s\S]*?(?=\n\/\*\*\n \* Close Foundry application windows)/,
+  )?.[0];
+  assert.ok(toolStudioWalk, 'Tool Studio walk source was not found');
+  const managerSizing = HARNESS.match(
+    /async function setManagerWindowSize[\s\S]*?(?=\n\/\*\*\n \* Capture a manager view)/,
+  )?.[0];
+  assert.ok(managerSizing, 'manager sizing helper source was not found');
+  const managerReadiness = HARNESS.match(
+    /async function waitForManagerApplicationRendered[\s\S]*?(?=\n\/\*\*\n \* Resize the rendered Crafting System Manager)/,
+  )?.[0];
+  assert.ok(managerReadiness, 'manager render-readiness helper source was not found');
+  const topOfStateLabels = TOOL_STUDIO_LABELS.filter(
+    (candidate) => !['manager-tool-stress-repair', 'manager-tool-stress-replacement'].includes(candidate)
+  );
+  for (const label of topOfStateLabels) {
+    assert.match(
+      toolStudioWalk,
+      new RegExp(
+        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(page, '${label}', \w+\)|screenshot\(page, '${label}'(?:, \{[\s\S]*?\})?\));`
+      ),
+      `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
+    );
+  }
+  assert.equal(HARNESS.includes('.manager-tools-row'), true);
+  assert.ok(HARNESS.includes('[data-manager-tool-id]'));
+  assert.ok(HARNESS.includes('exerciseToolStudioPointerTargets'));
+  assert.ok(HARNESS.includes('verifyToolStudioLiveReplacement'));
+  assert.match(toolStudioWalk, /sourceViewport: \{ width: 1280, height: 720 \}/);
+  assert.match(toolStudioWalk, /sourceViewport: \{ width: 900, height: 700 \}/);
+  assert.match(toolStudioWalk, /sourceViewport: \{ width: 680, height: 700 \}/);
+  assert.match(managerSizing, /globalThis\.__fabricateSmokeManagerApp[\s\S]*?app\.setPosition\(\{/);
+  const readinessIndex = managerSizing.indexOf('await waitForManagerApplicationRendered(page);');
+  const setPositionIndex = managerSizing.indexOf('await app.setPosition({');
+  assert.ok(readinessIndex >= 0, 'manager sizing must wait for the live ApplicationV2 element to render');
+  assert.ok(
+    setPositionIndex > readinessIndex,
+    'ApplicationV2 render readiness must settle before setPosition touches the live element',
+  );
+  assert.match(
+    managerReadiness,
+    /async function waitForManagerApplicationRendered[\s\S]*?__fabricateSmokeManagerApp[\s\S]*?app\?\.element[\s\S]*?#fabricate-crafting-system-manager[\s\S]*?\.fabricate-manager[\s\S]*?isConnected/,
+  );
+  assert.doesNotMatch(managerReadiness, /appElement === outer/);
+  assert.match(managerReadiness, /foundry\?\.applications\?\.instances[\s\S]*?instances\.values\(\)/);
+  assert.match(
+    managerReadiness,
+    /explicitApp = globalThis\.__fabricateSmokeManagerApp[\s\S]*?new Set\(\[explicitApp, \.\.\.registeredApps\]\.filter\(Boolean\)\)/,
+  );
+  assert.match(managerReadiness, /app\?\.element \?\? app\?\._element[\s\S]*?rawElement\?\.\[0\] \?\? rawElement/);
+  assert.match(
+    managerReadiness,
+    /document\.querySelectorAll\(selector\)[\s\S]*?renderedOuters\.length !== 1[\s\S]*?ownsRenderedManager/
+  );
+  assert.match(
+    managerReadiness,
+    /page\.evaluate\(resolveRegisteredManager, outerSelector\)/,
+  );
+  assert.match(
+    managerReadiness,
+    /element\?\.contains\?\.\(renderedManager\)[\s\S]*?ownsManager[\s\S]*?ownsRenderedManager/
+  );
+  assert.match(
+    managerReadiness,
+    /liveMatches\.length !== 1[\s\S]*?applicationCandidates[\s\S]*?globalThis\.__fabricateSmokeManagerApp = liveMatches\[0\]\.app/,
+  );
+  assert.match(managerReadiness, /appElement\?\.matches\?\.\('\.fabricate-manager'\)[\s\S]*?appElement\?\.querySelector\?\.\('\.fabricate-manager'\)/);
+  for (const diagnostic of [
+    'appRendered',
+    'elementType',
+    'elementId',
+    'elementConnected',
+    'elementHasStyle',
+    'managerConnected',
+  ]) {
+    assert.ok(managerReadiness.includes(diagnostic), `manager readiness timeout must report ${diagnostic}`);
+  }
+  assert.match(HARNESS, /browser:[\s\S]*?outer:[\s\S]*?product:/);
+  assert.doesNotMatch(managerSizing, /Object\.assign\(app\.style/);
+  assert.doesNotMatch(managerSizing, /const viewportWidth = Math\.max\(1366/);
+  assert.match(HARNESS, /shared by local and CI screenshot/);
+  assert.ok(HARNESS.includes('resetToolStudioScroll(page)'));
+  assert.ok(HARNESS.includes('assertToolStudioLibraryLayout(page)'));
+  assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: false })'));
+  assert.ok(HARNESS.includes('assertToolStudioEditorLayout(page, { stacked: true })'));
+  assert.ok(HARNESS.includes('visibleToolRowCount !== 8'));
+  assert.match(
+    HARNESS,
+    /characterPrerequisites: parityPrerequisites,[\s\S]*?The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}/,
+  );
+  assert.match(HARNESS, /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/);
+  assert.match(
+    HARNESS,
+    /normalized Tool snapshot[\s\S]*?description: 'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
+  );
+  assert.match(HARNESS, /const expectedToolNames = \[[\s\S]*?"Smith's Hammer"[\s\S]*?'Woodcarving Tools'/);
+  assert.match(
+    toolStudioWalk,
+    /did not automatically select Smith's Hammer[\s\S]*?const otherSelectTarget/,
+    'first-row auto-selection must be observed before any harness selection click',
+  );
+  assert.match(HARNESS, /visibleToolRows\.first\(\)[\s\S]*?Tool Studio parity library must select Smith's Hammer in the first row/);
+  assert.match(HARNESS, /data-tool-inspector-description[\s\S]*?well-balanced forge hammer/);
+  assert.match(
+    HARNESS,
+    /route transition asks ApplicationV2[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}/,
+  );
+  assert.match(
+    toolStudioWalk,
+    /setPosition\([\s\S]*?width: 900[\s\S]*?replacementSourceItem[\s\S]*?sidebar source remains occluded[\s\S]*?\.dragTo\(sourceCard\)[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}[\s\S]*?withSingleToolClipboardWrite\([\s\S]*?fixture\.replacementSourceItemUuid[\s\S]*?copySourceUuid\.click\(\)[\s\S]*?data-tool-editor-back[\s\S]*?data-action="discard"[\s\S]*?Smith's Hammer/,
+    'the second world Item must replace the source through a real sidebar drag, Copy UUID, and UI Discard restore',
+  );
+  assert.doesNotMatch(toolStudioWalk, /new DataTransfer|dispatchEvent\('drop'|data-tool-source-picker|manager-tool-source-replace/);
+  assert.match(HARNESS, /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/);
+  assert.match(
+    HARNESS,
+    /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?selectedFirst[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,
+  );
+  const issue800Search = HARNESS.indexOf("getByRole('searchbox', { name: 'Search components' })");
+  const issue800Fill = HARNESS.indexOf('componentSearch().fill(componentName)', issue800Search);
+  const issue800Wait = HARNESS.indexOf("identity.waitFor({ state: 'visible'", issue800Fill);
+  assert.ok(
+    issue800Search > 0 && issue800Fill > issue800Search && issue800Wait > issue800Fill,
+    'issue-800 evidence must reveal a paginated component before selecting it',
+  );
+  assert.match(
+    toolStudioWalk,
+    /expectedTotal: 8[\s\S]*?sourceViewport: \{ width: 1280, height: 520 \}[\s\S]*?expectedTotal: 8[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?expectedTotal: 9[\s\S]*?data-pagination-next[\s\S]*?expectedPage: 2[\s\S]*?Tool footer moved when the page changed/,
+    'the real library must cover tall/short one-page and 9+ pagination states',
+  );
+  assert.match(
+    toolStudioWalk,
+    /paginationComponentId[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?componentId: paginationComponentId/,
+    'the synthetic ninth Tool must carry a valid managed Component identity',
+  );
+  assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
+  assert.match(
+    toolStudioWalk,
+    /const expectedPrerequisiteNames = \[[\s\S]*?'Expert Crafter'[\s\S]*?"Proficient with Smith's Tools"[\s\S]*?'Attuned to the Weave'[\s\S]*?'Strength 13 or higher'[\s\S]*?'Trained in Arcana'[\s\S]*?Tool Studio parity prerequisite order drifted/,
+  );
+  assert.ok(HARNESS.includes("editor.locator('[data-tool-validation-check].is-invalid').count() !== 0"));
+  assert.match(
+    toolStudioWalk,
+    /input\[name="tool-on-break"\]\[value="destroy"\][\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('requirements'\)/,
+    'Requirements parity must be captured from a saved destroy-action baseline',
+  );
+  assert.match(
+    toolStudioWalk,
+    /Tool invalid prerequisite fixture[\s\S]*?data-editor-validation-summary="block"[\s\S]*?data-tool-validation-check="prerequisites"\]\.is-invalid[\s\S]*?Tool prerequisite fixture restore[\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('breakage'\)/,
+    'the invalid Validation frame must use a guaranteed domain blocker, then restore and save the prerequisite baseline',
+  );
+  for (const label of [
+    'manager-tool-parity-01-library-1280x720',
+    'manager-tool-zero-state-empty-library-1280x720',
+    'manager-tool-parity-02-overview-1280x720',
+    'manager-tool-parity-03-breakage-1280x720',
+    'manager-tool-parity-04-requirements-1280x720',
+    'manager-tool-parity-05-validation-1280x720',
+  ]) {
+    assert.ok(
+      HARNESS.includes(`captureToolStudioProduct(page, '${label}', wideGeometry)`),
+      `${label} must capture the truthful settled wide product frame`,
+    );
+  }
+  assert.ok(
+    HARNESS.includes(
+      "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry)"
+    ),
+    'the 900px parity frame must capture the truthful settled narrow product frame',
+  );
+  assert.match(
+    toolStudioWalk,
+    /screenshot\(page, 'manager-tool-stress-wrapping-680', \{\s*clip: \{ x: 0, y: 0, width: 680, height: 700 \},\s*\}\)/,
+    'the 680px stress frame must declare its truthful full-viewport dimensions in the manifest',
+  );
+  assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?900px/);
+  assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?680px/);
+  assert.match(
+    HARNESS,
+    /async function waitForToolEnabledState[\s\S]*?persisted === expected[\s\S]*?aria-pressed[\s\S]*?String\(expected\)/,
+  );
+  assert.match(
+    toolStudioWalk,
+    /persistedEnabledBefore[\s\S]*?waitForToolEnabledState\([\s\S]*?!persistedEnabledBefore[\s\S]*?waitForToolEnabledState\([\s\S]*?persistedEnabledBefore/,
+  );
+  assert.match(toolStudioWalk, /selectedToolIds[\s\S]*?fixture\.toolId/);
+  assert.match(toolStudioWalk, /data-tool-library-empty[\s\S]*?data-tool-browser-inspector-empty[\s\S]*?manager-tool-zero-state-empty-library-1280x720/);
+  assert.match(
+    toolStudioWalk,
+    /emptyInspectorBounds[\s\S]*?emptyInspectorContentBounds[\s\S]*?Math\.abs\(inspectorCenterY - contentCenterY\) > 2[\s\S]*?empty inspector is not vertically centered/,
+    'the empty inspector content must be vertically centered in the full right rail',
+  );
+  assert.match(HARNESS, /did not transition exactly once/);
+  assert.match(HARNESS, /did not apply its observable toggle effect/);
+  assert.doesNotMatch(HARNESS, /assertSinglePointerDispatch/);
+  assert.doesNotMatch(HARNESS, /stopImmediatePropagation|stopPropagation/);
+  assert.match(
+    toolStudioWalk,
+    /scrollToolEditorPanelToReveal\([\s\S]*?alternative-component[\s\S]*?manager-tool-stress-repair/,
+    'repair stress evidence must reveal the populated OR group in the editor pane',
+  );
+  assert.match(
+    toolStudioWalk,
+    /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-replacement-target[\s\S]*?manager-tool-stress-replacement/,
+    'replacement stress evidence must reveal the complete managed Component card in the editor pane',
+  );
+  assert.match(
+    HARNESS,
+    /const addRepairAlternative = firstRepairGroup\.locator\('\[data-recipe-add="alternative-component"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+  );
+  assert.match(
+    HARNESS,
+    /const addRepairGroup = editor\.locator\('\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
+    'the repair group control must choose one strict-safe pointer target and mutate once',
+  );
+  assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
+  assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
+  assert.match(
+    HARNESS,
+    /const componentTarget = replacementGrid\.locator\('\.manager-tool-replacement-component-trigger'\);[\s\S]*?'Component replacement selection'[\s\S]*?\(\) => componentOption\.click\(\)[\s\S]*?Component replacement selection did not update the draft control/,
+  );
+  assert.doesNotMatch(toolStudioWalk, /Direct Item replacement|data-tool-replacement-type|data-tool-replacement-picker/);
+  assert.match(
+    toolStudioWalk,
+    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),[\s\S]*?withSingleToolDraftTransition\(\s*page,\s*fixture\.toolId,\s*'check-driven Tool Edit route'/,
+    'the persisted + projected authority mutation must settle before the exactly-once Edit route',
+  );
+  assert.match(
+    HARNESS,
+    /async function withSingleToolDraftTransition[\s\S]*?viewState\.subscribe[\s\S]*?const distinctTransitions = report\.transitions\.filter[\s\S]*?distinctTransitions\.length !== 1[\s\S]*?publish exactly one distinct Tool draft transition/,
+    'selection and Edit must count one distinct live view-state transition instead of treating identical reactive publications as separate routes',
+  );
+  assert.match(
+    HARNESS,
+    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/,
+  );
+  assert.match(
+    toolStudioWalk,
+    /const liveManagerApp = await requireSingleLocator\(page\.locator\('#fabricate-crafting-system-manager'\), 'live Crafting System Manager app'\);[\s\S]*?const editorManager = liveManagerApp\.locator\('\.fabricate-manager\[data-manager-view="tool-edit"\]'\);/,
+  );
+  assert.match(
+    toolStudioWalk,
+    /const immuneOnBreakFieldset = editor\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/,
+  );
+  assert.match(
+    HARNESS,
+    /async function assertDisabledToolOnBreakFieldset[\s\S]*?element\.disabled === true[\s\S]*?element\.matches\(':disabled'\)[\s\S]*?fieldset\.locator\('button, input, select, textarea'\)[\s\S]*?controls\.nth\(index\)\.isDisabled\(\)/,
+  );
+  assert.doesNotMatch(
+    toolStudioWalk,
+    /await checkDriven\.click\(\);\s*await page\.locator\(`\.fabricate-manager \[data-manager-tool-id=/,
+  );
+  assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-edit-view\]'\)\.first\(\)/);
+  assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\)/);
+  assert.doesNotMatch(toolStudioWalk, /onBreakFieldset\.isDisabled\(\)/);
+  assert.match(
+    toolStudioWalk,
+    /const recipeToolRow = page\.locator\([\s\S]*?select, \[data-recipe-tool-bonus-mode\][\s\S]*?must not expose Tool breakage or check-bonus policy controls[\s\S]*?unexpectedly dirtied the Recipe draft[\s\S]*?manager-nav-button:has-text\("Checks"\)/,
+    'the Recipe Tools check must prove policy-free rows without dirtying the Recipe draft',
+  );
+  assert.match(
+    HARNESS,
+    /const fieldsetState = await fieldset\.evaluate\(\(element\) => \(\{[\s\S]*?disabled: element\.disabled === true,[\s\S]*?matchesDisabled: element\.matches\(':disabled'\),[\s\S]*?\}\)\);/,
+  );
+  assert.doesNotMatch(
+    HARNESS,
+    /\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)/,
+  );
+  assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
+});
+
+test('Tool tab geometry contract rejects clipping, actual overflow, and a missing fourth tab', () => {
+  const rect = (left, right) => ({ left, right });
+  const valid = {
+    manager: rect(0, 832),
+    tabs: rect(210, 512),
+    tabButtons: [
+      { id: 'tool-tab-overview', ...rect(218, 274) },
+      { id: 'tool-tab-breakage', ...rect(280, 340) },
+      { id: 'tool-tab-requirements', ...rect(346, 430) },
+      { id: 'tool-tab-validation', ...rect(436, 504) },
+    ],
+    tabsOverflow: {
+      overflowX: 'visible',
+      clientWidth: 302,
+      scrollWidth: 302,
+      scrollLeft: 0,
+    },
+  };
+  assert.doesNotThrow(() => toolTabContracts.assertToolStudioTabContainment(valid));
+  assert.throws(
+    () => toolTabContracts.assertToolStudioTabContainment({
+      ...valid,
+      tabButtons: valid.tabButtons.slice(0, 3),
+    }),
+    /four measurable tabs/,
+  );
+  assert.throws(
+    () => toolTabContracts.assertToolStudioTabContainment({
+      ...valid,
+      tabsOverflow: { ...valid.tabsOverflow, scrollWidth: 340 },
+    }),
+    /horizontally scrollable/,
+  );
+  assert.throws(
+    () => toolTabContracts.assertToolStudioTabContainment({
+      ...valid,
+      tabButtons: valid.tabButtons.map((tab, index) => (
+        index === 3 ? { ...tab, right: 520 } : tab
+      )),
+    }),
+    /within visible tab list escapes horizontal containment/,
+  );
+});
+
+test('Tool evidence contracts reject leaked horizontal state and duplicate store mutations', () => {
+  assert.doesNotThrow(() => assertToolStudioHorizontalScrollSettled([
+    { id: 'manager', scrollLeft: 0 },
+    { id: 'editor', scrollLeft: 0 },
+  ], 'stress frame'));
+  assert.throws(
+    () => assertToolStudioHorizontalScrollSettled([
+      { id: 'editor', scrollLeft: 24 },
+    ], 'stress frame'),
+    /leaked horizontal scroll/,
+  );
+  assert.doesNotThrow(() => assertSingleToolMutation({
+    calls: [{ method: 'patchToolDraft', args: [] }],
+  }, 'patchToolDraft', 'repair OR add'));
+  for (const calls of [
+    [],
+    [{ method: 'patchToolDraft' }, { method: 'patchToolDraft' }],
+    [{ method: 'openToolDraft' }],
+  ]) {
+    assert.throws(
+      () => assertSingleToolMutation({ calls }, 'patchToolDraft', 'repair OR add'),
+      /exactly one patchToolDraft mutation/,
+    );
+  }
+});
+
+test('the Tool Studio run writes one summary/manifest identity with head, target labels, and measured clips', () => {
+  assert.match(HARNESS, /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha:[\s\S]*?targetLabels:/);
+  assert.match(HARNESS, /results\.screenshotRun = screenshotRunIdentity/);
+  assert.match(
+    HARNESS,
+    /await writeFile\([\s\S]*?'screenshot-manifest\.json'[\s\S]*?\.\.\.screenshotRunIdentity,[\s\S]*?captures: screenshotManifestEntries/,
+  );
+  assert.match(
+    HARNESS,
+    /screenshotManifestEntries\.push\(\{[\s\S]*?label,[\s\S]*?file: `screenshot-\$\{num\}-\$\{label\}\.png`,[\s\S]*?width:[\s\S]*?height:/,
+  );
+});
+
+test('the Tool Studio fixture composes durable Tool identity through the canonical flag path', () => {
+  assert.match(HARNESS, /source\.getFlag\('fabricate', 'fabricate\.roles'\)/);
+  assert.match(
+    HARNESS,
+    /name: 'Smoke Tool Studio Replacement Item'[\s\S]*?img: sourceTemplate\.img/,
+    'the replacement Item must reuse a resolved fixture image rather than request a missing core asset',
+  );
+  assert.match(HARNESS, /source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\)/);
+  assert.match(HARNESS, /source\.unsetFlag\('fabricate', 'fabricate\.roles'\)/);
+  assert.match(
+    HARNESS,
+    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\) await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*if \(fixture\.sourceCreated\) await source\.delete\(\);\s*\}/,
+    'restoration must clear the fixture leaf, restore any prior roles snapshot, and delete the owned Smith fixture',
+  );
+  assert.match(
+    HARNESS,
+    /flags\.fabricate\.fabricate\.roles\.\$\{systemId\}\.toolId/,
+    'the owned replacement fixture must seed the same durable identity shape runtime readers use',
+  );
+  assert.match(
+    HARNESS,
+    /flags\.fabricate\.fabricate\.roles\.\$\{systemId\}\.componentId/,
+    'replacement evidence must inspect the canonical component-identity path',
+  );
+  assert.doesNotMatch(HARNESS, /source\.(?:get|set|unset)Flag\('fabricate', 'roles'/);
+  assert.doesNotMatch(HARNESS, /flags\.fabricate\.roles\.\$\{systemId\}\.(?:toolId|componentId)/);
 });
 
 test("theme-or-global-ui's multi-section target set keeps exactly the sections its labels touch (spine label rides the always-run spine)", () => {

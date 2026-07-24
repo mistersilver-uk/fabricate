@@ -59,6 +59,13 @@ function installManager(mgr) {
   };
 }
 
+function sourceItem(spec, description = '') {
+  const source = makeWorldItem(spec);
+  source.documentName = 'Item';
+  source.system = { description: { value: description } };
+  return source;
+}
+
 // ---------------------------------------------------------------------------
 // A1 — register a tool directly from an Item uuid with NO component
 // ---------------------------------------------------------------------------
@@ -67,7 +74,10 @@ test('A1 - addToolFromUuid registers a first-class tool (componentId null) match
   const mgr = buildManager();
   installManager(mgr);
   const system = await mgr.createSystem({ id: 'sysA', name: 'A' });
-  const source = makeWorldItem({ uuid: 'Item.hammer-src', name: 'Hammer' });
+  const source = sourceItem(
+    { uuid: 'Item.hammer-src', name: 'Hammer' },
+    '<p>A balanced forging hammer.</p>'
+  );
   _registry.set('Item.hammer-src', source);
 
   const { item: created } = await mgr.addToolFromUuid('sysA', 'Item.hammer-src');
@@ -75,6 +85,7 @@ test('A1 - addToolFromUuid registers a first-class tool (componentId null) match
   assert.equal(created.componentId, null);
   assert.equal(created.originItemUuid, 'Item.hammer-src');
   assert.equal(created.name, 'Hammer');
+  assert.equal(created.description, 'A balanced forging hammer.');
   // The durable `roles[sys].toolId` is stamped on the source Item.
   assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), created.id);
   // The tool validates with no componentId.
@@ -90,6 +101,299 @@ test('A1 - addToolFromUuid registers a first-class tool (componentId null) match
   assert.equal(rm.toolMatchesItem(recipe, system.tools[0], unrelated), false);
 });
 
+test('upsertTool relinks atomically, refreshes the staged snapshot, and moves the durable role', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const oldSource = sourceItem({ uuid: 'Item.old', name: 'Old Hammer' }, 'Old description');
+  const newSource = sourceItem({ uuid: 'Item.new', name: 'New Hammer' }, 'New description');
+  _registry.set(oldSource.uuid, oldSource);
+  _registry.set(newSource.uuid, newSource);
+  const { item: original } = await mgr.addToolFromUuid('sysA', oldSource.uuid);
+
+  const { item: relinked, action } = await mgr.upsertTool(
+    'sysA',
+    { id: original.id, label: 'Forge Hammer' },
+    { itemUuid: newSource.uuid }
+  );
+
+  assert.equal(action, 'updated');
+  assert.equal(relinked.id, original.id);
+  assert.equal(relinked.label, 'Forge Hammer');
+  assert.equal(relinked.name, 'New Hammer');
+  assert.equal(relinked.description, 'New description');
+  assert.equal(oldSource.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), undefined);
+  assert.equal(newSource.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), original.id);
+
+  newSource.system.description.value = 'Changed after registration';
+  const { item: edited } = await mgr.upsertTool('sysA', {
+    id: original.id,
+    label: 'Edited label only',
+  });
+  assert.equal(edited.description, 'New description', 'ordinary edits do not refresh the snapshot');
+});
+
+test('upsertTool sanitizes same-toolId clone provenance and restores exact state on failure', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({ uuid: 'Item.same-tool-id', name: 'Hammer' });
+  _registry.set(source.uuid, source);
+  const { item: original } = await mgr.addToolFromUuid('sysA', source.uuid);
+  await source.update({
+    '_stats.duplicateSource': 'Item.clone-origin',
+    '_stats.compendiumSource': 'Compendium.tools.pack.Item.hammer',
+  });
+
+  const { item: sanitized } = await mgr.upsertTool(
+    'sysA',
+    { id: original.id },
+    { itemUuid: source.uuid }
+  );
+
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), original.id);
+  assert.equal(source._stats.duplicateSource, null);
+  assert.equal(source._stats.compendiumSource, null);
+  await source.update({
+    '_stats.duplicateSource': 'Item.clone-origin',
+    '_stats.compendiumSource': 'Compendium.tools.pack.Item.hammer',
+  });
+  const system = mgr.getSystem('sysA');
+  const previousTools = system.tools;
+  let saveCalls = 0;
+  mgr.save = async () => {
+    saveCalls += 1;
+  };
+  const update = source.update.bind(source);
+  let rejectSanitization = true;
+  source.update = async (patch) => {
+    await update(patch);
+    if (rejectSanitization && '_stats.duplicateSource' in patch) {
+      rejectSanitization = false;
+      throw new Error('provenance sanitization failed after write');
+    }
+    return source;
+  };
+
+  await assert.rejects(
+    () => mgr.upsertTool('sysA', { id: sanitized.id }, { itemUuid: source.uuid }),
+    /provenance sanitization failed after write/
+  );
+
+  assert.equal(system.tools, previousTools);
+  assert.equal(system.tools[0], sanitized);
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), original.id);
+  assert.equal(source._stats.duplicateSource, 'Item.clone-origin');
+  assert.equal(source._stats.compendiumSource, 'Compendium.tools.pack.Item.hammer');
+  assert.equal(saveCalls, 2, 'the staged write is followed by one compensating settings write');
+});
+
+test('addToolFromUuid rejects null, index-like, and non-Item resolutions without mutation', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  const system = await mgr.createSystem({ id: 'sysA', name: 'A' });
+  _registry.set('Index.tool', { uuid: 'Index.tool', name: 'Index entry' });
+  _registry.set('Actor.not-item', { uuid: 'Actor.not-item', documentName: 'Actor' });
+
+  await assert.rejects(() => mgr.addToolFromUuid('sysA', 'Item.missing'), /Item/);
+  await assert.rejects(() => mgr.addToolFromUuid('sysA', 'Index.tool'), /Item/);
+  await assert.rejects(() => mgr.addToolFromUuid('sysA', 'Actor.not-item'), /Item/);
+  assert.deepEqual(system.tools, []);
+});
+
+test('upsertTool rolls back staged state and does not stamp when persistence fails', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  const system = await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({ uuid: 'Item.failure', name: 'Failure Hammer' });
+  _registry.set(source.uuid, source);
+  mgr.save = async () => {
+    throw new Error('settings write failed');
+  };
+
+  await assert.rejects(() => mgr.addToolFromUuid('sysA', source.uuid), /settings write failed/);
+  assert.deepEqual(system.tools, []);
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), undefined);
+});
+
+test('upsertTool restores the exact prior durable flag and Tool array when stamping fails', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  const system = await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({
+    uuid: 'Item.stamp-failure',
+    name: 'Failure Hammer',
+    duplicateSource: 'Item.clone-origin',
+    compendiumSource: 'Compendium.tools.pack.Item.hammer',
+  });
+  _registry.set(source.uuid, source);
+  await source.update({
+    'flags.fabricate.fabricate.roles.sysA.toolId': 'pre-existing-tool',
+  });
+  const previousTools = system.tools;
+  let saveCalls = 0;
+  mgr.save = async () => {
+    saveCalls += 1;
+  };
+  const update = source.update.bind(source);
+  let rejectStamp = true;
+  source.update = async (patch) => {
+    await update(patch);
+    if (rejectStamp && 'flags.fabricate.fabricate.roles.sysA.toolId' in patch) {
+      rejectStamp = false;
+      throw new Error('stamp failed after write');
+    }
+    return source;
+  };
+
+  await assert.rejects(() => mgr.addToolFromUuid('sysA', source.uuid), /stamp failed after write/);
+
+  assert.equal(system.tools, previousTools, 'the exact previous Tool array is restored');
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), 'pre-existing-tool');
+  assert.equal(source._stats.duplicateSource, 'Item.clone-origin');
+  assert.equal(source._stats.compendiumSource, 'Compendium.tools.pack.Item.hammer');
+  assert.equal(saveCalls, 2, 'the staged write is followed by one compensating settings write');
+});
+
+test('upsertTool relink restores both source flags and the Tool array when clearing fails', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const oldSource = sourceItem({ uuid: 'Item.old-failure', name: 'Old Hammer' });
+  const newSource = sourceItem({ uuid: 'Item.new-failure', name: 'New Hammer' });
+  _registry.set(oldSource.uuid, oldSource);
+  _registry.set(newSource.uuid, newSource);
+  const { item: original } = await mgr.addToolFromUuid('sysA', oldSource.uuid);
+  await newSource.update({
+    'flags.fabricate.fabricate.roles.sysA.toolId': 'other-tool',
+  });
+  const system = mgr.getSystem('sysA');
+  const previousTools = system.tools;
+  let saveCalls = 0;
+  mgr.save = async () => {
+    saveCalls += 1;
+  };
+  const unsetFlag = oldSource.unsetFlag.bind(oldSource);
+  let rejectClear = true;
+  oldSource.unsetFlag = async (...args) => {
+    await unsetFlag(...args);
+    if (rejectClear) {
+      rejectClear = false;
+      throw new Error('clear failed after write');
+    }
+    return oldSource;
+  };
+
+  await assert.rejects(
+    () => mgr.upsertTool('sysA', { id: original.id }, { itemUuid: newSource.uuid }),
+    /clear failed after write/
+  );
+
+  assert.equal(system.tools, previousTools);
+  assert.equal(system.tools[0], original);
+  assert.equal(oldSource.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), original.id);
+  assert.equal(newSource.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), 'other-tool');
+  assert.equal(saveCalls, 2);
+});
+
+test('upsertTool reports both the flag failure and failed settings compensation', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  const system = await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({ uuid: 'Item.aggregate-failure', name: 'Failure Hammer' });
+  _registry.set(source.uuid, source);
+  const previousTools = system.tools;
+  let saveCalls = 0;
+  mgr.save = async () => {
+    saveCalls += 1;
+    if (saveCalls === 2) throw new Error('compensation failed');
+  };
+  const update = source.update.bind(source);
+  let rejectStamp = true;
+  source.update = async (patch) => {
+    await update(patch);
+    if (rejectStamp && 'flags.fabricate.fabricate.roles.sysA.toolId' in patch) {
+      rejectStamp = false;
+      throw new Error('stamp failed');
+    }
+    return source;
+  };
+
+  let error;
+  try {
+    await mgr.addToolFromUuid('sysA', source.uuid);
+    assert.fail('expected the Tool transaction to reject');
+  } catch (caught) {
+    error = caught;
+  }
+
+  assert.ok(error instanceof AggregateError);
+  assert.deepEqual(
+    error.errors.map((entry) => entry.message),
+    ['stamp failed', 'compensation failed']
+  );
+  assert.equal(system.tools, previousTools);
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), undefined);
+});
+
+test('deleteTool restores memory and performs no flag write when settings persistence fails', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({ uuid: 'Item.delete-save-failure', name: 'Hammer' });
+  _registry.set(source.uuid, source);
+  const { item: builtTool } = await mgr.addToolFromUuid('sysA', source.uuid);
+  const system = mgr.getSystem('sysA');
+  const previousTools = system.tools;
+  let unsetCalls = 0;
+  const unsetFlag = source.unsetFlag.bind(source);
+  source.unsetFlag = async (...args) => {
+    unsetCalls += 1;
+    return unsetFlag(...args);
+  };
+  mgr.save = async () => {
+    throw new Error('delete settings failed');
+  };
+
+  await assert.rejects(() => mgr.deleteTool('sysA', builtTool.id), /delete settings failed/);
+
+  assert.equal(system.tools, previousTools);
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), builtTool.id);
+  assert.equal(unsetCalls, 0);
+});
+
+test('deleteTool prefers the registered source and rolls back deletion when strict clear fails', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({ uuid: 'Item.registered-delete', name: 'Hammer' });
+  _registry.set(source.uuid, source);
+  const { item: builtTool } = await mgr.addToolFromUuid('sysA', source.uuid);
+  builtTool.originItemUuid = 'Compendium.tools.pack.Item.hammer';
+  const system = mgr.getSystem('sysA');
+  const previousTools = system.tools;
+  let saveCalls = 0;
+  mgr.save = async () => {
+    saveCalls += 1;
+  };
+  const unsetFlag = source.unsetFlag.bind(source);
+  let rejectClear = true;
+  source.unsetFlag = async (...args) => {
+    await unsetFlag(...args);
+    if (rejectClear) {
+      rejectClear = false;
+      throw new Error('delete clear failed');
+    }
+    return source;
+  };
+
+  await assert.rejects(() => mgr.deleteTool('sysA', builtTool.id), /delete clear failed/);
+
+  assert.equal(system.tools, previousTools);
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), builtTool.id);
+  assert.equal(saveCalls, 2);
+});
+
 // ---------------------------------------------------------------------------
 // A2 — whetstone: a tool + a component on ONE Item coexist without flag clobber
 // ---------------------------------------------------------------------------
@@ -98,7 +402,7 @@ test('A2 - a component and a tool on one Item keep both roles leaves; deleting t
   const mgr = buildManager();
   installManager(mgr);
   await mgr.createSystem({ id: 'sysA', name: 'A' });
-  const source = makeWorldItem({ uuid: 'Item.whetstone', name: 'Whetstone' });
+  const source = sourceItem({ uuid: 'Item.whetstone', name: 'Whetstone' });
   _registry.set('Item.whetstone', source);
 
   const { item: comp } = await mgr.addItemFromUuid('sysA', 'Item.whetstone');
@@ -126,7 +430,7 @@ test('A3 - breakage selects the durable toolId tool and spares a duplicateSource
   const mgr = buildManager();
   installManager(mgr);
   await mgr.createSystem({ id: 'sysA', name: 'A' });
-  const source = makeWorldItem({ uuid: 'Item.hammer-src', name: 'Hammer' });
+  const source = sourceItem({ uuid: 'Item.hammer-src', name: 'Hammer' });
   _registry.set('Item.hammer-src', source);
   const { item: builtTool } = await mgr.addToolFromUuid('sysA', 'Item.hammer-src');
   const destroyTool = { ...builtTool, breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'destroy' } };

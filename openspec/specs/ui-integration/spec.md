@@ -25,10 +25,10 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
 - Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, gating experimental surfaces still in development (currently the recipe-graph placeholder).
-It defaults to disabled.
+  It defaults to disabled.
 - Fabricate exposes a per-client module setting, `fabricate.interactionPromptPosition`, for the on-screen anchor of the region-entry interaction prompt toast.
-It offers the four screen corners and four edge-centers and defaults to `bottom-center` (the prompt's historical position).
-The setting is client-scoped so each user can move the prompt away from their own conflicting on-screen widgets; an unset or unrecognized value resolves to `bottom-center`.
+  It offers the four screen corners and four edge-centers and defaults to `bottom-center` (the prompt's historical position).
+  The setting is client-scoped so each user can move the prompt away from their own conflicting on-screen widgets; an unset or unrecognized value resolves to `bottom-center`.
 - `Fabricate` is the default theme.
 - `Mythwright` preserves the previous dark green product palette.
 - The supported preset catalog also includes `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and `Foundry Native`.
@@ -42,13 +42,13 @@ The setting is client-scoped so each user can move the prompt away from their ow
 Product UI type must come from a shared, self-hosted three-family contract declared in the `:root` block of `styles/fabricate.css`, alongside the theme tokens and the spacing scale.
 
 - Two font tokens are declared once in `:root` — never inside a theme block, because every theme block must declare an identical token set: `--fab-font-serif` (Spectral, with a serif stack fallback) and `--fab-font-mono` (JetBrains Mono, with a monospace stack fallback).
-The UI face remains Foundry's `--font-primary` and is not tokenized here.
+  The UI face remains Foundry's `--font-primary` and is not tokenized here.
 - Fonts are **self-hosted** under `assets/fonts/` and loaded through `@font-face` with `font-display: swap`.
-No CDN or remote font URL: `styles/fabricate.css` is loaded globally into the Foundry document, a failed remote fetch is a console error in every world, and Foundry worlds are routinely run offline.
-Ship only the weights the product uses (Spectral 400/500/600/700, JetBrains Mono 400/500, latin subset), and ship each family's licence file beside it.
+  No CDN or remote font URL: `styles/fabricate.css` is loaded globally into the Foundry document, a failed remote fetch is a console error in every world, and Foundry worlds are routinely run offline.
+  Ship only the weights the product uses (Spectral 400/500/600/700, JetBrains Mono 400/500, latin subset), and ship each family's licence file beside it.
 - `--fab-font-serif` sets **names and headings**: an entity's name wherever it is named (browser rows, inspector titles, the rail's selected-system card), section and card titles, and the inputs that author a name.
 - `--fab-font-mono` sets **every numeric**: quantities, DC values, counts and count badges, step and order indices, and durations.
-A mono numeric surface must also set `font-variant-numeric: tabular-nums`, so a value changing width (9 → 10) cannot shift the control beside it.
+  A mono numeric surface must also set `font-variant-numeric: tabular-nums`, so a value changing width (9 → 10) cannot shift the control beside it.
 - A control whose text is words rather than a number stays in the UI face even when it sits in a numeric slot — the mono face marks a number, it does not decorate a pill.
 
 ### Spacing scale
@@ -56,9 +56,9 @@ A mono numeric surface must also set `font-variant-numeric: tabular-nums`, so a 
 Product UI padding, margin, and gap spacing must derive from a shared 4px-based spacing scale declared in the `:root` block of `styles/fabricate.css` rather than from raw pixel literals.
 
 - Semantic aliases name the primary 4px steps: `--fab-space-xs` (4px), `--fab-space-sm` (8px), `--fab-space-md` (12px), `--fab-space-lg` (16px), and `--fab-space-xl` (24px).
-The named scale deliberately skips 20px.
+  The named scale deliberately skips 20px.
 - The numeric tokens `--fab-space-1` (4px) through `--fab-space-6` (24px) are retained, including `--fab-space-5` (20px), which has no semantic alias.
-The sweep and new declarations prefer the numeric tokens for uniformity with existing call sites.
+  The sweep and new declarations prefer the numeric tokens for uniformity with existing call sites.
 - Two fine tokens cover dense optical spacing with zero visual shift: `--fab-space-2xs` (2px) for hairline spacing and `--fab-space-chip` (6px) for chip and icon+label gaps.
 - Documented literal exemptions that must NOT be tokenized: `1px` hairlines (borders, dividers, and `-1px` overlap bleeds) and one-off fixed dimensions in the 34–42px range (search-input icon clearances and grid-alignment offsets) where the value reserves space for a fixed element rather than expressing spacing rhythm.
 - Positioning offsets (`left`/`right`/`top`/`bottom`), `width`/`height`, `border-*` widths, `border-radius`, `grid-template-columns` track sizes, `@container`/media breakpoints, and font sizes are not spacing-scale members and remain literal.
@@ -72,10 +72,10 @@ Responsive layout rules for application bodies must therefore be keyed to the ap
 - The GM `Environments` editor responds to the admin main container width: list/editor panes stack, nested task/result/catalyst layouts collapse, independently scrollable regions remain usable, and save actions stay reachable.
 - The player `Gathering` app responds to its own app container width: active/history regions collapse to one column, task rows reserve icon width, and row metadata stacks without horizontal overflow.
 - The player `Gathering` view's three columns (environments list, centre detail, right inspector) all carry the same non-zero minimum width so the centre column cannot collapse to nothing ahead of the side columns; the three columns scale down together proportionally as the window narrows.
-Below the combined three-column minimum the columns reflow into a single vertical stack so the view stays usable instead of clipping or overflowing.
+  Below the combined three-column minimum the columns reflow into a single vertical stack so the view stays usable instead of clipping or overflowing.
 - The unified Fabricate window enforces a minimum window width and height, derived from the gathering view's column minimums plus the navigation rail and chrome, so a resize can never shrink the window below the size where the columns would be clipped.
 - These responsive rules are presentation-only.
-They must not change gathering runtime semantics, validation behavior, task visibility, attemptability, or persistence.
+  They must not change gathering runtime semantics, validation behavior, task visibility, attemptability, or persistence.
 
 ## Integration Points
 
@@ -118,99 +118,103 @@ Header hierarchy:
 - The top bar must not render redundant eyebrow/kicker labels that merely repeat the current view name, such as `Systems View` above `Crafting Systems`.
 - Section headers inside the page may use short contextual labels when they add information, such as selected object state, but they must not duplicate adjacent title text.
 - A screen renders **one** page header.
-A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the titlebar's system badge already carry.
+  A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the titlebar's system badge already carry.
 - The page title is the manager's display type and carries the weight that buys; the page's single primary action (`Create …`) is taller than a row button.
 
 Selected-system rail:
 
+- `GM management` is the first visible label in the expanded rail.
 - The rail's crafting-system card is a **selector**, not a caption: an uppercase micro-label, a real `<select>` listing every crafting system, and an `All crafting systems` link back to the system library.
-The GM can switch system from the rail without a round trip through the system library.
+  The GM can switch system from the rail without a round trip through the system library.
+- A compact collapse control sits at the top-right of that card, aligned with the `Crafting system` micro-label.
+  The Tool library and Tool editor use this same shared rail branch; they never suppress the selector or collapse control.
 - The selected system's name is set in the display face wherever it is named, including as the select's own value.
 - The rail does not repeat the product name or a "workspace" caption; the rail's own `GM management` section label already says what the rail is.
 - Rail count badges are **bare mono numerals**, right-aligned in the nav row — not bordered pills.
-They carry tabular figures so a count changing width (9 → 10) cannot move the row beside it.
-- The 56px collapsed rail hides the crafting-system card, the section label and the count numerals, leaving only the icon gutter.
+  They carry tabular figures so a count changing width (9 → 10) cannot move the row beside it.
+- The 56px collapsed rail hides the crafting-system card's label, selector, return link and card chrome, plus the section label and count numerals.
+  Its collapse control remains as the icon-strip expand control, so the rail is never trapped closed.
 
 Narrow (stacked) layout:
 
 - At or below the manager's stacked container width, the rail, main and inspector regions each keep **their own content height** and the body scrolls.
-They must not share the body's height between them: every region carries `min-height: 0` and clips its overflow, so an `auto` grid track would size each to a fraction of the body and silently render a browser's rows at full height inside a collapsed, invisible scroll box.
+  They must not share the body's height between them: every region carries `min-height: 0` and clips its overflow, so an `auto` grid track would size each to a fraction of the body and silently render a browser's rows at full height inside a collapsed, invisible scroll box.
 - The stacked rail is bounded and scrolls its own navigation, rather than becoming a full-height wall of nav above the content it navigates to.
 
 Selected-system navigation:
 
 - Manager must distinguish unready/loading Fabricate services from a true empty systems library.
-While Fabricate is still initializing or the recipe/crafting system managers have not finished loading persisted data, Manager shows a loading state and must not render `No crafting systems yet`.
+  While Fabricate is still initializing or the recipe/crafting system managers have not finished loading persisted data, Manager shows a loading state and must not render `No crafting systems yet`.
 - When at least one crafting system exists, manager v2 always has a selected crafting system.
-An empty or stale persisted selection resolves to the first available crafting system.
+  An empty or stale persisted selection resolves to the first available crafting system.
 - When no crafting systems exist, selected-system feature tabs are hidden and the systems browser is the active management surface.
 - When a crafting system is selected, `System Overview` is the first left-nav item and stays in that position regardless of feature gates.
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders.
-If a route is still planned only, it may remain in the placeholder/deferred-view set.
+  If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - The Manager V2 selected-system `Crafting` nav group (recipes, crafting settings, access, books & scrolls, recipe item editor) is **unconditional**: it renders whenever a crafting system is selected, regardless of `fabricate.experimentalFeatures` (issue 745, the v1.3 headline).
-The only experimental-gated selected-system rail item is `Graph`: it renders as a disabled planned rail item with the `Soon` treatment **only** while `fabricate.experimentalFeatures` is enabled, and cannot become the active route until its v2 route content is implemented (#442).
-There is no `Recipes` placeholder rail item and no `Rules` rail item; the deferred-placeholder set is `graph` alone, shown only under the experimental toggle.
-The top-level `Checks` rail item (hosting the Crafting / Salvage / Gathering / Validation sub-tabs) and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
-When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+  The only experimental-gated selected-system rail item is `Graph`: it renders as a disabled planned rail item with the `Soon` treatment **only** while `fabricate.experimentalFeatures` is enabled, and cannot become the active route until its v2 route content is implemented (#442).
+  There is no `Recipes` placeholder rail item and no `Rules` rail item; the deferred-placeholder set is `graph` alone, shown only under the experimental toggle.
+  The top-level `Checks` rail item (hosting the Crafting / Salvage / Gathering / Validation sub-tabs) and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
+  When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
 - The selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, shown whenever a crafting system is selected.
-The parent row shows an expand/collapse control and the recipe count as its badge.
-Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked open — activating it keeps the submenu expanded rather than collapsing it.
-The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
-The expanded submenu (built by `buildCraftingNavItems`) always contains `Recipes` and `Settings`, plus a **mode-conditional** entry derived from the system's `visibilityMode` (via `craftingEffect`): `Access` appears only in `restricted` mode (`showAccess`), and `Books & Scrolls` appears only in `item` and `knowledge` modes (`showBooksScrolls`); `global` mode shows neither.
-The submenu sits inside the same soft grouped container the Gathering group uses, and it carries Gathering-parity accessibility: `aria-expanded`/`aria-controls`/`aria-current`, distinct expand and collapse labels, and unique `manager-nav-crafting` / `manager-crafting-submenu` / `manager-crafting-nav-<id>` ids.
-Route exit from any Crafting child route runs through the Manager confirm-discard route-exit guard.
+  The parent row shows an expand/collapse control and the recipe count as its badge.
+  Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked open — activating it keeps the submenu expanded rather than collapsing it.
+  The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
+  The expanded submenu (built by `buildCraftingNavItems`) always contains `Recipes` and `Settings`, plus a **mode-conditional** entry derived from the system's `visibilityMode` (via `craftingEffect`): `Access` appears only in `restricted` mode (`showAccess`), and `Books & Scrolls` appears only in `item` and `knowledge` modes (`showBooksScrolls`); `global` mode shows neither.
+  The submenu sits inside the same soft grouped container the Gathering group uses, and it carries Gathering-parity accessibility: `aria-expanded`/`aria-controls`/`aria-current`, distinct expand and collapse labels, and unique `manager-nav-crafting` / `manager-crafting-submenu` / `manager-crafting-nav-<id>` ids.
+  Route exit from any Crafting child route runs through the Manager confirm-discard route-exit guard.
 - The `Crafting` group's `Settings` sub-route (`crafting-settings`, component `CraftingSettingsView`) is a real system-settings page, not a placeholder.
-It hosts the system-level crafting rules that used to live on the System Overview page: the recipe **resolution mode** card, the salvage **resolution mode** card (only when `features.salvage`), and the **Recipe Visibility** card — a single radio-card selector for the flat `visibilityMode` enum (`global` / `restricted` / `item` / `knowledge`) written through `setVisibilityMode`, paired with a `CraftingEffectPanel` that summarizes what the chosen mode enables.
-The Recipe Visibility control no longer lives on the System Overview page, and it authors the flat `visibilityMode` rather than the legacy `listMode` + `knowledge.mode` pair.
-Because the `Crafting` nav group is unconditional (issue 745), these controls are reachable for every selected system, independent of `fabricate.experimentalFeatures`.
-Per-recipe-item use and learn caps are NOT on this page — each recipe item's caps are authored in its `recipe-item-edit` tabbed editor (or the quick-limit toggle in the `ItemPageInspector` aside).
+  It hosts the system-level crafting rules that used to live on the System Overview page: the recipe **resolution mode** card, the salvage **resolution mode** card (only when `features.salvage`), and the **Recipe Visibility** card — a single radio-card selector for the flat `visibilityMode` enum (`global` / `restricted` / `item` / `knowledge`) written through `setVisibilityMode`, paired with a `CraftingEffectPanel` that summarizes what the chosen mode enables.
+  The Recipe Visibility control no longer lives on the System Overview page, and it authors the flat `visibilityMode` rather than the legacy `listMode` + `knowledge.mode` pair.
+  Because the `Crafting` nav group is unconditional (issue 745), these controls are reachable for every selected system, independent of `fabricate.experimentalFeatures`.
+  Per-recipe-item use and learn caps are NOT on this page — each recipe item's caps are authored in its `recipe-item-edit` tabbed editor (or the quick-limit toggle in the `ItemPageInspector` aside).
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
-Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
-Activating only the expand/collapse control toggles the submenu without navigation.
-While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked: it only toggles (no navigation) and the submenu remains expanded and cannot be collapsed.
-The expanded submenu contains Environments, Tasks, Events, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control.
-The `Travel` submenu item shows the total party count as its badge.
-The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment.
-Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
+  Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
+  Activating only the expand/collapse control toggles the submenu without navigation.
+  While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked: it only toggles (no navigation) and the submenu remains expanded and cannot be collapsed.
+  The expanded submenu contains Environments, Tasks, Events, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control.
+  The `Travel` submenu item shows the total party count as its badge.
+  The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment.
+  Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`.
-It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
+  It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
-The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
-- The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button.
-Activating that button returns to the systems browser without clearing the real selected-system store state.
+  The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
+- The selected-system rail scope uses the shared selector card described above.
+  Activating `All crafting systems` returns to the systems browser without clearing the real selected-system store state.
 
 Rail and count layout:
 
 - The manager left rail can be collapsed to an icon-only strip to reclaim horizontal width for the middle content column; section navigation (System Overview, Recipes, Components, Essences, Tools, the Gathering submenu parent, etc.) remains reachable when collapsed via its section icons, and a localized, keyboard-reachable toggle control switches between expanded and collapsed.
-The per-client preference persists in `fabricate.managerRailCollapsed` (default expanded).
+  The per-client preference persists in `fabricate.managerRailCollapsed` (default expanded).
 - The selected-system rail scope has stable geometry.
-Long system names are visually prominent but are capped or truncated before they can overflow the rail or move nav buttons below it.
+  Long system names are visually prominent but are capped or truncated before they can overflow the rail or move nav buttons below it.
 - Systems library row status is an interactive on/off toggle button bound to the crafting system's `enabled` state.
-It is color-coded, keyboard reachable, and must not trigger row selection when toggled.
+  It is color-coded, keyboard reachable, and must not trigger row selection when toggled.
 - Wherever a crafting system is shown in a picker or list (the systems library rail, the Interactable browser source picker, the interactable config source picker, and the Manage Interactables promote picker), two or more systems that share a display name must be visually distinguishable.
-A short, stable disambiguator (a leading crafting-system-id fragment) is appended to the display label of colliding names only; a system whose display name is unique is shown without a disambiguator.
-The disambiguation decision and the auto-defaulting picker's source-aware default selection are computed once in a single shared helper so every picker stays consistent.
+  A short, stable disambiguator (a leading crafting-system-id fragment) is appended to the display label of colliding names only; a system whose display name is unique is shown without a disambiguator.
+  The disambiguation decision and the auto-defaulting picker's source-aware default selection are computed once in a single shared helper so every picker stays consistent.
 - Count facts in the right inspector use a grid.
-Enabled facts render as an inline phrase that keeps the value and first label word together when wrapping, for example `3 Gathering` on the first line and `environments` on the next.
+  Enabled facts render as an inline phrase that keeps the value and first label word together when wrapping, for example `3 Gathering` on the first line and `environments` on the next.
 - Disabled feature counts are label-first with the disabled value emphasized, for example `Gathering environments Off`, not `Off Gathering environments`.
 - Count fact labels wrap at word boundaries and are not clipped or ellipsized except where a fixed navigation/control region explicitly requires truncation.
 
 Component browser display data:
 
 - Component descriptions are display-safe plain text.
-Foundry-style description objects must be normalized from their textual fields, and unknown object-shaped descriptions must render as empty text rather than object coercion strings.
-A description ingested or repaired under this behaviour contains no unresolved directive text on any surface — the component browser (inspector and rows) and the player inventory listing alike.
-A world upgraded from an earlier version displays its stored text as captured until the GM runs the item-data repair; when unresolved directives are detected at startup the GM is told, once, where that action lives.
-A directive belonging to a game system that registers no enricher for it is left verbatim, except that an authored label is rendered in its place when one is present.
-Description surfaces that read a stored value perform no resolution of their own.
-When a description resolves to no text at all, the surface shows its existing "no description" fallback rather than a blank gap.
+  Foundry-style description objects must be normalized from their textual fields, and unknown object-shaped descriptions must render as empty text rather than object coercion strings.
+  A description ingested or repaired under this behaviour contains no unresolved directive text on any surface — the component browser (inspector and rows) and the player inventory listing alike.
+  A world upgraded from an earlier version displays its stored text as captured until the GM runs the item-data repair; when unresolved directives are detected at startup the GM is told, once, where that action lives.
+  A directive belonging to a game system that registers no enricher for it is left verbatim, except that an authored label is rendered in its place when one is present.
+  Description surfaces that read a stored value perform no resolution of their own.
+  When a description resolves to no text at all, the surface shows its existing "no description" fallback rather than a blank gap.
 
 Environment browser layout:
 
 - Environment browse rows use a wide scene-proportional thumbnail in the identity cell and do not include a separate linked-scene column.
 - The task column renders the numeric task count only.
-Result and catalyst evidence belongs in the selected-environment inspector, not the browse row.
+  Result and catalyst evidence belongs in the selected-environment inspector, not the browse row.
 - Environment browse status uses the same compact on/off toggle pattern as systems rows.
 - Environment browse row actions place edit, duplicate, and delete in a compact grid left of move-up and move-down buttons stacked at the top-right and bottom-right of the actions column.
 
@@ -267,16 +271,16 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
 
 - Category list editor for custom categories only; reserved `General` is always present and not removable
 - The Tags & Categories screen is a tabbed screen over the three independent vocabularies — recipe categories, component categories, and item tags — with one vocabulary per tab and a per-tab count badge.
-Each tab has its own search plus a shown-count chip, a live-validated add form (tone-graded info / success / danger hints as the GM types: lowercase-normalization preview for tags, `General` reserved, duplicate detection, ready-to-add), and a redesigned row carrying a per-category icon, `#`-prefixed tag names, a "Built-in fallback" subtitle on the locked General row, an `N references` / `Unused` / `Locked` badge, and an inline delete-confirm strip for the destructive cascade.
-A recipe or component category may carry a persisted per-category icon, edited inline from its row.
+  Each tab has its own search plus a shown-count chip, a live-validated add form (tone-graded info / success / danger hints as the GM types: lowercase-normalization preview for tags, `General` reserved, duplicate detection, ready-to-add), and a redesigned row carrying a per-category icon, `#`-prefixed tag names, a "Built-in fallback" subtitle on the locked General row, an `N references` / `Unused` / `Locked` badge, and an inline delete-confirm strip for the destructive cascade.
+  A recipe or component category may carry a persisted per-category icon, edited inline from its row.
 - The screen has a right inspector rail: a "Vocabulary at a glance" tile set (recipe categories, component categories, item tags, total references), contextual "How it works" help, and a "Reference-safe by default" reassurance card.
-The total-references tile sums all three vocabularies, and a tag's reference count includes the recipe tag-placeholder ingredients that name it, not only the components carrying it.
+  The total-references tile sums all three vocabularies, and a tag's reference count includes the recipe tag-placeholder ingredients that name it, not only the components carrying it.
 - Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
 - Effect transfer toggle (`features.effectTransfer`)
 - Time requirements toggle (`requirements.time.enabled`): GM toggle, default on — an absent key defaults true, a present key must be exactly `false` to disable.
-It renders as a tile in the System Settings Optional features section (beside the currency toggle) and gates the recipe Duration surfaces (the single-step Duration card and the per-step duration editor) and the application of recipe/step durations at craft time.
+  It renders as a tile in the System Settings Optional features section (beside the currency toggle) and gates the recipe Duration surfaces (the single-step Duration card and the per-step duration editor) and the application of recipe/step durations at craft time.
 - Currency requirements toggle (`requirements.currency.enabled`)
 - Currency unit profile editor (`requirements.currency.units[]`)
 - Multi-step recipes toggle (`features.multiStepRecipes`)
@@ -292,8 +296,8 @@ A check is usable iff its mode carries an authored `rollFormula`; the legacy che
 - Roll formula, DC, and tier controls per mode (`simple` / `routed` / `progressive`)
 - The simple-mode dynamic-DC macro (`craftingCheck.simple.macroUuid`) — the one surviving check-adjacent macro (it only computes the DC)
 - Failure consumption policy — two live-persisting toggles in the non-alchemy crafting sub-tab editing `craftingCheck.consumption.consumeIngredientsOnFail` (default `true`; whether a recipe's ingredients are consumed on a failed crafting check) and `craftingCheck.consumption.breakToolsOnFail` (default `false`; whether required tools break on a failed check — the 1.7.0 rename of `consumeCatalystsOnFail`).
-The engine applies this policy on every failed crafting check; it is NOT shown in alchemy mode, where consumption is governed by the distinct `alchemy.consumeOnFail` flag.
-Salvage failure consumption is a separate, independently-defaulted policy read from `salvageCraftingCheck.consumption` (`consumeComponentOnFail`, default `true`; `breakToolsOnFail`, default `false`) that this crafting control does not change.
+  The engine applies this policy on every failed crafting check; it is NOT shown in alchemy mode, where consumption is governed by the distinct `alchemy.consumeOnFail` flag.
+  Salvage failure consumption is a separate, independently-defaulted policy read from `salvageCraftingCheck.consumption` (`consumeComponentOnFail`, default `true`; `breakToolsOnFail`, default `false`) that this crafting control does not change.
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`) (progressive only)
 
@@ -302,6 +306,8 @@ The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEdito
 `routedByIngredients` no longer renders the tier `CraftingCheckEditor` at all — it authors its optional pass/fail check via the shared `SimpleCraftingCheckEditor` (bound to `craftingCheck.simple`), which shows the DC, the meet/exceed comparison, the static/dynamic DC source, and the recipe DC tiers.
 
 Mode semantics are defined in `resolution-modes/spec.md`.
+The routed crafting and salvage editors expose a default-off Natural 20/1 tier-stepping toggle only while their routed check type is `relative`.
+The control writes `craftingCheck.routed.natStepping` or `salvageCraftingCheck.routed.natStepping`; it is absent for fixed checks and for gathering.
 
 ##### Check Tool-Breakage Controls
 
@@ -309,30 +315,30 @@ All three check editors (simple, routed, and progressive) ALWAYS render a single
 Each trigger pairs an expressive dice-matching condition with two effects: a themed outcome `<select>` and (under `checkDriven` authority) a break-tools pill.
 
 - The outcome select forces the check to Automatic success / Automatic failure / No effect (relabelled Award all / Award none / No effect on a progressive editor, reusing the existing award keys), and is disabled + pinned to No effect for an `outcomeTier` condition.
-Outcome forcing applies under BOTH authorities.
+  Outcome forcing applies under BOTH authorities.
 - The per-trigger break-tools pill (and the routed per-tier `outcome.breakTools` column) renders ONLY under `checkDriven` authority (`showBreakTools={checkDriven}`); under `toolSpecific` it is hidden and a check never breaks tools.
 - There is no free-text trigger label, no per-block enable toggle, and no natural-1 auto-seed; an empty trigger list is inert and the GM adds triggers explicitly.
-Condition types are `rollTotal`, `progressiveValue` (progressive editors only), `diceGroup` aggregate, and `outcomeTier` (routed editors only); dice groups are labelled from the formula, with duplicate `NdS` groups disambiguated (`#1` / `#2`).
+  Condition types are `rollTotal`, `progressiveValue` (progressive editors only), `diceGroup` aggregate, and `outcomeTier` (routed editors only); dice groups are labelled from the formula, with duplicate `NdS` groups disambiguated (`#1` / `#2`).
 - This authority gate applies per subsystem: crafting honours the system authority; salvage is gated on `features.salvage` identically to gathering — its checks tab hides when the feature is off and `salvageBreakageAuthority` falls back to `toolSpecific` (consistent with the gate acknowledged at lines 163 and 960); gathering exposes the per-trigger break-tools control only when `features.gathering === true`, otherwise it stays `toolSpecific`.
 
 #### Requirements Controls
 
 - Time toggle in the Optional features section, bound to `requirements.time.enabled` (default on).
-It renders always (like the currency toggle).
-When time requirements are enabled the recipe Duration card (single-step) and the per-step duration editor are authorable and their durations apply at craft time; when disabled, both editors are hidden and a step's `timeRequirement` no longer arms a timed run (the craft resolves immediately).
-Existing authored durations are preserved while the toggle is off (they render as read-only chips where a step summary is shown) and re-apply when it is turned back on.
+  It renders always (like the currency toggle).
+  When time requirements are enabled the recipe Duration card (single-step) and the per-step duration editor are authorable and their durations apply at craft time; when disabled, both editors are hidden and a step's `timeRequirement` no longer arms a timed run (the craft resolves immediately).
+  Existing authored durations are preserved while the toggle is off (they render as read-only chips where a step summary is shown) and re-apply when it is turned back on.
 - Currency toggle in the Optional features section, bound to `requirements.currency.enabled`.
-It renders always (independent of which optional feature flags exist on the system), so the section is never empty.
+  It renders always (independent of which optional feature flags exist on the system), so the section is never empty.
 - Currency units card under character modifiers, rendered only when `requirements.currency.enabled === true`.
-When currency is disabled the entire currency-units configuration block (spend strategy, provider, macros, and units) is hidden.
+  When currency is disabled the entire currency-units configuration block (spend strategy, provider, macros, and units) is hidden.
 - A config-level block above the unit list with a spend-strategy `<select>` offering the three peer strategies (`actorProperty` / `actorInventory` / `macro`; both dnd5e and pf2e), each with `<small>` hint text reflecting the selected strategy.
-When `actorInventory`, a provider `<select>` populated from the provider registry (or an empty-provider callout steering the GM to the macro strategy when the system has none).
-When `macro`, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs; the increment hint notes it is invoked to refund currency when a player cancels an in-progress craft (the `refundOnPlayerCancel` policy).
-There is no nested inventory-mode `<select>` — macro is its own peer strategy.
+  When `actorInventory`, a provider `<select>` populated from the provider registry (or an empty-provider callout steering the GM to the macro strategy when the system has none).
+  When `macro`, three macro drag-and-drop zones (`canAfford`/`increment`/`decrement`) that accept only `type === 'Macro'` drops, resolve the linked macro name/icon, support unlink (button + right-click), and show a missing state for unresolved UUIDs; the increment hint notes it is invoked to refund currency when a player cancels an in-progress craft (the `refundOnPlayerCancel` policy).
+  There is no nested inventory-mode `<select>` — macro is its own peer strategy.
 - Add currency unit and seed preset actions
 - Under `actorProperty` and `macro`, selectable expandable currency unit editors for label, abbreviation, icon, with a per-unit detail field that adapts to the strategy — actor data path (`actorProperty`), or no path/denomination field with a "macros match by abbreviation" note (`macro`)
 - Under `actorInventory` (with a provider) the GM-editable unit editors are replaced by a separate read-only, provider-managed denomination list (a "provider-managed denominations" callout plus per-unit label/abbreviation/coin-denomination shown as static values); the selected provider owns the denomination ladder, so the units are not GM-editable.
-The add-currency-unit, seed-preset, add-sub-unit, and sub-unit controls below are hidden while the provider branch is active.
+  The add-currency-unit, seed-preset, add-sub-unit, and sub-unit controls below are hidden while the provider branch is active.
 - Add-sub-unit dropdown with plus action
 - Sub-unit pills with editable amount and remove action
 
@@ -348,10 +354,10 @@ The selected system's recipe visibility is authored on the Crafting group's **Se
 It is no longer on the System Overview page, and it authors the flat `visibilityMode` enum rather than the legacy `listMode` + `knowledge.mode` pair.
 
 - A single radio-card selector (the shared `ResolutionModeCard` primitive) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
-Each option carries a label and description; exactly one mode is active for the whole system.
-- **Alchemy relabel (reveal-not-gate).** When `resolutionMode === "alchemy"` the card keys a `$derived` option set that renders the `restricted` option as "Manual (GM-granted access)" and rewords the item/knowledge/global descriptions from *gating* to *reveal* language (per `recipe-visibility`), because brewing is never gated by visibility.
-A non-alchemy system renders "Restricted" with gating language.
-The STORED enum value is unchanged in both (`restricted` stays `restricted` — no new enum value and no migration), so the Access tab (shown for `visibilityMode === "restricted"`) stays reachable to author the per-recipe grant.
+  Each option carries a label and description; exactly one mode is active for the whole system.
+- **Alchemy relabel (reveal-not-gate).** When `resolutionMode === "alchemy"` the card keys a `$derived` option set that renders the `restricted` option as "Manual (GM-granted access)" and rewords the item/knowledge/global descriptions from _gating_ to _reveal_ language (per `recipe-visibility`), because brewing is never gated by visibility.
+  A non-alchemy system renders "Restricted" with gating language.
+  The STORED enum value is unchanged in both (`restricted` stays `restricted` — no new enum value and no migration), so the Access tab (shown for `visibilityMode === "restricted"`) stays reachable to author the per-recipe grant.
 - Selecting an option live-applies it through `setVisibilityMode(mode)`, which persists `visibilityMode` and refreshes; the change is non-destructive (migrates no recipes) and there is no separate save action.
 - A `CraftingEffectPanel` beside the selector summarizes the active mode's effect (from the projected `craftingEffect(visibilityMode)` matrix): whether the Access tab, Books & Scrolls, limited-use, and learning-limits surfaces are shown.
 - Per-recipe-item use and learn caps are NOT authored here — each recipe item's caps live on its own Books & Scrolls item page (see Books & Scrolls Surface).
@@ -363,10 +369,15 @@ The GM admin must expose a recipe-item management surface for the selected craft
 
 Capabilities:
 
-- Add recipe item definitions from world or compendium items by drag/drop or picker
+- Add recipe item definitions from world or compendium Items by drag/drop only
 - Remove recipe item definitions
 - Show source-linked name and image preview
 - Warn when a recipe item definition's source item no longer resolves
+
+Tool creation, Tool source replacement, and Recipe Item source replacement use the same drag-only Item drop-zone primitive.
+It resolves the UUID from Foundry V13 Document drag data through awaited `fromUuid` before mutating state, accepts only a resolved `Item` document, and rejects missing, malformed, Folder, Actor, and compendium-index-only results without changing the current source or draft.
+The drop zone has no click-to-browse action, picker, shortcut list, select control, button role, or keyboard-operability claim.
+Existing Component identity replacement surfaces are not Item-source drop zones and retain their Component-specific interaction contract.
 
 Recipe item definitions are distinct from components:
 
@@ -480,36 +491,36 @@ Capabilities:
 
 - Add managed items from world or compendium.
 - Bulk-add managed items by dropping a Folder or a whole compendium onto the import zone.
-Folder
+  Folder
   drops are accepted from both the world Items directory and a compendium directory, and expand to
   every contained Item including nested subfolders; a compendium folder's items are resolved from
   the pack index entries.
 - Folder-aware categorization on bulk import: a folder drop, an in-pack-folder drop, or a
   whole-compendium drop that contains at least one item-bearing folder opens a mapping step before
   the import commits.
-The step lists each detected folder (the dropped folder plus every nested subfolder) with its item
+  The step lists each detected folder (the dropped folder plus every nested subfolder) with its item
   count, and lets the GM assign a category and/or tags per folder, inline-create a category (reusing
   the shared vocabulary model), or skip a folder.
-Tags are assigned from the existing vocabulary only; a new tag is created in the Tags & Categories
+  Tags are assigned from the existing vocabulary only; a new tag is created in the Tags & Categories
   screen, not inline at import.
-Category assignment is single-valued and OVERWRITES the imported default; tag assignment is additive
+  Category assignment is single-valued and OVERWRITES the imported default; tag assignment is additive
   (union).
-A "match-by-name" toggle, ON by default, pre-fills each folder's row when the folder name matches an
+  A "match-by-name" toggle, ON by default, pre-fills each folder's row when the folder name matches an
   existing category (case-insensitive) and/or tag (lowercased), applying each axis independently.
-The primary action imports the non-skipped folders' items and applies each folder's mapping to that
+  The primary action imports the non-skipped folders' items and applies each folder's mapping to that
   freshly imported component set; the item count updates live as folders are skipped, and a skipped
   folder's items are not imported.
-A single-item drop is unchanged, a folderless drop falls back to the one-shot import, and a
+  A single-item drop is unchanged, a folderless drop falls back to the one-shot import, and a
   compendium-directory folder that groups packs (not items) is skipped with a notice.
 - Remove managed items.
 - Edit managed item tags (if enabled).
 - Edit managed item essences (if enabled).
 - Edit managed item difficulty: the component editor's body exposes an editable
   progressive-difficulty stepper, titled "This component's Progressive DC".
-It is shown only when the system's crafting resolution mode is `progressive` (parity with the
+  It is shown only when the system's crafting resolution mode is `progressive` (parity with the
   read-only badge on the components-browser row).
-It accepts an integer of 1 or greater; zero clears the value.
-The stepper is staged into the component editor's draft and persisted with the rest of the edit on Save (not written on change), contributing to the editor's dirty state and unsaved-changes guard.
+  It accepts an integer of 1 or greater; zero clears the value.
+  The stepper is staged into the component editor's draft and persisted with the rest of the edit on Save (not written on change), contributing to the editor's dirty state and unsaved-changes guard.
 - Replace associated source item by drag/drop.
 
 Component import warnings:
@@ -526,7 +537,7 @@ Capabilities:
 - Browse, create, edit, duplicate when supported, and delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
 - Set optional source component identity by picker/drag-drop only when effect transfer is enabled.
-The source component may in turn expose a source item UUID.
+  The source component may in turn expose a source item UUID.
 - In Manager, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
 - Manager shows component usage evidence for essence definitions and shows source-link state only when `features.effectTransfer === true`.
 - Manager does not allow inline editing on the browse essences page; the row Edit action opens a dedicated edit essence view.
@@ -540,17 +551,61 @@ The source component may in turn expose a source item UUID.
 The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering` (see Manager Shell).
 It manages the system's single canonical Tool library (`system.tools`).
 
-Tool-breakage authority (issue 419):
+The Tools surface is a Tool Studio with a top-level library route and a focused `tool-edit` route.
+There is no Tool Kind field, filter, selector, pill, icon taxonomy, or persisted Kind value on either route.
 
-- The Tools page carries a system-level **tool-breakage source** control: a card with a header, descriptive hint, and a radio group offering `toolSpecific` (default) and `checkDriven`.
-- `toolSpecific` means each Tool's own breakage mode decides whether it breaks and a check never breaks tools; `checkDriven` means the active check's `checkBreakage` triggers decide whether all required tools break and each Tool's own mode is ignored except `immune`.
-- Each source option is self-describing (a bold name above a muted description); the `checkDriven` option's description carries the "per-tool breakage modes are not evaluated (except Immune)" guidance, so there is no separate advisory line.
+The library uses the Manager three-column shell at `210px | 1fr | 340px`.
+It owns the sole system-breakage-authority card above search, with self-describing `toolSpecific` and `checkDriven` options; changing authority persists live and never erases the inactive per-Tool settings.
+The center library accepts an Item drop to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
+Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state.
+The right inspector presents the selected Tool's identity and description followed by four headed card sections for breakage mode, on-break action, character prerequisites, and check bonus.
+The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
+Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
+When Tools exist and the current selection is absent or stale, the library selects the first Tool exactly once; a valid current selection is preserved and an empty library emits no selection.
+The result list scrolls independently above a persistent, full-width pagination footer that remains outside the scrolling region for both one-page and multi-page result sets.
 
-Per-tool breakage editing is governed by the active authority; the two authorities never expose their per-tool breakage surfaces at the same time:
+Each row exposes selection through a keyboard-focusable identity target with explicit selected semantics and Enter/Space activation.
+Selection, Edit, and enabled toggle are distinct localized named hit targets.
+Activating Edit or the toggle does not select or open through the row handler.
+The enabled toggle persists live through the same immediate path as Recipe enabling, updating both the focused draft and its baseline without marking an otherwise-clean editor dirty; a newly-created, not-yet-persisted Tool cannot be enabled through this path.
 
-- Under `toolSpecific` authority the per-tool breakage **mechanic** offers the three original modes — `Limited uses`, `Break chance`, `Dice expression` — each with its own field inputs. `Immune` is not offered here; an `Immune` tool coerces to the `Limited uses` display (an unlimited limited-uses tool also never breaks) and persists a concrete mechanic once edited.
-- Under `checkDriven` authority the per-tool breakage mechanic is binary: `Breakable` or `Immune`, with no field inputs. `Breakable` means the tool can break (the active check decides); it preserves the tool's existing non-immune mechanic under the hood (defaulting to unlimited limited-uses), so switching the source back to `toolSpecific` restores it.
-- An `Immune` tool never breaks under either authority and is still recorded as used; the `onBreak` configuration stays available, and the browse-row breakage chip reads as a never-breaks state (and as `Breakable` for a non-immune tool under `checkDriven`).
+The editor uses `210px | 1fr | 320px` and exposes exactly four tabs: Overview, Breakage, Requirements, and Validation.
+The header alone owns Back, Delete, Save, and the dirty-state affordance; there is no footer save bar.
+The body includes a live behavior preview, while the inspector summarizes identity, linkage, usage, and validation context.
+
+Overview uses the Recipe Studio tab, field, and enabled-card primitives.
+Source name and description are read-only snapshots, while the display label alone is editable.
+A linked source exposes Copy source UUID immediately before Unlink, never renders the raw UUID or a replacement picker, and accepts replacement only through a persistent drag-only drop-zone card with visible instructions and no button role, tabindex, or keyboard-operability claim.
+The persistent behavior inspector explains source Items, recipe requirements, salvage use, character prerequisites, check bonuses, and breakage on every editor tab, followed by a localized link to the published Tools documentation.
+Disabled preview rules are titled `No prerequisites to use` and `No check bonus`.
+Breakage authors the retained `limitedUses`, `breakageChance`, or `diceExpression` tool-specific configuration, the separate check-driven Breakable/Immune state (`checkBreakable`), and the `destroy`, `flagBroken`, or `replaceWith` action.
+Percentage authoring uses the shared synchronized number-and-range slider primitive also used by Gathering drop chances; Tool breakage supplies its own accessible labels and continuously interpolates across a green, yellow, amber, then red risk scale as the chance increases.
+Changing authority or check-driven immunity does not clear the inactive tool-specific configuration or on-break values.
+When `checkBreakable` is false under check-driven authority, on-break controls are actually disabled and removed from interaction while their retained values and the explanation remain readable; opacity or `pointer-events` alone is insufficient.
+
+`flagBroken` authors zero or more Recipe-compatible repair `IngredientGroup`s with the shared AND-groups/OR-options interaction model and Component, Tag, Essence, and Currency match types.
+`replaceWith` authors exactly one managed Component target through a full-width shared searchable popover card.
+The Tool Studio does not create or edit direct Item targets; legacy direct Item discriminators remain readable and executable at runtime until the GM deliberately replaces them with a managed Component target.
+Requirements selects shared `system.characterPrerequisites` ids, the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
+The bonus expression input visually supplies a leading `@` for roll-data paths, stores that sigil exactly once, provides explanatory hint text, and does not offer game-system-specific preset values.
+Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Source, Breakage, and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
+
+Leaving a dirty `tool-edit` route through Back, rail or breadcrumb navigation, a system-scope change, another Tool selection, or application close invokes the standard DialogV2 Save / Discard / Keep editing guard.
+Save proceeds only after successful validation and persistence.
+Invalid or failed Save keeps the same Tool mounted, opens Validation, and focuses or exposes the first failing check.
+The Validation tab projects domain failures onto stable localized categories and never renders raw field paths, exception messages, adapter details, or other internal error text.
+Save, delete, and enabled-toggle failures likewise emit only their localized operation-specific message; raw caught errors may remain internal state for control flow but never become notification copy.
+Discard restores the baseline before navigation, while Keep editing preserves the draft and focus.
+Re-entering the same Tool does not prompt.
+Delete uses a separate destructive DialogV2 confirmation; cancellation preserves the draft, and successful deletion returns to the library without a second dirty prompt.
+
+Tabs expose `tablist`, `tab`, and `tabpanel` relationships with selected/error state that is not color-only.
+Item creation/drop targets and every icon-only unlink, remove, and menu control have button semantics and localized accessible names.
+The Tool editor's sole identity/action header spans the complete Tool shell above the rail, editor, and preview.
+Tool routes suppress the generic system status ribbon, generic edit heading, rail scope card, and rail-collapse control so they do not precede the Tool content.
+At product-root widths of `832px` and wider, the library preserves `210px | minmax(0, 1fr) | 340px` and the editor preserves `210px | minmax(0, 1fr) | 320px`; center workspace and inspector own vertical scrolling with `min-width: 0` and `min-height: 0`.
+Only below `832px` do rail, main, and inspector stack in reading order with max-content rows, the body becoming the single vertical scroller while the bounded rail remains independently scrollable and main/inspector overflow becomes visible.
+At `680px` and below, header actions and tab/action clusters wrap without overlap, and Back, Delete, Save, validation state, replacement controls, and repair-row actions remain visible and reachable.
 
 ### Recipes Tab
 
@@ -634,7 +689,7 @@ Section headings are uppercase micro-labels sitting directly on the panel — `S
 Only the things that are objects keep a box: the 2×2 stat grid (Ingredients / Results / Steps / Crafting check) and the Requires / Produces flow rows.
 
 The hero chip row carries exactly two chips on one line: the category and a status pill (a dot plus `On`/`Off`, naming the state exactly as the row's switch does).
-There is no chip for the *absence* of a state — the retired `Unlocked` chip named a non-state and forced the row to wrap; `Locked`, `Incomplete` and `Can't enable` are shown only when true.
+There is no chip for the _absence_ of a state — the retired `Unlocked` chip named a non-state and forced the row to wrap; `Locked`, `Incomplete` and `Can't enable` are shown only when true.
 The flavour text is shown whole, in the one surface with room for it.
 
 The **Produces** list shows every produced group, **toned by role**.
@@ -653,11 +708,11 @@ Actions:
 - Duplicate
 - Delete
 
-In Manager, the recipes browser header offers a single primary `Create recipe` action (no crafting-system import/export on the recipes header); creating a recipe follows a create-then-edit model — `store.createRecipe` persists a new identity-only *incomplete shell* in the selected system via `RecipeManager.createRecipe({ craftingSystemId }, { allowIncomplete: true })` (it saves because persistence gates on structural validity only, not completeness) and the manager immediately opens the recipe-edit view on it.
+In Manager, the recipes browser header offers a single primary `Create recipe` action (no crafting-system import/export on the recipes header); creating a recipe follows a create-then-edit model — `store.createRecipe` persists a new identity-only _incomplete shell_ in the selected system via `RecipeManager.createRecipe({ craftingSystemId }, { allowIncomplete: true })` (it saves because persistence gates on structural validity only, not completeness) and the manager immediately opens the recipe-edit view on it.
 The new shell carries the default recipe name and image until edited, and the browse row surfaces a derived `Incomplete` chip until ingredient sets and result groups are added.
 The recipe browse row `Edit` action opens that same dedicated recipe-edit view rather than editing inline, and that Edit action is available regardless of the recipe's `locked` state.
 The recipe-edit view is the **five-tab editor** specified in `## Recipe Editor` below — Overview, Ingredients, Results, Tools and Validation — over a controlled local draft in the central `manager-main`, with the GM manager's right-hand context inspector panel (the global `manager-inspector` aside) carrying that editor's context rail.
-Ingredients, essences, tools, steps and results are all authored there; none of them is deferred, and there is no *Catalyst* concept in the editor (Tools replaced it).
+Ingredients, essences, tools, steps and results are all authored there; none of them is deferred, and there is no _Catalyst_ concept in the editor (Tools replaced it).
 Identity edits track a dirty state surfaced by a header dirty chip, persist via `store.updateRecipe` → `RecipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true })` (so an identity-only save is not blocked by the shell's still-empty ingredients/results), and a dirty draft prompts a discard confirmation on route exit.
 The recipe-edit header follows the standard editor convention shared with the gathering-task, gathering-event, and environment editors: an `Unsaved` chip (when dirty), `Back to recipes`, `Delete recipe` (danger, enabled whenever a recipe is selected), and `Save`.
 The context rail is **always present** on `recipe-edit`, and what its top section carries is decided by the system's canonical `visibilityMode` through `craftingEffect` (see `### Context rail`): the read-only access roster in `restricted`, the read-only Books & Scrolls "Appears in" summary in `item` / `knowledge`, and no top section at all in `global`.
@@ -713,7 +768,7 @@ Selecting a row opens the `GrantAccessInspector` for that recipe.
 The inspector authors the grant through **two independent rosters** — Characters and Players — each with its own search box and pager:
 
 - The **Characters** roster is the player-character actor roster (`adminStore.getPcRoster` → `services.getPlayerCharacterActors`); toggling a character grants or revokes its actor id in `access.characterIds`.
-A granted character makes the recipe visible to any viewer who **controls** that actor (assigned character or Foundry `OWNER` permission — see `recipe-visibility/spec.md`), not to a fixed user.
+  A granted character makes the recipe visible to any viewer who **controls** that actor (assigned character or Foundry `OWNER` permission — see `recipe-visibility/spec.md`), not to a fixed user.
 - The **Players** roster reuses the world-users projection; toggling a player grants or revokes its user id in `access.playerIds`, making the recipe visible to that user directly.
 - Each toggle persists the **full** `{ characterIds, playerIds }` snapshot via `adminStore.saveRecipeAccess` (live-apply, no dirty draft), so searching or paging never loses a grant.
 
@@ -732,38 +787,38 @@ Current GM editor behavior:
 - The selected draft can edit environment name, description, enabled state, `selectionMode`, and optional `sceneUuid`.
 - The selected draft can edit a player-facing environment image independent of any linked scene.
 - The selected draft can edit gathering composition tags: multiple `biomes` and multiple `dangerTags`.
-Geography is no longer a composition tag and the legacy single-`region` selector has been removed; geography is authored as realm membership (see the realm multi-select below).
+  Geography is no longer a composition tag and the legacy single-`region` selector has been removed; geography is authored as realm membership (see the realm multi-select below).
 - When `gatheringRealmSettings.enabled` is `true`, the environment editor surfaces a multi-select **realm** chip control (`includedRealmIds`) mirroring the biome selector, sourced from the system's `GatheringRealm` records.
-When the toggle is off the realm control is hidden entirely.
-When the toggle is on but the system has no realms yet, the control shows a muted empty line pointing the GM to create realms in the Travel tab first.
+  When the toggle is off the realm control is hidden entirely.
+  When the toggle is on but the system has no realms yet, the control shows a muted empty line pointing the GM to create realms in the Travel tab first.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
 - The selected system's Gathering Settings tab configures d100 reward selection, event selection, limits, and event outcome through `gatheringConfig.systems[systemId].rules`.
 - The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day.
-Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
+  Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes Gathering Task and event library rows for the selected crafting system, including per-environment automatic/manual composition controls.
 - In automatic composition, task and event tabs show Included, Excluded, and Non-matching record sections; excluding a record writes the matching `disabled*Ids` list and Restore clears it.
 - In manual composition, task and event tabs show only Included in this environment and Available to add.
-Removing an included manual task or event clears `enabled*Ids` and `forced*Ids`, ignores stale `disabled*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
+  Removing an included manual task or event clears `enabled*Ids` and `forced*Ids`, ignores stale `disabled*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
 - Manual Available to add rows present Add for matching records, Force add for enabled non-matching records, and a disabled library note for library-disabled records.
 - When the Manager Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/event options before composing environments.
 - Gathering Task and event row overrides stay inside expandable rows so the default environment workspace remains scannable.
-Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
+  Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview.
-D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
+  D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - Reusable event authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The selected-system inspector exposes a per-system character modifier library for gathering, with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
 - D100 drop row and event editors expose character modifier references with modifier selection, `+`/`-` operator, optional min/max bounds, per-row override fields, and clear GM-facing evidence without leaking expression or macro internals to non-GM blind history.
 - The settings/tag area can edit gathering vocabularies for biomes and danger.
-The legacy `regions` vocabulary dimension has been removed (geography is not a composition tag); geography is authored as `GatheringRealm` records in the Travel tab.
-Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
+  The legacy `regions` vocabulary dimension has been removed (geography is not a composition tag); geography is authored as `GatheringRealm` records in the Travel tab.
+  Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
 - The editor keeps core environment identity separate from task/node authoring.
 - The editor allows environments to exist without a linked scene.
-Scene link controls are optional access/evidence controls, not the identity of the environment.
+  Scene link controls are optional access/evidence controls, not the identity of the environment.
 - The editor should group rich gathering authoring into Overview, Location, Conditions, Tasks / Nodes, Results, Risk / Encounters, Economy, Visibility, and Advanced sections or equivalent groupings.
 - Conditions authoring shows which task availability, yield, risk, stamina, or difficulty modifiers are active.
 - Tasks / Nodes authoring exposes task identity, enabled state, current node count, max node count, depletion timing, respawn policy, next respawn evidence, and manual restock controls when node economy is enabled.
@@ -795,7 +850,7 @@ Scene link controls are optional access/evidence controls, not the identity of t
 - The selected task can enable, edit, and clear a visibility gate.
 - Visibility-gate authoring is formula-only: it uses a `formula` and a `threshold` field, with no provider select and no macro UUID field.
 - Incomplete visibility input is local UI state only and must not be sent to the environment store until both fields are present.
-Clearing visibility calls the store only when a committed visibility gate exists.
+  Clearing visibility calls the store only when a committed visibility gate exists.
 - The selected routed task can edit `resultSelection.provider` as `macroOutcome` or `rollTableOutcome`.
 - Routed `macroOutcome` authoring uses available script macro options for `macroUuid`.
 - Routed `rollTableOutcome` authoring uses a UUID text input for `rollTableUuid`.
@@ -806,8 +861,8 @@ Clearing visibility calls the store only when a committed visibility gate exists
 - Task, result-group, result, catalyst, visibility, result-selection, progressive, check, time-requirement, and failure-outcome mutations preserve other nested task configuration.
 - Dirty state is tracked for the selected draft, and save/cancel affordances are visible.
 - Creating a new environment persists a disabled draft shell with one disabled placeholder task for validation compatibility.
-New draft placeholder result groups receive immediate IDs so they can be edited before save/reload.
-This shell is not a configured player-visible gathering path until configured and enabled by the GM.
+  New draft placeholder result groups receive immediate IDs so they can be edited before save/reload.
+  This shell is not a configured player-visible gathering path until configured and enabled by the GM.
 - Duplicate, delete, and reorder actions use gathering environment store methods.
 - Delete requires confirmation and cleans referenced active and historical gathering runs through the store.
 - Store-owned task/result/catalyst/visibility/result-selection/progressive/check/time-requirement/failure-outcome callbacks are delegated through the admin store and remain inside the environment draft save/cancel flow.
@@ -834,36 +889,36 @@ It must not be duplicated in a separate detached settings UI.
 The Travel/Realms subsystem is opt-in per system:
 
 - A `Travel & Realms` toggle (default off) lives in the gathering Settings surface (it is the one surface that stays visible when the subsystem is disabled, since it hosts the toggle).
-Enabling it writes `gatheringRealmSettings.enabled = true`.
-The toggle card carries hint copy naming where Travel lives (e.g. "Enabling this reveals the Travel tab…") so a GM can connect the toggle to the outcome.
+  Enabling it writes `gatheringRealmSettings.enabled = true`.
+  The toggle card carries hint copy naming where Travel lives (e.g. "Enabling this reveals the Travel tab…") so a GM can connect the toggle to the outcome.
 - When the toggle is off, the `Travel` nav item is hidden AND removed from the gathering tab-resolution/fallback lists, so a stale `activeGatheringTab === 'travel'` falls back to `Environments` (filtering the render alone is insufficient).
-The environment editor also hides its realm selector while the toggle is off.
-Disabling the subsystem treats every environment as ungated at runtime.
+  The environment editor also hides its realm selector while the toggle is off.
+  Disabling the subsystem treats every environment as ungated at runtime.
 
 Shipped capabilities:
 
 - `Travel` is reachable only while a gathering-enabled crafting system is selected.
-Party create/rename/enable/disable, member management, and travel-actor assignment are **world-global** (parties are shared across systems); only the current-realm override block is **per selected system**.
-The view states this explicitly.
+  Party create/rename/enable/disable, member management, and travel-actor assignment are **world-global** (parties are shared across systems); only the current-realm override block is **per selected system**.
+  The view states this explicitly.
 - The `Travel` submenu badge shows the total party count.
 - Create, rename, enable/disable, and delete Fabricate parties.
 - Assign actor members to a party and assign exactly one **travel actor** (the actor that represents the party on a campaign map).
-Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
+  Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
 - The enable toggle is disabled (with an "assign a travel actor to enable" hint) while a party has no travel actor; newly created parties visibly show their disabled state.
 - When the world has no actors, the member and travel-actor pickers show an explicit empty state directing the GM to create an Actor first.
 - Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-realm evidence per source state, member/travel-actor summary, stale references).
-Override editing exists in exactly one place (center).
+  Override editing exists in exactly one place (center).
 - The current-realm evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
-The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from token-derived sensing (Phase 3, shipped).
+  The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from token-derived sensing (Phase 3, shipped).
 - The Travel route presents a third **Map Region Links** tab (`GatheringTravelTabs.svelte`) that lists the Scene Regions on the active scene (`GatheringMapLinksTab.svelte`) with a per-region realm picker (`MapRegionLinkPicker.svelte`) linking each scene region to at most one realm (single-valued per scene region, written by `adminStore.setMapRegionLink`).
 - Each stale member / travel-actor / override-realm reference gets a remove/clear action; "repair" means removing the stale reference and re-assigning through the normal pickers.
 - The route embeds the canonical **realm authoring surface** using a realm list + detail layout: the list creates/selects/deletes realms; the detail pane edits the selected realm's name, description, image, enabled, secret, and biomes (chosen from the system biome vocabulary).
-Edits merge-patch over the existing record so unedited fields (sort, sceneMappings, modifiers) round-trip untouched.
-Delete is destructive and routes through the confirm dialog with referenced-by evidence (a deliberate change from the prior immediate-delete quick list).
+  Edits merge-patch over the existing record so unedited fields (sort, sceneMappings, modifiers) round-trip untouched.
+  Delete is destructive and routes through the confirm dialog with referenced-by evidence (a deliberate change from the prior immediate-delete quick list).
 - This realm authoring is the source of the realms an environment can be assigned to via its `includedRealmIds` multi-select; the multi-realm data is authored here, not in the environments browser.
-The legacy environments-browser "Region" filter has been removed.
+  The legacy environments-browser "Region" filter has been removed.
 - Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern.
-Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
+  Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
 
 Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): realm discovery controls, and the player-facing travel/current-realm view. (Realm authoring — name/description/img/secret/biomes — and the environment realm-membership control now ship inside the Travel route and environment editor; `sceneMappings` authoring now ships via the Map Region Links tab; only the legacy realm ordering and Phase 4 `modifiers` authoring remain reserved.)
 
@@ -885,7 +940,7 @@ Player-facing event copy is framed as a neutral encounter (a travelling merchant
 - An environment's player-facing event presence reads neutrally (for example "This area has events in store." and "The events here are hidden until you gather.").
 - Event-outcome copy uses event terminology (for example "If an event occurs, your gather still succeeds." / "…the gather fails.") rather than risk/hazard terminology.
 - Copy that legitimately describes the danger axis (for example "Danger tags let environments opt in…") is retained.
-The d100 result-group validation copy still reserves the failure aliases (including the former miss/`hazard` terms) as forbidden result-group names — this is the failure-keyword concept, not the Gathering Event concept.
+  The d100 result-group validation copy still reserves the failure aliases (including the former miss/`hazard` terms) as forbidden result-group names — this is the failure-keyword concept, not the Gathering Event concept.
 
 ## Canvas Interactables — Manage Interactables Panel (GM)
 
@@ -905,7 +960,7 @@ Scoped to a single crafting system.
 The Manager recipe-edit view is a **five-tab editor** — Overview, Ingredients, Results, Tools, Validation — over a controlled local draft.
 Every edit stages into that draft and commits in one `updateRecipe` call on Save (through the `allowIncomplete` authoring path, which gates on structural validity only); the `enabled` toggle is the single immediate exception, because enabling validates against the persisted recipe.
 The shared header carries an `Unsaved` chip, `Back to recipes`, `Delete recipe` and `Save`, and every route exit runs the Manager confirm-discard guard.
-A recipe whose ingredients or results are still empty is a persistable *incomplete shell*: it stays non-craftable (the engine gates on completeness) and the browse row shows a derived `Incomplete` chip.
+A recipe whose ingredients or results are still empty is a persistable _incomplete shell_: it stays non-craftable (the engine gates on completeness) and the browse row shows a derived `Incomplete` chip.
 
 ### Resolution-mode banner
 
@@ -919,16 +974,16 @@ The editor's right-hand column is the shell's existing `manager-inspector` aside
 
 Its top section is **mode-conditional**, driven by the system's canonical `visibilityMode` through the `craftingEffect(mode)` matrix — the same single source of truth the crafting nav and Crafting Settings consume:
 
-| `visibilityMode` | `craftingEffect` | Rail top section |
-| --- | --- | --- |
-| `restricted` | `showAccess` | **Who can craft this** — the players and characters granted this recipe, plus a **Manage access** deep-link to the Access tab |
-| `item`, `knowledge` | `showBooksScrolls` | **Appears in** — the books/scrolls that teach this recipe, plus an **Open Books & Scrolls** deep-link |
-| `global` | neither | No section: a globally-visible system grants no per-recipe access and uses no books |
+| `visibilityMode`    | `craftingEffect`   | Rail top section                                                                                                              |
+| ------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `restricted`        | `showAccess`       | **Who can craft this** — the players and characters granted this recipe, plus a **Manage access** deep-link to the Access tab |
+| `item`, `knowledge` | `showBooksScrolls` | **Appears in** — the books/scrolls that teach this recipe, plus an **Open Books & Scrolls** deep-link                         |
+| `global`            | neither            | No section: a globally-visible system grants no per-recipe access and uses no books                                           |
 
 The rail is **read-only in every mode**.
 Authoring lives on the owning screen: the Access tab owns `recipe.access`, and Books & Scrolls owns book membership.
 
-Below the mode-conditional section, in every mode, the rail carries the recipe's **Category** selector, the **Recipe mode** (Simple / Complex) segmented control when the system's resolution mode permits multiple ingredient sets, the **Step mode** (Single / Multi-step) segmented control, and a **Validation** mini-list showing either an *All clear* pill or the failing readiness checks with a deep-link into the Validation tab.
+Below the mode-conditional section, in every mode, the rail carries the recipe's **Category** selector, the **Recipe mode** (Simple / Complex) segmented control when the system's resolution mode permits multiple ingredient sets, the **Step mode** (Single / Multi-step) segmented control, and a **Validation** mini-list showing either an _All clear_ pill or the failing readiness checks with a deep-link into the Validation tab.
 
 ### Access rosters (restricted mode)
 
@@ -936,14 +991,14 @@ The rail's access rows are **resolved in the admin store** and handed to the rai
 Three rules govern that resolution, and each exists because the naive alternative silently misreports who can craft a recipe:
 
 - **A character's controlling players are a SET, not one user.**
-The runtime predicate grants access to any viewer whose **assigned character** is that actor **OR** who holds Foundry `OWNER` on it — a union, not a fallback chain.
-Each resolved character therefore carries `controlledBy: Array<{ id, name, avatar, assigned }>` (assigned-first, then name-sorted), never a singular "played by" field.
+  The runtime predicate grants access to any viewer whose **assigned character** is that actor **OR** who holds Foundry `OWNER` on it — a union, not a fallback chain.
+  Each resolved character therefore carries `controlledBy: Array<{ id, name, avatar, assigned }>` (assigned-first, then name-sorted), never a singular "played by" field.
 - **`ownership.default >= OWNER` reaches the whole table.**
-When it does, the character carries `sharedWithAllPlayers: true` and the rail renders **"Shared with all players"** — a distinct string, never "Played by ⟨one name⟩", which would tell the GM that one player got the recipe when in fact everyone did.
-With no controllers at all, the rail renders **no** sub-line rather than inventing an attribution.
+  When it does, the character carries `sharedWithAllPlayers: true` and the rail renders **"Shared with all players"** — a distinct string, never "Played by ⟨one name⟩", which would tell the GM that one player got the recipe when in fact everyone did.
+  With no controllers at all, the rail renders **no** sub-line rather than inventing an attribution.
 - **GMs are filtered before ownership is tested.**
-`Document#testUserPermission` short-circuits every GM (Assistant GMs included) to `OWNER`, so the roster is derived from Foundry's non-GM `game.users.players` roster first.
-The same roster now backs the Access tab's grantable **Players** list, which previously offered GMs as targets even though granting one had no effect.
+  `Document#testUserPermission` short-circuits every GM (Assistant GMs included) to `OWNER`, so the roster is derived from Foundry's non-GM `game.users.players` roster first.
+  The same roster now backs the Access tab's grantable **Players** list, which previously offered GMs as targets even though granting one had no effect.
 
 Granted **character** ids resolve over **every world actor**, not the player-character roster: the runtime predicate applies no type filter, so a grant naming a non-player-character actor is still honoured by the engine and must still be displayed.
 An id that no longer resolves (a deleted actor or user) is **dropped from display and never persisted away** — rendering the rail must not mutate the grant.
@@ -973,11 +1028,11 @@ The recipe editor's context rail shows a **read-only** summary of the grant plus
 If the system's visibility mode consumes an item or teaches by knowledge (`item` / `knowledge`):
 
 - The recipe's context rail lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
-There is no book/scroll `kind` — `RecipeItemDefinition` manages every recipe item regardless of Foundry item type.
+  There is no book/scroll `kind` — `RecipeItemDefinition` manages every recipe item regardless of Foundry item type.
 - Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
-A row whose definition's `originItemUuid` no longer resolves shows a missing/stale state and retains the link.
+  A row whose definition's `originItemUuid` no longer resolves shows a missing/stale state and retains the link.
 - **Adding** a recipe to a book is authored from the book's side (Books & Scrolls → the recipe-item editor stages `recipeIds` and persists on Save).
-The recipe editor carries no drop zone and no "link another" affordance: a second authoring path for the same many-to-many is duplication, not a capability.
+  The recipe editor carries no drop zone and no "link another" affordance: a second authoring path for the same many-to-many is duplication, not a capability.
 - Membership changes apply immediately (through `setRecipeBookMembership`), independently of the recipe draft's Save.
 
 Owned copies match by UUID or resolved source UUID of the linked recipe item definition.
@@ -987,10 +1042,18 @@ If the required linkage is missing, show a validation warning.
 
 `recipe.locked` is persisted and engine-honoured (`guardCraftStart` refuses a locked craft), and the Overview tab is where it is written.
 
-A locked recipe stays **visible** to players but only a GM can craft it — a different concept from the Overview's recipe-item *image* lock (which merely means the image comes from a linked recipe item), so it carries its own copy and its own hooks.
+A locked recipe stays **visible** to players but only a GM can craft it — a different concept from the Overview's recipe-item _image_ lock (which merely means the image comes from a linked recipe item), so it carries its own copy and its own hooks.
 
 The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
 The change persists immediately (like `enabled`), outside the recipe draft's Save.
+
+### Tools tab
+
+The recipe editor's Tools tab authors Tool references only.
+Recipe-wide Tools are available in every resolution mode, and explicit multi-step recipes may author additional Tool references per step.
+Named ingredient sets receive their own Tool card only when the Crafting System uses `routedByIngredients`; unnamed sets and every other resolution mode expose no per-set Tool authoring.
+The per-set card reuses the Results tab's result-set outer card, header, and static-label hierarchy.
+Rows contain Tool identity and removal only: Recipe data exposes no breakage, consumption, prerequisite, or bonus policy control because those behaviors belong to Tool Studio and Crafting System check settings.
 
 ### Ingredients tab
 
@@ -1033,24 +1096,24 @@ The GM component surfaces: the component browser and the component editor.
 ### Requirements
 
 1. The GM component browser groups and filters by `Component.category`.
-Tags are edited only in the component editor and must not be rendered as row chips; rows show a single-line description, mirroring the Recipe Studio.
+   Tags are edited only in the component editor and must not be rendered as row chips; rows show a single-line description, mirroring the Recipe Studio.
 2. The GM component editor is a single scrolling column with no right rail.
-Back sits beside Save in the header.
-Source actions (replace by drop, unlink, open item sheet, copy UUID) are reachable from the identity strip; the component's progressive difficulty is authored in the body.
+   Back sits beside Save in the header.
+   Source actions (replace by drop, unlink, open item sheet, copy UUID) are reachable from the identity strip; the component's progressive difficulty is authored in the body.
 3. Source actions commit immediately and are never staged into the editor draft.
-Replacing or unlinking a component's source item restamps durable component identity and saves; carrying source fields through the draft's update path would skip that restamping.
+   Replacing or unlinking a component's source item restamps durable component identity and saves; carrying source fields through the draft's update path would skip that restamping.
 4. The component salvage panel derives its presentation from `salvageResolutionMode` plus salvage-check enablement, gated by `features.salvage` and `component.salvage.enabled`.
-The persisted `routed` token is displayed as "Routed by check".
+   The persisted `routed` token is displayed as "Routed by check".
 5. The result-group editor remains reachable when salvage is disabled.
-Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
-The per-component enable control is disabled, with a visible explanation, until at least one result group exists; since the add-group control lives in the result-group editor, collapsing that editor would make enabling unreachable.
-The disabled-state copy distinguishes "no result groups authored yet" from "authored but disabled".
+   Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
+   The per-component enable control is disabled, with a visible explanation, until at least one result group exists; since the add-group control lives in the result-group editor, collapsing that editor would make enabling unreachable.
+   The disabled-state copy distinguishes "no result groups authored yet" from "authored but disabled".
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
-A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
-A "Manage presets" link routes to the system's Checks screen.
+   A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
+   A "Manage presets" link routes to the system's Checks screen.
 7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
 8. The component browser preserves the identical view-state across an editor round-trip specified under Recipe Studio, including its **essence** filter alongside category, page, sort, group-by-category, page size, and per-category collapse state; opening a component editor and returning restores exactly what the GM left.
-A genuine crafting-system switch resets category + essence + page + collapse, while keeping sort, group-by-category, and page size as cross-system preferences.
+   A genuine crafting-system switch resets category + essence + page + collapse, while keeping sort, group-by-category, and page size as cross-system preferences.
 
 ## Step Editor
 
@@ -1070,9 +1133,10 @@ Ingredient set editor supports:
   - Item placeholder options that match one or more configured system tags
 - Essence options authored as OR alternatives within a group (when the system enables essences); the set-level add appends a single-option essence group
 
-Required tools are **not** authored here.
-*Catalyst* is a retired concept — Tools replaced it, and the recipe's tools are authored on the editor's **Tools** tab at recipe and step scope.
-The persisted per-**set** `IngredientSet.toolIds` field has no editor of its own; it round-trips unchanged.
+Required tools are **not** authored in the Ingredients tab.
+_Catalyst_ is a retired concept — Tools replaced it, and Tool references are authored on the editor's **Tools** tab at recipe and step scope.
+When the system uses `routedByIngredients`, each named ingredient set also receives a Tool card on that tab.
+Persisted per-set `IngredientSet.toolIds` round-trip unchanged but remain inert and hidden for unnamed sets and every other resolution mode.
 
 Result editor changes by mode.
 The UI must expose required data fields from `resolution-modes/spec.md`, but mode logic itself is defined in `resolution-modes/spec.md`.
@@ -1095,14 +1159,14 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 - `routedByCheck` UI:
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
   - Result groups carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
-The `checkOutcomeIds` assignment picker offers **success tiers only** (`success === true`), matching the success-only routing rule (a failure tier never routes and awards nothing).
+    The `checkOutcomeIds` assignment picker offers **success tiers only** (`success === true`), matching the success-only routing rule (a failure tier never routes and awards nothing).
   - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
 
 ### Alchemy check-mode selector (issue 554)
 
 - At the **top of the Checks tab's Crafting sub-tab**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode` (`none` / `simple` / `tiered`), rendered ABOVE the per-mode editor and persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
-Selecting a mode swaps the editor below it live.
+  Selecting a mode swaps the editor below it live.
 - The selector is NOT rendered on the Crafting Settings page; that page keeps only the Recipe resolution, Recipe visibility, and (when salvage is on) Salvage resolution cards.
 - The three behaviour flags the selector preserves (`learnOnCraft`, `consumeOnFail`, `showAttemptHistoryToPlayers`) are themselves authored by the **Alchemy behaviour-flag controls** below the selector; see that requirement for the sanctioned authoring path.
 
@@ -1110,9 +1174,9 @@ Selecting a mode swaps the editor below it live.
 
 - Below the alchemy check-mode selector on the Checks tab's Crafting sub-tab (shown only when `resolutionMode === "alchemy"`, regardless of `checkMode`): three live-persisting toggle cards editing the system-level alchemy behaviour flags — `learnOnCraft` (default `false`), `consumeOnFail` (default `true`), and `showAttemptHistoryToPlayers` (default `true`).
 - Each toggle reflects the stored value (including a stored non-default value) and persists through `store.saveAlchemyConfig`, which spreads the nested `alchemy` block so `checkMode` and the other two flags are preserved.
-Because `saveAlchemyConfig` rewrites all three flags from its argument, the caller sends the current projected values with only the toggled field overridden.
+  Because `saveAlchemyConfig` rewrites all three flags from its argument, the caller sends the current projected values with only the toggled field overridden.
 - The controls' semantics are defined by `resolution-modes/spec.md` (consume-on-fail) and `recipe-visibility/spec.md` (learn-on-craft, attempt history); this requirement covers only the authoring surface.
-The failure-consumption toggles of §Crafting Check Controls are the distinct, non-alchemy `craftingCheck.consumption` policy and are NOT shown in alchemy mode.
+  The failure-consumption toggles of §Crafting Check Controls are the distinct, non-alchemy `craftingCheck.consumption` policy and are NOT shown in alchemy mode.
 
 ### Checks tab per-mode behaviour (issue 554)
 
@@ -1123,10 +1187,10 @@ The failure-consumption toggles of §Crafting Check Controls are the distinct, n
 ### Alchemy Recipe UI (GM Editor)
 
 - Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
-Ingredient-set vs result-group rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
+  Ingredient-set vs result-group rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
   - **None** → single ingredient set + single result set.
   - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
-No "add result set" beyond the two.
+    No "add result set" beyond the two.
   - **Tiered** → result groups with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
@@ -1135,25 +1199,25 @@ No "add result set" beyond the two.
 
 - Ordered results editor
 - Read-only difficulty badge per result item.
-The badge deep-links to the component editor's Difficulty card, and never edits in place: `component.difficulty` is a **Component** property consumed by progressive recipes, progressive salvage, progressive gathering and the system-validation blocker, so an inline editor here would write across an aggregate boundary (or make "Save recipe" silently persist a Component change).
-A component with no authored difficulty reads as unset, not as `0`.
+  The badge deep-links to the component editor's Difficulty card, and never edits in place: `component.difficulty` is a **Component** property consumed by progressive recipes, progressive salvage, progressive gathering and the system-validation blocker, so an inline editor here would write across an aggregate boundary (or make "Save recipe" silently persist a Component change).
+  A component with no authored difficulty reads as unset, not as `0`.
 - Drag reorder controls
 - **Keyboard reorder controls** alongside them: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the result they move, with the new position announced through an `aria-live="polite"` region.
-Result order is load-bearing in progressive mode (the award loop spends the check budget down the list), so a drag-only reorder is an accessibility gap, not a convenience one.
+  Result order is load-bearing in progressive mode (the award loop spends the check budget down the list), so a drag-only reorder is an accessibility gap, not a convenience one.
 - A **reorder-permission toggle card** at the END of the progressive block, after the result sets — never directly beneath the roll-budget info strip.
-The card is info-toned, defaults **on**, and writes `Recipe.allowPlayerResultReorder`.
-Placement is a requirement, not a preference: the strip and the card are both info-toned, so adjacency renders them as one undifferentiated block, and the resulting reading order (strip = how this list is spent, list = the thing, card = who may reorder it) states the policy after the thing it governs.
-The strip's copy is NOT folded into the card's sub-line, because the strip states an invariant true of every progressive recipe while the card states a conditional the GM can switch off.
+  The card is info-toned, defaults **on**, and writes `Recipe.allowPlayerResultReorder`.
+  Placement is a requirement, not a preference: the strip and the card are both info-toned, so adjacency renders them as one undifferentiated block, and the resulting reading order (strip = how this list is spent, list = the thing, card = who may reorder it) states the policy after the thing it governs.
+  The strip's copy is NOT folded into the card's sub-line, because the strip states an invariant true of every progressive recipe while the card states a conditional the GM can switch off.
 - The **salvage editor** renders the same toggle card, gated on `salvageResolutionMode === 'progressive'`, writing `Component.salvage.allowPlayerResultReorder`.
 - The progressive **salvage** result list shows **ordinals** and a **read-only difficulty badge** per row.
-These are required alongside the salvage toggle card and not severable from it: progressive salvage spends the roll down the list, so without them the card would govern an order the GM cannot see, and a card reading "players may reorder the stages" above a list of bare selects asserts a model the surface contradicts.
-The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
+  These are required alongside the salvage toggle card and not severable from it: progressive salvage spends the roll down the list, so without them the card would govern an order the GM cannot see, and a card reading "players may reorder the stages" above a list of bare selects asserts a model the surface contradicts.
+  The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 - A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
-The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
+  The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
 - A salvage result row picks its component through a **searchable popover whose trigger carries the component's image and its name**, not a native `<select>`.
-The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
-The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
-The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
+  The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
+  The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
+  The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
 
 ## Crafting App (Player)
 
@@ -1163,11 +1227,11 @@ The popover is portaled to the manager host so it escapes the editor panel's `ov
   `Craft With` and `Using Components From` form controls.
 - The left side of the header shows the currently selected crafting actor's
   image/avatar and name.
-The default and last-selection resolution order is the
+  The default and last-selection resolution order is the
   same as the crafting store selection behavior.
 - Clicking the selected crafting actor image or name opens a searchable,
   scrollable dropdown of available crafting actors.
-Each row shows actor image
+  Each row shows actor image
   and name.
 - The right side of the header shows `Component Sources` and a row of selected
   component source actor images/avatars.
@@ -1180,7 +1244,7 @@ Each row shows actor image
   from the previous crafting actor to the newly selected crafting actor.
 - An edit control beside the source avatars opens a searchable, scrollable
   dropdown of owned actors for selecting or deselecting component sources.
-Each
+  Each
   row shows actor image and name.
 - Persist last selections in client settings
 - Actor/source selection is shared across both tabs (rendered above tab content)
@@ -1219,17 +1283,17 @@ The engine seam behind the player salvage surface (§Player Salvage Surface).
 Stated as its own section, a sibling of §Craft Execution, because the outcome semantics are the engine's, not the presentation's.
 
 - Salvage runs through the `salvageComponent` facade seam, which takes an **`actorId`** and never an actor uuid.
-The engine's `salvage` performs **no ownership check of its own** — it resolves the uuid and mutates that actor's Items directly — so the facade's actor resolution is the only ownership gate on this path.
-A uuid accepted from a UI would bypass it, and a stale or foreign one reaches the server and **throws** rather than returning a message.
+  The engine's `salvage` performs **no ownership check of its own** — it resolves the uuid and mutates that actor's Items directly — so the facade's actor resolution is the only ownership gate on this path.
+  A uuid accepted from a UI would bypass it, and a stale or foreign one reaches the server and **throws** rather than returning a message.
 - The seam **returns** rather than throwing for every ordinary failure (actor / system / component not found, feature disabled, salvage disabled, validation failure), so a failed salvage surfaces its message.
 - **`cancelled` is distinct from `success: false`.**
-A dismissed roll prompt returns `{ success: false, cancelled: true, results: null }` with **guaranteed zero mutation** — no component consumed, no tool breakage — and discards a run created by that call.
-It is a user's choice, not a failure, and MUST NOT be reported as an error.
+  A dismissed roll prompt returns `{ success: false, cancelled: true, results: null }` with **guaranteed zero mutation** — no component consumed, no tool breakage — and discards a run created by that call.
+  It is a user's choice, not a failure, and MUST NOT be reported as an error.
 - There is a **third** outcome: a component with a time requirement returns `success` with **null results**.
-The run has STARTED and awarded nothing.
-Treating `success` as "done" would show a success state for a run that gave the player nothing.
+  The run has STARTED and awarded nothing.
+  Treating `success` as "done" would show a success state for a run that gave the player nothing.
 - A misconfigured required check (routed or progressive with no authored roll formula) returns `{ success: false, misconfigured: true }` with zero mutation and a GM-config message.
-Like a dismissed roll prompt, it **discards a run created by that call**, so a misconfigured abort never leaves a persisted `inProgress` salvage run; a reused pre-existing run is left untouched.
+  Like a dismissed roll prompt, it **discards a run created by that call**, so a misconfigured abort never leaves a persisted `inProgress` salvage run; a reused pre-existing run is left untouched.
 - The UI passes `interactive: true`; the default `false` keeps macros and automation silent (see the path-agnostic §Interactive Roll Prompt for the shared contract).
 
 ### Interactive Roll Prompt (path-agnostic)
@@ -1242,7 +1306,7 @@ This is the PR #497 per-call-flag decision, consumed uniformly by the crafting s
 
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
 - The card appends the **rolled check total** as its own row, mirroring the salvage summary's "with a roll of N" rule: rendered only for a finite value and omitted for a no-check guaranteed craft/salvage (`rollValue` null).
-The total is the RAW roll (`checkResult.data.total`), not the progressive awarding value, so a forced crit shows the natural roll rather than the `MAX_SAFE_INTEGER`/`0` award sentinel.
+  The total is the RAW roll (`checkResult.data.total`), not the progressive awarding value, so a forced crit shows the natural roll rather than the `MAX_SAFE_INTEGER`/`0` award sentinel.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
 - Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
 - Gathering posts its own result card under the same `features.chatOutput` toggle.
@@ -1328,15 +1392,15 @@ Alchemy is the only conditional entry; the others are always present.
 ##### Multi-Step Recipe Presentation
 
 - The player recipe listing projects a recipe's ingredient sets, per-set craftability, and Craft-button craftability from the recipe's **first execution step** (`Recipe.getExecutionSteps()[0]`), not the raw top-level `ingredientSets`.
-Because an explicit multi-step recipe holds its sets on `steps[]` and leaves the top-level arrays empty, a stepped recipe therefore surfaces its first step's required materials and evaluates craftability against them (over the **union** of recipe-level and step-level tool ids), rather than degrading to an empty `missingMaterials` banner.
-A single-step recipe is unaffected: its implicit step shares the top-level arrays.
+  Because an explicit multi-step recipe holds its sets on `steps[]` and leaves the top-level arrays empty, a stepped recipe therefore surfaces its first step's required materials and evaluates craftability against them (over the **union** of recipe-level and step-level tool ids), rather than degrading to an empty `missingMaterials` banner.
+  A single-step recipe is unaffected: its implicit step shares the top-level arrays.
 - When a recipe resolves to more than one execution step in `simple` mode, the `RecipeListingModel` carries a `steps[]` array.
-Each entry surfaces the step's label (author name or 1-based position, never its id), its required materials with per-step craftability (Have / Need / Missing), and the components that step produces.
-Each entry also carries its effective authored `duration` when the step is timed.
-The `simple`-mode detail body renders these as an ordered list of per-step requirement blocks — a static preview of the whole recipe, not a live run-progress tracker.
-Each block renders inputs only; intermediate step yields are not shown.
-A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
-A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
+  Each entry surfaces the step's label (author name or 1-based position, never its id), its required materials with per-step craftability (Have / Need / Missing), and the components that step produces.
+  Each entry also carries its effective authored `duration` when the step is timed.
+  The `simple`-mode detail body renders these as an ordered list of per-step requirement blocks — a static preview of the whole recipe, not a live run-progress tracker.
+  Each block renders inputs only; intermediate step yields are not shown.
+  A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
+  A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
 - A fully revealed timed implicit recipe projects its positive authored
   `timeRequirement` as `RecipeListingModel.duration`.
   For a fully revealed `simple` recipe with more than one execution step, each
@@ -1352,10 +1416,10 @@ A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as
   A Discovery-Mode teaser always exposes `duration: null` and `steps: []`, so timing
   cannot leak through either the aggregate or a step.
 - In `simple` mode the listing's top-level expected output (`result`) is resolved from the recipe's **terminal** execution step's result groups (against that step's own set), so a multi-step recipe's PRODUCES is its final product rather than the first step's intermediate output.
-Single-step recipes are unaffected (their only step is both first and terminal).
-`routedByCheck` continues to emit an empty top-level `result` (its output is per outcome tier); `routedByIngredients` and `progressive` multi-step PRODUCES is unchanged and must not be mis-routed.
+  Single-step recipes are unaffected (their only step is both first and terminal).
+  `routedByCheck` continues to emit an empty top-level `result` (its output is per outcome tier); `routedByIngredients` and `progressive` multi-step PRODUCES is unchanged and must not be mis-routed.
 - The crafting-check descriptor is not surfaced (the projection yields `null`) when the mode's check is optional, has no authored roll formula, and checks are not enabled (`craftingCheck.enabled !== true` and `features.craftingChecks !== true`).
-A mandatory-by-mode check, an authored formula, or an enabled-but-unformulated check still surface (the last keeps the "no roll formula configured" GM misconfiguration note).
+  A mandatory-by-mode check, an authored formula, or an enabled-but-unformulated check still surface (the last keeps the "no roll formula configured" GM misconfiguration note).
 
 ##### Progressive Stage List
 
@@ -1365,24 +1429,24 @@ The salvage deltas are stated at the end of this section; everything else applie
 
 - A progressive recipe's detail body renders an **ordered stage list**, replacing the generic input/output table: a progressive output is not a flat set, because one roll is spent down the list and the order decides what the player receives.
 - The stage list is built from the **authored** result group and deliberately bypasses the award loop.
-Browsing has no roll, so routing it through the award loop yields a zero budget, awards nothing, and renders an empty output list.
+  Browsing has no roll, so routing it through the award loop yields a zero budget, awards nothing, and renders an empty output list.
 - Each row carries: its **ordinal** (the row's position, not the stage's identity), the component **name** and **image**, a **read-only difficulty**, and the **cumulative threshold** at which the stage is reached.
 - The cumulative threshold is the player's decision input: per-stage difficulty alone forces the player to do the arithmetic and redo it after every move.
 - The threshold is **derived from the award mode**, not a running sum of difficulties.
-A running sum is correct only for `equal`; `exceed` gates on a strict comparison and sits one above each cumulative sum, and `partial` awards a tail result whenever any budget remains, making its final stage reachable *below* its cumulative sum.
+  A running sum is correct only for `equal`; `exceed` gates on a strict comparison and sits one above each cumulative sum, and `partial` awards a tail result whenever any budget remains, making its final stage reachable _below_ its cumulative sum.
 - A stage the award loop skips (an invalid or absent difficulty) is reached at **no** budget, so its threshold is **omitted** rather than shown as zero or as a running total.
-Such a stage must not advance the cumulative total for later stages.
+  Such a stage must not advance the cumulative total for later stages.
 - The displayed threshold and the awarded result MUST agree with the award loop for every award mode and every budget.
 - Stages are shown in the **player's** order (see `resolution-modes` §Player Reorder), reconciled against the authored list.
 - When the permission is true the rows are reorderable by **drag** and by **keyboard**: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the stage they move, with the new position announced through an `aria-live="polite"` region.
-Drag is a mouse-only enhancement — HTML5 drag does not fire on touch, so the move buttons are the only touch path and must meet the touch-target size.
+  Drag is a mouse-only enhancement — HTML5 drag does not fire on touch, so the move buttons are the only touch path and must meet the touch-target size.
 - The announcement names the stage that MOVED, read before the move is applied, and is a single localized string carrying name, position and total (never assembled from fragments).
 - Reorder writes are **debounced** and committed on settle, not per intermediate move, because each write is a replicated document write.
 - If a write **fails**, the rows revert to the last persisted order and the revert is announced through the **same** `aria-live` region.
-A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
+  A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
 - When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip glyph** (the grip is the affordance signal), use a default cursor, attach **no** drag handlers, and show one muted line explaining that the GM set the order.
-No live region is rendered in this state, because nothing can change.
-Identical rows minus working affordances are not acceptable: a player must not be able to grab a row and have nothing happen.
+  No live region is rendered in this state, because nothing can change.
+  Identical rows minus working affordances are not acceptable: a player must not be able to grab a row and have nothing happen.
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 **Optional per-caller extensions.**
@@ -1404,17 +1468,17 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 **Progressive salvage deltas.**
 
 - The award mode is **salvage's own** (`system.salvageCraftingCheck.progressive.awardMode`), authored independently of the recipe's.
-Deriving salvage thresholds from the crafting award mode violates the agreement requirement above invisibly, because both blocks normally exist and are normally authored.
+  Deriving salvage thresholds from the crafting award mode violates the agreement requirement above invisibly, because both blocks normally exist and are normally authored.
 - The permission is `Component.salvage.allowPlayerResultReorder` (default true; only an explicit `false` pins the authored order), not the recipe's.
 - The player's order is stored under the `salvage:<componentId>` key (see `resolution-modes` §Which user's order is read).
 - A pending debounced write MUST be **flushed before a salvage run starts**, and a **rejected** write MUST abort the run: an unflushed write is captured stale onto the run record, and a rejected one leaves the player looking at an order that was reverted.
 - Salvage renders **no exclude affordance**: reorder is the whole of the feature.
 - The panel MUST state the mode and the flow **rule** as two separate statements: naming the mode ("progressive, ordered") does not tell a player that the roll **stops** at the first result it cannot reach, and stopping is the entire reason the order is worth arranging.
-Neither is a duplicate of the other, and collapsing them loses the mechanic rather than a repetition.
+  Neither is a duplicate of the other, and collapsing them loses the mechanic rather than a repetition.
 - Where reordering is permitted, the surface MUST offer a **reset** to the GM's authored order.
-An order the player can rearrange is one they can get lost in, and the authored order is the only one they cannot reconstruct from what is on screen.
-Reset persists **no preference** (an empty order), never the currently-authored ids: an empty order follows a later GM re-author, whereas pinning today's ids would silently outlive the GM changing them.
-It is offered only when the rendered order actually **differs** from the authored one — a stored order can name the authored sequence exactly, so a reset offered on the mere presence of stored state does nothing when pressed.
+  An order the player can rearrange is one they can get lost in, and the authored order is the only one they cannot reconstruct from what is on screen.
+  Reset persists **no preference** (an empty order), never the currently-authored ids: an empty order follows a later GM re-author, whereas pinning today's ids would silently outlive the GM changing them.
+  It is offered only when the rendered order actually **differs** from the authored one — a stored order can name the authored sequence exactly, so a reset offered on the mere presence of stored state does nothing when pressed.
 
 ##### Browse Status
 
@@ -1542,7 +1606,7 @@ It is offered only when the rendered order actually **differs** from the authore
   outcome.
 - Advancing re-invokes the craft seam for the same recipe and ingredient set (it
   carries no separate run id; the engine advances the active step).
-- The unified player-facing Journal screen (see *Journal App*) is the cross-activity
+- The unified player-facing Journal screen (see _Journal App_) is the cross-activity
   home for monitoring and advancing these runs; a direct cross-link from the Run
   Summary into the Journal is a deferred follow-up.
 
@@ -1579,7 +1643,7 @@ The a11y contract: the status pill is `aria-live="polite"`; the bench chip body 
 - Session-scoped working set displayed as compact grid with quantity badges (e.g., "Iron Ore x3"); a placed component's essence icons + counts show on its chip.
 - Each unique component appears once; adding increments the badge count.
 - Chip interactions: the chip body adds one (left-click / Enter / Space); a right-click, Shift+Enter, or the focus/hover `−` control removes one; the `×` control removes all (delete the key).
-The `−` and `×` `stopPropagation` so they never also add.
+  The `−` and `×` `stopPropagation` so they never also add.
 - Supports: add from palette, add/remove/remove-all on a chip, clear all, submit.
 - Submit triggers signature matching per existing Signature Resolution rules in `resolution-modes/spec.md`.
 - The Produces preview surfaces the result component's essence icons + counts when essences are enabled.
@@ -1599,7 +1663,7 @@ The `−` and `×` `stopPropagation` so they never also add.
 #### Active Runs and History (cross-reference reconciliation)
 
 - The alchemy tab does NOT host runs or history.
-Run monitoring remains a Journal concern (see *Journal App*); the tab's internal fizzle dead-end memory is not run history.
+  Run monitoring remains a Journal concern (see _Journal App_); the tab's internal fizzle dead-end memory is not run history.
 - The unified Journal screen surfaces alchemy runs alongside crafting, gathering, and salvage runs; an alchemy run is redacted there for a viewer who has not discovered its recipe.
 - Forward-compat: the active station-tool chip stays in `ActorSelectTopBar` this iteration (the alchemy tab has no header/context bar yet); it migrates to an alchemy header bar if/when one is added.
 
@@ -1613,7 +1677,7 @@ Run monitoring remains a Journal concern (see *Journal App*); the tab's internal
 
 - Must not leak hidden recipe metadata on invalid combinations or failed attempts.
 - An untried bench and a remembered-fizzle bench are distinguished ONLY by the per-character dead-end memory: an untried set reads `untried` (no confirmation that a reaction exists), and only a remembered fizzle reads `no-reaction`.
-A fizzle brew runs no check and shows no roll animation.
+  A fizzle brew runs no check and shows no roll animation.
 - No-signature attempts are shown as failed attempts with specific feedback and ingredient consumption per `alchemy.consumeOnFail`.
 - If a matched attempt cannot route to a valid result group, show a misconfiguration error state (GM fix required) rather than a normal player-failure outcome.
 
@@ -1630,16 +1694,16 @@ The player's owned crafting materials: what they carry, where it came from, and 
 It shares the selected character and the component-source actors with the Crafting tab, so both agree on what the player owns.
 
 - **Layout.**
-Two responsive columns — filters + item grid on the left, an item inspector on the right — reflowing to **stacked** below the container breakpoint.
-The window is resizable, so a fixed column count is not the contract: the grid is responsive and its column count is an expression of the available width.
+  Two responsive columns — filters + item grid on the left, an item inspector on the right — reflowing to **stacked** below the container breakpoint.
+  The window is resizable, so a fixed column count is not the contract: the grid is responsive and its column count is an expression of the available width.
 - **Filter chips.**
-A chip row in this fixed order: **All · Components · Essences · Tools · Books & Scrolls**.
-Each chip carries an icon and a live count computed over the search-filtered set, so a chip's badge reflects what selecting it would show.
+  A chip row in this fixed order: **All · Components · Essences · Tools · Books & Scrolls**.
+  Each chip carries an icon and a live count computed over the search-filtered set, so a chip's badge reflects what selecting it would show.
 - **Sort.**
-Name / Quantity / **Type**.
+  Name / Quantity / **Type**.
 - **Card contract.**
-Each item card is a **square thumbnail** carrying every at-a-glance signal, with the item name beneath.
-Every overlay sits **inside** the thumbnail's bounds and above it — not hanging off the card frame:
+  Each item card is a **square thumbnail** carrying every at-a-glance signal, with the item name beneath.
+  Every overlay sits **inside** the thumbnail's bounds and above it — not hanging off the card frame:
   - a **quantity pip**;
   - **corner badges**: a **recycle** badge when the item is salvageable, and a **wrench** badge when it is a registered tool.
     These two flags are **orthogonal** — a component can be both, and a broken salvageable tool is a common case — so they MUST NOT share one slot.
@@ -1647,17 +1711,17 @@ Every overlay sits **inside** the thumbnail's bounds and above it — not hangin
     Essences are GM-authored per system with their own icon; a fixed icon set, or a hue keyed on an essence's name, silently mis-renders any essence the GM named differently.
     The chip exists so the glyph reads against arbitrary artwork.
 - **One card per unified physical stack.**
-The listing renders **one card per unified physical stack**, not one per crafting system.
-A physical document that backs a component in **N crafting systems** appears **once**, with its quantity counted **once** — a per-system card duplicated the same stack and let the player read N× the true count, and salvaging one card silently consumed the sibling's documents.
-The projection **aggregates then collapses**: each system contributes today's within-system aggregate of a component across every owned document and source actor (a **participation**), then participations whose **contributing-document identity sets intersect** collapse into one card, and `totalQuantity` / `sources` are computed over the **union** of the card's contributing documents **deduped by identity** (a document participating in two systems counts its stack quantity once) and summed per source actor.
-Document identity for this dedup and join is **`item.uuid` alone** — never a compendium/duplicate-source union: `_stats.compendiumSource` and the transitive `_stats.duplicateSource` are shared across **distinct** documents (Foundry stamps a fresh `duplicateSource` on every drag-to-actor), so keying on them would merge two genuinely-owned stacks and undercount real holdings (`getItemIdentityReferences` is the codebase's precedent for excluding `duplicateSource` from identity; see `data-models/spec.md` for the `roles`-map component identity these participations resolve through).
-This **adds** cross-system unification and does **not** disturb today's same-component aggregation: distinct documents (across stacks or source actors) that resolve to the **same** component still aggregate into one summed card, and distinct documents that resolve to **different** components — even when they share a compendium/duplicate-source template — stay **distinct** cards.
-The card's at-a-glance signals (salvageable, tool, essence pips) are the **union** across participations, essence pips **deduped by essence id**.
-`broken` is a **singular** physical property of the document(s), never per system.
-Essence rows (synthetic per-system aggregates keyed `essence:<systemId>:<essenceId>`) and Books & Scrolls rows are legitimately distinct per system and are **NOT** collapsed by this behaviour.
+  The listing renders **one card per unified physical stack**, not one per crafting system.
+  A physical document that backs a component in **N crafting systems** appears **once**, with its quantity counted **once** — a per-system card duplicated the same stack and let the player read N× the true count, and salvaging one card silently consumed the sibling's documents.
+  The projection **aggregates then collapses**: each system contributes today's within-system aggregate of a component across every owned document and source actor (a **participation**), then participations whose **contributing-document identity sets intersect** collapse into one card, and `totalQuantity` / `sources` are computed over the **union** of the card's contributing documents **deduped by identity** (a document participating in two systems counts its stack quantity once) and summed per source actor.
+  Document identity for this dedup and join is **`item.uuid` alone** — never a compendium/duplicate-source union: `_stats.compendiumSource` and the transitive `_stats.duplicateSource` are shared across **distinct** documents (Foundry stamps a fresh `duplicateSource` on every drag-to-actor), so keying on them would merge two genuinely-owned stacks and undercount real holdings (`getItemIdentityReferences` is the codebase's precedent for excluding `duplicateSource` from identity; see `data-models/spec.md` for the `roles`-map component identity these participations resolve through).
+  This **adds** cross-system unification and does **not** disturb today's same-component aggregation: distinct documents (across stacks or source actors) that resolve to the **same** component still aggregate into one summed card, and distinct documents that resolve to **different** components — even when they share a compendium/duplicate-source template — stay **distinct** cards.
+  The card's at-a-glance signals (salvageable, tool, essence pips) are the **union** across participations, essence pips **deduped by essence id**.
+  `broken` is a **singular** physical property of the document(s), never per system.
+  Essence rows (synthetic per-system aggregates keyed `essence:<systemId>:<essenceId>`) and Books & Scrolls rows are legitimately distinct per system and are **NOT** collapsed by this behaviour.
 - **Broken treatment.**
-`broken` is a **read-only** verdict, and no engine path un-breaks a tool.
-It has **two** sources, and reading only the second reports almost every broken tool a player can actually see as intact:
+  `broken` is a **read-only** verdict, and no engine path un-breaks a tool.
+  It has **two** sources, and reading only the second reports almost every broken tool a player can actually see as intact:
 
   - the persisted **`flags.fabricate.toolBroken`** past fact — the authoritative presence-gate disqualifier, written by the `flagBroken` on-break action for **every** breakage mode and requiring no roll to know.
     This is the source that matters most: `flagBroken` is the only on-break mode that leaves a broken item in the player's inventory at all (`destroy` and `replaceWith` remove it), and a chance- or formula-broken tool carries this flag with **no usage counter** whatsoever.
@@ -1669,20 +1733,20 @@ There is **no repair affordance** anywhere; the treatment states why the tool is
 Brokenness is about **usability, not salvageability**, and MUST NOT gate the salvage surface.
 
 - **Inspector system selector.**
-When a card participates in **more than one** crafting system, the inspector presents a **system selector** as the **first** element of the detail header, above the `Info | Salvage` control, scoping the **whole body** (name, image, description, tags, tier, essences, used-by, required-for, produced-by, and the salvage surface) to the **selected participation** — the reported case is an essence in one system and an elemental tag in the other.
-The selector is a native **`<select>` drop-down** — a labeled VALUE choice ("pick which system's data this body shows"), **not** content-tab navigation and **not** a segmented toggle.
-A drop-down is what scales: a physical item can be registered in more than two or three systems, and a segmented control would grow too wide and wrap; a native select is a11y-clean by construction (a labeled listbox), so it needs no bespoke radiogroup/roving-tabindex ARIA.
-The label is associated with the control (`<label for>`), each option reads as the system **name** first with a plain-text affordance suffix (`<name> — Salvageable, Tool`) — deliberately **not** `<option label>`, whose present value REPLACES the visible option text — and the initially-selected option is the salvageable-biased primary.
-Display name and image are the **primary** (default-selected) participation's component name/image, biased to a **salvageable** participation first so clicking the union recycle badge never opens a primary with no Salvage tab.
-With exactly one participation the selector is **absent** and the surface is byte-identical to a single-system card — no selector node, no chrome, no layout shift.
+  When a card participates in **more than one** crafting system, the inspector presents a **system selector** as the **first** element of the detail header, above the `Info | Salvage` control, scoping the **whole body** (name, image, description, tags, tier, essences, used-by, required-for, produced-by, and the salvage surface) to the **selected participation** — the reported case is an essence in one system and an elemental tag in the other.
+  The selector is a native **`<select>` drop-down** — a labeled VALUE choice ("pick which system's data this body shows"), **not** content-tab navigation and **not** a segmented toggle.
+  A drop-down is what scales: a physical item can be registered in more than two or three systems, and a segmented control would grow too wide and wrap; a native select is a11y-clean by construction (a labeled listbox), so it needs no bespoke radiogroup/roving-tabindex ARIA.
+  The label is associated with the control (`<label for>`), each option reads as the system **name** first with a plain-text affordance suffix (`<name> — Salvageable, Tool`) — deliberately **not** `<option label>`, whose present value REPLACES the visible option text — and the initially-selected option is the salvageable-biased primary.
+  Display name and image are the **primary** (default-selected) participation's component name/image, biased to a **salvageable** participation first so clicking the union recycle badge never opens a primary with no Salvage tab.
+  With exactly one participation the selector is **absent** and the surface is byte-identical to a single-system card — no selector node, no chrome, no layout shift.
 - **Inspector Info order.**
-Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
-Sources and Contributing are physical facts of the stack and stay card-scoped; every other Info leaf scopes to the selected participation.
+  Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
+  Sources and Contributing are physical facts of the stack and stay card-scoped; every other Info leaf scopes to the selected participation.
 - **Used-by reverse index composition.**
-The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
-Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.
-Entries are deduplicated per component and per source, so a component consumed both directly and via a tag lists the recipe once.
-Essence-type options continue to feed the separate essence contributor channel and add no component used-by entries.
+  The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
+  Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.
+  Entries are deduplicated per component and per source, so a component consumed both directly and via a tag lists the recipe once.
+  Essence-type options continue to feed the separate essence contributor channel and add no component used-by entries.
 
 #### Player Salvage Surface
 
@@ -1690,43 +1754,43 @@ The player's route to salvage.
 
 - Salvage lives **inline in the inspector**; it is never a modal.
 - **The acting participation is the selected one, never the primary default.**
-On a card that participates in more than one system the salvage action resolves the acting `(systemId, componentId, targetActorId)` from the **selected** participation (the system selector's current choice) across the view handler, the store, the success-ribbon gate, and the panel — none falls back to the primary.
-Each participation salvages against **its own** contributing documents, so the depleted / "None remaining" / disabled-action basis is the selected participation's **own** owned quantity, not the card's cross-system union (a system-B salvage on a divergent-roles card cannot consume documents system B does not back).
-The panel **names the acting system** when the card spans more than one.
-The progressive stage-order preference is keyed per **`(systemId, componentId)`** (`salvage:<systemId>:<componentId>`): component ids are not globally unique (copy-import preserves them), so a component-id-only key collided across systems the moment the collapse surfaced two participations of one card, and the store's write key must match the engine's capture key exactly or the captured order silently reads empty.
+  On a card that participates in more than one system the salvage action resolves the acting `(systemId, componentId, targetActorId)` from the **selected** participation (the system selector's current choice) across the view handler, the store, the success-ribbon gate, and the panel — none falls back to the primary.
+  Each participation salvages against **its own** contributing documents, so the depleted / "None remaining" / disabled-action basis is the selected participation's **own** owned quantity, not the card's cross-system union (a system-B salvage on a divergent-roles card cannot consume documents system B does not back).
+  The panel **names the acting system** when the card spans more than one.
+  The progressive stage-order preference is keyed per **`(systemId, componentId)`** (`salvage:<systemId>:<componentId>`): component ids are not globally unique (copy-import preserves them), so a component-id-only key collided across systems the moment the collapse surfaced two participations of one card, and the store's write key must match the engine's capture key exactly or the captured order silently reads empty.
 - An **`Info | Salvage`** control appears when the item is salvageable — **including when it is broken**, since brokenness does not gate salvageability.
-When the item is not salvageable, **no tab bar renders at all**: a hidden tab reads as "this isn't salvageable", which is wrong and unfixable by the player.
+  When the item is not salvageable, **no tab bar renders at all**: a hidden tab reads as "this isn't salvageable", which is wrong and unfixable by the player.
 - The body dispatches on the pair **`(mode, checkUsable)`** against **`system.salvageCraftingCheck`** — salvage's own check block, NOT `system.craftingCheck`, which is the recipe block.
-Both normally exist and are normally authored, so reading the wrong one renders plausibly while showing the player a formula and a DC the engine will never use.
+  Both normally exist and are normally authored, so reading the wrong one renders plausibly while showing the player a formula and a DC the engine will never use.
 - A check is **usable** iff its mode's roll formula is authored; that is the only gate the engine applies.
-"No check" and "pass/fail" are therefore **one `simple` mode at two usability states**, not two modes.
+  "No check" and "pass/fail" are therefore **one `simple` mode at two usability states**, not two modes.
 - A routed or progressive salvage with **no authored formula** renders a GM-config state, not its authored tiers or stages: the engine aborts such an attempt with zero mutation, so showing the contract would put it under an action that always fails.
 - **Simple multi-group misconfigured state.** A stored-but-not-yet-re-normalized `simple`-mode component with more than one success result group is misconfigured (the engine only ever awards the first group).
-The builder projects it with `misconfigured: true` and a `misconfiguredReason` discriminator (`'simpleMultiGroup' | 'routedNoFormula' | 'progressiveNoFormula'`); the misconfigured body dispatches on that discriminator — not a binary mode dispatch — so the Simple case renders Simple-specific copy ("more than one salvage result group; Simple mode uses a single group — fix it in the component editor"), and the mode banner is suppressed when misconfigured so a green recycle banner never sits above a "this is broken" body.
-The GM-facing inventory renders this cue; the non-GM visibility gate retains the hard-hide for a still-invalid stored config (justified: the config self-heals on the next system normalize, and the GM gets the cue in two surfaces — the manager overview critical and this body).
-Both surfaces show the working salvage panel once the config re-normalizes to a single success group.
+  The builder projects it with `misconfigured: true` and a `misconfiguredReason` discriminator (`'simpleMultiGroup' | 'routedNoFormula' | 'progressiveNoFormula'`); the misconfigured body dispatches on that discriminator — not a binary mode dispatch — so the Simple case renders Simple-specific copy ("more than one salvage result group; Simple mode uses a single group — fix it in the component editor"), and the mode banner is suppressed when misconfigured so a green recycle banner never sits above a "this is broken" body.
+  The GM-facing inventory renders this cue; the non-GM visibility gate retains the hard-hide for a still-invalid stored config (justified: the config self-heals on the next system normalize, and the GM gets the cue in two surfaces — the manager overview critical and this body).
+  Both surfaces show the working salvage panel once the config re-normalizes to a single success group.
 - **`dcOverride` shifts the simple DC and routed RELATIVE thresholds only.**
-A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
-A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
+  A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
+  A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
 - The action is **one-shot for every mode**: it rolls AND commits in a single gesture.
-The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
-The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
+  The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
+  The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
 - The roll summary is **read-only** and renders only **after** resolution.
-It never renders a hardcoded formula: the formula is system-authored, and the prompt has already displayed the resolved one.
+  It never renders a hardcoded formula: the formula is system-authored, and the prompt has already displayed the resolved one.
 - A **cancelled** prompt returns to the pre-roll state with zero mutation and **no notification**.
 - A **time-gated** salvage (`success` with null results) shows a **waiting** state carrying the engine's message, **not** a success state.
 - The success ribbon stays **pinned to the salvaged row** until dismissed or another item is selected — **including when its last copy was consumed and the row leaves the listing**.
-Otherwise the selection falls through to another item and the ribbon renders against the wrong component; with single-copy components this is the common case.
+  Otherwise the selection falls through to another item and the ribbon renders against the wrong component; with single-copy components this is the common case.
 - **Result-driven tab routing.** A newly-arrived salvage result actively opens or reopens the Salvage tab in one ordered effect keyed on a NEW result reference — so it survives roll-dialog remounts, a manual Info click is not yanked back, a changed item key resets to Info, and the result branch wins when both fire.
 - **Required-tool disclosure before the attempt.** When the component's `salvage.toolIds` resolve to any library Tools, the panel renders a **Required tools** section (after the banner, before the roll summary) listing each tool's display name and image with an **available / unavailable** `StatusPill` treatment (success/danger tones, an icon plus a localized label — two signals, never colour alone) mirroring the crafting recipe detail's tools group.
-The tool availability is computed builder-side against the **target salvage actor** (`salvage.targetActorId`, the first owned source) — the same single actor the engine validates and the store salvages — **not** the party aggregate the crafting recipe surface uses, so a tool held only by a non-target party member reads unavailable exactly as the engine will enforce it.
-Disclosure is independent of resolution mode **and** of the misconfigured state: a prerequisite is worth disclosing in every state.
-A present-but-broken tool reads unavailable; the panel renders availability only, with no distinct repair cue.
+  The tool availability is computed builder-side against the **target salvage actor** (`salvage.targetActorId`, the first owned source) — the same single actor the engine validates and the store salvages — **not** the party aggregate the crafting recipe surface uses, so a tool held only by a non-target party member reads unavailable exactly as the engine will enforce it.
+  Disclosure is independent of resolution mode **and** of the misconfigured state: a prerequisite is worth disclosing in every state.
+  A present-but-broken tool reads unavailable; the panel renders availability only, with no distinct repair cue.
 - **Tool-blocked action.** The pre-roll action is **disabled when any required tool is unavailable**, so the one-shot roll is never spent on an attempt the engine will reject for a missing tool.
-In that state the footer note **supersedes** the one-shot cost note and instead explains why the button is off; the disabled action may reference the note via `aria-describedby`.
-The engine's `_validateTools` remains the server-side authority — this disable is a UX affordance mirroring crafting's `canCraft`.
+  In that state the footer note **supersedes** the one-shot cost note and instead explains why the button is off; the disabled action may reference the note via `aria-describedby`.
+  The engine's `_validateTools` remains the server-side authority — this disable is a UX affordance mirroring crafting's `canCraft`.
 - **Depleted-stack honesty.** After the last copy is consumed the store reconciles the held row to `totalQuantity` 0, the header reads "None remaining", the ribbon's "Salvage again" is replaced by a nothing-left note, and the pre-roll action disables on depletion or an unavailable required tool (`disabled = busy || misconfigured || waiting || depleted || !toolsAvailable`).
-The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
+  The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
 - **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 
@@ -1747,16 +1811,16 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 ### Actor Selection
 
-- The unified window selects the gathering actor through a shared **Actor selection top bar** rendered above all tabs (see *Unified Window Actor Selection Top Bar*), rather than only a per-tab header control.
+- The unified window selects the gathering actor through a shared **Actor selection top bar** rendered above all tabs (see _Unified Window Actor Selection Top Bar_), rather than only a per-tab header control.
 - The bar's selectable list is restricted to **player characters** — the actor type(s) a system designates as player characters, owned for non-GM users, all for GMs.
-The current dnd5e/pf2e implementation of that concept is `actor.type === 'character'` (the predicate `isPlayerCharacterActor`); other player-character types are a known limitation.
-This restriction is a selection-list concern only and does not change which actors are authorized to make a gathering attempt.
+  The current dnd5e/pf2e implementation of that concept is `actor.type === 'character'` (the predicate `isPlayerCharacterActor`); other player-character types are a known limitation.
+  This restriction is a selection-list concern only and does not change which actors are authorized to make a gathering attempt.
 - The top header/bar shows the selected actor and, when enabled, gathering stamina current/max values plus regeneration or adjustment affordances where permitted.
 - Persist the last selected actor in `fabricate.lastGatheringActor`.
-The shared store seeds from this setting, persists the selection on change, and re-persists a fallback selection when the stored id is empty or stale.
+  The shared store seeds from this setting, persists the selection on change, and re-persists a fallback selection when the stored id is empty or stale.
 - Only actors the user owns are selectable for non-GM users.
 - Gathering attempt authorization remains permission-based, not actor-type-based; an owned `npc`, `group`, or other non-player-character actor remains attempt-authorized even though it does not appear in the player-character selection list.
-Startup preference cleanup likewise stays ownership-based, so a persisted owned non-player-character id is not cleared at startup; the shared store converges it to a player character.
+  Startup preference cleanup likewise stays ownership-based, so a persisted owned non-player-character id is not cleared at startup; the shared store converges it to a player character.
 - The app should provide primary tabs or segmented navigation for `Environments` and `Gathering Log`.
 
 ### Unified Window Actor Selection Top Bar
@@ -1764,60 +1828,60 @@ Startup preference cleanup likewise stays ownership-based, so a persisted owned 
 The unified Fabricate window presents a shared, content-width **Actor selection top bar** above all primary tabs.
 
 - The bar spans the content width and renders above ALL tabs (`Gathering`, `Crafting`, `Journal`, `Inventory`), not inside any single tab body.
-It lives in a vertical flex column wrapper (`.fabricate-app-main`) where the bar is `flex: 0 0 auto` and the content region is `flex: 1 1 auto; min-height: 0`, so a tab body using `height: 100%` keeps a bounded parent and does not collapse or double-scroll.
+  It lives in a vertical flex column wrapper (`.fabricate-app-main`) where the bar is `flex: 0 0 auto` and the content region is `flex: 1 1 auto; min-height: 0`, so a tab body using `height: 100%` keeps a bounded parent and does not collapse or double-scroll.
 - The bar's left side is a character-portrait + dropdown-caret trigger that opens a searchable popover listing the user's selectable **player characters** (owned for non-GM, all for GM), narrowing the ownership-selectable set by the player-character concept.
-The popover provides a case-insensitive name search and a `role="listbox"` of portrait + name options; selecting an option updates the shared selection and persists it.
+  The popover provides a case-insensitive name search and a `role="listbox"` of portrait + name options; selecting an option updates the shared selection and persists it.
 - The bar's right side carries tab-specific context.
-For the `Gathering` tab only, it shows the current weather, the current time-of-day, and the current realm (each icon + value).
-For other tabs the right-side context is empty.
-The condition icons MUST be the fixed icons used by the GM gathering-settings UI — `fas fa-cloud-sun` for weather, `fas fa-clock` for time of day, and `fas fa-map-location-dot` for realm — rather than per-value or text labels; the value text shows the current weather/time/realm. "Current realm" is sourced from the gathering listing's party/system **realm context** — resolved by the engine for the single active realm-enabled gathering system and the selected actor — not from any one selected environment.
-The realm chip is shown whenever that subsystem is enabled, independent of whether an environment is selected, so the all-environments-locked / no-current-realm state still surfaces the realm context.
-A selected environment refines the chip (an identical value in the single-system case).
-When the party has no resolved current realm, a "No current realm" placeholder is shown and no realm name is fabricated.
-When more than one realm-enabled gathering system is present in the listing, a single chip cannot honestly represent two systems' realm contexts (per-system overrides and reveal modes can differ), so the listing-level chip is omitted and the chip falls back to the selection-driven value; its absence in that ambiguous case is intended.
-The chip carries an accessible name ("Realm: <value>") and announces its appearance and value changes through a polite live region.
+  For the `Gathering` tab only, it shows the current weather, the current time-of-day, and the current realm (each icon + value).
+  For other tabs the right-side context is empty.
+  The condition icons MUST be the fixed icons used by the GM gathering-settings UI — `fas fa-cloud-sun` for weather, `fas fa-clock` for time of day, and `fas fa-map-location-dot` for realm — rather than per-value or text labels; the value text shows the current weather/time/realm. "Current realm" is sourced from the gathering listing's party/system **realm context** — resolved by the engine for the single active realm-enabled gathering system and the selected actor — not from any one selected environment.
+  The realm chip is shown whenever that subsystem is enabled, independent of whether an environment is selected, so the all-environments-locked / no-current-realm state still surfaces the realm context.
+  A selected environment refines the chip (an identical value in the single-system case).
+  When the party has no resolved current realm, a "No current realm" placeholder is shown and no realm name is fabricated.
+  When more than one realm-enabled gathering system is present in the listing, a single chip cannot honestly represent two systems' realm contexts (per-system overrides and reveal modes can differ), so the listing-level chip is omitted and the chip falls back to the selection-driven value; its absence in that ambiguous case is intended.
+  The chip carries an accessible name ("Realm: <value>") and announces its appearance and value changes through a polite live region.
 - The bar uses the player-app theming scope and base design tokens only; it must render correctly in both themes and must not depend on Manager-scoped tokens.
-Selecting an actor in the bar re-filters and persists the gathering listing; the bar renders independently of the tab bodies, so bar rendering MUST NOT depend on any tab body's implementation state.
+  Selecting an actor in the bar re-filters and persists the gathering listing; the bar renders independently of the tab bodies, so bar rendering MUST NOT depend on any tab body's implementation state.
 - The popover keyboard/accessibility model follows the IconPicker interaction pattern: a `role="dialog"` popover with an `aria-label`; the trigger exposes `aria-haspopup` and `aria-expanded`; options are `role="option"` rows inside a `role="listbox"`; the popover supports Tab-through option buttons, Escape / outside-click dismissal, and focus-on-open of the search input.
-It does not provide listbox arrow-key roving focus or `aria-activedescendant`.
-The popover renders in-place below the trigger (left-aligned, dropping downward) as a descendant of the bar root, so an outside-click dismisses it.
+  It does not provide listbox arrow-key roving focus or `aria-activedescendant`.
+  The popover renders in-place below the trigger (left-aligned, dropping downward) as a descendant of the bar root, so an outside-click dismisses it.
 - An actor whose portrait `img` is null/empty MUST render a neutral fallback icon (not an empty `<img>`); the portrait is decorative (`aria-hidden`) and the actor name is the accessible label / alt text.
-Long actor names MUST truncate with ellipsis (and expose the full name via `title`) in both the trigger and the option rows.
-The trigger and each option row lay portrait + name out flush-left (not centered) and size tall enough to contain the portrait without clipping, overriding the host application's default `button` styling.
+  Long actor names MUST truncate with ellipsis (and expose the full name via `title`) in both the trigger and the option rows.
+  The trigger and each option row lay portrait + name out flush-left (not centered) and size tall enough to contain the portrait without clipping, overriding the host application's default `button` styling.
 - When there are zero selectable actors, the trigger is disabled with a placeholder portrait/label and the popover shows a neutral empty state.
 - The right-side gathering context renders gracefully when `conditions.timeOfDay` is absent (the fixed clock icon + an "unknown time-of-day" label), when `conditions.weather` is absent (the fixed cloud-sun icon + an "unknown weather" label), and when the listing's realm context resolves no current realm (a neutral "No current realm" placeholder).
-When the window is resized narrow, the weather/time-of-day/realm cluster truncates or wraps, the actor trigger stays usable, and the bar produces no horizontal overflow.
+  When the window is resized narrow, the weather/time-of-day/realm cluster truncates or wraps, the actor trigger stays usable, and the bar produces no horizontal overflow.
 
 ### Shared Actor Selection State
 
 Bidirectional shell↔tab actor/realm state flows through a single shared selection store provided on the app services, not through per-tab prop drilling.
 
 - A single shared selection store is created once when services are built and exposed on the services bag so both the shell and the gathering tab read and write the same reactive state.
-The shell writes the selected actor id and the selectable-actor list; the gathering tab reads the selected actor id and writes the current realm; the bar reads realm and conditions for its right-side context.
+  The shell writes the selected actor id and the selectable-actor list; the gathering tab reads the selected actor id and writes the current realm; the bar reads realm and conditions for its right-side context.
 - The store seeds the selected actor from the persisted last-gathering-actor selection.
-When that id is empty or **not present in the bar's player-character `selectableActors`** (stale, including a legacy owned non-player-character id), it falls back to the first selectable actor and re-persists that fallback so a fresh client converges on a valid, sticky player-character selection.
-When the selectable list is **empty**, the store sets no selection, persists nothing, and must not throw (it must not index the first element of an empty list).
+  When that id is empty or **not present in the bar's player-character `selectableActors`** (stale, including a legacy owned non-player-character id), it falls back to the first selectable actor and re-persists that fallback so a fresh client converges on a valid, sticky player-character selection.
+  When the selectable list is **empty**, the store sets no selection, persists nothing, and must not throw (it must not index the first element of an empty list).
 - The store factory must not access Foundry globals directly; all environment access goes through the injected services bag, preserving the presentational-component boundary.
 - The re-persist fallback runs at most once per load: a re-entrant load after a deliberate selection must not clobber or re-seed the user's choice (guarded by an initialized flag).
 - The shared store is the single source of truth for the selected gathering actor **after convergence**.
-Because the gathering listing resolves a remembered actor against its ownership list (not the player-character list), a legacy persisted owned non-player-character id may be honored by the listing on the first fetch; the store converges by falling back to the first player character and re-persisting, after which the store and the persisted setting agree.
+  Because the gathering listing resolves a remembered actor against its ownership list (not the player-character list), a legacy persisted owned non-player-character id may be honored by the listing on the first fetch; the store converges by falling back to the first player character and re-persisting, after which the store and the persisted setting agree.
 
 ### Environment List
 
 - Show only environments whose owning crafting system has `features.gathering === true`.
 - Disabled environments surface to all viewers (players and GMs alike) as non-interactive **locked teasers** (identity-only, unselectable), never as selectable environments; their tasks, weights, and composition internals are redacted.
 - The Environments column provides a **player-side, client-persisted "hide unavailable" toggle** rendered as Fabricate's pill switch (a `<button>` with a track/knob and an On/Off state label, matching the GM apps' `manager-status-toggle`) on its own row beneath the search field, with a preceding descriptive label that is the switch's accessible name.
-When enabled it hides exactly the **locked** listings (engine `locked === true`): disabled environments and location-gated environments the party is not in (out-of-realm or scene-gated).
-It **does not** hide in-realm, selectable environments whose individual tasks are merely blocked (e.g. stamina- or tool-blocked) — those remain visible with their blocked reasons.
-The toggle defaults **off** (show all), changes only the viewing client's presentation (never saved data, the engine listing, or GM configuration), and persists **per client/device** via a client-scoped (`localStorage`) setting.
-It is independent of selection mode: a merely masked (blind) environment that is otherwise reachable stays visible, while a blind environment that is also locked is hidden with the rest.
-The visible label is the control's accessible name and surfaces the hidden count.
-When the toggle hides every remaining environment (but a search filter did not), the column shows a distinct "all unavailable environments hidden" empty state with an in-place control to show them again, kept distinct from the search "no matches" empty state.
+  When enabled it hides exactly the **locked** listings (engine `locked === true`): disabled environments and location-gated environments the party is not in (out-of-realm or scene-gated).
+  It **does not** hide in-realm, selectable environments whose individual tasks are merely blocked (e.g. stamina- or tool-blocked) — those remain visible with their blocked reasons.
+  The toggle defaults **off** (show all), changes only the viewing client's presentation (never saved data, the engine listing, or GM configuration), and persists **per client/device** via a client-scoped (`localStorage`) setting.
+  It is independent of selection mode: a merely masked (blind) environment that is otherwise reachable stays visible, while a blind environment that is also locked is hidden with the rest.
+  The visible label is the control's accessible name and surfaces the hidden count.
+  When the toggle hides every remaining environment (but a search filter did not), the column shows a distinct "all unavailable environments hidden" empty state with an in-place control to show them again, kept distinct from the search "no matches" empty state.
 - Support search plus biome, risk/status, and availability filters where data exists.
-Geography is not a player browse filter (the inert legacy `environment.region` free-text string is not echoed to the player listing).
+  Geography is not a player browse filter (the inert legacy `environment.region` free-text string is not echoed to the player listing).
 - If an environment is scene-gated, show whether the selected actor currently meets the scene/token requirements.
 - Display environment image, name, description, biome, danger/risk, current global weather/time evidence, selection-mode summary, visibility/condition summary, scene/access state, and availability summary where safe to reveal.
-The player-facing geography pip was removed; player geography surfaces, when built, read resolved current realms rather than the inert `environment.region`.
+  The player-facing geography pip was removed; player geography surfaces, when built, read resolved current realms rather than the inert `environment.region`.
 - Do not expose weather or time of day as player environment browse filters.
 - Environment rows should be image-led and include environment name, biome, risk/status chip, and availability summary where safe to reveal.
 - Selecting an environment populates a task list and environment detail/evidence panel.
@@ -1831,9 +1895,9 @@ When location-aware gathering is enabled, the player Gathering app shows current
   When more than one realm-enabled gathering system is present, the listing-level header chip is omitted (selection-driven fallback); its absence in that ambiguous case is intended.
 - Show the selected actor's party when the actor belongs to a Fabricate gathering party.
 - Show the current realm name(s) when the selected actor is allowed to know them.
-Show "Undiscovered realm" style placeholders for secret current realms the selected actor has not discovered.
+  Show "Undiscovered realm" style placeholders for secret current realms the selected actor has not discovered.
 - Show the current-realm evidence source using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
-A player's current realm may resolve live from travel-actor sensing (`source: 'travelActor'`, Phase 3, shipped) as well as from a manual override.
+  A player's current realm may resolve live from travel-actor sensing (`source: 'travelActor'`, Phase 3, shipped) as well as from a manual override.
 - If the actor is not in a party, show a concise no-party location state that still does not block non-location-gated environments.
 - Current-realm display must fit narrow Foundry ApplicationV2 layouts without overlapping actor/stamina controls, and current-realm chips must wrap within the app container without forcing horizontal scrolling.
 
@@ -1842,12 +1906,12 @@ A player's current realm may resolve live from travel-actor sensing (`source: 't
 The player Gathering app makes location-gated availability understandable.
 
 - Available environments sort before locked (disabled or out-of-realm/scene-gated) environments.
-Locked environments remain visible by default (when safe, with clear blocked reasons); the player may opt to hide all currently-locked (out-of-reach) environments via the client-persisted "hide unavailable" Environments-column toggle described under Environment List.
-This toggle targets only `locked === true` listings and never hides in-realm, task-blocked environments.
+  Locked environments remain visible by default (when safe, with clear blocked reasons); the player may opt to hide all currently-locked (out-of-reach) environments via the client-persisted "hide unavailable" Environments-column toggle described under Environment List.
+  This toggle targets only `locked === true` listings and never hides in-realm, task-blocked environments.
 - Known destination guidance may list realm names; secret or undiscovered destination guidance must use undiscovered placeholders and counts.
 - Guidance must distinguish the location blocker from weather, time, tool, stamina, node, scene, permission, duplicate-run, and visibility blockers where practical.
 - Environment cards/details must not leak hidden blind task names, hidden results, hidden events, provider diagnostics, GM-only notes, or secret undiscovered realm names.
-Secret undiscovered realm names and ids must not appear in visible text, `title`, `aria-label`, filter labels, or DOM `data-*` attributes.
+  Secret undiscovered realm names and ids must not appear in visible text, `title`, `aria-label`, filter labels, or DOM `data-*` attributes.
 - Non-GM destination filters may expose known destination names and aggregate buckets such as `Undiscovered realms`; they must not expose secret undiscovered realm names or ids.
 
 ### Player Realm Modifier Visibility
@@ -1855,7 +1919,7 @@ Secret undiscovered realm names and ids must not appear in visible text, `title`
 The player UI respects the realm modifier visibility setting.
 
 - Modifier visibility defaults to visible.
-Visible modifiers show concise source evidence, such as the realm name and the affected value.
+  Visible modifiers show concise source evidence, such as the realm name and the affected value.
 - GM-only modifiers must not reveal secret realm identity or hidden modifier values to non-GM users; hidden modifier effects avoid misleading player copy (generic "local conditions may affect this attempt" copy is acceptable when needed).
 
 ### Task Selection
@@ -1920,7 +1984,7 @@ If `task.timeRequirement` is present:
 ### Active Runs
 
 The Gathering App must include a dedicated active-runs section.
-These runs also appear in the unified player Journal (see *Journal App*), which monitors gathering, crafting, and salvage runs together; the Gathering App remains the place to START a gather.
+These runs also appear in the unified player Journal (see _Journal App_), which monitors gathering, crafting, and salvage runs together; the Gathering App remains the place to START a gather.
 
 Each active run entry shows:
 
@@ -2000,14 +2064,14 @@ When stamina economy is enabled:
 ## Journal App (Player)
 
 The **Journal** is the unified player-facing home for monitoring runs.
-It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`, `Journal`, `Inventory`), rendered beneath the shared Actor selection top bar, and reads the selected player-character's existing crafting, gathering, and salvage runs through one UI-safe projection (the `RunModel` / `StepModel` shapes defined in `data-models/spec.md` *Run Journal Projection*).
+It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`, `Journal`, `Inventory`), rendered beneath the shared Actor selection top bar, and reads the selected player-character's existing crafting, gathering, and salvage runs through one UI-safe projection (the `RunModel` / `StepModel` shapes defined in `data-models/spec.md` _Run Journal Projection_).
 
 Scope:
 
 - The Journal **monitors** active and historical runs and, for crafting only, **advances** them.
 - It never CREATES runs; run creation stays in the Crafting, Alchemy, and Gathering flows.
-- It is the unified player home for the per-activity run views described elsewhere in this spec — the Crafting tab *Run Summary*, the Alchemy tab *Active Runs and History*, and the Gathering App *Active Runs* / *History*.
-Those per-activity sections remain authoritative for their own tab, and the Journal cross-references rather than replaces them.
+- It is the unified player home for the per-activity run views described elsewhere in this spec — the Crafting tab _Run Summary_, the Alchemy tab _Active Runs and History_, and the Gathering App _Active Runs_ / _History_.
+  Those per-activity sections remain authoritative for their own tab, and the Journal cross-references rather than replaces them.
 
 ### Navigation and Active-Run Count Badge
 
@@ -2016,8 +2080,8 @@ Those per-activity sections remain authoritative for their own tab, and the Jour
 - The badge is hidden when the count is zero.
 - The badge stays fresh even while the Journal tab is closed: the shell re-fetches the listing on world-time advance and scene change, so another open tab still shows an accurate count.
 - The badge count and the Journal listing MUST reflect the currently-persisted runs for the selected actor regardless of which client created or advanced them.
-A run started or advanced by another user — including via the primary-GM world-time timed resume — MUST become visible to a GM viewing that actor after the actor document syncs, without a full app reload.
-Per-client run-manager caches MUST NOT serve stale runs: they are invalidated when the selected actor's run-container flags change on any client, so this cross-client freshness holds and the "badge stays fresh on world-time advance" guarantee above continues to hold across clients.
+  A run started or advanced by another user — including via the primary-GM world-time timed resume — MUST become visible to a GM viewing that actor after the actor document syncs, without a full app reload.
+  Per-client run-manager caches MUST NOT serve stale runs: they are invalidated when the selected actor's run-container flags change on any client, so this cross-client freshness holds and the "badge stays fresh on world-time advance" guarantee above continues to hold across clients.
 
 ### Run Monitoring
 
@@ -2027,18 +2091,18 @@ Per-client run-manager caches MUST NOT serve stale runs: they are invalidated wh
 - Selecting a run opens a centre detail panel (steps, requirements, and — for a succeeded run — its crafted items, titled `FABRICATE.App.Journal.Results.Title` so it does not collide with the right column's "Recent results" card) plus a right column ordered "about this run" → "what to expect" → "recent results" → "tips".
 - All countdowns and timestamps are world-time based.
 - **Single-step recipes suppress redundant step chrome.**
-A run whose projection reports `multiStep: false` (see `data-models/spec.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip is retained.
-A single-step run's requirements card uses the single-step title (`FABRICATE.App.Journal.StepDetails.TitleSingleStep`, "Craft requirements") while a multi-step run's card keeps "Step requirements" (`FABRICATE.App.Journal.StepDetails.Title`), and the run-card progress bar carries a run-neutral "Crafting progress" (`FABRICATE.App.Journal.Progress.Label`) aria-label for every run.
-A single-step crafting run's "what to expect" card uses the single-step explainer (`FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep`) instead of the multi-step crafting copy.
+  A run whose projection reports `multiStep: false` (see `data-models/spec.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip is retained.
+  A single-step run's requirements card uses the single-step title (`FABRICATE.App.Journal.StepDetails.TitleSingleStep`, "Craft requirements") while a multi-step run's card keeps "Step requirements" (`FABRICATE.App.Journal.StepDetails.Title`), and the run-card progress bar carries a run-neutral "Crafting progress" (`FABRICATE.App.Journal.Progress.Label`) aria-label for every run.
+  A single-step crafting run's "what to expect" card uses the single-step explainer (`FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep`) instead of the multi-step crafting copy.
 
 ### Run-Type-Aware Actions Panel
 
 The run detail's actions area is keyed on the projection's `manualAdvance` flag:
 
 - **Crafting (`manualAdvance: true`)** shows a primary advance button.
-On a non-final step it reads **"Trigger Next Step"** with the `FABRICATE.App.Journal.Actions.TriggerHint` ready hint and the `FABRICATE.App.Journal.TimeRemaining.WhenPassed` gate hint; on the **final step** (`isFinalStep: true` — a single-step recipe, or the last step of a multi-step recipe, where there is no next step to trigger) it reads **"Finish Crafting"** with the `FinishHint` ready hint and the `WhenPassedFinal` gate hint, and the left run card's matured countdown reads "Ready to finish" (`Countdown.ReadyToFinish`) rather than "Ready to continue".
-It is DISABLED until the active step's time gate has matured — readiness is derived from `timeGate.availableAt <= worldTime` (race-free), NOT from the run's persisted status — and while an advance is in flight.
-Triggering invokes the crafting advance contract in `recipes-and-steps/spec.md` (*Run Progression — Player-Initiated Advance*); the final-step variant is copy-only and re-enters the same advance flow.
+  On a non-final step it reads **"Trigger Next Step"** with the `FABRICATE.App.Journal.Actions.TriggerHint` ready hint and the `FABRICATE.App.Journal.TimeRemaining.WhenPassed` gate hint; on the **final step** (`isFinalStep: true` — a single-step recipe, or the last step of a multi-step recipe, where there is no next step to trigger) it reads **"Finish Crafting"** with the `FinishHint` ready hint and the `WhenPassedFinal` gate hint, and the left run card's matured countdown reads "Ready to finish" (`Countdown.ReadyToFinish`) rather than "Ready to continue".
+  It is DISABLED until the active step's time gate has matured — readiness is derived from `timeGate.availableAt <= worldTime` (race-free), NOT from the run's persisted status — and while an advance is in flight.
+  Triggering invokes the crafting advance contract in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_); the final-step variant is copy-only and re-enters the same advance flow.
 - **Gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because matured gathering and salvage runs auto-resolve on world time.
 
 ### World-Time Disclosure
@@ -2047,11 +2111,11 @@ The Journal discloses that all displayed times use the game world's world time �
 
 ### Crafting / Alchemy Viewer Redaction
 
-Runs of recipes the viewer cannot see are redacted, mirroring the gathering blind-run redaction (*Rich Gathering Disclosure*):
+Runs of recipes the viewer cannot see are redacted, mirroring the gathering blind-run redaction (_Rich Gathering Disclosure_):
 
 - A crafting or alchemy run whose recipe is undiscovered or knowledge-gated for the viewer, or whose recipe no longer resolves, is shown with a generic localized title (`FABRICATE.App.Journal.Redacted.Title`), a default image, and no recipe id, steps, results, or failure detail.
 - GM viewers and globally-visible recipes are never redacted.
-- The redaction is enforced in the projection (`data-models/spec.md` *Run Journal Projection*), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
+- The redaction is enforced in the projection (`data-models/spec.md` _Run Journal Projection_), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
 
 ## Data Storage (UI-relevant)
 

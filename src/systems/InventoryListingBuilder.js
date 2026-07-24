@@ -67,6 +67,7 @@ import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -1887,17 +1888,30 @@ export class InventoryListingBuilder {
       addRequiredFor,
       seen,
     };
-    for (const set of Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []) {
-      this._indexIngredientSet(set, setCtx);
+    const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    const executionScopes = steps.length > 0 ? steps : [recipe];
+    for (const scope of executionScopes) {
+      for (const set of Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : []) {
+        this._indexIngredientSet(set, setCtx);
+      }
     }
-    for (const toolId of Array.isArray(recipe?.toolIds) ? recipe.toolIds : []) {
-      const componentId = toolComponentById.get(toolId);
-      if (componentId) addRequiredFor(componentId, recipeSourceKey, recipeSourceValue);
+    this._indexRecipeTools(recipe?.toolIds, setCtx);
+    for (const step of steps) {
+      this._indexRecipeTools(step?.toolIds, setCtx);
     }
 
     // Produced-by (recipe): every output result component id.
     for (const componentId of this._recipeResultComponentIds(recipe)) {
       addProduced(componentId, recipeSourceKey, recipeSourceValue);
+    }
+  }
+
+  _indexRecipeTools(toolIds, ctx) {
+    for (const toolId of Array.isArray(toolIds) ? toolIds : []) {
+      const componentId = ctx.toolComponentById.get(toolId);
+      if (componentId) {
+        ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+      }
     }
   }
 
@@ -1926,9 +1940,13 @@ export class InventoryListingBuilder {
     for (const group of Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []) {
       this._indexIngredientOptions(group, ctx);
     }
-    for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
-      const componentId = ctx.toolComponentById.get(toolId);
-      if (componentId) ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+    if (ingredientSetToolsAreActive(ctx.system, set)) {
+      for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
+        const componentId = ctx.toolComponentById.get(toolId);
+        if (componentId) {
+          ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+        }
+      }
     }
     for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
       if (Number(quantity) > 0) {

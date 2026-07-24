@@ -330,6 +330,50 @@ test('the harness guards the process against a late teardown rejection and exits
   assert.match(source, /process\.exit\(results\.passed \? 0 : 1\)/);
 });
 
+test('source: Manager readiness resolves the explicit or registered owner of the unique connected DOM', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+  const start = source.indexOf('async function waitForManagerApplicationRendered(page)');
+  const end = source.indexOf('/**\n * Resize the rendered Crafting System Manager', start);
+  assert.ok(start > 0 && end > start, 'expected to bound the Manager readiness helper');
+  const body = source.slice(start, end);
+
+  assert.match(body, /resolveRegisteredManager = \(selector\)/);
+  assert.match(body, /document\.querySelectorAll\(selector\)/);
+  assert.match(body, /page\.evaluate\(resolveRegisteredManager, outerSelector\)/);
+  assert.match(body, /renderedOuters\.length !== 1 \|\| renderedManagers\.length !== 1/);
+  assert.match(body, /explicitApp = globalThis\.__fabricateSmokeManagerApp/);
+  assert.match(body, /new Set\(\[explicitApp, \.\.\.registeredApps\]\.filter\(Boolean\)\)/);
+  assert.match(body, /ownsRenderedManager/);
+  assert.match(
+    body,
+    /liveMatches = applicationCandidates\.filter\(\(candidate\) => candidate\.liveMatch\)/
+  );
+  assert.match(
+    body,
+    /ApplicationV2 render readiness failed \(\$\{causeMessage\}\)/
+  );
+});
+
+test('source: responsive evidence viewports narrowly waive Foundry minimum-resolution warnings', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+  assert.match(
+    source,
+    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|900px by 700px\|680px by 700px/,
+  );
+});
+
+test('source: smoke-world cleanup removes stale chat cards before stale documents', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+  const messageCleanup = source.indexOf('const staleMessages = game.messages?.contents ?? []');
+  const actorCleanup = source.indexOf('const staleActors = game.actors.contents.filter', messageCleanup);
+  assert.ok(messageCleanup > 0, 'expected stale smoke chat cleanup');
+  assert.ok(actorCleanup > messageCleanup, 'chat cards must be removed before their source documents');
+  assert.match(
+    source.slice(messageCleanup, actorCleanup),
+    /ChatMessage\.deleteDocuments\(staleMessages\.map\(message => message\.id\)\)/
+  );
+});
+
 // ── Issue #807: transient D0 renderer-teardown tolerance ──────────────────
 //
 // Walk-order note (reconciled against the real D0 walk): the motivating

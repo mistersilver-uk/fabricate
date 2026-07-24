@@ -31,7 +31,8 @@ CraftingSystem = {
   // breaks; a check NEVER breaks tools under this authority (force-break gated off,
   // though a trigger's forced outcome still applies).
   // "checkDriven": the active check's checkBreakage triggers decide whether ALL
-  // required tools break; each Tool's own mode is ignored except "immune".
+  // required tools break; each Tool's own mode is ignored and each Tool's
+  // separate checkBreakable flag decides whether it participates.
   // Normalized on read (no versioned migration): unknown/missing -> "toolSpecific".
   toolBreakage: {
     authority: "toolSpecific" | "checkDriven", // default "toolSpecific"
@@ -178,6 +179,9 @@ CraftingSystem = {
   //   }
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
+  //     natStepping?: boolean,                      // default false; persisted for crafting/
+  //                                                // salvage routed checks, but affects only
+  //                                                // relative outcome matching
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],
@@ -289,128 +293,125 @@ CraftingSystem = {
 ### Requirements
 
 1. Every crafting system has a reserved effective recipe category named `general` (`General` in UI copy).
-It is always enabled and cannot be removed.
+   It is always enabled and cannot be removed.
 2. `CraftingSystem.categories` stores only additional user-defined recipe categories.
-The reserved `general` category must not be persisted in that array.
+   The reserved `general` category must not be persisted in that array.
 3. `Recipe.category` defaults to `general`.
 4. Recipe categories are always enabled.
-Legacy persisted `features.recipeCategories`, `features.categories`, and `enableCategories` values are compatibility inputs only; normalization must emit enabled category aliases.
+   Legacy persisted `features.recipeCategories`, `features.categories`, and `enableCategories` values are compatibility inputs only; normalization must emit enabled category aliases.
 5. Item tags are always enabled.
-Legacy persisted `features.itemTags` and `enableTags` values are compatibility inputs only; normalization must emit enabled item-tag aliases.
+   Legacy persisted `features.itemTags` and `enableTags` values are compatibility inputs only; normalization must emit enabled item-tag aliases.
 6. `categories`, `componentCategories`, and `itemTags` should be normalized to unique, trimmed strings.
-6a.
-Every crafting system has a reserved effective component category named `general` (`General` in UI copy).
-It is always enabled, cannot be removed, and must not be persisted in `CraftingSystem.componentCategories`.
-6b.
-`CraftingSystem.componentCategories` stores only additional user-defined component categories.
-It is a sibling of, and independent from, `CraftingSystem.categories` (recipe categories): the two vocabularies must not be merged, aliased, or cross-populated.
-A component category is never offered as a recipe category and vice versa.
-6c.
-`CraftingSystem.categories` and `CraftingSystem.componentCategories` may each carry an optional per-category icon in a parallel name-keyed map (`categoryIcons` / `componentCategoryIcons`), keyed by the lowercased category name so the string vocabulary arrays stay backwards-compatible.
-The reserved `general` bucket may carry a default icon under the `general` key but is still never persisted in the string arrays.
-Each icon map is normalized to the categories that currently exist (plus `general`), so an icon for a category that no longer exists is dropped; the settings write replaces the whole map.
-6d.
-Deleting a referenced recipe or component category reassigns the affected records' `category` to `general` rather than leaving the value lingering.
-Deleting a referenced item tag strips it from the `tags` of every component carrying it.
+   6a.
+   Every crafting system has a reserved effective component category named `general` (`General` in UI copy).
+   It is always enabled, cannot be removed, and must not be persisted in `CraftingSystem.componentCategories`.
+   6b.
+   `CraftingSystem.componentCategories` stores only additional user-defined component categories.
+   It is a sibling of, and independent from, `CraftingSystem.categories` (recipe categories): the two vocabularies must not be merged, aliased, or cross-populated.
+   A component category is never offered as a recipe category and vice versa.
+   6c.
+   `CraftingSystem.categories` and `CraftingSystem.componentCategories` may each carry an optional per-category icon in a parallel name-keyed map (`categoryIcons` / `componentCategoryIcons`), keyed by the lowercased category name so the string vocabulary arrays stay backwards-compatible.
+   The reserved `general` bucket may carry a default icon under the `general` key but is still never persisted in the string arrays.
+   Each icon map is normalized to the categories that currently exist (plus `general`), so an icon for a category that no longer exists is dropped; the settings write replaces the whole map.
+   6d.
+   Deleting a referenced recipe or component category reassigns the affected records' `category` to `general` rather than leaving the value lingering.
+   Deleting a referenced item tag strips it from the `tags` of every component carrying it.
 7. `resolutionMode` must be one of `"simple"`, `"routedByIngredients"`, `"routedByCheck"`, `"progressive"`, or `"alchemy"`.
 8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`checkMode: "none"`, `learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
    - `alchemy.checkMode` selects the check slot: `none` → no check; `simple` → the mandatory `craftingCheck.simple` pass/fail check; `tiered` → the mandatory `craftingCheck.routed` check.
-An invalid value normalizes to `none`.
+     An invalid value normalizes to `none`.
 9. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
-9a.
-The per-system gathering economy block (`gatheringConfig.systems[systemId].economy`, defined in `gathering-and-harvesting`) carries a normalized `resolutionMode: "d100" | "progressive" | "routed"` (default `"d100"`).
-An absent, invalid, or wrong-shape value (including a stray `"simple"`) normalizes to `"d100"` on both the read and persist paths.
-It is GM configuration and is not part of the player gathering listing payload.
+   9a.
+   The per-system gathering economy block (`gatheringConfig.systems[systemId].economy`, defined in `gathering-and-harvesting`) carries a normalized `resolutionMode: "d100" | "progressive" | "routed"` (default `"d100"`).
+   An absent, invalid, or wrong-shape value (including a stray `"simple"`) normalizes to `"d100"` on both the read and persist paths.
+   It is GM configuration and is not part of the player gathering listing payload.
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.originItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
 13. **`consumption.breakToolsOnFail` governs Tool usage/breakage on a failed craft or salvage.** It is present on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`.
-It defaults to `false` (tools are not broken on failure unless enabled).
-It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
-Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
+    It defaults to `false` (tools are not broken on failure unless enabled).
+    It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
+    Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
 14. When `features.gathering` is true, a crafting system may own a `gatheringRealms` library (default `[]`) and `gatheringRealmSettings`. `gatheringRealmSettings.enabled` (default `false`) gates the whole realm/travel/availability subsystem; the records and behavior are inert until a GM opts in.
-A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour).
-Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed.
-The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; realm membership is expressed through `includedRealmIds` (multiple `GatheringRealm` ids).
-A startup migration derives `GatheringRealm` records from the legacy per-system region vocabulary and maps `environment.region` → `includedRealmIds` (orphan free-text region strings are left inert).
-Realm records are scoped to the owning system, must not be shared by reference across systems, and ride along with crafting-system import/export (a pre-unification export is upgraded idempotently on the next migration run after import).
-A Realm maps to Foundry Scene Regions many-to-one through `sceneMappings[].sceneRegionUuid`; those Foundry-bridge fields keep their `sceneRegionUuid`/`sceneUuid` names.
-Record shapes and behavior are defined in `gathering-and-harvesting` (*Location-Aware Gathering*).
-Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (world setting `fabricate.gatheringParties`; see the Gathering Party requirements in `gathering-and-harvesting`) and are excluded from system import/export.
-Beyond the `system` object and its realms, per-system gathering environments (the `gatheringEnvironments` world setting) and the per-system `gatheringConfig` slice (rules, conditions, vocabularies, economy, reusable tasks, reusable events, character modifiers) ride along with crafting-system import/export; the runtime-versus-authoring boundary, migration, reference reporting, and copy-mode rebinding rules are defined in `import-export` (Specification 010).
-The `gatheringParties` exclusion above still holds.
+    A **Gathering Realm** is the Fabricate gathering-geography concept (renamed from **Gathering Region** to remove the collision with Foundry's own first-class **Region** — `RegionDocument` / Region Behaviour).
+    Realm is geography only and is NOT a composition axis — composition matches by biome + danger only, and the legacy region vocabulary has been removed.
+    The legacy `GatheringEnvironment.region` string is **inert**: it is preserved on read for back-compat but is not a composition input and is not editor-surfaced; realm membership is expressed through `includedRealmIds` (multiple `GatheringRealm` ids).
+    A startup migration derives `GatheringRealm` records from the legacy per-system region vocabulary and maps `environment.region` → `includedRealmIds` (orphan free-text region strings are left inert).
+    Realm records are scoped to the owning system, must not be shared by reference across systems, and ride along with crafting-system import/export (a pre-unification export is upgraded idempotently on the next migration run after import).
+    A Realm maps to Foundry Scene Regions many-to-one through `sceneMappings[].sceneRegionUuid`; those Foundry-bridge fields keep their `sceneRegionUuid`/`sceneUuid` names.
+    Record shapes and behavior are defined in `gathering-and-harvesting` (_Location-Aware Gathering_).
+    Fabricate-managed **Gathering Parties** are NOT part of the crafting system — they are world-level records (world setting `fabricate.gatheringParties`; see the Gathering Party requirements in `gathering-and-harvesting`) and are excluded from system import/export.
+    Beyond the `system` object and its realms, per-system gathering environments (the `gatheringEnvironments` world setting) and the per-system `gatheringConfig` slice (rules, conditions, vocabularies, economy, reusable tasks, reusable events, character modifiers) ride along with crafting-system import/export; the runtime-versus-authoring boundary, migration, reference reporting, and copy-mode rebinding rules are defined in `import-export` (Specification 010).
+    The `gatheringParties` exclusion above still holds.
 15. `requirements.currency.units[]` defines Fabricate's built-in currency unit profile for currency requirements (salvage currency requirements today; recipe steps no longer carry a currency requirement).
 16. Currency unit profiles must be acyclic.
-Each connected conversion branch must resolve to exactly one terminal base unit.
+    Each connected conversion branch must resolve to exactly one terminal base unit.
 17. Legacy `requirements.currency.provider === "system"` configs with `systemAdapter === "dnd5e" | "pf2e"` normalize to the matching seeded currency unit profile when no explicit units exist.
 18. Built-in currency provider selection (legacy `provider`/`systemAdapter`) and the legacy single currency macro UUID field are legacy inputs only; normalized currency requirements do not emit them. (The new `providerId` and `macros` fields below are distinct first-class fields, not the legacy inputs.)
 19. `requirements.currency.spendStrategy` selects how currency is read and spent.
-It is one of **three peer top-level strategies** — `"actorProperty"` (default), `"actorInventory"`, or `"macro"`; any other value normalizes to `"actorProperty"`.
-A legacy nested config (`"actorInventory"` with the retired `inventoryMode === "macro"`) maps forward to the peer `"macro"` strategy on normalization; `inventoryMode` is never re-emitted.
-The GM selects the strategy directly in both dnd5e and pf2e worlds (it is no longer derived solely from preset seeding).
-Each strategy is realized by a symmetric coin spender behind a common `{ check(actor, requirement, ctx), spend(actor, requirement, ctx) }` interface (the `actorProperty`/`actorInventory` spenders also retain `readCoins` as the affordability primitive their `check` wraps); a consumer resolves the spender by `spendStrategy` and drives both the up-front affordability check and the deduction uniformly. (These spenders are reusable infrastructure; the step-level integration that previously drove them has been removed, and component-level currency spending is a deferred follow-up.)
-    - `"actorProperty"` (the generic `ActorPropertyCoinSpender`) reads each unit's balance from its `actorPath` and spends through a single batched `actor.update(...)`, making its own change across configured sub-units.
-This is the dnd5e and general behavior.
-    - `"actorInventory"` uses a preconfigured provider.
-The generic `ActorInventoryCoinSpender` delegates the system-specific coin I/O to a per-system coin adapter resolved by `game.system.id`.
-Providers are registered in a pure, Foundry-free registry (`getCurrencyProvidersForFoundrySystem`, `getDefaultProviderId`, `resolveProvider`); the only registered provider is the pf2e inventory adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. `providerId` is stored and selectable but the runtime still resolves the adapter by `game.system.id` (one provider per system today).
-Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to the `"macro"` strategy.
-When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding.
-    - `"macro"` drives currency through GM-supplied macros.
-Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`.
-A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
-The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
-It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
-The macro strategy is GM-only config with no separate feature flag (matching the property macros).
-    - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
+    It is one of **three peer top-level strategies** — `"actorProperty"` (default), `"actorInventory"`, or `"macro"`; any other value normalizes to `"actorProperty"`.
+    A legacy nested config (`"actorInventory"` with the retired `inventoryMode === "macro"`) maps forward to the peer `"macro"` strategy on normalization; `inventoryMode` is never re-emitted.
+    The GM selects the strategy directly in both dnd5e and pf2e worlds (it is no longer derived solely from preset seeding).
+    Each strategy is realized by a symmetric coin spender behind a common `{ check(actor, requirement, ctx), spend(actor, requirement, ctx) }` interface (the `actorProperty`/`actorInventory` spenders also retain `readCoins` as the affordability primitive their `check` wraps); a consumer resolves the spender by `spendStrategy` and drives both the up-front affordability check and the deduction uniformly. (These spenders are reusable infrastructure; the step-level integration that previously drove them has been removed, and component-level currency spending is a deferred follow-up.) - `"actorProperty"` (the generic `ActorPropertyCoinSpender`) reads each unit's balance from its `actorPath` and spends through a single batched `actor.update(...)`, making its own change across configured sub-units.
+    This is the dnd5e and general behavior. - `"actorInventory"` uses a preconfigured provider.
+    The generic `ActorInventoryCoinSpender` delegates the system-specific coin I/O to a per-system coin adapter resolved by `game.system.id`.
+    Providers are registered in a pure, Foundry-free registry (`getCurrencyProvidersForFoundrySystem`, `getDefaultProviderId`, `resolveProvider`); the only registered provider is the pf2e inventory adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. `providerId` is stored and selectable but the runtime still resolves the adapter by `game.system.id` (one provider per system today).
+    Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to the `"macro"` strategy.
+    When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding. - `"macro"` drives currency through GM-supplied macros.
+    Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`.
+    A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
+    The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
+    It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
+    The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the system's default `providerId`; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
 20. `providerId` is a trimmed string (default `""`) and `macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
-Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
-Absent fields back-compat default to `""`/empty macros with no migration.
-The retired `inventoryMode` field is never emitted.
+    Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
+    Absent fields back-compat default to `""`/empty macros with no migration.
+    The retired `inventoryMode` field is never emitted.
 21. **Tool-breakage authority** (`toolBreakage.authority`) is a per-system switch, normalized on read (no versioned migration): unknown or missing normalizes to `"toolSpecific"`, mirroring the inline `resolutionMode`/`salvageResolutionMode` defaulters.
-A system with no persisted `toolBreakage` reads as `{ authority: "toolSpecific" }`.
-The governing rule: authority decides WHETHER a tool breaks; `checkBreakage` triggers decide WHEN, under `checkDriven`; the Tool's `onBreak` decides what happens; an `immune` Tool never breaks under either authority.
+    A system with no persisted `toolBreakage` reads as `{ authority: "toolSpecific" }`.
+    The governing rule is that authority decides WHETHER a Tool breaks, `checkBreakage` triggers decide WHEN under `checkDriven`, and the Tool's `onBreak` decides what happens.
+    `checkBreakable: false` opts a Tool out of check-driven breakage without replacing or erasing its retained tool-specific mode.
 22. Authority is strictly either-or (issue 419 recombine): a check can break tools ONLY under `"checkDriven"`.
-Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
-A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
-23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, except `immune`, which is always honoured (filtered out of the force-break set and recorded as skipped-immune evidence).
-The decision is made by a single shared evaluator (`evaluateCheckBreakage`) that crafting, salvage, and gathering all route through, so the decision cannot drift between surfaces.
-The evaluator additionally reads the routed per-tier `data.breakTools` as an implicit always-on trigger (the only remaining legacy bridge), so a routed tier's `breakTools` needs no separate persistence, and only an engine-evaluated roll-formula check result can force-break (`engineEvaluated === true`); any other result never force-breaks.
-A configured trigger force-breaks only when it both opts in (`breakTools === true`) AND its condition matches.
+    Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
+    A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
+23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, its tool-specific usage state (including retained `limitedUses.timesUsed` counters) is not mutated, and Tools with `checkBreakable: false` are filtered out of the force-break set as immune evidence.
+    The decision is made by a single shared evaluator (`evaluateCheckBreakage`) that crafting, salvage, and gathering all route through, so the decision cannot drift between surfaces.
+    The evaluator additionally reads the routed per-tier `data.breakTools` as an implicit always-on trigger (the only remaining legacy bridge), so a routed tier's `breakTools` needs no separate persistence, and only an engine-evaluated roll-formula check result can force-break (`engineEvaluated === true`); any other result never force-breaks.
+    A configured trigger force-breaks only when it both opts in (`breakTools === true`) AND its condition matches.
 24. `checkBreakage` triggers always target **all required tools** for the attempt (never a single check-selected tool in v1).
-The `rollTotal` condition targets the raw roll total (`data.total`); `progressiveValue` targets the awarding `value` and is meaningful only on progressive checks (absent → never matches); these are distinct sources because a forced-outcome trigger can overwrite `value` while `data.total` keeps the raw roll.
-The `diceGroup` `groupId` is the index into the evaluated `roll.dice` term order (not re-parsed from the formula string), so duplicate `NdS` groups are disambiguated deterministically; per-die aggregates read active-only raw faces and fail open (no break) when no per-die data is available.
-The `outcomeTier` condition matches when the resolved tier/outcome is in `tierIds[]` or `outcomeKeys[]`; both are honoured by the engine and the normalizer, but the editor UI authors only `tierIds[]` in v1 (`outcomeKeys[]` is an engine-level capability with no editor surface) — **acknowledged limit (issue 419)**.
+    The `rollTotal` condition targets the raw roll total (`data.total`); `progressiveValue` targets the awarding `value` and is meaningful only on progressive checks (absent → never matches); these are distinct sources because a forced-outcome trigger can overwrite `value` while `data.total` keeps the raw roll.
+    The `diceGroup` `groupId` is the index into the evaluated `roll.dice` term order (not re-parsed from the formula string), so duplicate `NdS` groups are disambiguated deterministically; per-die aggregates read active-only raw faces and fail open (no break) when no per-die data is available.
+    The `outcomeTier` condition matches when the resolved tier/outcome is in `tierIds[]` or `outcomeKeys[]`; both are honoured by the engine and the normalizer, but the editor UI authors only `tierIds[]` in v1 (`outcomeKeys[]` is an engine-level capability with no editor surface) — **acknowledged limit (issue 419)**.
 25. **`consumeCatalystsOnFail` interaction on the failure path** (issue 419): breakage on a FAILED attempt runs only when `consumption.consumeCatalystsOnFail === true` — identical to how the legacy `breakTools` force-break is gated today.
-A matched `checkDriven` trigger on a failed attempt therefore breaks tools only when `consumeCatalystsOnFail === true`.
-On the SUCCESS path breakage always applies (no such gate exists there).
+    A matched `checkDriven` trigger on a failed attempt therefore breaks tools only when `consumeCatalystsOnFail === true`.
+    On the SUCCESS path breakage always applies (no such gate exists there).
 
 26. **Crafting-check slot ownership.** `craftingCheck.simple` is the shared optional pass/fail crafting-check slot: it backs the `simple`, `alchemy`, AND `routedByIngredients` modes' check (it is not a 1:1 slot↔mode identity — do not read it as "the simple-mode check").
-`craftingCheck.routed` backs ONLY `routedByCheck`'s tier-routing check.
-`craftingCheck.progressive` backs `progressive`.
-The runtime reads the slot matching the mode (`CraftingEngine._runCraftingCheck` / `_resolveCraftingCheckBreakage`, `RunJournalBuilder._checkConfigForMode`, `CraftingListingBuilder._buildCheck`), and the GM Checks editor binds `routedByIngredients` to the `SimpleCraftingCheckEditor` (`craftingCheck.simple`), reserving the tier `CraftingCheckEditor` for `routedByCheck`.
+    `craftingCheck.routed` backs ONLY `routedByCheck`'s tier-routing check.
+    `craftingCheck.progressive` backs `progressive`.
+    The runtime reads the slot matching the mode (`CraftingEngine._runCraftingCheck` / `_resolveCraftingCheckBreakage`, `RunJournalBuilder._checkConfigForMode`, `CraftingListingBuilder._buildCheck`), and the GM Checks editor binds `routedByIngredients` to the `SimpleCraftingCheckEditor` (`craftingCheck.simple`), reserving the tier `CraftingCheckEditor` for `routedByCheck`.
 27. **Crafting-check slot migration.** The 1.10.0 startup migration (`migrateMoveRoutedByIngredientsCheck`) moves a `routedByIngredients` system's pass/fail fields (`rollFormula`, `dc`, `thresholdMode`, `tiers`, `checkBreakage`) from `craftingCheck.routed` to `craftingCheck.simple` when the simple slot is unauthored (tier ids preserved so recipe `checkTierId` references survive; the routed slot's formula is cleared), operating on the raw persisted shape; it is guarded (never clobbers an authored simple slot) and idempotent.
-The symmetric `CraftingSystemManager.updateSystem` slot movement runs when a system's mode crosses the `routedByIngredients` boundary (into RI: `routed → simple`; out of RI into `routedByCheck`: `simple → routed`), guarded to fill only an unauthored destination each direction.
-Caveat: a `dcMode: 'dynamic'` simple check moved into `routedByCheck` loses its dynamic DC (the routed slot has no `dcMode`), and the resulting static `routed.dc` should be re-authored by the GM.
+    The symmetric `CraftingSystemManager.updateSystem` slot movement runs when a system's mode crosses the `routedByIngredients` boundary (into RI: `routed → simple`; out of RI into `routedByCheck`: `simple → routed`), guarded to fill only an unauthored destination each direction.
+    Caveat: a `dcMode: 'dynamic'` simple check moved into `routedByCheck` loses its dynamic DC (the routed slot has no `dcMode`), and the resulting static `routed.dc` should be re-authored by the GM.
 28. **`CraftingSystem.id` is a durable-flag-key segment.** A system's `id` must match `/^[A-Za-z0-9_-]+$/` (letters, digits, `_`, or `-`; no dots or spaces), because it is used as a per-Item durable-flag map key segment in `flags.fabricate.roles[systemId].componentId`.
-A dot would be nested by `expandObject` on write and silently missed by the `roles[systemId]` reader, degrading matching to the raw-reference path.
-`CraftingSystemManager` therefore rejects an unsafe id LOUDLY at the creation/import entry point and NEVER rewrites an id (recipes, tools, and gathering config reference the system by id); `foundry.utils.randomID()` always satisfies the pattern.
-A pre-existing world already carrying an unsafe (e.g. dotted) id is not thrown at match time: its components resolve only by raw source references, the per-system `roles` identity tier is inert for it, and it warns once — such a system should be recreated or re-imported with a valid id.
+    A dot would be nested by `expandObject` on write and silently missed by the `roles[systemId]` reader, degrading matching to the raw-reference path.
+    `CraftingSystemManager` therefore rejects an unsafe id LOUDLY at the creation/import entry point and NEVER rewrites an id (recipes, tools, and gathering config reference the system by id); `foundry.utils.randomID()` always satisfies the pattern.
+    A pre-existing world already carrying an unsafe (e.g. dotted) id is not thrown at match time: its components resolve only by raw source references, the per-system `roles` identity tier is inert for it, and it warns once — such a system should be recreated or re-imported with a valid id.
 
 29. **`craftingCheck.mode` has a single valid value, `passFail`.** It is a legacy discriminator that predates the resolution-mode model.
-Normalization emits `mode: "passFail"` unconditionally, defaulting to `passFail` and collapsing any other value — including the removed `tiered` and `namedOutcomes` tokens — to `passFail`.
-No runtime consumes `craftingCheck.mode`: crafting resolution is driven entirely by the recipe/step `resolutionMode` and the matching `craftingCheck.simple` / `routed` / `progressive` sub-object (see requirement 26 and `resolution-modes`), not by this field.
-The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
-This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
-`craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
+    Normalization emits `mode: "passFail"` unconditionally, defaulting to `passFail` and collapsing any other value — including the removed `tiered` and `namedOutcomes` tokens — to `passFail`.
+    No runtime consumes `craftingCheck.mode`: crafting resolution is driven entirely by the recipe/step `resolutionMode` and the matching `craftingCheck.simple` / `routed` / `progressive` sub-object (see requirement 26 and `resolution-modes`), not by this field.
+    The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
+    This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
+    `craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
 
 30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
-A check is **usable** IFF its resolution mode carries an authored `rollFormula` (see the *Crafting Check Macro Contract* section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
-The historical `checkSource` discriminator (with its `"builtIn"` value) and the `builtIn: { ability, skill, dc, advantage }` game-system adapter sub-object are **NOT** part of the model: that adapter, together with the macro-as-check-source fields (`macroUuid`, `successMacroUuid`, `failureMacroUuid`), was removed in the 1.8.0 migration (`migrateRemoveLegacyCheckSources`).
-Normalization never emits `checkSource` or `builtIn`, and any persisted values are stripped on migration.
-The distinct `craftingCheck.simple.macroUuid` (the optional dynamic-DC macro) is a separate, retained feature and is not a check source.
+    A check is **usable** IFF its resolution mode carries an authored `rollFormula` (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
+    The historical `checkSource` discriminator (with its `"builtIn"` value) and the `builtIn: { ability, skill, dc, advantage }` game-system adapter sub-object are **NOT** part of the model: that adapter, together with the macro-as-check-source fields (`macroUuid`, `successMacroUuid`, `failureMacroUuid`), was removed in the 1.8.0 migration (`migrateRemoveLegacyCheckSources`).
+    Normalization never emits `checkSource` or `builtIn`, and any persisted values are stripped on migration.
+    The distinct `craftingCheck.simple.macroUuid` (the optional dynamic-DC macro) is a separate, retained feature and is not a check source.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -458,7 +459,7 @@ Requirements:
    The routed crafting-check formula check is keyed ONLY off the system MODE plus
    `craftingCheck.routed.rollFormula`: a `routedByCheck` system with no formula
    emits a `routedCheckNoFormula` issue that is `severity: 'critical', blocks:
-   'system'` **unconditionally** — every recipe in the mode routes by the check, so
+'system'` **unconditionally** — every recipe in the mode routes by the check, so
    the gap is a whole-system blocker independent of any recipe, computed with NO
    recipe scan.
    A `routedByIngredients` system never emits `routedCheckNoFormula` (its check is
@@ -488,62 +489,62 @@ Define one actor-backed currency denomination and its optional sub-unit breakdow
 
 ```ts
 type CurrencyUnit = {
-  id: string,           // stable internal reference used by CurrencyRequirement.unit
-  label: string,
-  abbreviation: string,
-  icon: string,
-  actorPath: string,    // Foundry actor data path containing the numeric balance (actorProperty strategy)
-  denomination?: string, // pf2e coin denomination (pp|gp|sp|cp); used by the actorInventory strategy
+  id: string; // stable internal reference used by CurrencyRequirement.unit
+  label: string;
+  abbreviation: string;
+  icon: string;
+  actorPath: string; // Foundry actor data path containing the numeric balance (actorProperty strategy)
+  denomination?: string; // pf2e coin denomination (pp|gp|sp|cp); used by the actorInventory strategy
   contains: Array<{
-    unitId: string,     // another CurrencyUnit.id
-    amount: number,     // positive integer count contained in one parent unit
-  }>,
-}
+    unitId: string; // another CurrencyUnit.id
+    amount: number; // positive integer count contained in one parent unit
+  }>;
+};
 ```
 
 ### Requirements
 
 1. `id` is stable after creation and is the value stored by salvage currency requirements.
 2. `label`, `abbreviation`, `icon`, `actorPath`, `denomination`, and `contains[]` are GM-editable.
-`abbreviation` is **optional** and defaults to the empty string when unauthored.
-It is **never** defaulted to, or persisted as, the unit `id`.
+   `abbreviation` is **optional** and defaults to the empty string when unauthored.
+   It is **never** defaulted to, or persisted as, the unit `id`.
 3. A unit must not contain itself directly or indirectly, and a single unit's decomposition must reach each descendant by exactly one path.
-A sub-unit `S` is eligible for parent `P` only when the set of units reachable from `P` (inclusive, through `contains[]`) and the set reachable from `S` are disjoint; this subsumes self-containment, an already-direct child, a cycle back to `P`, and the descendant/diamond cases where `P` would gain two conversion paths to the same node.
-A profile where any unit reaches the same descendant by more than one distinct path is a validation error (conflicting conversion paths).
-A unit legitimately shared as a child of two different parents (e.g. `gp -> sp` and `ep -> sp`) is allowed, because each parent's reachable set is computed over its own subtree.
+   A sub-unit `S` is eligible for parent `P` only when the set of units reachable from `P` (inclusive, through `contains[]`) and the set reachable from `S` are disjoint; this subsumes self-containment, an already-direct child, a cycle back to `P`, and the descendant/diamond cases where `P` would gain two conversion paths to the same node.
+   A profile where any unit reaches the same descendant by more than one distinct path is a validation error (conflicting conversion paths).
+   A unit legitimately shared as a child of two different parents (e.g. `gp -> sp` and `ep -> sp`) is allowed, because each parent's reachable set is computed over its own subtree.
 4. `contains[].amount` must be a positive integer; a non-integer or non-positive amount is a profile validation error.
 5. A sub-unit reference must point at another configured currency unit.
 6. `actorPath` vs `denomination` vs `abbreviation` validation is conditional on the owning `requirements.currency.spendStrategy`:
    - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
    - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
    - Under `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination`/`actorPath` are not required.
-Additionally, the config-level `canAfford` and `decrement` macros must be set (the `increment` macro is optional).
-The `"macro"` requirement is unchanged by the abbreviation default: an empty `abbreviation` (the new default for an unauthored unit) still produces the missing-abbreviation validation error under `"macro"`.
+     Additionally, the config-level `canAfford` and `decrement` macros must be set (the `increment` macro is optional).
+     The `"macro"` requirement is unchanged by the abbreviation default: an empty `abbreviation` (the new default for an unauthored unit) still produces the missing-abbreviation validation error under `"macro"`.
 7. When a stored `abbreviation` strictly equals the unit `id` **and** the id has the generated-id shape (`/^[A-Za-z0-9]{10,}$/`, matching `foundry.utils.randomID()` or the crypto fallback), normalization treats the abbreviation as unauthored and resets it to the empty string (legacy self-heal).
-Short or non-alphanumeric semantic ids are **deliberately left un-healed** even when `abbreviation === id`: they fail the generated-id shape guard, so a hand-authored abbreviation that intentionally equals a semantic id (e.g. the seeded preset coin keys `cp`/`sp`/`ep`/`gp`/`pp`, the only such ids in practice) is preserved.
-The self-heal only ever fires on the accidental, machine-generated bake.
+   Short or non-alphanumeric semantic ids are **deliberately left un-healed** even when `abbreviation === id`: they fail the generated-id shape guard, so a hand-authored abbreviation that intentionally equals a semantic id (e.g. the seeded preset coin keys `cp`/`sp`/`ep`/`gp`/`pp`, the only such ids in practice) is preserved.
+   The self-heal only ever fires on the accidental, machine-generated bake.
 
 ### Recipe Visibility Requirements
 
 0. `visibilityMode` is the **canonical** recipe-visibility strategy and must be one of `"global"`, `"restricted"`, `"item"`, or `"knowledge"`; unknown, missing, or invalid values normalize to `"knowledge"`.
-It supersedes the legacy `recipeVisibility.listMode` + `knowledge.mode` pair (which requirements 1–8 below describe) and gates the whole Crafting authoring surface (nav group, Settings effect panel, Books & Scrolls, limited-use, learning limits) plus the player book affordances.
-The `1.12.0` migration seeds it from the legacy block (`global`→`global`, `player`→`restricted`, `knowledge`+`item`→`item`, `knowledge`+`learned`/`itemOrLearned`→`knowledge`, `teaser`→`global` with `teaserConfig` preserved, absent/invalid→`knowledge`).
-A stored value is normalized on read to one of the four (unknown/absent→`knowledge`); the visibility runtime instead derives from the legacy pair only for a raw/un-normalized system that carries no `visibilityMode` (`player`→`restricted`, `knowledge`+`item`→`item`, `knowledge`+learning→`knowledge`, else `global`).
-Switching `visibilityMode` migrates no recipes and needs no confirmation.
-The legacy `recipeVisibility` block is retained on read as the derivation source and for its residual `knowledge.learn.dragDropEnabled`.
+   It supersedes the legacy `recipeVisibility.listMode` + `knowledge.mode` pair (which requirements 1–8 below describe) and gates the whole Crafting authoring surface (nav group, Settings effect panel, Books & Scrolls, limited-use, learning limits) plus the player book affordances.
+   The `1.12.0` migration seeds it from the legacy block (`global`→`global`, `player`→`restricted`, `knowledge`+`item`→`item`, `knowledge`+`learned`/`itemOrLearned`→`knowledge`, `teaser`→`global` with `teaserConfig` preserved, absent/invalid→`knowledge`).
+   A stored value is normalized on read to one of the four (unknown/absent→`knowledge`); the visibility runtime instead derives from the legacy pair only for a raw/un-normalized system that carries no `visibilityMode` (`player`→`restricted`, `knowledge`+`item`→`item`, `knowledge`+learning→`knowledge`, else `global`).
+   Switching `visibilityMode` migrates no recipes and needs no confirmation.
+   The legacy `recipeVisibility` block is retained on read as the derivation source and for its residual `knowledge.learn.dragDropEnabled`.
 1. `listMode` (legacy) must be one of `"global"`, `"player"`, or `"knowledge"`.
-Invalid or missing values default to `"global"`.
+   Invalid or missing values default to `"global"`.
 2. The `knowledge` sub-object is only meaningful when `listMode === "knowledge"`.
 3. When `listMode === "global"`, all enabled recipes are visible to all users without restriction or knowledge filtering.
 4. `knowledge.learn.dragDropEnabled` controls automatic learning from actor item drops when knowledge learning is enabled; default is `true`.
 5. If `knowledge.learn.dragDropEnabled` is `false`, automatic actor-drop learning is disabled and manual learn UI affordances must be used.
 6. The per-recipe-item use and learn caps are NOT on `recipeVisibility.knowledge`.
-They live on each recipe item definition (`RecipeItemDefinition.caps`, see that model), so two recipe items in one system may carry different caps.
-`caps.learn.limitRecipes` enables that item's learn cap; `caps.learn.maxRecipes` is normalized to a finite integer `> 0` and is retained only when `limitRecipes === true`, mirroring how `caps.item.maxUses` is retained only when `caps.item.limitUses === true`.
-A `limitRecipes === true` item with a missing or invalid `maxRecipes` is normalized so that `learnsAllowed` (and its legacy `maxRecipes` mirror) seeds to `1` — the value the UI stepper displays — because a limit of "0/undefined" is meaningless and would wrongly read as uncapped downstream, hiding the learn-all CTA (issue 544).
-The observable behaviour for stored, normalized systems is a 1-learn budget; the surviving runtime uncapped fallback (`RecipeVisibilityService._getLearnCapForRecipe`) is a defensive dead path reachable only from raw, un-normalized test fixtures.
+   They live on each recipe item definition (`RecipeItemDefinition.caps`, see that model), so two recipe items in one system may carry different caps.
+   `caps.learn.limitRecipes` enables that item's learn cap; `caps.learn.maxRecipes` is normalized to a finite integer `> 0` and is retained only when `limitRecipes === true`, mirroring how `caps.item.maxUses` is retained only when `caps.item.limitUses === true`.
+   A `limitRecipes === true` item with a missing or invalid `maxRecipes` is normalized so that `learnsAllowed` (and its legacy `maxRecipes` mirror) seeds to `1` — the value the UI stepper displays — because a limit of "0/undefined" is meaningless and would wrongly read as uncapped downstream, hiding the learn-all CTA (issue 544).
+   The observable behaviour for stored, normalized systems is a 1-learn budget; the surviving runtime uncapped fallback (`RecipeVisibilityService._getLearnCapForRecipe`) is a defensive dead path reachable only from raw, un-normalized test fixtures.
 7. `caps.learn.destroyWhenSpent` removes the recipe item once its learn budget is spent; default is `false`.
-It is deliberately distinct from the item craft-charge flag `caps.item.destroyWhenExhausted` and must not be normalized to a shared name.
+   It is deliberately distinct from the item craft-charge flag `caps.item.destroyWhenExhausted` and must not be normalized to a shared name.
 8. The `1.11.0` migration seeds every existing recipe item's `caps` from the system's old `knowledge.item` / `knowledge.learn` values and strips those fields from `recipeVisibility.knowledge`, so existing worlds keep their behaviour while new recipe items default uncapped.
 
 ## EssenceDefinition
@@ -649,24 +650,24 @@ RecipeItemDefinition = {
 1. `originItemUuid` points to the canonical world or compendium item template used for recipe-item matching.
 2. New recipe item definitions are created from dropped or selected Foundry items; manual UUID entry is not part of the canonical UI flow.
 3. If the source template later becomes unresolved, the stored `originItemUuid` is retained and the definition becomes stale-but-readable.
-A recipe item records the same union of source references a component does — `registeredItemUuid` (the registered live document), `originItemUuid` (the canonical compendium/source uuid), and `aliasItemUuids` (issue 555) — so a compendium-imported book resolves owned copies dragged from either the compendium item or the imported world item.
-The durable `flags.fabricate.roles[systemId].recipeItemDefinitionId` on the source Item is the identity-of-record; `originItemUuid` is a best-effort source pointer, is never recomputed for an existing definition, and `registeredItemUuid` defaults to it when absent.
-See **Recipe Item Identity → Registration Source Identity** for the clone-gate and stamping rules.
+   A recipe item records the same union of source references a component does — `registeredItemUuid` (the registered live document), `originItemUuid` (the canonical compendium/source uuid), and `aliasItemUuids` (issue 555) — so a compendium-imported book resolves owned copies dragged from either the compendium item or the imported world item.
+   The durable `flags.fabricate.roles[systemId].recipeItemDefinitionId` on the source Item is the identity-of-record; `originItemUuid` is a best-effort source pointer, is never recomputed for an existing definition, and `registeredItemUuid` defaults to it when absent.
+   See **Recipe Item Identity → Registration Source Identity** for the clone-gate and stamping rules.
 4. `recipeIds[]` is the **canonical** recipe↔book membership (issue 511, PR-B): it is many-to-many, so a book may contain several recipes and a recipe may belong to several books.
-This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
-The scalar reverse ref `recipe.recipeItemId` (and the legacy `recipe.linkedRecipeItemUuid` book alias) is removed by the `1.13.0` migration, which inverts it onto `recipeIds`; membership is authored book-side on the Contents tab, and the runtime falls back to the legacy reverse ref only for a fully un-migrated system (no book carries `recipeIds` yet).
+   This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
+   The scalar reverse ref `recipe.recipeItemId` (and the legacy `recipe.linkedRecipeItemUuid` book alias) is removed by the `1.13.0` migration, which inverts it onto `recipeIds`; membership is authored book-side on the Contents tab, and the runtime falls back to the legacy reverse ref only for a fully un-migrated system (no book carries `recipeIds` yet).
 5. `caps` holds this recipe item's own use and learn caps.
-The use cap (`caps.item.limitUses` / `maxUses` / `whenSpent`) governs how many times holding the item grants crafting access; the learn cap (`caps.learn.limitLearning` / `learnsAllowed` / `learnScope` / `destroyWhenSpent`) governs how many of the item's linked recipes may be learned from it.
-The PR-B redesign renamed the cap fields; the new names are canonical and each legacy name (`destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) is persisted and kept in sync so an un-migrated raw cap still loads.
-`caps.learn.destroyWhenSpent` is deliberately distinct from `caps.item.whenSpent === "destroyed"` (`destroyWhenExhausted`) and must not be normalized to a shared name.
+   The use cap (`caps.item.limitUses` / `maxUses` / `whenSpent`) governs how many times holding the item grants crafting access; the learn cap (`caps.learn.limitLearning` / `learnsAllowed` / `learnScope` / `destroyWhenSpent`) governs how many of the item's linked recipes may be learned from it.
+   The PR-B redesign renamed the cap fields; the new names are canonical and each legacy name (`destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) is persisted and kept in sync so an un-migrated raw cap still loads.
+   `caps.learn.destroyWhenSpent` is deliberately distinct from `caps.item.whenSpent === "destroyed"` (`destroyWhenExhausted`) and must not be normalized to a shared name.
 6. `caps.learn.learnScope` selects the learn-cap counter scope: `"perInstance"` (default) counts against each physical item document (`recipeItemLearning.learnedCount`), while `"total"` draws every actor's learns from one GM-authoritative shared world pool keyed `system::defId`.
-6a. `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds` (issue 544) are each a deduped, trimmed, non-empty string list (default `[]`), normalized with the same shape in `CraftingSystemManager._normalizeRecipeItemCaps`.
-`prerequisiteIds` (**Required Knowledge**) is a list of recipeIds the reader must ALL already have learned; it folds a legacy single `caps.learn.prerequisite` string on normalize (back-compat, no stored data to migrate) and the singular is no longer emitted.
-`characterPrerequisiteIds` references into `CraftingSystem.characterPrerequisites[].id`: a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
-The two gates are distinct — `prerequisiteIds` gates on prior recipe knowledge, `characterPrerequisiteIds` gates on actor stats/flags — but both are only enforced when `caps.learn.limitLearning` is `true` (Limited learning off ⇒ learn freely, neither gate applies).
-An id that no longer resolves is skipped at runtime (fail-open for character prerequisites), so deleting a prerequisite removes its gate rather than bricking the book.
+   6a. `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds` (issue 544) are each a deduped, trimmed, non-empty string list (default `[]`), normalized with the same shape in `CraftingSystemManager._normalizeRecipeItemCaps`.
+   `prerequisiteIds` (**Required Knowledge**) is a list of recipeIds the reader must ALL already have learned; it folds a legacy single `caps.learn.prerequisite` string on normalize (back-compat, no stored data to migrate) and the singular is no longer emitted.
+   `characterPrerequisiteIds` references into `CraftingSystem.characterPrerequisites[].id`: a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
+   The two gates are distinct — `prerequisiteIds` gates on prior recipe knowledge, `characterPrerequisiteIds` gates on actor stats/flags — but both are only enforced when `caps.learn.limitLearning` is `true` (Limited learning off ⇒ learn freely, neither gate applies).
+   An id that no longer resolves is skipped at runtime (fail-open for character prerequisites), so deleting a prerequisite removes its gate rather than bricking the book.
 7. The `1.11.0` migration seeds `caps` on every existing recipe item from the system's former `recipeVisibility.knowledge.item` / `.learn` values, then strips those fields from the system config.
-Recipe items created after the migration default to uncapped.
+   Recipe items created after the migration default to uncapped.
 
 ## CharacterPrerequisite
 
@@ -691,16 +692,16 @@ CharacterPrerequisite = {
 ### Requirements
 
 1. `characterPrerequisites` normalizes wholesale from the incoming array (`normalizeCharacterPrerequisiteList`); settings replace rather than deep-merge, so a removed entry does not resurrect.
-An entry with no assignable `id` is dropped.
+   An entry with no assignable `id` is dropped.
 2. `op` is one of the nine word tokens above; an unknown or missing token normalizes to `"gte"`.
-The three **valueless** operators — `isTrue`, `isFalse`, `exists` — force `value` to `null` and hide the editor's value field; the six numeric operators keep a comparand (an empty-string value normalizes to `null`).
+   The three **valueless** operators — `isTrue`, `isFalse`, `exists` — force `value` to `null` and hide the editor's value field; the six numeric operators keep a comparand (an empty-string value normalizes to `null`).
 3. `path` is stored WITHOUT a leading `@` (the `@` is a display/authoring affordance only); a leading `@` on input is stripped on normalization.
-It is resolved at runtime as a dotted traversal of `actor.getRollData()`, which Foundry has already flattened (`skills.cra.rank` in pf2e, `skills.arc.value` in dnd5e).
+   It is resolved at runtime as a dotted traversal of `actor.getRollData()`, which Foundry has already flattened (`skills.cra.rank` in pf2e, `skills.arc.value` in dnd5e).
 4. Evaluation is pure and Foundry-free (`evaluatePrerequisite` / `evaluatePrerequisites`).
-An unknown or missing `path` degrades to `0` (numeric operators) or `false` (boolean/existence operators) and logs a single `console.warn`; it never throws.
-`evaluatePrerequisites` applies **AND** semantics and returns `{ passed, failures }`, where each failure carries a `prerequisitePreview` string (`@path op value`, or `@path op` for valueless) for player messaging.
+   An unknown or missing `path` degrades to `0` (numeric operators) or `false` (boolean/existence operators) and logs a single `console.warn`; it never throws.
+   `evaluatePrerequisites` applies **AND** semantics and returns `{ passed, failures }`, where each failure carries a `prerequisitePreview` string (`@path op value`, or `@path op` for valueless) for player messaging.
 5. `op` is a deliberate **word-token** vocabulary that parallels the symbolic `CheckBreakageCondition` operators (`==` / `<=` / `>=` / `<` / `>`, defined under **CraftingSystem**).
-The two are the same comparison intent on different surfaces (a stat gate versus a dice-matching trigger) and are intentionally not unified.
+   The two are the same comparison intent on different surfaces (a stat gate versus a dice-matching trigger) and are intentionally not unified.
 
 ## Component
 
@@ -745,53 +746,53 @@ Represent one curated item entry available to recipes and salvage operations.
 3. Each essence key must exist among the ids in `CraftingSystem.essenceDefinitions` when essences are enabled.
 4. `salvage` is only valid when `CraftingSystem.features.salvage` is true.
 5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group, with a mode-conditioned upper bound.
-In `simple` salvage mode a component's salvage has exactly one success result group (`role !== 'failure'`) plus at most one reserved `role: 'failure'` group, the failure group tolerated only when `salvageCraftingCheck.simple.rollFormula` is authored; no additional groups are permitted.
-`salvage.enabled` is clamped to `false` in `simple` mode when there is no success group (a failure-only config cannot be enabled).
-Routed mode keeps "one or more"; progressive keeps "exactly one".
-This bound is enforced at the `_normalizeSalvage` normalizer — the single chokepoint every writer passes (GM save, import, copy-mode, migration) — not by any UI control, via a success-first retain-one clamp whose post-clamp `resultGroups[0]` is the first success group (the group the engine awards via `slice(0, 1)`, with no role filter).
-The reserved-failure tolerance is a data-model / validation allowance only: salvage Simple awards `slice(0, 1)` and never routes to a failure group.
+   In `simple` salvage mode a component's salvage has exactly one success result group (`role !== 'failure'`) plus at most one reserved `role: 'failure'` group, the failure group tolerated only when `salvageCraftingCheck.simple.rollFormula` is authored; no additional groups are permitted.
+   `salvage.enabled` is clamped to `false` in `simple` mode when there is no success group (a failure-only config cannot be enabled).
+   Routed mode keeps "one or more"; progressive keeps "exactly one".
+   This bound is enforced at the `_normalizeSalvage` normalizer — the single chokepoint every writer passes (GM save, import, copy-mode, migration) — not by any UI control, via a success-first retain-one clamp whose post-clamp `resultGroups[0]` is the first success group (the group the engine awards via `slice(0, 1)`, with no role filter).
+   The reserved-failure tolerance is a data-model / validation allowance only: salvage Simple awards `slice(0, 1)` and never routes to a failure group.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
-Explicit `fabricate.essences` item flags remain a compatibility override for that item.
-The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
-The separate name fallback some callers apply after the resolver returns null is not part of this matcher and is unchanged here.
-That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine._findComponentItems`.
-Closing that name path is deferred to issue 557.
+   Explicit `fabricate.essences` item flags remain a compatibility override for that item.
+   The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
+   The separate name fallback some callers apply after the resolver returns null is not part of this matcher and is unchanged here.
+   That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine._findComponentItems`.
+   Closing that name path is deferred to issue 557.
 7. `salvage.outcomeRouting` is only meaningful when `salvageResolutionMode` is `"routed"`.
-In routed salvage mode it keys on the salvage check's outcome-tier NAMES (`salvageCraftingCheck.routed.{relativeOutcomes,fixedOutcomes}` for the active `type`) — the same source the per-component routing editor offers and the runtime routes by — NOT the legacy flat `salvageCraftingCheck.outcomes` list.
-Every SUCCESS tier must route to an existing result group; failure tiers may stay unrouted (the runtime yields nothing for an unrouted outcome), and a route pointing at a deleted group is invalid.
-When the salvage check defines no outcome tiers, routing is impossible and the component must NOT be faulted — the gap surfaces once as the system-level `salvageRoutedNoTiers` issue instead of a per-component error.
+   In routed salvage mode it keys on the salvage check's outcome-tier NAMES (`salvageCraftingCheck.routed.{relativeOutcomes,fixedOutcomes}` for the active `type`) — the same source the per-component routing editor offers and the runtime routes by — NOT the legacy flat `salvageCraftingCheck.outcomes` list.
+   Every SUCCESS tier must route to an existing result group; failure tiers may stay unrouted (the runtime yields nothing for an unrouted outcome), and a route pointing at a deleted group is invalid.
+   When the salvage check defines no outcome tiers, routing is impossible and the component must NOT be faulted — the gap surfaces once as the system-level `salvageRoutedNoTiers` issue instead of a per-component error.
 8. `salvage.ingredientQuantity` must be a positive integer.
 9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
-9a.
-A component's or recipe-item definition's stored `description` is the RESOLVED plain text of its source document's description.
-A content-link directive resolves to the referenced document's name whether or not the author supplied a label.
-A reference that cannot be resolved contributes its authored label when one is present, and is otherwise omitted rather than rendered as a placeholder word.
-Enrichment output has visibility-gated and secret markup removed before storage, by attribute — GM-only, owner-only, hidden, and unrevealed secret regions are stripped from the resolved markup regardless of which user performed the enrichment — so no such content reaches a stored description or any reader of one.
-Resolution never inlines an embedded document, and never evaluates a dice expression into a fixed number: an inline roll contributes its label when authored and otherwise its bare dice formula.
-9b.
-The stored description is refreshed by exactly two triggers: a linked source item changing, and the GM item-data repair.
-It is not refreshed on render.
-9c.
-Unlike the one-hop `name` and `img` snapshots of requirement 9, a resolved description is N-hop — it embeds the names of other documents.
-Renaming a referenced document, or removing the module that provided it, does not refresh the components quoting it; the GM item-data repair is the reconciliation path.
-A game-system or module content update is likewise a reason to run it.
-9d.
-A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
+   9a.
+   A component's or recipe-item definition's stored `description` is the RESOLVED plain text of its source document's description.
+   A content-link directive resolves to the referenced document's name whether or not the author supplied a label.
+   A reference that cannot be resolved contributes its authored label when one is present, and is otherwise omitted rather than rendered as a placeholder word.
+   Enrichment output has visibility-gated and secret markup removed before storage, by attribute — GM-only, owner-only, hidden, and unrevealed secret regions are stripped from the resolved markup regardless of which user performed the enrichment — so no such content reaches a stored description or any reader of one.
+   Resolution never inlines an embedded document, and never evaluates a dice expression into a fixed number: an inline roll contributes its label when authored and otherwise its bare dice formula.
+   9b.
+   The stored description is refreshed by exactly two triggers: a linked source item changing, and the GM item-data repair.
+   It is not refreshed on render.
+   9c.
+   Unlike the one-hop `name` and `img` snapshots of requirement 9, a resolved description is N-hop — it embeds the names of other documents.
+   Renaming a referenced document, or removing the module that provided it, does not refresh the components quoting it; the GM item-data repair is the reconciliation path.
+   A game-system or module content update is likewise a reason to run it.
+   9d.
+   A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
 13. `Component.category` defaults to `general`.
-Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
-A custom token is free text surfaced verbatim; only `general` is localized.
+    Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
+    A custom token is free text surfaced verbatim; only `general` is localized.
 14. `Component.salvage.enabled` is GM-authorable and defaults to `false`.
-It gates salvage at runtime.
-A component whose salvage config is invalidated by a system resolution-mode change is auto-disabled and must be re-enablable from the GM component editor.
-No migration seeds this field; an existing component with authored salvage results but no explicit `enabled` value reads as disabled.
+    It gates salvage at runtime.
+    A component whose salvage config is invalidated by a system resolution-mode change is auto-disabled and must be re-enablable from the GM component editor.
+    No migration seeds this field; an existing component with authored salvage results but no explicit `enabled` value reads as disabled.
 15. Requirement 5 is enforced by normalization, in both directions.
-Component normalization must clamp `salvage.enabled` to `false` whenever the normalized `salvage.resultGroups` is empty, and — in `simple` mode — whenever no success group survives the clamp.
-In `simple` mode the clamp additionally drops surplus groups: it keeps the first success group at `resultGroups[0]`, keeps at most one reserved `role: 'failure'` group (only when `salvageCraftingCheck.simple.rollFormula` is authored), and re-orders a failure-first input so the success group lands at index 0.
-The clamp applies to every writer that passes through normalization — GM edits, import, copy-mode, and migration — and only ever turns `enabled` off, never on.
-Enforcement must not rest on a UI control's disabled state: a GM surface that merely refuses to *enable* a zero-group component does not prevent a component from *becoming* zero-group while enabled.
+    Component normalization must clamp `salvage.enabled` to `false` whenever the normalized `salvage.resultGroups` is empty, and — in `simple` mode — whenever no success group survives the clamp.
+    In `simple` mode the clamp additionally drops surplus groups: it keeps the first success group at `resultGroups[0]`, keeps at most one reserved `role: 'failure'` group (only when `salvageCraftingCheck.simple.rollFormula` is authored), and re-orders a failure-first input so the success group lands at index 0.
+    The clamp applies to every writer that passes through normalization — GM edits, import, copy-mode, and migration — and only ever turns `enabled` off, never on.
+    Enforcement must not rest on a UI control's disabled state: a GM surface that merely refuses to _enable_ a zero-group component does not prevent a component from _becoming_ zero-group while enabled.
 
 ## Recipe
 
@@ -892,22 +893,22 @@ Recipe = {
 
 ### Requirements
 
-1. A *craftable* Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
-   This is a *completeness* requirement: it gates crafting and craftable-visibility, not persistence.
+1. A _craftable_ Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
+   This is a _completeness_ requirement: it gates crafting and craftable-visibility, not persistence.
    `Recipe.validate()` enforces completeness and is the craftability contract; the crafting engine gates on it, so an incomplete recipe is never craftable.
    `Recipe.validateStructure()` omits completeness (it waives the missing-ingredient-set / missing-result-group / missing-result errors) and is the persistence contract.
-2. An authoring *incomplete shell* — a recipe with valid identity (a name; default name "Unnamed Recipe" and default image apply when omitted) that is structurally consistent but missing its ingredient sets and/or result groups — MAY be persisted via the GM authoring path (create-then-edit and identity-only saves).
+2. An authoring _incomplete shell_ — a recipe with valid identity (a name; default name "Unnamed Recipe" and default image apply when omitted) that is structurally consistent but missing its ingredient sets and/or result groups — MAY be persisted via the GM authoring path (create-then-edit and identity-only saves).
    Persistence gates only on structural validity (`validateStructure()`), never on completeness; structural-integrity errors (duplicate result-group/result IDs, invalid results, invalid step time/currency values, variable result-mapping and outcome-routing integrity) still block persistence.
    Reserved/duplicate `ResultGroup.name` is a reference-integrity rule enforced at the service level for the routed modes and alchemy `tiered` check mode (see the next paragraph), NOT a structural/persistence blocker: `validateStructure()` waives the name checks, so an authoring incomplete shell — or a recipe carrying a stray leftover `resultSelection` — is never blocked on a name error.
    Issue 554 retired the per-recipe `resultSelection.provider`, so `Recipe._validateRoutedResultSelection` no longer governs alchemy name-uniqueness.
    `routedByCheck` `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, a per-mode reference-integrity check that always applies), independent of this persistence gate.
-   Incompleteness is *derived* from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
+   Incompleteness is _derived_ from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
 3. Resolution-mode constraints are defined in `resolution-modes/spec.md`.
 4. `resultSelection.provider` is RETIRED for alchemy (issue 554): alchemy routes on the SYSTEM-level `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`), not a per-recipe provider.
    The 1.14.0 migration strips `resultSelection` from every alchemy recipe.
    No live mode reads `resultSelection`: `routedByIngredients` routes by `IngredientSet.resultGroupId` and `routedByCheck` routes by `ResultGroup.name`/`checkOutcomeIds` against the system routed check, and alchemy routes per its `checkMode`.
 5. Result-group selection with a reserved `role: 'failure'` group applies to plain `simple` resolution mode (success group on a passed check, reserved failure group on a fail when authored) as well as alchemy.
-Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
+   Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
    - `none`: one ingredient set + one result group; a matched brew always produces that group (no check).
    - `simple`: the success result group on a passed `craftingCheck.simple`, and the reserved `role: 'failure'` result group on a fail (produced only when non-empty).
    - `tiered`: identical to `routedByCheck` — each success outcome tier routes to its assigned `ResultGroup` via `checkOutcomeIds`; a failed routed check fizzles.
@@ -916,25 +917,27 @@ Alchemy result-group selection is per `CraftingSystem.alchemy.checkMode`:
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
 8. If `transferEffects` is true and essences are enabled, transfer behaviour follows `recipes-and-steps/spec.md`.
 9. `access` is the canonical per-recipe grant for `restricted` visibility mode (issue 511, PR-B): `access.characterIds` grants named player-characters and `access.playerIds` grants named players.
-Each normalizes to a deduped list of non-empty id strings (non-string entries are dropped).
-When both lists are empty, the player grants are read-forward once from the legacy `visibility.allowedUserIds`, so a pre-`access` recipe keeps showing to the same players after the runtime switches to reading `access`.
-An `access` grant with both lists empty means no non-GM user may see the recipe (the GM always can).
-9a.
-The legacy `visibility` block is retained on read as the `access` read-forward source and the un-migrated fallback: if `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array; an empty array is valid and means no non-GM user may see the recipe.
+   Each normalizes to a deduped list of non-empty id strings (non-string entries are dropped).
+   When both lists are empty, the player grants are read-forward once from the legacy `visibility.allowedUserIds`, so a pre-`access` recipe keeps showing to the same players after the runtime switches to reading `access`.
+   An `access` grant with both lists empty means no non-GM user may see the recipe (the GM always can).
+   9a.
+   The legacy `visibility` block is retained on read as the `access` read-forward source and the un-migrated fallback: if `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array; an empty array is valid and means no non-GM user may see the recipe.
 10. If `visibilityMode` is `item` or `knowledge`, the recipe should be a member of at least one recipe item definition (`RecipeItemDefinition.recipeIds`, the canonical membership since issue 511 PR-B) for player craftability.
-The legacy scalar `recipeItemId` requirements below still hold for un-migrated systems that resolve membership through the reverse-ref fallback.
+    The legacy scalar `recipeItemId` requirements below still hold for un-migrated systems that resolve membership through the reverse-ref fallback.
 11. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
 12. If a legacy `recipeItemId` is configured and the referenced `RecipeItemDefinition.originItemUuid` is stale or no longer resolves, validation must warn.
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
-It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
-An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
-13a. `craftingModifier` is an optional per-recipe crafting-check modifier override (issue 770): `{ policy?, modifierIds? } | null`, defaulting to `null` (inherit the system default policy + `defaultModifierIds`).
-The normalizer keeps only a known `policy` (`addAll`/`highest`/`byRecipe`) and a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object with neither a valid policy nor a non-empty id list, round-trips to `null`.
-Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
+    It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
+    An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
+    13a. `craftingModifier` is an optional per-recipe crafting-check modifier override (issue 770): `{ policy?, modifierIds? } | null`, defaulting to `null` (inherit the system default policy + `defaultModifierIds`).
+    The normalizer keeps only a known `policy` (`addAll`/`highest`/`byRecipe`) and a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object with neither a valid policy nor a non-empty id list, round-trips to `null`.
+    Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
-The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
-A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
-It survives export/import (the importer re-stamps it) and is retained across GM edits (an edit that omits `importSource` inherits the stored value through the `{ ...recipe.toJSON(), ...updates }` merge in `updateRecipe`).
+    The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
+    A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
+    It survives export/import (the importer re-stamps it) and is retained across GM edits (an edit that omits `importSource` inherits the stored value through the `{ ...recipe.toJSON(), ...updates }` merge in `updateRecipe`).
+15. Legacy `toolBonusModes` input is ignored immediately and omitted from canonical Recipe writes.
+    Recipe and Step data persist Tool references only; prerequisite, bonus, breakage, and on-break behavior belong to the referenced Tool or its Crafting System.
 
 ### Validation Guidance
 
@@ -945,8 +948,8 @@ Shape validation (invalid):
 Valid-but-hidden configuration:
 
 - `visibility.restricted` is `true` and `allowedUserIds` is `[]`.
-The recipe is hidden from all non-GM users.
-GM can still view and manage the recipe.
+  The recipe is hidden from all non-GM users.
+  GM can still view and manage the recipe.
 
 ## Recipe Item Identity
 
@@ -978,7 +981,7 @@ The raw-reference fall-through is load-bearing for multi-system worlds, stale fl
 The invariant is that within a single system's component set at most one component bears a given id; component ids are NOT globally unique, because independently-authored systems can coincidentally share an id and every world that copy-imported BEFORE issue 570 retains its origin's ids (copy-import itself no longer preserves origin ids — see the residual note below).
 The resolver is the single component matcher used across crafting ingredient and collection matching, recipe tool matching, essence resolution, the inventory used-by listing, owned-item repair, gathering award-stacking, alchemy signature matching, and canvas Item→Tool drop resolution.
 This closes the transitive-`_stats.duplicateSource` false positive on the source-reference path while preserving a system's recognition of its own component in multi-system worlds.
-Residual, CLOSED by issue 570: copy-mode import now regenerates every component id and atomically remaps every within-payload component reference (recipe ingredient and result refs including the `systemItemId` alias, the recursive `alternatives[]` refs, and the flat `ingredients`/`results` aliases; the retained `tool.componentId` alias in both the system and gathering-library tool slices; `onBreak.replacementComponentId`; `essence.sourceComponentId`; salvage result refs; gathering drop-row `componentId`; and legacy `catalysts[]`), so two systems copy-imported from the same origin no longer share a component id.
+Residual, CLOSED by issue 570: copy-mode import now regenerates every component id and atomically remaps every within-payload component reference (recipe ingredient and result refs including the `systemItemId` alias, the recursive `alternatives[]` refs, and the flat `ingredients`/`results` aliases; the retained `tool.componentId` alias in both the system and gathering-library tool slices; component-discriminated `onBreak.replacementTarget`; `essence.sourceComponentId`; salvage result refs; gathering drop-row `componentId`; and legacy `catalysts[]`), so two systems copy-imported from the same origin no longer share a component id.
 Issue 561 removed the blocker by giving Tools their own identity — a Tool no longer borrows `componentId` for cross-system matching — and issue 570 flipped regeneration on in `prepareForImport('copy')`.
 The per-system `roles` map and the resolver's `systemId` scoping remain load-bearing, because component ids stay per-system-unique only: independently-authored systems, and worlds that copy-imported BEFORE issue 570, can still share ids.
 
@@ -991,17 +994,18 @@ A legacy scalar `flags.fabricate.componentId` (components) or `flags.fabricate.r
 Registration stamps only the owning system's `roles[system.id]` leaf for the kind, and clears only that per-system leaf on re-point or repair, never the whole `roles` flag nor the whole `roles[systemId]` object (which would destroy the sibling leaves).
 A CRAFTED OUTPUT item carries the durable component identity of its result component: crafting stamps `flags.fabricate.roles[craftingSystemId].componentId` on the output item at creation, so a freshly crafted product resolves to its OWN component through the identity tier and never through the transitive `_stats.duplicateSource` it inherits from a source item duplicated off a sibling component (a result with no managed component, or a system id that is not a durable-flag-key segment, is left unstamped and degrades to raw-reference resolution).
 A GATHERED AWARD item carries the durable component identity of its awarded component: the gathering award creation path stamps `flags.fabricate.roles[systemId].componentId` (the awarding system's id) on the created item at creation, so a gathered part resolves to its OWN component through the identity tier; an award with no managed component (a bare `itemUuid` source), or a system id that is not a durable-flag-key segment, is left unstamped and degrades to raw-reference resolution.
-A TOOL-REPLACEMENT grant item (created when a broken tool's `onBreak.replaceWith` resolves its `replacementComponentId`) carries that replacement component's durable identity: the replacement creation path stamps `flags.fabricate.roles[systemId].componentId = replacementComponentId`, and ADDITIONALLY stamps `flags.fabricate.roles[systemId].toolId` with the linking tool's id when exactly one first-class tool in `system.tools` links the replacement component (`tool.componentId === replacementComponentId`), so a replacement that is itself a working tool stays durably matchable and breakable; on zero or multiple linking tools only `componentId` is stamped, and when the replacement component does not resolve, nothing is stamped.
+A TOOL-REPLACEMENT grant item created from a Component-discriminated `onBreak.replacementTarget` carries that replacement Component's durable identity: the creation path stamps `flags.fabricate.roles[systemId].componentId`, and additionally stamps `flags.fabricate.roles[systemId].toolId` when exactly one first-class Tool links that Component, so a replacement that is itself a working Tool stays durably matchable and breakable.
+A direct-Item replacement preserves the resolved Item source identity and never receives fabricated Component identity.
 These creation-time stamps write the same `roles[systemId]` leaves the one-shot component restamp and the **Repair item data** action write, with the same values, so they are idempotent-compatible; they add no migration and fix only items created after the one-shot back-fill has run.
 
 - A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
-A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
-So a registered duplicate becomes a NEW definition or component instead of overwriting the original.
+  A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
+  So a registered duplicate becomes a NEW definition or component instead of overwriting the original.
 - This clone-gate is a REGISTRATION and source-repair rule only.
-It must never reach the runtime matcher: an actor-owned drag copy also carries `_stats.duplicateSource`, but its `compendiumSource` is legitimate provenance there (tier 3).
+  It must never reach the runtime matcher: an actor-owned drag copy also carries `_stats.duplicateSource`, but its `compendiumSource` is legitimate provenance there (tier 3).
 - Registration stamps the durable flag (overwriting any marker inherited from a duplicated original), strips a clone's stale `_stats.duplicateSource`, and clears a clone's stale `_stats.compendiumSource`.
 - Existing stored `originItemUuid` values are never recomputed.
-A recipe item records the same union of source references a component does (`registeredItemUuid` = the registered live document, `originItemUuid` = the canonical compendium/source uuid, `aliasItemUuids` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item.
+  A recipe item records the same union of source references a component does (`registeredItemUuid` = the registered live document, `originItemUuid` = the canonical compendium/source uuid, `aliasItemUuids` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item.
 
 Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: the second registration is a non-clone whose `compendiumSource` still matches, so find-existing dedups.
 It is cleanly distinguishable from the duplicate case by the absence of `_stats.duplicateSource`.
@@ -1009,20 +1013,20 @@ It is cleanly distinguishable from the duplicate case by the absence of `_stats.
 ### Repair and Auto-Stamp
 
 - A primary-GM-gated (`game.users.activeGM?.id === game.user?.id`), idempotent, one-shot `ready`-body pass — keyed by the `RECIPE_ITEM_FLAG_STAMP_VERSION` world setting (target `2`) — backfills the per-system `roles[system.id].recipeItemDefinitionId` leaf on every registered definition's writable source Item, per owning system (a source registered in two systems lands both leaves), for world items and unlocked-pack items (locked packs skipped), and strips a clone's stale `_stats`.
-The target was bumped `1 → 2` (issue 567): a world already stamped at v1, which wrote the retired scalar, re-runs once to backfill the map; the legacy scalar is left in place as the transitional fallback tier.
-A separate one-shot, primary-GM-gated, `ready`-body restamp — keyed by the `COMPONENT_FLAG_STAMP_VERSION` world setting — backfills `roles[system.id].componentId` for every registered component's writable source Item; it mirrors the recipe-item auto-stamp and is likewise NOT a `MigrationRunner` entry.
-This removes the confirmed regression whereby a real registered book and an unregistered duplicate of it are byte-for-byte identical on the matcher's inputs (tier-4 only).
-It is NOT a `MigrationRunner` entry: that runner reads and writes only settings-data payloads and has no Item handle, so it cannot write Item flags.
+  The target was bumped `1 → 2` (issue 567): a world already stamped at v1, which wrote the retired scalar, re-runs once to backfill the map; the legacy scalar is left in place as the transitional fallback tier.
+  A separate one-shot, primary-GM-gated, `ready`-body restamp — keyed by the `COMPONENT_FLAG_STAMP_VERSION` world setting — backfills `roles[system.id].componentId` for every registered component's writable source Item; it mirrors the recipe-item auto-stamp and is likewise NOT a `MigrationRunner` entry.
+  This removes the confirmed regression whereby a real registered book and an unregistered duplicate of it are byte-for-byte identical on the matcher's inputs (tier-4 only).
+  It is NOT a `MigrationRunner` entry: that runner reads and writes only settings-data payloads and has no Item handle, so it cannot write Item flags.
 - A GM **Repair item data** maintenance action reconciles both kinds across world items, writable packs, and actor-owned items.
-World/pack SOURCE items use the same clone-gated identity (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
-Actor-owned copies use the ordinary runtime matchers — the four-tier recipe-item matcher, or the list-aware, system-scoped component resolver (no clone-gate).
-Components, tools, AND recipe items are reconciled PER SYSTEM: the repair resolves each item against one system's definition set with that system's id, and writes or clears ONLY that system's `roles[systemId]` leaf for the kind (`componentId` / `toolId` / `recipeItemDefinitionId`), so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
-For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by an exact (case/whitespace-normalized) name match, unique WITHIN the system being reconciled, to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions within that system is skipped as ambiguous.
-Because recipe-item repair is now per-system (issue 567), name uniqueness is scoped to the system, so a source registered in two systems is reconciled independently in each.
-A flagged owned copy is authoritative and left untouched, and repair never triggers a learn.
+  World/pack SOURCE items use the same clone-gated identity (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
+  Actor-owned copies use the ordinary runtime matchers — the four-tier recipe-item matcher, or the list-aware, system-scoped component resolver (no clone-gate).
+  Components, tools, AND recipe items are reconciled PER SYSTEM: the repair resolves each item against one system's definition set with that system's id, and writes or clears ONLY that system's `roles[systemId]` leaf for the kind (`componentId` / `toolId` / `recipeItemDefinitionId`), so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
+  For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by an exact (case/whitespace-normalized) name match, unique WITHIN the system being reconciled, to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions within that system is skipped as ambiguous.
+  Because recipe-item repair is now per-system (issue 567), name uniqueness is scoped to the system, so a source registered in two systems is reconciled independently in each.
+  A flagged owned copy is authoritative and left untouched, and repair never triggers a learn.
 - A cross-system shared source (two systems each owning a definition with the same `originItemUuid`) keeps a durable per-system claim in EACH system: registration, repair, and the restamp each write only that system's `roles[systemId].recipeItemDefinitionId` leaf, so both systems' owned copies resolve to the correct definition and neither clobbers the other.
-This is the same per-system model as components and tools; the earlier recipe-item "last writer wins" single-scalar limitation is retired (issue 567).
-The legacy scalar `flags.fabricate.recipeItemDefinitionId` remains a transitional read-only fallback tier for pre-upgrade owned copies until they are re-dragged or repaired.
+  This is the same per-system model as components and tools; the earlier recipe-item "last writer wins" single-scalar limitation is retired (issue 567).
+  The legacy scalar `flags.fabricate.recipeItemDefinitionId` remains a transitional read-only fallback tier for pre-upgrade owned copies until they are re-dragged or repaired.
 
 ### Match Context Contract
 
@@ -1036,7 +1040,7 @@ RecipeItemMatchContext = {
   candidateItemUuid: string,
   candidateSourceId: string | null,
   isMatch: boolean,
-}
+};
 ```
 
 ## Step
@@ -1090,7 +1094,7 @@ IngredientSet = {
   // The 1.17.0 migration rewrites each positive entry into a single-option essence
   // group; constructors keep reading it for one release, nothing new writes it.
   essences: { [essenceId: string]: number },
-  toolIds: string[], // references library Tools required for this ingredient set
+  toolIds: string[], // active only for a named set in routedByIngredients
 
   // routedByIngredients: routes the satisfied ingredient set to this result group
   resultGroupId?: string,
@@ -1103,7 +1107,9 @@ IngredientSet = {
 2. Ingredient-set evaluation is always OR-across-sets at recipe/step level.
 3. AND-across-ingredient-sets is not supported.
 4. `toolIds` normalizes to `[]` when absent; each id coerces to a trimmed string and empties are dropped.
-The applicable Tool set for an ingredient set is the union of recipe-level, step-level, and ingredient-set-level `toolIds`, resolved against the per-system Tools library; ids that miss the library are logged and dropped.
+   Ingredient-set Tool ids are active only when the owning Crafting System uses `routedByIngredients` and the set's trim-normalized name is non-empty.
+   Outside that boundary the ids remain serialized for lossless round-tripping but are ignored by craftability, execution, inventory `requiredFor` projections, Recipe complexity, and admin Tool counts.
+   For an active set, the applicable Tool set is the distinct union of recipe-level, active-step, and ingredient-set-level `toolIds`, resolved against the per-system Tools library; ids that miss the library are logged and dropped.
 
 ## IngredientGroup
 
@@ -1173,36 +1179,36 @@ Ingredient = {
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
 6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
 7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured `requirements.currency.units[].id` and `amount` is a positive cost.
-A currency option matches no inventory item and contributes no alchemy signature.
+   A currency option matches no inventory item and contributes no alchemy signature.
 8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
-It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
-An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
+   It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
+   An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
 
 ### Currency-Alternative Spend (Craft-Time)
 
 When the crafting system has `requirements.currency.enabled === true`, a currency option can satisfy its ingredient group by spending the crafting actor's currency at craft time:
 
 1. Selection is **items-first, currency-fallback** per group.
-Every non-currency option is tried first; the first item-satisfiable option wins even if a currency option is authored earlier (items strictly beat currency).
-Only if no item option satisfies does the resolver choose the first AFFORDABLE currency option in author order among the group's currency options.
+   Every non-currency option is tried first; the first item-satisfiable option wins even if a currency option is authored earlier (items strictly beat currency).
+   Only if no item option satisfies does the resolver choose the first AFFORDABLE currency option in author order among the group's currency options.
 2. Affordability is evaluated against the crafting actor through the same currency profile/spend strategy the system configures (`actorProperty` / `actorInventory` / `macro`).
-The craftability display and the engine execution resolve currency against the **same** actor, so what a player sees agrees with what the craft spends.
-With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
+   The craftability display and the engine execution resolve currency against the **same** actor, so what a player sees agrees with what the craft spends.
+   With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
 3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated across units that share a base ladder — **before** any item or currency mutation.
-On a shortfall the craft aborts with an `Insufficient currency` message and zero mutation, and never falls back to an unselected item plan.
+   On a shortfall the craft aborts with an `Insufficient currency` message and zero mutation, and never falls back to an unselected item plan.
 4. Currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
-Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
+   Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
 6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored) → `label`, so a well-formed requirement never surfaces the raw unit `id`.
-The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the system's resolved currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
-This applies to the player crafting-app currency option cost row (`RecipeManager` resolves the recipe's currency units through `normalizeCurrencyUnit` so the abbreviation self-heal applies, then formats the row through `formatCurrencyRequirement`).
+   The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the system's resolved currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
+   This applies to the player crafting-app currency option cost row (`RecipeManager` resolves the recipe's currency units through `normalizeCurrencyUnit` so the abbreviation self-heal applies, then formats the row through `formatCurrencyRequirement`).
 
 ### Essence-Alternative Consumption (Craft-Time)
 
 An essence option satisfies its ingredient group by consuming essence-carrying items until its `amount` is met, symmetric with component/tag alternatives:
 
 1. The per-item essence contribution is read through an injected bound `resolveItemEssences(item) => essenceMap` collaborator, keeping the pure model Foundry-free.
-The default resolver is **flag-only** (`fabricate.essences` item flag), so the no-probe `canBeCraftedWith`/display path stays byte-for-byte the legacy behaviour; callers (`RecipeManager`, `CraftingEngine`, the per-slot selector) bind a **component-aware** resolver that also credits component-defined essences — an intentional capability increase over the old flag-only per-set gate.
+   The default resolver is **flag-only** (`fabricate.essences` item flag), so the no-probe `canBeCraftedWith`/display path stays byte-for-byte the legacy behaviour; callers (`RecipeManager`, `CraftingEngine`, the per-slot selector) bind a **component-aware** resolver that also credits component-defined essences — an intentional capability increase over the old flag-only per-set gate.
 2. Consumption reads the shared `remaining` map and commits through `_commitItemPlan` (keyed by `uuid || id`), so an item already claimed by a component/tag group in the same set is not recounted toward the essence group (anti-double-consume).
 3. Consumption is **unit-granular**: an indivisible item may over-consume past `amount` (e.g. one item worth 3 essence to meet `amount: 2`), acceptable and symmetric with tag/component options.
 4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and `system.quantity`-summed in standard craft, mirroring the existing documented divergence between the two matchers.
@@ -1217,8 +1223,8 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 
 1. Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Scope is the **enabled** recipes in the crafting system.
-`SignatureValidator.validateSystem` scans only enabled recipes — the exact complement of the runtime matcher's `if (!recipe.enabled) continue;` skip — so the scanned set equals the matchable set.
-The invariant is *"the set of **enabled** recipes is collision-free"*: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through `validateSystem`, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
+   `SignatureValidator.validateSystem` scans only enabled recipes — the exact complement of the runtime matcher's `if (!recipe.enabled) continue;` skip — so the scanned set equals the matchable set.
+   The invariant is _"the set of **enabled** recipes is collision-free"_: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through `validateSystem`, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
 3. Signature overlap is based on satisfiable ingredient assignments, not just textual equality.
 4. Matching expansion must include:
    - direct component matches (`match.type === "component"`)
@@ -1252,94 +1258,120 @@ are always by id into the per-system library.
 
 ```js
 Tool = {
+  id: string,
+  enabled: boolean,
   componentId: string | null,      // OPTIONAL managed-component link; null for an item-sourced tool
   // Own source references (issue 561; renamed in issue 560), identical field shape to a component.
   registeredItemUuid: string | null, // the registered live source document uuid
   originItemUuid: string | null,     // the canonical/compendium source uuid
   aliasItemUuids: string[],          // additional source references for matching
-  // Registration/migration-time DISPLAY SNAPSHOT (name + img ONLY, never `label`).
+  // Registration/migration-time DISPLAY SNAPSHOT (name + img + description, never `label`).
   name: string | null,
   img: string | null,
+  description: string,
   label: string,                   // pre-existing, user-authored display override (distinct from the snapshot)
   requirement: null | {
     formula: string,
   },
+  prerequisites: {
+    enabled: boolean,
+    ids: string[],                 // shared CraftingSystem.characterPrerequisites ids
+    gateMode: "bonus" | "usability",
+  },
+  bonus: {
+    enabled: boolean,
+    expression: string,
+  },
   breakage: {
-    mode: "limitedUses" | "breakageChance" | "diceExpression" | "immune",
+    mode: "limitedUses" | "breakageChance" | "diceExpression",
     maxUses?: number | null,         // limitedUses; null means unlimited
     breakageChance?: number,         // breakageChance; integer 0..100
     formula?: string,                // diceExpression
     threshold?: number,              // diceExpression; broken when result < threshold
-    // "immune" carries no additional fields; the tool never breaks under EITHER
-    // breakage authority and is still recorded as used (no toolUsage flag, which is
-    // limitedUses-only). Under checkDriven authority it is the per-tool opt-out.
   },
+  checkBreakable: boolean,         // default true; check-driven immunity only
   onBreak: {
     mode: "destroy" | "flagBroken" | "replaceWith",
-    replacementComponentId?: string  // replaceWith; must !== componentId
-  }
+    replacementTarget?:
+      | { type: "component", componentId: string }
+      | { type: "item", itemUuid: string },
+  },
+  repairRequirements: IngredientGroup[], // flagBroken repair recipe; zero groups is valid
 }
 ```
 
 ### Requirements
 
 1. A Tool must carry EITHER a `componentId` (a managed-component link) OR its own source references (`registeredItemUuid` / `originItemUuid`); a Tool with NEITHER is invalid.
-A first-class tool registered from an Item uuid carries its own source references plus a `name` + `img` display snapshot and `componentId: null`; a whetstone that is also a component, or a tool migrated from a legacy componentId-tool, keeps `componentId` populated (for `onBreak.replaceWith` resolution and the UI's linked-component display) but `componentId` is no longer the matching basis.
-A component-linked tool that carries no own source references derives them and its `name` + `img` snapshot from its linked component on every `_normalizeSystem` load (`deriveToolSourceFromComponents`), not only at migration time — so a tool authored by dropping a managed component, a copy-imported tool, and a post-migration authored tool all match owned items by source reference, continuous with the `1.15.0` migration and idempotent (an item-sourced or already-derived tool is left untouched, and the derivation never overwrites the tool's own snapshot or `label`).
-The `name` + `img` display snapshot is captured at registration/migration time and is NOT auto-refreshed when the GM renames the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
-The pre-existing user-authored `label` is a DISTINCT field and is NEVER written by snapshot capture, migration, or any refresh.
+   A first-class tool registered from an Item uuid carries its own source references plus a `name` + `img` display snapshot and `componentId: null`; a whetstone that is also a component, or a tool migrated from a legacy componentId-tool, keeps `componentId` populated (for `onBreak.replaceWith` resolution and the UI's linked-component display) but `componentId` is no longer the matching basis.
+   A component-linked tool that carries no own source references derives them and its `name` + `img` snapshot from its linked component on every `_normalizeSystem` load (`deriveToolSourceFromComponents`), not only at migration time — so a tool authored by dropping a managed component, a copy-imported tool, and a post-migration authored tool all match owned items by source reference, continuous with the `1.15.0` migration and idempotent (an item-sourced or already-derived tool is left untouched, and the derivation never overwrites the tool's own snapshot or `label`).
+   The `name` + `img` + `description` display snapshot is captured at registration or relinking time and is NOT auto-refreshed when the GM changes the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
+   The pre-existing user-authored `label` is a DISTINCT field and is NEVER written by snapshot capture, migration, or any refresh.
 2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`).
-Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
-Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
-The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
-3. A referenced Tool is always required: it must be present and pass its optional `requirement` before crafting or a gathering attempt may proceed.
-A reference whose id no longer resolves in its library, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED`.
+   Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
+   Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
+   The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
+3. A referenced Tool is always required: it must be present and pass any enabled shared-prerequisite usability gate before crafting, salvage, or gathering may proceed.
+   Its optional legacy gathering `requirement` formula is additionally enforced only for gathering attempts.
+   A reference whose id no longer resolves in its library, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED`.
 4. `requirement` is optional and formula-only.
-When present, it requires a non-empty `formula` — a Foundry roll expression evaluated against the actor's roll data.
-The actor satisfies the requirement when the result is truthy (a non-zero number or a `true` boolean).
-There is no provider discriminator and no macro support on this surface.
-5. Exactly one `breakage.mode` is configured per tool:
+   When present, it requires a non-empty `formula` — a Foundry roll expression evaluated against the actor's roll data.
+   The actor satisfies the requirement when the result is truthy (a non-zero number or a `true` boolean).
+   There is no provider discriminator and no macro support on this surface.
+5. Exactly one of the three tool-specific `breakage.mode` values is configured per Tool, and that configuration is retained but entirely inactive while `checkDriven` authority is active (including no mutation of retained tool-specific usage counters):
    - `limitedUses`: `maxUses` is null or a positive integer.
-Tool usage is tracked on the owned item via `flags.fabricate.toolUsage = { timesUsed }`.
-The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
+     Tool usage is tracked on the owned item via `flags.fabricate.toolUsage = { timesUsed }`.
+     The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
    - `breakageChance`: `breakageChance` is an integer in `0..100`.
-The tool breaks when `Math.random() * 100 < breakageChance` (so `0` never breaks and `100` always breaks).
+     The tool breaks when `Math.random() * 100 < breakageChance` (so `0` never breaks and `100` always breaks).
    - `diceExpression`: `formula` is a non-empty Foundry roll formula evaluated against the actor's roll data; `threshold` is a finite number.
-The tool breaks when the numeric result is `< threshold`.
-   - `immune`: carries no breakage fields and never breaks under either authority.
-It is still recorded as used (no `toolUsage` flag is written, because that flag is `limitedUses`-only), and under `checkDriven` authority it is filtered out of the force-break set.
-`onBreak` stays configurable but is inert while immune.
-6. Exactly one `onBreak.mode` is configured per tool. `replaceWith` requires `replacementComponentId !== componentId`.
-7. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
-8. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
-The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
-Canvas virtual-presence stays keyed by `componentId`: an item-sourced tool (`componentId: null`) does NOT participate in canvas virtual-presence in this change (re-keying virtual-presence onto `toolId` is tracked separately).
-9. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching** against the tool's OWN identity.
-Durable-identity matching means: (a) the durable per-system tool-identity flag `flags.fabricate.roles[systemId].toolId`, OR (b) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`) intersecting the tool's source references.
-Tools have no legacy scalar identity tier.
-An item is NEVER selected for usage or destruction by a transitive `_stats.duplicateSource` reference or by name alone, either of which still satisfies the non-destructive **presence** gate (the wide shared tool matcher).
-An item that satisfies presence only via a transitive duplicate-source reference or by name is spared from usage/breakage and recorded as a skipped tool.
-When an actor owns both a durable-identity match and a presence-only match for the same tool, the durable-identity item is the one used or broken.
-Because destroying the wrong item is irreversible, this is the shipped behaviour ("is"): a world-template copy lacking both a compendium source and a durable flag is spared until repaired, rather than risking an irreversible wrong-item destroy.
-A locked-compendium copy carries its own compendium source, matches durable identity (b), and still breaks.
-10. A Tool's durable identity is `flags.fabricate.roles[systemId].toolId`, stamped on its source Item at direct registration (`addToolFromUuid`) and by the one-shot `ready`-body restamp (`autoStampToolSources`, keyed by `TOOL_FLAG_STAMP_VERSION`), an additive SIBLING of `roles[systemId].componentId`.
-A whetstone that is both a component and a tool carries both leaves in one `roles[systemId]` object, and neither registration clobbers the other: deregistering or re-pointing a tool clears ONLY the `roles[systemId].toolId` leaf.
-A bulk-imported tool (via `createSystem`) matches by raw source references until a manual "Repair item data" stamps its owned copies, identical to imported components.
-11. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
-Tool **usage/breakage** selection matches by durable-identity against the tool's OWN identity per requirement 9.
+     The tool breaks when the numeric result is `< threshold`.
+     Legacy `breakage.mode: "immune"` reads forward in both `Tool` construction and `_normalizeSystem` as `{ mode: "limitedUses", maxUses: null }` plus `checkBreakable: false`, and the next canonical write never emits `immune`.
+6. `prerequisites` always persists `{ enabled, ids, gateMode }`, and `bonus` always persists `{ enabled, expression }` even while either setting is inactive.
+   The system normalizer processes `characterPrerequisites` before Tools, prunes unknown Tool prerequisite ids in every state, retains valid ids while disabled, and changes an enabled gate to disabled when pruning leaves no ids.
+7. Exactly one `onBreak.mode` is configured per Tool.
+   `replaceWith` carries exactly one discriminator in `replacementTarget`: a managed Component id or a direct Item UUID; malformed, empty, or dual targets are invalid, and a Component target must differ from the Tool's own `componentId` when present.
+   New Manager authoring is Component-only: the Tool Studio never creates or edits the direct Item discriminator.
+   Direct Item targets remain normalized and executable solely for backward compatibility with already-persisted Tools, and an unrelated Tool edit or immediate enabled toggle must preserve them byte-for-byte.
+   `flagBroken` permits zero or more repair `IngredientGroup`s; every present group must be complete canonical `IngredientGroup`/`Ingredient` JSON whose options use valid Component, Tag, Essence, or Currency match shapes and numeric positive option quantities.
+   Every breakage consumer resolves and creates exactly one quantity-one replacement before deleting the original.
+   Direct UUID resolution awaits `fromUuid` and accepts only a returned Document with `documentName === "Item"`; null, index entries, and non-Item Documents fail.
+   Resolution failure, missing creation API, a throw, and null/empty creation preserve the original and are not reported as `replaced`.
+   Component targets receive managed Component identity, while direct Item targets preserve source Item identity without fabricated Component identity.
+8. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
+9. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
+   The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
+   Canvas virtual-presence stays keyed by `componentId`: an item-sourced tool (`componentId: null`) does NOT participate in canvas virtual-presence in this change (re-keying virtual-presence onto `toolId` is tracked separately).
+10. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching** against the tool's OWN identity.
+    Durable-identity matching means: (a) the durable per-system tool-identity flag `flags.fabricate.roles[systemId].toolId`, OR (b) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`) intersecting the tool's source references.
+    Tools have no legacy scalar identity tier.
+    An item is NEVER selected for usage or destruction by a transitive `_stats.duplicateSource` reference or by name alone, either of which still satisfies the non-destructive **presence** gate (the wide shared tool matcher).
+    An item that satisfies presence only via a transitive duplicate-source reference or by name is spared from usage/breakage and recorded as a skipped tool.
+    When an actor owns both a durable-identity match and a presence-only match for the same tool, the durable-identity item is the one used or broken.
+    Because destroying the wrong item is irreversible, this is the shipped behaviour ("is"): a world-template copy lacking both a compendium source and a durable flag is spared until repaired, rather than risking an irreversible wrong-item destroy.
+    A locked-compendium copy carries its own compendium source, matches durable identity (b), and still breaks.
+11. A Tool's durable identity is `flags.fabricate.roles[systemId].toolId`, stamped on its source Item by the atomic Tool upsert used by `addToolFromUuid` and by the one-shot `ready`-body restamp (`autoStampToolSources`, keyed by `TOOL_FLAG_STAMP_VERSION`), an additive SIBLING of `roles[systemId].componentId`.
+    A whetstone that is both a component and a tool carries both leaves in one `roles[systemId]` object, and neither registration clobbers the other: deregistering or re-pointing a tool clears ONLY the `roles[systemId].toolId` leaf.
+    A bulk-imported tool (via `createSystem`) matches by raw source references until a manual "Repair item data" stamps its owned copies, identical to imported components.
+    The upsert rejects non-Item Documents, stages the description/name/image/source snapshots, clears only a changed old Tool role leaf, stamps the new leaf, and persists one normalized Tool atomically.
+12. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
+    Tool **usage/breakage** selection matches by durable identity against the Tool's own identity per requirement 10.
 
 ### Validation Matrix
 
-| Field                                  | Valid values                                       | Invalid values            |
-|----------------------------------------|----------------------------------------------------|---------------------------|
-| `componentId`                          | optional when source references are present        | absent AND no source references |
-| `requirement.formula`                  | non-empty string                                   | empty                     |
-| `breakage.limitedUses.maxUses`         | null or positive integer                           | `0`, negative, fractional |
-| `breakage.breakageChance.breakageChance` | integer `0..100`                                 | non-integer, out of range |
-| `breakage.diceExpression.formula`      | non-empty string                                   | empty                     |
-| `breakage.diceExpression.threshold`    | finite number                                      | non-finite                |
-| `breakage.immune`                      | no breakage fields required or permitted           | —                         |
-| `onBreak.replaceWith.replacementComponentId` | non-empty, must differ from `componentId`    | empty, equal to `componentId` |
+| Field                                    | Valid values                                              | Invalid values                  |
+| ---------------------------------------- | --------------------------------------------------------- | ------------------------------- |
+| `componentId`                            | optional when source references are present               | absent AND no source references |
+| `requirement.formula`                    | non-empty string                                          | empty                           |
+| `breakage.limitedUses.maxUses`           | null or positive integer                                  | `0`, negative, fractional       |
+| `breakage.breakageChance.breakageChance` | integer `0..100`                                          | non-integer, out of range       |
+| `breakage.diceExpression.formula`        | non-empty string                                          | empty                           |
+| `breakage.diceExpression.threshold`      | finite number                                             | non-finite                      |
+| `prerequisites.ids`                      | known shared ids; at least one when enabled               | unknown or enabled-empty        |
+| `bonus.expression`                       | non-empty when enabled                                    | enabled-empty                   |
+| `checkBreakable`                         | boolean                                                   | non-boolean canonical input     |
+| `onBreak.replaceWith.replacementTarget`  | exactly one valid Component id or Item UUID discriminator | absent, malformed, or dual      |
+| `repairRequirements`                     | empty or complete canonical `IngredientGroup`s            | incomplete present group        |
 
 ## Gathering Drop Reference
 
@@ -1409,7 +1441,7 @@ Result = {
   componentId: string,
   quantity: number,
   propertyMacroUuid: string | null,
-}
+};
 ```
 
 ### Requirements
@@ -1573,10 +1605,10 @@ Requirements:
 4. History should be newest-first and capped by a configured or default limit.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
 6. Run-flag writes must be document-coherent.
-A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
-A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
-This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
-The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
+   A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
+   A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+   This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
+   The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
 
 ### Gathering Runs Flag
 
@@ -1597,9 +1629,9 @@ Requirements:
 4. Within one actor's `gatheringRuns.active`, at most one active run may exist for a given `taskId`.
 5. Detailed `GatheringRun` shape and lifecycle semantics are defined in `gathering-and-harvesting/spec.md`.
 6. Run-flag writes must be document-coherent.
-A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
-A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
-This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
+   A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
+   A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+   This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
 
 ### Learned Recipes Flag
 
@@ -1656,22 +1688,22 @@ Requirements:
 
 1. The flag is actor-scoped and world-local so realm knowledge follows the character across party changes.
 2. `systemId` must refer to the crafting system that owns the realm; `realmId` must refer to a `GatheringRealm` in that system.
-Discovery writes validate this before persisting.
+   Discovery writes validate this before persisting.
 3. `discoveredAt` must be a timestamp and `source` must be one of the listed values.
 4. Reads never throw on a stale `partyId`; missing or stale realm ids must not disclose secret realm names to non-GM users.
 5. Because this is an actor flag (not a world setting), it is **not** rewritten by the `1.1.0` migration runner.
-Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and every write persists only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
-6. Discovery semantics are defined in `gathering-and-harvesting` (*Actor Realm Discovery*).
+   Reads accept the legacy `discoveredGatheringRegions` flag as a fallback and every write persists only the new `discoveredGatheringRealms` key, upgrading each actor lazily.
+6. Discovery semantics are defined in `gathering-and-harvesting` (_Actor Realm Discovery_).
 
 ## Run Journal Projection
 
 ### Purpose
 
-Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-integration/spec.md` *Journal App*).
+Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-integration/spec.md` _Journal App_).
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
-`RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see *CraftingRun* / *CraftingRunStepState*), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
+`RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see _CraftingRun_ / _CraftingRunStepState_), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
-Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors and (crafting only) advances *existing* runs without creating them.
+Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors and (crafting only) advances _existing_ runs without creating them.
 
 ### JournalListing
 
@@ -1786,9 +1818,9 @@ StepModel = {
    `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
 5. **`manualAdvance` is the Trigger Next Step gate.**
-   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `recipes-and-steps/spec.md` (*Run Progression — Player-Initiated Advance*).
+   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_).
 6. **`resolutionModeLabel` uses the player-facing label map.**
-   It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (*Player-Facing Mode Labels*) and never emits the raw `resolutionMode` token.
+   It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (_Player-Facing Mode Labels_) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**
    It is the count of active (non-terminal) runs the Journal navigation surfaces as its active-run count badge.
 
@@ -1801,7 +1833,7 @@ Tracks how many time an owned item granting knowledge of a recipe has been used 
 ```js
 Item.flags.fabricate.recipeItemUsage = {
   timesUsed: number,
-}
+};
 ```
 
 Requirements:
@@ -1820,7 +1852,7 @@ It mirrors the Recipe Item Usage Flag: a distinct counter for the learn-cap mech
 ```js
 Item.flags.fabricate.recipeItemLearning = {
   learnedCount: number,
-}
+};
 ```
 
 Requirements:
@@ -1842,7 +1874,7 @@ Written only by the `limitedUses` breakage mode.
 ```js
 Item.flags.fabricate.toolUsage = {
   timesUsed: number,
-}
+};
 ```
 
 Requirements:
@@ -1851,16 +1883,16 @@ Requirements:
 2. Usage is tracked per owned item instance.
 3. The `breakageChance` and `diceExpression` breakage modes do not write this flag.
 4. **Legacy catalyst-usage fallback.** When `flags.fabricate.toolUsage` is absent, the runtime MUST fall back to reading the legacy `flags.fabricate.catalystItemUsage = { timesUsed }` flag so in-flight per-item usage counters survive the 0.6.0 Catalyst→Tool migration without an item-flag rewrite.
-This fallback is meaningful **only** for migrated `limitedUses` tools (mapped from `degradesOnUse: true`); presence-only tools (`breakageChance: 0`, mapped from `degradesOnUse: false`) never read or write usage.
-The first post-migration `applyUsage` on a `limitedUses` tool writes `toolUsage` (authoritative thereafter); the legacy `catalystItemUsage` flag is never back-filled or cleared — once `toolUsage` exists it wins and the fallback path is not re-entered.
-The legacy `catalystUses` bare-number flag is read and coerced to the `{ timesUsed }` shape under the same fallback.
+   This fallback is meaningful **only** for migrated `limitedUses` tools (mapped from `degradesOnUse: true`); presence-only tools (`breakageChance: 0`, mapped from `degradesOnUse: false`) never read or write usage.
+   The first post-migration `applyUsage` on a `limitedUses` tool writes `toolUsage` (authoritative thereafter); the legacy `catalystItemUsage` flag is never back-filled or cleared — once `toolUsage` exists it wins and the fallback path is not re-entered.
+   The legacy `catalystUses` bare-number flag is read and coerced to the `{ timesUsed }` shape under the same fallback.
 
 ### Tool Broken Flag
 
 Set by the `flagBroken` on-break action to mark an item as unusable as a tool until a GM clears the flag.
 
 ```js
-Item.flags.fabricate.toolBroken = true
+Item.flags.fabricate.toolBroken = true;
 ```
 
 Requirements:
@@ -1868,9 +1900,9 @@ Requirements:
 1. When set to `true`, the item does not satisfy a crafting or gathering tool presence gate.
 2. The flag is not cleared by Fabricate; the GM clears it via the Foundry item flag editor (or future repair flow).
 3. The `flagBroken` action also appends a localized leading-space `(broken)` suffix (the literal `" (broken)"`) to the owned item's display name.
-The suffix is applied idempotently — never double-appended, and never appended to an item that was already `toolBroken`-flagged before the action fired.
-The suffix is display-only and is not auto-cleared by Fabricate; the flag (not the name) remains the authoritative presence-gate disqualifier (data-models req 7, gathering req 2).
-A managed component matched purely by name (no `registeredItemUuid`/alias ids) stops matching its component once renamed, so a GM clearing the flag must also restore the original name to regain `damaged`-tier recognition.
+   The suffix is applied idempotently — never double-appended, and never appended to an item that was already `toolBroken`-flagged before the action fired.
+   The suffix is display-only and is not auto-cleared by Fabricate; the flag (not the name) remains the authoritative presence-gate disqualifier (data-models req 7, gathering req 2).
+   A managed component matched purely by name (no `registeredItemUuid`/alias ids) stops matching its component once renamed, so a GM clearing the flag must also restore the original name to regain `damaged`-tier recognition.
 
 ## Canvas Interactables
 
@@ -1890,21 +1922,21 @@ All authoritative per-interactable state lives in the behaviour `system`:
 
 ```js
 behavior.system = {
-  interactableType: "tool" | "gatheringTask",   // initial "tool" (unconfigured sentinel)
-  sourceUuid: string,                 // the Fabricate Tool / Gathering Task source identity; initial "Fabricate.unconfigured.tool" (non-resolvable sentinel)
-  systemId: string,                   // initial "unconfigured" (sentinel)
-  toolId: string|null,                // tool interactables
-  taskId: string|null,                // gatheringTask interactables
-  environmentId: string|null,         // resolved at drop (gatheringTask only)
-  taskNodeLink: "linked" | "unlinked", // gatheringTask resource-node link (default "linked")
-  node: object|null,                  // independent node pool when taskNodeLink === "unlinked" (issue 302); else null
+  interactableType: 'tool' | 'gatheringTask', // initial "tool" (unconfigured sentinel)
+  sourceUuid: string, // the Fabricate Tool / Gathering Task source identity; initial "Fabricate.unconfigured.tool" (non-resolvable sentinel)
+  systemId: string, // initial "unconfigured" (sentinel)
+  toolId: string | null, // tool interactables
+  taskId: string | null, // gatheringTask interactables
+  environmentId: string | null, // resolved at drop (gatheringTask only)
+  taskNodeLink: 'linked' | 'unlinked', // gatheringTask resource-node link (default "linked")
+  node: object | null, // independent node pool when taskNodeLink === "unlinked" (issue 302); else null
   name: string,
-  presentation: { promptText: string|null, hidden: boolean },
+  presentation: { promptText: string | null, hidden: boolean },
   linkedVisual: {
-    uuid: string|null,
-    documentName: "Tile" | "Drawing" | "Token" | null,
-    mode: "marker" | "none",          // "none" = region-only (no visible marker)
-    missingPolicy: "ignore" | "warn" | "recreate"
+    uuid: string | null,
+    documentName: 'Tile' | 'Drawing' | 'Token' | null,
+    mode: 'marker' | 'none', // "none" = region-only (no visible marker)
+    missingPolicy: 'ignore' | 'warn' | 'recreate',
   },
   // `taskNodeLink` selects whether a gatheringTask shares the task's node or owns
   // its own — much like an FVTT token↔actor link:
@@ -1914,12 +1946,14 @@ behavior.system = {
   //                        (normalized node shape; independent lifecycle). issue 302.
   // A `tool` is always linked with a null node.
   state: {
-    enabled: boolean, consumed: boolean, locked: boolean,
-    uses: { max: number|null, used: number },
-    cooldown: { seconds: number|null, lastUsedWorldTime: number|null }
+    enabled: boolean,
+    consumed: boolean,
+    locked: boolean,
+    uses: { max: number | null, used: number },
+    cooldown: { seconds: number | null, lastUsedWorldTime: number | null },
   },
-  activation: { trigger: "regionEnter", audience: "players" | "all" }
-}
+  activation: { trigger: 'regionEnter', audience: 'players' | 'all' },
+};
 ```
 
 Built/read via `src/canvas/regions/interactableRegionFlags.js`; the class + CONFIG registration live in `src/canvas/regions/FabricateInteractableRegionBehavior.js`.
@@ -1927,26 +1961,26 @@ Built/read via `src/canvas/regions/interactableRegionFlags.js`; the class + CONF
 Requirements:
 
 1. `interactableType`, `sourceUuid`, and `systemId` are **required** (`blank:false`) but now carry **`initial`s** — `interactableType: "tool"`, `sourceUuid: "Fabricate.unconfigured.tool"`, `systemId: "unconfigured"` (the unconfigured sentinels) — so the DataModel always instantiates **valid** even when the native "+ Add Behavior" path supplies an empty `system` (no `DataModelValidationError`).
-A behaviour still carrying the sentinels (or missing the type-appropriate `toolId`/`taskId`) is **UNCONFIGURED** (`isUnconfiguredInteractable`, the single authority) and is **inert until configured** (concealed from players, never grants activation; see requirement 5). `toolId`/`taskId` and `environmentId` are scoped by `interactableType`.
-A **Tool** interactable opens the unified window on the **Crafting** tab and injects the activated tool as a session-scoped `activeCanvasTool` (virtual-present) on activation.
-The Crafting tab is a shipped player surface (recipe browsing, detail, shopping list, craft execution, run summary), and the injected tool participates in tool-availability checks (`presentTools` derived from `_activeCanvasTool` in `src/ui/SvelteFabricateApp.svelte.js`).
-A **gathering-task** interactable opens the gathering app scoped to that environment + task, **auto-selecting both**.
-Its resource-node link is gated by `taskNodeLink`: by default (`linked`) it reads/decrements the **environment's `nodeRuntime[taskId]`** exactly like opening gathering directly (depletion and respawn follow the gathering task; the `node` field is null); when `taskNodeLink === "unlinked"` (issue 302) it reads/decrements its OWN independent pool stored in `node` (independent lifecycle — capacity, current, depletion timing, respawn policy).
-The read normalizes through `normalizeNodeConfig`; a link that claims `unlinked` but whose `node` does not normalize **downgrades** to `linked`.
-Only a `gatheringTask` may carry an independent node.
+   A behaviour still carrying the sentinels (or missing the type-appropriate `toolId`/`taskId`) is **UNCONFIGURED** (`isUnconfiguredInteractable`, the single authority) and is **inert until configured** (concealed from players, never grants activation; see requirement 5). `toolId`/`taskId` and `environmentId` are scoped by `interactableType`.
+   A **Tool** interactable opens the unified window on the **Crafting** tab and injects the activated tool as a session-scoped `activeCanvasTool` (virtual-present) on activation.
+   The Crafting tab is a shipped player surface (recipe browsing, detail, shopping list, craft execution, run summary), and the injected tool participates in tool-availability checks (`presentTools` derived from `_activeCanvasTool` in `src/ui/SvelteFabricateApp.svelte.js`).
+   A **gathering-task** interactable opens the gathering app scoped to that environment + task, **auto-selecting both**.
+   Its resource-node link is gated by `taskNodeLink`: by default (`linked`) it reads/decrements the **environment's `nodeRuntime[taskId]`** exactly like opening gathering directly (depletion and respawn follow the gathering task; the `node` field is null); when `taskNodeLink === "unlinked"` (issue 302) it reads/decrements its OWN independent pool stored in `node` (independent lifecycle — capacity, current, depletion timing, respawn policy).
+   The read normalizes through `normalizeNodeConfig`; a link that claims `unlinked` but whose `node` does not normalize **downgrades** to `linked`.
+   Only a `gatheringTask` may carry an independent node.
 2. Spawning is **GM-only**.
 3. Deleting the linked visual does NOT destroy the interactable; recovery is governed by `linkedVisual.missingPolicy`. **Region-only** (`mode: "none"`) is supported — the interactable works with no visible marker.
 4. **Visibility is split from eligibility (Lock vs Disable).** A **DISABLED** (`state.enabled === false`) OR explicitly **HIDDEN** (`presentation.hidden === true`) interactable is **concealed from players**: the on-enter prompt does NOT fire (pure rule `shouldPromptOnEnter`) and the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only; pure rule `resolveMarkerHidden`).
-A **LOCKED** (`state.locked === true`) interactable is **visible**: the marker stays shown and the prompt fires, but pressing Interact is **denied** with `FABRICATE.Canvas.Interactable.Denied.Locked` ("This is locked."). `evaluateActivationEligibility` still gates the actual activation (precedence DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN, denied at Interact time with the specific reason).
-These pure rules live in `src/canvas/regions/interactableRegionActivation.js`.
+   A **LOCKED** (`state.locked === true`) interactable is **visible**: the marker stays shown and the prompt fires, but pressing Interact is **denied** with `FABRICATE.Canvas.Interactable.Denied.Locked` ("This is locked."). `evaluateActivationEligibility` still gates the actual activation (precedence DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN, denied at Interact time with the specific reason).
+   These pure rules live in `src/canvas/regions/interactableRegionActivation.js`.
 5. **Creation MAY be sourceless; the result is born UNCONFIGURED + inert (issue 342).** A `fabricate.interactable` behaviour MAY be created **without a resolvable source** — e.g. via Foundry's native Region → Behaviors "+ Add Behavior → Fabricate Interactable".
-The three identity fields carry **`initial`s** (`interactableType: "tool"`, and the `sourceUuid` / `systemId` **unconfigured sentinels** `"Fabricate.unconfigured.tool"` / `"unconfigured"`), so the DataModel always instantiates **valid** (no `DataModelValidationError`, no cascading sheet crash).
-The native add is therefore **allowed through** (this reverses #334's cancellation): the `preCreateRegionBehavior` edge defensively stamps the sentinel onto any empty identity field and shows the GM an **info** notice pointing at the Interactable config panel.
-Such a behaviour is **UNCONFIGURED** (`isUnconfiguredInteractable`: sentinel/empty `sourceUuid` or `systemId`, or a missing type-appropriate id) and is **concealed/inert** — the on-enter prompt does NOT fire (`shouldPromptOnEnter` ⇒ `isConcealed`), its marker is hidden from players (`resolveMarkerHidden`), and activation is **denied, never thrown** (`validateActivationRequest` returns `UNCONFIGURED` → `FABRICATE.Canvas.Interactable.Denied.Unconfigured`).
-A GM configures its identity (type → crafting system → tool/task → environment) from the rich config panel via the pure `planConfigureSource`, which writes the canonical `sourceUuid` (`buildInteractableSourceUuid`) through the existing GM-routed `updateBehavior` seam and never persists a partial identity; once configured it activates exactly like a drag/drop-placed interactable.
-A freshly-created interactable behaviour **never inherits another interactable's linked visual**: an inherited `linkedVisual.uuid` (Foundry region-duplication) is neutralised at creation so two interactables never share one marker (the #334 neutralisation is retained).
-The pure decisions live in `src/canvas/regions/interactableCreationGuard.js` / `interactableRegionFlags.js` / `interactableConfigActions.js`; the `preCreateRegionBehavior` Foundry edge in `src/main.js` is a thin, no-throw adapter that allows creation, stamps the sentinel, and notifies the GM.
-Fabricate's own drag/drop placement paths are unchanged — they pre-build a complete `system` and never go through the unconfigured path.
+   The three identity fields carry **`initial`s** (`interactableType: "tool"`, and the `sourceUuid` / `systemId` **unconfigured sentinels** `"Fabricate.unconfigured.tool"` / `"unconfigured"`), so the DataModel always instantiates **valid** (no `DataModelValidationError`, no cascading sheet crash).
+   The native add is therefore **allowed through** (this reverses #334's cancellation): the `preCreateRegionBehavior` edge defensively stamps the sentinel onto any empty identity field and shows the GM an **info** notice pointing at the Interactable config panel.
+   Such a behaviour is **UNCONFIGURED** (`isUnconfiguredInteractable`: sentinel/empty `sourceUuid` or `systemId`, or a missing type-appropriate id) and is **concealed/inert** — the on-enter prompt does NOT fire (`shouldPromptOnEnter` ⇒ `isConcealed`), its marker is hidden from players (`resolveMarkerHidden`), and activation is **denied, never thrown** (`validateActivationRequest` returns `UNCONFIGURED` → `FABRICATE.Canvas.Interactable.Denied.Unconfigured`).
+   A GM configures its identity (type → crafting system → tool/task → environment) from the rich config panel via the pure `planConfigureSource`, which writes the canonical `sourceUuid` (`buildInteractableSourceUuid`) through the existing GM-routed `updateBehavior` seam and never persists a partial identity; once configured it activates exactly like a drag/drop-placed interactable.
+   A freshly-created interactable behaviour **never inherits another interactable's linked visual**: an inherited `linkedVisual.uuid` (Foundry region-duplication) is neutralised at creation so two interactables never share one marker (the #334 neutralisation is retained).
+   The pure decisions live in `src/canvas/regions/interactableCreationGuard.js` / `interactableRegionFlags.js` / `interactableConfigActions.js`; the `preCreateRegionBehavior` Foundry edge in `src/main.js` is a thin, no-throw adapter that allows creation, stamps the sentinel, and notifies the GM.
+   Fabricate's own drag/drop placement paths are unchanged — they pre-build a complete `system` and never go through the unconfigured path.
 
 ### Region-level ownership & provenance-aware deletion (issue 533)
 
@@ -1956,20 +1990,20 @@ A **PROMOTED** region is a region the user already drew for another purpose (lig
 
 ```js
 region.flags.fabricate = {
-  interactableRegion: true   // stamped ONLY on a region Fabricate CREATED
-}
+  interactableRegion: true, // stamped ONLY on a region Fabricate CREATED
+};
 ```
 
 Requirements:
 
 1. **Ownership is stamped at create.** When Fabricate CREATES a region (`_spawnInteractableRegion`) it stamps `flags.fabricate.interactableRegion = true` (`buildInteractableRegionFlags`).
-Promotion attaches a behaviour to the user's existing region and MUST NOT stamp this flag.
+   Promotion attaches a behaviour to the user's existing region and MUST NOT stamp this flag.
 2. **Deletion removes only what Fabricate added.** Deleting an interactable (from the config panel or the Manage panel) routes through the pure decision `decideInteractableDeletion` (region flag + behaviour list + target behaviour → a plan) and the thin edge `executeInteractableDeletion` (`src/canvas/regions/interactableDeletion.js`).
-A region that is **Fabricate-created AND carries no foreign behaviours** is deleted wholesale (`region.delete()`).
-Otherwise — a **promoted** foreign region, OR a region also carrying non-Fabricate behaviours — only Fabricate's `fabricate.interactable` behaviour(s) are removed (`region.deleteEmbeddedDocuments('RegionBehavior', …)`), leaving the Region and every foreign behaviour intact; a now-stale ownership stamp on a kept region is cleared (`unsetFlag`).
-The confirm copy states which will happen (whole region vs only the Fabricate interactable).
+   A region that is **Fabricate-created AND carries no foreign behaviours** is deleted wholesale (`region.delete()`).
+   Otherwise — a **promoted** foreign region, OR a region also carrying non-Fabricate behaviours — only Fabricate's `fabricate.interactable` behaviour(s) are removed (`region.deleteEmbeddedDocuments('RegionBehavior', …)`), leaving the Region and every foreign behaviour intact; a now-stale ownership stamp on a kept region is cleared (`unsetFlag`).
+   The confirm copy states which will happen (whole region vs only the Fabricate interactable).
 3. **Safe legacy default.** A region created before this flag existed carries no ownership stamp, so its provenance is unknown; unknown provenance is treated as **promoted (do-not-destroy)** — the conservative choice that can never destroy user data.
-The cost is that a legacy Fabricate-created region may be left behind as an empty Region after its interactable is removed; that is a harmless leftover the GM can delete by hand, never data loss.
+   The cost is that a legacy Fabricate-created region may be left behind as an empty Region after its interactable is removed; that is a harmless leftover the GM can delete by hand, never data loss.
 
 ### Uninstall-safe world cleanup (issue 535)
 
@@ -1981,15 +2015,15 @@ This is documented core behaviour for module sub-types — Foundry does NOT remo
 Requirements:
 
 1. **GM-invocable cleanup.** Fabricate MUST expose a GM-invocable, uninstall-safe cleanup — `game.fabricate.cleanupInteractables()` — that a GM runs BEFORE disabling/uninstalling.
-It is a plain API method (no rendered UI control), runnable from a macro/console, GM-gated, no-throw, and confirmed via `DialogV2` with a summary (behaviours + markers + scenes).
+   It is a plain API method (no rendered UI control), runnable from a macro/console, GM-gated, no-throw, and confirmed via `DialogV2` with a summary (behaviours + markers + scenes).
 2. **Removes only what Fabricate owns.** The cleanup removes EXACTLY: every `fabricate.interactable` behaviour (`isInteractableRegionBehavior`, via `region.deleteEmbeddedDocuments('RegionBehavior', …)`), Fabricate's own **Tile/Drawing** markers (`isInteractableVisual` reverse flag, via `scene.deleteEmbeddedDocuments`), and clears the region-ownership stamp (`flags.fabricate.interactableRegion`).
-The pure decision `decideWorldInteractableCleanup` (scenes → id-keyed removal set + summary) and the thin edge `executeWorldInteractableCleanup` live in `src/canvas/regions/interactableCleanup.js`.
+   The pure decision `decideWorldInteractableCleanup` (scenes → id-keyed removal set + summary) and the thin edge `executeWorldInteractableCleanup` live in `src/canvas/regions/interactableCleanup.js`.
 3. **Never deletes user data — with one documented asymmetry.** The cleanup NEVER deletes a parent Region (even a Fabricate-created one — an empty leftover region is a harmless artefact, unlike single-interactable deletion which may delete a created region wholesale), NEVER removes a foreign behaviour, and NEVER deletes a **Token** marker.
-A Token marker is an existing GM-owned token the GM relinked, so cleanup only CLEARS its reverse flag (`buildClearLinkedVisualFlags`) and leaves the token intact.
-The **asymmetry**: Tile/Drawing markers carrying the reverse flag ARE deleted — and because `relinkVisual` stamps the reverse flag onto ANY selected Tile/Drawing/Token, a Tile/Drawing the GM DREW THEMSELVES and then relinked as a marker is deleted too (only Tokens are exempted from deletion).
-This matches issue #535's explicit "delete tiles/drawings" scope; the GM must **unlink** such a hand-drawn marker (config panel "Remove") before cleanup/uninstall to keep it, and the docs state this caveat.
-Selection is fail-closed: a document without a well-formed reverse flag (`readLinkedVisualRef` → non-empty `linkedRegionUuid` + `linkedBehaviorId`) is never selected.
-Legacy/unflagged provenance is handled conservatively (behaviour removed, region kept), and an empty world is a no-op.
+   A Token marker is an existing GM-owned token the GM relinked, so cleanup only CLEARS its reverse flag (`buildClearLinkedVisualFlags`) and leaves the token intact.
+   The **asymmetry**: Tile/Drawing markers carrying the reverse flag ARE deleted — and because `relinkVisual` stamps the reverse flag onto ANY selected Tile/Drawing/Token, a Tile/Drawing the GM DREW THEMSELVES and then relinked as a marker is deleted too (only Tokens are exempted from deletion).
+   This matches issue #535's explicit "delete tiles/drawings" scope; the GM must **unlink** such a hand-drawn marker (config panel "Remove") before cleanup/uninstall to keep it, and the docs state this caveat.
+   Selection is fail-closed: a document without a well-formed reverse flag (`readLinkedVisualRef` → non-empty `linkedRegionUuid` + `linkedBehaviorId`) is never selected.
+   Legacy/unflagged provenance is handled conservatively (behaviour removed, region kept), and an empty world is a no-op.
 
 ### Linked Visual reverse flags (holds no state; reflects env depletion + concealment)
 
@@ -2012,16 +2046,16 @@ Marker reflection (image swap + concealment) is reconciled by `src/canvas/region
 Requirements:
 
 1. The default marker is a **Tile**; a **Drawing** (labelled zone) and an **existing GM-placed Token** are also supported.
-The reverse flag makes a Tile/Token HUD "Configure Fabricate Interactable" entry resolve.
+   The reverse flag makes a Tile/Token HUD "Configure Fabricate Interactable" entry resolve.
 2. The linked visual **never OWNS interactable state** — the authoritative node state lives on the behaviour (`system.node`) or the environment, never on the marker.
-It nevertheless **reflects two GM-controlled facts** about its owning behaviour (SHIPPED):
+   It nevertheless **reflects two GM-controlled facts** about its owning behaviour (SHIPPED):
    - **Node depletion image swap (Tile markers only).** When the active node for a gathering task is depleted (`current <= 0`) AND the task/node configures a `depletedBehavior.swapImage`, the linked Tile marker swaps its texture to that image; when the node recharges (respawns above `0`) it flips back to the available image.
-The available image is stashed at `flags.fabricate.markerAvailableImg` on the first swap and restored on recharge.
-The depleted state is read from the **SHARED** `environment.nodeRuntime[taskId]` for a task-linked interactable, or from the behaviour's OWN `system.node.current` (+ `system.node.depletedBehavior.swapImage`) for an unlinked one (issue 302).
-The decision (`resolveMarkerImage`) is pure; the sync (`syncInteractableMarkers`) is **active-GM-gated, no-throw, and idempotent**, reacting to the `gatheringEnvironments` setting change (gather decrement + world-time respawn) and `canvasReady`.
-Every other client sees the change through normal Foundry document sync.
+     The available image is stashed at `flags.fabricate.markerAvailableImg` on the first swap and restored on recharge.
+     The depleted state is read from the **SHARED** `environment.nodeRuntime[taskId]` for a task-linked interactable, or from the behaviour's OWN `system.node.current` (+ `system.node.depletedBehavior.swapImage`) for an unlinked one (issue 302).
+     The decision (`resolveMarkerImage`) is pure; the sync (`syncInteractableMarkers`) is **active-GM-gated, no-throw, and idempotent**, reacting to the `gatheringEnvironments` setting change (gather decrement + world-time respawn) and `canvasReady`.
+     Every other client sees the change through normal Foundry document sync.
    - **Concealment (all interactables).** When the interactable is DISABLED (`state.enabled === false`) OR explicitly HIDDEN (`presentation.hidden === true`), the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only), reconciled in the same active-GM pass (`resolveMarkerHidden`).
-A LOCKED interactable's marker stays visible.
+     A LOCKED interactable's marker stays visible.
 3. A missing linked visual resolves cleanly to null — the interactable still functions (the central advantage of the region-first model).
 
 ### Gathering-Task Node State — linked to the task by default, optionally unlinked/independent (issue 302)
@@ -2034,17 +2068,17 @@ The active node's depleted state is reflected onto the linked Tile marker as an 
 Requirements:
 
 1. **The task-node link is `linked` by default and may be `unlinked`.** A task-linked interactable (`taskNodeLink: "linked"`, `node: null`) opens the gathering app scoped to its `environmentId` + `taskId` (auto-selecting both) and reads/decrements the SAME `environment.nodeRuntime[taskId]` as opening gathering directly — depletion and respawn follow the task, and it does not alter environment node availability beyond a normal gathering attempt.
-An unlinked node (`taskNodeLink: "unlinked"`) reads/decrements its OWN `system.node` pool: depleting it never touches the environment node, and vice-versa.
-The link is resolved by `GatheringRichStateService._resolveNodeSource`, which returns the environment branch whenever there is no interactable ref, the behaviour is task-linked, or the behaviour/node cannot be resolved.
-Only a `gatheringTask` may carry an independent node; a link claiming `unlinked` whose `node` does not normalize **downgrades** to `linked`.
-The link is switchable post-placement and non-destructive — re-linking clears `system.node`, and re-seeding an independent pool reuses any node still carried on the behaviour.
+   An unlinked node (`taskNodeLink: "unlinked"`) reads/decrements its OWN `system.node` pool: depleting it never touches the environment node, and vice-versa.
+   The link is resolved by `GatheringRichStateService._resolveNodeSource`, which returns the environment branch whenever there is no interactable ref, the behaviour is task-linked, or the behaviour/node cannot be resolved.
+   Only a `gatheringTask` may carry an independent node; a link claiming `unlinked` whose `node` does not normalize **downgrades** to `linked`.
+   The link is switchable post-placement and non-destructive — re-linking clears `system.node`, and re-seeding an independent pool reuses any node still carried on the behaviour.
 2. Tool requirements resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed interactables).
 3. **Independent-node lifecycle + world-time respawn.** An unlinked node persists its `current`/respawn timers on `system.node` through the active-GM behaviour-update edge (players cannot write a behaviour they do not own).
-On each world-time advance the primary GM scans scene region behaviours for unlinked-node gathering tasks and advances each `overTime` pool through the same calendar-aware respawn arithmetic the environment pass uses (`nonRegenerating`/`manual` never gain), writing the changed `system.node` back.
-The timed/waiting-run maturity decrement lands on the SAME pool the attempt gated against: the **environment** node for a task-linked interactable, or the independent pool re-resolved from the run's persisted `interactableRef` (with an environment-branch fallback if the behaviour is gone).
+   On each world-time advance the primary GM scans scene region behaviours for unlinked-node gathering tasks and advances each `overTime` pool through the same calendar-aware respawn arithmetic the environment pass uses (`nonRegenerating`/`manual` never gain), writing the changed `system.node` back.
+   The timed/waiting-run maturity decrement lands on the SAME pool the attempt gated against: the **environment** node for a task-linked interactable, or the independent pool re-resolved from the run's persisted `interactableRef` (with an environment-branch fallback if the behaviour is gone).
 4. **Node-driven marker image swap (SHIPPED).** The `depletedBehavior.swapImage` (task-level when linked, or `system.node.depletedBehavior.swapImage` when unlinked) drives the linked **Tile** marker: when the active node is depleted (`current <= 0`) the Tile marker swaps to `swapImage`; on recharge it flips back (available image stashed/restored via `flags.fabricate.markerAvailableImg`).
-This is reconciled by an idempotent, active-GM, no-throw sync (`syncInteractableMarkers` in `interactableMarkerDepletion.js`) reacting to the `gatheringEnvironments` setting change and `canvasReady`.
-There is no migration — a behaviour with no `taskNodeLink` reads as linked with a null node, identical to a task-linked interactable.
+   This is reconciled by an idempotent, active-GM, no-throw sync (`syncInteractableMarkers` in `interactableMarkerDepletion.js`) reacting to the `gatheringEnvironments` setting change and `canvasReady`.
+   There is no migration — a behaviour with no `taskNodeLink` reads as linked with a null node, identical to a task-linked interactable.
 
 ### Session-Scoped Active Canvas Tool (`activeCanvasTool`)
 
@@ -2053,12 +2087,12 @@ Activating a Tool interactable injects a **virtual-present** tool into the craft
 Requirements:
 
 1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds }`.
-A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` string.
+   A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` string.
 2. A virtual-present tool is treated as satisfied **without the actor owning the item** and is **excluded from breakage and usage** (it is the station's tool, not the actor's).
 3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance (set in `show(tab, { activeCanvasTool })`, cleared on close), system-scoped per the rule above, and never written to any persisted run record.
-With no active tool the payload is null (inert).
+   With no active tool the payload is null (inert).
 4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`.
-The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
+   The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
 
 ### Item → Tool Drop Resolution
 
@@ -2070,14 +2104,14 @@ An Item whose durable identity names a different component is NOT resolved to a 
 When a Gathering-Task Interactable is dropped, its `environmentId` is resolved by this precedence chain (pure decision in `src/canvas/environmentResolution.js`):
 
 1. **Tagged Scene Region** — the drop point falls inside a Foundry Scene Region flagged `flags.fabricate.environmentId`.
-One unambiguous existing hit auto-resolves (a `ui.notifications.info` names the resolved environment); multiple hits are ambiguous and fall through to the dialog.
+   One unambiguous existing hit auto-resolves (a `ui.notifications.info` names the resolved environment); multiple hits are ambiguous and fall through to the dialog.
 2. **Task `defaultEnvironmentId`** — the task's new optional placement-hint field (a single existing id; a stale id falls through).
 3. **GM dialog** — neither auto-source resolved (or the region was ambiguous).
-Cancel **aborts the spawn** (no region is created).
+   Cancel **aborts the spawn** (no region is created).
 
 Holding **Alt** during the drop always **forces the GM dialog**, bypassing tiers 1 and 2.
 
-Note the two distinct uses of an environment id at different lifecycle stages: a **Scene Region `flags.fabricate.environmentId`** is a *drop-time placement* hint used only to resolve which environment a dropped interactable belongs to, whereas `environment.sceneUuid` is the *runtime gathering gate* that ties a composed environment to a scene during attempt validation.
+Note the two distinct uses of an environment id at different lifecycle stages: a **Scene Region `flags.fabricate.environmentId`** is a _drop-time placement_ hint used only to resolve which environment a dropped interactable belongs to, whereas `environment.sceneUuid` is the _runtime gathering gate_ that ties a composed environment to a scene during attempt validation.
 They are unrelated mechanisms.
 
 ## Macro Contracts
@@ -2108,7 +2142,7 @@ Errors thrown by a configured macro propagate unchanged to the owning Fabricate 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
 The crafting-check macro / built-in game-system adapter path has been removed.
-The GM-authored roll formula is now Fabricate's built-in check: a plain dice expression the engine rolls and evaluates natively, giving GMs a low-complexity check without writing a macro or relying on a dnd5e/pf2e stat adapter (see requirement 30 in *Data Models*).
+The GM-authored roll formula is now Fabricate's built-in check: a plain dice expression the engine rolls and evaluates natively, giving GMs a low-complexity check without writing a macro or relying on a dnd5e/pf2e stat adapter (see requirement 30 in _Data Models_).
 A crafting check is now usable IFF its resolution mode has an authored roll formula (`craftingCheck.simple|routed|progressive.rollFormula`); the engine rolls that formula and evaluates the outcome itself.
 There is no macro-return contract — when a required check (progressive, or `routedByCheck` mode) has no authored roll formula the attempt fails loudly with zero mutation (the required-check guard), and an optional check (simple, alchemy, or `routedByIngredients`) with no formula is a no-op.
 The `routedByIngredients` optional pass/fail check reads `craftingCheck.simple.rollFormula` (the same shared slot as `simple`/`alchemy`), not `craftingCheck.routed`.
@@ -2182,30 +2216,30 @@ A step failure is handled entirely by the engine's failure-consumption policy; t
 
 The following canonical field names must be used in all new writes:
 
-| Model | Canonical Field | Description |
-|-------|----------------|-------------|
-| Tool | `componentId` | Managed item reference |
-| Ingredient | `match.type = "component"` | Match type for component-based ingredients |
-| Ingredient | `match.componentId` | Component reference inside match object |
-| Result | `componentId` | Produced item component reference |
-| CraftingSystem | `components` | Array of managed item entries |
-| CraftingSystem | `recipeItemDefinitions` | Array of managed recipe-item entries |
-| CraftingSystem | `essenceDefinitions` | Array of essence definitions, emitted unconditionally by normalization (empty when `features.essences` is off); supersedes the derived `essences` id-string alias |
-| CraftingSystem | `visibilityMode` | Canonical flat recipe-visibility strategy (`global`/`restricted`/`item`/`knowledge`); supersedes legacy `recipeVisibility.listMode` + `knowledge.mode` |
-| IngredientSet | `ingredientGroups` | Array of ingredient group objects |
-| Recipe | `resultGroups` | Array of result group objects |
-| Recipe | `access` | Per-recipe restricted-mode grants (`{ characterIds, playerIds }`); read-forward from legacy `visibility.allowedUserIds` |
-| ~~Recipe~~ `recipeItemId` | *(legacy)* | Removed by the 1.13.0 migration; membership inverted to `RecipeItemDefinition.recipeIds` |
-| EssenceDefinition | `sourceComponentId` | Managed component source reference |
-| EssenceDefinition | `sourceItemUuid` | Resolved or legacy template item evidence for effect transfer |
-| Component | `originItemUuid` | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560) |
-| RecipeItemDefinition | `originItemUuid` | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560) |
-| RecipeItemDefinition | `recipeIds` | Canonical recipe↔book membership (many-to-many); inverts the removed `Recipe.recipeItemId` |
-| RecipeItemDefinition | `caps` | Per-recipe-item use/learn caps (`caps.item`, `caps.learn`); canonical cap fields `whenSpent`, `limitLearning`, `learnsAllowed`, `learnScope` (legacy mirrors `destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) |
-| CraftingSystem | `itemTags` | Array of tag strings |
-| Item flag | `toolUsage.timesUsed` | Tool usage tracking (legacy `catalystItemUsage.timesUsed` read as fallback) |
-| Item flag | `recipeItemUsage.timesUsed` | Recipe-item craft-charge tracking (`RecipeItemDefinition.caps.item` cap) |
-| Item flag | `recipeItemLearning.learnedCount` | Recipe-item learn-cap tracking (`RecipeItemDefinition.caps.learn` cap), per document instance |
+| Model                     | Canonical Field                   | Description                                                                                                                                                                                                                        |
+| ------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tool                      | `componentId`                     | Managed item reference                                                                                                                                                                                                             |
+| Ingredient                | `match.type = "component"`        | Match type for component-based ingredients                                                                                                                                                                                         |
+| Ingredient                | `match.componentId`               | Component reference inside match object                                                                                                                                                                                            |
+| Result                    | `componentId`                     | Produced item component reference                                                                                                                                                                                                  |
+| CraftingSystem            | `components`                      | Array of managed item entries                                                                                                                                                                                                      |
+| CraftingSystem            | `recipeItemDefinitions`           | Array of managed recipe-item entries                                                                                                                                                                                               |
+| CraftingSystem            | `essenceDefinitions`              | Array of essence definitions, emitted unconditionally by normalization (empty when `features.essences` is off); supersedes the derived `essences` id-string alias                                                                  |
+| CraftingSystem            | `visibilityMode`                  | Canonical flat recipe-visibility strategy (`global`/`restricted`/`item`/`knowledge`); supersedes legacy `recipeVisibility.listMode` + `knowledge.mode`                                                                             |
+| IngredientSet             | `ingredientGroups`                | Array of ingredient group objects                                                                                                                                                                                                  |
+| Recipe                    | `resultGroups`                    | Array of result group objects                                                                                                                                                                                                      |
+| Recipe                    | `access`                          | Per-recipe restricted-mode grants (`{ characterIds, playerIds }`); read-forward from legacy `visibility.allowedUserIds`                                                                                                            |
+| ~~Recipe~~ `recipeItemId` | _(legacy)_                        | Removed by the 1.13.0 migration; membership inverted to `RecipeItemDefinition.recipeIds`                                                                                                                                           |
+| EssenceDefinition         | `sourceComponentId`               | Managed component source reference                                                                                                                                                                                                 |
+| EssenceDefinition         | `sourceItemUuid`                  | Resolved or legacy template item evidence for effect transfer                                                                                                                                                                      |
+| Component                 | `originItemUuid`                  | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560)                                                                                                                                  |
+| RecipeItemDefinition      | `originItemUuid`                  | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560)                                                                                                                                  |
+| RecipeItemDefinition      | `recipeIds`                       | Canonical recipe↔book membership (many-to-many); inverts the removed `Recipe.recipeItemId`                                                                                                                                         |
+| RecipeItemDefinition      | `caps`                            | Per-recipe-item use/learn caps (`caps.item`, `caps.learn`); canonical cap fields `whenSpent`, `limitLearning`, `learnsAllowed`, `learnScope` (legacy mirrors `destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) |
+| CraftingSystem            | `itemTags`                        | Array of tag strings                                                                                                                                                                                                               |
+| Item flag                 | `toolUsage.timesUsed`             | Tool usage tracking (legacy `catalystItemUsage.timesUsed` read as fallback)                                                                                                                                                        |
+| Item flag                 | `recipeItemUsage.timesUsed`       | Recipe-item craft-charge tracking (`RecipeItemDefinition.caps.item` cap)                                                                                                                                                           |
+| Item flag                 | `recipeItemLearning.learnedCount` | Recipe-item learn-cap tracking (`RecipeItemDefinition.caps.learn` cap), per document instance                                                                                                                                      |
 
 ### Legacy Read Aliases
 
@@ -2213,21 +2247,21 @@ The following legacy aliases are accepted by constructors and normalization func
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Legacy Alias | Canonical Form | Context | Normalization |
-|-------------|---------------|---------|---------------|
-| `systemItemId` | `componentId` | Tool, Ingredient, Result | Constructor reads `systemItemId` as fallback; normalized to `componentId` |
-| `match.type = "systemItem"` | `match.type = "component"` | Ingredient.match | Constructor and migration rewrite type to `"component"` |
-| `match.systemItemId` | `match.componentId` | Ingredient.match | Constructor reads as fallback for `componentId` |
-| `managedItems` | `components` | CraftingSystem | Normalization and migration rename to `components` |
-| `ingredients` (flat array) | `ingredientGroups` | IngredientSet | Constructor wraps each ingredient into a single-option group |
-| `results` (flat array) | `resultGroups` | Recipe | Constructor wraps into a single result group |
-| `associatedSystemItemId` | `sourceComponentId` | EssenceDefinition | Normalization reads as fallback for the managed source component reference |
-| `associatedSystemItemId` | `originItemUuid` | Component | Constructor reads as fallback for `originItemUuid` |
-| `tags` | `itemTags` | CraftingSystem | Normalization reads `tags` as fallback for `itemTags` |
-| `catalystItemUsage` / `catalystUses` (bare number) | `toolUsage.timesUsed` | Item flag | Runtime reads `toolUsage` first; when absent, falls back to `catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) so migrated `limitedUses` tools preserve in-flight usage. Legacy flag is never back-filled or cleared. |
-| `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` (pre-`1.16.0`) | `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` | Component, RecipeItemDefinition, Tool | Issue 560 rename: normalization reads the old names new-name-first, old-name-tolerant, and emits the new names |
-| `linkedRecipeItemUuid` | `recipeItemId` | Recipe | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `originItemUuid` within the recipe's crafting system |
-| `IngredientSet.essences` (map) | essence ingredient options (`match.type === "essence"`) | IngredientSet | The 1.17.0 migration rewrites each positive `essences[essenceId]` entry into a single-option essence group; constructors keep reading the map for one release |
+| Legacy Alias                                                       | Canonical Form                                             | Context                               | Normalization                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `systemItemId`                                                     | `componentId`                                              | Tool, Ingredient, Result              | Constructor reads `systemItemId` as fallback; normalized to `componentId`                                                                                                                                                                               |
+| `match.type = "systemItem"`                                        | `match.type = "component"`                                 | Ingredient.match                      | Constructor and migration rewrite type to `"component"`                                                                                                                                                                                                 |
+| `match.systemItemId`                                               | `match.componentId`                                        | Ingredient.match                      | Constructor reads as fallback for `componentId`                                                                                                                                                                                                         |
+| `managedItems`                                                     | `components`                                               | CraftingSystem                        | Normalization and migration rename to `components`                                                                                                                                                                                                      |
+| `ingredients` (flat array)                                         | `ingredientGroups`                                         | IngredientSet                         | Constructor wraps each ingredient into a single-option group                                                                                                                                                                                            |
+| `results` (flat array)                                             | `resultGroups`                                             | Recipe                                | Constructor wraps into a single result group                                                                                                                                                                                                            |
+| `associatedSystemItemId`                                           | `sourceComponentId`                                        | EssenceDefinition                     | Normalization reads as fallback for the managed source component reference                                                                                                                                                                              |
+| `associatedSystemItemId`                                           | `originItemUuid`                                           | Component                             | Constructor reads as fallback for `originItemUuid`                                                                                                                                                                                                      |
+| `tags`                                                             | `itemTags`                                                 | CraftingSystem                        | Normalization reads `tags` as fallback for `itemTags`                                                                                                                                                                                                   |
+| `catalystItemUsage` / `catalystUses` (bare number)                 | `toolUsage.timesUsed`                                      | Item flag                             | Runtime reads `toolUsage` first; when absent, falls back to `catalystItemUsage` (and the bare-number `catalystUses`, coerced to `{ timesUsed }`) so migrated `limitedUses` tools preserve in-flight usage. Legacy flag is never back-filled or cleared. |
+| `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` (pre-`1.16.0`) | `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` | Component, RecipeItemDefinition, Tool | Issue 560 rename: normalization reads the old names new-name-first, old-name-tolerant, and emits the new names                                                                                                                                          |
+| `linkedRecipeItemUuid`                                             | `recipeItemId`                                             | Recipe                                | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `originItemUuid` within the recipe's crafting system                                                                                                                           |
+| `IngredientSet.essences` (map)                                     | essence ingredient options (`match.type === "essence"`)    | IngredientSet                         | The 1.17.0 migration rewrites each positive `essences[essenceId]` entry into a single-option essence group; constructors keep reading the map for one release                                                                                           |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2252,10 +2286,10 @@ They do not represent the canonical data contract and must not be relied upon by
 
 The following aliases **must not be emitted by new code** and must be stripped on import/export for backward compatibility with data written by older versions:
 
-| Retired Alias | Removed In | Notes |
-|--------------|-----------|-------|
-| `enableTiers` | #105 | Tiered crafting mode was removed; this field was hardcoded to `false` and never functionally active. |
-| `tiers` | #105 | Tiered crafting mode was removed; this field was hardcoded to `[]` and never functionally active. |
+| Retired Alias | Removed In | Notes                                                                                                |
+| ------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| `enableTiers` | #105       | Tiered crafting mode was removed; this field was hardcoded to `false` and never functionally active. |
+| `tiers`       | #105       | Tiered crafting mode was removed; this field was hardcoded to `[]` and never functionally active.    |
 
 ### Testing Requirements
 
