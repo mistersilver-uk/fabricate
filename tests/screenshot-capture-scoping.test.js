@@ -296,11 +296,18 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /async function exerciseToolStudioPointerTargets[\s\S]*?(?=\n\/\*\*\n \* Close Foundry application windows)/,
   )?.[0];
   assert.ok(toolStudioWalk, 'Tool Studio walk source was not found');
-  for (const label of TOOL_STUDIO_LABELS) {
+  const managerSizing = HARNESS.match(
+    /async function setManagerWindowSize[\s\S]*?(?=\n\/\*\*\n \* Capture a manager view)/,
+  )?.[0];
+  assert.ok(managerSizing, 'manager sizing helper source was not found');
+  const topOfStateLabels = TOOL_STUDIO_LABELS.filter(
+    (candidate) => !['manager-tool-stress-repair', 'manager-tool-stress-replacement'].includes(candidate)
+  );
+  for (const label of topOfStateLabels) {
     assert.match(
       toolStudioWalk,
       new RegExp(
-        `await resetToolStudioScroll\\(page\\);\\s*await (?:captureToolStudioProduct\\(page, '${label}', \\{[^}]+\\}\\)|screenshot\\(page, '${label}'\\));`
+        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(page, '${label}', \w+\)|screenshot\(page, '${label}'\));`
       ),
       `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
     );
@@ -309,10 +316,13 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(HARNESS.includes('[data-manager-tool-id]'));
   assert.ok(HARNESS.includes('exerciseToolStudioPointerTargets'));
   assert.ok(HARNESS.includes('verifyToolStudioLiveReplacement'));
-  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 1214, height: 724 })'));
-  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 834, height: 704 })'));
-  assert.ok(HARNESS.includes('setManagerWindowSize(page, { width: 614, height: 704 })'));
-  assert.match(HARNESS, /ApplicationV2 contributes a 2px horizontal frame and a 38px title bar/);
+  assert.match(toolStudioWalk, /sourceViewport: \{ width: 1280, height: 720 \}/);
+  assert.match(toolStudioWalk, /sourceViewport: \{ width: 900, height: 700 \}/);
+  assert.match(toolStudioWalk, /sourceViewport: \{ width: 680, height: 700 \}/);
+  assert.match(managerSizing, /globalThis\.__fabricateSmokeManagerApp[\s\S]*?app\.setPosition\(\{/);
+  assert.match(HARNESS, /browser:[\s\S]*?outer:[\s\S]*?product:/);
+  assert.doesNotMatch(managerSizing, /Object\.assign\(app\.style/);
+  assert.doesNotMatch(managerSizing, /const viewportWidth = Math\.max\(1366/);
   assert.match(HARNESS, /shared by local and CI screenshot/);
   assert.ok(HARNESS.includes('resetToolStudioScroll(page)'));
   assert.ok(HARNESS.includes('assertToolStudioLibraryLayout(page)'));
@@ -333,7 +343,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /data-tool-inspector-description[\s\S]*?well-balanced forge hammer/);
   assert.match(
     HARNESS,
-    /route transition asks ApplicationV2[\s\S]*?setManagerWindowSize\(page, \{ width: 1214, height: 724 \}\)/,
+    /route transition asks ApplicationV2[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}/,
   );
   assert.match(
     HARNESS,
@@ -364,18 +374,34 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     'manager-tool-parity-05-validation-1280x720',
   ]) {
     assert.ok(
-      HARNESS.includes(`captureToolStudioProduct(page, '${label}', { width: 1212, height: 686 })`),
-      `${label} must capture the exact 1212x686 product frame`,
+      HARNESS.includes(`captureToolStudioProduct(page, '${label}', wideGeometry)`),
+      `${label} must capture the truthful settled wide product frame`,
     );
   }
   assert.ok(
     HARNESS.includes(
-      "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', { width: 832, height: 666 })"
+      "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry)"
     ),
-    'the 900px parity frame must capture the exact 832x666 product frame',
+    'the 900px parity frame must capture the truthful settled narrow product frame',
   );
-  assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?900px/);
-  assert.match(HARNESS, /assertSinglePointerDispatch\(page,[\s\S]*?680px/);
+  assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?900px/);
+  assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?680px/);
+  assert.match(toolStudioWalk, /persistedEnabledBefore[\s\S]*?enabled === !before[\s\S]*?enabled === before/);
+  assert.match(toolStudioWalk, /selectedToolIds[\s\S]*?fixture\.toolId/);
+  assert.match(HARNESS, /did not transition exactly once/);
+  assert.match(HARNESS, /did not apply its observable toggle effect/);
+  assert.doesNotMatch(HARNESS, /assertSinglePointerDispatch/);
+  assert.doesNotMatch(HARNESS, /stopImmediatePropagation|stopPropagation/);
+  assert.match(
+    toolStudioWalk,
+    /scrollToolEditorPanelToReveal\([\s\S]*?alternative-component[\s\S]*?manager-tool-stress-repair/,
+    'repair stress evidence must reveal the populated OR group in the editor pane',
+  );
+  assert.match(
+    toolStudioWalk,
+    /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-replacement-picker[\s\S]*?manager-tool-stress-replacement/,
+    'replacement stress evidence must reveal the direct Item picker in the editor pane',
+  );
   assert.match(
     HARNESS,
     /assertPointerTarget\(page,\s*editor\.locator\('\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]'\),\s*'\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]',\s*'Tool repair OR add-component control'\)/,

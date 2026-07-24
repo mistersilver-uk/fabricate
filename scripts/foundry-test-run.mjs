@@ -1070,22 +1070,52 @@ async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs
  * @param {{ width: number, height: number }} size
  * @param {{ timeout?: number, fallbackMs?: number }} [options]
  */
-async function waitForManagerGeometrySettled(page, { width, height }, { timeout = 1500, fallbackMs = 500 } = {}) {
+async function waitForManagerGeometrySettled(page, { timeout = 1500, fallbackMs = 500 } = {}) {
   await page.evaluate(() => { delete window.__fabGeomSettle; }).catch(() => {});
-  await waitForSettled(page, ({ width, height }) => {
+  await waitForSettled(page, () => {
     const manager = document.querySelector('.fabricate-manager');
     const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
     if (!app) return false;
-    const rect = app.getBoundingClientRect();
-    const w = Math.round(rect.width);
-    const h = Math.round(rect.height);
-    if (Math.abs(w - width) > 3 || Math.abs(h - height) > 3) { window.__fabGeomSettle = null; return false; }
+    const outer = app.getBoundingClientRect();
+    const product = manager.getBoundingClientRect();
     const state = window.__fabGeomSettle || { sig: null, stable: 0 };
-    const sig = `${w}x${h}`;
+    const sig = [
+      window.innerWidth,
+      window.innerHeight,
+      Math.round(outer.left),
+      Math.round(outer.top),
+      Math.round(outer.width),
+      Math.round(outer.height),
+      Math.round(product.left),
+      Math.round(product.top),
+      Math.round(product.width),
+      Math.round(product.height),
+    ].join(':');
     if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
     window.__fabGeomSettle = state;
     return state.stable >= 4; // ~4 steady RAF samples ≈ 65ms of quiescence.
-  }, { width, height }, { timeout, fallbackMs });
+  }, undefined, { timeout, fallbackMs });
+  return page.evaluate(() => {
+    const manager = document.querySelector('.fabricate-manager');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
+    if (!manager || !app) throw new Error('Crafting System Manager geometry is unavailable');
+    const rectangle = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+      };
+    };
+    return {
+      browser: { width: window.innerWidth, height: window.innerHeight },
+      outer: rectangle(app),
+      product: rectangle(manager),
+    };
+  });
 }
 
 /**
@@ -1119,57 +1149,62 @@ async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {})
  * Resize the rendered Crafting System Manager application frame for
  * responsive screenshots and hit testing.
  *
- * R4 (#750): the D0 walk issues many consecutive identical
- * `setManagerWindowSize(1280, 820)` calls; each otherwise repaid a viewport
- * resize and a fixed settle for a no-op. Short-circuit when the app is ALREADY
- * at the requested geometry (verified against the live DOM — a fresh `.show()`
- * resets the app size, so a cached size alone is not trusted), which batches
- * same-width frames by eliminating the redundant resizes between them. When a
- * resize IS needed, settle on the app reaching a stable measured geometry
- * instead of a blanket 500ms wait.
+ * A supplied source viewport is exact screenshot evidence; ordinary manager
+ * callers retain the roomy shared viewport. The outer frame is always resized
+ * through the live ApplicationV2 instance, then the browser, outer frame, and
+ * inner product rectangles are measured after they settle. Foundry V13 may
+ * clamp the requested outer height to the exact browser viewport.
  * @param {import('playwright').Page} page
- * @param {{ width: number, height: number }} size
+ * @param {{ width: number, height: number, sourceViewport?: {width: number, height: number} }} size
  */
-async function setManagerWindowSize(page, { width, height }) {
-  const viewportWidth = Math.max(1366, width + 80);
-  const viewportHeight = Math.max(768, height + 80);
-  const alreadySized = await page.evaluate(({ width, height, viewportWidth, viewportHeight }) => {
-    const manager = document.querySelector('.fabricate-manager');
-    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-    if (!app) return false;
-    const rect = app.getBoundingClientRect();
-    return Math.abs(window.innerWidth - viewportWidth) <= 2
-      && Math.abs(window.innerHeight - viewportHeight) <= 2
-      && Math.abs(rect.width - width) <= 2
-      && Math.abs(rect.height - height) <= 2;
-  }, { width, height, viewportWidth, viewportHeight }).catch(() => false);
-  if (alreadySized) return;
+async function setManagerWindowSize(page, { width, height, sourceViewport = null }) {
+  const viewport = sourceViewport || {
+    width: Math.max(1366, width + 80),
+    height: Math.max(768, height + 80),
+  };
 
   await withDeadline(
-    page.setViewportSize({ width: viewportWidth, height: viewportHeight }),
+    page.setViewportSize(viewport),
     15_000,
     `setViewportSize ${width}x${height}`
   );
   await withDeadline(
-    page.evaluate(({ width, height }) => {
-      const manager = document.querySelector('.fabricate-manager');
-      const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-      if (!app) return null;
-      Object.assign(app.style, {
-        width: `${width}px`,
-        height: `${height}px`,
-        left: '20px',
-        top: '20px'
+    page.evaluate(async ({ width, height, viewport }) => {
+      const app = globalThis.__fabricateSmokeManagerApp;
+      if (!app || typeof app.setPosition !== 'function') {
+        throw new Error('Live Crafting System Manager ApplicationV2 instance has no setPosition');
+      }
+      await app.setPosition({
+        width,
+        height,
+        left: Math.max(0, Math.round((viewport.width - width) / 2)),
+        top: 0,
       });
-      return {
-        width: app.getBoundingClientRect().width,
-        height: app.getBoundingClientRect().height
-      };
-    }, { width, height }),
+    }, { width, height, viewport }),
     15_000,
     `setManagerWindowSize evaluate ${width}x${height}`
   );
-  await waitForManagerGeometrySettled(page, { width, height }, { timeout: 1500, fallbackMs: 500 });
+  const geometry = await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
+  if (geometry.browser.width !== viewport.width || geometry.browser.height !== viewport.height) {
+    throw new Error(`Manager source viewport drifted: ${JSON.stringify({ expected: viewport, actual: geometry.browser })}`);
+  }
+  if (
+    geometry.outer.left < 0
+    || geometry.outer.top < 0
+    || geometry.outer.right > geometry.browser.width
+    || geometry.outer.bottom > geometry.browser.height
+  ) {
+    throw new Error(`ApplicationV2 outer rectangle escapes the browser viewport: ${JSON.stringify(geometry)}`);
+  }
+  if (
+    geometry.product.left < geometry.outer.left
+    || geometry.product.top < geometry.outer.top
+    || geometry.product.right > geometry.outer.right
+    || geometry.product.bottom > geometry.outer.bottom
+  ) {
+    throw new Error(`Tool Studio product rectangle escapes the ApplicationV2 frame: ${JSON.stringify(geometry)}`);
+  }
+  return geometry;
 }
 
 /**
@@ -1651,34 +1686,30 @@ async function assertPointerTarget(page, locator, targetSelector, label) {
   }
 }
 
-async function assertSinglePointerDispatch(page, locator, label) {
-  await locator.evaluate((element) => element.setAttribute('data-tool-pointer-probe', ''));
-  await assertPointerTarget(page, locator, '[data-tool-pointer-probe]', label);
-  await locator.evaluate(() => {
-    globalThis.__fabricateToolPointerProbeCleanup?.();
-    globalThis.__fabricateToolPointerProbeCount = 0;
-    const listener = (event) => {
-      if (!event.target?.closest?.('[data-tool-pointer-probe]')) return;
-      globalThis.__fabricateToolPointerProbeCount += 1;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    document.addEventListener('click', listener, true);
-    globalThis.__fabricateToolPointerProbeCleanup = () => {
-      document.removeEventListener('click', listener, true);
-      delete globalThis.__fabricateToolPointerProbeCleanup;
-    };
-  });
+async function clickToolTabAndAssertEffect(page, editor, name, label) {
+  const target = editor.locator(`#tool-tab-${name}`);
+  await assertPointerTarget(page, target, `#tool-tab-${name}`, label);
+  await target.click();
+  await editor.locator(`[data-tool-editor-panel="${name}"]`).waitFor({ state: 'visible', timeout: 5_000 });
+  const effect = await editor.locator('.manager-tool-editor-tabs').evaluate((tablist, expectedName) => ({
+    selected: tablist.querySelectorAll('[role="tab"][aria-selected="true"]').length,
+    expectedSelected: tablist.querySelector(`#tool-tab-${expectedName}`)?.getAttribute('aria-selected'),
+  }), name);
+  if (effect.selected !== 1 || effect.expectedSelected !== 'true') {
+    throw new Error(`${label} did not transition exactly once to ${name}: ${JSON.stringify(effect)}`);
+  }
+}
+
+async function toggleToolControlAndRestore(page, locator, label) {
+  await assertPointerTarget(page, locator, 'input', label);
+  const before = await locator.isChecked();
   await locator.click();
-  const dispatchCount = await page.evaluate(() => {
-    const count = globalThis.__fabricateToolPointerProbeCount;
-    globalThis.__fabricateToolPointerProbeCleanup?.();
-    document.querySelector('[data-tool-pointer-probe]')?.removeAttribute('data-tool-pointer-probe');
-    delete globalThis.__fabricateToolPointerProbeCount;
-    return count;
-  });
-  if (dispatchCount !== 1) {
-    throw new Error(`${label} dispatched ${dispatchCount} pointer clicks instead of exactly one`);
+  if (await locator.isChecked() === before) {
+    throw new Error(`${label} did not apply its observable toggle effect`);
+  }
+  await locator.click();
+  if (await locator.isChecked() !== before) {
+    throw new Error(`${label} did not restore its original persisted state`);
   }
 }
 
@@ -1753,7 +1784,35 @@ async function resetToolStudioScroll(page) {
   }
 }
 
-async function captureToolStudioProduct(page, label, { width, height }) {
+async function scrollToolEditorPanelToReveal(editor, selector, label) {
+  const panel = editor.locator('[data-tool-editor-panel]');
+  const target = editor.locator(selector);
+  await target.scrollIntoViewIfNeeded();
+  const report = await panel.evaluate((element, targetSelector) => {
+    const targetElement = element.querySelector(targetSelector);
+    if (!targetElement) return null;
+    const panelRect = element.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    return {
+      scrollTop: element.scrollTop,
+      targetVisible: targetRect.top >= panelRect.top && targetRect.bottom <= panelRect.bottom,
+    };
+  }, selector);
+  if (!report || report.scrollTop <= 0 || !report.targetVisible) {
+    throw new Error(`${label} stress control was not visibly scrolled into the editor pane: ${JSON.stringify(report)}`);
+  }
+  for (const [identitySelector, identityLabel] of [
+    ['[data-tool-editor-header]', 'header'],
+    ['.manager-tool-editor-tabs', 'tabs'],
+    ['[data-tool-behavior-preview]', 'preview'],
+  ]) {
+    if (!(await editor.locator(identitySelector).isVisible())) {
+      throw new Error(`${label} lost ${identityLabel} identity context`);
+    }
+  }
+}
+
+async function captureToolStudioProduct(page, label, expectedGeometry) {
   const manager = await requireSingleLocator(
     page.locator('#fabricate-crafting-system-manager .fabricate-manager'),
     `${label} live Tool Studio manager`
@@ -1761,13 +1820,14 @@ async function captureToolStudioProduct(page, label, { width, height }) {
   const box = await manager.boundingBox();
   if (!box) throw new Error(`${label} Tool Studio product rectangle is not measurable`);
   const measured = { width: Math.round(box.width), height: Math.round(box.height) };
-  if (measured.width !== width || measured.height !== height) {
+  const expected = expectedGeometry?.product;
+  if (!expected || measured.width !== expected.width || measured.height !== expected.height) {
     throw new Error(
-      `${label} Tool Studio product rectangle was ${measured.width}x${measured.height}; expected ${width}x${height}`
+      `${label} Tool Studio product rectangle drifted: ${JSON.stringify({ measured, expectedGeometry })}`
     );
   }
   await screenshot(page, label, {
-    clip: { x: box.x, y: box.y, width, height },
+    clip: { x: box.x, y: box.y, width: box.width, height: box.height },
   });
 }
 
@@ -3917,11 +3977,15 @@ async function waitForToolBreakageAuthority(page, systemId) {
 }
 
 async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fixture }) {
-  // ApplicationV2 contributes a 2px horizontal frame and a 38px title bar. Size
-  // the outer window so the captured `.fabricate-manager` product root matches the
-  // prototype crop exactly. This code path is shared by local and CI screenshot
-  // profiles, so both environments enforce the same product-space geometry.
-  await setManagerWindowSize(page, { width: 1214, height: 724 });
+  // Request the prototype's outer geometry inside its exact source viewport.
+  // ApplicationV2 contributes its own frame and V13 truthfully clamps it to that
+  // viewport; capture the settled inner product rectangle rather than fabricating
+  // room outside the source. This path is shared by local and CI screenshot profiles.
+  let wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
   await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
   await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   const liveManagerApp = await requireSingleLocator(page.locator('#fabricate-crafting-system-manager'), 'live Crafting System Manager app');
@@ -3978,21 +4042,58 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertToolStudioLibraryLayout(page);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', wideGeometry);
 
-  await setManagerWindowSize(page, { width: 614, height: 704 });
+  await setManagerWindowSize(page, {
+    width: 614,
+    height: 704,
+    sourceViewport: { width: 680, height: 700 },
+  });
   await resetToolStudioScroll(page);
-  await assertSinglePointerDispatch(page, selectTarget, 'Tool row selection at 680px');
-  await assertSinglePointerDispatch(page, enabledToggle, 'Tool enabled toggle at 680px');
-  await assertSinglePointerDispatch(page, editButton, 'Tool Edit at 680px');
-  await setManagerWindowSize(page, { width: 1214, height: 724 });
+  await visibleToolRows.nth(1).locator('.manager-tools-select-target').click();
+  await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection at 680px');
+  await selectTarget.click();
+  const selectedToolIds = await visibleToolRows.evaluateAll((rows) => rows
+    .filter((candidate) => candidate.classList.contains('is-selected'))
+    .map((candidate) => candidate.dataset.managerToolId));
+  if (JSON.stringify(selectedToolIds) !== JSON.stringify([fixture.toolId])) {
+    throw new Error(`Tool row selection at 680px did not select exactly the intended Tool: ${JSON.stringify(selectedToolIds)}`);
+  }
+  const persistedEnabledBefore = await page.evaluate(({ systemId, toolId }) => (
+    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled
+  ), { systemId, toolId: fixture.toolId });
+  await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle at 680px');
+  await enabledToggle.click();
+  await page.waitForFunction(({ systemId, toolId, before }) => (
+    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === !before
+  ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore });
+  await enabledToggle.click();
+  await page.waitForFunction(({ systemId, toolId, before }) => (
+    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === before
+  ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore });
+  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
+  await editButton.click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-editor-header] h2')
+    .filter({ hasText: "Smith's Hammer" }).waitFor({ state: 'visible', timeout: 5_000 });
+  await liveManagerApp.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
 
   await editButton.click();
   const editorManager = liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]');
   await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
   // The route transition asks ApplicationV2 to adopt the editor's default size;
-  // re-apply the parity window so the editor product root remains 1212x686.
-  await setManagerWindowSize(page, { width: 1214, height: 724 });
+  // re-apply the requested window through the live instance and retain V13's
+  // truthful viewport-clamped product geometry.
+  wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
   await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
   await assertPointerTarget(page, editor.locator('[data-tool-source-card]'), '[data-tool-source-card]', 'Tool Item drop target');
@@ -4007,11 +4108,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, 'Overview parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', wideGeometry);
   const displayLabel = editor.locator('[data-tool-label]');
   await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-long-name', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-stress-long-name', wideGeometry);
   await displayLabel.fill("Smith's Hammer");
   await saveToolStudioDraftIfDirty(editor);
 
@@ -4023,14 +4124,18 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
   await assertSavedToolStudioCapture(editor, 'Breakage parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', wideGeometry);
   await editor.locator('input[name="tool-on-break"][value="flagBroken"]').check();
   await editor.locator('[data-tool-repair-add-group]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await assertPointerTarget(page, editor.locator('[data-tool-repair-add-group]').first(), '[data-tool-repair-add-group]', 'Tool repair AND control');
   await assertPointerTarget(page, editor.locator('[data-tool-repair-group] [data-recipe-add="alternative-component"]'), '[data-tool-repair-group] [data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
   await assertNoScreenshotOverlays(page);
-  await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-repair', { width: 1212, height: 686 });
+  await scrollToolEditorPanelToReveal(
+    editor,
+    '[data-tool-repair-group] [data-recipe-add="alternative-component"]',
+    'Populated repair',
+  );
+  await captureToolStudioProduct(page, 'manager-tool-stress-repair', wideGeometry);
 
   await editor.locator('input[name="tool-on-break"][value="replaceWith"]').check();
   const replacementGrid = editor.locator('[data-tool-replacement-target]');
@@ -4055,8 +4160,12 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await itemTarget.selectOption('');
   await itemTarget.selectOption(itemOption);
   await assertNoScreenshotOverlays(page);
-  await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-replacement', { width: 1212, height: 686 });
+  await scrollToolEditorPanelToReveal(
+    editor,
+    '[data-tool-replacement-target] [data-tool-replacement-picker]',
+    'Direct Item replacement',
+  );
+  await captureToolStudioProduct(page, 'manager-tool-stress-replacement', wideGeometry);
   await editor.locator('[data-tool-editor-save]').click();
   await editor.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   await editor.locator('[data-tool-editor-back]').click();
@@ -4086,7 +4195,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertDisabledToolOnBreakFieldset(immuneOnBreakFieldset);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-immune', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-stress-immune', wideGeometry);
   await editor.locator('[data-tool-editor-save]').click();
   await editor.locator('[data-tool-editor-back]').click();
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
@@ -4122,7 +4231,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, 'Requirements parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-04-requirements-1280x720', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-parity-04-requirements-1280x720', wideGeometry);
 
   await tab('validation').click();
   await editor.locator('[data-tool-validation-tab]').waitFor({ state: 'visible', timeout: 5_000 });
@@ -4131,45 +4240,58 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   await assertSavedToolStudioCapture(editor, 'Validation parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', wideGeometry);
   await tab('requirements').click();
   await editor.locator('[data-tool-bonus-expression]').fill('');
   await tab('validation').click();
   await editor.locator('[data-first-validation-failure]').waitFor({ state: 'visible', timeout: 5_000 });
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', { width: 1212, height: 686 });
+  await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', wideGeometry);
   await tab('requirements').click();
   await editor.locator('[data-tool-bonus-expression]').fill('@prof');
   await saveToolStudioDraftIfDirty(editor);
   await tab('breakage').click();
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
-  await setManagerWindowSize(page, { width: 834, height: 704 });
+  const narrowGeometry = await setManagerWindowSize(page, {
+    width: 834,
+    height: 704,
+    sourceViewport: { width: 900, height: 700 },
+  });
   await editor.locator('[data-tool-editor-header]').waitFor({ state: 'visible', timeout: 5_000 });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: false });
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, '832px Breakage parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', { width: 832, height: 666 });
-  await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 900px');
-  await assertSinglePointerDispatch(page, tab('requirements'), 'Tool Requirements tab at 900px');
-  await tab('requirements').click();
-  await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
-  await assertSinglePointerDispatch(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 900px');
+  await captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry);
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 900px');
+  await toggleToolControlAndRestore(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 900px');
+  await saveToolStudioDraftIfDirty(editor);
+  await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 900px');
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click();
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements restore at 900px');
 
-  await setManagerWindowSize(page, { width: 614, height: 704 });
+  await setManagerWindowSize(page, {
+    width: 614,
+    height: 704,
+    sourceViewport: { width: 680, height: 700 },
+  });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: true });
-  await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 680px');
-  await assertSinglePointerDispatch(page, tab('breakage'), 'Tool Breakage tab at 680px');
-  await assertSinglePointerDispatch(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 680px');
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 680px');
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 680px');
+  await toggleToolControlAndRestore(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 680px');
+  await saveToolStudioDraftIfDirty(editor);
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage capture restore at 680px');
   await resetToolStudioScroll(page);
   await screenshot(page, 'manager-tool-stress-wrapping-680');
-  await setManagerWindowSize(page, { width: 1214, height: 724 });
-
-  await page.evaluate(async () => globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.());
+  await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 680px');
   await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
   await openManagerRecipeEditor(page, recipeName);
   await page.locator('[data-recipe-tab-button="tools"]').first().click();
   const bonusMode = page.locator(`[data-recipe-tool-bonus-mode="${fixture.toolId}"]`).first();

@@ -113,8 +113,10 @@
 
   <section class="manager-tool-breakage-method">
     <div class="manager-tool-section-heading" data-tool-breakage-method-heading>
-      <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.BreakageKicker', 'Breakage')}</p><h3>{authority === 'toolSpecific' ? text('FABRICATE.Admin.Manager.Tools.Editor.HowThisToolBreaks', 'How this Tool breaks') : text('FABRICATE.Admin.Manager.Tools.Editor.CanThisToolBreak', 'Can this Tool break?')}</h3></div>
-      <p>{authority === 'toolSpecific' ? text('FABRICATE.Admin.Manager.Tools.Editor.HowThisToolBreaksHint', 'Each Tool tracks its own breakage. Pick the method for this one.') : text('FABRICATE.Admin.Manager.Tools.Editor.CanThisToolBreakHint', 'The crafting check decides whether a breakable Tool breaks.')}</p>
+      <div>
+        <h3><i class="fas fa-heart-crack" aria-hidden="true"></i>{authority === 'toolSpecific' ? text('FABRICATE.Admin.Manager.Tools.Editor.HowThisToolBreaks', 'How this Tool breaks') : text('FABRICATE.Admin.Manager.Tools.Editor.CanThisToolBreak', 'Can this Tool break?')}</h3>
+        <p>{authority === 'toolSpecific' ? text('FABRICATE.Admin.Manager.Tools.Editor.HowThisToolBreaksHint', 'Each Tool tracks its own breakage. Pick the method for this one.') : text('FABRICATE.Admin.Manager.Tools.Editor.CanThisToolBreakHint', 'The crafting check decides whether a breakable Tool breaks.')}</p>
+      </div>
     </div>
     {#if authority === 'toolSpecific'}
       <div class="manager-tool-choice-grid" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}>
