@@ -1850,6 +1850,50 @@ async function withSingleToolStoreMutation(page, method, label, action, assertEf
   assertSingleToolMutation(report, method, label);
 }
 
+async function withSingleToolDraftTransition(page, expectedToolId, label, action, assertEffect) {
+  await page.evaluate(() => {
+    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+    if (!store?.viewState?.subscribe) {
+      throw new Error('Tool draft transition probe could not resolve the live manager view state');
+    }
+    if (globalThis.__fabricateToolDraftTransitionProbe) {
+      throw new Error('Tool draft transition probe was already active');
+    }
+    const transitions = [];
+    let initial = true;
+    const unsubscribe = store.viewState.subscribe((state) => {
+      if (initial) {
+        initial = false;
+        return;
+      }
+      transitions.push({
+        toolId: String(state?.toolDraft?.id || ''),
+        dirty: state?.toolDraftDirty === true,
+      });
+    });
+    globalThis.__fabricateToolDraftTransitionProbe = { transitions, unsubscribe };
+  });
+  let report;
+  try {
+    await action();
+    await assertEffect();
+  } finally {
+    report = await page.evaluate(() => {
+      const probe = globalThis.__fabricateToolDraftTransitionProbe;
+      if (!probe) return { transitions: [], missing: true };
+      probe.unsubscribe();
+      delete globalThis.__fabricateToolDraftTransitionProbe;
+      return { transitions: probe.transitions };
+    });
+  }
+  const matching = report.transitions.filter(({ toolId }) => toolId === String(expectedToolId));
+  if (report.transitions.length !== 1 || matching.length !== 1) {
+    throw new Error(
+      `${label} must publish exactly one Tool draft transition for ${expectedToolId}: ${JSON.stringify(report)}`
+    );
+  }
+}
+
 async function clickToolTabAndAssertEffect(page, editor, name, label) {
   const target = editor.locator(`#tool-tab-${name}`);
   await assertPointerTarget(page, target, `#tool-tab-${name}`, label);
@@ -4395,9 +4439,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
   await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit');
   const otherSelectTarget = visibleToolRows.nth(1).locator('.manager-tools-select-target');
-  await withSingleToolStoreMutation(
+  const otherToolId = await visibleToolRows.nth(1).getAttribute('data-manager-tool-id');
+  if (!otherToolId) throw new Error('Tool Studio alternate row has no Tool ID');
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    otherToolId,
     'Tool alternate-row selection',
     () => otherSelectTarget.click(),
     async () => {
@@ -4406,9 +4452,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       }
     },
   );
-  await withSingleToolStoreMutation(
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    fixture.toolId,
     'Tool parity-row selection',
     () => selectTarget.click(),
     async () => {
@@ -4462,9 +4508,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     sourceViewport: { width: 680, height: 700 },
   });
   await resetToolStudioScroll(page);
-  await withSingleToolStoreMutation(
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    otherToolId,
     'Tool 680px alternate-row selection',
     () => visibleToolRows.nth(1).locator('.manager-tools-select-target').click(),
     async () => {
@@ -4474,9 +4520,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     },
   );
   await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection at 680px');
-  await withSingleToolStoreMutation(
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    fixture.toolId,
     'Tool row selection at 680px',
     () => selectTarget.click(),
     async () => {
@@ -4514,9 +4560,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore }),
   );
   await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
-  await withSingleToolStoreMutation(
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    fixture.toolId,
     'Tool Edit route at 680px',
     () => editButton.click(),
     () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-editor-header] h2')
@@ -4530,9 +4576,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     sourceViewport: { width: 1280, height: 720 },
   });
 
-  await withSingleToolStoreMutation(
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    fixture.toolId,
     'Tool Edit route at 1280px',
     () => editButton.click(),
     () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
@@ -4803,9 +4849,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`),
     'check-driven Tool Edit button',
   );
-  await withSingleToolStoreMutation(
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    fixture.toolId,
     'check-driven Tool Edit route',
     () => checkDrivenEditButton.click(),
     () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
@@ -4843,9 +4889,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       game.fabricate.getCraftingSystemManager().getSystem(id)?.toolBreakage?.authority === 'toolSpecific'
     ), systemId, { timeout: 10_000, polling: 'raf' }),
   );
-  await withSingleToolStoreMutation(
+  await withSingleToolDraftTransition(
     page,
-    'openToolDraft',
+    fixture.toolId,
     'tool-specific Tool Edit route',
     () => manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click(),
     () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
