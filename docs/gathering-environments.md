@@ -193,8 +193,9 @@ Each library tool carries:
 | **Source** | The item the tool is. Either its own source item (an item-sourced tool) or a managed component (a component-linked tool). See [Tools]({% link tools.md %}) |
 | **Display label** | Optional. Falls back to the tool's item or component name |
 | **Tool requirement** | Optional formula checked against the character's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
-| **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), **Dice expression** (a formula compared against a threshold), or **Immune** (never breaks) |
-| **On-break action** | One of **Destroy item**, **Mark as broken**, or **Replace with item** (the replacement must differ from the original) |
+| **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), or **Dice expression** (a formula compared against a threshold) |
+| **Check-driven eligibility** | **Immune** excludes the tool from breakage triggered by a check. It does not remove its retained tool-specific breakage mechanic. |
+| **On-break action** | One of **Destroy item**, **Mark as broken**, or **Replace with item**. A replacement can be a managed component or a direct Item. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -499,12 +500,13 @@ A library tool carries:
 |:------|:------------|
 | Source | The item the tool is. Either its own source item or a managed component from the system's component library. See [Tools]({% link tools.md %}) |
 | Requirement | Optional. A roll expression that must hold true for the character to use the tool |
-| Breakage mechanic | One of limited uses, breakage chance, a dice expression, or immune (never breaks) |
+| Breakage mechanic | One of limited uses, breakage chance, or a dice expression |
+| Check-driven eligibility | Immune excludes the tool from check-driven breakage. It does not remove its retained tool-specific breakage mechanic. |
 | Maximum uses | For limited uses: a positive number, or blank for unlimited |
 | Breakage chance | For breakage chance: a whole percent from 0 to 100 |
 | Dice expression and threshold | For a dice expression: a roll formula and a number it must reach to avoid breaking |
-| On-break action | One of destroy the item, mark it as broken, or replace it with another component |
-| Replacement | For replace: a different managed component given to the character when the tool breaks |
+| On-break action | One of destroy the item, mark it as broken, or replace it with another item |
+| Replacement | For replace: a different managed component or direct Item given to the character when the tool breaks |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -515,7 +517,8 @@ Either way, the on-break action always happens.
 
 Whether a tool breaks in the first place follows the system's **Tool breakage source** setting on the [Tools]({% link tools.md %}#tool-breakage-source) page.
 With the default **Tool-specific** source, each tool's own breakage mechanic decides.
-With the **Check-driven** source, the gathering check decides whether all required tools break, the same way it does for crafting and salvage, and per-tool mechanics are ignored except for immune tools.
+With the **Check-driven** source, the gathering check decides whether every required tool that is not **Immune** breaks, the same way it does for crafting and salvage.
+Each Tool retains its own mechanic, but that mechanic is not evaluated while this source is active.
 This takes effect once the Progressive and Routed by check gathering modes ship.
 The only gathering mode available today, d100, has no check for triggers to read, so check-driven breakage cannot fire for a d100 attempt.
 Until then, gathering tool breakage uses the Tool-specific source regardless of this setting.

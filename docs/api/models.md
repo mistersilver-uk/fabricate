@@ -168,12 +168,15 @@ A Tool entry stored under `system.tools` (the `craftingSystems` setting) has thi
   aliasItemUuids,     // string[] (additional source references for matching)
   label,          // string (optional user-authored display label, distinct from the snapshot)
   requirement,    // null | { formula } (a Foundry roll expression; required when set)
+  prerequisites,  // { enabled, ids, gateMode: 'bonus' | 'usability' }
+  bonus,          // { enabled, expression }
   breakage,       // { mode: 'limitedUses', maxUses } |
                   // { mode: 'breakageChance', breakageChance } |
-                  // { mode: 'diceExpression', formula, threshold } |
-                  // { mode: 'immune' }
-  onBreak         // { mode: 'destroy' } | { mode: 'flagBroken' } |
-                  // { mode: 'replaceWith', replacementComponentId }
+                  // { mode: 'diceExpression', formula, threshold }
+  checkBreakable, // boolean (default true; participates in check-driven breakage)
+  onBreak,        // { mode: 'destroy' } | { mode: 'flagBroken' } |
+                  // { mode: 'replaceWith', replacementTarget }
+  repairRequirements // IngredientGroup[] (for flagBroken; may be empty)
 }
 ```
 
@@ -181,6 +184,14 @@ A Tool is first-class as of issue 561: it carries its own source references (`re
 `componentId` is optional.
 It is `null` for an item-sourced tool and populated only for a tool that is also a managed component (a whetstone) or one migrated from a legacy component-linked tool.
 A valid Tool carries either a `componentId` or its own source references.
+
+`prerequisites` references the crafting system's shared character prerequisites.
+Its gate mode either controls whether the character can use the Tool or suppresses its enabled bonus.
+`bonus` is an optional check expression.
+`checkBreakable: false` excludes the Tool from check-driven breakage only.
+It does not replace the retained tool-specific breakage mechanic.
+For `replaceWith`, `replacementTarget` is exactly one managed Component or direct Item UUID.
+`repairRequirements` holds the optional ingredient groups used to repair a Tool marked as broken.
 
 Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.toolUsage = { timesUsed }`.
 The `flagBroken` on-break action sets `Item.flags.fabricate.toolBroken = true`.
