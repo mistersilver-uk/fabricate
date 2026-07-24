@@ -14018,8 +14018,14 @@
 
 .fabricate-manager .manager-tool-source-card code {
   display: block;
+  width: fit-content;
   max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
   overflow: hidden;
+  background: transparent;
+  box-shadow: none;
   color: var(--fab-mv2-text-muted);
   font-family: var(--fab-font-mono);
   font-size: 0.64rem;

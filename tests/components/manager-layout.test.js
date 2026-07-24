@@ -929,6 +929,25 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   );
 });
 
+test('Tool Overview source UUID resets global code chrome to a compact metadata subline', () => {
+  const sourceIdBlock = blockFor('.fabricate-manager .manager-tool-source-card code');
+  for (const declaration of [
+    'display: block;',
+    'width: fit-content;',
+    'max-width: 100%;',
+    'margin: 0;',
+    'padding: 0;',
+    'border: 0;',
+    'background: transparent;',
+    'box-shadow: none;',
+    'font-family: var(--fab-font-mono);',
+    'text-overflow: ellipsis;',
+    'white-space: nowrap;',
+  ]) {
+    assert.ok(sourceIdBlock.includes(declaration), `Tool source UUID must retain ${declaration}`);
+  }
+});
+
 test('manager gathering task browser defines bounded toolbar and compact table geometry without reorder controls', () => {
   const toolbarBlock = blockFor('.fabricate-manager .manager-task-toolbar');
   const panelBlock = blockFor('.fabricate-manager .manager-gathering-panel-tasks');
