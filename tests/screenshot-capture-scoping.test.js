@@ -473,6 +473,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(toolStudioWalk, /persistedEnabledBefore[\s\S]*?enabled === !before[\s\S]*?enabled === before/);
   assert.match(toolStudioWalk, /selectedToolIds[\s\S]*?fixture\.toolId/);
   assert.match(toolStudioWalk, /data-tool-library-empty[\s\S]*?data-tool-browser-inspector-empty[\s\S]*?manager-tool-zero-state-empty-library-1280x720/);
+  assert.match(
+    toolStudioWalk,
+    /emptyInspectorBounds[\s\S]*?emptyInspectorContentBounds[\s\S]*?Math\.abs\(inspectorCenterY - contentCenterY\) > 2[\s\S]*?empty inspector is not vertically centered/,
+    'the empty inspector content must be vertically centered in the full right rail',
+  );
   assert.match(HARNESS, /did not transition exactly once/);
   assert.match(HARNESS, /did not apply its observable toggle effect/);
   assert.doesNotMatch(HARNESS, /assertSinglePointerDispatch/);

@@ -19941,9 +19941,10 @@
 }
 
 .fabricate-manager .manager-tool-browser-inspector.is-empty {
+  flex: 1 1 auto;
   align-items: center;
   justify-content: center;
-  min-height: 220px;
+  min-height: 0;
   text-align: center;
 }
 

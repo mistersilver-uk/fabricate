@@ -4745,9 +4745,30 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   try {
     await replaceToolStudioTools(page, systemId, []);
     await manager.locator('[data-tool-library-empty]').waitFor({ state: 'visible', timeout: 5_000 });
-    await manager.locator('[data-tool-browser-inspector-empty]').waitFor({ state: 'visible', timeout: 5_000 });
+    const emptyInspector = manager.locator('[data-tool-browser-inspector-empty]');
+    await emptyInspector.waitFor({ state: 'visible', timeout: 5_000 });
     if (await manager.locator('.manager-tools-row').count() !== 0) {
       throw new Error('Tool Studio empty-library capture still rendered Tool rows');
+    }
+    const [emptyInspectorBounds, emptyInspectorContentBounds] = await Promise.all([
+      emptyInspector.boundingBox(),
+      emptyInspector.locator(':scope > div').boundingBox(),
+    ]);
+    const inspectorCenterY = emptyInspectorBounds
+      ? emptyInspectorBounds.y + (emptyInspectorBounds.height / 2)
+      : Number.NaN;
+    const contentCenterY = emptyInspectorContentBounds
+      ? emptyInspectorContentBounds.y + (emptyInspectorContentBounds.height / 2)
+      : Number.NaN;
+    if (
+      !Number.isFinite(inspectorCenterY)
+      || !Number.isFinite(contentCenterY)
+      || Math.abs(inspectorCenterY - contentCenterY) > 2
+    ) {
+      throw new Error(`Tool Studio empty inspector is not vertically centered: ${JSON.stringify({
+        emptyInspectorBounds,
+        emptyInspectorContentBounds,
+      })}`);
     }
     await resetToolStudioScroll(page);
     await captureToolStudioProduct(page, 'manager-tool-zero-state-empty-library-1280x720', wideGeometry);
