@@ -17,6 +17,16 @@ In Alchemy mode a check is required whenever the Alchemy check is Simple or Tier
 The outcome-tier check is required in Routed by check mode.
 Each attempt runs the check automatically, before any materials are consumed.
 
+## Dynamic DC macros
+
+A GM can have a Macro calculate the difficulty for each crafting attempt.
+On the **Crafting check** page, open the **DC source** card and choose **Dynamic**.
+Then drag the Script Macro you want to use into the **DC macro** area.
+The macro calculates only the DC.
+It does not roll the check or choose the crafting result.
+If no Macro is linked, the Macro fails, or it cannot provide a usable number, Fabricate uses the configured static DC instead.
+See the [Dynamic DC Macro API example]({% link api/crafting-engine.md %}#dynamic-dc-macro) for the supported inputs and a working Script Macro.
+
 ## Rolling a check from the UI
 
 When a player crafts or gathers from the Fabricate UI, the check is rolled interactively.
