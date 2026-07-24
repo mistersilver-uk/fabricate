@@ -198,6 +198,8 @@ Direct Item targets remain readable and executable for backward compatibility wi
 `repairRequirements` holds the optional ingredient groups used to repair a Tool marked as broken.
 
 Per-item usage for `limitedUses` tools is tracked under `Item.flags.fabricate.toolUsage = { timesUsed }`.
+The counter changes only while the system uses Tool-specific breakage.
+Under check-driven authority the retained Tool-specific configuration and its counters are inactive and unchanged.
 The `flagBroken` on-break action sets `Item.flags.fabricate.toolBroken = true`.
 A tool's durable identity is stamped on its source Item as `Item.flags.fabricate.roles[systemId].toolId`, a sibling of the component role flag, so the same Item can be both a component and a tool.
 

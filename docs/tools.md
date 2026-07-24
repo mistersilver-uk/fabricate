@@ -112,6 +112,7 @@ The library's **Tool breakage source** setting decides what determines whether a
 Under **Check-driven**, each Tool also has a separate **Breakable** or **Immune** choice.
 An **Immune** Tool is excluded when the check breaks other required Tools.
 This choice does not replace or erase the Tool's retained Tool-specific breakage configuration.
+Retained limited-use counters do not change while check-driven authority is active.
 
 Authority decides whether Tool-specific settings or the active check controls breakage.
 The Tool's **Breakable** or **Immune** choice decides whether it participates in check-driven breakage.

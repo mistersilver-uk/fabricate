@@ -523,6 +523,7 @@ Whether a tool breaks in the first place follows the system's **Tool breakage so
 With the default **Tool-specific** source, each tool's own breakage mechanic decides.
 With the **Check-driven** source, the gathering check decides whether every required tool that is not **Immune** breaks, the same way it does for crafting and salvage.
 Each Tool retains its own mechanic, but that mechanic is not evaluated while this source is active.
+Retained limited-use counters also remain unchanged while check-driven authority is active.
 This takes effect once the Progressive and Routed by check gathering modes ship.
 The only gathering mode available today, d100, has no check for triggers to read, so check-driven breakage cannot fire for a d100 attempt.
 Until then, gathering tool breakage uses the Tool-specific source regardless of this setting.

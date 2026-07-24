@@ -376,7 +376,7 @@ CraftingSystem = {
 22. Authority is strictly either-or (issue 419 recombine): a check can break tools ONLY under `"checkDriven"`.
     Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
     A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
-23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, and Tools with `checkBreakable: false` are filtered out of the force-break set as immune evidence.
+23. Under `"checkDriven"` authority, the active check's `checkBreakage` triggers decide whether **all required tools** break for the attempt; each Tool's own `breakage.mode` is **not** evaluated, its tool-specific usage state (including retained `limitedUses.timesUsed` counters) is not mutated, and Tools with `checkBreakable: false` are filtered out of the force-break set as immune evidence.
     The decision is made by a single shared evaluator (`evaluateCheckBreakage`) that crafting, salvage, and gathering all route through, so the decision cannot drift between surfaces.
     The evaluator additionally reads the routed per-tier `data.breakTools` as an implicit always-on trigger (the only remaining legacy bridge), so a routed tier's `breakTools` needs no separate persistence, and only an engine-evaluated roll-formula check result can force-break (`engineEvaluated === true`); any other result never force-breaks.
     A configured trigger force-breaks only when it both opts in (`breakTools === true`) AND its condition matches.
@@ -1318,7 +1318,7 @@ Tool = {
    When present, it requires a non-empty `formula` — a Foundry roll expression evaluated against the actor's roll data.
    The actor satisfies the requirement when the result is truthy (a non-zero number or a `true` boolean).
    There is no provider discriminator and no macro support on this surface.
-5. Exactly one of the three tool-specific `breakage.mode` values is configured per Tool, and that configuration is retained while `checkDriven` authority is active:
+5. Exactly one of the three tool-specific `breakage.mode` values is configured per Tool, and that configuration is retained but entirely inactive while `checkDriven` authority is active (including no mutation of retained tool-specific usage counters):
    - `limitedUses`: `maxUses` is null or a positive integer.
      Tool usage is tracked on the owned item via `flags.fabricate.toolUsage = { timesUsed }`.
      The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
