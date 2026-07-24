@@ -754,6 +754,34 @@ test('_applyToolBreakage checkDriven: forceBreak breaks all required non-immune 
   assert.equal(getPath(axe._flags.fabricate, 'fabricate.toolBroken'), true);
 });
 
+test('_applyToolBreakage checkDriven: forceBreak does not increment retained limitedUses usage', async () => {
+  installSystem();
+  const engine = new CraftingEngine(toolMatcherManager());
+  const actorRef = { uuid: 'Actor.a' };
+  const axe = new FakeItem('c-axe', {
+    flags: { fabricate: { toolUsage: { timesUsed: 9 } } },
+    parent: actorRef,
+  });
+  const tool = {
+    componentId: 'c-axe',
+    breakage: { mode: 'limitedUses', maxUses: 1 },
+    onBreak: { mode: 'flagBroken' },
+  };
+
+  const used = await engine._applyToolBreakage(
+    recipe(),
+    [{ tool, item: axe }],
+    checkDrivenOpts()
+  );
+
+  assert.equal(used[0].broken, true, 'the check trigger still controls breakage');
+  assert.equal(
+    getPath(axe._flags.fabricate, 'fabricate.toolUsage.timesUsed'),
+    9,
+    'the inactive toolSpecific usage counter is unchanged'
+  );
+});
+
 test('_applyToolBreakage checkDriven: immune tool is filtered out of the forced set and recorded skipped', async () => {
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
@@ -775,6 +803,11 @@ test('_applyToolBreakage checkDriven: no forceBreak breaks nothing (per-tool mod
   const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'flagBroken' } };
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], { forceBreak: false, authority: 'checkDriven' });
   assert.equal(used[0].broken, false);
+  assert.equal(
+    getPath(axe._flags.fabricate, 'fabricate.toolUsage.timesUsed'),
+    9,
+    'the inactive toolSpecific usage counter is unchanged'
+  );
 });
 
 test('_applyToolBreakage checkDriven: virtual-present tool recorded as skipped evidence (not mutated)', async () => {

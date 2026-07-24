@@ -165,6 +165,24 @@ function selectedIngredientItems(selection) {
 }
 
 /**
+ * Resolve the still-live inventory documents named by persisted Item UUIDs.
+ * Timed FINISH uses these concrete documents as Tool exclusions because a
+ * partially consumed stack remains in inventory after START.
+ *
+ * @param {Actor[]} actors
+ * @param {Iterable<string>} itemUuids
+ * @returns {Set<Item>}
+ */
+function resolveLiveInventoryItemsByUuid(actors, itemUuids) {
+  const uuidSet = itemUuids instanceof Set ? itemUuids : new Set(itemUuids);
+  return new Set(
+    (Array.isArray(actors) ? actors : [])
+      .flatMap((actor) => [...(actor?.items ?? [])])
+      .filter((item) => item?.uuid && uuidSet.has(item.uuid))
+  );
+}
+
+/**
  * Return the concrete owned Item documents that a quantity-based consumption
  * plan will touch, in the same order used by `_consumeComponentItems`.
  *
@@ -1266,6 +1284,10 @@ export class CraftingEngine {
         ? prepared.resolvedEssences
         : {};
     const summary = Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [];
+    const consumedLiveItems = resolveLiveInventoryItemsByUuid(
+      componentSourceActors,
+      summary.map((entry) => entry?.itemUuid).filter(Boolean)
+    );
 
     // Reconstruct lightweight consumed-item snapshots. The real Foundry items were
     // deleted at START, so these carry only what chat / history / property-macro
@@ -1305,7 +1327,8 @@ export class CraftingEngine {
       executionRecipe,
       toolsForSet,
       presentTools,
-      craftingActor
+      craftingActor,
+      { excludedItems: consumedLiveItems }
     );
     const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];
 
@@ -2906,6 +2929,7 @@ export class CraftingEngine {
         actor,
         item,
         planned,
+        authority,
         buildItemRef: (_actor, breakItem) => ({
           actorUuid: breakItem?.parent?.uuid || null,
           itemUuid: breakItem?.uuid || null,

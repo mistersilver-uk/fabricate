@@ -758,6 +758,52 @@ test('checkDriven runtime: no trigger match breaks nothing', async () => {
   assert.equal(applied[0].broken, false, 'limitedUses own-mode is ignored under checkDriven; no trigger then no break');
 });
 
+for (const [label, checkResult] of [
+  ['matched trigger', FORCE_RESULT],
+  [
+    'unmatched trigger',
+    engineCheckResult({
+      diceGroups: [{ groupId: 0, group: '1d20', sum: 15, results: [15] }],
+    }),
+  ],
+]) {
+  test(`checkDriven runtime: ${label} never applies retained limitedUses usage`, async () => {
+    const tool = Tool.fromJSON({
+      componentId: 'axe',
+      breakage: { mode: 'limitedUses', maxUses: 10 },
+      onBreak: { mode: 'flagBroken' },
+    });
+    const item = new FakeItem(
+      { fabricate: { toolUsage: { timesUsed: 4 } } },
+      { uuid: 'Item.axe' }
+    );
+    const originalApplyUsage = tool.applyUsage.bind(tool);
+    let applyUsageCalls = 0;
+    tool.applyUsage = async (...args) => {
+      applyUsageCalls += 1;
+      return originalApplyUsage(...args);
+    };
+    const runtime = checkDrivenRuntime([{ tool, item }]);
+    const args = {
+      actor: { uuid: 'Actor.a' },
+      task: { id: `usage-${label}` },
+      system: checkDrivenSystem,
+      checkResult,
+      checkBreakage: FORCE_TRIGGER,
+    };
+
+    await runtime.plan(args);
+    await runtime.apply(args);
+
+    assert.equal(applyUsageCalls, 0, 'checkDriven authority never calls Tool.applyUsage');
+    assert.equal(
+      getPath(item._flags.fabricate, 'fabricate.toolUsage.timesUsed'),
+      4,
+      'the retained toolSpecific limitedUses counter is unchanged'
+    );
+  });
+}
+
 test('checkDriven runtime: virtual-present tools are recorded as skipped, not mutated', async () => {
   const runtime = checkDrivenRuntime([
     { tool: { componentId: 'station', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } }, item: null, virtual: true },

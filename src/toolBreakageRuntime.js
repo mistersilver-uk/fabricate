@@ -383,6 +383,7 @@ export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
  * @param {object} params.actor
  * @param {object} params.item
  * @param {object} [params.planned]                - prior plan entry for this item, if any
+ * @param {string} [params.authority=toolSpecific] - active system breakage authority
  * @param {Function} [params.evaluateExpression]
  * @param {Function} [params.buildItemRef]         - (actor, item) => itemRef
  * @param {Function} [params.createReplacement]    - async ({ actor, target }) => Item|{success: true}|true|null
@@ -393,17 +394,19 @@ export async function applyToolUsageAndBreakage({
   actor,
   item,
   planned,
+  authority = 'toolSpecific',
   evaluateExpression,
   buildItemRef,
   createReplacement,
 } = {}) {
-  await tool.applyUsage(item);
+  if (authority !== 'checkDriven') {
+    await tool.applyUsage(item);
+  }
   const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-  // `applyUsage` has already incremented the persisted `timesUsed`, so the
-  // breakage decision must read the POST-increment count via `Tool#evaluateBreakage`
-  // (its documented contract). Using the plan-phase projector `evaluateToolBreakagePlan`
-  // here would add a second +1 on top of the applied increment and break `limitedUses`
-  // tools one use early (e.g. maxUses:2 breaking on the first craft).
+  // Under tool-specific authority, `applyUsage` has already incremented the
+  // persisted `timesUsed`, so an unplanned decision must read the POST-increment
+  // count via `Tool#evaluateBreakage` (its documented contract). Check-driven
+  // callers provide a planned forced decision and disable retained usage tracking.
   const breakageResult = planned
     ? { mode: planned.mode, broken: planned.broken, evidence: planned.evidence }
     : await tool.evaluateBreakage({ actor, item, evaluateExpression });
@@ -626,6 +629,7 @@ export function createToolBreakageRuntime({
           actor,
           item,
           planned,
+          authority,
           evaluateExpression,
           buildItemRef,
           createReplacement: makeCreateReplacement(system),
