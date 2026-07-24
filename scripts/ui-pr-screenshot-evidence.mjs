@@ -324,6 +324,7 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEventEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringEventsBrowserView\.svelte$/],
   },
   toolStudioFrame('01-library-1280x720', 'Tool Studio — library parity', 'manager-tool-parity-01-library-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('zero-state-empty-library-1280x720', 'Tool Studio — empty library zero state', 'manager-tool-zero-state-empty-library-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('02-overview-1280x720', 'Tool Studio — Overview parity', 'manager-tool-parity-02-overview-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('03-breakage-1280x720', 'Tool Studio — Breakage parity', 'manager-tool-parity-03-breakage-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('04-requirements-1280x720', 'Tool Studio — Requirements parity', 'manager-tool-parity-04-requirements-1280x720', TOOL_STUDIO_MATCHES),
@@ -985,7 +986,7 @@ export function collectScreenshotEvidence({
   const copied = [];
   const missing = [];
   const allImages = existsSync(sourceRoot) ? listImages(sourceRoot).sort((a, b) => a.localeCompare(b)) : [];
-  const toolViews = views.filter((view) => /^(?:0[1-6]-|stress-)/.test(view.id));
+  const toolViews = views.filter(isToolStudioView);
   const toolEvidence = toolViews.length > 0
     ? validateToolStudioRunEvidence({ sourceRoot, views, headSha })
     : null;
@@ -997,11 +998,11 @@ export function collectScreenshotEvidence({
       missing.push(view);
       continue;
     }
-    if (toolEvidence && /^(?:0[1-6]-|stress-)/.test(view.id) && candidates.length !== 1) {
+    if (toolEvidence && isToolStudioView(view) && candidates.length !== 1) {
       throw new Error(`Duplicate Tool Studio screenshot evidence for ${view.id}: ${candidates.length} candidates`);
     }
     const source = candidates[0];
-    if (toolEvidence && /^(?:0[1-6]-|stress-)/.test(view.id)) {
+    if (toolEvidence && isToolStudioView(view)) {
       validateToolStudioCapture(view, source, toolEvidence);
     }
     const destination = join(destinationRoot, `${view.id}${extensionOf(source)}`);
@@ -1017,8 +1018,13 @@ export function collectScreenshotEvidence({
   return { views, copied, missing, destinationRoot };
 }
 
+function isToolStudioView(view) {
+  return view.matches === TOOL_STUDIO_MATCHES;
+}
+
 const TOOL_PARITY_DIMENSIONS = new Map([
   ['01-library-1280x720', [1212, 682]],
+  ['zero-state-empty-library-1280x720', [1212, 682]],
   ['02-overview-1280x720', [1212, 682]],
   ['03-breakage-1280x720', [1212, 682]],
   ['04-requirements-1280x720', [1212, 682]],

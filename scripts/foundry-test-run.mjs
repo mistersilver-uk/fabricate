@@ -4210,6 +4210,13 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       system: sourceSystem,
     });
     if (!source) throw new Error("Tool Studio fixture could not create Smith's Hammer");
+    const replacementSource = await Item.create({
+      name: 'Smoke Tool Studio Replacement Item',
+      type: sourceTemplate.type,
+      img: 'icons/tools/hand/hammer-and-sickle-mechanical.webp',
+      system: clone(sourceSystem),
+    });
+    if (!replacementSource) throw new Error('Tool Studio fixture could not create its replacement Item');
 
     const restore = {
       tools: clone(system.tools || []),
@@ -4219,6 +4226,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       recipeToolBonusModes: clone(recipe.toolBonusModes || {}),
       sourceRoles: clone(source.getFlag('fabricate', 'fabricate.roles') || null),
       sourceCreated: true,
+      replacementSourceCreated: true,
     };
     const prerequisiteId = 'smoke-tool-studio-training';
     const requestedToolId = 'smoke-tool-studio';
@@ -4311,6 +4319,8 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       ...restore,
       toolId,
       sourceItemUuid: source.uuid,
+      replacementSourceItemId: replacementSource.id,
+      replacementSourceItemUuid: replacementSource.uuid,
       uncachedReplacementUuid: `Compendium.dnd5e.items.Item.${uncached._id}`,
     };
   }, { systemId, recipeId });
@@ -4337,6 +4347,8 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
       if (fixture.sourceRoles) await source.setFlag('fabricate', 'fabricate.roles', fixture.sourceRoles);
       if (fixture.sourceCreated) await source.delete();
     }
+    const replacementSource = await fromUuid(fixture.replacementSourceItemUuid);
+    if (replacementSource && fixture.replacementSourceCreated) await replacementSource.delete();
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
   }, { systemId, recipeId, fixture });
 }
@@ -4428,6 +4440,132 @@ async function waitForToolBreakageAuthority(page, systemId) {
   }
 }
 
+async function withSingleToolClipboardWrite(page, expectedUuid, action) {
+  await page.evaluate(() => {
+    const app = globalThis.__fabricateSmokeManagerApp;
+    const services = app?._services;
+    if (!services?.copyToClipboard) throw new Error('Tool source copy service is unavailable');
+    const notifications = globalThis.ui?.notifications;
+    globalThis.__fabricateToolClipboardProbe = {
+      calls: [],
+      info: [],
+      errors: [],
+      services,
+      notifications,
+      originalCopy: services.copyToClipboard,
+      originalInfo: notifications?.info,
+      originalError: notifications?.error,
+    };
+    services.copyToClipboard = async (text) => {
+      globalThis.__fabricateToolClipboardProbe.calls.push(text);
+    };
+    if (notifications) {
+      notifications.info = (message) => globalThis.__fabricateToolClipboardProbe.info.push(message);
+      notifications.error = (message) => globalThis.__fabricateToolClipboardProbe.errors.push(message);
+    }
+  });
+  let observed;
+  try {
+    await action();
+    await page.waitForFunction(() => globalThis.__fabricateToolClipboardProbe?.calls?.length === 1, null, {
+      timeout: 5_000,
+    });
+    observed = await page.evaluate(() => ({
+      calls: [...globalThis.__fabricateToolClipboardProbe.calls],
+      info: [...globalThis.__fabricateToolClipboardProbe.info],
+      errors: [...globalThis.__fabricateToolClipboardProbe.errors],
+    }));
+  } finally {
+    await page.evaluate(() => {
+      const probe = globalThis.__fabricateToolClipboardProbe;
+      if (!probe) return;
+      probe.services.copyToClipboard = probe.originalCopy;
+      if (probe.notifications) {
+        probe.notifications.info = probe.originalInfo;
+        probe.notifications.error = probe.originalError;
+      }
+      delete globalThis.__fabricateToolClipboardProbe;
+    }).catch(() => {});
+  }
+  if (JSON.stringify(observed?.calls) !== JSON.stringify([expectedUuid])) {
+    throw new Error(`Tool source Copy UUID wrote the wrong value or count: ${JSON.stringify(observed)}`);
+  }
+  if (observed.info.length !== 1 || observed.errors.length !== 0) {
+    throw new Error(`Tool source Copy UUID notification was not one honest success: ${JSON.stringify(observed)}`);
+  }
+}
+
+async function assertToolLibraryPagination(page, { expectedTotal, expectedPage = 1, expectScrollable }) {
+  const browser = page.locator('.fabricate-manager [data-manager-tools-browser]').first();
+  const list = browser.locator('[data-tool-library-scroll]');
+  const footer = browser.locator('[data-tool-browser-pagination]');
+  await list.waitFor({ state: 'visible', timeout: 5_000 });
+  await footer.waitFor({ state: 'visible', timeout: 5_000 });
+  const state = await browser.evaluate((element) => {
+    const scroll = element.querySelector('[data-tool-library-scroll]');
+    const pagination = element.querySelector('[data-tool-browser-pagination]');
+    const summary = pagination?.querySelector('[data-pagination-summary]');
+    const nav = pagination?.querySelector('.manager-pagination-nav');
+    const size = pagination?.querySelector('[data-pagination-size]');
+    const rect = (node) => {
+      const value = node?.getBoundingClientRect();
+      return value ? { left: value.left, right: value.right, top: value.top, bottom: value.bottom } : null;
+    };
+    return {
+      browser: rect(element),
+      scroll: rect(scroll),
+      footer: rect(pagination),
+      scrollable: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
+      selectedFirst: element.querySelector('.manager-tools-row:first-child')?.classList.contains('is-selected') === true,
+      ordered: Boolean(
+        summary &&
+        nav &&
+        size &&
+        (summary.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        (nav.compareDocumentPosition(size) & Node.DOCUMENT_POSITION_FOLLOWING)
+      ),
+    };
+  });
+  if (
+    !state.browser ||
+    !state.scroll ||
+    !state.footer ||
+    Math.abs(state.footer.left - state.browser.left) > 2 ||
+    Math.abs(state.footer.right - state.browser.right) > 2 ||
+    Math.abs(state.footer.bottom - state.browser.bottom) > 2 ||
+    state.scroll.bottom > state.footer.top + 2
+  ) {
+    throw new Error(`Tool pagination is not a full-width bottom-pinned footer: ${JSON.stringify(state)}`);
+  }
+  if (!state.ordered) throw new Error('Tool pagination does not match Recipe Studio control ordering');
+  if (expectedPage === 1 && !state.selectedFirst) {
+    throw new Error('Tool library did not preserve automatic first-row selection');
+  }
+  if (expectScrollable !== undefined && state.scrollable !== expectScrollable) {
+    throw new Error(`Tool list scrollability was ${state.scrollable}; expected ${expectScrollable}`);
+  }
+  const summary = await footer.locator('[data-pagination-summary]').textContent();
+  const pageText = await footer.locator('[data-pagination-page]').textContent();
+  if (!summary?.includes(`of ${expectedTotal}`) || !pageText?.includes(`Page ${expectedPage} of`)) {
+    throw new Error(`Tool pagination rendered the wrong dataset/page: ${summary}; ${pageText}`);
+  }
+  const before = await footer.boundingBox();
+  await list.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const after = await footer.boundingBox();
+  if (!before || !after || Math.abs(before.y - after.y) > 1 || Math.abs(before.height - after.height) > 1) {
+    throw new Error(`Tool footer moved when only the result list scrolled: ${JSON.stringify({ before, after })}`);
+  }
+  return after;
+}
+
+async function replaceToolStudioTools(page, systemId, tools) {
+  await page.evaluate(async ({ systemId, tools }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    await csm.updateSystem(systemId, { tools });
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+  }, { systemId, tools });
+}
+
 async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fixture }) {
   // Request the prototype's outer geometry inside its exact source viewport.
   // ApplicationV2 contributes its own frame and V13 truthfully clamps it to that
@@ -4462,6 +4600,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const visibleToolNames = await visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
   if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
     throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
+  }
+  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
+    throw new Error("Tool Studio parity library did not automatically select Smith's Hammer in the first row");
   }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
@@ -4501,6 +4642,72 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (!inspectorDescription?.includes('well-balanced forge hammer')) {
     throw new Error(`Tool Studio parity inspector has the wrong source description: ${inspectorDescription}`);
   }
+  const parityTools = await page.evaluate((systemId) => foundry.utils.deepClone(
+    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools || []
+  ), systemId);
+  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1 });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 524,
+    sourceViewport: { width: 1280, height: 520 },
+  });
+  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectScrollable: true });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await page.evaluate(async ({ systemId, tool }) => {
+    await game.fabricate.getCraftingSystemManager().upsertTool(systemId, tool);
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+  }, {
+    systemId,
+    tool: {
+      id: 'smoke-tool-studio-pagination-ninth',
+      enabled: true,
+      label: 'Zephyr Kiln',
+      breakage: { mode: 'limitedUses', maxUses: 12 },
+      checkBreakable: true,
+      onBreak: { mode: 'destroy' },
+      prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+      bonus: { enabled: false, expression: '' },
+      repairRequirements: [],
+    },
+  });
+  await manager.locator('[data-tool-result-count]').filter({ hasText: '9 tools' })
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1 });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 524,
+    sourceViewport: { width: 1280, height: 520 },
+  });
+  const firstPageFooter = await assertToolLibraryPagination(
+    page,
+    { expectedTotal: 9, expectedPage: 1, expectScrollable: true },
+  );
+  await manager.locator('[data-tool-browser-pagination] [data-pagination-next]').click();
+  const secondPageFooter = await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 2 });
+  if (
+    Math.abs(firstPageFooter.y - secondPageFooter.y) > 1 ||
+    Math.abs(firstPageFooter.width - secondPageFooter.width) > 1 ||
+    Math.abs(firstPageFooter.height - secondPageFooter.height) > 1
+  ) {
+    throw new Error(`Tool footer moved when the page changed: ${JSON.stringify({
+      firstPageFooter,
+      secondPageFooter,
+    })}`);
+  }
+  await replaceToolStudioTools(page, systemId, parityTools);
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await row.waitFor({ state: 'visible', timeout: 5_000 });
+  await page.waitForFunction((toolId) => document
+    .querySelector(`[data-manager-tool-id="${toolId}"]`)
+    ?.classList.contains('is-selected'), fixture.toolId, { timeout: 5_000 });
   const enabledBefore = await enabledToggle.getAttribute('aria-pressed');
   await withSingleToolStoreMutation(
     page,
@@ -4532,6 +4739,19 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', wideGeometry);
+  try {
+    await replaceToolStudioTools(page, systemId, []);
+    await manager.locator('[data-tool-library-empty]').waitFor({ state: 'visible', timeout: 5_000 });
+    await manager.locator('[data-tool-browser-inspector-empty]').waitFor({ state: 'visible', timeout: 5_000 });
+    if (await manager.locator('.manager-tools-row').count() !== 0) {
+      throw new Error('Tool Studio empty-library capture still rendered Tool rows');
+    }
+    await resetToolStudioScroll(page);
+    await captureToolStudioProduct(page, 'manager-tool-zero-state-empty-library-1280x720', wideGeometry);
+  } finally {
+    await replaceToolStudioTools(page, systemId, parityTools);
+    await row.waitFor({ state: 'visible', timeout: 5_000 });
+  }
 
   await setManagerWindowSize(page, {
     width: 614,
@@ -4629,56 +4849,50 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
   const sourceCard = editor.locator('[data-tool-source-card]');
   await assertPointerTarget(page, sourceCard, '[data-tool-source-card]', 'Tool Item drop target');
-  const sourceDataTransfer = await page.evaluateHandle((uuid) => {
-    const dataTransfer = new DataTransfer();
-    dataTransfer.setData('text/plain', JSON.stringify({ type: 'Item', uuid }));
-    return dataTransfer;
-  }, fixture.sourceItemUuid);
-  try {
-    await withSingleToolStoreMutation(
-      page,
-      'stageToolDraftSource',
-      'Tool Item drop',
-      () => sourceCard.dispatchEvent('drop', { dataTransfer: sourceDataTransfer }),
-      () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
-    );
-  } finally {
-    await sourceDataTransfer.dispose();
-  }
-  const sourceUnlink = editor.locator('[data-tool-source-unlink]');
-  await assertPointerTarget(page, sourceUnlink, '[data-tool-source-unlink]', 'Tool Item unlink');
-  await withSingleToolStoreMutation(
-    page,
-    'unlinkToolDraftSource',
-    'Tool Item unlink',
-    () => sourceUnlink.click(),
-    () => sourceUnlink.waitFor({ state: 'detached', timeout: 5_000 }),
-  );
-  const sourceReplaceDetails = editor.locator('.manager-tool-source-replace');
-  const sourceReplaceDisclosure = sourceReplaceDetails.locator(':scope > summary');
-  await assertPointerTarget(page, sourceReplaceDisclosure, '.manager-tool-source-replace > summary', 'Tool Item replacement disclosure');
-  await sourceReplaceDisclosure.click();
-  const sourcePicker = editor.locator('[data-tool-source-picker]');
-  await assertPointerTarget(page, sourcePicker, '[data-tool-source-picker]', 'Tool Item picker');
+  await page.locator('#sidebar [data-tab="items"]').first().click({ force: true });
+  const replacementSourceItem = page.locator([
+    `#sidebar .directory-item[data-entry-id="${fixture.replacementSourceItemId}"]`,
+    `#sidebar .directory-item[data-document-id="${fixture.replacementSourceItemId}"]`,
+  ].join(', ')).first();
+  await replacementSourceItem.waitFor({ state: 'visible', timeout: 10_000 });
   await withSingleToolStoreMutation(
     page,
     'stageToolDraftSource',
-    'Tool Item picker',
-    () => selectOptionAndAssertSingleChange(
-      sourcePicker,
-      fixture.sourceItemUuid,
-      'Tool Item picker',
-      { expectRetainedValue: false },
-    ),
-    () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
+    'Tool Item sidebar drag',
+    () => replacementSourceItem.dragTo(sourceCard),
+    () => sourceCard.filter({ hasText: 'Smoke Tool Studio Replacement Item' })
+      .waitFor({ state: 'visible', timeout: 5_000 }),
   );
-  if (await sourceReplaceDetails.getAttribute('open') !== null) {
-    await sourceReplaceDisclosure.click();
-  }
-  if (await sourceReplaceDetails.getAttribute('open') !== null) {
-    throw new Error('Tool Item replacement disclosure remained open after source restoration');
-  }
-  await saveToolStudioDraftIfDirty(editor);
+  const copySourceUuid = editor.locator('[data-tool-source-copy-uuid]');
+  await assertPointerTarget(page, copySourceUuid, '[data-tool-source-copy-uuid]', 'Copy source UUID');
+  await withSingleToolClipboardWrite(
+    page,
+    fixture.replacementSourceItemUuid,
+    () => copySourceUuid.click(),
+  );
+  await editor.locator('[data-tool-editor-back]').click();
+  const discardDraft = page.locator(
+    '.dialog button[data-action="discard"], .dialog button:has-text("Discard")'
+  ).first();
+  await discardDraft.waitFor({ state: 'visible', timeout: 5_000 });
+  await discardDraft.click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]')
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool Edit route after source discard',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
+      .waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await editor.locator('[data-tool-source-card]').filter({ hasText: "Smith's Hammer" })
+    .waitFor({ state: 'visible', timeout: 5_000 });
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);

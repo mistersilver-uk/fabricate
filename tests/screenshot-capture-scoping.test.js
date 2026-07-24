@@ -37,6 +37,7 @@ const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const TOOL_STUDIO_LABELS = [
   'manager-tool-parity-01-library-1280x720',
+  'manager-tool-zero-state-empty-library-1280x720',
   'manager-tool-parity-02-overview-1280x720',
   'manager-tool-stress-long-name',
   'manager-tool-parity-03-breakage-1280x720',
@@ -108,6 +109,7 @@ test('styles/fabricate.css scopes to the Tool parity/stress set, two rail frames
     'stress-replacement',
     'stress-wrapping-680',
     'theme-or-global-ui',
+    'zero-state-empty-library-1280x720',
   ]);
 });
 
@@ -394,6 +396,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /normalized Tool snapshot[\s\S]*?description: 'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
   );
   assert.match(HARNESS, /const expectedToolNames = \[[\s\S]*?"Smith's Hammer"[\s\S]*?'Woodcarving Tools'/);
+  assert.match(
+    toolStudioWalk,
+    /did not automatically select Smith's Hammer[\s\S]*?const otherSelectTarget/,
+    'first-row auto-selection must be observed before any harness selection click',
+  );
   assert.match(HARNESS, /visibleToolRows\.first\(\)[\s\S]*?Tool Studio parity library must select Smith's Hammer in the first row/);
   assert.match(HARNESS, /data-tool-inspector-description[\s\S]*?well-balanced forge hammer/);
   assert.match(
@@ -401,9 +408,20 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /route transition asks ApplicationV2[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}/,
   );
   assert.match(
+    toolStudioWalk,
+    /replacementSourceItem[\s\S]*?\.dragTo\(sourceCard\)[\s\S]*?withSingleToolClipboardWrite\([\s\S]*?fixture\.replacementSourceItemUuid[\s\S]*?copySourceUuid\.click\(\)[\s\S]*?data-tool-editor-back[\s\S]*?data-action="discard"[\s\S]*?Smith's Hammer/,
+    'the second world Item must replace the source through a real sidebar drag, Copy UUID, and UI Discard restore',
+  );
+  assert.doesNotMatch(toolStudioWalk, /new DataTransfer|dispatchEvent\('drop'|data-tool-source-picker|manager-tool-source-replace/);
+  assert.match(HARNESS, /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/);
+  assert.match(
     HARNESS,
-    /sourceReplaceDisclosure\.click\(\);[\s\S]*?const sourcePicker = editor\.locator\('\[data-tool-source-picker\]'\);[\s\S]*?stageToolDraftSource[\s\S]*?selectOptionAndAssertSingleChange\([\s\S]*?fixture\.sourceItemUuid[\s\S]*?sourceReplaceDisclosure\.click\(\);/,
-    'the hidden replacement picker must perform one real source mutation and close before parity capture',
+    /async function assertToolLibraryPagination[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?selectedFirst[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,
+  );
+  assert.match(
+    toolStudioWalk,
+    /expectedTotal: 8[\s\S]*?sourceViewport: \{ width: 1280, height: 520 \}[\s\S]*?expectedTotal: 8[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?expectedTotal: 9[\s\S]*?data-pagination-next[\s\S]*?expectedPage: 2[\s\S]*?Tool footer moved when the page changed/,
+    'the real library must cover tall/short one-page and 9+ pagination states',
   );
   assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
   assert.match(
@@ -423,6 +441,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   for (const label of [
     'manager-tool-parity-01-library-1280x720',
+    'manager-tool-zero-state-empty-library-1280x720',
     'manager-tool-parity-02-overview-1280x720',
     'manager-tool-parity-03-breakage-1280x720',
     'manager-tool-parity-04-requirements-1280x720',
@@ -448,11 +467,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?680px/);
   assert.match(toolStudioWalk, /persistedEnabledBefore[\s\S]*?enabled === !before[\s\S]*?enabled === before/);
   assert.match(toolStudioWalk, /selectedToolIds[\s\S]*?fixture\.toolId/);
-  assert.match(
-    toolStudioWalk,
-    /sourceReplaceDetails\.getAttribute\('open'\)[\s\S]*?sourceReplaceDisclosure\.click\(\)[\s\S]*?remained open after source restoration/,
-    'Overview parity must close and verify the Item replacement disclosure before capture',
-  );
+  assert.match(toolStudioWalk, /data-tool-library-empty[\s\S]*?data-tool-browser-inspector-empty[\s\S]*?manager-tool-zero-state-empty-library-1280x720/);
   assert.match(HARNESS, /did not transition exactly once/);
   assert.match(HARNESS, /did not apply its observable toggle effect/);
   assert.doesNotMatch(HARNESS, /assertSinglePointerDispatch/);

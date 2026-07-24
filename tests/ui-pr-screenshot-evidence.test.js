@@ -88,6 +88,7 @@ function withScreenshotFixtures(fixtures, runAssert) {
 
 const TOOL_STUDIO_VIEWS = [
   ['01-library-1280x720', 'manager-tool-parity-01-library-1280x720', 1212, 682],
+  ['zero-state-empty-library-1280x720', 'manager-tool-zero-state-empty-library-1280x720', 1212, 682],
   ['02-overview-1280x720', 'manager-tool-parity-02-overview-1280x720', 1212, 682],
   ['03-breakage-1280x720', 'manager-tool-parity-03-breakage-1280x720', 1212, 682],
   ['04-requirements-1280x720', 'manager-tool-parity-04-requirements-1280x720', 1212, 682],
@@ -185,7 +186,7 @@ describe('UI PR screenshot evidence', () => {
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
   ];
 
-  it('maps every changed Tool Studio UI file to six parity frames and separate stress evidence', () => {
+  it('maps every changed Tool Studio UI file to parity, zero-state, and separate stress evidence', () => {
     for (const file of toolStudioFiles) {
       const toolViews = mapChangedFilesToViews([file]).filter((view) =>
         TOOL_STUDIO_VIEWS.some(([id]) => id === view.id)
@@ -878,7 +879,11 @@ describe('UI PR screenshot evidence', () => {
       ],
       [toolStudioEvidenceFixtures({ headSha: 'stale123' }), 'abc1234', /stale for the requested PR head SHA/],
       [
-        toolStudioEvidenceFixtures({ targetLabels: TOOL_STUDIO_VIEWS.slice(1).map(([, label]) => label) }),
+        toolStudioEvidenceFixtures({
+          targetLabels: TOOL_STUDIO_VIEWS
+            .filter(([id]) => id !== 'zero-state-empty-library-1280x720')
+            .map(([, label]) => label),
+        }),
         'abc1234',
         /another target-label set/,
       ],
@@ -919,7 +924,9 @@ describe('UI PR screenshot evidence', () => {
       ],
       [
         toolStudioEvidenceFixtures({
-          capturePatch: ({ index }) => index === 5 ? { height: 666 } : {},
+          capturePatch: ({ label }) => label === 'manager-tool-parity-06-breakage-900x700'
+            ? { height: 666 }
+            : {},
         }),
         /Wrong Tool Studio dimensions for 06-breakage-900x700: 832x666; expected 832x662/,
       ],

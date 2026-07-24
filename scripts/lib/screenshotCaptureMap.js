@@ -145,6 +145,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-gathering-travel-normal',
   'manager-gathering-travel-stacked',
   'manager-tool-parity-01-library-1280x720',
+  'manager-tool-zero-state-empty-library-1280x720',
   'manager-tool-parity-02-overview-1280x720',
   'manager-tool-stress-long-name',
   'manager-tool-parity-03-breakage-1280x720',
