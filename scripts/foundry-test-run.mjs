@@ -1783,16 +1783,106 @@ async function assertPointerTarget(page, locator, targetSelector, label) {
   }
 }
 
+function assertSingleToolMutation(report, expectedMethod, label) {
+  const matchingCalls = report?.calls?.filter((call) => call.method === expectedMethod) ?? [];
+  const unexpectedCalls = report?.calls?.filter((call) => call.method !== expectedMethod) ?? [];
+  if (matchingCalls.length !== 1 || unexpectedCalls.length > 0) {
+    throw new Error(
+      `${label} must dispatch exactly one ${expectedMethod} mutation: ${JSON.stringify(report)}`
+    );
+  }
+}
+
+async function beginToolStoreMutationProbe(page, methodNames) {
+  await page.evaluate((names) => {
+    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+    if (!store) throw new Error('Tool mutation probe could not resolve the live manager store');
+    if (globalThis.__fabricateToolMutationProbe) {
+      throw new Error('Tool mutation probe was already active');
+    }
+    const calls = [];
+    const originals = new Map();
+    for (const method of names) {
+      const original = store[method];
+      if (typeof original !== 'function') {
+        throw new Error(`Tool mutation probe could not wrap store.${method}`);
+      }
+      originals.set(method, original);
+      store[method] = function (...args) {
+        calls.push({
+          method,
+          args: args.map((value) => {
+            try {
+              return JSON.parse(JSON.stringify(value));
+            } catch {
+              return String(value);
+            }
+          }),
+        });
+        return original.apply(this, args);
+      };
+    }
+    globalThis.__fabricateToolMutationProbe = { store, calls, originals };
+  }, methodNames);
+}
+
+async function finishToolStoreMutationProbe(page) {
+  return page.evaluate(() => {
+    const probe = globalThis.__fabricateToolMutationProbe;
+    if (!probe) return { calls: [], missing: true };
+    for (const [method, original] of probe.originals) {
+      probe.store[method] = original;
+    }
+    delete globalThis.__fabricateToolMutationProbe;
+    return { calls: probe.calls };
+  });
+}
+
+async function withSingleToolStoreMutation(page, method, label, action, assertEffect) {
+  await beginToolStoreMutationProbe(page, [method]);
+  let report;
+  try {
+    await action();
+    await assertEffect();
+  } finally {
+    report = await finishToolStoreMutationProbe(page);
+  }
+  assertSingleToolMutation(report, method, label);
+}
+
 async function clickToolTabAndAssertEffect(page, editor, name, label) {
   const target = editor.locator(`#tool-tab-${name}`);
   await assertPointerTarget(page, target, `#tool-tab-${name}`, label);
+  if (await target.getAttribute('aria-selected') !== 'false') {
+    throw new Error(`${label} must begin on a different Tool tab`);
+  }
+  await target.evaluate((element) => {
+    const transitions = [];
+    const observer = new MutationObserver(() => {
+      transitions.push(element.getAttribute('aria-selected'));
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ['aria-selected'] });
+    element.__fabricateToolTabProbe = { observer, transitions };
+  });
   await target.click();
   await editor.locator(`[data-tool-editor-panel="${name}"]`).waitFor({ state: 'visible', timeout: 5_000 });
-  const effect = await editor.locator('.manager-tool-editor-tabs').evaluate((tablist, expectedName) => ({
-    selected: tablist.querySelectorAll('[role="tab"][aria-selected="true"]').length,
-    expectedSelected: tablist.querySelector(`#tool-tab-${expectedName}`)?.getAttribute('aria-selected'),
-  }), name);
-  if (effect.selected !== 1 || effect.expectedSelected !== 'true') {
+  const effect = await target.evaluate((element) => {
+    const probe = element.__fabricateToolTabProbe;
+    probe?.observer?.disconnect();
+    delete element.__fabricateToolTabProbe;
+    const tablist = element.closest('[role="tablist"]');
+    return {
+      selected: tablist?.querySelectorAll('[role="tab"][aria-selected="true"]').length ?? 0,
+      expectedSelected: element.getAttribute('aria-selected'),
+      selectedTransitions: probe?.transitions?.filter((value) => value === 'true').length ?? 0,
+      transitions: probe?.transitions ?? [],
+    };
+  });
+  if (
+    effect.selected !== 1
+    || effect.expectedSelected !== 'true'
+    || effect.selectedTransitions !== 1
+  ) {
     throw new Error(`${label} did not transition exactly once to ${name}: ${JSON.stringify(effect)}`);
   }
 }
@@ -1800,13 +1890,51 @@ async function clickToolTabAndAssertEffect(page, editor, name, label) {
 async function toggleToolControlAndRestore(page, locator, label) {
   await assertPointerTarget(page, locator, 'input', label);
   const before = await locator.isChecked();
-  await locator.click();
-  if (await locator.isChecked() === before) {
-    throw new Error(`${label} did not apply its observable toggle effect`);
-  }
-  await locator.click();
-  if (await locator.isChecked() !== before) {
-    throw new Error(`${label} did not restore its original persisted state`);
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    `${label} apply`,
+    () => locator.click(),
+    async () => {
+      if (await locator.isChecked() === before) {
+        throw new Error(`${label} did not apply its observable toggle effect`);
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    `${label} restore`,
+    () => locator.click(),
+    async () => {
+      if (await locator.isChecked() !== before) {
+        throw new Error(`${label} did not restore its original persisted state`);
+      }
+    },
+  );
+}
+
+async function selectOptionAndAssertSingleChange(locator, value, label) {
+  await locator.evaluate((element) => {
+    element.__fabricateSelectChangeCount = 0;
+    element.__fabricateSelectChangeListener = () => {
+      element.__fabricateSelectChangeCount += 1;
+    };
+    element.addEventListener('change', element.__fabricateSelectChangeListener);
+  });
+  await locator.selectOption(value);
+  const effect = await locator.evaluate((element) => {
+    element.removeEventListener('change', element.__fabricateSelectChangeListener);
+    const report = {
+      changes: element.__fabricateSelectChangeCount,
+      value: element.value,
+    };
+    delete element.__fabricateSelectChangeCount;
+    delete element.__fabricateSelectChangeListener;
+    return report;
+  });
+  if (effect.changes !== 1 || effect.value !== value) {
+    throw new Error(`${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`);
   }
 }
 
@@ -1857,34 +1985,115 @@ async function assertDisabledToolOnBreakFieldset(fieldset) {
   }
 }
 
-async function resetToolStudioScroll(page) {
-  const scroll = await page.evaluate(() => {
-    const selectors = [
-      '.fabricate-manager .manager-body',
-      '.fabricate-manager .manager-main',
-      '.fabricate-manager [data-tool-editor-panel]',
-      '.fabricate-manager [data-tool-behavior-preview]',
-      '.fabricate-manager .manager-inspector',
-    ];
-    const positions = {};
-    for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      if (!element) continue;
-      element.scrollTop = 0;
-      positions[selector] = element.scrollTop;
-    }
-    return positions;
-  });
-  const unsettled = Object.entries(scroll).filter(([, top]) => top !== 0);
+function assertToolStudioHorizontalScrollSettled(positions, label) {
+  const unsettled = (positions || []).filter(({ scrollLeft }) => scrollLeft !== 0);
   if (unsettled.length > 0) {
-    throw new Error(`Tool Studio scroll reset failed: ${JSON.stringify(unsettled)}`);
+    throw new Error(`${label} leaked horizontal scroll: ${JSON.stringify(unsettled)}`);
   }
 }
 
-async function scrollToolEditorPanelToReveal(editor, selector, label) {
+async function readToolStudioHorizontalScroll(page, { reset = false } = {}) {
+  return page.evaluate((shouldReset) => {
+    const manager = document.querySelector('#fabricate-crafting-system-manager .fabricate-manager');
+    if (!manager) return [];
+    const explicitSelectors = [
+      'html',
+      'body',
+      '#fabricate-crafting-system-manager',
+      '.fabricate-manager',
+      '.fabricate-manager .manager-body',
+      '.fabricate-manager .manager-main',
+      '.fabricate-manager [data-tool-edit-view]',
+      '.fabricate-manager .manager-tool-editor-tabs',
+      '.fabricate-manager [data-tool-editor-panel]',
+      '.fabricate-manager [data-tool-behavior-preview]',
+      '.fabricate-manager .manager-inspector',
+      '.fabricate-manager .manager-tool-repair',
+      '.fabricate-manager [data-tool-repair-group]',
+    ];
+    const elements = new Set([document.scrollingElement]);
+    for (const selector of explicitSelectors) {
+      for (const element of document.querySelectorAll(selector)) elements.add(element);
+    }
+    for (const element of manager.querySelectorAll('*')) {
+      if (element.scrollWidth > element.clientWidth + 1) elements.add(element);
+    }
+    const positions = [];
+    let index = 0;
+    for (const element of elements) {
+      if (!element) continue;
+      if (shouldReset) element.scrollLeft = 0;
+      positions.push({
+        index,
+        tag: element.tagName,
+        id: element.id || '',
+        className: String(element.className || ''),
+        scrollLeft: element.scrollLeft,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      });
+      index += 1;
+    }
+    return positions;
+  }, reset);
+}
+
+async function assertToolStudioHorizontalScroll(page, label) {
+  const positions = await readToolStudioHorizontalScroll(page);
+  assertToolStudioHorizontalScrollSettled(positions, label);
+}
+
+async function resetToolStudioHorizontalScroll(page, label = 'Tool Studio') {
+  await readToolStudioHorizontalScroll(page, { reset: true });
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await assertToolStudioHorizontalScroll(page, `${label} horizontal reset`);
+}
+
+async function resetToolStudioScroll(page) {
+  const selectors = [
+    '.fabricate-manager .manager-body',
+    '.fabricate-manager .manager-main',
+    '.fabricate-manager [data-tool-editor-panel]',
+    '.fabricate-manager [data-tool-behavior-preview]',
+    '.fabricate-manager .manager-inspector',
+  ];
+  await page.evaluate((targets) => {
+    for (const selector of targets) {
+      for (const element of document.querySelectorAll(selector)) element.scrollTop = 0;
+    }
+  }, selectors);
+  await resetToolStudioHorizontalScroll(page);
+  const scroll = await page.evaluate((targets) => targets.flatMap((selector) => (
+    Array.from(document.querySelectorAll(selector), (element, index) => ({
+      selector,
+      index,
+      scrollTop: element.scrollTop,
+    }))
+  )), selectors);
+  const unsettled = scroll.filter(({ scrollTop }) => scrollTop !== 0);
+  if (unsettled.length > 0) {
+    throw new Error(`Tool Studio vertical scroll reset failed: ${JSON.stringify(unsettled)}`);
+  }
+}
+
+async function scrollToolEditorPanelToReveal(page, editor, selector, label) {
   const panel = editor.locator('[data-tool-editor-panel]');
   const target = editor.locator(selector);
+  const fixedBefore = await editor.evaluate(() => {
+    const read = (selector) => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    };
+    return {
+      header: read('[data-tool-editor-header]'),
+      tabs: read('.manager-tool-editor-tabs'),
+      preview: read('[data-tool-behavior-preview]'),
+    };
+  });
   await target.scrollIntoViewIfNeeded();
+  await resetToolStudioHorizontalScroll(page, label);
   const report = await panel.evaluate((element, targetSelector) => {
     const targetElement = element.querySelector(targetSelector);
     if (!targetElement) return null;
@@ -1893,10 +2102,32 @@ async function scrollToolEditorPanelToReveal(editor, selector, label) {
     return {
       scrollTop: element.scrollTop,
       targetVisible: targetRect.top >= panelRect.top && targetRect.bottom <= panelRect.bottom,
+      targetContained: targetRect.left >= panelRect.left - 1 && targetRect.right <= panelRect.right + 1,
     };
   }, selector);
-  if (!report || report.scrollTop <= 0 || !report.targetVisible) {
+  if (!report || report.scrollTop <= 0 || !report.targetVisible || !report.targetContained) {
     throw new Error(`${label} stress control was not visibly scrolled into the editor pane: ${JSON.stringify(report)}`);
+  }
+  const fixedAfter = await editor.evaluate(() => {
+    const read = (selector) => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    };
+    return {
+      header: read('[data-tool-editor-header]'),
+      tabs: read('.manager-tool-editor-tabs'),
+      preview: read('[data-tool-behavior-preview]'),
+    };
+  });
+  for (const key of ['header', 'tabs', 'preview']) {
+    for (const edge of ['left', 'right', 'top', 'bottom']) {
+      if (Math.abs((fixedBefore[key]?.[edge] ?? 0) - (fixedAfter[key]?.[edge] ?? 0)) > 1) {
+        throw new Error(
+          `${label} moved fixed ${key} context while revealing stress content: `
+          + `${JSON.stringify({ fixedBefore, fixedAfter })}`
+        );
+      }
+    }
   }
   for (const [identitySelector, identityLabel] of [
     ['[data-tool-editor-header]', 'header'],
@@ -1923,9 +2154,11 @@ async function captureToolStudioProduct(page, label, expectedGeometry) {
       `${label} Tool Studio product rectangle drifted: ${JSON.stringify({ measured, expectedGeometry })}`
     );
   }
+  await assertToolStudioHorizontalScroll(page, `${label} before capture`);
   await screenshot(page, label, {
     clip: { x: box.x, y: box.y, width: box.width, height: box.height },
   });
+  await assertToolStudioHorizontalScroll(page, `${label} after capture`);
 }
 
 async function readToolStudioLayout(page) {
@@ -1965,6 +2198,17 @@ async function readToolStudioLayout(page) {
         scrollHeight: element.scrollHeight,
       };
     };
+    const readHorizontalOverflow = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        overflowX: style.overflowX,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        scrollLeft: element.scrollLeft,
+      };
+    };
     return {
       manager: readRect('.fabricate-manager'),
       body: readRect('.fabricate-manager .manager-body'),
@@ -1976,6 +2220,22 @@ async function readToolStudioLayout(page) {
       editorHeader: readRect('[data-tool-editor-header]'),
       editorActions: readRect('.manager-tool-edit-actions'),
       tabs: readRect('.manager-tool-editor-tabs'),
+      tabButtons: Array.from(
+        document.querySelectorAll('.manager-tool-editor-tabs > [role="tab"]'),
+        (element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            id: element.id,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+          };
+        },
+      ),
+      tabsOverflow: readHorizontalOverflow('.manager-tool-editor-tabs'),
       composition: readRect('.manager-tool-edit-composition')?.width > 0
         ? readRect('.manager-tool-edit-composition')
         : readRect('.fabricate-manager .manager-body'),
@@ -2000,6 +2260,25 @@ async function readToolStudioLayout(page) {
 function assertHorizontalContainment(parent, child, label) {
   if (!parent || !child || child.left < parent.left - 1 || child.right > parent.right + 1) {
     throw new Error(`${label} escapes horizontal containment: ${JSON.stringify({ parent, child })}`);
+  }
+}
+
+function assertToolStudioTabContainment(report) {
+  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 4) {
+    throw new Error(`Tool editor must render four measurable tabs: ${JSON.stringify(report)}`);
+  }
+  const overflow = report.tabsOverflow;
+  if (
+    !overflow
+    || overflow.scrollLeft !== 0
+    || overflow.scrollWidth > overflow.clientWidth + 1
+    || !['hidden', 'clip'].includes(overflow.overflowX)
+  ) {
+    throw new Error(`Tool editor tabs remain horizontally scrollable: ${JSON.stringify(overflow)}`);
+  }
+  for (const tab of report.tabButtons) {
+    assertHorizontalContainment(report.tabs, tab, `${tab.id} within visible tab list`);
+    assertHorizontalContainment(report.manager, tab, `${tab.id} within Tool Studio product root`);
   }
 }
 
@@ -2045,6 +2324,7 @@ async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
   ]) {
     assertHorizontalContainment(parent, child, label);
   }
+  assertToolStudioTabContainment(report);
   assertToolStudioTypography(report, [
     ['editorNameType', 20, 'Tool editor name'],
     ['previewNameType', 17, 'Tool preview name'],
@@ -4114,11 +4394,29 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection');
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
   await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit');
-  await selectTarget.click();
-  await row.waitFor({ state: 'visible' });
-  if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
-    throw new Error('Tool row selection did not expose selected state');
-  }
+  const otherSelectTarget = visibleToolRows.nth(1).locator('.manager-tools-select-target');
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'Tool alternate-row selection',
+    () => otherSelectTarget.click(),
+    async () => {
+      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool alternate-row selection did not expose selected state');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'Tool parity-row selection',
+    () => selectTarget.click(),
+    async () => {
+      if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool row selection did not expose selected state');
+      }
+    },
+  );
   if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
     throw new Error("Tool Studio parity library must select Smith's Hammer in the first row");
   }
@@ -4127,11 +4425,28 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     throw new Error(`Tool Studio parity inspector has the wrong source description: ${inspectorDescription}`);
   }
   const enabledBefore = await enabledToggle.getAttribute('aria-pressed');
-  await enabledToggle.click();
-  await enabledToggle.click();
-  if (await enabledToggle.getAttribute('aria-pressed') !== enabledBefore) {
-    throw new Error('Tool enabled toggle did not persist and restore independently');
-  }
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle apply',
+    () => enabledToggle.click(),
+    async () => {
+      if (await enabledToggle.getAttribute('aria-pressed') === enabledBefore) {
+        throw new Error('Tool enabled toggle did not persist independently');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle restore',
+    () => enabledToggle.click(),
+    async () => {
+      if (await enabledToggle.getAttribute('aria-pressed') !== enabledBefore) {
+        throw new Error('Tool enabled toggle did not restore independently');
+      }
+    },
+  );
   if (await liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]').count() > 0) {
     throw new Error('Tool toggle incorrectly opened the editor');
   }
@@ -4147,9 +4462,29 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     sourceViewport: { width: 680, height: 700 },
   });
   await resetToolStudioScroll(page);
-  await visibleToolRows.nth(1).locator('.manager-tools-select-target').click();
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'Tool 680px alternate-row selection',
+    () => visibleToolRows.nth(1).locator('.manager-tools-select-target').click(),
+    async () => {
+      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool 680px alternate-row selection did not expose selected state');
+      }
+    },
+  );
   await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection at 680px');
-  await selectTarget.click();
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'Tool row selection at 680px',
+    () => selectTarget.click(),
+    async () => {
+      if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool row selection at 680px did not expose selected state');
+      }
+    },
+  );
   const selectedToolIds = await visibleToolRows.evaluateAll((rows) => rows
     .filter((candidate) => candidate.classList.contains('is-selected'))
     .map((candidate) => candidate.dataset.managerToolId));
@@ -4160,18 +4495,33 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled
   ), { systemId, toolId: fixture.toolId });
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle at 680px');
-  await enabledToggle.click();
-  await page.waitForFunction(({ systemId, toolId, before }) => (
-    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === !before
-  ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore });
-  await enabledToggle.click();
-  await page.waitForFunction(({ systemId, toolId, before }) => (
-    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === before
-  ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore });
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle at 680px apply',
+    () => enabledToggle.click(),
+    () => page.waitForFunction(({ systemId, toolId, before }) => (
+      game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === !before
+    ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore }),
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle at 680px restore',
+    () => enabledToggle.click(),
+    () => page.waitForFunction(({ systemId, toolId, before }) => (
+      game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === before
+    ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore }),
+  );
   await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
-  await editButton.click();
-  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-editor-header] h2')
-    .filter({ hasText: "Smith's Hammer" }).waitFor({ state: 'visible', timeout: 5_000 });
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'Tool Edit route at 680px',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-editor-header] h2')
+      .filter({ hasText: "Smith's Hammer" }).waitFor({ state: 'visible', timeout: 5_000 }),
+  );
   await liveManagerApp.locator('[data-tool-editor-back]').click();
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
   await setManagerWindowSize(page, {
@@ -4180,7 +4530,14 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     sourceViewport: { width: 1280, height: 720 },
   });
 
-  await editButton.click();
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'Tool Edit route at 1280px',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
+      .waitFor({ state: 'visible', timeout: 5_000 }),
+  );
   const editorManager = liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]');
   await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
   // The route transition asks ApplicationV2 to adopt the editor's default size;
@@ -4193,13 +4550,53 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
-  await assertPointerTarget(page, editor.locator('[data-tool-source-card]'), '[data-tool-source-card]', 'Tool Item drop target');
-  await assertPointerTarget(page, editor.locator('[data-tool-source-unlink]'), '[data-tool-source-unlink]', 'Tool Item unlink');
+  const sourceCard = editor.locator('[data-tool-source-card]');
+  await assertPointerTarget(page, sourceCard, '[data-tool-source-card]', 'Tool Item drop target');
+  const sourceDataTransfer = await page.evaluateHandle((uuid) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/plain', JSON.stringify({ type: 'Item', uuid }));
+    return dataTransfer;
+  }, fixture.sourceItemUuid);
+  try {
+    await withSingleToolStoreMutation(
+      page,
+      'stageToolDraftSource',
+      'Tool Item drop',
+      () => sourceCard.dispatchEvent('drop', { dataTransfer: sourceDataTransfer }),
+      () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
+    );
+  } finally {
+    await sourceDataTransfer.dispose();
+  }
+  const sourceUnlink = editor.locator('[data-tool-source-unlink]');
+  await assertPointerTarget(page, sourceUnlink, '[data-tool-source-unlink]', 'Tool Item unlink');
+  await withSingleToolStoreMutation(
+    page,
+    'unlinkToolDraftSource',
+    'Tool Item unlink',
+    () => sourceUnlink.click(),
+    () => sourceUnlink.waitFor({ state: 'detached', timeout: 5_000 }),
+  );
   const sourceReplaceDisclosure = editor.locator('.manager-tool-source-replace > summary');
   await assertPointerTarget(page, sourceReplaceDisclosure, '.manager-tool-source-replace > summary', 'Tool Item replacement disclosure');
   await sourceReplaceDisclosure.click();
-  await assertPointerTarget(page, editor.locator('[data-tool-source-picker]'), '[data-tool-source-picker]', 'Tool Item picker');
-  await sourceReplaceDisclosure.click();
+  const sourcePicker = editor.locator('[data-tool-source-picker]');
+  await assertPointerTarget(page, sourcePicker, '[data-tool-source-picker]', 'Tool Item picker');
+  await withSingleToolStoreMutation(
+    page,
+    'stageToolDraftSource',
+    'Tool Item picker',
+    () => selectOptionAndAssertSingleChange(
+      sourcePicker,
+      fixture.sourceItemUuid,
+      'Tool Item picker',
+    ),
+    () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  if (await sourceReplaceDisclosure.getAttribute('open') !== null) {
+    await sourceReplaceDisclosure.click();
+  }
+  await saveToolStudioDraftIfDirty(editor);
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
@@ -4217,47 +4614,168 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
     await assertPointerTarget(page, tab(name), `#tool-tab-${name}`, `Tool ${name} tab`);
   }
-  await tab('breakage').click();
-  await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 1280px');
   await assertSavedToolStudioCapture(editor, 'Breakage parity');
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', wideGeometry);
-  await editor.locator('input[name="tool-on-break"][value="flagBroken"]').check();
-  await editor.locator('[data-tool-repair-add-group]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await assertPointerTarget(page, editor.locator('[data-tool-repair-add-group]').first(), '[data-tool-repair-add-group]', 'Tool repair AND control');
-  await assertPointerTarget(page, editor.locator('[data-tool-repair-group] [data-recipe-add="alternative-component"]'), '[data-tool-repair-group] [data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
+  const flagBrokenChoice = editor.locator('input[name="tool-on-break"][value="flagBroken"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool flag-broken action',
+    () => flagBrokenChoice.check(),
+    async () => {
+      if (!(await flagBrokenChoice.isChecked())) throw new Error('Tool flag-broken action did not apply');
+    },
+  );
+  const initialRepairGroupCount = await editor.locator('[data-tool-repair-group]').count();
+  const addRepairGroup = editor.locator('[data-tool-repair-add-group="tags"]');
+  await assertPointerTarget(page, addRepairGroup, '[data-tool-repair-add-group="tags"]', 'Tool repair AND control');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair AND add',
+    () => addRepairGroup.click(),
+    async () => {
+      if (await editor.locator('[data-tool-repair-group]').count() !== initialRepairGroupCount + 1) {
+        throw new Error('Tool repair AND control did not add exactly one group');
+      }
+    },
+  );
+  const addedRepairGroupRemove = editor.locator('[data-tool-repair-group]').last().locator(':scope > .manager-icon-button');
+  await assertPointerTarget(page, addedRepairGroupRemove, '.manager-tool-repair-group > .manager-icon-button', 'Tool repair AND restore');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair AND restore',
+    () => addedRepairGroupRemove.click(),
+    async () => {
+      if (await editor.locator('[data-tool-repair-group]').count() !== initialRepairGroupCount) {
+        throw new Error('Tool repair AND restore did not remove exactly one group');
+      }
+    },
+  );
+  const firstRepairGroup = editor.locator('[data-tool-repair-group]').first();
+  const initialRepairOptionCount = await firstRepairGroup.locator('[data-recipe-option]').count();
+  const addRepairAlternative = firstRepairGroup.locator('[data-recipe-add="alternative-component"]');
+  await assertPointerTarget(page, addRepairAlternative, '[data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair OR add',
+    () => addRepairAlternative.click(),
+    async () => {
+      if (await firstRepairGroup.locator('[data-recipe-option]').count() !== initialRepairOptionCount + 1) {
+        throw new Error('Tool repair OR control did not add exactly one alternative');
+      }
+    },
+  );
+  const addedRepairAlternativeRemove = firstRepairGroup.locator('[data-recipe-option]').last()
+    .locator('[data-recipe-remove="alternative"]');
+  await assertPointerTarget(page, addedRepairAlternativeRemove, '[data-recipe-remove="alternative"]', 'Tool repair OR restore');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair OR restore',
+    () => addedRepairAlternativeRemove.click(),
+    async () => {
+      if (await firstRepairGroup.locator('[data-recipe-option]').count() !== initialRepairOptionCount) {
+        throw new Error('Tool repair OR restore did not remove exactly one alternative');
+      }
+    },
+  );
   await assertNoScreenshotOverlays(page);
   await scrollToolEditorPanelToReveal(
+    page,
     editor,
     '[data-tool-repair-group] [data-recipe-add="alternative-component"]',
     'Populated repair',
   );
   await captureToolStudioProduct(page, 'manager-tool-stress-repair', wideGeometry);
 
-  await editor.locator('input[name="tool-on-break"][value="replaceWith"]').check();
+  const replaceWithChoice = editor.locator('input[name="tool-on-break"][value="replaceWith"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool replace-with action',
+    () => replaceWithChoice.check(),
+    async () => {
+      if (!(await replaceWithChoice.isChecked())) throw new Error('Tool replace-with action did not apply');
+    },
+  );
   const replacementGrid = editor.locator('[data-tool-replacement-target]');
   await replacementGrid.waitFor({ state: 'visible', timeout: 5_000 });
   const replacementType = replacementGrid.locator('[data-tool-replacement-type]');
-  await replacementType.selectOption('component');
   let replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
   await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
   const componentTarget = replacementPicker;
   await assertPointerTarget(page, componentTarget, '[data-tool-replacement-target] select', 'Component replacement picker');
   const componentOption = await componentTarget.locator('option:not([value=""])').first().getAttribute('value');
   if (!componentOption) throw new Error('Tool Studio Component picker has no managed Component options');
-  await componentTarget.selectOption(componentOption);
-  await replacementType.selectOption('item');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Component replacement selection',
+    () => selectOptionAndAssertSingleChange(componentTarget, componentOption, 'Component replacement selection'),
+    async () => {
+      if (await componentTarget.inputValue() !== componentOption) {
+        throw new Error('Component replacement selection did not update the draft control');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement route',
+    () => selectOptionAndAssertSingleChange(replacementType, 'item', 'Direct Item replacement route'),
+    async () => {
+      if (await replacementType.inputValue() !== 'item') {
+        throw new Error('Direct Item replacement route did not update the target type');
+      }
+    },
+  );
   replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
   await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
   const itemTarget = replacementPicker;
   await assertPointerTarget(page, itemTarget, '[data-tool-replacement-target] select', 'direct Item replacement picker');
   const itemOption = await itemTarget.locator('option:not([value=""])').first().getAttribute('value');
   if (!itemOption) throw new Error('Tool Studio direct Item picker has no world Item options');
-  await itemTarget.selectOption(itemOption);
-  await itemTarget.selectOption('');
-  await itemTarget.selectOption(itemOption);
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement selection',
+    () => selectOptionAndAssertSingleChange(itemTarget, itemOption, 'Direct Item replacement selection'),
+    async () => {
+      if (await itemTarget.inputValue() !== itemOption) {
+        throw new Error('Direct Item replacement selection did not update the draft control');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement unlink',
+    () => selectOptionAndAssertSingleChange(itemTarget, '', 'Direct Item replacement unlink'),
+    async () => {
+      if (await itemTarget.inputValue() !== '') {
+        throw new Error('Direct Item replacement unlink did not clear the draft control');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement restore',
+    () => selectOptionAndAssertSingleChange(itemTarget, itemOption, 'Direct Item replacement restore'),
+    async () => {
+      if (await itemTarget.inputValue() !== itemOption) {
+        throw new Error('Direct Item replacement restore did not update the draft control');
+      }
+    },
+  );
   await assertNoScreenshotOverlays(page);
   await scrollToolEditorPanelToReveal(
+    page,
     editor,
     '[data-tool-replacement-target] [data-tool-replacement-picker]',
     'Direct Item replacement',
@@ -4273,19 +4791,38 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     'check-driven authority control',
   );
   await assertPointerTarget(page, checkDriven, '[data-manager-tools-authority] label', 'check-driven authority');
-  await checkDriven.click();
-  await waitForToolBreakageAuthority(page, systemId);
+  await withSingleToolStoreMutation(
+    page,
+    'setToolBreakageAuthority',
+    'check-driven authority',
+    () => checkDriven.click(),
+    () => waitForToolBreakageAuthority(page, systemId),
+  );
   await requireSingleLocator(manager, 'live Fabricate manager before check-driven Edit');
   const checkDrivenEditButton = await requireSingleLocator(
     manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`),
     'check-driven Tool Edit button',
   );
-  await checkDrivenEditButton.click();
-  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'check-driven Tool Edit route',
+    () => checkDrivenEditButton.click(),
+    () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
   await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
   await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
-  await tab('breakage').click();
-  await editor.locator('input[name="tool-check-breakable"][value="immune"]').check();
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'check-driven Tool Breakage tab');
+  const immuneChoice = editor.locator('input[name="tool-check-breakable"][value="immune"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'check-driven Immune choice',
+    () => immuneChoice.check(),
+    async () => {
+      if (!(await immuneChoice.isChecked())) throw new Error('check-driven Immune choice did not apply');
+    },
+  );
   const immuneOnBreakFieldset = editor.locator('[data-tool-breakage-tab]:has(input[name="tool-check-breakable"][value="immune"]:checked) [data-tool-on-break-controls]:disabled');
   await immuneOnBreakFieldset.waitFor({ state: 'visible', timeout: 10_000 });
   await requireSingleLocator(immuneOnBreakFieldset, 'check-driven immune on-break fieldset');
@@ -4297,14 +4834,33 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await editor.locator('[data-tool-editor-back]').click();
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
   const toolSpecific = manager.locator('[data-manager-tools-authority] label:has(input[value="toolSpecific"])');
-  await toolSpecific.click();
-  await page.waitForFunction((systemId) => (
-    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.toolBreakage?.authority === 'toolSpecific'
-  ), systemId, { timeout: 10_000, polling: 'raf' });
-  await manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click();
-  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
-  await tab('breakage').click();
-  await editor.locator('input[name="tool-on-break"][value="destroy"]').check();
+  await withSingleToolStoreMutation(
+    page,
+    'setToolBreakageAuthority',
+    'tool-specific authority restore',
+    () => toolSpecific.click(),
+    () => page.waitForFunction((id) => (
+      game.fabricate.getCraftingSystemManager().getSystem(id)?.toolBreakage?.authority === 'toolSpecific'
+    ), systemId, { timeout: 10_000, polling: 'raf' }),
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'openToolDraft',
+    'tool-specific Tool Edit route',
+    () => manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click(),
+    () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'tool-specific Tool Breakage tab');
+  const destroyChoice = editor.locator('input[name="tool-on-break"][value="destroy"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool destroy action restore',
+    () => destroyChoice.check(),
+    async () => {
+      if (!(await destroyChoice.isChecked())) throw new Error('Tool destroy action did not restore');
+    },
+  );
   await saveToolStudioDraftIfDirty(editor);
 
   await tab('requirements').click();

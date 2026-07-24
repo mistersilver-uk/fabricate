@@ -13767,7 +13767,7 @@
   gap: var(--fab-space-5);
   padding: var(--fab-space-3) var(--fab-space-4) 0;
   border-bottom: 1px solid var(--fab-mv2-border);
-  overflow-x: auto;
+  overflow-x: hidden;
   grid-column: 2;
   grid-row: 2;
 }
@@ -14209,10 +14209,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
+  overflow-x: clip;
 }
 
 .fabricate-manager .manager-tool-repair-group > .manager-icon-button {
@@ -14236,6 +14240,27 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-tool-repair .manager-recipe-ingredient-requirement,
+.fabricate-manager .manager-tool-repair .manager-recipe-ingredient-requirement-options,
+.fabricate-manager .manager-tool-repair .manager-recipe-ingredient-option-row {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.fabricate-manager .manager-tool-repair .manager-recipe-option-target {
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fabricate-manager .manager-tool-repair .manager-recipe-option-controls {
+  flex-wrap: wrap;
+  max-width: 100%;
+  margin-left: auto;
 }
 
 .fabricate-manager .manager-tool-prerequisite-list {
@@ -14640,6 +14665,26 @@
 }
 
 @container fabricate-manager (min-width: 832px) and (max-width: 900px) {
+  .fabricate-manager .manager-tool-editor-tabs {
+    justify-content: space-between;
+    gap: var(--fab-space-1);
+    padding-right: var(--fab-space-2);
+    padding-left: var(--fab-space-2);
+  }
+
+  .fabricate-manager .manager-tool-editor-tabs > button {
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: var(--fab-space-2xs);
+    font-size: 0.625rem;
+  }
+
+  .fabricate-manager .manager-tool-editor-tabs > button > span {
+    min-width: 15px;
+    padding-right: var(--fab-space-2xs);
+    padding-left: var(--fab-space-2xs);
+  }
+
   .fabricate-manager .manager-tool-section-heading > p {
     margin-top: 0;
   }

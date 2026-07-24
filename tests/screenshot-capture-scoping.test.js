@@ -50,6 +50,27 @@ const TOOL_STUDIO_LABELS = [
   'manager-tool-stress-wrapping-680',
 ];
 
+function harnessFunctionSpan(start, end) {
+  const match = HARNESS.match(new RegExp(
+    String.raw`function ${start}[^]*?(?=\n(?:async )?function ${end})`,
+  ));
+  assert.ok(match, `${start} harness function was not found`);
+  return match[0];
+}
+
+const assertSingleToolMutation = new Function(
+  `"use strict"; ${harnessFunctionSpan('assertSingleToolMutation', 'beginToolStoreMutationProbe')}; `
+  + 'return assertSingleToolMutation;',
+)();
+const assertToolStudioHorizontalScrollSettled = new Function(
+  `"use strict"; ${harnessFunctionSpan('assertToolStudioHorizontalScrollSettled', 'readToolStudioHorizontalScroll')}; `
+  + 'return assertToolStudioHorizontalScrollSettled;',
+)();
+const toolTabContracts = new Function(
+  `"use strict"; ${harnessFunctionSpan('assertHorizontalContainment', 'assertToolStudioTypography')}; `
+  + 'return { assertToolStudioTabContainment };',
+)();
+
 // ── Scoping map: a changed-file set → the EXACT captured-label set ──────────────
 
 test('a broad styles/theme.css change scopes to theme-or-global-ui (6 labels), NOT the full set', () => {
@@ -381,8 +402,8 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /sourceReplaceDisclosure\.click\(\);[\s\S]*?assertPointerTarget\(page, editor\.locator\('\[data-tool-source-picker\]'\)[\s\S]*?sourceReplaceDisclosure\.click\(\);/,
-    'the hidden replacement picker must be exercised through its compact disclosure and closed before parity capture',
+    /sourceReplaceDisclosure\.click\(\);[\s\S]*?const sourcePicker = editor\.locator\('\[data-tool-source-picker\]'\);[\s\S]*?stageToolDraftSource[\s\S]*?selectOptionAndAssertSingleChange\([\s\S]*?fixture\.sourceItemUuid[\s\S]*?sourceReplaceDisclosure\.click\(\);/,
+    'the hidden replacement picker must perform one real source mutation and close before parity capture',
   );
   assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
   assert.match(
@@ -438,37 +459,24 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /assertPointerTarget\(page,\s*editor\.locator\('\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]'\),\s*'\[data-tool-repair-group\] \[data-recipe-add="alternative-component"\]',\s*'Tool repair OR add-component control'\)/,
+    /const addRepairAlternative = firstRepairGroup\.locator\('\[data-recipe-add="alternative-component"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
   );
   assert.match(
     HARNESS,
-    /assertPointerTarget\(page,\s*editor\.locator\('\[data-tool-repair-add-group\]'\)\.first\(\),\s*'\[data-tool-repair-add-group\]',\s*'Tool repair AND control'\)/,
-    'the intentionally plural repair add-type selector must choose one strict-safe pointer target',
+    /const addRepairGroup = editor\.locator\('\[data-tool-repair-add-group="tags"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
+    'the repair group control must choose one strict-safe pointer target and mutate once',
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
   assert.match(
     HARNESS,
-    /await replacementType\.selectOption\('component'\);[\s\S]*?const componentTarget = replacementPicker;[\s\S]*?await replacementType\.selectOption\('item'\);[\s\S]*?const itemTarget = replacementPicker;[\s\S]*?if \(!itemOption\) throw new Error\('Tool Studio direct Item picker has no world Item options'\);/,
+    /const componentTarget = replacementPicker;[\s\S]*?'Component replacement selection'[\s\S]*?selectOptionAndAssertSingleChange\(componentTarget, componentOption[\s\S]*?'Direct Item replacement route'[\s\S]*?selectOptionAndAssertSingleChange\(replacementType, 'item'[\s\S]*?const itemTarget = replacementPicker;[\s\S]*?if \(!itemOption\) throw new Error\('Tool Studio direct Item picker has no world Item options'\);/,
   );
   assert.doesNotMatch(HARNESS, /itemTarget\.selectOption\(fixture\.replacementItemUuid\)/);
-  const authorityClickIndex = toolStudioWalk.indexOf('await checkDriven.click();');
-  const authorityWaitIndex = toolStudioWalk.indexOf(
-    'await waitForToolBreakageAuthority(page, systemId);',
-    authorityClickIndex,
-  );
-  const authorityEditIndex = toolStudioWalk.indexOf(
-    'await checkDrivenEditButton.click();',
-    authorityWaitIndex,
-  );
-  assert.ok(authorityClickIndex >= 0, 'the real check-driven pointer click is missing');
-  assert.ok(
-    authorityWaitIndex > authorityClickIndex,
-    'the persisted + projected authority wait must follow the real pointer click',
-  );
-  assert.ok(
-    authorityEditIndex > authorityWaitIndex,
-    'the scoped Edit click must wait for persisted + projected authority',
+  assert.match(
+    toolStudioWalk,
+    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),[\s\S]*?withSingleToolStoreMutation\(\s*page,\s*'openToolDraft',\s*'check-driven Tool Edit route'/,
+    'the persisted + projected authority mutation must settle before the exactly-once Edit route',
   );
   assert.match(
     HARNESS,
@@ -507,6 +515,76 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)/,
   );
   assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
+});
+
+test('Tool tab geometry contract rejects clipping, scrolling, and a missing fourth tab', () => {
+  const rect = (left, right) => ({ left, right });
+  const valid = {
+    manager: rect(0, 832),
+    tabs: rect(210, 512),
+    tabButtons: [
+      { id: 'tool-tab-overview', ...rect(218, 274) },
+      { id: 'tool-tab-breakage', ...rect(280, 340) },
+      { id: 'tool-tab-requirements', ...rect(346, 430) },
+      { id: 'tool-tab-validation', ...rect(436, 504) },
+    ],
+    tabsOverflow: {
+      overflowX: 'hidden',
+      clientWidth: 302,
+      scrollWidth: 302,
+      scrollLeft: 0,
+    },
+  };
+  assert.doesNotThrow(() => toolTabContracts.assertToolStudioTabContainment(valid));
+  assert.throws(
+    () => toolTabContracts.assertToolStudioTabContainment({
+      ...valid,
+      tabButtons: valid.tabButtons.slice(0, 3),
+    }),
+    /four measurable tabs/,
+  );
+  assert.throws(
+    () => toolTabContracts.assertToolStudioTabContainment({
+      ...valid,
+      tabsOverflow: { ...valid.tabsOverflow, scrollWidth: 340 },
+    }),
+    /horizontally scrollable/,
+  );
+  assert.throws(
+    () => toolTabContracts.assertToolStudioTabContainment({
+      ...valid,
+      tabButtons: valid.tabButtons.map((tab, index) => (
+        index === 3 ? { ...tab, right: 520 } : tab
+      )),
+    }),
+    /within visible tab list escapes horizontal containment/,
+  );
+});
+
+test('Tool evidence contracts reject leaked horizontal state and duplicate store mutations', () => {
+  assert.doesNotThrow(() => assertToolStudioHorizontalScrollSettled([
+    { id: 'manager', scrollLeft: 0 },
+    { id: 'editor', scrollLeft: 0 },
+  ], 'stress frame'));
+  assert.throws(
+    () => assertToolStudioHorizontalScrollSettled([
+      { id: 'editor', scrollLeft: 24 },
+    ], 'stress frame'),
+    /leaked horizontal scroll/,
+  );
+  assert.doesNotThrow(() => assertSingleToolMutation({
+    calls: [{ method: 'patchToolDraft', args: [] }],
+  }, 'patchToolDraft', 'repair OR add'));
+  for (const calls of [
+    [],
+    [{ method: 'patchToolDraft' }, { method: 'patchToolDraft' }],
+    [{ method: 'openToolDraft' }],
+  ]) {
+    assert.throws(
+      () => assertSingleToolMutation({ calls }, 'patchToolDraft', 'repair OR add'),
+      /exactly one patchToolDraft mutation/,
+    );
+  }
 });
 
 test('the Tool Studio run writes one summary/manifest identity with head, target labels, and measured clips', () => {
