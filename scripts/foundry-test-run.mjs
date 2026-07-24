@@ -4654,7 +4654,8 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     () => sourceUnlink.click(),
     () => sourceUnlink.waitFor({ state: 'detached', timeout: 5_000 }),
   );
-  const sourceReplaceDisclosure = editor.locator('.manager-tool-source-replace > summary');
+  const sourceReplaceDetails = editor.locator('.manager-tool-source-replace');
+  const sourceReplaceDisclosure = sourceReplaceDetails.locator(':scope > summary');
   await assertPointerTarget(page, sourceReplaceDisclosure, '.manager-tool-source-replace > summary', 'Tool Item replacement disclosure');
   await sourceReplaceDisclosure.click();
   const sourcePicker = editor.locator('[data-tool-source-picker]');
@@ -4671,8 +4672,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     ),
     () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
   );
-  if (await sourceReplaceDisclosure.getAttribute('open') !== null) {
+  if (await sourceReplaceDetails.getAttribute('open') !== null) {
     await sourceReplaceDisclosure.click();
+  }
+  if (await sourceReplaceDetails.getAttribute('open') !== null) {
+    throw new Error('Tool Item replacement disclosure remained open after source restoration');
   }
   await saveToolStudioDraftIfDirty(editor);
   await resetToolStudioScroll(page);
