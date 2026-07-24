@@ -17,6 +17,9 @@ import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
+import { IngredientSet } from '../src/models/IngredientSet.js';
+import { Recipe } from '../src/models/Recipe.js';
+import { RecipeManager } from '../src/systems/RecipeManager.js';
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -295,6 +298,83 @@ test('simple mode: validate, consume ingredients, create result item', async () 
   assert.ok(Array.isArray(result.results), 'result.results should be an array');
   assert.equal(result.results.length, 1, 'one result item should be created');
   assert.equal(result.results[0].name, 'Plank', 'result item should be the plank');
+});
+
+test('simple mode: craft consumes the owned item whose managed component carries a required tag', async () => {
+  const systemId = 'sys-867-tag-consumption';
+  const matchingSource = 'Item.867-matching-source';
+  const nonMatchingSource = 'Item.867-nonmatching-source';
+  const system = buildSystem({
+    id: systemId,
+    managedItems: [
+      {
+        id: 'comp-867-matching',
+        registeredItemUuid: matchingSource,
+        name: 'Herb',
+        tags: ['plant'],
+      },
+      {
+        id: 'comp-867-nonmatching',
+        registeredItemUuid: nonMatchingSource,
+        name: 'Stone',
+        tags: ['mineral'],
+      },
+    ],
+  });
+  setupGame(system);
+
+  const matching = new FakeItem('held-matching', 'Held Herb', 2, matchingSource);
+  const nonMatching = new FakeItem('held-nonmatching', 'Held Stone', 2, nonMatchingSource);
+  // Keep the non-matching decoy first: a broad matcher would consume it and fail below.
+  const sourceActor = new FakeActor('TagCrafter', [nonMatching, matching]);
+  const craftingActor = new FakeActor('TagCrafter');
+  const ingredientSet = IngredientSet.fromJSON({
+    id: 'set-867-tags',
+    ingredientGroups: [
+      {
+        id: 'group-867-tags',
+        name: 'Plant ingredient',
+        options: [{ match: { type: 'tags', tags: ['plant'], tagMatch: 'any' }, quantity: 1 }],
+      },
+    ],
+  });
+  const recipe = new Recipe({
+    id: 'recipe-867-tags',
+    name: 'Tagged Poultice',
+    craftingSystemId: systemId,
+    ingredientSets: [ingredientSet.toJSON()],
+    resultGroups: [
+      { id: 'rg-867', results: [{ id: 'result-867', componentId: 'comp-result', quantity: 1 }] },
+    ],
+  });
+
+  const recipeManager = new RecipeManager();
+  const engine = new CraftingEngine(recipeManager, null, buildResolutionService(system));
+  stubEngine(
+    engine,
+    { success: true, outcome: null, value: null, data: {} },
+    new FakeItem('result-867', 'Poultice')
+  );
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, true, 'craft should succeed using the tagged component-backed item');
+  assert.equal(matching.system.quantity, 1, 'matching stack should be decremented');
+  assert.equal(matching._updates.length, 1, 'matching stack should be updated once');
+  assert.equal(matching._deleted, false, 'matching stack should remain when quantity is left');
+  assert.equal(nonMatching.system.quantity, 2, 'non-matching stack quantity should be unchanged');
+  assert.equal(nonMatching._updates.length, 0, 'non-matching stack should not be updated');
+  assert.equal(nonMatching._deleted, false, 'non-matching stack should not be deleted');
+  assert.equal(
+    matching.flags.fabricate,
+    undefined,
+    'matching item has no item-level Fabricate tag flag'
+  );
+  assert.equal(
+    nonMatching.flags.fabricate,
+    undefined,
+    'non-matching item has no item-level Fabricate tag flag'
+  );
 });
 
 test('simple mode: fails when ingredients missing', async () => {
