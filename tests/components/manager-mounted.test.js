@@ -9936,12 +9936,52 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('.manager-tools-library-actions .manager-icon-button').click();
     assert.deepEqual(enabledChanges, [['tool-catalyst', false]]);
     assert.deepEqual(edits, ['tool-catalyst']);
-    assert.deepEqual(selections, [], 'toggle and Edit do not activate the row identity target');
+    assert.deepEqual(
+      selections,
+      ['tool-catalyst'],
+      'the first Tool is selected once while toggle and Edit stay separate'
+    );
 
     const select = target.querySelector('.manager-tools-select-target');
     select.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     select.click();
-    assert.deepEqual(selections, ['tool-catalyst']);
+    assert.deepEqual(selections, ['tool-catalyst', 'tool-catalyst']);
+    assert.ok(target.querySelector('[data-tool-library-scroll]'));
+    assert.ok(target.querySelector('[data-tool-browser-pagination] .manager-pagination'));
+  });
+
+  it('does not override a valid Tool selection and emits nothing for an empty library', async () => {
+    const selections = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [toolRouteFixture],
+        selectedToolId: toolRouteFixture.id,
+        onSelectTool: (id) => selections.push(id),
+      },
+    });
+    flushSync();
+    await tick();
+    flushSync();
+    assert.deepEqual(selections, []);
+
+    unmount(mounted);
+    target.remove();
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [],
+        onSelectTool: (id) => selections.push(id),
+      },
+    });
+    flushSync();
+    await tick();
+    flushSync();
+    assert.deepEqual(selections, []);
   });
 
   it('shows canonical validation status on every Tool row and preserves a long label', () => {
@@ -10040,8 +10080,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true',
       'the Tool library preserves its Crafting submenu context'
     );
-    assert.ok(target.querySelector('[data-tool-browser-inspector-empty]'));
-    target.querySelector('[data-manager-tool-id="tool-catalyst"] .manager-tools-select-target').click();
     await tick();
     flushSync();
 

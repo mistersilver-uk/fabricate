@@ -8,8 +8,10 @@ import { chromium } from 'playwright';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
 const colorPickerPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerColorPicker.svelte');
+const enPath = resolve(__dirname, '../../lang/en.json');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
+const en = JSON.parse(readFileSync(enPath, 'utf8'));
 
 function blockFor(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -929,23 +931,48 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   );
 });
 
-test('Tool Overview source UUID resets global code chrome to a compact metadata subline', () => {
-  const sourceIdBlock = blockFor('.fabricate-manager .manager-tool-source-card code');
+test('Tool Overview source remains a visible drag-only drop zone with first-line guidance', () => {
+  const sourceCardBlock = blockFor('.fabricate-manager .manager-tool-source-card');
+  const sourceHintBlock = blockFor('.fabricate-manager .manager-tool-source-copy > small');
+  const sourceHintIconBlock = blockFor('.fabricate-manager .manager-tool-source-copy > small > i');
   for (const declaration of [
-    'display: block;',
-    'width: fit-content;',
-    'max-width: 100%;',
-    'margin: 0;',
-    'padding: 0;',
-    'border: 0;',
-    'background: transparent;',
-    'box-shadow: none;',
-    'font-family: var(--fab-font-mono);',
-    'text-overflow: ellipsis;',
-    'white-space: nowrap;',
+    'display: grid;',
+    'border: 1px dashed var(--fab-mv2-border);',
+    'background: var(--fab-surface-soft);',
   ]) {
-    assert.ok(sourceIdBlock.includes(declaration), `Tool source UUID must retain ${declaration}`);
+    assert.ok(sourceCardBlock.includes(declaration), `Tool source drop zone must retain ${declaration}`);
   }
+  assert.ok(sourceHintBlock.includes('align-items: flex-start;'));
+  assert.ok(sourceHintBlock.includes('line-height: 1.3;'));
+  assert.ok(sourceHintIconBlock.includes('margin-top: 0.15em;'));
+});
+
+test('Tool library pins a full-width pagination footer outside its scrolling result region', () => {
+  const mainBlock = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-tools-main');
+  const libraryBlock = blockFor('.fabricate-manager .manager-tools-library-card');
+  const scrollBlock = blockFor('.fabricate-manager .manager-tools-library-scroll');
+  const footerBlock = blockFor('.fabricate-manager .manager-tools-browser-pagination');
+  const paginationBlock = blockFor('.fabricate-manager .manager-tools-browser-pagination .manager-pagination');
+
+  assert.ok(mainBlock.includes('grid-template-rows: auto auto auto minmax(0, 1fr);'));
+  assert.ok(libraryBlock.includes('min-height: 0;'));
+  assert.ok(scrollBlock.includes('flex: 1 1 auto;'));
+  assert.ok(scrollBlock.includes('overflow: hidden auto;'));
+  assert.ok(footerBlock.includes('flex: 0 0 auto;'));
+  assert.ok(footerBlock.includes('width: 100%;'));
+  assert.ok(footerBlock.includes('margin-top: auto;'));
+  assert.ok(paginationBlock.includes('width: 100%;'));
+});
+
+test('Tool Overview source and disabled-preview copy stays localized and exact', () => {
+  const editor = en.FABRICATE.Admin.Manager.Tools.Editor;
+  assert.equal(editor.CopySourceUuid, 'Copy source UUID');
+  assert.equal(
+    editor.SourceDropHint,
+    'Drop another Item here to replace the linked source.'
+  );
+  assert.equal(editor.PreviewPrerequisitesDisabled, 'No prerequisites to use');
+  assert.equal(editor.PreviewBonusDisabled, 'No check bonus');
 });
 
 test('manager gathering task browser defines bounded toolbar and compact table geometry without reorder controls', () => {

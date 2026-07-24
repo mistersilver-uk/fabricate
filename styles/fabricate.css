@@ -13795,12 +13795,8 @@
   color: var(--fab-danger-text);
 }
 
-.fabricate-manager .manager-tool-editor-tabs > button > span {
+.fabricate-manager .manager-tool-editor-tabs .manager-editor-tab-badge {
   min-width: 18px;
-  padding: var(--fab-space-2xs) var(--fab-space-1);
-  border: 1px solid var(--fab-danger-border);
-  border-radius: 999px;
-  background: var(--fab-danger-soft);
   text-align: center;
 }
 
@@ -13954,7 +13950,7 @@
   gap: var(--fab-space-3);
   min-height: 70px;
   padding: 14px 15px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px dashed var(--fab-mv2-border);
   border-radius: 11px;
   background: var(--fab-surface-soft);
 }
@@ -13976,6 +13972,27 @@
   flex-direction: column;
   gap: var(--fab-space-1);
   min-width: 0;
+}
+
+.fabricate-manager .manager-tool-source-copy > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-tool-source-copy > small {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-1);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.64rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager .manager-tool-source-copy > small > i {
+  flex: 0 0 auto;
+  margin-top: 0.15em;
+  color: var(--fab-mv2-accent);
 }
 
 .fabricate-manager .manager-tool-source-actions {
@@ -14428,6 +14445,10 @@
   color: var(--fab-mv2-accent);
 }
 
+.fabricate-manager .manager-tool-how-it-works li > i {
+  margin-top: 0.2em;
+}
+
 .fabricate-manager .manager-tool-how-it-works li button {
   grid-column: 2;
   justify-self: start;
@@ -14444,21 +14465,12 @@
 }
 
 .fabricate-manager .manager-tool-overview-enabled {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-3);
-  padding-top: var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
+  display: block;
 }
 
-.fabricate-manager .manager-tool-overview-enabled > div {
-  display: grid;
-  gap: var(--fab-space-2xs);
-}
-
-.fabricate-manager .manager-tool-overview-enabled small {
-  color: var(--fab-mv2-text-muted);
+.fabricate-manager .manager-tool-overview-enabled > .manager-recipe-status-card {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .fabricate-manager .manager-tool-authority-readonly h3,
@@ -19457,7 +19469,9 @@
 }
 
 .fabricate-manager[data-manager-view="tools"] .manager-tools-main {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 14px;
+  min-height: 0;
   padding: 18px var(--fab-space-5);
 }
 
@@ -19481,6 +19495,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
+  min-height: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -19758,6 +19773,24 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-tools-library-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  scrollbar-gutter: stable;
+}
+
+.fabricate-manager .manager-tools-browser-pagination {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: auto;
+}
+
+.fabricate-manager .manager-tools-browser-pagination .manager-pagination {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .fabricate-manager .manager-tools-library-list > article {

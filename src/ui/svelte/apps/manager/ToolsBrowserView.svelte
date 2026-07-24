@@ -24,6 +24,7 @@
   let pageIndex = $state(0);
   let pageSize = $state(8);
   let selectedItemUuid = $state('');
+  let autoSelectedToolId = $state('');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -35,6 +36,17 @@
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredTools.length) pageIndex = 0;
+  });
+
+  $effect(() => {
+    if (tools.some((tool) => tool.id === selectedToolId)) {
+      autoSelectedToolId = '';
+      return;
+    }
+    const firstToolId = tools[0]?.id || '';
+    if (!firstToolId || autoSelectedToolId === firstToolId) return;
+    autoSelectedToolId = firstToolId;
+    onSelectTool(firstToolId);
   });
 
   function chooseTool(tool) {
@@ -180,22 +192,23 @@
 
   <section class="manager-tools-library-card" data-manager-tools-browser>
     <p class="manager-tools-result-summary" data-tool-result-count>{countLabel(filteredTools.length)}</p>
-    {#if tools.length === 0}
-      <div class="manager-empty" data-tool-library-empty>
-        <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}</h3>
-        <p>{text('FABRICATE.Admin.Manager.Tools.EmptyHintDrop', 'Create an unlinked Tool or drop an Item above.')}</p>
-      </div>
-    {:else if filteredTools.length === 0}
-      <div class="manager-empty" data-tool-library-filtered-empty>
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Tools.EmptySearch', 'No Tools match your search')}</h3>
-      </div>
-    {:else}
-      <div class="manager-tools-library-list" role="list">
-        {#each pagedTools as tool (tool.id)}
-          {@const row = projectToolRow(tool, managedItemOptions, breakageAuthority)}
-          <article class="manager-tools-row" class:is-selected={selectedToolId === tool.id} data-manager-tool-id={tool.id} role="listitem">
+    <div class="manager-tools-library-scroll" data-tool-library-scroll>
+      {#if tools.length === 0}
+        <div class="manager-empty" data-tool-library-empty>
+          <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+          <h3>{text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}</h3>
+          <p>{text('FABRICATE.Admin.Manager.Tools.EmptyHintDrop', 'Create an unlinked Tool or drop an Item above.')}</p>
+        </div>
+      {:else if filteredTools.length === 0}
+        <div class="manager-empty" data-tool-library-filtered-empty>
+          <i class="fas fa-search" aria-hidden="true"></i>
+          <h3>{text('FABRICATE.Admin.Manager.Tools.EmptySearch', 'No Tools match your search')}</h3>
+        </div>
+      {:else}
+        <div class="manager-tools-library-list" role="list">
+          {#each pagedTools as tool (tool.id)}
+            {@const row = projectToolRow(tool, managedItemOptions, breakageAuthority)}
+            <article class="manager-tools-row" class:is-selected={selectedToolId === tool.id} data-manager-tool-id={tool.id} role="listitem">
             <button
               type="button"
               class="manager-tools-select-target"
@@ -241,17 +254,23 @@
                 onclick={() => onEditTool(tool.id)}
               ><i class="fas fa-pen" aria-hidden="true"></i></button>
             </div>
-          </article>
-        {/each}
+            </article>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    {#if tools.length > 0}
+      <div class="manager-tools-browser-pagination" data-tool-browser-pagination>
+        <Pagination
+          totalCount={filteredTools.length}
+          {pageSize}
+          {pageIndex}
+          pageSizeOptions={[8, 16, 24]}
+          persistent
+          onPageChange={(next) => { pageIndex = next; }}
+          onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+        />
       </div>
-      <Pagination
-        totalCount={filteredTools.length}
-        {pageSize}
-        {pageIndex}
-        pageSizeOptions={[8, 16, 24]}
-        onPageChange={(next) => { pageIndex = next; }}
-        onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
-      />
     {/if}
   </section>
 </main>

@@ -49,7 +49,7 @@
   }
 </script>
 
-<div class="manager-tool-editor-tabs" role="tablist" aria-label={text('Tabs', 'Tool editor sections')}>
+<div class="manager-tool-editor-tabs manager-editor-tabs" role="tablist" aria-label={text('Tabs', 'Tool editor sections')}>
   {#each tabs as tab (tab[0])}
     <button
       type="button"
@@ -58,6 +58,7 @@
       aria-selected={activeTab === tab[0]}
       aria-controls={activeTab === tab[0] ? `tool-panel-${tab[0]}` : undefined}
       tabindex={activeTab === tab[0] ? 0 : -1}
+      class="manager-editor-tab-button"
       class:is-active={activeTab === tab[0]}
       class:is-danger={tab[0] === 'validation' && errorCount > 0}
       onclick={() => onChange(tab[0])}
@@ -66,9 +67,12 @@
       <i class={tab[2]} aria-hidden="true"></i>
       {text(`Tab${tab[0][0].toUpperCase()}${tab[0].slice(1)}`, tab[1])}
       {#if tab[0] === 'requirements' && requirementCount > 0}
-        <span>{requirementCount}</span>
+        <span class="manager-chip is-neutral manager-editor-tab-badge">{requirementCount}</span>
       {:else if tab[0] === 'validation'}
-        <span class:is-valid={errorCount === 0} aria-label={errorCount > 0 ? issueCountText(errorCount) : text('AllValid', 'All checks pass')}>{errorCount > 0 ? errorCount : '✓'}</span>
+        <span
+          class={`manager-chip manager-editor-tab-badge ${errorCount > 0 ? 'is-danger' : 'is-positive is-valid'}`}
+          aria-label={errorCount > 0 ? issueCountText(errorCount) : text('AllValid', 'All checks pass')}
+        >{errorCount > 0 ? errorCount : '✓'}</span>
       {/if}
     </button>
   {/each}

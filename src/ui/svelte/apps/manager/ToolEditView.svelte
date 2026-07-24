@@ -39,8 +39,8 @@
     onSave = () => {},
     onTabChange = () => {},
     onPatch = () => {},
-    onStageSource = () => {},
     onSourceDrop = () => {},
+    onCopySourceUuid = () => {},
     onUnlinkSource = () => {},
   } = $props();
 
@@ -108,7 +108,7 @@
       tabindex="0"
     >
       {#if activeTab === 'overview'}
-        <ToolOverviewTab {tool} {worldItems} {managedItems} {onPatch} {onStageSource} {onSourceDrop} {onUnlinkSource} onOpenTab={onTabChange} />
+        <ToolOverviewTab {tool} {worldItems} {managedItems} {onPatch} {onSourceDrop} {onCopySourceUuid} {onUnlinkSource} />
       {:else if activeTab === 'breakage'}
         <ToolBreakageTab
           {tool}

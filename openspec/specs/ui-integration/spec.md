@@ -551,6 +551,8 @@ The center library accepts an Item drop or Item-picker selection to create a Too
 Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state, and the right inspector presents selected-Tool detail and Edit.
 The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
+When Tools exist and the current selection is absent or stale, the library selects the first Tool exactly once; a valid current selection is preserved and an empty library emits no selection.
+The result list scrolls independently above a persistent, full-width pagination footer that remains outside the scrolling region for both one-page and multi-page result sets.
 
 Each row exposes selection through a keyboard-focusable identity target with explicit selected semantics and Enter/Space activation.
 Selection, Edit, and enabled toggle are distinct localized named hit targets.
@@ -560,7 +562,11 @@ The editor uses `210px | 1fr | 320px` and exposes exactly four tabs: Overview, B
 The header alone owns Back, Delete, Save, and the dirty-state affordance; there is no footer save bar.
 The body includes a live behavior preview, while the inspector summarizes identity, linkage, usage, and validation context.
 
-Overview authors the display label, enabled state, description snapshot/link state, and Item picker/drop/unlink actions.
+Overview uses the Recipe Studio tab, field, and enabled-card primitives.
+Source name and description are read-only snapshots, while the display label alone is editable.
+A linked source exposes Copy source UUID immediately before Unlink, never renders the raw UUID or a replacement picker, and accepts replacement only through a persistent drag-only drop-zone card with visible instructions and no button role, tabindex, or keyboard-operability claim.
+Overview guidance separately explains source Items, recipe requirements, character prerequisites, check bonuses, and breakage without navigation actions.
+Disabled preview rules are titled `No prerequisites to use` and `No check bonus`.
 Breakage authors the retained `limitedUses`, `breakageChance`, or `diceExpression` tool-specific configuration, the separate check-driven Breakable/Immune state (`checkBreakable`), and the `destroy`, `flagBroken`, or `replaceWith` action.
 Changing authority or check-driven immunity does not clear the inactive tool-specific configuration or on-break values.
 When `checkBreakable` is false under check-driven authority, on-break controls are actually disabled and removed from interaction while their retained values and the explanation remain readable; opacity or `pointer-events` alone is insufficient.

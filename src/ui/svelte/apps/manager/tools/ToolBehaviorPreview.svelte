@@ -88,13 +88,13 @@
           { count: tool.prerequisites.ids?.length || 0 },
           tool.prerequisites.ids?.length === 1 ? '1 prerequisite' : '{count} prerequisites'
         )
-      : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+      : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisitesDisabled', 'No prerequisites to use')
   );
   const bonusValue = $derived(
     tool?.bonus?.enabled
       ? tool.bonus.expression ||
           text('FABRICATE.Admin.Manager.Tools.Editor.StatusIncomplete', 'Incomplete')
-      : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+      : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusDisabled', 'No check bonus')
   );
   const bonusLabel = $derived(
     tool?.bonus?.enabled && String(tool.bonus.expression || '').trim()

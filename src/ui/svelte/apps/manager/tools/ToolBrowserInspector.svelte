@@ -145,9 +145,11 @@
     </div>
   </section>
 {:else}
-  <section class="manager-inspector-card manager-tool-browser-inspector is-empty" data-tool-browser-inspector-empty>
-    <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-    <h3>{text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}</h3>
-    <p>{text('FABRICATE.Admin.Manager.Tools.SelectHint', 'Choose a Tool to inspect its behavior.')}</p>
+  <section class="manager-empty manager-tool-browser-inspector is-empty" data-tool-browser-inspector-empty>
+    <div>
+      <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+      <h3>{text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}</h3>
+      <p>{text('FABRICATE.Admin.Manager.Tools.SelectHint', 'Choose a Tool to inspect its behavior.')}</p>
+    </div>
   </section>
 {/if}

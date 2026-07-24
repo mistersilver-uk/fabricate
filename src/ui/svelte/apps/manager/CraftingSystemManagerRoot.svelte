@@ -5472,8 +5472,8 @@
         onSave={saveSelectedToolDraft}
         onTabChange={(tab) => { toolEditorActiveTab = tab; }}
         onPatch={(patch) => store.patchToolDraft?.(patch)}
-        onStageSource={(uuid, snapshot) => store.stageToolDraftSource?.(uuid, snapshot)}
         onSourceDrop={stageToolEditorSourceDrop}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
         onUnlinkSource={() => store.unlinkToolDraftSource?.()}
       />
     {:else if currentView === 'essences' && selectedSystem}
