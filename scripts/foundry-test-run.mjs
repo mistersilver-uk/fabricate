@@ -3708,12 +3708,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       value,
     }));
     await csm.updateSystem(systemId, {
-      characterPrerequisites: [
-        ...(system.characterPrerequisites || []).filter(
-          (entry) => !parityPrerequisites.some((fixtureEntry) => fixtureEntry.id === entry.id)
-        ),
-        ...parityPrerequisites,
-      ],
+      characterPrerequisites: parityPrerequisites,
       // The parity frame owns an exact eight-row fixture. Clear the unrelated
       // smoke tools first; restoration below reinstates the original array.
       tools: [],
