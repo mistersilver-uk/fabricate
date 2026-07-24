@@ -300,6 +300,10 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /async function setManagerWindowSize[\s\S]*?(?=\n\/\*\*\n \* Capture a manager view)/,
   )?.[0];
   assert.ok(managerSizing, 'manager sizing helper source was not found');
+  const managerReadiness = HARNESS.match(
+    /async function waitForManagerApplicationRendered[\s\S]*?(?=\n\/\*\*\n \* Resize the rendered Crafting System Manager)/,
+  )?.[0];
+  assert.ok(managerReadiness, 'manager render-readiness helper source was not found');
   const topOfStateLabels = TOOL_STUDIO_LABELS.filter(
     (candidate) => !['manager-tool-stress-repair', 'manager-tool-stress-replacement'].includes(candidate)
   );
@@ -328,9 +332,21 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     'ApplicationV2 render readiness must settle before setPosition touches the live element',
   );
   assert.match(
-    HARNESS,
+    managerReadiness,
     /async function waitForManagerApplicationRendered[\s\S]*?__fabricateSmokeManagerApp[\s\S]*?app\?\.element[\s\S]*?#fabricate-crafting-system-manager[\s\S]*?\.fabricate-manager[\s\S]*?isConnected/,
   );
+  assert.doesNotMatch(managerReadiness, /appElement === outer/);
+  assert.match(managerReadiness, /appElement\?\.matches\?\.\('\.fabricate-manager'\)[\s\S]*?appElement\?\.querySelector\?\.\('\.fabricate-manager'\)/);
+  for (const diagnostic of [
+    'appRendered',
+    'elementType',
+    'elementId',
+    'elementConnected',
+    'elementHasStyle',
+    'managerConnected',
+  ]) {
+    assert.ok(managerReadiness.includes(diagnostic), `manager readiness timeout must report ${diagnostic}`);
+  }
   assert.match(HARNESS, /browser:[\s\S]*?outer:[\s\S]*?product:/);
   assert.doesNotMatch(managerSizing, /Object\.assign\(app\.style/);
   assert.doesNotMatch(managerSizing, /const viewportWidth = Math\.max\(1366/);
