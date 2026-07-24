@@ -24,9 +24,10 @@
   function issueCountText(count) {
     const key = `FABRICATE.Admin.Manager.Tools.${count === 1 ? 'ValidationIssue' : 'ValidationIssues'}`;
     const translated = localize(key);
-    const value = translated && translated !== key
-      ? translated
-      : count === 1 ? '1 issue' : '{count} issues';
+    let fallback = '{count} issues';
+    if (count === 1) fallback = '1 issue';
+    let value = fallback;
+    if (translated && translated !== key) value = translated;
     return value.replace('{count}', String(count));
   }
 
