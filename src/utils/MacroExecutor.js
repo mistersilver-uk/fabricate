@@ -31,12 +31,7 @@ export const MacroExecutor = {
     // Foundry V13.351 client/client.mjs publishes game, foundry, ui, and fromUuid on
     // globalThis, so accepting them again as function parameters is redundant. Macro commands
     // resolve those runtime globals directly.
-    const fn = new AsyncFunction(
-      'context',
-      'args',
-      'scope',
-      `"use strict";\n${macro.command}`
-    );
+    const fn = new AsyncFunction('context', 'args', 'scope', `"use strict";\n${macro.command}`);
 
     return await fn(payload, payload, payload);
   },
