@@ -21,6 +21,7 @@ The repository MUST treat files under `openspec/specs/*/spec.md` as the canonica
 Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts.
 The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
 Each task entry MUST declare its lane surface as a literal field so model-tier selection has a mechanically available input rather than a reading of prose.
+For non-trivial UI work, the delta MUST include a reference-surfaces and reuse inventory before plan approval.
 
 #### Scenario: planning issue work
 
@@ -30,6 +31,13 @@ Each task entry MUST declare its lane surface as a literal field so model-tier s
 - **AND** it rewrites the block in place across plan-review iterations rather than appending duplicate blocks, and never edits outside the markers
 - **AND** every `### Tasks` entry carries a literal `Lane surface` field naming one of the declared values, which the driver reads as a lookup when it selects that lane's model tier
 - **AND** a spawned orchestrator helper remains read-only and returns draft or replacement managed-block text for the driver to apply
+
+#### Scenario: planning non-trivial UI work
+
+- **WHEN** a change adds or materially redesigns a UI surface
+- **THEN** its delta records every supplied visual reference and analogous shipped surface
+- **AND** it names the reusable primitives and CSS contracts selected for the work
+- **AND** it justifies every deliberate non-reuse or shared-extraction gap before plan approval
 
 #### Scenario: implementing the delta into canonical specs
 
@@ -71,6 +79,25 @@ One mechanically valid evidence run MUST satisfy every gate it directly covers w
 - **WHEN** check evidence is stale or ambiguous, its target changed, repository policy requires an exact-head result, or a reviewer's owned concern materially changed or retains an unresolved finding
 - **THEN** the driver reruns the applicable check or review before maintainer handoff
 
+### Requirement: Reference-led visual comparison
+
+Before visual approval, non-trivial UI work MUST compare every supplied prototype, screenshot, defect matrix, named shipped sibling, and named CSS record against the equivalent rendered Fabricate state.
+The comparison MUST record each artifact's stable identity and dimensions, authority per control and state, and every justified deviation.
+
+#### Scenario: resolving visual authority
+
+- **WHEN** supplied references overlap or disagree
+- **THEN** the plan assigns authority separately for each affected control and state rather than choosing one artifact globally
+- **AND** it records which rendered route and state are equivalent to each reference
+- **AND** any unavailable artifact leaves its affected decision and visual approval pending
+
+#### Scenario: approving rendered parity
+
+- **WHEN** implementation claims parity with the approved reference comparison
+- **THEN** review compares the rendered state, representative data, and relevant responsive sizes against that comparison
+- **AND** a source declaration, token name, or gate fixture copied from the implementation is not accepted as proof that the visual effect exists
+- **AND** a reusable shipped primitive is used for the same behavior unless the approved inventory documents an incompatibility
+
 ### Requirement: Branch and PR workflow
 
 All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and the workflow driver MUST deliver the integrated result through a PR targeting `main`.
@@ -81,6 +108,7 @@ The release automation's forward-port merge from `release` into `main` is not ag
 
 - **WHEN** the workflow driver will coordinate mutable work
 - **THEN** it verifies that the clean coordinator checkout is on a non-protected integration branch
+- **AND** it uses a separate clean coordinator worktree when the current checkout contains unrelated user-owned state, or records before/after branch, SHA, tracked, untracked, and relevant ignored state and proves that state was preserved
 - **AND** every spawned mutable agent verifies its assigned worktree, lane branch, base SHA, and clean status before editing
 
 #### Scenario: finishing mutable work
@@ -98,6 +126,13 @@ The release automation's forward-port merge from `release` into `main` is not ag
 - **THEN** the driver reuses the retained mutable lane when ownership and dependency context remain valid, or creates a fresh revision lane from current integration `HEAD`
 - **AND** the driver integrates accepted follow-up commits and updates the same PR unless the user explicitly asks for a replacement
 
+#### Scenario: batching explicit maintainer feedback
+
+- **WHEN** a maintainer explicitly asks to batch feedback
+- **THEN** the driver queues ordinary findings until the stated batch boundary and produces one cohesive revision ordered by severity, path ownership, and dependency
+- **AND** only a safety or data-loss blocker interrupts the batch
+- **AND** it preserves the mapping from every queued finding to the revision that addressed it
+
 #### Scenario: read-only review work
 
 - **WHEN** a review-only agent evaluates work
@@ -112,10 +147,24 @@ The release automation's forward-port merge from `release` into `main` is not ag
 - **AND** it MUST NOT squash-merge a prerelease line into `release`, because squashing collapses Conventional Commit types and mis-computes the stable version
 - **AND** it MUST NOT merge `release` or `main` into a hotfix line; a fix leaves a hotfix line by cherry-pick
 
+### Requirement: Manual-test candidate proof
+
+Before asking a maintainer to test, the workflow driver MUST identify and prove the exact candidate root, branch, SHA, launch surface, dirty-state status, and visibility from the maintainer's requested checkout.
+
+#### Scenario: handing a candidate to a maintainer
+
+- **WHEN** the workflow asks a maintainer to perform manual testing
+- **THEN** the driver integrates the candidate into the intended checkout or deliberately serves it from another exact worktree
+- **AND** it reports the absolute root, branch, `HEAD`, URL or launch command, tracked and meaningful untracked state, and relevant ignored state
+- **AND** it proves the running process, Foundry module path, or requested checkout resolves to that candidate rather than merely asserting branch or SHA
+- **AND** it records coordinator branch, SHA, and dirty state before and after preparation and preserves unrelated user-owned state
+- **AND** if the requested checkout cannot safely expose the candidate, it reports the exact clean alternate root and launch command instead of claiming visibility
+
 ### Requirement: Ready-for-review delivery gate
 
 Before maintainer handoff, the workflow driver MUST deliver a PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and required implementation review, is ready for review, and has every required post-undraft GitHub and external check successful.
 Draft-head checks MUST be treated only as preflight evidence because required workflows may use the `ready_for_review` trigger.
+Metadata-only CI MUST use concurrency independent from code-gate attempts, and a `ready_for_review` event MUST run the full required code gates.
 
 #### Scenario: preparing the final remote head
 
@@ -142,6 +191,9 @@ Draft-head checks MUST be treated only as preflight evidence because required wo
 - **AND** it waits for every required GitHub Actions and external check on that exact remote head
 - **AND** both SonarCloud checks, Automatic Analysis and Quality Gate, report success
 - **AND** pending, skipped when required, cancelled, stale-head, or failing checks do not satisfy the gate
+- **AND** it identifies one authoritative full exact-head attempt, normally the `ready_for_review` attempt, and requires every full gate from that attempt rather than combining successful jobs across duplicates
+- **AND** metadata-only `edited` attempts cannot cancel or satisfy the authoritative code-gate attempt
+- **AND** cancelled or skipped duplicate attempts neither supply missing gates nor invalidate a separately complete authoritative attempt
 
 #### Scenario: restarting failed or stale delivery
 
@@ -234,6 +286,15 @@ An escalated lane proven clean at its assigned base with zero commits MAY be dis
 - **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, Foundry or Docker smoke, and screenshot generation
 - **AND** the driver runs required final gates from the fully integrated coordinator branch
 - **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
+
+#### Scenario: recovering interrupted or stale Foundry smoke
+
+- **WHEN** the per-worktree Foundry smoke container is running or may be stale before its bound setup data is replaced
+- **THEN** the launcher resolves the exact worktree container, stops it, waits for proof that it is stopped, and aborts before setup-data mutation if the stop fails or cannot be proved
+- **AND** it stops rather than removes the container so the extracted Foundry application cache is preserved
+- **AND** it uses bounded stop, startup, join, setup, and teardown phases and proves a clean join and setup state before fixtures run
+- **AND** local development may reuse the safely stopped per-worktree cache while CI uses its isolated identity and the same stop-before-data-replacement ordering
+- **AND** screenshots left by an interrupted, failed, degraded, or mismatched run remain diagnostic rather than publishable evidence
 
 #### Scenario: per-worktree-isolated real-Foundry capture
 
@@ -364,6 +425,36 @@ Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/REA
 - **WHEN** a harness document cites a location in the codebase
 - **THEN** it names the symbol and the file path (locatable with `grep -n`) instead of a line number
 
+### Requirement: Focused Markdown lint
+
+Focused Markdown lint MUST inspect only explicitly supplied paths for local development and implementation lanes.
+The whole-repository Markdown command MUST remain the authoritative local and CI gate.
+
+#### Scenario: linting assigned Markdown paths
+
+- **WHEN** a developer or lane runs `npm run lint:md:files -- <paths>`
+- **THEN** the command passes only those paths to `markdownlint-cli2 --no-globs`
+- **AND** configured broad globs do not load an invalid unrequested Markdown file
+- **AND** an invalid requested Markdown file fails the focused command
+
+#### Scenario: running authoritative Markdown lint
+
+- **WHEN** the integrated change is validated locally or in CI
+- **THEN** `npm run lint:md` continues to inspect the whole configured authored-Markdown surface
+- **AND** CI does not replace it with the focused path command
+
+### Requirement: Mounted-component dependency closure
+
+Mounted-component setup MUST resolve the static local-import closure of the declared raw, rune, and compiled component graph before importing the mounted target.
+A missing local dependency MUST fail setup normally with an actionable diagnostic, and non-zero test cancellation remains unacceptable.
+
+#### Scenario: a transitive local import is omitted
+
+- **WHEN** a declared mounted-test graph omits a raw or compiled local module reached through static imports
+- **THEN** shared harness setup fails promptly and lists the missing import and importer chain
+- **AND** the test process reports a normal failure with zero cancelled tests rather than hanging
+- **AND** local development and CI exercise the same helper through the existing `npm test` path
+
 ### Requirement: Product contracts stay in specs
 
 Agents and skills MUST keep durable product behavior in canonical specs or active OpenSpec design docs, not in role prompts.
@@ -405,6 +496,7 @@ Agents planning or implementing Manager feature routes MUST account for placehol
 ### Requirement: UI PR screenshot evidence
 
 Pull requests that change UI files MUST include smoke-run screenshot evidence for the relevant changed views before the PR is opened or updated.
+Every collected automated view MUST prove successful, non-degraded, exact-run provenance.
 
 #### Scenario: UI files changed
 
@@ -417,11 +509,27 @@ Pull requests that change UI files MUST include smoke-run screenshot evidence fo
 - **AND** generic unrelated image links are not sufficient evidence
 - **AND** uploaded artifact names or `test-results/` paths are treated as automation fallback evidence, not the normal visible PR screenshot handoff
 
+#### Scenario: validating automated screenshot provenance
+
+- **WHEN** an automated screenshot is collected for an affected view
+- **THEN** the run summary reports success and is not degraded
+- **AND** summary and capture manifest identify the same run and exact requested source head
+- **AND** requested target labels include the view and the PNG is bound to its capture record
+- **AND** manifest-declared dimensions equal decoded PNG dimensions
+- **AND** view-specific parity, stress-frame, or dimension constraints remain additive and may be stricter than the generic provenance check
+
 #### Scenario: screenshot capture is blocked
 
 - **WHEN** a UI-changing PR genuinely cannot capture screenshots because the Foundry smoke harness or browser is unavailable
 - **THEN** a maintainer (not an agent) applies the `screenshots-exempt` label to waive the required `check-screenshots` gate
 - **AND** there is no self-serve `SCREENSHOTS_NEEDED:` text bypass; the gate cannot be satisfied from the PR body without real screenshot evidence or the maintainer label
+
+#### Scenario: a maintainer replaces automated visual production
+
+- **WHEN** an issue-specific maintainer instruction replaces the automated screenshot producer
+- **THEN** the workflow records the affected views and reports agent visual approval as pending maintainer evidence
+- **AND** the instruction does not itself satisfy or waive `check-screenshots`
+- **AND** the PR still requires qualifying maintainer-provided evidence embedded in `Screenshots (if applicable)` or a maintainer-applied `screenshots-exempt` label
 
 #### Scenario: smoke screenshots need images
 

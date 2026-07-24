@@ -85,6 +85,8 @@ Check the assigned target's base-relative Foundry-facing diff against the real F
 A `DialogV2.confirm` dialog renders no window-title chrome, so a test or harness must assert on the body copy or the button labels, never on a window title.
 Wire `yes: { label, callback }` when an action verb is wanted on the confirm button (for example "Disable"); a bare `yes: () => …` renders a generic "Yes".
 - UUID resolution, flags (e.g. preserving `flags.core.sourceId`), and settings registration under the `fabricate.*` namespace.
+- Separate sequential settings, flag, or document API calls that together enforce one invariant: require a complete pre-state snapshot, ordered writes, reverse-order compensation that restores key presence as well as value, explicit reporting of compensation failures, and tests for same-primary-value repair plus every write and compensation boundary.
+A single atomic or batched document API operation does not require application-level compensation merely because it writes several documents.
 - compatibility metadata in `module.json` when new Foundry API requirements appear.
 - version-sensitive behaviour, deprecations, and removed APIs across Foundry releases.
 

@@ -18,6 +18,7 @@ See `openspec/README.md` for the block format and rules.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth.
 - Route quick-start documentation changes to `docs/quickstart.md` only.
+- Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 
 ## Default Agentic Workflow
 
@@ -54,6 +55,7 @@ Spawned agents verify their assigned path, branch or detached SHA, base, and cle
 Parallel mutable lanes require disjoint owned paths and no dependency on unintegrated output.
 The driver serializes dependency installation and complete test, build, lint, Foundry/Docker, and screenshot gates from the fully integrated coordinator branch.
 Follow the canonical mechanics in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for assignment briefs, review artifacts, integration mapping, feedback revisions, conflicts, and cleanup.
+That lifecycle also owns manual-test candidate visibility, unrelated dirty-state preservation, and explicit maintainer feedback batching.
 
 ### Auto-spawn routing
 
@@ -302,6 +304,7 @@ A rejected lease stops the loop for investigation; never retry with `--force` or
 6. Mark the PR ready for review, then wait for every required GitHub Actions and external check triggered for that exact head.
 Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
 Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
+Choose one authoritative full exact-head attempt, normally the `ready_for_review` attempt, and require all full gates from that attempt rather than combining jobs from duplicates; metadata-only `edited` attempts never qualify.
 7. On any failure, return the PR to draft before gathering evidence and routing fixes through the normal isolated implementation and review loops.
 After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks, repeating review only for a materially changed owned concern or unresolved finding.
 8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
@@ -371,6 +374,8 @@ Use `npm run lint:fix` / `npm run lint:css:fix` / `npm run format` to auto-fix.
 See the "Linting & formatting" section in `CONTRIBUTING.md`.
 - `npm run lint:md` (markdownlint, config in `.markdownlint-cli2.jsonc`) gates every authored Markdown file and enforces **one sentence per line** — run it before finalising any change that touches Markdown.
 Run `npm run lint:md:fix` to auto-split prose, re-running until the count stops dropping (a long paragraph splits one boundary per pass), and wrap a multi-sentence table cell's table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region, since a cell cannot break across lines.
+- `npm run lint:md:files -- <paths>` is the focused local and lane check and passes only the explicit paths to `markdownlint-cli2 --no-globs`, so configured repository globs cannot pull unrelated Markdown into the run.
+`npm run lint:md` remains the unchanged authoritative whole-repository gate in local development and CI; CI does not substitute the focused command for it.
 - `npm run test:foundry` — use when a task needs live Foundry UI or screenshot validation.
 - For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
 - Fall back to `npm run test:foundry` when a change depends on real Foundry runtime behavior, when no Vite dev server is available, or when clean reproducible screenshots are needed.
@@ -380,6 +385,7 @@ The reduced `rc`/`ci` smoke stays the CI/release gate and `full` remains the occ
 The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs`, the branch adds a capture state that reaches it rather than publishing an unrelated frame.
 The `check-screenshots` gate cannot be self-satisfied: there is no `SCREENSHOTS_NEEDED:` bypass.
 If capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label (agents must never apply it).
+An explicit issue-specific maintainer instruction may replace automated screenshot production, but it leaves agent visual approval pending and does not itself satisfy or waive `check-screenshots`; qualifying maintainer-provided evidence or the maintainer label is still required.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster icon paths directly when previews need imagery; do not invent custom SVG preview art.
 - The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-test-run.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text.
 When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep the harness for the changed classes / text before declaring the change done.
@@ -576,6 +582,7 @@ Treat the cited file paths as **load-bearing**: when a change touches a path men
 Cite code by symbol name and file path only — for example `_playerListingFields` in `src/systems/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.
 
 Some contributor-workflow deep-dives moved into `CONTRIBUTING.md`: the Foundry smoke harness (`npm run test:foundry` phases, outputs, Phase D0 selector drift) is the "Foundry integration (smoke) tests" section; UI PR screenshot evidence is the "UI PR screenshot evidence" section; the Foundry-vs-Fabricate CSS override map (button layout, focus rings, specificity ladder) is the "Foundry vs Fabricate CSS overrides" section.
+Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md`.
 
 ### Manager confirm-discard guard
 
@@ -691,58 +698,11 @@ It is unrelated to the registered-entry match ref and stays `sourceUuid`.
 The learned-recipe provenance record (`Actor.flags.fabricate.learnedRecipes[recipeId].sourceItemUuid`, written by `RecipeVisibilityService`) is a fourth, actor-flag family that is also NOT in the settings-payload rename scope.
 Classify every occurrence by the owning object before renaming.
 
-### Prototype-driven redesign and design-system migration
+### Reference-led redesign and design-system migration
 
-Fabricate's UI is being redesigned surface-by-surface from standalone HTML prototypes.
-Issues 675 (player Inventory) and 676 (GM Component Studio) each passed a three-round plan gate, a two-round implementation review, and a docs loop — and the maintainer still found user-visible drift within minutes of opening them, plus two surfaces that were specified and never built.
-Every reviewer had checked the change against *rules* (tokens, geometry, type scale, a11y); none had put the new surface beside the shipped one it was supposed to match, and none had checked whether the CSS did anything.
-These notes are what that cost.
-
-- **The already-migrated side wins — identify it, do not assume it.**
-When a redesign lands one surface at a time, every prototype-vs-shipped disagreement has a side that is already the new design system.
-That side wins.
-The shipped sibling won for issue 676 (the Recipe Studio was itself built from a prototype and had already been corrected in use), and the **prototype** won for issue 675 (the Inventory leads the new player design; Crafting/Gathering/Journal are the old one and follow later).
-Neither "the mock is the source of truth" nor "match the neighbour" is safe as a blanket rule — applied blindly, the first re-introduces fixed defects and the second drags a leading surface backwards.
-
-- **"Where the brief is silent, X wins" does not fire where the brief speaks.**
-Issue 676's plan carried exactly that clause and drifted anyway: the brief spoke, the implementer followed it faithfully, and the result still diverged from its sibling — because the sibling had already fixed the thing the brief described.
-A sibling rule must read "the sibling wins wherever it has an opinion", and the check must be a control-by-control diff, not a tie-breaker invoked when someone happens to notice a gap.
-
-- **A shipped sibling's CSS comments are the record of what the prototype got wrong.**
-Read them before building from a mock.
-`.manager-recipe-row.is-selected { box-shadow: none; }` in `styles/fabricate.css` exists to opt the recipe row out of a shared rule, and says why: a ring plus a bar states the selection twice.
-Issue 676 was added to that shared rule's selector list, never got the opt-out, and shipped the bar.
-The same file documents deleting a duplicate page header, replacing a bordered count chip that "read as something to press", and cutting three row icons to one — all three of which issue 676 rebuilt.
-
-- **Implementing a brief's token NAMES is not implementing its design.**
-A brief describes a delta from the prototype's baseline, so the same declaration means different things against a different baseline.
-Issue 675's card selection shipped `--accent-border` + `--surface-soft` exactly as written, onto a resting card that was already `--surface-soft` — the rule compiled to a no-op and selection became invisible.
-Verify the change **renders**; a style that declares correctly and changes nothing passes every review we have.
-
-- **Duplicated scoped styles drift silently, and per-file review cannot see it.**
-Svelte scoping lets two components hand-roll the same class names with different values while each reads as perfectly self-consistent.
-Issue 675's `InventoryBookDetail.svelte` and `InventoryComponentDetail.svelte` did this across eleven classes, so the inspector rendered two design systems depending on what the player clicked.
-Extract the shared shell; matching the values by hand only resets the clock.
-
-- **A "verbatim" extraction during a redesign carries the OLD design forward.**
-Splitting a component is a structural refactor, and "I moved it unchanged" is the correct claim for the code and the wrong outcome for the pixels when everything around it is being restyled.
-
-- **A gate authored from the implementation enshrines the implementation.**
-`tests/components/component-studio-font-size.test.js` was written by measuring the shipped markup, so its fixture hardcoded the drifted controls and its own comments recorded the drift as expected values.
-It then defended the drift.
-Author a visual gate from the design source, and treat a gate whose fixture mirrors the component as measuring nothing.
-
-- **Hand-rolled markup where a primitive exists is a drift generator.**
-Both issues did this: `Medallion`, `StatusPill`, `DropZone`, `RollResultBox`, `CraftButton` and `CraftingThumb` all exist and were re-implemented locally, each copy landing on its own values.
-When reviewing a new surface, list the primitives its sibling uses and ask why each one is absent — "it's a valid manager surface" is not the bar, "it is the same surface" is.
-
-- **Borrowing vocabulary from the wrong neighbour is invisible to rule-based review.**
-Issue 676's editor was built from the Gathering vocabulary (`manager-task-core-card`, the environment scene widgets, `manager-availability-pill`) rather than the Recipe Studio's, so its tag pills inherited a **warning** ramp and rendered amber.
-Every token was a real `--fab-*` token and every gate passed.
-
-- **A mock's fixtures hide the states real data produces.**
-No item in issue 675's prototype was both a tool and salvageable, so its salvageable and tool badges could share one corner slot; in Fabricate those flags are independent and the broken salvageable tool is the headline case.
-The prototype is not authority on states it never had to survive — long names, missing art, both-flags-true, zero-length collections.
+Non-trivial UI work follows `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
+Open every supplied artifact, assign authority per control and state, record dimensions and expected deviations, inventory shipped siblings and primitives before plan approval, and compare rendered output rather than source declarations.
+The shipped primitive catalog and semantic-slider geometry live in `.agents/skills/fabricate-ux-designer/references/design-system.md`.
 
 ## Markdown & Prose Conventions
 
