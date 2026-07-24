@@ -120,6 +120,21 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/utils\/componentBrowserModel\.js$/,
     ],
   },
+  // Issue 772: the multi-select bulk-edit frame — more than one row checked, the sticky
+  // bulk-actions bar visible (Add/Remove tag toggle, Set-category select, tag chips) and,
+  // ideally, the post-apply "N updated" summary. Its OWN view id so this specific state
+  // reaches the PR rather than an unrelated components frame.
+  {
+    id: 'manager-components-bulk-select',
+    label: 'Manager components browser — multi-select bulk-actions bar (set category / add-remove tags)',
+    smokeLabels: ['manager-components-bulk-select'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/BulkActionsBar\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+      /^src\/utils\/componentBrowserModel\.js$/,
+    ],
+  },
   {
     id: 'manager-components-progressive',
     label: 'Manager components browser — progressive difficulty badge (value + None)',

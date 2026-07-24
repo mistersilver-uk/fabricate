@@ -4756,6 +4756,26 @@
   min-width: 0;
 }
 
+/* Multi-select bulk edit (issue 772): the leading per-row checkbox. It is a real control
+   (excluded from the manager's blanket text-input theming), so it is themed here at the
+   source with the manager accent rather than in scoped Svelte. The focus-ring comes from
+   the shared `.fabricate-manager input:focus-visible` rule. */
+.fabricate-manager .manager-component-select {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-component-select-input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--fab-mv2-accent);
+  cursor: pointer;
+}
+
 .fabricate-manager .manager-component-row-meta {
   display: flex;
   flex-wrap: wrap;

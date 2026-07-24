@@ -11,6 +11,7 @@ import {
   COMPONENT_SORT_KEYS,
   componentCategoryOf,
   componentCategoryOptions,
+  componentSelection,
   createComponentBrowserState,
   describeActiveComponentFilters,
   filterComponents,
@@ -273,5 +274,66 @@ describe('component browser model (issue 676)', () => {
     assert.deepEqual(sortComponents(null, {}), []);
     assert.deepEqual(groupComponentsByCategory(null), []);
     assert.deepEqual(paginateComponents(null, {}).components, []);
+  });
+});
+
+describe('componentSelection reducer (issue 772)', () => {
+  const ORDER = ['a', 'b', 'c', 'd', 'e'];
+
+  it('toggle adds then removes an id, moving the anchor to it', () => {
+    const added = componentSelection(new Set(), { type: 'toggle', id: 'b' }, ORDER);
+    assert.deepEqual([...added.selection], ['b']);
+    assert.equal(added.anchorId, 'b');
+    const removed = componentSelection(added.selection, { type: 'toggle', id: 'b' }, ORDER);
+    assert.deepEqual([...removed.selection], []);
+    assert.equal(removed.anchorId, 'b', 'anchor still tracks the last-clicked row');
+  });
+
+  it('does not mutate the input set', () => {
+    const input = new Set(['a']);
+    const result = componentSelection(input, { type: 'toggle', id: 'b' }, ORDER);
+    assert.deepEqual([...input], ['a'], 'input untouched');
+    assert.notEqual(result.selection, input, 'a new Set is returned');
+  });
+
+  it('range selects the inclusive run over the sorted order, regardless of direction', () => {
+    const down = componentSelection(new Set(), { type: 'range', id: 'd', anchorId: 'b' }, ORDER);
+    assert.deepEqual([...down.selection].sort(), ['b', 'c', 'd']);
+    assert.equal(down.anchorId, 'd');
+    // Anchor below the target selects the same run.
+    const up = componentSelection(new Set(), { type: 'range', id: 'b', anchorId: 'd' }, ORDER);
+    assert.deepEqual([...up.selection].sort(), ['b', 'c', 'd']);
+  });
+
+  it('range unions into an existing selection', () => {
+    const seed = new Set(['a']);
+    const result = componentSelection(seed, { type: 'range', id: 'c', anchorId: 'b' }, ORDER);
+    assert.deepEqual([...result.selection].sort(), ['a', 'b', 'c']);
+  });
+
+  it('range with a missing anchor/endpoint degrades to a single add', () => {
+    const noAnchor = componentSelection(new Set(), { type: 'range', id: 'c', anchorId: null }, ORDER);
+    assert.deepEqual([...noAnchor.selection], ['c']);
+    const goneAnchor = componentSelection(
+      new Set(),
+      { type: 'range', id: 'c', anchorId: 'zzz' },
+      ORDER
+    );
+    assert.deepEqual([...goneAnchor.selection], ['c']);
+  });
+
+  it('selectAllFiltered yields exactly the ordered (filtered) ids, honouring the active filter', () => {
+    // The view passes the store's search-narrowed, filtered, cross-page order — so a
+    // narrower order selects only those ids, never rows filtered out of view.
+    const filtered = ['b', 'd'];
+    const result = componentSelection(new Set(['a']), { type: 'selectAllFiltered' }, filtered);
+    assert.deepEqual([...result.selection].sort(), ['b', 'd']);
+    assert.equal(result.anchorId, 'd');
+  });
+
+  it('clear empties the selection and drops the anchor', () => {
+    const result = componentSelection(new Set(['a', 'b']), { type: 'clear' }, ORDER);
+    assert.equal(result.selection.size, 0);
+    assert.equal(result.anchorId, null);
   });
 });

@@ -501,6 +501,20 @@ The primary action imports the non-skipped folders' items and applies each folde
   folder's items are not imported.
 A single-item drop is unchanged, a folderless drop falls back to the one-shot import, and a
   compendium-directory folder that groups packs (not items) is skipped with a notice.
+- Multi-select bulk edit of managed components: the components browser presents a leading
+  checkbox per row (the row's identity button still owns single-select for the inspector),
+  supports shift-click range selection over the derived sorted order, and offers a select-all
+  that honours the active filter (search, category, essence) across all pages.
+The selection clears on a system switch.
+When more than one component is selected a bulk-actions bar appears at the top of the components
+  table: it reports the selection count, offers select-all and clear, and applies one edit across
+  the whole set — SET category (single-valued overwrite; clearing resets to `general`) and ADD or
+  REMOVE tags (many-valued; remove is case-insensitive), reusing the shared set-apply primitive and
+  the shared inline vocabulary creation for a new category.
+The bar reports how many components were updated, counting only components that actually changed;
+  the per-category and per-tag counts refresh through the standard view-state refresh.
+No new persisted model field is introduced (the edit writes the existing `Component.category` and
+  `tags`).
 - Remove managed items.
 - Edit managed item tags (if enabled).
 - Edit managed item essences (if enabled).

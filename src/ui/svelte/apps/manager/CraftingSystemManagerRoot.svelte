@@ -5409,12 +5409,15 @@
         {selectedSystemId}
         selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
         categoryVocabulary={selectedSystem?.componentCategories || []}
+        tagVocabulary={selectedSystem?.itemTags || []}
         bind:browserState={componentBrowserState}
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
         onSearchChange={(term) => store.setItemSearch?.(term)}
         onSelectComponent={(id) => selectComponent(id)}
         onDropComponent={(data) => dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
+        onBulkApply={(ids, mapping) => store.bulkApplyComponentCategoryAndTags?.(ids, mapping)}
+        onAddCategory={addComponentCategory}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView

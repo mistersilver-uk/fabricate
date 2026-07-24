@@ -59,6 +59,11 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToggleCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+  // The multi-select bulk-actions bar the browser renders (issue 772). Its reused
+  // controls (SegmentedControl, SearchablePopover, InlineVocabularyAdd,
+  // RecipeRoutingAssignment) are already registered below; omitting the bar itself HANGS
+  // this suite (# cancelled), never fails it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/BulkActionsBar.svelte');
   // The Component Studio EDITOR's own components (issue 676). They live under
   // `component/` — NOT `components/`, which is the BROWSER's dir; the screenshot
   // evidence map globs the two separately. ComponentSourceInspector and

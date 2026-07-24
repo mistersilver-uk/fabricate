@@ -56,7 +56,8 @@ export const COMPONENT_DEFAULT_PAGE_SIZE = 25;
  * @returns {{
  *   categoryFilter: string, essenceFilter: string, groupByCategory: boolean,
  *   sortKey: ComponentSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string
+ *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>,
+ *   selection: Set<string>, selectionAnchor: string|null, systemId: string
  * }}
  */
 export function createComponentBrowserState() {
@@ -69,6 +70,12 @@ export function createComponentBrowserState() {
     pageIndex: 0,
     pageSize: COMPONENT_DEFAULT_PAGE_SIZE,
     collapsedCategories: new Set(),
+    // Multi-select bulk edit (issue 772). `selection` mirrors `collapsedCategories`:
+    // a fresh Set per object, held here so it survives the editor round-trip, and
+    // CLEARED alongside the filters on a genuine system switch. `selectionAnchor` is
+    // the shift-range anchor (the last-toggled id).
+    selection: new Set(),
+    selectionAnchor: null,
     systemId: '',
   };
 }
@@ -300,6 +307,75 @@ export function describeActiveComponentFilters(filters = {}) {
  * @param {{pageIndex?: number, pageSize?: number}} [options]
  * @returns {{components: object[], pageIndex: number, pageCount: number, totalCount: number, rangeStart: number, rangeEnd: number}}
  */
+/**
+ * Pure reducer for the components browser's multi-select set (issue 772's bulk edit).
+ *
+ * Selection is a `Set<componentId>` held on `browserState.ui` (mirroring
+ * `collapsedCategories`); the `.svelte` view keeps only the wiring and hands this the
+ * current set, the action, and the DERIVED sorted-and-filtered id order it renders. All
+ * range/select-all reasoning lives here so it can be unit-tested away from mounting.
+ *
+ * `orderedIds` is the id order the view actually shows — the store's search-narrowed,
+ * category/essence-filtered, sorted list ACROSS pages (not just the current page). This
+ * is what makes "select all" honour the active filter and shift-range span page breaks.
+ *
+ * Actions:
+ *  - `{type: 'toggle', id}` — flip one id; the new anchor is that id.
+ *  - `{type: 'range', id, anchorId}` — select the inclusive run between `anchorId` and
+ *    `id` over `orderedIds` (shift-click). Falls back to a plain add of `id` when either
+ *    endpoint is not in the current order. The anchor moves to `id`.
+ *  - `{type: 'selectAllFiltered'}` — add every id in `orderedIds` (the active filter).
+ *  - `{type: 'clear'}` — empty selection and drop the anchor.
+ *
+ * Returns `{selection: Set<string>, anchorId: string|null}`. The input set is never
+ * mutated — a NEW Set is always returned so Svelte reactivity re-propagates.
+ *
+ * @param {Set<string>} currentSet
+ * @param {{type: string, id?: string, anchorId?: string|null}} action
+ * @param {string[]} orderedIds
+ * @returns {{selection: Set<string>, anchorId: string|null}}
+ */
+export function componentSelection(currentSet, action, orderedIds = []) {
+  const current = currentSet instanceof Set ? currentSet : new Set();
+  const order = Array.isArray(orderedIds) ? orderedIds.map(String) : [];
+  const type = action?.type;
+
+  if (type === 'clear') {
+    return { selection: new Set(), anchorId: null };
+  }
+
+  if (type === 'selectAllFiltered') {
+    return { selection: new Set(order), anchorId: order.length > 0 ? order.at(-1) : null };
+  }
+
+  if (type === 'toggle') {
+    const id = String(action.id);
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return { selection: next, anchorId: id };
+  }
+
+  if (type === 'range') {
+    const id = String(action.id);
+    const anchorId = action.anchorId == null ? null : String(action.anchorId);
+    const next = new Set(current);
+    const from = anchorId == null ? -1 : order.indexOf(anchorId);
+    const to = order.indexOf(id);
+    if (from === -1 || to === -1) {
+      // No usable anchor/endpoint in the current order — degrade to a single add.
+      next.add(id);
+      return { selection: next, anchorId: id };
+    }
+    const [lo, hi] = from <= to ? [from, to] : [to, from];
+    for (let i = lo; i <= hi; i += 1) next.add(order[i]);
+    return { selection: next, anchorId: id };
+  }
+
+  // Unknown action — return an equivalent new set, anchor unchanged.
+  return { selection: new Set(current), anchorId: action?.anchorId ?? null };
+}
+
 export function paginateComponents(components, options = {}) {
   const rows = Array.isArray(components) ? components : [];
   const pageSize = Math.max(1, numeric(options.pageSize, COMPONENT_DEFAULT_PAGE_SIZE));
