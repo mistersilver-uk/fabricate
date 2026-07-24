@@ -133,6 +133,61 @@ test('upsertTool relinks atomically, refreshes the staged snapshot, and moves th
   assert.equal(edited.description, 'New description', 'ordinary edits do not refresh the snapshot');
 });
 
+test('upsertTool sanitizes same-toolId clone provenance and restores exact state on failure', async () => {
+  const mgr = buildManager();
+  installManager(mgr);
+  await mgr.createSystem({ id: 'sysA', name: 'A' });
+  const source = sourceItem({ uuid: 'Item.same-tool-id', name: 'Hammer' });
+  _registry.set(source.uuid, source);
+  const { item: original } = await mgr.addToolFromUuid('sysA', source.uuid);
+  await source.update({
+    '_stats.duplicateSource': 'Item.clone-origin',
+    '_stats.compendiumSource': 'Compendium.tools.pack.Item.hammer',
+  });
+
+  const { item: sanitized } = await mgr.upsertTool(
+    'sysA',
+    { id: original.id },
+    { itemUuid: source.uuid }
+  );
+
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), original.id);
+  assert.equal(source._stats.duplicateSource, null);
+  assert.equal(source._stats.compendiumSource, null);
+  await source.update({
+    '_stats.duplicateSource': 'Item.clone-origin',
+    '_stats.compendiumSource': 'Compendium.tools.pack.Item.hammer',
+  });
+  const system = mgr.getSystem('sysA');
+  const previousTools = system.tools;
+  let saveCalls = 0;
+  mgr.save = async () => {
+    saveCalls += 1;
+  };
+  const update = source.update.bind(source);
+  let rejectSanitization = true;
+  source.update = async (patch) => {
+    await update(patch);
+    if (rejectSanitization && '_stats.duplicateSource' in patch) {
+      rejectSanitization = false;
+      throw new Error('provenance sanitization failed after write');
+    }
+    return source;
+  };
+
+  await assert.rejects(
+    () => mgr.upsertTool('sysA', { id: sanitized.id }, { itemUuid: source.uuid }),
+    /provenance sanitization failed after write/
+  );
+
+  assert.equal(system.tools, previousTools);
+  assert.equal(system.tools[0], sanitized);
+  assert.equal(source.getFlag('fabricate', 'fabricate.roles.sysA.toolId'), original.id);
+  assert.equal(source._stats.duplicateSource, 'Item.clone-origin');
+  assert.equal(source._stats.compendiumSource, 'Compendium.tools.pack.Item.hammer');
+  assert.equal(saveCalls, 2, 'the staged write is followed by one compensating settings write');
+});
+
 test('addToolFromUuid rejects null, index-like, and non-Item resolutions without mutation', async () => {
   const mgr = buildManager();
   installManager(mgr);

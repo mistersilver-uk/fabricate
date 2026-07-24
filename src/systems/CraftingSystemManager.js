@@ -2255,7 +2255,8 @@ export class CraftingSystemManager {
   async _rollbackToolTransaction(system, previousTools, sourceFlagStates, cause) {
     const errors = [cause];
     system.tools = previousTools;
-    for (const state of [...sourceFlagStates].reverse()) {
+    for (let index = sourceFlagStates.length - 1; index >= 0; index -= 1) {
+      const state = sourceFlagStates[index];
       try {
         await this._restoreSourceFlag(state);
       } catch (error) {
@@ -2295,10 +2296,8 @@ export class CraftingSystemManager {
         previousSourceUuid && previousSourceUuid !== nextSourceUuid
           ? await this._resolveStrictSourceFlagState(previousSourceUuid, flagKey)
           : null;
-      if (nextSourceState.value !== toolId) {
-        sourceFlagStates.push(nextSourceState);
-        await this._stampSourceIdentity(source, flagKey, toolId);
-      }
+      sourceFlagStates.push(nextSourceState);
+      await this._stampSourceIdentity(source, flagKey, toolId);
       if (previousSourceState?.value === toolId) {
         sourceFlagStates.push(previousSourceState);
         await previousSourceState.source.unsetFlag(
