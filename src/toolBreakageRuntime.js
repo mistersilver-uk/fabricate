@@ -383,7 +383,7 @@ export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
  * @param {object} [params.planned]                - prior plan entry for this item, if any
  * @param {Function} [params.evaluateExpression]
  * @param {Function} [params.buildItemRef]         - (actor, item) => itemRef
- * @param {Function} [params.createReplacement]    - async ({ actor, componentId }) => void
+ * @param {Function} [params.createReplacement]    - async ({ actor, target }) => Item|{success: true}|true|null
  * @returns {Promise<object>} evidence entry
  */
 export async function applyToolUsageAndBreakage({
@@ -474,8 +474,9 @@ export function createToolBreakageRuntime({
     } = {}) {
       const matched = matchTools({ actor, system, task, tools, presentTools });
       const authority = resolveAuthority(system);
-      // Under checkDriven authority, the active check decides whether ALL required
-      // tools break for this attempt; per-tool modes are ignored except `immune`.
+      // Under checkDriven authority, the active check decides whether required tools
+      // break. `checkBreakable === false` excludes a Tool. Legacy `breakage.mode:
+      // 'immune'` is read forward as that exclusion and is never written canonically.
       const decision =
         authority === 'checkDriven'
           ? evaluateCheckBreakage({ checkBreakage, checkResult })
@@ -509,7 +510,7 @@ export function createToolBreakageRuntime({
         let extra = {};
         if (authority === 'checkDriven') {
           if (isImmune) {
-            // Immune tools never break and are recorded as skipped-immune.
+            // Excluded tools never break and are recorded as skipped-immune.
             breakageResult = { mode: 'immune', broken: false, evidence: { authority } };
             extra = { authority, skippedImmune: true };
           } else if (decision.forceBreak) {
@@ -595,11 +596,14 @@ export function createToolBreakageRuntime({
           continue;
         }
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
+        // `checkBreakable === false` is the canonical exclusion. The legacy `immune`
+        // mode remains a read-forward compatibility input for unnormalized callers.
         const isImmune = tool.checkBreakable === false || tool.breakage?.mode === 'immune';
         let planned = plannedByItem.get(stringOrEmpty(itemRef?.itemUuid));
         let extra = {};
         if (authority === 'checkDriven') {
           if (isImmune) {
+            // Excluded tools never break and are recorded as skipped-immune.
             planned = { mode: 'immune', broken: false, evidence: { authority } };
             extra = { authority, skippedImmune: true };
           } else if (decision.forceBreak) {

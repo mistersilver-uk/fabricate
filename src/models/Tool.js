@@ -1,12 +1,13 @@
 /**
- * Represents a tool required to attempt a gathering task.
+ * Represents a system-owned library Tool shared by crafting, salvage, and gathering.
  *
  * Spec contract (data-models/spec.md, gathering-and-harvesting):
  *   componentId:       string | null          - OPTIONAL managed-component link (issue 561);
  *                                               null for a first-class tool registered from an
  *                                               Item uuid, populated for a whetstone or a
  *                                               migrated legacy tool (no longer the matching basis)
- *   name / img:        string | null          - registration/migration display snapshot (issue 561);
+ *   name / img:        string | null          - registration/migration source-display snapshot (issue 561);
+ *   description:       string                 - registration/migration source-description snapshot;
  *                                               NOT `label`, and not auto-refreshed on rename
  *   registeredItemUuid /
  *   originItemUuid /
@@ -16,16 +17,20 @@
  *   requirement:       null | {               - optional truthy-expression gate
  *     formula:         string                   // dice/roll expression
  *   }
+ *   prerequisites:     { enabled, ids, gateMode } - optional shared-prerequisite gate
+ *   bonus:             { enabled, expression } - optional expression contribution
  *   breakage:          { mode, ...mode-specific fields }
  *     mode === 'limitedUses':     maxUses:        number | null     (null = unlimited; usage tracked on the item)
  *     mode === 'breakageChance':  breakageChance: number (integer 0..100)
  *     mode === 'diceExpression':  formula:        string (Foundry roll), threshold: number
- *   checkBreakable:    boolean                    separate check-driven immunity switch
+ *   checkBreakable:    boolean                    check-driven exclusion switch; legacy
+ *                                               `breakage.mode: 'immune'` reads forward as false
  *   onBreak:           { mode, ...mode-specific fields }
  *     mode === 'destroy':       (no fields)
  *     mode === 'flagBroken':    (no fields)
  *     mode === 'replaceWith':   replacementTarget: { type: 'component', componentId }
  *                                | { type: 'item', itemUuid }
+ *   repairRequirements: IngredientGroup[]       - materials required to repair a flagged copy
  *
  * Item-flag conventions:
  *   Item.flags.fabricate.toolUsage  = { timesUsed: number }   // limitedUses only
@@ -470,7 +475,7 @@ export class Tool {
    * @param {object} params
    * @param {Item} params.item                                       - The owned Foundry Item to act on
    * @param {object} [params.actor]                                  - Actor that owned the item
-   * @param {Function} [params.createReplacement]                    - async ({ actor, componentId }) => void
+   * @param {Function} [params.createReplacement]                    - async ({ actor, target }) => Item|{success: true}|true|null
    */
   async applyBreakage({ item, actor, createReplacement } = {}) {
     const mode = this.onBreak.mode;
