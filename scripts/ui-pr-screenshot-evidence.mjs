@@ -1059,9 +1059,11 @@ function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
   if (!expectedHead || summaryRun.headSha !== expectedHead || manifest.headSha !== expectedHead) {
     throw new Error('Tool Studio screenshot evidence is stale for the requested PR head SHA');
   }
-  const expectedLabels = views.flatMap((view) => view.smokeLabels).sort();
-  const summaryLabels = [...(summaryRun.targetLabels || [])].sort();
-  const manifestLabels = [...(manifest.targetLabels || [])].sort();
+  const expectedLabels = views
+    .flatMap((view) => view.smokeLabels)
+    .sort((a, b) => a.localeCompare(b));
+  const summaryLabels = [...(summaryRun.targetLabels || [])].sort((a, b) => a.localeCompare(b));
+  const manifestLabels = [...(manifest.targetLabels || [])].sort((a, b) => a.localeCompare(b));
   if (
     JSON.stringify(summaryLabels) !== JSON.stringify(expectedLabels) ||
     JSON.stringify(manifestLabels) !== JSON.stringify(expectedLabels)
