@@ -97,13 +97,13 @@
       : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
   );
   const bonusLabel = $derived(
-    tool?.bonus?.enabled
+    tool?.bonus?.enabled && String(tool.bonus.expression || '').trim()
       ? formattedText(
           'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue',
           { expression: bonusValue },
           'Adds {expression}'
         )
-      : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+      : bonusValue
   );
   const rules = $derived([
     {
