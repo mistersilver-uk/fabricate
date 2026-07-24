@@ -13773,6 +13773,8 @@
 }
 
 .fabricate-manager .manager-tool-editor-panel {
+  /* Shared radio cards query their available editor width, not the full manager shell. */
+  container-type: inline-size;
   padding: var(--fab-space-5);
   grid-column: 2;
   grid-row: 3;
@@ -14081,86 +14083,6 @@
 .fabricate-manager .manager-tool-segments > label.is-selected {
   background: var(--fab-accent-soft);
   color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-tool-choice-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tool-choice-grid.is-two-up {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.fabricate-manager .manager-tool-choice-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  align-items: start;
-  gap: 9px;
-  min-width: 0;
-  min-height: 100px;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 11px;
-  background: var(--fab-overlay-light-03);
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-tool-choice-card.is-selected {
-  border-color: var(--fab-mv2-accent);
-  background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-tool-choice-card > input {
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.fabricate-manager .manager-tool-choice-card:has(input:focus-visible) {
-  outline: 2px solid var(--fab-mv2-accent);
-  outline-offset: 2px;
-}
-
-.fabricate-manager .manager-tool-choice-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 7px;
-  background: var(--fab-surface-active);
-  color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-tool-choice-copy {
-  display: grid;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tool-choice-copy strong {
-  color: var(--fab-mv2-text);
-  font-size: 0.72rem;
-  line-height: 1.2;
-}
-
-.fabricate-manager .manager-tool-choice-copy small {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.64rem;
-  font-weight: 400;
-  line-height: 1.25;
-}
-
-.fabricate-manager fieldset:disabled .manager-tool-choice-card {
-  cursor: not-allowed;
 }
 
 .fabricate-manager .manager-tool-inline-fields {
@@ -14937,11 +14859,6 @@
   .fabricate-manager .manager-tool-section-heading > p {
     margin-top: 0;
   }
-
-  .fabricate-manager .manager-tool-choice-card {
-    min-height: 154px;
-    padding: 10px;
-  }
 }
 
 @container fabricate-manager (max-width: 831px) {
@@ -15009,9 +14926,7 @@
 
   .fabricate-manager .manager-tool-source-card,
   .fabricate-manager .manager-tool-inline-fields,
-  .fabricate-manager .manager-tool-prerequisite-list,
-  .fabricate-manager .manager-tool-choice-grid,
-  .fabricate-manager .manager-tool-choice-grid.is-two-up {
+  .fabricate-manager .manager-tool-prerequisite-list {
     grid-template-columns: minmax(0, 1fr);
   }
 

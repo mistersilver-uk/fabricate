@@ -33,11 +33,14 @@ async function readRenderedToolGeometry(width, view) {
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
-            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><div class="manager-tool-choice-grid">
-              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">A</span><span class="manager-tool-choice-copy"><strong>Limited uses</strong><small>A fixed number of uses, then it breaks.</small></span></label>
-              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">B</span><span class="manager-tool-choice-copy"><strong>Break chance</strong><small>A % chance to break each use.</small></span></label>
-              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">C</span><span class="manager-tool-choice-copy"><strong>Dice expression</strong><small>Roll a separate breakage check.</small></span></label>
-            </div></section>
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
+              <legend class="manager-resolution-mode-legend">Breakage mechanic</legend>
+              <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
+                <label class="manager-resolution-option is-active" data-radio-card-option="limitedUses"><input type="radio" name="tool-breakage-mode" value="limitedUses" checked><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-hourglass-half"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Limited uses</span><span class="manager-resolution-option-desc" data-tool-choice-description>A fixed number of uses, then it breaks.</span></span></label>
+                <label class="manager-resolution-option" data-radio-card-option="breakageChance"><input type="radio" name="tool-breakage-mode" value="breakageChance"><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-percent"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Breakage chance</span><span class="manager-resolution-option-desc" data-tool-choice-description>A % chance to break each use.</span></span></label>
+                <label class="manager-resolution-option" data-radio-card-option="diceExpression"><input type="radio" name="tool-breakage-mode" value="diceExpression"><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-dice-d20"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Dice expression</span><span class="manager-resolution-option-desc" data-tool-choice-description>Roll a separate breakage check.</span></span></label>
+              </div>
+            </fieldset></section>
           </div></section><aside class="manager-tool-preview" data-tool-behavior-preview><div class="manager-tool-preview-identity"><div><h3>Smith's Hammer</h3></div></div><ul class="manager-tool-preview-rules"><li>5 uses</li></ul></aside></div>
         </main>`
         : `<main class="manager-main manager-tools-main"><div class="manager-tools-library-list"><article data-manager-tool-id="hammer"><button class="manager-tools-select-target"><span></span><span class="manager-tools-library-copy"><strong>Smith's Hammer</strong></span></button><div class="manager-tools-library-actions"></div></article></div></main><aside class="manager-inspector"><section data-tool-browser-inspector>Inspector</section></aside>`;
@@ -61,6 +64,17 @@ async function readRenderedToolGeometry(width, view) {
         const value = document.querySelector(selector);
         return value ? getComputedStyle(value)[property] : null;
       };
+      const rects = (selector) =>
+        Array.from(document.querySelectorAll(selector), (node) => {
+          const value = node.getBoundingClientRect();
+          return {
+            left: value.left,
+            right: value.right,
+            top: value.top,
+            bottom: value.bottom,
+            width: value.width,
+          };
+        });
       const root = document.querySelector('.fabricate-manager');
       return {
         root: rect('.fabricate-manager'),
@@ -78,9 +92,10 @@ async function readRenderedToolGeometry(width, view) {
         sectionHeading: rect('.manager-tool-section-heading'),
         sectionTitle: rect('.manager-tool-section-heading h3'),
         sectionHint: rect('.manager-tool-section-heading > p'),
-        choice: rect('.manager-tool-choice-card'),
-        choiceIcon: rect('.manager-tool-choice-icon'),
-        choiceTitle: rect('.manager-tool-choice-copy strong'),
+        choiceOptions: rect('.manager-resolution-mode-options'),
+        choices: rects('.manager-resolution-option'),
+        choiceBodies: rects('.manager-resolution-option-body'),
+        panelContainerType: styleValue('[data-tool-editor-panel]', 'containerType'),
         panelPaddingInline: Number.parseFloat(
           styleValue('[data-tool-editor-panel]', 'paddingLeft')
         ),
@@ -137,26 +152,26 @@ test('Tool editor header spans the 210px/editor/320px triptych and stacks only b
   assert.equal(wrapped.overflow, false);
 });
 
-test('Tool Breakage preserves compact vertical cards and a stacked heading at the 832px triptych', async () => {
+test('Tool Breakage keeps three shared radio cards wide and stacks them inside the 832px editor panel', async () => {
   const wide = await readRenderedToolGeometry(1212, 'tool-edit');
   const narrow = await readRenderedToolGeometry(832, 'tool-edit');
 
+  assert.equal(wide.choices.length, 3);
   assert.ok(
-    wide.choiceIcon.bottom <= wide.choiceTitle.top + 1,
-    'wide choice cards keep icon above copy'
+    wide.choices.every((choice) => Math.abs(choice.top - wide.choices[0].top) <= 1),
+    'wide shared radio cards render in three columns'
   );
-  assert.ok(
-    narrow.choiceIcon.bottom <= narrow.choiceTitle.top + 1,
-    '832px choice cards keep icon above copy'
-  );
-  assert.ok(
-    narrow.choice.width >= 78 && narrow.choice.width <= 82,
-    `832px choice width is ${narrow.choice.width}`
-  );
-  assert.ok(
-    narrow.choice.bottom - narrow.choice.top >= 150 &&
-      narrow.choice.bottom - narrow.choice.top <= 158
-  );
+  assert.ok(wide.choices[1].left >= wide.choices[0].right - 1);
+  assert.ok(wide.choices[2].left >= wide.choices[1].right - 1);
+  assert.equal(narrow.panelContainerType, 'inline-size');
+  assert.equal(narrow.choices.length, 3);
+  assert.ok(narrow.choices[1].top >= narrow.choices[0].bottom - 1);
+  assert.ok(narrow.choices[2].top >= narrow.choices[1].bottom - 1);
+  for (const [index, choice] of narrow.choices.entries()) {
+    assert.ok(choice.left >= narrow.choiceOptions.left - 1);
+    assert.ok(choice.right <= narrow.choiceOptions.right + 1);
+    assert.ok(narrow.choiceBodies[index].right <= choice.right + 1);
+  }
   assert.ok(
     narrow.sectionHint.top >= narrow.sectionTitle.bottom - 1,
     '832px breakage hint follows the title'

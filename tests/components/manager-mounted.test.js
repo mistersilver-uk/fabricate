@@ -8800,16 +8800,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     saveButton.click();
     await tick();
     flushSync();
-    assert.ok(
-      calls.some(
-        (call) =>
-          call[0] === 'updateGatheringLibraryTask' &&
-          call[1] === 'alchemy' &&
-          call[2] === 'task-herbs' &&
-          call[3].name === 'Gather Sun Herbs' &&
-          call[3].enabled === true
-      ),
-      'Save should persist staged edits in a single call'
+    const savedTaskCall = calls.find(
+      (call) =>
+        call[0] === 'updateGatheringLibraryTask' &&
+        call[1] === 'alchemy' &&
+        call[2] === 'task-herbs' &&
+        call[3].name === 'Gather Sun Herbs' &&
+        call[3].enabled === true
+    );
+    assert.ok(savedTaskCall, 'Save should persist staged edits in a single call');
+    assert.equal(
+      savedTaskCall[3].dropRows.find((row) => row.id === 'drop-nightshade')?.dropRate,
+      25,
+      'Save should persist the ChanceSlider value through the task dropRows payload'
     );
     target.querySelector('.manager-header-actions .manager-button:not(.is-primary)').click();
     await tick();
