@@ -27,7 +27,10 @@ const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/Gath
 const gatheringTasksBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
 const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
 const toolEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolEditView.svelte');
+const toolBreakagePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
+const toolOverviewPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte');
 const toolRequirementsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte');
+const toolValidationPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
@@ -51,7 +54,10 @@ const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
 const toolEditSource = readFileSync(toolEditPath, 'utf8');
+const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
+const toolOverviewSource = readFileSync(toolOverviewPath, 'utf8');
 const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
+const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
@@ -1628,13 +1634,27 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Title, 'Tools');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Add, 'Add tool');
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save changes');
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll, 'Save All');
     assert.ok(rootSource.includes("import ToolEditView from './ToolEditView.svelte';"), 'root should import the focused Tool editor');
     assert.ok(toolEditSource.includes('<ToolRequirementsTab'), 'focused editor should render its requirements tab');
     assert.ok(!toolRequirementsSource.includes('ProviderExpressionInput'), 'Tool requirements should use shared prerequisites rather than provider selection');
     assert.ok(toolRequirementsSource.includes('manager-tool-prerequisite-list'), 'Tool requirements should expose the shared prerequisite picker');
     assert.ok(toolRequirementsSource.includes('data-tool-bonus-expression'), 'Tool requirements should expose the numeric bonus expression');
+    assert.ok(
+      /manager-tool-section-heading[\s\S]*?<h3><i class="fas fa-heart-crack"[\s\S]*?<\/h3>[\s\S]*?<p>/.test(toolBreakageSource),
+      'Breakage should render its icon heading and immediate hint before the method cards'
+    );
+    assert.ok(!toolBreakageSource.includes('BreakageKicker'), 'Breakage should not restore the redundant BREAKAGE kicker');
+    assert.ok(
+      /manager-tool-source-copy"><strong>\{source\.name\}<\/strong><code title=\{source\.uuid \|\| ''\}>\{compactSourceId\}<\/code>/.test(toolOverviewSource),
+      'Overview should keep the compact source UUID subline directly under the source name'
+    );
+    assert.ok(toolOverviewSource.includes('manager-tool-source-actions'), 'Overview should retain compact trailing source actions');
+    assert.ok(
+      /manager-tool-validation-errors[\s\S]*?<h3>\{text\('FABRICATE\.Admin\.Manager\.Tools\.Editor\.DomainErrors', 'Save blockers'\)\}<\/h3>/.test(toolValidationSource),
+      'Validation should scope the Save blockers hierarchy to its error section'
+    );
   });
 
   it('wires a collapsible left rail persisted via the manager setting seam', () => {
