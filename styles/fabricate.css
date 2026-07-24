@@ -14642,6 +14642,10 @@
   font-size: 0.66rem;
 }
 
+.fabricate-manager .manager-tool-validation-checks > li.is-invalid > i {
+  color: var(--fab-danger-text);
+}
+
 .fabricate-manager .manager-tool-setting-toggle {
   position: relative;
   flex: 0 0 34px;

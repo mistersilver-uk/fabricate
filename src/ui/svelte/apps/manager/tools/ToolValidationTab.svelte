@@ -56,10 +56,12 @@
   const checks = $derived(editorValidation.checks);
   const invalidCount = $derived(editorValidation.issueCount);
   const issueCountLabel = $derived(
-    text('FABRICATE.Admin.Manager.Tools.ValidationIssues', '{count} issues').replace(
-      '{count}',
-      String(invalidCount)
-    )
+    invalidCount === 1
+      ? text('FABRICATE.Admin.Manager.Tools.ValidationIssue', '1 issue')
+      : text('FABRICATE.Admin.Manager.Tools.ValidationIssues', '{count} issues').replace(
+          '{count}',
+          String(invalidCount)
+        )
   );
   function focusFirstFailure(node, enabled) {
     if (enabled) queueMicrotask(() => node.focus());

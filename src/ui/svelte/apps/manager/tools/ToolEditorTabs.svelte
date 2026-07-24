@@ -21,6 +21,15 @@
     );
   }
 
+  function issueCountText(count) {
+    const key = `FABRICATE.Admin.Manager.Tools.${count === 1 ? 'ValidationIssue' : 'ValidationIssues'}`;
+    const translated = localize(key);
+    const value = translated && translated !== key
+      ? translated
+      : count === 1 ? '1 issue' : '{count} issues';
+    return value.replace('{count}', String(count));
+  }
+
   function handleKeydown(event, index) {
     const lastIndex = tabs.length - 1;
     let nextIndex = null;
@@ -58,7 +67,7 @@
       {#if tab[0] === 'requirements' && requirementCount > 0}
         <span>{requirementCount}</span>
       {:else if tab[0] === 'validation'}
-        <span class:is-valid={errorCount === 0} aria-label={errorCount > 0 ? text('ErrorCount', '{count} errors', { count: errorCount }) : text('AllValid', 'All checks pass')}>{errorCount > 0 ? errorCount : '✓'}</span>
+        <span class:is-valid={errorCount === 0} aria-label={errorCount > 0 ? issueCountText(errorCount) : text('AllValid', 'All checks pass')}>{errorCount > 0 ? errorCount : '✓'}</span>
       {/if}
     </button>
   {/each}
