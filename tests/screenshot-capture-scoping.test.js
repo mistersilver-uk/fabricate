@@ -409,7 +409,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     toolStudioWalk,
-    /replacementSourceItem[\s\S]*?\.dragTo\(sourceCard\)[\s\S]*?withSingleToolClipboardWrite\([\s\S]*?fixture\.replacementSourceItemUuid[\s\S]*?copySourceUuid\.click\(\)[\s\S]*?data-tool-editor-back[\s\S]*?data-action="discard"[\s\S]*?Smith's Hammer/,
+    /setPosition\([\s\S]*?width: 900[\s\S]*?replacementSourceItem[\s\S]*?sidebar source remains occluded[\s\S]*?\.dragTo\(sourceCard\)[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}[\s\S]*?withSingleToolClipboardWrite\([\s\S]*?fixture\.replacementSourceItemUuid[\s\S]*?copySourceUuid\.click\(\)[\s\S]*?data-tool-editor-back[\s\S]*?data-action="discard"[\s\S]*?Smith's Hammer/,
     'the second world Item must replace the source through a real sidebar drag, Copy UUID, and UI Discard restore',
   );
   assert.doesNotMatch(toolStudioWalk, /new DataTransfer|dispatchEvent\('drop'|data-tool-source-picker|manager-tool-source-replace/);

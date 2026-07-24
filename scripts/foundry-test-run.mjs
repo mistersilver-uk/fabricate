@@ -4853,11 +4853,37 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const sourceCard = editor.locator('[data-tool-source-card]');
   await assertPointerTarget(page, sourceCard, '[data-tool-source-card]', 'Tool Item drop target');
   await page.locator('#sidebar [data-tab="items"]').first().click({ force: true });
+  // A user must be able to expose Foundry's Item directory before starting a
+  // native drag. Move the live ApplicationV2 window left for that interaction,
+  // then restore the exact 1280px evidence geometry immediately afterwards.
+  await page.evaluate(async () => {
+    await globalThis.__fabricateSmokeManagerApp.setPosition({
+      width: 900,
+      height: 700,
+      left: 0,
+      top: 0,
+    });
+  });
+  await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
   const replacementSourceItem = page.locator([
     `#sidebar .directory-item[data-entry-id="${fixture.replacementSourceItemId}"]`,
     `#sidebar .directory-item[data-document-id="${fixture.replacementSourceItemId}"]`,
   ].join(', ')).first();
   await replacementSourceItem.waitFor({ state: 'visible', timeout: 10_000 });
+  const [managerBounds, replacementBounds] = await Promise.all([
+    liveManagerApp.boundingBox(),
+    replacementSourceItem.boundingBox(),
+  ]);
+  if (
+    !managerBounds
+    || !replacementBounds
+    || replacementBounds.x + (replacementBounds.width / 2) <= managerBounds.x + managerBounds.width
+  ) {
+    throw new Error(`Tool Item sidebar source remains occluded by the manager: ${JSON.stringify({
+      managerBounds,
+      replacementBounds,
+    })}`);
+  }
   await withSingleToolStoreMutation(
     page,
     'stageToolDraftSource',
@@ -4866,6 +4892,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     () => sourceCard.filter({ hasText: 'Smoke Tool Studio Replacement Item' })
       .waitFor({ state: 'visible', timeout: 5_000 }),
   );
+  wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
   const copySourceUuid = editor.locator('[data-tool-source-copy-uuid]');
   await assertPointerTarget(page, copySourceUuid, '[data-tool-source-copy-uuid]', 'Copy source UUID');
   await withSingleToolClipboardWrite(
