@@ -75,6 +75,8 @@ test('Tool editor header spans the 210px/editor/320px triptych and stacks only b
     assert.ok(Math.abs(report.header.left - report.root.left) <= 1);
     assert.ok(Math.abs(report.header.right - report.root.right) <= 1);
     assert.ok(report.tabs.left >= report.rail.right - 1);
+    assert.ok(Math.abs(report.rail.top - report.tabs.top) <= 1);
+    assert.ok(Math.abs(report.panel.top - report.tabs.bottom) <= 1);
     assert.ok(report.preview.left >= report.panel.right - 1);
     assert.equal(report.overflow, false);
   }
