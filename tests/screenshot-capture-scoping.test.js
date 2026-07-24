@@ -423,6 +423,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /expectedTotal: 8[\s\S]*?sourceViewport: \{ width: 1280, height: 520 \}[\s\S]*?expectedTotal: 8[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?expectedTotal: 9[\s\S]*?data-pagination-next[\s\S]*?expectedPage: 2[\s\S]*?Tool footer moved when the page changed/,
     'the real library must cover tall/short one-page and 9+ pagination states',
   );
+  assert.match(
+    toolStudioWalk,
+    /paginationComponentId[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?componentId: paginationComponentId/,
+    'the synthetic ninth Tool must carry a valid managed Component identity',
+  );
   assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
   assert.match(
     toolStudioWalk,

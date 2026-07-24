@@ -4645,6 +4645,8 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   const parityTools = await page.evaluate((systemId) => foundry.utils.deepClone(
     game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools || []
   ), systemId);
+  const paginationComponentId = parityTools.find((tool) => tool.componentId)?.componentId;
+  if (!paginationComponentId) throw new Error('Tool Studio pagination fixture has no managed Component identity');
   await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1 });
   await setManagerWindowSize(page, {
     width: 1214,
@@ -4666,6 +4668,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       id: 'smoke-tool-studio-pagination-ninth',
       enabled: true,
       label: 'Zephyr Kiln',
+      componentId: paginationComponentId,
       breakage: { mode: 'limitedUses', maxUses: 12 },
       checkBreakable: true,
       onBreak: { mode: 'destroy' },
