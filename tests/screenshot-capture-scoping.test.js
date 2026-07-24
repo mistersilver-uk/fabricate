@@ -448,6 +448,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?680px/);
   assert.match(toolStudioWalk, /persistedEnabledBefore[\s\S]*?enabled === !before[\s\S]*?enabled === before/);
   assert.match(toolStudioWalk, /selectedToolIds[\s\S]*?fixture\.toolId/);
+  assert.match(
+    toolStudioWalk,
+    /sourceReplaceDetails\.getAttribute\('open'\)[\s\S]*?sourceReplaceDisclosure\.click\(\)[\s\S]*?remained open after source restoration/,
+    'Overview parity must close and verify the Item replacement disclosure before capture',
+  );
   assert.match(HARNESS, /did not transition exactly once/);
   assert.match(HARNESS, /did not apply its observable toggle effect/);
   assert.doesNotMatch(HARNESS, /assertSinglePointerDispatch/);
