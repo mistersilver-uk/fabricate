@@ -122,6 +122,15 @@ test('omits the roll row when no check ran (null / absent / non-finite value)', 
   );
 });
 
+test('renders a localized natural-step note only for an actual tier change', () => {
+  const stepped = buildCraftingChatContent(successModel({ natStep: { direction: 'up' } }));
+  assert.ok(stepped.includes('fabricate-craft-chat__nat-step'));
+  assert.ok(stepped.includes('FABRICATE.Chat.NaturalStepUp'));
+
+  const notStepped = buildCraftingChatContent(successModel({ natStep: null }));
+  assert.ok(!notStepped.includes('fabricate-craft-chat__nat-step'));
+});
+
 test('escapes HTML in user-authored names', () => {
   const content = buildCraftingChatContent(
     successModel({ results: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }] })

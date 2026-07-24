@@ -64,6 +64,7 @@ export const CLASS_B_LABELS = Object.freeze(
     'manager-system-edit-lists',
     'interactables-manager-promote',
     'interactables-manager-empty',
+    'manager-tool-stress-invalid-validation',
   ])
 );
 
@@ -143,7 +144,18 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-gathering-event-editor-normal',
   'manager-gathering-travel-normal',
   'manager-gathering-travel-stacked',
-  'manager-tools-normal',
+  'manager-tool-parity-01-library-1280x720',
+  'manager-tool-parity-02-overview-1280x720',
+  'manager-tool-stress-long-name',
+  'manager-tool-parity-03-breakage-1280x720',
+  'manager-tool-stress-repair',
+  'manager-tool-stress-replacement',
+  'manager-tool-stress-immune',
+  'manager-tool-parity-04-requirements-1280x720',
+  'manager-tool-parity-05-validation-1280x720',
+  'manager-tool-stress-invalid-validation',
+  'manager-tool-parity-06-breakage-900x700',
+  'manager-tool-stress-wrapping-680',
   'manager-components-progressive',
   'manager-component-edit-difficulty',
   'interactable-config-linked',
@@ -360,8 +372,13 @@ const D0_SECTION_SPANS = [
     to: 'manager-gathering-travel-stacked',
   },
   {
+    name: 'tools',
+    from: 'manager-tool-parity-01-library-1280x720',
+    to: 'manager-tool-stress-wrapping-680',
+  },
+  {
     name: 'overview-interactables',
-    from: 'manager-tools-normal',
+    from: 'manager-components-progressive',
     to: 'interactables-manager-empty',
   },
   {

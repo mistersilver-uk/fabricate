@@ -16,10 +16,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeChange.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
-import {
-  TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST,
-  TOOL_ON_BREAK_MODES as TOOL_ON_BREAK_MODE_LIST,
-} from '../models/Tool.js';
+import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
 import {
   normalizeComponentCategory,
@@ -47,7 +44,6 @@ import { SignatureValidator } from './SignatureValidator.js';
 // system-owned tool normalizer enforces the exact same enumerations as the Tool
 // model and the adminStore editor without duplicating the literal lists.
 const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
-const TOOL_ON_BREAK_MODES = new Set(TOOL_ON_BREAK_MODE_LIST);
 
 export class CraftingSystemManager {
   /**
@@ -157,6 +153,13 @@ export class CraftingSystemManager {
     const recipeItemDefinitions = this._normalizeRecipeItemDefinitions(
       system.recipeItemDefinitions ?? system.recipeItems
     );
+    // Normalize the shared prerequisite library before Tools so every payload path
+    // (settings, import, copy, or direct registration) applies the same ID invariant.
+    const characterPrerequisites = normalizeCharacterPrerequisiteList(
+      system.characterPrerequisites,
+      () => foundry.utils.randomID()
+    );
+    const validToolPrerequisiteIds = new Set(characterPrerequisites.map((entry) => entry.id));
     const essenceIds = new Set(essenceDefinitions.map((def) => def.id));
     // Salvage-normalization context (issue 764), HOISTED above the component map so the
     // Simple-mode group-count clamp in `_normalizeSalvage` sees the owning system's mode
@@ -188,10 +191,14 @@ export class CraftingSystemManager {
     // idempotent. Item-sourced tools (`componentId: null`) and already-derived tools are left
     // untouched. Runs after component normalization so `items` is the resolved component set.
     const normalizedTools = Array.isArray(system.tools)
-      ? system.tools.map((t) => this._normalizeTool(t))
+      ? system.tools.map((t) =>
+          this._normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds })
+        )
       : [];
     for (const normalizedTool of normalizedTools) {
-      deriveToolSourceFromComponents(normalizedTool, items);
+      if (deriveToolSourceFromComponents(normalizedTool, items) && !normalizedTool.description) {
+        normalizedTool.description = itemById.get(normalizedTool.componentId)?.description || '';
+      }
     }
 
     const resolvedEssenceDefinitions = essenceDefinitions.map((def) => {
@@ -317,10 +324,7 @@ export class CraftingSystemManager {
       // book/scroll (referenced by id from a recipe item's `caps.learn`).
       // Normalized wholesale from the incoming array; settings replace (not
       // deep-merge), so a removed entry does not resurrect.
-      characterPrerequisites: normalizeCharacterPrerequisiteList(
-        system.characterPrerequisites,
-        () => foundry.utils.randomID()
-      ),
+      characterPrerequisites,
       // Per-system gathering realm library (geography) + realm behavior
       // settings. Realms ride along with export/import for free because the
       // exporter clones the normalized system and import funnels back through
@@ -367,7 +371,7 @@ export class CraftingSystemManager {
    * @returns {{ id: string, label: string, enabled: boolean, componentId: string|null,
    *   requirement: object|null, breakage: object, onBreak: object }}
    */
-  _normalizeTool(tool = {}) {
+  _normalizeTool(tool = {}, { validPrerequisiteIds = null } = {}) {
     const normalizedTool = !tool || typeof tool !== 'object' ? {} : tool;
     const id = String(normalizedTool.id || foundry.utils.randomID());
     // `label` is the PRE-EXISTING, user-authored display override — distinct from the
@@ -414,20 +418,36 @@ export class CraftingSystemManager {
           ),
         ]
       : [];
-    return {
+    const model = new Tool({
+      ...normalizedTool,
       id,
       label,
-      enabled: normalizedTool.enabled !== false,
       componentId,
-      name:
-        typeof normalizedTool.name === 'string' && normalizedTool.name ? normalizedTool.name : null,
-      img: typeof normalizedTool.img === 'string' && normalizedTool.img ? normalizedTool.img : null,
       registeredItemUuid,
       originItemUuid,
       aliasItemUuids,
-      requirement: this._normalizeToolRequirement(normalizedTool.requirement),
-      breakage: this._normalizeToolBreakage(normalizedTool.breakage),
-      onBreak: this._normalizeToolOnBreak(normalizedTool.onBreak),
+      prerequisites: this._normalizeToolPrerequisites(
+        normalizedTool.prerequisites,
+        validPrerequisiteIds
+      ),
+    });
+    return model.toJSON();
+  }
+
+  _normalizeToolPrerequisites(input, validIds = null) {
+    const source = input && typeof input === 'object' ? input : {};
+    const ids = [
+      ...new Set(
+        (Array.isArray(source.ids) ? source.ids : [])
+          .filter((id) => typeof id === 'string')
+          .map((id) => id.trim())
+          .filter((id) => id && (!(validIds instanceof Set) || validIds.has(id)))
+      ),
+    ];
+    return {
+      enabled: source.enabled === true && ids.length > 0,
+      ids,
+      gateMode: source.gateMode === 'bonus' ? 'bonus' : 'usability',
     };
   }
 
@@ -440,6 +460,7 @@ export class CraftingSystemManager {
   }
 
   _normalizeToolBreakage(input) {
+    if (input?.mode === 'immune') return { mode: 'limitedUses', maxUses: null };
     const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
     if (mode === 'limitedUses') {
       const raw = input?.maxUses;
@@ -454,10 +475,6 @@ export class CraftingSystemManager {
       const raw = Number(input?.breakageChance);
       return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
     }
-    if (mode === 'immune') {
-      // An immune tool carries no breakage fields and never breaks.
-      return { mode };
-    }
     const threshold = Number(input?.threshold);
     return {
       mode,
@@ -467,15 +484,7 @@ export class CraftingSystemManager {
   }
 
   _normalizeToolOnBreak(input) {
-    const mode = TOOL_ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
-    if (mode === 'replaceWith') {
-      return {
-        mode,
-        replacementComponentId:
-          typeof input?.replacementComponentId === 'string' ? input.replacementComponentId : null,
-      };
-    }
-    return { mode };
+    return new Tool({ componentId: '_normalizer_', onBreak: input }).onBreak;
   }
 
   _normalizeFeatures(system = {}) {
@@ -550,7 +559,7 @@ export class CraftingSystemManager {
       },
       progressive: this._normalizeProgressiveCraftingCheck(check?.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
-      routed: this._normalizeRoutedCraftingCheck(check?.routed),
+      routed: this._normalizeRoutedCraftingCheck(check?.routed, { allowNatStepping: true }),
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
       // Per-recipe check-modifier catalogue + default policy (issue 770). A crafting-
       // owned aggregate (NOT gathering's `characterModifiers`), feeding the
@@ -761,7 +770,7 @@ export class CraftingSystemManager {
   // deleting a tier in one mode never affects the other. Kept alongside the
   // legacy `outcomes` string list rather than replacing it, so the existing
   // routing engine is untouched.
-  _normalizeRoutedCraftingCheck(routed = {}) {
+  _normalizeRoutedCraftingCheck(routed = {}, { allowNatStepping = false } = {}) {
     const source = !routed || typeof routed !== 'object' ? {} : routed;
     const relative = Array.isArray(source.relativeOutcomes) ? source.relativeOutcomes : [];
     const fixed = Array.isArray(source.fixedOutcomes) ? source.fixedOutcomes : [];
@@ -778,6 +787,7 @@ export class CraftingSystemManager {
     }
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
+      ...(allowNatStepping && { natStepping: source.natStepping === true }),
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
@@ -954,7 +964,9 @@ export class CraftingSystemManager {
       // the dynamic-DC macro are stored but hidden by the salvage editors (salvage
       // has no recipes to pick a tier from).
       simple: this._normalizeSimpleCraftingCheck(normalizedCheck.simple),
-      routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed),
+      routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed, {
+        allowNatStepping: true,
+      }),
       progressive: this._normalizeProgressiveCraftingCheck(normalizedCheck.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
     };
@@ -1514,8 +1526,7 @@ export class CraftingSystemManager {
    * Build a first-class Tool's source snapshot from an Item uuid (issue 561): the same
    * union of source refs a component/recipe-item records, plus the `name` + `img` display
    * snapshot — but NEVER `label` (that is a distinct user-authored override). Mirrors
-   * {@link _buildRecipeItemSourceSnapshot}; the description is intentionally omitted (a tool
-   * snapshot is name/img only).
+   * {@link _buildRecipeItemSourceSnapshot}, including the no-auto-refresh description snapshot.
    * @private
    */
   async _buildToolSourceSnapshot(itemUuid, source = null) {
@@ -1524,6 +1535,7 @@ export class CraftingSystemManager {
     return {
       name: source?.name || fallbackName,
       img: source?.img || 'icons/svg/item-bag.svg',
+      description: source ? await this._extractSourceDescription(source) : '',
       registeredItemUuid: sourceData.currentUuid,
       originItemUuid: sourceData.canonicalUuid,
       aliasItemUuids: sourceData.aliasItemUuids,
@@ -2153,30 +2165,96 @@ export class CraftingSystemManager {
    * @returns {Promise<{ item: object, action: 'added' }>}
    */
   async addToolFromUuid(systemId, itemUuid) {
-    this._assertGM('add tool from uuid');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    return this.upsertTool(systemId, {}, { itemUuid });
+  }
 
+  async _resolveToolSourceItem(itemUuid) {
     let source;
     try {
       source = await fromUuid(itemUuid);
     } catch {
       source = null;
     }
+    if (!source || source.documentName !== 'Item') {
+      throw new Error(
+        `Cannot register Tool source "${itemUuid}": resolved document is not an Item`
+      );
+    }
+    return source;
+  }
 
-    if (source && source.documentName && source.documentName !== 'Item') {
-      throw new Error(`Cannot add non-Item document (${source.documentName}) as a tool`);
+  _findToolForUpsert(tools, data, snapshot, source, flagKey) {
+    const requestedId = typeof data?.id === 'string' ? data.id.trim() : '';
+    if (requestedId) {
+      const byId = tools.find((entry) => String(entry?.id) === requestedId);
+      if (byId) return byId;
+    }
+    const durableId = flagKey ? getFabricateFlag(source, flagKey, null) : null;
+    if (durableId) {
+      const byDurableId = tools.find((entry) => String(entry?.id) === String(durableId));
+      if (byDurableId) return byDurableId;
+    }
+    const refs = new Set([snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean));
+    return (
+      tools.find((entry) =>
+        [entry?.registeredItemUuid, entry?.originItemUuid].some((ref) => refs.has(ref))
+      ) || null
+    );
+  }
+
+  /**
+   * Persist one normalized Tool, optionally registering or relinking its Item source.
+   * Source resolution and snapshot construction finish before the system is mutated;
+   * a failed settings write restores the prior Tool array and performs no flag writes.
+   */
+  async upsertTool(systemId, data = {}, { itemUuid } = {}) {
+    this._assertGM('add tool from uuid');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    const flagKey = this._toolRoleFlagKey(system.id);
+    const hasSourceRequest = typeof itemUuid === 'string' && !!itemUuid.trim();
+    const source = hasSourceRequest ? await this._resolveToolSourceItem(itemUuid.trim()) : null;
+    const snapshot = source ? await this._buildToolSourceSnapshot(itemUuid.trim(), source) : null;
+    const tools = Array.isArray(system.tools) ? system.tools : [];
+    const existing = this._findToolForUpsert(tools, data, snapshot, source, flagKey);
+    const validPrerequisiteIds = new Set(
+      (Array.isArray(system.characterPrerequisites) ? system.characterPrerequisites : []).map(
+        (entry) => entry.id
+      )
+    );
+    const staged = this._normalizeTool(
+      {
+        ...existing,
+        ...(data && typeof data === 'object' ? data : null),
+        ...snapshot,
+        id: existing?.id || data?.id || foundry.utils.randomID(),
+        ...(source && { componentId: null }),
+      },
+      { validPrerequisiteIds }
+    );
+    const validation = Tool.fromJSON(staged).validate();
+    if (!validation.valid) throw new Error(`Cannot save Tool: ${validation.errors.join('; ')}`);
+
+    const nextTools = existing
+      ? tools.map((entry) => (entry === existing ? staged : entry))
+      : [...tools, staged];
+    const previousTools = system.tools;
+    system.tools = nextTools;
+    try {
+      await this.save();
+    } catch (error) {
+      system.tools = previousTools;
+      throw error;
     }
 
-    const snapshot = await this._buildToolSourceSnapshot(itemUuid, source);
-    const tool = this._normalizeTool({ ...snapshot, componentId: null });
-    if (!Array.isArray(system.tools)) system.tools = [];
-    system.tools.push(tool);
-
-    const flagKey = this._toolRoleFlagKey(system.id);
-    if (flagKey) await this._stampSourceIdentity(source, flagKey, tool.id);
-    await this.save();
-    return { item: tool, action: 'added' };
+    const previousSourceUuid = existing?.registeredItemUuid || existing?.originItemUuid || null;
+    if (source && flagKey) {
+      await this._stampSourceIdentity(source, flagKey, staged.id);
+      if (previousSourceUuid && previousSourceUuid !== staged.registeredItemUuid) {
+        await this._clearSourceFlag(previousSourceUuid, flagKey, staged.id);
+      }
+    }
+    return { item: staged, action: existing ? 'updated' : 'added' };
   }
 
   /**
@@ -3688,8 +3766,10 @@ export class CraftingSystemManager {
       tools: { stamped: 0, stripped: 0, cleared: 0 },
       recipeItems: { stamped: 0, stripped: 0, cleared: 0 },
       // Description refresh outcomes (issue 800), deliberately a bucket of its own so
-      // the identity counts above keep their existing meaning. Components and
-      // recipe-item definitions only — tools carry no description.
+      // the identity counts above keep their existing meaning. Repair-time component
+      // description refresh excludes Tools because first-class Tool source snapshots
+      // (name, image, and description) are captured at registration/relink and
+      // deliberately do not auto-refresh.
       // `skipped` is the flat total; `skippedUnresolved` (source item/pack/module gone
       // — actionable) and `skippedEmpty` (source resolved but carries no description —
       // nothing to do) split it by cause so the GM notice can name one.

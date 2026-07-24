@@ -42,7 +42,9 @@
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringEventEditView from './GatheringEventEditView.svelte';
   import RealmNameField from './RealmNameField.svelte';
+  import ToolEditView from './ToolEditView.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
+  import ToolBrowserInspector from './tools/ToolBrowserInspector.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
@@ -177,6 +179,8 @@
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
+  let toolEditorActiveTab = $state('overview');
+  let toolValidationFocusNonce = $state(0);
 
   // Per-check tool-breakage trigger block (issue 419), carried on every check
   // draft so authoring it under checkDriven authority persists. Deep-clone the
@@ -216,6 +220,7 @@
           : '';
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
+      natStepping: source.natStepping === true,
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
@@ -370,6 +375,27 @@
   const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
+  const isToolStudioRoute = $derived(currentView === 'tools' || currentView === 'tool-edit');
+
+  $effect(() => {
+    if (!isToolStudioRoute) return;
+    let active = true;
+    const applyOptions = (options) => {
+      if (active) worldItemOptions = Array.isArray(options) ? options : [];
+    };
+    let request;
+    try {
+      request = services?.getWorldItemOptions?.();
+    } catch {
+      applyOptions([]);
+      return;
+    }
+    if (isPromise(request)) request.then(applyOptions, () => applyOptions([]));
+    else applyOptions(request);
+    return () => {
+      active = false;
+    };
+  });
 
   // The pure `evaluateSystemValidation` report, computed in the admin store from
   // the selected system's recipes/environments/components. Drives the GM system
@@ -1688,17 +1714,23 @@
     return { valid: errors.length === 0, errors };
   }
 
-  const libraryToolsList = $derived(Array.isArray($viewState.toolsDraft) ? $viewState.toolsDraft : []);
-  const dirtyToolIds = $derived(Array.isArray($viewState.toolsDraftDirtyToolIds) ? $viewState.toolsDraftDirtyToolIds : []);
+  const libraryToolsList = $derived(Array.isArray(selectedSystem?.tools) ? selectedSystem.tools : []);
+  const focusedToolDraft = $derived($viewState.toolDraft || null);
+  const focusedToolValidation = $derived(
+    $viewState.toolDraftValidation || { valid: false, errors: ['missing'] }
+  );
+  const dirtyToolIds = $derived(
+    $viewState.toolDraftDirty && focusedToolDraft?.id ? [focusedToolDraft.id] : []
+  );
   const selectedLibraryTool = $derived(
-    libraryToolsList.find(tool => tool.id === $viewState.toolsDraftSelectedToolId) || null
+    libraryToolsList.find(tool => tool.id === focusedToolDraft?.id) || null
   );
   const selectedLibraryToolDirty = $derived(
     selectedLibraryTool ? dirtyToolIds.includes(selectedLibraryTool.id) : false
   );
   const selectedToolDraftValidation = $derived(
-    currentView === 'tools' && selectedLibraryTool
-      ? (store.validateToolDraft?.(selectedLibraryTool.id) || { valid: true, errors: [] })
+    currentView === 'tool-edit' && focusedToolDraft
+      ? focusedToolValidation
       : { valid: true, errors: [] }
   );
 
@@ -1734,7 +1766,6 @@
     gatheringEventSaving = false;
     gatheringEventSaveError = '';
     gatheringMenuExpanded = isGatheringRoute;
-    store?.cancelToolsDraft?.();
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -1783,6 +1814,11 @@
   $effect(() => {
     services?.registerEssenceDirtyGuard?.(() => confirmEssenceRouteExit('close'));
     return () => services?.registerEssenceDirtyGuard?.(null);
+  });
+
+  $effect(() => {
+    services?.registerToolDirtyGuard?.(() => confirmToolsRouteExit('close'));
+    return () => services?.registerToolDirtyGuard?.(null);
   });
 
   $effect(() => {
@@ -2045,6 +2081,7 @@
     // the `systems` library here.
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
+    if (view === 'tool-edit' && !$viewState.toolDraft) return 'tools';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
@@ -2087,6 +2124,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle', 'Travel and parties');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
+    if (currentView === 'tool-edit') return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
     if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Title', 'Checks');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
@@ -2115,6 +2153,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current realm for the selected crafting system.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
+    if (currentView === 'tool-edit') return text('FABRICATE.Admin.Manager.Tools.EditSubtitle', 'Configure Tool identity, breakage, requirements, and validation.');
     if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Subtitle', 'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.');
@@ -2453,21 +2492,15 @@
     return confirmSystemDetailsRouteExit(nextView);
   }
 
-  // When a "Save all" is blocked by a tool that fails validation (after blank,
-  // unmodified new drafts are discarded by the store), tell the user why and
-  // focus the offending tool, instead of silently aborting the save and leaving
-  // them stranded on the tools page (issue 297).
   function surfaceToolsSaveValidationError() {
-    const validation = store?.validateToolsDraft?.() ?? { valid: true, errors: [] };
-    if (validation.valid) return;
-    const firstInvalidId = validation.errors?.[0]?.id;
-    if (firstInvalidId) store?.selectDraftTool?.(firstInvalidId);
+    toolEditorActiveTab = 'validation';
+    toolValidationFocusNonce += 1;
     notifyWarn(localize('FABRICATE.Admin.Manager.Tools.SaveBlockedInvalid'));
   }
 
   async function finishToolsRouteExit(action) {
     if (action === 'save') {
-      const saved = await store?.saveAllDirtyToolDrafts?.();
+      const saved = await store?.saveToolDraft?.();
       if (saved === false) {
         surfaceToolsSaveValidationError();
         return false;
@@ -2476,33 +2509,35 @@
       return true;
     }
     if (action === 'discard' || action === true) {
+      store?.discardToolDraft?.();
       store?.cancelToolsDraft?.();
       return true;
     }
     return false;
   }
 
-  function confirmToolsRouteExit(nextView) {
-    if (activeView !== 'tools') return true;
-    if (nextView === 'tools') return true;
-    if (!store?.isToolsDraftDirty?.()) {
+  function confirmToolsRouteExit(nextView, nextToolId = '') {
+    if (activeView !== 'tool-edit') return true;
+    const currentToolId = String(focusedToolDraft?.id || '');
+    if (nextView === 'tool-edit' && nextToolId && nextToolId === currentToolId) return true;
+    if ($viewState.toolDraftDirty !== true) {
       store?.cancelToolsDraft?.();
       return true;
     }
     const confirmation = services?.confirmDirtyToolsNavigation
-      ? services.confirmDirtyToolsNavigation({ dirtyCount: dirtyToolIds.length })
+      ? services.confirmDirtyToolsNavigation({ toolId: currentToolId })
       : store?.confirmDiscardDirtyToolsDraft?.();
     if (isPromise(confirmation)) return confirmation.then(finishToolsRouteExit);
     return finishToolsRouteExit(confirmation);
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'checks') && !selectedSystem) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'tool-edit' || view === 'checks') && !selectedSystem) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
       activeView = view;
-      if (view === 'tools') store?.enterToolsDraft?.(selectedSystemId);
+      if (view === 'tools') store?.cancelToolsDraft?.();
     });
   }
 
@@ -2531,6 +2566,7 @@
     'recipe-item-edit': 'books-scrolls',
     'component-edit': 'components',
     'essence-edit': 'essences',
+    'tool-edit': 'tools',
   };
 
   function browserViewForScopeChange(view) {
@@ -3551,18 +3587,38 @@
 
   async function addToolFromDrop(data) {
     if (!data) return false;
-    // A managed-component drop still links the tool to that component (whetstone / component-
-    // linked tool).
     if (data.type === 'FabricateManagedComponent') {
       const componentId = data.componentId || data.id;
       if (!componentId) return false;
-      return store.addToolToDraft?.({ componentId }) ?? false;
+      return createToolEditor({ componentId });
     }
-    // A raw Item drop creates a FIRST-CLASS item-sourced tool from the Item uuid (issue 561,
-    // B1) — no component import. The tool carries its own source refs + snapshot and a null
-    // componentId.
     if (!data.uuid) return false;
-    return (await store.addToolFromUuidToDraft?.(data.uuid)) ?? false;
+    const source = await services?.resolveToolSource?.(data.uuid);
+    if (!source) return false;
+    const created = store.createToolDraft?.({}, selectedSystemId);
+    if (!created) return false;
+    store.stageToolDraftSource?.(data.uuid, source);
+    toolEditorActiveTab = 'overview';
+    activeView = 'tool-edit';
+    return true;
+  }
+
+  async function stageToolEditorSourceDrop(data) {
+    if (!data?.uuid) return false;
+    const snapshot = worldItemOptions.find((item) => item.uuid === data.uuid)
+      || await services?.resolveToolSource?.(data.uuid);
+    if (!snapshot) return false;
+    store.stageToolDraftSource?.(data.uuid, snapshot);
+    return true;
+  }
+
+  function createToolFromWorldItem(item) {
+    if (!item?.uuid) return false;
+    const created = store.createToolDraft?.({}, selectedSystemId);
+    if (!created) return false;
+    store.stageToolDraftSource?.(item.uuid, item);
+    enterToolEditor();
+    return true;
   }
 
   function gatheringConditionOptions(kind) {
@@ -3705,16 +3761,53 @@
     });
   }
 
-  async function saveSelectedToolDraft() {
-    const toolId = $viewState.toolsDraftSelectedToolId;
-    if (!toolId || !store?.saveToolDraft) return;
-    await store.saveToolDraft(toolId);
+  function enterToolEditor() {
+    toolEditorActiveTab = 'overview';
+    activeView = 'tool-edit';
   }
 
-  function deleteSelectedLibraryTool() {
-    const toolId = $viewState.toolsDraftSelectedToolId;
-    if (!toolId) return;
-    store?.deleteToolFromDraft?.(toolId);
+  function createToolEditor(initialPatch = {}) {
+    const created = store?.createToolDraft?.(initialPatch, selectedSystemId);
+    if (!created) return false;
+    enterToolEditor();
+    return true;
+  }
+
+  function openToolEditor(toolId) {
+    const id = String(toolId || '');
+    if (!id) return false;
+    if (currentView === 'tool-edit' && String(focusedToolDraft?.id || '') === id) return true;
+    afterTruthyResult(confirmToolsRouteExit('tool-edit', id), () => {
+      if (store?.openToolDraft?.(id, selectedSystemId) === false) return;
+      enterToolEditor();
+    });
+    return true;
+  }
+
+  function selectLibraryTool(toolId) {
+    if (!toolId) return false;
+    return store?.openToolDraft?.(toolId, selectedSystemId) ?? false;
+  }
+
+  function backToToolsBrowser() {
+    afterTruthyResult(confirmRouteExit('tools'), () => { activeView = 'tools'; });
+  }
+
+  async function saveSelectedToolDraft() {
+    if (!focusedToolDraft || !store?.saveToolDraft) return false;
+    const saved = await store.saveToolDraft();
+    if (saved === false) surfaceToolsSaveValidationError();
+    return saved;
+  }
+
+  async function deleteSelectedLibraryTool() {
+    if (!focusedToolDraft) return false;
+    const confirmed = await services?.confirmDeleteTool?.({ tool: focusedToolDraft });
+    if (confirmed !== true) return false;
+    const deleted = await store?.deleteToolDraft?.();
+    if (deleted !== true) return false;
+    activeView = 'tools';
+    return true;
   }
 
   function activateGatheringParent() {
@@ -4518,6 +4611,7 @@
     every screen, so the gold badge carries the SELECTED SYSTEM's name (user-authored
     text — hence max-width + ellipsis + title) and never a theme or product name.
   -->
+  {#if !isToolStudioRoute}
   <div class="manager-titlebar" data-manager-titlebar aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}>
     <!--
       The layer-group icon and "Crafting Systems" product label used to lead this
@@ -4543,7 +4637,9 @@
       </span>
     {/if}
   </div>
+  {/if}
 
+  {#if !isToolStudioRoute}
   <header class="manager-header">
     <div class="manager-heading">
       <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
@@ -4647,6 +4743,12 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
         {/if}
+        {#if currentView === 'tool-edit'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={backToToolsBrowser}>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{focusedToolDraft?.label || focusedToolDraft?.name || text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled tool')}</span>
+        {/if}
         {#if currentView === 'checks'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
@@ -4680,7 +4782,7 @@
             <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
           </div>
         </div>
-      {:else}
+      {:else if currentView !== 'tool-edit'}
         <h1 class="manager-title">{viewTitle()}</h1>
         <p class="manager-subtitle">{viewSubtitle()}</p>
       {/if}
@@ -4698,7 +4800,7 @@
         </div>
       {/if}
     </div>
-    {#if currentView !== 'tools'}
+    {#if currentView !== 'tools' && currentView !== 'tool-edit'}
     <div class="manager-header-actions" aria-label={headerActionsLabel()}>
       {#if currentView === 'recipes'}
         <button type="button" class="manager-button is-primary" onclick={createRecipe} disabled={!selectedSystemId}>
@@ -4898,9 +5000,30 @@
     </div>
     {/if}
   </header>
+  {/if}
+
+  {#if currentView === 'tools' && selectedSystem}
+    <header class="manager-header manager-tools-context-header" data-tool-library-context>
+      <div class="manager-heading">
+        <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
+          <button type="button" onclick={() => editSystem(selectedSystem.id)}>{selectedSystem.name}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
+        </nav>
+        <h1 class="manager-title">{text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}</h1>
+        <p class="manager-subtitle">{text(
+          'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
+          'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
+        )}</p>
+      </div>
+    </header>
+  {/if}
 
   <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
     <aside class="manager-rail" aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}>
+      {#if !isToolStudioRoute}
       <button
         type="button"
         class="manager-rail-toggle"
@@ -4915,6 +5038,7 @@
       >
         <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
       </button>
+      {/if}
       <!--
         The rail's crafting-system card. The kicker names what the card CONTAINS
         ("Crafting system"), not the product — the product name is already on the
@@ -4923,6 +5047,7 @@
         The "GM management workspace" caption that used to hang below it is gone: the
         section label beneath the card already says GM management.
       -->
+      {#if !isToolStudioRoute}
       <section class="manager-rail-block" aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}>
         {#if selectedSystem}
           <div class="manager-scope-card">
@@ -4962,6 +5087,7 @@
           <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</h2>
         {/if}
       </section>
+      {/if}
 
       <!--
         The rail's uppercase section label. Hidden entirely in the 56px collapsed
@@ -4980,13 +5106,13 @@
             {/if}
           </button>
           <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
-          <div class={`manager-nav-group ${craftingMenuExpanded ? 'is-expanded' : ''}`}>
+          <div class={`manager-nav-group ${craftingMenuExpanded || isToolStudioRoute ? 'is-expanded' : ''}`}>
             <button
               type="button"
               class="manager-nav-button manager-nav-parent"
               id="manager-nav-crafting"
               aria-current={isCraftingRoute ? 'page' : undefined}
-              aria-expanded={craftingMenuExpanded}
+              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
               onclick={activateCraftingParent}
             >
               <i class="fas fa-hammer" aria-hidden="true"></i>
@@ -4996,16 +5122,16 @@
             <button
               type="button"
               class="manager-nav-toggle"
-              aria-label={craftingMenuExpanded
+              aria-label={craftingMenuExpanded || isToolStudioRoute
                 ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
                 : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
               aria-controls="manager-crafting-submenu"
-              aria-expanded={craftingMenuExpanded}
+              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
               onclick={toggleCraftingMenu}
             >
-              <i class={craftingMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+              <i class={craftingMenuExpanded || isToolStudioRoute ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
             </button>
-            {#if craftingMenuExpanded}
+            {#if craftingMenuExpanded || isToolStudioRoute}
               <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
                 {#each craftingNavItems as craftingItem (craftingItem.id)}
                   <button
@@ -5042,7 +5168,7 @@
               <span class="manager-nav-count">{selectedCounts.essences}</span>
             </button>
           {/if}
-          <button type="button" class={`manager-nav-button ${currentView === 'tools' ? 'is-active' : ''}`} aria-current={currentView === 'tools' ? 'page' : undefined} onclick={() => setView('tools')}>
+          <button type="button" class={`manager-nav-button ${currentView === 'tools' || currentView === 'tool-edit' ? 'is-active' : ''}`} aria-current={currentView === 'tools' || currentView === 'tool-edit' ? 'page' : undefined} onclick={() => setView('tools')}>
             <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
             <span class="manager-nav-count">{toolsNavCount}</span>
@@ -5307,20 +5433,48 @@
       />
     {:else if currentView === 'tools' && selectedSystem}
       <ToolsBrowserView
-        tools={$viewState.toolsDraft || []}
-        selectedToolId={$viewState.toolsDraftSelectedToolId || ''}
-        expandedToolId={$viewState.toolsDraftExpandedToolId || ''}
-        dirtyToolIds={dirtyToolIds}
+        tools={libraryToolsList}
+        selectedToolId={focusedToolDraft?.id || ''}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
+        worldItems={worldItemOptions}
         breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
-        onSelectTool={(id) => store.selectDraftTool?.(id)}
-        onExpandTool={(id) => store.setExpandedDraftTool?.(id)}
-        onToggleExpand={(id) => store.setExpandedDraftTool?.(id === $viewState.toolsDraftExpandedToolId ? '' : id)}
-        onAddTool={(initialPatch) => initialPatch ? store.addToolToDraft?.(initialPatch) : store.addToolToDraft?.()}
-        onAddToolDrop={addToolFromDrop}
-        onUpdateTool={(id, patch) => store.updateToolInDraft?.(id, patch)}
-        onDeleteTool={(id) => store.deleteToolFromDraft?.(id)}
+        onSelectTool={selectLibraryTool}
+        onEditTool={openToolEditor}
+        onCreateTool={(initialPatch) => createToolEditor(initialPatch || {})}
+        onCreateFromItem={createToolFromWorldItem}
+        onCreateToolDrop={addToolFromDrop}
+        onToggleToolEnabled={(id, enabled) => store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
         onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
+      />
+    {:else if currentView === 'tool-edit' && selectedSystem && focusedToolDraft}
+      <ToolEditView
+        tool={focusedToolDraft}
+        systemName={selectedSystem.name}
+        validation={focusedToolValidation}
+        dirty={$viewState.toolDraftDirty === true}
+        saving={$viewState.toolDraftSaving === true}
+        saveError={$viewState.toolDraftSaveError}
+        activeTab={toolEditorActiveTab}
+        focusValidationNonce={toolValidationFocusNonce}
+        worldItems={worldItemOptions}
+        managedItems={selectedSystem?.managedItemOptions || []}
+        itemTags={selectedSystem?.itemTags || []}
+        essenceOptions={selectedSystem?.features?.essences === true ? (selectedSystem?.essenceDefinitions || []) : []}
+        currencyUnits={selectedSystem?.requirements?.currency?.units || []}
+        currencyEnabled={selectedSystem?.requirements?.currency?.enabled === true}
+        prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
+        authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+        onOpenSystems={selectSystemAndShowBrowser}
+        onOpenSystem={() => editSystem(selectedSystem.id)}
+        onOpenTools={backToToolsBrowser}
+        onBack={backToToolsBrowser}
+        onDelete={deleteSelectedLibraryTool}
+        onSave={saveSelectedToolDraft}
+        onTabChange={(tab) => { toolEditorActiveTab = tab; }}
+        onPatch={(patch) => store.patchToolDraft?.(patch)}
+        onStageSource={(uuid, snapshot) => store.stageToolDraftSource?.(uuid, snapshot)}
+        onSourceDrop={stageToolEditorSourceDrop}
+        onUnlinkSource={() => store.unlinkToolDraftSource?.()}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
@@ -5605,7 +5759,7 @@
          took in decision 4: its context rail is deleted and its content became real
          tabs (Access, Books & Scrolls) and an Overview control (Step mode), so the
          editor has nothing to put in a third column and the tabs take the width back. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit'}
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
@@ -6919,118 +7073,13 @@
           onAddComponents={() => setView('components')}
         />
       {:else if currentView === 'tools'}
-        {#if selectedLibraryTool}
-          {@const toolImageSrc = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))?.img || 'icons/svg/item-bag.svg'}
-          {@const toolComponent = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))}
-          <section class="manager-inspector-card" data-manager-tool-inspector>
-            <div class="manager-inspector-title-row is-hero-large">
-              <img class="manager-recipe-preview" src={toolImageSrc} alt="" />
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.SelectedKicker', 'Selected tool')}</p>
-                <div class="manager-tool-inspector-heading">
-                  <h2 class="manager-inspector-name" title={selectedLibraryTool.label || toolComponent?.name || ''}>{selectedLibraryTool.label || toolComponent?.name || text('FABRICATE.Admin.Manager.Tools.OverviewComponentMissing', 'Not set')}</h2>
-                  {#if selectedLibraryToolDirty}
-                    <span class="manager-chip is-warning manager-tools-dirty-chip">
-                      <i class="fas fa-save" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</span>
-                    </span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-            <div class="manager-tool-inspector-actions">
-              <button type="button"
-                class="manager-button is-danger"
-                onclick={deleteSelectedLibraryTool}
-                disabled={$viewState.toolsDraftSaving}>
-                <i class="fas fa-trash" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete tool')}</span>
-              </button>
-              <button type="button"
-                class="manager-button is-primary"
-                onclick={saveSelectedToolDraft}
-                disabled={!selectedLibraryToolDirty || !selectedToolDraftValidation.valid || $viewState.toolsDraftSaving}
-                title={selectedToolDraftValidation.valid ? '' : selectedToolDraftValidation.errors.join('; ')}>
-                <i class={$viewState.toolsDraftSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save changes')}</span>
-              </button>
-            </div>
-          </section>
-
-          <section class="manager-inspector-card manager-tools-component-browser-card" data-manager-tools-component-browser>
-            <div class="manager-tools-component-browser-header">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.ComponentBrowser', 'Components')}</h3>
-              <label class="manager-search is-compact" data-manager-tools-component-search>
-                <i class="fas fa-search" aria-hidden="true"></i>
-                <input type="search"
-                  value={toolsComponentSearchTerm}
-                  oninput={onToolsComponentSearchInput}
-                  placeholder={text('FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsPlaceholder', 'Search components...')}
-                  aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsByName', 'Search component names')} />
-              </label>
-            </div>
-
-            <div class="manager-tools-component-browser-scroll">
-              {#if toolsComponentCards.length === 0}
-                <div class="manager-empty is-compact">
-                  <div>
-                    <i class="fas fa-box-open" aria-hidden="true"></i>
-                    <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.NoComponents', 'No components available')}</h3>
-                  </div>
-                </div>
-              {:else if toolsFilteredComponentCards.length === 0}
-                <div class="manager-empty is-compact">
-                  <div>
-                    <i class="fas fa-search" aria-hidden="true"></i>
-                    <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyComponentSearchTitle', 'No components match these filters')}</h3>
-                  </div>
-                </div>
-              {:else}
-                <div class="manager-tools-component-grid" role="list">
-                  {#each toolsPaginatedComponentCards as item (item.id)}
-                    <div class="manager-task-component-card"
-                      role="listitem"
-                      draggable="true"
-                      data-manager-tools-component-card={item.id}
-                      ondragstart={(event) => onToolsComponentDragStart(item, event)}>
-                      <img class="manager-task-component-card-image" src={toolsComponentCardImage(item)} alt="" />
-                      <span class="manager-task-component-card-copy">
-                        <strong>{item.name}</strong>
-                        <span>{toolsComponentDescription(item) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}</span>
-                        {#if Array.isArray(item.tags) && item.tags.length > 0}
-                          <span class="manager-task-component-card-tags">
-                            {#each item.tags.slice(0, 3) as tag (tag)}
-                              <small>{tag}</small>
-                            {/each}
-                          </span>
-                        {/if}
-                      </span>
-                      <span class="manager-task-component-card-grip" aria-hidden="true">⋮⋮</span>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-
-            <div class="manager-tools-component-browser-footer">
-              <Pagination
-                totalCount={toolsFilteredComponentCards.length}
-                pageSize={toolsComponentPageSize}
-                pageIndex={toolsComponentPageIndex}
-                pageSizeOptions={[6, 9, 12]}
-                onPageChange={(next) => toolsComponentPageIndex = next}
-                onPageSizeChange={(next) => { toolsComponentPageSize = next; toolsComponentPageIndex = 0; }}
-              />
-            </div>
-          </section>
-        {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Tools.SelectEmpty', 'Select a tool to inspect.')}</h3>
-            </div>
-          </div>
-        {/if}
+        <ToolBrowserInspector
+          tool={selectedLibraryTool}
+          managedItems={selectedSystem?.managedItemOptions || []}
+          prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
+          authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+          onEdit={openToolEditor}
+        />
       {:else if currentView === 'component-edit'}
         <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single
              scrolling column: the source actions rehomed into the identity strip and

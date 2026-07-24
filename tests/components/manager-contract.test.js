@@ -26,6 +26,11 @@ const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/En
 const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
 const gatheringTasksBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
 const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
+const toolEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolEditView.svelte');
+const toolBreakagePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
+const toolOverviewPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte');
+const toolRequirementsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte');
+const toolValidationPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
@@ -48,6 +53,11 @@ const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
+const toolEditSource = readFileSync(toolEditPath, 'utf8');
+const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
+const toolOverviewSource = readFileSync(toolOverviewPath, 'utf8');
+const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
+const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
@@ -188,6 +198,31 @@ describe('CraftingSystemManager source contract', () => {
       unfiltered.includes('isPlayerCharacterActor'),
       false,
       'the access roster applies no player-character type filter'
+    );
+  });
+
+  it('forwards Tool Item services from the internal service set into prepared Svelte props', () => {
+    const buildServicesStart = appSource.indexOf('  _buildServices() {');
+    const preparePropsStart = appSource.indexOf('  _prepareSvelteProps(context) {');
+    const preparePropsEnd = appSource.indexOf('\n  // Foundry', preparePropsStart);
+    const buildServicesSource = appSource.slice(buildServicesStart, preparePropsStart);
+    const preparePropsSource = appSource.slice(preparePropsStart, preparePropsEnd);
+    const preparedServicesSource = preparePropsSource.slice(
+      preparePropsSource.indexOf('      services: {')
+    );
+
+    assert.ok(
+      buildServicesSource.includes('getWorldItemOptions: () =>') &&
+        buildServicesSource.includes('resolveToolSource: async (uuid) =>'),
+      'the internal service set should define the world Item projection and Tool source resolver'
+    );
+    assert.ok(
+      preparedServicesSource.includes('getWorldItemOptions: this._services.getWorldItemOptions,'),
+      'prepared Svelte props should forward world Item options into the root services'
+    );
+    assert.ok(
+      preparedServicesSource.includes('resolveToolSource: this._services.resolveToolSource,'),
+      'prepared Svelte props should forward Tool Item drop resolution into the root services'
     );
   });
 
@@ -1560,26 +1595,28 @@ describe('CraftingSystemManager source contract', () => {
   // NOTE: status-toggle contract on environmentEditSource removed when the editor
   // was placeholder'd out pending redesign.
 
-  it('wires the Gathering Tools page through root-owned draft callbacks', () => {
+  it('wires the Tools library and focused editor through root-owned draft callbacks', () => {
     assert.ok(
       rootSource.includes("import ToolsBrowserView from './ToolsBrowserView.svelte';"),
       'root should import ToolsBrowserView'
     );
     for (const snippet of [
       "currentView === 'tools'",
-      'enterToolsDraft',
-      'saveToolDraft',
-      'saveAllDirtyToolDrafts',
-      'cancelToolsDraft',
-      'addToolToDraft',
-      'updateToolInDraft',
-      'deleteToolFromDraft',
-      'selectDraftTool',
-      'setExpandedDraftTool',
-      'toolsDraftDirtyToolIds',
-      'toolsDraftSelectedToolId',
+      "currentView === 'tool-edit'",
+      'focusedToolDraft',
+      'focusedToolValidation',
+      'createToolEditor',
+      'openToolEditor',
+      'selectLibraryTool',
+      'backToToolsBrowser',
+      'saveSelectedToolDraft',
+      'deleteSelectedLibraryTool',
+      'confirmToolsRouteExit',
+      'store?.createToolDraft',
+      'store?.openToolDraft',
+      'store?.saveToolDraft',
+      'store?.deleteToolDraft',
       'toolsNavCount',
-      'selectedToolDraftValidation'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
     }
@@ -1597,13 +1634,27 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Title, 'Tools');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Add, 'Add tool');
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save changes');
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll, 'Save All');
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.RequirementInstructions, 'Enter an actor roll-data property. The tool is available when the value is greater than zero.');
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.RequirementExampleActorProperty, 'Example: @tools.example.value');
-    assert.ok(!toolsBrowserSource.includes('ProviderExpressionInput'), 'tools requirement editor should not expose provider selection');
-    assert.ok(toolsBrowserSource.includes('manager-tools-requirement-expression'), 'tools requirement editor should expose a single expression input');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Tools, 'Tools');
+    assert.ok(rootSource.includes("import ToolEditView from './ToolEditView.svelte';"), 'root should import the focused Tool editor');
+    assert.ok(toolEditSource.includes('<ToolRequirementsTab'), 'focused editor should render its requirements tab');
+    assert.ok(!toolRequirementsSource.includes('ProviderExpressionInput'), 'Tool requirements should use shared prerequisites rather than provider selection');
+    assert.ok(toolRequirementsSource.includes('manager-tool-prerequisite-list'), 'Tool requirements should expose the shared prerequisite picker');
+    assert.ok(toolRequirementsSource.includes('data-tool-bonus-expression'), 'Tool requirements should expose the numeric bonus expression');
+    assert.ok(
+      /manager-tool-section-heading[\s\S]*?<h3><i class="fas fa-heart-crack"[\s\S]*?<\/h3>[\s\S]*?<p>/.test(toolBreakageSource),
+      'Breakage should render its icon heading and immediate hint before the method cards'
+    );
+    assert.ok(!toolBreakageSource.includes('BreakageKicker'), 'Breakage should not restore the redundant BREAKAGE kicker');
+    assert.ok(
+      /manager-tool-source-copy"><strong>\{source\.name\}<\/strong><code title=\{source\.uuid \|\| ''\}>\{compactSourceId\}<\/code>/.test(toolOverviewSource),
+      'Overview should keep the compact source UUID subline directly under the source name'
+    );
+    assert.ok(toolOverviewSource.includes('manager-tool-source-actions'), 'Overview should retain compact trailing source actions');
+    assert.ok(
+      /manager-tool-validation-errors[\s\S]*?<h3>\{text\('FABRICATE\.Admin\.Manager\.Tools\.Editor\.DomainErrors', 'Save blockers'\)\}<\/h3>/.test(toolValidationSource),
+      'Validation should scope the Save blockers hierarchy to its error section'
+    );
   });
 
   it('wires a collapsible left rail persisted via the manager setting seam', () => {

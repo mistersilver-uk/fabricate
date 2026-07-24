@@ -302,6 +302,8 @@ The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEdito
 `routedByIngredients` no longer renders the tier `CraftingCheckEditor` at all — it authors its optional pass/fail check via the shared `SimpleCraftingCheckEditor` (bound to `craftingCheck.simple`), which shows the DC, the meet/exceed comparison, the static/dynamic DC source, and the recipe DC tiers.
 
 Mode semantics are defined in `resolution-modes/spec.md`.
+The routed crafting and salvage editors expose a default-off Natural 20/1 tier-stepping toggle only while their routed check type is `relative`.
+The control writes `craftingCheck.routed.natStepping` or `salvageCraftingCheck.routed.natStepping`; it is absent for fixed checks and for gathering.
 
 ##### Check Tool-Breakage Controls
 
@@ -540,17 +542,50 @@ The source component may in turn expose a source item UUID.
 The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering` (see Manager Shell).
 It manages the system's single canonical Tool library (`system.tools`).
 
-Tool-breakage authority (issue 419):
+The Tools surface is a Tool Studio with a top-level library route and a focused `tool-edit` route.
+There is no Tool Kind field, filter, selector, pill, icon taxonomy, or persisted Kind value on either route.
 
-- The Tools page carries a system-level **tool-breakage source** control: a card with a header, descriptive hint, and a radio group offering `toolSpecific` (default) and `checkDriven`.
-- `toolSpecific` means each Tool's own breakage mode decides whether it breaks and a check never breaks tools; `checkDriven` means the active check's `checkBreakage` triggers decide whether all required tools break and each Tool's own mode is ignored except `immune`.
-- Each source option is self-describing (a bold name above a muted description); the `checkDriven` option's description carries the "per-tool breakage modes are not evaluated (except Immune)" guidance, so there is no separate advisory line.
+The library uses the Manager three-column shell at `210px | 1fr | 340px`.
+It owns the sole system-breakage-authority card above search, with self-describing `toolSpecific` and `checkDriven` options; changing authority persists live and never erases the inactive per-Tool settings.
+The center library accepts an Item drop or Item-picker selection to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
+Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state, and the right inspector presents selected-Tool detail and Edit.
+The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
+Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
 
-Per-tool breakage editing is governed by the active authority; the two authorities never expose their per-tool breakage surfaces at the same time:
+Each row exposes selection through a keyboard-focusable identity target with explicit selected semantics and Enter/Space activation.
+Selection, Edit, and enabled toggle are distinct localized named hit targets.
+Activating Edit or the toggle does not select or open through the row handler, and the enabled toggle persists live.
 
-- Under `toolSpecific` authority the per-tool breakage **mechanic** offers the three original modes — `Limited uses`, `Break chance`, `Dice expression` — each with its own field inputs. `Immune` is not offered here; an `Immune` tool coerces to the `Limited uses` display (an unlimited limited-uses tool also never breaks) and persists a concrete mechanic once edited.
-- Under `checkDriven` authority the per-tool breakage mechanic is binary: `Breakable` or `Immune`, with no field inputs. `Breakable` means the tool can break (the active check decides); it preserves the tool's existing non-immune mechanic under the hood (defaulting to unlimited limited-uses), so switching the source back to `toolSpecific` restores it.
-- An `Immune` tool never breaks under either authority and is still recorded as used; the `onBreak` configuration stays available, and the browse-row breakage chip reads as a never-breaks state (and as `Breakable` for a non-immune tool under `checkDriven`).
+The editor uses `210px | 1fr | 320px` and exposes exactly four tabs: Overview, Breakage, Requirements, and Validation.
+The header alone owns Back, Delete, Save, and the dirty-state affordance; there is no footer save bar.
+The body includes a live behavior preview, while the inspector summarizes identity, linkage, usage, and validation context.
+
+Overview authors the display label, enabled state, description snapshot/link state, and Item picker/drop/unlink actions.
+Breakage authors the retained `limitedUses`, `breakageChance`, or `diceExpression` tool-specific configuration, the separate check-driven Breakable/Immune state (`checkBreakable`), and the `destroy`, `flagBroken`, or `replaceWith` action.
+Changing authority or check-driven immunity does not clear the inactive tool-specific configuration or on-break values.
+When `checkBreakable` is false under check-driven authority, on-break controls are actually disabled and removed from interaction while their retained values and the explanation remain readable; opacity or `pointer-events` alone is insufficient.
+
+`flagBroken` authors zero or more Recipe-compatible repair `IngredientGroup`s with the shared AND-groups/OR-options interaction model and Component, Tag, Essence, and Currency match types.
+`replaceWith` authors exactly one managed Component target or direct Item UUID target, with picker/drop and localized unlink controls.
+Requirements selects shared `system.characterPrerequisites` ids, the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
+Validation lists every failing model check, exposes the first failure for focus, and reports an all-clear state that is not color-only.
+
+Leaving a dirty `tool-edit` route through Back, rail or breadcrumb navigation, a system-scope change, another Tool selection, or application close invokes the standard DialogV2 Save / Discard / Keep editing guard.
+Save proceeds only after successful validation and persistence.
+Invalid or failed Save keeps the same Tool mounted, opens Validation, and focuses or exposes the first failing check.
+The Validation tab projects domain failures onto stable localized categories and never renders raw field paths, exception messages, adapter details, or other internal error text.
+Save, delete, and enabled-toggle failures likewise emit only their localized operation-specific message; raw caught errors may remain internal state for control flow but never become notification copy.
+Discard restores the baseline before navigation, while Keep editing preserves the draft and focus.
+Re-entering the same Tool does not prompt.
+Delete uses a separate destructive DialogV2 confirmation; cancellation preserves the draft, and successful deletion returns to the library without a second dirty prompt.
+
+Tabs expose `tablist`, `tab`, and `tabpanel` relationships with selected/error state that is not color-only.
+Item creation/drop targets and every icon-only unlink, remove, and menu control have button semantics and localized accessible names.
+The Tool editor's sole identity/action header spans the complete Tool shell above the rail, editor, and preview.
+Tool routes suppress the generic system status ribbon, generic edit heading, rail scope card, and rail-collapse control so they do not precede the Tool content.
+At product-root widths of `832px` and wider, the library preserves `210px | minmax(0, 1fr) | 340px` and the editor preserves `210px | minmax(0, 1fr) | 320px`; center workspace and inspector own vertical scrolling with `min-width: 0` and `min-height: 0`.
+Only below `832px` do rail, main, and inspector stack in reading order with max-content rows, the body becoming the single vertical scroller while the bounded rail remains independently scrollable and main/inspector overflow becomes visible.
+At `680px` and below, header actions and tab/action clusters wrap without overlap, and Back, Delete, Save, validation state, replacement controls, and repair-row actions remain visible and reachable.
 
 ### Recipes Tab
 
@@ -991,6 +1026,12 @@ A locked recipe stays **visible** to players but only a GM can craft it — a di
 
 The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
 The change persists immediately (like `enabled`), outside the recipe draft's Save.
+
+### Tools tab
+
+The recipe editor's Tools tab authors required Tools at recipe, step, and ingredient-set scope and applies the recipe's one `toolBonusModes` map by Tool id across every applicable scope.
+Each applicable Tool carries a localized bonus-mode select that writes `recipe.toolBonusModes[toolId]` as `always`, `highestOnly`, or `never`, with an absent entry displayed and evaluated as `always`.
+The control has an associated localized label and remains reachable and wrapping at narrow widths.
 
 ### Ingredients tab
 

@@ -111,7 +111,23 @@ See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 Tools are items required for crafting but not consumed, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
 A recipe can require tools for the whole recipe, for a single step, or for a particular ingredient set.
 
-See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage modes, and usage tracking. (Tools replaced the retired Catalyst concept in version 0.6.0.)
+See [Tools]({% link tools.md %}) for source linking, prerequisites, breakage, and usage tracking.
+
+### Tool bonus modes
+
+The recipe **Tools** tab gives every selected Tool a bonus mode.
+The same choice follows that Tool at recipe, step, and ingredient-set scopes.
+
+- **Always** adds the Tool's eligible bonus.
+- **Highest only** adds the greatest eligible value among Tools using this mode.
+- **Never** excludes the Tool's bonus from this recipe.
+
+Fabricate combines every **Always** contribution with at most one **Highest only** contribution.
+A Tool whose prerequisites use **Bonus is withheld** contributes nothing when those prerequisites fail, but it still satisfies the Tool requirement.
+A Tool whose prerequisites use **Tool is unusable** blocks crafting when those prerequisites fail.
+
+These bonus modes apply to crafting checks.
+Salvage applies every eligible Tool bonus, and gathering applies no numeric Tool bonus.
 
 ## Authoring and Crafting Surfaces
 

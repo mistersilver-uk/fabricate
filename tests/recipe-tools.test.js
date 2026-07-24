@@ -42,8 +42,8 @@ function item(name) {
   };
 }
 
-function actor(items) {
-  return { items };
+function actor(items, rollData = {}) {
+  return { items, getRollData: () => rollData };
 }
 
 /**
@@ -51,14 +51,25 @@ function actor(items) {
  * components + tools, resolved by `RecipeManager` via
  * `game.fabricate.getCraftingSystemManager()`.
  */
-function installSystem({ id = 'sys-1', components = [], tools = [] } = {}) {
-  const system = { id, components, tools, features: {} };
+function installSystem({
+  id = 'sys-1',
+  components = [],
+  tools = [],
+  characterPrerequisites = [],
+} = {}) {
+  const system = { id, components, tools, characterPrerequisites, features: {} };
   globalThis.game.fabricate = {
     getCraftingSystemManager: () => ({
       getSystem: sid => (sid === id ? system : null)
     })
   };
   return system;
+}
+
+function managerForSystem(system) {
+  return new RecipeManager({
+    getCraftingSystem: (systemId) => (systemId === system.id ? system : null),
+  });
 }
 
 function toolComponent(id, name) {
@@ -104,6 +115,36 @@ test('recipe toolIds round-trip through toJSON', () => {
   assert.deepEqual(recipe.toJSON().toolIds, ['t-1', 't-2']);
   const rehydrated = Recipe.fromJSON(recipe.toJSON());
   assert.deepEqual(rehydrated.toolIds, ['t-1', 't-2']);
+});
+
+test('recipe toolBonusModes normalizes valid modes and treats absent or invalid entries as always', () => {
+  const recipe = new Recipe({
+    toolBonusModes: {
+      ' hammer ': 'highestOnly',
+      saw: 'never',
+      anvil: 'always',
+      malformed: 'sometimes',
+      '  ': 'never',
+    },
+  });
+
+  assert.deepEqual(recipe.toolBonusModes, {
+    hammer: 'highestOnly',
+    saw: 'never',
+    anvil: 'always',
+  });
+  assert.equal(recipe.getToolBonusMode('missing'), 'always');
+  assert.equal(recipe.getToolBonusMode('malformed'), 'always');
+});
+
+test('recipe toolBonusModes serializes and rehydrates without sharing the input map', () => {
+  const modes = { hammer: 'highestOnly', saw: 'never' };
+  const recipe = new Recipe({ toolBonusModes: modes });
+  modes.hammer = 'never';
+
+  const json = recipe.toJSON();
+  assert.deepEqual(json.toolBonusModes, { hammer: 'highestOnly', saw: 'never' });
+  assert.deepEqual(Recipe.fromJSON(json).toolBonusModes, json.toolBonusModes);
 });
 
 test('getExecutionSteps implicit step carries recipe toolIds', () => {
@@ -167,10 +208,11 @@ test('getToolsForSet returns [] when the recipe has no system', () => {
 // evaluateCraftability — toolStates / missing.tools
 // ---------------------------------------------------------------------------
 
-function craftableRecipe({ toolIds = [], setToolIds = [] } = {}) {
+function craftableRecipe({ toolIds = [], setToolIds = [], toolBonusModes = {} } = {}) {
   return new Recipe({
     craftingSystemId: 'sys-1',
     toolIds,
+    toolBonusModes,
     ingredientSets: [new IngredientSet({
       id: 'set-1',
       toolIds: setToolIds,
@@ -200,6 +242,37 @@ test('evaluateCraftability: present tool yields toolStates available and craftab
   assert.equal(result.toolStates[0].name, 'Axe');
   assert.deepEqual(result.missing.tools, []);
   assert.equal(result.canCraft, true);
+});
+
+test('evaluateCraftability preserves direct Item Tool display identity', () => {
+  const directTool = {
+    id: 'tool-precision-kit',
+    componentId: null,
+    label: 'Precision Kit',
+    name: 'Jewelers Tools',
+    img: 'icons/tools/hand/needle-grey.webp',
+    registeredItemUuid: 'Item.precision-kit',
+    originItemUuid: 'Item.precision-kit',
+    aliasItemUuids: [],
+  };
+  installSystem({
+    id: 'sys-1',
+    components: [toolComponent('c-iron', 'Iron')],
+    tools: [directTool],
+  });
+  const manager = new RecipeManager();
+  const recipe = craftableRecipe({ toolIds: [directTool.id] });
+  const ownedTool = roleItem({
+    uuid: 'Actor.smith.Item.precision-kit',
+    compendiumSource: directTool.registeredItemUuid,
+    name: 'Jewelers Tools',
+  });
+
+  const result = manager.evaluateCraftability([actor([item('Iron'), ownedTool])], recipe);
+
+  assert.equal(result.canCraft, true);
+  assert.equal(result.toolStates[0].name, 'Precision Kit');
+  assert.equal(result.toolStates[0].img, directTool.img);
 });
 
 test('evaluateCraftability: missing tool yields missing.tools and blocks craft', () => {
@@ -259,6 +332,146 @@ test('evaluateCraftability: no toolIds leaves toolStates/missing.tools empty', (
   assert.deepEqual(result.toolStates, []);
   assert.deepEqual(result.missing.tools, []);
   assert.equal(result.canCraft, true);
+});
+
+test('evaluateCraftability binds owned Tool prerequisites to the matched item actor', () => {
+  const system = installSystem({
+    id: 'sys-1',
+    components: [toolComponent('c-iron', 'Iron'), toolComponent('c-axe', 'Axe')],
+    characterPrerequisites: [
+      { id: 'trained', path: 'skills.craft', op: 'gte', value: 2 },
+    ],
+    tools: [{
+      id: 'tool-axe',
+      componentId: 'c-axe',
+      prerequisites: { enabled: true, ids: ['trained'], gateMode: 'usability' },
+      bonus: { enabled: true, expression: '@skills.craft' },
+    }],
+  });
+  const manager = managerForSystem(system);
+  const recipe = craftableRecipe({ toolIds: ['tool-axe'] });
+  const toolOwner = actor([item('Iron'), item('Axe')], { skills: { craft: 0 } });
+  const trainedActor = actor([], { skills: { craft: 5 } });
+
+  const result = manager.evaluateCraftability([toolOwner, trainedActor], recipe, {
+    craftingActor: trainedActor,
+  });
+
+  assert.equal(result.canCraft, false);
+  assert.equal(result.toolStates[0].available, false);
+  assert.equal(result.toolStates[0].actor, toolOwner);
+  assert.equal(result.missing.tools[0].id, 'tool-axe');
+});
+
+test('evaluateCraftability keeps bonus-only failures available and exposes owner-bound contribution input', () => {
+  const system = installSystem({
+    id: 'sys-1',
+    components: [toolComponent('c-iron', 'Iron'), toolComponent('c-axe', 'Axe')],
+    characterPrerequisites: [
+      { id: 'trained', path: 'skills.craft', op: 'gte', value: 2 },
+    ],
+    tools: [{
+      id: 'tool-axe',
+      componentId: 'c-axe',
+      prerequisites: { enabled: true, ids: ['trained'], gateMode: 'bonus' },
+      bonus: { enabled: true, expression: '@skills.craft' },
+    }],
+  });
+  const manager = managerForSystem(system);
+  const recipe = craftableRecipe({
+    toolIds: ['tool-axe'],
+    toolBonusModes: { 'tool-axe': 'highestOnly' },
+  });
+  const axe = item('Axe');
+  const toolOwner = actor([item('Iron'), axe], { skills: { craft: 0 } });
+
+  const result = manager.evaluateCraftability([toolOwner], recipe);
+  const state = result.toolStates[0];
+
+  assert.equal(result.canCraft, true);
+  assert.equal(state.available, true);
+  assert.equal(state.bonusEligible, false);
+  assert.equal(state.bonusValue, 0);
+  assert.equal(state.contributionInput.matchedItem, axe);
+  assert.equal(state.contributionInput.primaryActor, toolOwner);
+  assert.equal(state.contributionInput.bonusMode, 'highestOnly');
+});
+
+test('evaluateCraftability binds virtual Tool prerequisites and contribution input to primary actor', () => {
+  const system = installSystem({
+    id: 'sys-1',
+    components: [toolComponent('c-iron', 'Iron'), toolComponent('c-axe', 'Axe')],
+    characterPrerequisites: [
+      { id: 'trained', path: 'skills.craft', op: 'gte', value: 2 },
+    ],
+    tools: [{
+      id: 'tool-axe',
+      componentId: 'c-axe',
+      prerequisites: { enabled: true, ids: ['trained'], gateMode: 'usability' },
+      bonus: { enabled: true, expression: '@skills.craft' },
+    }],
+  });
+  const manager = managerForSystem(system);
+  const recipe = craftableRecipe({ toolIds: ['tool-axe'] });
+  const sourceActor = actor([item('Iron')], { skills: { craft: 0 } });
+  const primaryActor = actor([], { skills: { craft: 4 } });
+
+  const result = manager.evaluateCraftability([sourceActor], recipe, {
+    craftingActor: primaryActor,
+    presentTools: { systemId: 'sys-1', componentIds: ['c-axe'] },
+  });
+  const state = result.toolStates[0];
+
+  assert.equal(result.canCraft, true);
+  assert.equal(state.available, true);
+  assert.equal(state.virtual, true);
+  assert.equal(state.actor, primaryActor);
+  assert.equal(state.contributionInput.matchedItem, null);
+  assert.equal(state.contributionInput.primaryActor, primaryActor);
+});
+
+test('evaluateCraftability resolves Tools and prerequisites through explicit production wiring', () => {
+  const system = installSystem({
+    id: 'sys-1',
+    components: [toolComponent('c-iron', 'Iron'), toolComponent('c-axe', 'Axe')],
+    characterPrerequisites: [
+      { id: 'trained', path: 'skills.craft', op: 'gte', value: 2 },
+    ],
+    tools: [{
+      id: 'tool-axe',
+      componentId: 'c-axe',
+      prerequisites: { enabled: true, ids: ['trained'], gateMode: 'usability' },
+    }],
+  });
+  const manager = managerForSystem(system);
+  const recipe = new Recipe({
+    craftingSystemId: 'sys-1',
+    toolIds: ['tool-axe'],
+    ingredientSets: [new IngredientSet({ id: 'set-1', ingredientGroups: [] })],
+    resultGroups: [
+      { id: 'rg', name: 'Out', results: [{ id: 'r', componentId: 'c-bar', quantity: 1 }] },
+    ],
+  });
+  const previousFabricate = globalThis.game.fabricate;
+  globalThis.game.fabricate = null;
+
+  try {
+    const primaryActor = actor([], { skills: { craft: 3 } });
+    const result = manager.evaluateCraftability([actor([])], recipe, {
+      craftingActor: primaryActor,
+      presentTools: { systemId: 'sys-1', componentIds: ['c-axe'] },
+    });
+
+    assert.equal(result.canCraft, true);
+    assert.equal(result.toolStates[0].available, true);
+    assert.equal(result.toolStates[0].actor, primaryActor);
+    assert.deepEqual(
+      result.toolStates[0].contributionInput.prerequisiteDefinitions,
+      system.characterPrerequisites
+    );
+  } finally {
+    globalThis.game.fabricate = previousFabricate;
+  }
 });
 
 test('canCraft passes through missing.tools', () => {

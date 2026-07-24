@@ -41,12 +41,17 @@ test('_normalizeTool produces the canonical Tool shape with defaults for a spars
     componentId: null,
     name: null,
     img: null,
+    description: '',
     registeredItemUuid: null,
     originItemUuid: null,
     aliasItemUuids: [],
     requirement: null,
+    prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+    bonus: { enabled: false, expression: '' },
     breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' }
+    checkBreakable: true,
+    onBreak: { mode: 'destroy' },
+    repairRequirements: []
   });
 });
 
@@ -103,13 +108,16 @@ test('_normalizeTool normalizes diceExpression breakage', () => {
   assert.deepEqual(sparse.breakage, { mode: 'diceExpression', formula: '', threshold: 0 });
 });
 
-test('_normalizeTool normalizes replaceWith onBreak with replacementComponentId', () => {
+test('_normalizeTool reads legacy replacementComponentId into a discriminated target', () => {
   const manager = makeManager();
   const tool = manager._normalizeTool({ id: 't1', onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-broken' } });
-  assert.deepEqual(tool.onBreak, { mode: 'replaceWith', replacementComponentId: 'comp-broken' });
+  assert.deepEqual(tool.onBreak, {
+    mode: 'replaceWith',
+    replacementTarget: { type: 'component', componentId: 'comp-broken' },
+  });
 
   const missing = manager._normalizeTool({ id: 't2', onBreak: { mode: 'replaceWith' } });
-  assert.equal(missing.onBreak.replacementComponentId, null);
+  assert.equal(missing.onBreak.replacementTarget, null);
 });
 
 test('_normalizeTool keeps flagBroken onBreak without extra fields', () => {
@@ -153,12 +161,17 @@ test('_normalizeSystem populates a normalized tools array', () => {
     componentId: 'comp-axe',
     name: null,
     img: null,
+    description: '',
     registeredItemUuid: null,
     originItemUuid: null,
     aliasItemUuids: [],
     requirement: null,
+    prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+    bonus: { enabled: false, expression: '' },
     breakage: { mode: 'limitedUses', maxUses: 5 },
-    onBreak: { mode: 'destroy' }
+    checkBreakable: true,
+    onBreak: { mode: 'destroy' },
+    repairRequirements: []
   });
   assert.equal(system.tools[1].breakage.mode, 'breakageChance');
   assert.equal(system.tools[1].onBreak.mode, 'flagBroken');
@@ -215,10 +228,101 @@ test('_normalizeTool preserves source refs + name/img snapshot and never clobber
 // issue 419: immune breakage mode, toolBreakage.authority, checkBreakage
 // ---------------------------------------------------------------------------
 
-test('_normalizeToolBreakage accepts immune and carries no breakage fields', () => {
+test('_normalizeToolBreakage reads legacy immune forward exactly like the Tool model', () => {
   const manager = makeManager();
   const breakage = manager._normalizeToolBreakage({ mode: 'immune', maxUses: 5, breakageChance: 9 });
-  assert.deepEqual(breakage, { mode: 'immune' });
+  assert.deepEqual(breakage, { mode: 'limitedUses', maxUses: null });
+});
+
+test('_normalizeSystem normalizes prerequisites before Tools and prevents stale ids from failing open', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 's',
+    characterPrerequisites: [
+      { id: 'strong', name: 'Strong', path: 'abilities.str', op: 'gte', value: 2 },
+      { id: 'trained', name: 'Trained', path: 'skills.craft', op: 'gte', value: 1 },
+    ],
+    tools: [
+      {
+        id: 'active',
+        prerequisites: {
+          enabled: true,
+          ids: ['strong', 'missing'],
+          gateMode: 'usability',
+        },
+      },
+      {
+        id: 'emptied',
+        prerequisites: { enabled: true, ids: ['missing'], gateMode: 'bonus' },
+      },
+      {
+        id: 'disabled',
+        prerequisites: {
+          enabled: false,
+          ids: ['trained', 'missing'],
+          gateMode: 'bonus',
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(system.tools[0].prerequisites, {
+    enabled: true,
+    ids: ['strong'],
+    gateMode: 'usability',
+  });
+  assert.deepEqual(system.tools[1].prerequisites, {
+    enabled: false,
+    ids: [],
+    gateMode: 'bonus',
+  });
+  assert.deepEqual(system.tools[2].prerequisites, {
+    enabled: false,
+    ids: ['trained'],
+    gateMode: 'bonus',
+  });
+});
+
+test('_normalizeSystem preserves the complete canonical Tool shape and strips Kind', () => {
+  const manager = makeManager();
+  const [tool] = manager._normalizeSystem({
+    id: 's',
+    characterPrerequisites: [
+      { id: 'strong', name: 'Strong', path: 'abilities.str', op: 'gte', value: 2 },
+    ],
+    tools: [
+      {
+        id: 'hammer',
+        kind: 'handheld',
+        description: 'A source snapshot',
+        checkBreakable: false,
+        prerequisites: { enabled: false, ids: ['strong'], gateMode: 'bonus' },
+        bonus: { enabled: false, expression: '@prof' },
+        breakage: { mode: 'diceExpression', formula: '1d20', threshold: 4 },
+        onBreak: {
+          mode: 'replaceWith',
+          replacementTarget: { type: 'item', itemUuid: 'Item.broken-hammer' },
+        },
+        repairRequirements: [
+          {
+            id: 'repair',
+            options: [{ match: { type: 'component', componentId: 'binding' }, quantity: 1 }],
+          },
+        ],
+      },
+    ],
+  }).tools;
+
+  assert.equal(tool.description, 'A source snapshot');
+  assert.equal(tool.checkBreakable, false);
+  assert.deepEqual(tool.prerequisites.ids, ['strong']);
+  assert.deepEqual(tool.bonus, { enabled: false, expression: '@prof' });
+  assert.deepEqual(tool.onBreak.replacementTarget, {
+    type: 'item',
+    itemUuid: 'Item.broken-hammer',
+  });
+  assert.equal(tool.repairRequirements.length, 1);
+  assert.equal('kind' in tool, false);
 });
 
 test('_normalizeSystem defaults toolBreakage.authority to toolSpecific when absent', () => {

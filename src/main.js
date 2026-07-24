@@ -239,6 +239,7 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
     buildItemRef: (actor, item) => gatheringRunItemRef(actor, item),
     resolveReplacementSource: ({ componentId, system }) =>
       resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),
+    resolveItemUuid: (uuid) => fromUuid(uuid),
     evaluateExpression
   });
 }
@@ -442,7 +443,9 @@ class Fabricate {
     // Run data migrations before managers load persisted data
     await this._runMigrations();
     // Create managers
-    this.recipeManager = new RecipeManager();
+    this.recipeManager = new RecipeManager({
+      getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+    });
     // Issue 800: the manager RESOLVES source descriptions through Foundry's own
     // enricher at its async ingestion boundaries, so a content link is stored as the
     // referenced document's name rather than raw `@UUID[…]` text. Both seams default
@@ -501,7 +504,11 @@ class Fabricate {
       this.salvageRunManager,
       this.actorInventoryCoinSpender,
       this.actorPropertyCoinSpender,
-      { getPlayerResultOrder: entry => this._readPlayerResultOrder(entry) }
+      {
+        getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
+        getCraftingSystem: systemId => this.craftingSystemManager.getSystem(systemId),
+        resolveItemUuid: uuid => fromUuid(uuid)
+      }
     );
 
     // Initialize recipe manager

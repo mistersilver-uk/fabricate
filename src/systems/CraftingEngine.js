@@ -4,8 +4,8 @@ import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
 import {
   applyToolUsageAndBreakage,
+  createToolReplacementCreator,
   evaluateCheckBreakage,
-  stampReplacementComponentIdentity,
 } from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
@@ -21,6 +21,7 @@ import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
+import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import {
   awardedQuantityOf,
@@ -36,6 +37,11 @@ import {
 } from './currencyAffordance.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
+import {
+  appendToolBonusTerms,
+  composeToolBonusTerms,
+  evaluateToolCheckContribution,
+} from './toolCheckBonus.js';
 
 /**
  * Resolve the winning alchemy match from ALL sets that matched a submission by
@@ -116,6 +122,11 @@ export function rollTotalForCard(checkResult) {
   return checkResult?.data?.total ?? checkResult?.value ?? null;
 }
 
+/** Actual routed natural-step evidence for result chat, or null when unchanged. */
+function natStepForCard(checkResult) {
+  return checkResult?.data?.natStep ?? null;
+}
+
 /**
  * Map one `_consumeIngredients` entry to the persisted run-record shape, capturing
  * the item's `name`/`img` at consume time (issue 738). A consumed item is DELETED
@@ -188,7 +199,11 @@ export class CraftingEngine {
     // Salvage deliberately does NOT route this through `this.resolutionModeService`: many
     // callers construct CraftingEngine without one, which would make the seam silently
     // unreachable.
-    { getPlayerResultOrder = () => null } = {}
+    {
+      getPlayerResultOrder = () => null,
+      getCraftingSystem = () => null,
+      resolveItemUuid = async () => null,
+    } = {}
   ) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
@@ -202,6 +217,8 @@ export class CraftingEngine {
     this.actorInventoryCoinSpender = actorInventoryCoinSpender;
     this.actorPropertyCoinSpender = actorPropertyCoinSpender;
     this.getPlayerResultOrder = getPlayerResultOrder;
+    this.getCraftingSystem = getCraftingSystem;
+    this.resolveItemUuid = resolveItemUuid;
   }
 
   /**
@@ -573,7 +590,9 @@ export class CraftingEngine {
         componentSourceActors,
         executionRecipe,
         toolsForSet,
-        presentTools
+        presentTools,
+        craftingActor,
+        ingredientSet
       );
       if (!toolValidation.valid) {
         return {
@@ -619,7 +638,10 @@ export class CraftingEngine {
         componentSourceActors,
         ingredientSet,
         step,
-        { interactive: options?.interactive === true }
+        {
+          interactive: options?.interactive === true,
+          toolItems: toolValidation.tools,
+        }
       );
       // A misconfigured required check (no authored roll formula for the active mode)
       // is a GM-side system gap, not a rolled failure: abort with ZERO mutation so the
@@ -680,13 +702,10 @@ export class CraftingEngine {
           }
           if (failurePolicy.breakToolsOnFail) {
             usedToolPairs = toolValidation.tools;
-            // The single shared `evaluateCheckBreakage` seam decides forced breakage
-            // on the check-failure path too (gated by `breakToolsOnFail`, as
-            // today). Under `toolSpecific` an engine-evaluated crit/tier
-            // `data.breakTools` force-break applies; under `checkDriven` the active
-            // check's `checkBreakage` triggers decide. The no-check passthrough
-            // result is not engine-evaluated, so it never force-breaks (the
-            // `engineEvaluated` guard lives inside the seam).
+            // The single shared `evaluateCheckBreakage` seam applies failure-path
+            // breakage too, gated by `breakToolsOnFail`. Only `checkDriven` lets the
+            // active check's `checkBreakage` triggers force breakage. Under
+            // `toolSpecific`, the matched Tools' own retained breakage modes decide.
             const breakDecision = this._resolveCraftingBreakageDecision(
               this._getRecipeSystem(executionRecipe),
               executionRecipe,
@@ -731,6 +750,7 @@ export class CraftingEngine {
           createdResults: [],
           failureReason: checkResult.message || 'Crafting check failed',
           rollValue: rollTotalForCard(checkResult),
+          natStep: natStepForCard(checkResult),
         });
         return {
           success: false,
@@ -800,6 +820,7 @@ export class CraftingEngine {
           createdResults: [],
           failureReason: message,
           rollValue: rollTotalForCard(checkResult),
+          natStep: natStepForCard(checkResult),
         });
         return {
           success: false,
@@ -852,6 +873,7 @@ export class CraftingEngine {
             createdResults: [],
             failureReason: message,
             rollValue: rollTotalForCard(checkResult),
+            natStep: natStepForCard(checkResult),
           });
           return {
             success: false,
@@ -875,13 +897,11 @@ export class CraftingEngine {
       await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
       // Apply tool usage/breakage for the recipe's resolved library Tools via the
-      // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
-      // engine-evaluated crit/tier `breakTools` forces every matched tool to break (the
-      // no-check passthrough result is not engine-evaluated, so it does not); under
-      // `checkDriven` the active
-      // check's `checkBreakage` triggers decide whether all required non-immune tools
-      // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
-      // gate exists here).
+      // single shared `evaluateCheckBreakage` seam. Under `toolSpecific`, each
+      // matched Tool's retained breakage mode decides. Under `checkDriven`, the
+      // active check's `checkBreakage` triggers decide whether each participating
+      // required Tool breaks. The SUCCESS path always applies breakage. It has no
+      // `breakToolsOnFail` gate.
       const successBreakDecision = this._resolveCraftingBreakageDecision(
         this._getRecipeSystem(executionRecipe),
         executionRecipe,
@@ -959,6 +979,7 @@ export class CraftingEngine {
         tools: toolValidation.tools,
         createdResults: resultItems,
         rollValue: rollTotalForCard(checkResult),
+        natStep: natStepForCard(checkResult),
       });
 
       // Collapsed chain (issue 710): a non-final step just succeeded and the run is
@@ -1094,7 +1115,9 @@ export class CraftingEngine {
       componentSourceActors,
       executionRecipe,
       toolsForSet,
-      presentTools
+      presentTools,
+      craftingActor,
+      ingredientSet
     );
     if (!toolValidation.valid) {
       return abort(toolValidation.message);
@@ -1246,7 +1269,9 @@ export class CraftingEngine {
       componentSourceActors,
       executionRecipe,
       toolsForSet,
-      presentTools
+      presentTools,
+      craftingActor,
+      ingredientSet
     );
     const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];
 
@@ -1259,7 +1284,10 @@ export class CraftingEngine {
       componentSourceActors,
       ingredientSet,
       step,
-      { interactive: options?.interactive === true }
+      {
+        interactive: options?.interactive === true,
+        toolItems,
+      }
     );
 
     if (checkResult.misconfigured) {
@@ -1325,6 +1353,7 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
+        natStep: natStepForCard(checkResult),
       });
       return { resolved: true, result: { success: false, results: null, message } };
     };
@@ -1424,6 +1453,7 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
+        natStep: natStepForCard(checkResult),
       });
       return {
         resolved: true,
@@ -1478,6 +1508,7 @@ export class CraftingEngine {
       tools: toolItems,
       createdResults: resultItems,
       rollValue: rollTotalForCard(checkResult),
+      natStep: natStepForCard(checkResult),
     });
 
     const stepLabel = step.name || `step ${stepIndex + 1}`;
@@ -1603,6 +1634,7 @@ export class CraftingEngine {
       createdResults: resultItems,
       failureReason: checkResult.message || 'Crafting check failed',
       rollValue: rollTotalForCard(checkResult),
+      natStep: natStepForCard(checkResult),
     });
 
     return {
@@ -2583,7 +2615,50 @@ export class CraftingEngine {
    * @param {{ systemId?: string|null, componentIds?: string[] }|null} [presentTools] - virtual-present payload
    * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean, breakable?: boolean}> }>}
    */
-  async _validateTools(actors, recipe, tools = [], presentTools = null) {
+  async _validateTools(
+    actors,
+    recipe,
+    tools = [],
+    presentTools = null,
+    primaryActor = null,
+    ingredientSet = null
+  ) {
+    if (typeof this.recipeManager?.resolveToolStates === 'function') {
+      const states = this.recipeManager.resolveToolStates(recipe, tools, actors, {
+        presentTools,
+        primaryActor,
+        ingredientSet,
+      });
+      const missingIndex = states.findIndex((state) => state?.available !== true);
+      if (missingIndex !== -1) {
+        return {
+          valid: false,
+          message: `Missing required tool (${toolDisplayReference(
+            tools[missingIndex],
+            recipe,
+            this.recipeManager
+          )})`,
+        };
+      }
+      return {
+        valid: true,
+        tools: states.map((state, index) => {
+          const tool = tools[index];
+          const item = state?.contributionInput?.matchedItem ?? null;
+          return {
+            tool,
+            item,
+            virtual: state?.virtual === true,
+            breakable:
+              item && typeof this.recipeManager?.toolMatchesItemByIdentity === 'function'
+                ? this.recipeManager.toolMatchesItemByIdentity(recipe, tool, item) === true
+                : item != null,
+            contributionInput: state?.contributionInput ?? null,
+          };
+        }),
+      };
+    }
+
     const toolItems = [];
     const presentSet = resolvePresentComponentIds({
       presentTools,
@@ -2638,6 +2713,35 @@ export class CraftingEngine {
     }
 
     return { valid: true, tools: toolItems };
+  }
+
+  async _appendToolCheckBonuses(formula, toolItems = [], { salvage = false } = {}) {
+    const contributions = [];
+    const seenToolIds = new Set();
+    for (const toolItem of Array.isArray(toolItems) ? toolItems : []) {
+      const input = toolItem?.contributionInput;
+      if (!input) continue;
+      const toolId = input.tool?.id ?? null;
+      if (toolId && seenToolIds.has(toolId)) continue;
+      if (toolId) seenToolIds.add(toolId);
+      contributions.push(
+        await evaluateToolCheckContribution({
+          ...input,
+          bonusMode: salvage ? 'always' : input.bonusMode,
+          evaluatePrerequisite: ({ actor, prerequisite }) =>
+            evaluatePrerequisite(actor?.getRollData?.() ?? actor?.system ?? {}, prerequisite),
+          evaluateExpression: async ({ actor, expression }) => {
+            if (typeof globalThis.Roll !== 'function') return 0;
+            const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+            const roll = await new globalThis.Roll(expression, rollData).evaluate({
+              allowInteractive: false,
+            });
+            return roll?.total;
+          },
+        })
+      );
+    }
+    return appendToolBonusTerms(formula, composeToolBonusTerms(contributions).terms);
   }
 
   /**
@@ -2731,10 +2835,10 @@ export class CraftingEngine {
         continue;
       }
       const actor = item?.parent ?? null;
-      const isImmune = tool.breakage?.mode === 'immune';
-      // checkDriven: immune tools are filtered out of the forced set (never break);
-      // every other required tool breaks when forceBreak. toolSpecific: the legacy
-      // forceBreak override applies, else the tool's own mode decides.
+      const isImmune = tool.checkBreakable === false || tool.breakage?.mode === 'immune';
+      // checkDriven: `checkBreakable: false` excludes a Tool from the forced set;
+      // every other required Tool breaks when forceBreak. toolSpecific: this flag
+      // does not grant immunity. The retained Tool-specific breakage mode decides.
       let planned;
       const extra = {};
       if (checkDriven) {
@@ -2753,9 +2857,8 @@ export class CraftingEngine {
           extra.authority = authority;
         }
       } else if (isImmune) {
-        // An immune tool never breaks under EITHER authority — a legacy crit/tier
-        // forceBreak must not break it either. Defer to the tool's own (never-break)
-        // evaluation rather than forcing it.
+        // `checkBreakable` governs check-driven participation only. Under
+        // toolSpecific, defer to the Tool's retained breakage-mode evaluation.
         planned = undefined;
       } else {
         planned = forceBreak ? { mode: 'forced', broken: true, evidence: {} } : undefined;
@@ -2785,44 +2888,24 @@ export class CraftingEngine {
   }
 
   /**
-   * Build a `replaceWith` creator that resolves the replacement component from
-   * the recipe's crafting system and creates the item on the actor.
+   * Build a `replaceWith` creator that resolves component targets through the
+   * recipe's crafting system and direct-Item targets by UUID, then creates the
+   * replacement item on the actor.
    * @private
    */
   _makeToolReplacementCreator(recipe) {
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(recipe?.craftingSystemId);
-    return async ({ actor, componentId }) => {
-      const component =
-        (system?.components || []).find((entry) => entry.id === componentId) || null;
-      if (!component || typeof actor?.createEmbeddedDocuments !== 'function') return;
-      let source = component;
-      if (component.registeredItemUuid && typeof globalThis.fromUuidSync === 'function') {
-        try {
-          source = globalThis.fromUuidSync(component.registeredItemUuid) ?? component;
-        } catch {
-          source = component;
-        }
-      }
-      const itemData = source.toObject?.() ?? {
-        name: source.name ?? 'Replacement Item',
-        img: source.img ?? 'icons/svg/item-bag.svg',
-        type: source.type ?? 'loot',
-        system: source.system
-          ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
-          : {},
-      };
-      itemData.system ??= {};
-      if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
-      if (source.uuid) {
-        globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
-      }
-      // Stamp the replacement's durable per-system identity (issue 780) so it resolves to
-      // its own component — and, when it is itself a single linking first-class tool, stays
-      // durably breakable — once #601 removes the name-fallback tier.
-      stampReplacementComponentIdentity(itemData, system, componentId);
-      await actor.createEmbeddedDocuments('Item', [itemData]);
-    };
+    const system = this.getCraftingSystem(recipe?.craftingSystemId);
+    return createToolReplacementCreator({
+      system,
+      resolveComponentSource: async ({ componentId }) => {
+        const component =
+          (system?.components || []).find((entry) => entry.id === componentId) || null;
+        if (!component?.registeredItemUuid) return component;
+        const source = await this.resolveItemUuid(component.registeredItemUuid);
+        return source?.documentName === 'Item' ? source : null;
+      },
+      resolveItemUuid: this.resolveItemUuid,
+    });
   }
 
   /**
@@ -3215,7 +3298,7 @@ export class CraftingEngine {
     // Interactive-roll options threaded from `craft()`. `{ interactive }` opts a
     // UI-triggered craft into the confirm-roll dialog + chat post; defaults to
     // non-interactive so the programmatic API stays silent.
-    { interactive = false } = {}
+    { interactive = false, toolItems = [] } = {}
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -3258,7 +3341,10 @@ export class CraftingEngine {
             message: 'alchemy simple check mode requires a configured crafting check roll formula',
           };
         }
-        return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+        return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, {
+          interactive,
+          toolItems,
+        });
       }
       // tiered
       if (!this._hasCheckFormula(system?.craftingCheck?.routed)) {
@@ -3280,6 +3366,7 @@ export class CraftingEngine {
       return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, {
         interactive,
         applyMinSuccessOutcome: false,
+        toolItems,
       });
     }
 
@@ -3334,11 +3421,14 @@ export class CraftingEngine {
     }
 
     if (useSimpleCheck) {
-      return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+      return this._runSimpleCheck(system, recipe, ingredientSet, craftingActor, {
+        interactive,
+        toolItems,
+      });
     }
 
     if (useProgressiveCheck) {
-      return this._runProgressiveCheck(system, recipe, craftingActor, { interactive });
+      return this._runProgressiveCheck(system, recipe, craftingActor, { interactive, toolItems });
     }
 
     if (useRoutedCheck) {
@@ -3346,7 +3436,10 @@ export class CraftingEngine {
       // outcome tier whose name drives routing). `routedByIngredients` routes result
       // groups by the chosen ingredient set and runs its optional pass/fail check
       // through `useSimpleCheck` above against `craftingCheck.simple`.
-      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, { interactive });
+      return this._runRoutedCheck(system, recipe, ingredientSet, craftingActor, {
+        interactive,
+        toolItems,
+      });
     }
 
     // No usable roll-formula check path applied. A check is only "usable" when its
@@ -3380,7 +3473,7 @@ export class CraftingEngine {
     recipe,
     ingredientSet,
     craftingActor,
-    { interactive = false } = {}
+    { interactive = false, toolItems = [] } = {}
   ) {
     return this._runPassFailCheck(
       system,
@@ -3388,7 +3481,7 @@ export class CraftingEngine {
       recipe,
       ingredientSet,
       craftingActor,
-      { interactive }
+      { interactive, toolItems }
     );
   }
 
@@ -3416,9 +3509,10 @@ export class CraftingEngine {
     recipe,
     ingredientSet,
     craftingActor,
-    { interactive = false } = {}
+    { interactive = false, toolItems = [] } = {}
   ) {
     const checkConfig = config || {};
+    const formula = await this._appendToolCheckBonuses(checkConfig.rollFormula, toolItems);
     const dc = await this._resolveSimpleCheckDc(
       system,
       checkConfig,
@@ -3427,7 +3521,7 @@ export class CraftingEngine {
       craftingActor
     );
     const result = await runFormulaPassFail({
-      formula: checkConfig.rollFormula,
+      formula,
       dc,
       thresholdMode: checkConfig.thresholdMode,
       triggers: checkConfig.checkBreakage?.triggers,
@@ -3474,9 +3568,10 @@ export class CraftingEngine {
     // `applyMinSuccessOutcome` gates the recipe minimum-tier bump: `routedByCheck`
     // applies it, the alchemy tiered dispatch passes false so a carried (unclearable)
     // `minSuccessOutcomeId` has no runtime effect on an alchemy brew.
-    { interactive = false, applyMinSuccessOutcome = true } = {}
+    { interactive = false, applyMinSuccessOutcome = true, toolItems = [] } = {}
   ) {
     const routed = system?.craftingCheck?.routed || {};
+    const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems);
     const dc = await this._resolveSimpleCheckDc(
       system,
       routed,
@@ -3485,13 +3580,14 @@ export class CraftingEngine {
       craftingActor
     );
     const result = await runFormulaRouted({
-      formula: routed.rollFormula,
+      formula,
       dc,
       thresholdMode: routed.thresholdMode,
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
       triggers: routed.checkBreakage?.triggers,
+      natStepping: routed.natStepping === true,
       actor: craftingActor,
       label: 'Crafting',
       craftingModifier: this._buildCraftingModifierContext(system, recipe),
@@ -3579,10 +3675,16 @@ export class CraftingEngine {
    * crit awards nothing (`value = 0`), and either may break tools (forced failure
    * wins). Delegates to the shared {@link runFormulaProgressive}.
    */
-  async _runProgressiveCheck(system, recipe, craftingActor, { interactive = false } = {}) {
+  async _runProgressiveCheck(
+    system,
+    recipe,
+    craftingActor,
+    { interactive = false, toolItems = [] } = {}
+  ) {
     const progressive = system?.craftingCheck?.progressive || {};
+    const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
     const result = await runFormulaProgressive({
-      formula: progressive.rollFormula,
+      formula,
       triggers: progressive.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
@@ -3865,6 +3967,7 @@ export class CraftingEngine {
    * @param {string}  [params.failureReason]     - Human-readable failure reason (failure only).
    * @param {number|null} [params.rollValue]      - The crafting check total (`checkResult.value`),
    *   or null when no check ran; the card renders it only when finite.
+   * @param {object|null} [params.natStep]         - Actual routed natural-step evidence.
    * @private
    */
   async _postCraftChatMessage({
@@ -3876,6 +3979,7 @@ export class CraftingEngine {
     createdResults,
     failureReason,
     rollValue = null,
+    natStep = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
@@ -3904,6 +4008,7 @@ export class CraftingEngine {
         })),
         tools: toolEntries,
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
+        natStep,
         failureReason: failureReason || '',
       },
       localize
@@ -4003,6 +4108,7 @@ export class CraftingEngine {
    * @param {string}  [params.failureReason] - Human-readable reason (failure only).
    * @param {number|null} [params.rollValue]  - The salvage check total (`checkResult.value`),
    *   or null when no check ran; the card renders it only when finite.
+   * @param {object|null} [params.natStep]     - Actual routed natural-step evidence.
    * @private
    */
   async _postSalvageChatMessage({
@@ -4015,6 +4121,7 @@ export class CraftingEngine {
     usedTools,
     failureReason,
     rollValue = null,
+    natStep = null,
   }) {
     if (!system || system.features?.chatOutput !== true) return;
 
@@ -4043,6 +4150,7 @@ export class CraftingEngine {
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
+        natStep,
         failureReason: failureReason || '',
       },
       localize
@@ -4256,6 +4364,10 @@ export class CraftingEngine {
         ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
         ...(Array.isArray(step?.toolIds) ? step.toolIds : []),
       ],
+      toolBonusModes: {
+        ...recipe?.toolBonusModes,
+        ...step?.toolBonusModes,
+      },
     };
   }
 
@@ -4410,7 +4522,13 @@ export class CraftingEngine {
 
     const syntheticRecipe = { craftingSystemId, components: managedItems };
     const salvageTools = this._resolveSalvageTools(system, component.salvage);
-    const toolValidation = await this._validateTools([actor], syntheticRecipe, salvageTools);
+    const toolValidation = await this._validateTools(
+      [actor],
+      syntheticRecipe,
+      salvageTools,
+      null,
+      actor
+    );
     if (!toolValidation.valid) {
       if (salvageRunManager && salvageRun) {
         salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
@@ -4484,6 +4602,7 @@ export class CraftingEngine {
 
     const checkResult = await this._runSalvageCraftingCheck(component, system, actor, {
       interactive: options?.interactive === true,
+      toolItems: toolValidation.tools,
     });
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
 
@@ -4585,6 +4704,7 @@ export class CraftingEngine {
         usedTools,
         failureReason: checkResult.message || 'Salvage check failed',
         rollValue: rollTotalForCard(checkResult),
+        natStep: natStepForCard(checkResult),
       });
 
       return {
@@ -4689,6 +4809,7 @@ export class CraftingEngine {
       usedTools,
       failureReason: '',
       rollValue: rollTotalForCard(checkResult),
+      natStep: natStepForCard(checkResult),
     });
 
     return {
@@ -4893,18 +5014,32 @@ export class CraftingEngine {
    * other mode with no usable formula is a no-op success.
    * @private
    */
-  async _runSalvageCraftingCheck(component, system, actor, { interactive = false } = {}) {
+  async _runSalvageCraftingCheck(
+    component,
+    system,
+    actor,
+    { interactive = false, toolItems = [] } = {}
+  ) {
     const check = system?.salvageCraftingCheck || {};
     const mode = system?.salvageResolutionMode || 'simple';
 
     if (mode === 'progressive' && check.progressive?.rollFormula) {
-      return this._runSalvageProgressiveCheck(check.progressive, component, actor, { interactive });
+      return this._runSalvageProgressiveCheck(check.progressive, component, actor, {
+        interactive,
+        toolItems,
+      });
     }
     if (mode === 'simple' && check.simple?.rollFormula) {
-      return this._runSalvageSimpleCheck(check.simple, component, actor, { interactive });
+      return this._runSalvageSimpleCheck(check.simple, component, actor, {
+        interactive,
+        toolItems,
+      });
     }
     if (mode === 'routed' && check.routed?.rollFormula) {
-      return this._runSalvageRoutedCheck(check.routed, component, actor, { interactive });
+      return this._runSalvageRoutedCheck(check.routed, component, actor, {
+        interactive,
+        toolItems,
+      });
     }
 
     // A salvage check is REQUIRED to produce an outcome in progressive mode and in
@@ -4939,10 +5074,18 @@ export class CraftingEngine {
    * (per-component override ?? default), honouring per-die crits. Delegates the roll
    * to the shared {@link runFormulaPassFail}.
    */
-  async _runSalvageSimpleCheck(simple, component, actor, { interactive = false } = {}) {
+  async _runSalvageSimpleCheck(
+    simple,
+    component,
+    actor,
+    { interactive = false, toolItems = [] } = {}
+  ) {
     const dc = this._resolveSalvageDc(simple, component);
+    const formula = await this._appendToolCheckBonuses(simple.rollFormula, toolItems, {
+      salvage: true,
+    });
     const result = await runFormulaPassFail({
-      formula: simple.rollFormula,
+      formula,
       dc,
       thresholdMode: simple.thresholdMode,
       triggers: simple.checkBreakage?.triggers,
@@ -4965,9 +5108,17 @@ export class CraftingEngine {
    * progressive salvage awarding spends against result difficulties. Delegates to the
    * shared {@link runFormulaProgressive}.
    */
-  async _runSalvageProgressiveCheck(progressive, component, actor, { interactive = false } = {}) {
+  async _runSalvageProgressiveCheck(
+    progressive,
+    component,
+    actor,
+    { interactive = false, toolItems = [] } = {}
+  ) {
+    const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems, {
+      salvage: true,
+    });
     const result = await runFormulaProgressive({
-      formula: progressive.rollFormula,
+      formula,
       triggers: progressive.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
@@ -4991,16 +5142,25 @@ export class CraftingEngine {
    * component `dcOverride` shifts every relative threshold. Delegates to the shared
    * {@link runFormulaRouted}.
    */
-  async _runSalvageRoutedCheck(routed, component, actor, { interactive = false } = {}) {
+  async _runSalvageRoutedCheck(
+    routed,
+    component,
+    actor,
+    { interactive = false, toolItems = [] } = {}
+  ) {
     const dc = this._resolveSalvageDc(routed, component);
+    const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems, {
+      salvage: true,
+    });
     const result = await runFormulaRouted({
-      formula: routed.rollFormula,
+      formula,
       dc,
       thresholdMode: routed.thresholdMode,
       type: routed.type,
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
       triggers: routed.checkBreakage?.triggers,
+      natStepping: routed.natStepping === true,
       actor,
       label: 'Salvage',
       // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-

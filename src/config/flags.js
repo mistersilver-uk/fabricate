@@ -3,12 +3,13 @@ export const FABRICATE_FLAG_NAMESPACE = 'fabricate';
 /**
  * A durable-flag MAP KEY (a crafting-system id in `roles.<systemId>.componentId`,
  * and later a `toolId` / `recipeItemDefinitionId`) is interpolated into a DOTTED
- * flag path. Foundry's `setFlag` → `expandObject` splits on EVERY dot, so a segment
- * that itself contains a `.` nests the key one level deeper on WRITE, while any
- * reader indexing the map by that id (`roles[systemId]`) misses it on READ — the
- * flag silently degrades to the pre-#556 raw-reference path. This pattern restricts
- * such a segment to characters that cannot break the path. `foundry.utils.randomID()`
- * always satisfies it; a hand-edited or imported system JSON may not.
+ * flag path. Fabricate writes that path through a flattened `Document#update` key,
+ * where every dot separates an object segment. A system id containing `.` would
+ * therefore nest the key one level deeper while a reader indexing the map by that id
+ * (`roles[systemId]`) misses it — the flag silently degrades to the pre-#556
+ * raw-reference path. This pattern restricts such a segment to characters that cannot
+ * break the path. `foundry.utils.randomID()` always satisfies it; a hand-edited or
+ * imported system JSON may not.
  */
 export const FABRICATE_FLAG_KEY_SEGMENT_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -39,8 +40,8 @@ export function isSafeFlagKeySegment(segment) {
  * Mirrors the source-side stamp `CraftingSystemManager` writes via
  * `setFabricateFlag(source, 'roles.<systemId>.<roleKey>', id)`: the roles map lives at the
  * doubly-nested `flags.fabricate.fabricate.roles` path (`normalizeFlagKey` prefixes
- * `fabricate.`, then `expandObject` nests it under the `fabricate` scope), so on a plain
- * item-data object that same path is written directly. The container is built with
+ * `fabricate.`, then the flattened update path nests it under the `fabricate` scope), so
+ * on a plain item-data object that same path is written directly. The container is built with
  * sibling-preserving `||=` so any existing flags and any `roles` leaves for OTHER systems
  * survive.
  *
@@ -82,26 +83,39 @@ export function getFabricateFlag(document, key, defaultValue = null) {
   }
 }
 
+/**
+ * Write a Fabricate flag through the same nested path {@link getFabricateFlag} reads.
+ * Foundry V13's `setFlag(scope, key, value)` stores a dotted key literally, so real
+ * DataModel-backed Documents use one atomic flattened `update` path instead. Lightweight
+ * collaborators without `updateSource` retain Fabricate's historical dotted-key `setFlag`
+ * contract. A `null` value remains a value; callers that intend deletion must use Foundry's
+ * `unsetFlag` API. Write failures reject so callers never report a flag as persisted when
+ * Foundry refused the update.
+ */
 export async function setFabricateFlag(document, key, value) {
-  if (!document || typeof document.setFlag !== 'function') {
+  const canUpdate =
+    typeof document?.update === 'function' && typeof document?.updateSource === 'function';
+  const canSetFlag = typeof document?.setFlag === 'function';
+  if (!canUpdate && !canSetFlag) {
     return null;
   }
 
-  try {
-    return await document.setFlag(FABRICATE_FLAG_NAMESPACE, normalizeFlagKey(key), value);
-  } catch {
-    return null;
+  const normalizedKey = normalizeFlagKey(key);
+  if (canUpdate) {
+    const path = `flags.${FABRICATE_FLAG_NAMESPACE}.${normalizedKey}`;
+    return await document.update({ [path]: value });
   }
+  return await document.setFlag(FABRICATE_FLAG_NAMESPACE, normalizedKey, value);
 }
 
 /**
- * `setFabricateFlag` writes through `setFlag`, whose recursive merge NEVER removes
+ * `setFabricateFlag` writes through `Document#update`, whose recursive merge NEVER removes
  * keys deleted from a nested object. So a run removed from a run-container's
  * `active` map lingers in the persisted flag forever, resurfaces on reload, and
  * can be re-processed. Delete the removed active keys with Foundry's `-=` syntax
  * BEFORE the merge write. The stored path is doubly-nested
  * `flags.fabricate.fabricate.<key>` — `normalizeFlagKey` prefixes `fabricate.` and
- * `expandObject` nests it under the `fabricate` scope. Shared by the crafting and
+ * the flattened update path nests it under the `fabricate` scope. Shared by the crafting and
  * salvage run managers (the gathering flag has its own single-scope writer).
  *
  * @param {Document} document the actor owning the run container

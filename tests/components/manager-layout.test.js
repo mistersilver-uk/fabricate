@@ -17,6 +17,120 @@ function blockFor(selector) {
   return match?.[0] || '';
 }
 
+async function readRenderedToolGeometry(width, view) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  try {
+    const editor = view === 'tool-edit'
+      ? `<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
+          <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button">Back</button><button class="manager-button">Delete</button><button class="manager-button" data-tool-editor-save>Save Tool</button></div></div></header>
+          <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
+          <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
+            <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><div class="manager-tool-choice-grid">
+              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">A</span><span class="manager-tool-choice-copy"><strong>Limited uses</strong><small>A fixed number of uses, then it breaks.</small></span></label>
+              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">B</span><span class="manager-tool-choice-copy"><strong>Break chance</strong><small>A % chance to break each use.</small></span></label>
+              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">C</span><span class="manager-tool-choice-copy"><strong>Dice expression</strong><small>Roll a separate breakage check.</small></span></label>
+            </div></section>
+          </div></section><aside class="manager-tool-preview" data-tool-behavior-preview><div class="manager-tool-preview-identity"><div><h3>Smith's Hammer</h3></div></div><ul class="manager-tool-preview-rules"><li>5 uses</li></ul></aside></div>
+        </main>`
+      : `<main class="manager-main manager-tools-main"><div class="manager-tools-library-list"><article data-manager-tool-id="hammer"><button class="manager-tools-select-target"><span></span><span class="manager-tools-library-copy"><strong>Smith's Hammer</strong></span></button><div class="manager-tools-library-actions"></div></article></div></main><aside class="manager-inspector"><section data-tool-browser-inspector>Inspector</section></aside>`;
+    await page.setContent(`<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="${view}"><div class="manager-body"><aside class="manager-rail">Rail</aside>${editor}</div></div></div>`);
+    return await page.evaluate(() => {
+      const rect = (selector) => {
+        const value = document.querySelector(selector)?.getBoundingClientRect();
+        return value ? { left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width } : null;
+      };
+      const styleValue = (selector, property) => {
+        const value = document.querySelector(selector);
+        return value ? getComputedStyle(value)[property] : null;
+      };
+      const root = document.querySelector('.fabricate-manager');
+      return {
+        root: rect('.fabricate-manager'),
+        rail: rect('.manager-rail'),
+        main: rect('.manager-main'),
+        inspector: rect('.manager-inspector'),
+        header: rect('[data-tool-editor-header]'),
+        actions: rect('.manager-tool-edit-actions'),
+        tabs: rect('.manager-tool-editor-tabs'),
+        panel: rect('[data-tool-editor-panel]'),
+        preview: rect('[data-tool-behavior-preview]'),
+        authority: rect('.manager-tool-authority-readonly'),
+        authorityTitle: rect('.manager-tool-authority-readonly h3'),
+        authorityCopy: rect('.manager-tool-authority-readonly p:last-child'),
+        sectionHeading: rect('.manager-tool-section-heading'),
+        sectionTitle: rect('.manager-tool-section-heading h3'),
+        sectionHint: rect('.manager-tool-section-heading > p'),
+        choice: rect('.manager-tool-choice-card'),
+        choiceIcon: rect('.manager-tool-choice-icon'),
+        choiceTitle: rect('.manager-tool-choice-copy strong'),
+        panelPaddingInline: Number.parseFloat(styleValue('[data-tool-editor-panel]', 'paddingLeft')),
+        authorityTitleSize: Number.parseFloat(styleValue('.manager-tool-authority-readonly h3', 'fontSize')),
+        authorityCopySize: Number.parseFloat(styleValue('.manager-tool-authority-readonly p:last-child', 'fontSize')),
+        previewBackground: styleValue('[data-tool-behavior-preview]', 'backgroundColor'),
+        previewCardBackground: styleValue('.manager-tool-preview-identity', 'backgroundColor'),
+        overflow: root.scrollWidth > root.clientWidth,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+test('Tool library renders 210px and 340px fixed columns through the 832px product root', async () => {
+  for (const width of [1212, 832]) {
+    const report = await readRenderedToolGeometry(width, 'tools');
+    assert.equal(Math.round(report.rail.width), 210);
+    assert.equal(Math.round(report.inspector.width), 340);
+    assert.equal(report.overflow, false);
+    assert.ok(report.main.left >= report.rail.right - 1);
+    assert.ok(report.inspector.left >= report.main.right - 1);
+  }
+  const stacked = await readRenderedToolGeometry(831, 'tools');
+  assert.ok(stacked.main.top >= stacked.rail.bottom - 1);
+  assert.equal(stacked.overflow, false);
+});
+
+test('Tool editor header spans the 210px/editor/320px triptych and stacks only below 832px', async () => {
+  for (const width of [1212, 832]) {
+    const report = await readRenderedToolGeometry(width, 'tool-edit');
+    assert.equal(Math.round(report.rail.width), 210);
+    assert.equal(Math.round(report.preview.width), 320);
+    assert.ok(Math.abs(report.header.left - report.root.left) <= 1);
+    assert.ok(Math.abs(report.header.right - report.root.right) <= 1);
+    assert.ok(report.tabs.left >= report.rail.right - 1);
+    assert.ok(Math.abs(report.rail.top - report.tabs.top) <= 1);
+    assert.ok(Math.abs(report.panel.top - report.tabs.bottom) <= 1);
+    assert.ok(report.preview.left >= report.panel.right - 1);
+    assert.equal(report.overflow, false);
+  }
+  const stacked = await readRenderedToolGeometry(831, 'tool-edit');
+  assert.ok(stacked.rail.top >= stacked.header.bottom - 1);
+  assert.ok(stacked.tabs.top >= stacked.rail.bottom - 1);
+  assert.ok(stacked.preview.top >= stacked.panel.bottom - 1);
+  assert.equal(stacked.overflow, false);
+  const wrapped = await readRenderedToolGeometry(680, 'tool-edit');
+  assert.ok(wrapped.actions.bottom <= wrapped.header.bottom + 1);
+  assert.equal(wrapped.overflow, false);
+});
+
+test('Tool Breakage preserves compact vertical cards and a stacked heading at the 832px triptych', async () => {
+  const wide = await readRenderedToolGeometry(1212, 'tool-edit');
+  const narrow = await readRenderedToolGeometry(832, 'tool-edit');
+
+  assert.ok(wide.choiceIcon.bottom <= wide.choiceTitle.top + 1, 'wide choice cards keep icon above copy');
+  assert.ok(narrow.choiceIcon.bottom <= narrow.choiceTitle.top + 1, '832px choice cards keep icon above copy');
+  assert.ok(narrow.choice.width >= 78 && narrow.choice.width <= 82, `832px choice width is ${narrow.choice.width}`);
+  assert.ok(narrow.choice.bottom - narrow.choice.top >= 150 && narrow.choice.bottom - narrow.choice.top <= 158);
+  assert.ok(narrow.sectionHint.top >= narrow.sectionTitle.bottom - 1, '832px breakage hint follows the title');
+  assert.ok(narrow.authority.bottom - narrow.authority.top <= 125, '832px authority summary stays compact');
+  assert.ok(narrow.panelPaddingInline >= 20 && narrow.panelPaddingInline <= 22);
+  assert.ok(Math.abs(narrow.authorityTitleSize - 12.48) <= 0.6);
+  assert.ok(Math.abs(narrow.authorityCopySize - 10.24) <= 0.6);
+  assert.notEqual(narrow.previewBackground, narrow.previewCardBackground);
+});
+
 test('manager root defines a scoped responsive app container', () => {
   const block = blockFor('.fabricate-manager');
 
@@ -813,6 +927,25 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     false,
     "the row's I/O readout is a phrase, not a numeric, and stays in the UI face"
   );
+});
+
+test('Tool Overview source UUID resets global code chrome to a compact metadata subline', () => {
+  const sourceIdBlock = blockFor('.fabricate-manager .manager-tool-source-card code');
+  for (const declaration of [
+    'display: block;',
+    'width: fit-content;',
+    'max-width: 100%;',
+    'margin: 0;',
+    'padding: 0;',
+    'border: 0;',
+    'background: transparent;',
+    'box-shadow: none;',
+    'font-family: var(--fab-font-mono);',
+    'text-overflow: ellipsis;',
+    'white-space: nowrap;',
+  ]) {
+    assert.ok(sourceIdBlock.includes(declaration), `Tool source UUID must retain ${declaration}`);
+  }
 });
 
 test('manager gathering task browser defines bounded toolbar and compact table geometry without reorder controls', () => {

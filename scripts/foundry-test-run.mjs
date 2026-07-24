@@ -29,6 +29,7 @@
  */
 
 import { chromium } from 'playwright';
+import { randomUUID } from 'node:crypto';
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -253,6 +254,12 @@ async function echoWaivedConsoleErrorsToStepSummary(waived) {
 
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
+const screenshotManifestEntries = [];
+const screenshotRunIdentity = {
+  runId: randomUUID(),
+  headSha: String(process.env.FOUNDRY_SCREENSHOT_HEAD_SHA || process.env.GITHUB_SHA || '').trim(),
+  targetLabels: [...SCREENSHOT_TARGET_LABELS].sort((a, b) => a.localeCompare(b)),
+};
 
 // ── Phase timings ───────────────────────────────────────────────────────────
 /** @type {Array<{ phase: string, startedAt: string, durationMs: number }>} */
@@ -385,6 +392,12 @@ async function screenshot(page, label, options = {}) {
   // `options` forwards Playwright screenshot options (e.g. a `clip` box for a
   // region capture such as the chat sidebar); default is a full-page shot.
   await page.screenshot({ path, ...options });
+  screenshotManifestEntries.push({
+    label,
+    file: `screenshot-${num}-${label}.png`,
+    width: options.clip?.width ?? null,
+    height: options.clip?.height ?? null,
+  });
   markViewTiming(label);
 }
 
@@ -1057,22 +1070,52 @@ async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs
  * @param {{ width: number, height: number }} size
  * @param {{ timeout?: number, fallbackMs?: number }} [options]
  */
-async function waitForManagerGeometrySettled(page, { width, height }, { timeout = 1500, fallbackMs = 500 } = {}) {
+async function waitForManagerGeometrySettled(page, { timeout = 1500, fallbackMs = 500 } = {}) {
   await page.evaluate(() => { delete window.__fabGeomSettle; }).catch(() => {});
-  await waitForSettled(page, ({ width, height }) => {
+  await waitForSettled(page, () => {
     const manager = document.querySelector('.fabricate-manager');
     const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
     if (!app) return false;
-    const rect = app.getBoundingClientRect();
-    const w = Math.round(rect.width);
-    const h = Math.round(rect.height);
-    if (Math.abs(w - width) > 3 || Math.abs(h - height) > 3) { window.__fabGeomSettle = null; return false; }
+    const outer = app.getBoundingClientRect();
+    const product = manager.getBoundingClientRect();
     const state = window.__fabGeomSettle || { sig: null, stable: 0 };
-    const sig = `${w}x${h}`;
+    const sig = [
+      window.innerWidth,
+      window.innerHeight,
+      Math.round(outer.left),
+      Math.round(outer.top),
+      Math.round(outer.width),
+      Math.round(outer.height),
+      Math.round(product.left),
+      Math.round(product.top),
+      Math.round(product.width),
+      Math.round(product.height),
+    ].join(':');
     if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
     window.__fabGeomSettle = state;
     return state.stable >= 4; // ~4 steady RAF samples ≈ 65ms of quiescence.
-  }, { width, height }, { timeout, fallbackMs });
+  }, undefined, { timeout, fallbackMs });
+  return page.evaluate(() => {
+    const manager = document.querySelector('.fabricate-manager');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
+    if (!manager || !app) throw new Error('Crafting System Manager geometry is unavailable');
+    const rectangle = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+      };
+    };
+    return {
+      browser: { width: window.innerWidth, height: window.innerHeight },
+      outer: rectangle(app),
+      product: rectangle(manager),
+    };
+  });
 }
 
 /**
@@ -1102,61 +1145,163 @@ async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {})
   }, undefined, { timeout, fallbackMs });
 }
 
+async function waitForManagerApplicationRendered(page) {
+  const outerSelector = '#fabricate-crafting-system-manager';
+  const resolveRegisteredManager = () => {
+    const instances = foundry?.applications?.instances;
+    const registeredApps = instances?.values
+      ? Array.from(instances.values())
+      : (instances ? Array.from(instances) : []);
+    const uniqueApps = Array.from(new Set(registeredApps));
+    const registryCandidates = uniqueApps.map((app, index) => {
+      const rawElement = app?.element ?? app?._element ?? null;
+      const element = rawElement?.[0] ?? rawElement;
+      const manager = element?.matches?.('.fabricate-manager')
+        ? element
+        : element?.querySelector?.('.fabricate-manager')
+          ?? element?.closest?.('.fabricate-manager');
+      const ownsManager = Boolean(
+        manager?.isConnected
+        && (
+          element === manager
+          || element?.contains?.(manager)
+          || manager?.contains?.(element)
+        )
+      );
+      return {
+        app,
+        index,
+        appType: app?.constructor?.name ?? typeof app,
+        appRendered: app?.rendered ?? null,
+        elementType: element?.constructor?.name ?? typeof element,
+        elementId: element?.id ?? null,
+        elementConnected: Boolean(element?.isConnected),
+        elementHasStyle: Boolean(element?.style),
+        managerConnected: Boolean(manager?.isConnected),
+        ownsManager,
+        liveMatch: Boolean(
+          element?.isConnected
+          && element?.style
+          && manager?.isConnected
+          && (element.id === 'fabricate-crafting-system-manager' || ownsManager)
+        ),
+      };
+    });
+    const liveMatches = registryCandidates.filter((candidate) => candidate.liveMatch);
+    if (liveMatches.length !== 1) {
+      const diagnostics = registryCandidates.map(({ app: _app, ...candidate }) => candidate);
+      throw new Error(
+        `Crafting System Manager registry resolution found ${liveMatches.length} live instances: `
+        + JSON.stringify({ registryCandidates: diagnostics })
+      );
+    }
+    globalThis.__fabricateSmokeManagerApp = liveMatches[0].app;
+    const { app: _app, ...selected } = liveMatches[0];
+    return selected;
+  };
+  const inspectReadiness = (diagnostic = false) => {
+    const app = globalThis.__fabricateSmokeManagerApp;
+    const rawElement = app?.element ?? app?._element ?? null;
+    const appElement = rawElement?.[0] ?? rawElement;
+    const manager = appElement?.matches?.('.fabricate-manager')
+      ? appElement
+      : appElement?.querySelector?.('.fabricate-manager')
+        ?? appElement?.closest?.('.fabricate-manager');
+    const report = {
+      ready: Boolean(appElement?.isConnected && appElement?.style && manager?.isConnected),
+      appRendered: app?.rendered ?? null,
+      elementType: appElement?.constructor?.name ?? typeof appElement,
+      elementId: appElement?.id ?? null,
+      elementConnected: Boolean(appElement?.isConnected),
+      elementHasStyle: Boolean(appElement?.style),
+      managerConnected: Boolean(manager?.isConnected),
+      selectorManagerConnected: Boolean(
+        document.querySelector('#fabricate-crafting-system-manager .fabricate-manager')?.isConnected
+      ),
+    };
+    if (diagnostic || report.ready) return report;
+    return false;
+  };
+  try {
+    await page.locator(outerSelector).waitFor({ state: 'attached', timeout: 15_000 });
+    await page.locator(`${outerSelector} .fabricate-manager`).waitFor({
+      state: 'attached',
+      timeout: 15_000,
+    });
+    await page.evaluate(resolveRegisteredManager);
+    await page.waitForFunction(inspectReadiness, false, { timeout: 15_000, polling: 'raf' });
+  } catch (error) {
+    const readiness = await page.evaluate(inspectReadiness, true).catch((diagnosticError) => ({
+      diagnosticError: diagnosticError.message,
+    }));
+    throw new Error(
+      `Crafting System Manager ApplicationV2 render readiness failed: ${JSON.stringify(readiness)}`,
+      { cause: error }
+    );
+  }
+}
+
 /**
  * Resize the rendered Crafting System Manager application frame for
  * responsive screenshots and hit testing.
  *
- * R4 (#750): the D0 walk issues many consecutive identical
- * `setManagerWindowSize(1280, 820)` calls; each otherwise repaid a viewport
- * resize and a fixed settle for a no-op. Short-circuit when the app is ALREADY
- * at the requested geometry (verified against the live DOM — a fresh `.show()`
- * resets the app size, so a cached size alone is not trusted), which batches
- * same-width frames by eliminating the redundant resizes between them. When a
- * resize IS needed, settle on the app reaching a stable measured geometry
- * instead of a blanket 500ms wait.
+ * A supplied source viewport is exact screenshot evidence; ordinary manager
+ * callers retain the roomy shared viewport. The outer frame is always resized
+ * through the live ApplicationV2 instance, then the browser, outer frame, and
+ * inner product rectangles are measured after they settle. Foundry V13 may
+ * clamp the requested outer height to the exact browser viewport.
  * @param {import('playwright').Page} page
- * @param {{ width: number, height: number }} size
+ * @param {{ width: number, height: number, sourceViewport?: {width: number, height: number} }} size
  */
-async function setManagerWindowSize(page, { width, height }) {
-  const viewportWidth = Math.max(1366, width + 80);
-  const viewportHeight = Math.max(768, height + 80);
-  const alreadySized = await page.evaluate(({ width, height, viewportWidth, viewportHeight }) => {
-    const manager = document.querySelector('.fabricate-manager');
-    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-    if (!app) return false;
-    const rect = app.getBoundingClientRect();
-    return Math.abs(window.innerWidth - viewportWidth) <= 2
-      && Math.abs(window.innerHeight - viewportHeight) <= 2
-      && Math.abs(rect.width - width) <= 2
-      && Math.abs(rect.height - height) <= 2;
-  }, { width, height, viewportWidth, viewportHeight }).catch(() => false);
-  if (alreadySized) return;
+async function setManagerWindowSize(page, { width, height, sourceViewport = null }) {
+  const viewport = sourceViewport || {
+    width: Math.max(1366, width + 80),
+    height: Math.max(768, height + 80),
+  };
 
   await withDeadline(
-    page.setViewportSize({ width: viewportWidth, height: viewportHeight }),
+    page.setViewportSize(viewport),
     15_000,
     `setViewportSize ${width}x${height}`
   );
+  await waitForManagerApplicationRendered(page);
   await withDeadline(
-    page.evaluate(({ width, height }) => {
-      const manager = document.querySelector('.fabricate-manager');
-      const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-      if (!app) return null;
-      Object.assign(app.style, {
-        width: `${width}px`,
-        height: `${height}px`,
-        left: '20px',
-        top: '20px'
+    page.evaluate(async ({ width, height, viewport }) => {
+      const app = globalThis.__fabricateSmokeManagerApp;
+      if (!app || typeof app.setPosition !== 'function') {
+        throw new Error('Live Crafting System Manager ApplicationV2 instance has no setPosition');
+      }
+      await app.setPosition({
+        width,
+        height,
+        left: Math.max(0, Math.round((viewport.width - width) / 2)),
+        top: 0,
       });
-      return {
-        width: app.getBoundingClientRect().width,
-        height: app.getBoundingClientRect().height
-      };
-    }, { width, height }),
+    }, { width, height, viewport }),
     15_000,
     `setManagerWindowSize evaluate ${width}x${height}`
   );
-  await waitForManagerGeometrySettled(page, { width, height }, { timeout: 1500, fallbackMs: 500 });
+  const geometry = await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
+  if (geometry.browser.width !== viewport.width || geometry.browser.height !== viewport.height) {
+    throw new Error(`Manager source viewport drifted: ${JSON.stringify({ expected: viewport, actual: geometry.browser })}`);
+  }
+  if (
+    geometry.outer.left < 0
+    || geometry.outer.top < 0
+    || geometry.outer.right > geometry.browser.width
+    || geometry.outer.bottom > geometry.browser.height
+  ) {
+    throw new Error(`ApplicationV2 outer rectangle escapes the browser viewport: ${JSON.stringify(geometry)}`);
+  }
+  if (
+    geometry.product.left < geometry.outer.left
+    || geometry.product.top < geometry.outer.top
+    || geometry.product.right > geometry.outer.right
+    || geometry.product.bottom > geometry.outer.bottom
+  ) {
+    throw new Error(`Tool Studio product rectangle escapes the ApplicationV2 frame: ${JSON.stringify(geometry)}`);
+  }
+  return geometry;
 }
 
 /**
@@ -1373,6 +1518,8 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-gathering-task-row',
       '.manager-gathering-event-row',
       '.manager-tools-row',
+      '[data-manager-tool-id]',
+      '[data-tool-edit-view]',
       '.manager-inspector-card',
       '.manager-system-edit-form',
       '.manager-edit-card',
@@ -1428,7 +1575,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-vocabulary-row'
       || metric.selector === '.manager-gathering-task-row'
       || metric.selector === '.manager-gathering-event-row'
-      || metric.selector === '.manager-tools-row'
+      || metric.selector === '[data-manager-tool-id]'
       || metric.selector === '.manager-travel-parties-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
@@ -1439,6 +1586,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-event-edit-view'
       || metric.selector === '.manager-essence-edit-view'
       || metric.selector === '.manager-recipe-edit-main'
+      || metric.selector === '[data-tool-edit-view]'
       || metric.selector === '.manager-component-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
@@ -1615,6 +1763,671 @@ async function assertProgressiveStageListSound(page, label, { expectAnnouncement
 async function softClick(locator, options = {}) {
   if (await locator.count() === 0) return;
   await locator.first().click(options).catch(() => {});
+}
+
+async function assertPointerTarget(page, locator, targetSelector, label) {
+  await locator.scrollIntoViewIfNeeded();
+  await locator.waitFor({ state: 'visible', timeout: 5_000 });
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`No pointer box found for ${label}`);
+  const hit = await page.evaluate(({ x, y, targetSelector }) => {
+    const element = document.elementFromPoint(x, y);
+    return {
+      matched: Boolean(element?.closest?.(targetSelector)),
+      tag: element?.tagName || 'none',
+      className: String(element?.className || ''),
+    };
+  }, { x: box.x + box.width / 2, y: box.y + box.height / 2, targetSelector });
+  if (!hit.matched) {
+    throw new Error(`${label} pointer missed ${targetSelector}; hit ${hit.tag} ${hit.className}`);
+  }
+}
+
+function assertSingleToolMutation(report, expectedMethod, label) {
+  const matchingCalls = report?.calls?.filter((call) => call.method === expectedMethod) ?? [];
+  const unexpectedCalls = report?.calls?.filter((call) => call.method !== expectedMethod) ?? [];
+  if (matchingCalls.length !== 1 || unexpectedCalls.length > 0) {
+    throw new Error(
+      `${label} must dispatch exactly one ${expectedMethod} mutation: ${JSON.stringify(report)}`
+    );
+  }
+}
+
+async function beginToolStoreMutationProbe(page, methodNames) {
+  await page.evaluate((names) => {
+    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+    if (!store) throw new Error('Tool mutation probe could not resolve the live manager store');
+    if (globalThis.__fabricateToolMutationProbe) {
+      throw new Error('Tool mutation probe was already active');
+    }
+    const calls = [];
+    const restorations = [];
+    const systemManager = game?.fabricate?.getCraftingSystemManager?.();
+    for (const method of names) {
+      const persistentBoundary = {
+        toggleToolEnabled: 'upsertTool',
+        setToolBreakageAuthority: 'updateSystem',
+      }[method];
+      if (persistentBoundary) {
+        const original = systemManager?.[persistentBoundary];
+        if (typeof original !== 'function') {
+          throw new Error(`Tool mutation probe could not wrap systemManager.${persistentBoundary}`);
+        }
+        systemManager[persistentBoundary] = function (...args) {
+          calls.push({
+            method,
+            args: args.map((value) => {
+              try {
+                return JSON.parse(JSON.stringify(value));
+              } catch {
+                return String(value);
+              }
+            }),
+          });
+          return original.apply(this, args);
+        };
+        restorations.push(() => {
+          systemManager[persistentBoundary] = original;
+        });
+        continue;
+      }
+      if (!store.viewState?.subscribe) {
+        throw new Error(`Tool mutation probe could not observe store.${method}`);
+      }
+      let initial = true;
+      const unsubscribe = store.viewState.subscribe((state) => {
+        if (initial) {
+          initial = false;
+          return;
+        }
+        calls.push({
+          method,
+          args: [{
+            toolId: String(state?.toolDraft?.id || ''),
+            dirty: state?.toolDraftDirty === true,
+          }],
+        });
+      });
+      restorations.push(unsubscribe);
+    }
+    globalThis.__fabricateToolMutationProbe = { calls, restorations };
+  }, methodNames);
+}
+
+async function finishToolStoreMutationProbe(page) {
+  return page.evaluate(() => {
+    const probe = globalThis.__fabricateToolMutationProbe;
+    if (!probe) return { calls: [], missing: true };
+    for (const restore of probe.restorations) restore();
+    delete globalThis.__fabricateToolMutationProbe;
+    return { calls: probe.calls };
+  });
+}
+
+async function withSingleToolStoreMutation(page, method, label, action, assertEffect) {
+  await beginToolStoreMutationProbe(page, [method]);
+  let report;
+  try {
+    await action();
+    await assertEffect();
+  } finally {
+    report = await finishToolStoreMutationProbe(page);
+  }
+  assertSingleToolMutation(report, method, label);
+}
+
+async function withSingleToolDraftTransition(page, expectedToolId, label, action, assertEffect) {
+  await page.evaluate(() => {
+    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+    if (!store?.viewState?.subscribe) {
+      throw new Error('Tool draft transition probe could not resolve the live manager view state');
+    }
+    if (globalThis.__fabricateToolDraftTransitionProbe) {
+      throw new Error('Tool draft transition probe was already active');
+    }
+    const transitions = [];
+    let initial = true;
+    const unsubscribe = store.viewState.subscribe((state) => {
+      if (initial) {
+        initial = false;
+        return;
+      }
+      transitions.push({
+        toolId: String(state?.toolDraft?.id || ''),
+        dirty: state?.toolDraftDirty === true,
+      });
+    });
+    globalThis.__fabricateToolDraftTransitionProbe = { transitions, unsubscribe };
+  });
+  let report;
+  try {
+    await action();
+    await assertEffect();
+  } finally {
+    report = await page.evaluate(() => {
+      const probe = globalThis.__fabricateToolDraftTransitionProbe;
+      if (!probe) return { transitions: [], missing: true };
+      probe.unsubscribe();
+      delete globalThis.__fabricateToolDraftTransitionProbe;
+      return { transitions: probe.transitions };
+    });
+  }
+  const matching = report.transitions.filter(({ toolId }) => toolId === String(expectedToolId));
+  if (report.transitions.length !== 1 || matching.length !== 1) {
+    throw new Error(
+      `${label} must publish exactly one Tool draft transition for ${expectedToolId}: ${JSON.stringify(report)}`
+    );
+  }
+}
+
+async function clickToolTabAndAssertEffect(page, editor, name, label) {
+  const target = editor.locator(`#tool-tab-${name}`);
+  await assertPointerTarget(page, target, `#tool-tab-${name}`, label);
+  if (await target.getAttribute('aria-selected') !== 'false') {
+    throw new Error(`${label} must begin on a different Tool tab`);
+  }
+  await target.evaluate((element) => {
+    const transitions = [];
+    const observer = new MutationObserver(() => {
+      transitions.push(element.getAttribute('aria-selected'));
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ['aria-selected'] });
+    element.__fabricateToolTabProbe = { observer, transitions };
+  });
+  await target.click();
+  await editor.locator(`[data-tool-editor-panel="${name}"]`).waitFor({ state: 'visible', timeout: 5_000 });
+  const effect = await target.evaluate((element) => {
+    const probe = element.__fabricateToolTabProbe;
+    probe?.observer?.disconnect();
+    delete element.__fabricateToolTabProbe;
+    const tablist = element.closest('[role="tablist"]');
+    return {
+      selected: tablist?.querySelectorAll('[role="tab"][aria-selected="true"]').length ?? 0,
+      expectedSelected: element.getAttribute('aria-selected'),
+      selectedTransitions: probe?.transitions?.filter((value) => value === 'true').length ?? 0,
+      transitions: probe?.transitions ?? [],
+    };
+  });
+  if (
+    effect.selected !== 1
+    || effect.expectedSelected !== 'true'
+    || effect.selectedTransitions !== 1
+  ) {
+    throw new Error(`${label} did not transition exactly once to ${name}: ${JSON.stringify(effect)}`);
+  }
+}
+
+async function toggleToolControlAndRestore(page, locator, label) {
+  await assertPointerTarget(page, locator, 'input', label);
+  const before = await locator.isChecked();
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    `${label} apply`,
+    () => locator.click(),
+    async () => {
+      if (await locator.isChecked() === before) {
+        throw new Error(`${label} did not apply its observable toggle effect`);
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    `${label} restore`,
+    () => locator.click(),
+    async () => {
+      if (await locator.isChecked() !== before) {
+        throw new Error(`${label} did not restore its original persisted state`);
+      }
+    },
+  );
+}
+
+async function selectOptionAndAssertSingleChange(
+  locator,
+  value,
+  label,
+  { expectRetainedValue = true } = {},
+) {
+  await locator.evaluate((element) => {
+    element.__fabricateSelectChangeCount = 0;
+    element.__fabricateSelectChangeListener = () => {
+      element.__fabricateSelectChangeCount += 1;
+    };
+    element.addEventListener('change', element.__fabricateSelectChangeListener);
+  });
+  await locator.selectOption(value);
+  const effect = await locator.evaluate((element) => {
+    element.removeEventListener('change', element.__fabricateSelectChangeListener);
+    const report = {
+      changes: element.__fabricateSelectChangeCount,
+      value: element.value,
+    };
+    delete element.__fabricateSelectChangeCount;
+    delete element.__fabricateSelectChangeListener;
+    return report;
+  });
+  if (effect.changes !== 1 || (expectRetainedValue && effect.value !== value)) {
+    throw new Error(`${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`);
+  }
+}
+
+async function saveToolStudioDraftIfDirty(editor) {
+  if (await editor.locator('[data-tool-editor-dirty]').count() === 0) return;
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-dirty]').waitFor({
+    state: 'detached',
+    timeout: 10_000,
+  });
+}
+
+async function assertSavedToolStudioCapture(editor, label) {
+  if (await editor.locator('[data-tool-editor-dirty]').count() > 0) {
+    throw new Error(`${label} must capture a saved Tool draft`);
+  }
+  const status = (await editor.locator('[data-tool-editor-status]').textContent())?.trim();
+  if (status !== 'All changes saved') {
+    throw new Error(`${label} must expose All changes saved status; found ${JSON.stringify(status)}`);
+  }
+}
+
+async function requireSingleLocator(locator, label) {
+  const count = await locator.count();
+  if (count !== 1) {
+    throw new Error(`${label} expected exactly one match, found ${count}`);
+  }
+  return locator;
+}
+
+async function assertDisabledToolOnBreakFieldset(fieldset) {
+  const fieldsetState = await fieldset.evaluate((element) => ({
+    disabled: element.disabled === true,
+    matchesDisabled: element.matches(':disabled'),
+  }));
+  if (!fieldsetState.disabled || !fieldsetState.matchesDisabled) {
+    throw new Error(`Check-driven immune fieldset did not expose native disabled state: ${JSON.stringify(fieldsetState)}`);
+  }
+  const controls = fieldset.locator('button, input, select, textarea');
+  const controlCount = await controls.count();
+  if (controlCount === 0) {
+    throw new Error('Check-driven immune fieldset exposed no actionable controls');
+  }
+  for (let index = 0; index < controlCount; index += 1) {
+    if (!(await controls.nth(index).isDisabled())) {
+      throw new Error(`Check-driven immune on-break control ${index + 1} remained interactive`);
+    }
+  }
+}
+
+function assertToolStudioHorizontalScrollSettled(positions, label) {
+  const unsettled = (positions || []).filter(({ scrollLeft }) => scrollLeft !== 0);
+  if (unsettled.length > 0) {
+    throw new Error(`${label} leaked horizontal scroll: ${JSON.stringify(unsettled)}`);
+  }
+}
+
+async function readToolStudioHorizontalScroll(page, { reset = false } = {}) {
+  return page.evaluate((shouldReset) => {
+    const manager = document.querySelector('#fabricate-crafting-system-manager .fabricate-manager');
+    if (!manager) return [];
+    const explicitSelectors = [
+      'html',
+      'body',
+      '#fabricate-crafting-system-manager',
+      '.fabricate-manager',
+      '.fabricate-manager .manager-body',
+      '.fabricate-manager .manager-main',
+      '.fabricate-manager [data-tool-edit-view]',
+      '.fabricate-manager .manager-tool-editor-tabs',
+      '.fabricate-manager [data-tool-editor-panel]',
+      '.fabricate-manager [data-tool-behavior-preview]',
+      '.fabricate-manager .manager-inspector',
+      '.fabricate-manager .manager-tool-repair',
+      '.fabricate-manager [data-tool-repair-group]',
+    ];
+    const elements = new Set([document.scrollingElement]);
+    for (const selector of explicitSelectors) {
+      for (const element of document.querySelectorAll(selector)) elements.add(element);
+    }
+    for (const element of manager.querySelectorAll('*')) {
+      if (element.scrollWidth > element.clientWidth + 1) elements.add(element);
+    }
+    const positions = [];
+    let index = 0;
+    for (const element of elements) {
+      if (!element) continue;
+      if (shouldReset) element.scrollLeft = 0;
+      positions.push({
+        index,
+        tag: element.tagName,
+        id: element.id || '',
+        className: String(element.className || ''),
+        scrollLeft: element.scrollLeft,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      });
+      index += 1;
+    }
+    return positions;
+  }, reset);
+}
+
+async function assertToolStudioHorizontalScroll(page, label) {
+  const positions = await readToolStudioHorizontalScroll(page);
+  assertToolStudioHorizontalScrollSettled(positions, label);
+}
+
+async function resetToolStudioHorizontalScroll(page, label = 'Tool Studio') {
+  await readToolStudioHorizontalScroll(page, { reset: true });
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await assertToolStudioHorizontalScroll(page, `${label} horizontal reset`);
+}
+
+async function resetToolStudioScroll(page) {
+  const selectors = [
+    '.fabricate-manager .manager-body',
+    '.fabricate-manager .manager-main',
+    '.fabricate-manager [data-tool-editor-panel]',
+    '.fabricate-manager [data-tool-behavior-preview]',
+    '.fabricate-manager .manager-inspector',
+  ];
+  await page.evaluate((targets) => {
+    for (const selector of targets) {
+      for (const element of document.querySelectorAll(selector)) element.scrollTop = 0;
+    }
+  }, selectors);
+  await resetToolStudioHorizontalScroll(page);
+  const scroll = await page.evaluate((targets) => targets.flatMap((selector) => (
+    Array.from(document.querySelectorAll(selector), (element, index) => ({
+      selector,
+      index,
+      scrollTop: element.scrollTop,
+    }))
+  )), selectors);
+  const unsettled = scroll.filter(({ scrollTop }) => scrollTop !== 0);
+  if (unsettled.length > 0) {
+    throw new Error(`Tool Studio vertical scroll reset failed: ${JSON.stringify(unsettled)}`);
+  }
+}
+
+async function scrollToolEditorPanelToReveal(page, editor, selector, label) {
+  const panel = editor.locator('[data-tool-editor-panel]');
+  const target = editor.locator(selector);
+  const fixedBefore = await editor.evaluate(() => {
+    const read = (selector) => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    };
+    return {
+      header: read('[data-tool-editor-header]'),
+      tabs: read('.manager-tool-editor-tabs'),
+      preview: read('[data-tool-behavior-preview]'),
+    };
+  });
+  await target.scrollIntoViewIfNeeded();
+  await resetToolStudioHorizontalScroll(page, label);
+  const report = await panel.evaluate((element, targetSelector) => {
+    const targetElement = element.querySelector(targetSelector);
+    if (!targetElement) return null;
+    const panelRect = element.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    return {
+      scrollTop: element.scrollTop,
+      targetVisible: targetRect.top >= panelRect.top && targetRect.bottom <= panelRect.bottom,
+      targetContained: targetRect.left >= panelRect.left - 1 && targetRect.right <= panelRect.right + 1,
+    };
+  }, selector);
+  if (!report || report.scrollTop <= 0 || !report.targetVisible || !report.targetContained) {
+    throw new Error(`${label} stress control was not visibly scrolled into the editor pane: ${JSON.stringify(report)}`);
+  }
+  const fixedAfter = await editor.evaluate(() => {
+    const read = (selector) => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    };
+    return {
+      header: read('[data-tool-editor-header]'),
+      tabs: read('.manager-tool-editor-tabs'),
+      preview: read('[data-tool-behavior-preview]'),
+    };
+  });
+  for (const key of ['header', 'tabs', 'preview']) {
+    for (const edge of ['left', 'right', 'top', 'bottom']) {
+      if (Math.abs((fixedBefore[key]?.[edge] ?? 0) - (fixedAfter[key]?.[edge] ?? 0)) > 1) {
+        throw new Error(
+          `${label} moved fixed ${key} context while revealing stress content: `
+          + `${JSON.stringify({ fixedBefore, fixedAfter })}`
+        );
+      }
+    }
+  }
+  for (const [identitySelector, identityLabel] of [
+    ['[data-tool-editor-header]', 'header'],
+    ['.manager-tool-editor-tabs', 'tabs'],
+    ['[data-tool-behavior-preview]', 'preview'],
+  ]) {
+    if (!(await editor.locator(identitySelector).isVisible())) {
+      throw new Error(`${label} lost ${identityLabel} identity context`);
+    }
+  }
+}
+
+async function captureToolStudioProduct(page, label, expectedGeometry) {
+  const manager = await requireSingleLocator(
+    page.locator('#fabricate-crafting-system-manager .fabricate-manager'),
+    `${label} live Tool Studio manager`
+  );
+  const box = await manager.boundingBox();
+  if (!box) throw new Error(`${label} Tool Studio product rectangle is not measurable`);
+  const measured = { width: Math.round(box.width), height: Math.round(box.height) };
+  const expected = expectedGeometry?.product;
+  if (!expected || measured.width !== expected.width || measured.height !== expected.height) {
+    throw new Error(
+      `${label} Tool Studio product rectangle drifted: ${JSON.stringify({ measured, expectedGeometry })}`
+    );
+  }
+  await assertToolStudioHorizontalScroll(page, `${label} before capture`);
+  await screenshot(page, label, {
+    clip: { x: box.x, y: box.y, width: box.width, height: box.height },
+  });
+  await assertToolStudioHorizontalScroll(page, `${label} after capture`);
+}
+
+async function readToolStudioLayout(page) {
+  return page.evaluate(() => {
+    const readRect = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const readType = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        fontSize: Number.parseFloat(style.fontSize),
+        lineHeight: style.lineHeight,
+        overflow: style.overflow,
+        textOverflow: style.textOverflow,
+        whiteSpace: style.whiteSpace,
+      };
+    };
+    const readOverflow = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        overflowY: style.overflowY,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      };
+    };
+    const readHorizontalOverflow = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        overflowX: style.overflowX,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        scrollLeft: element.scrollLeft,
+      };
+    };
+    return {
+      manager: readRect('.fabricate-manager'),
+      body: readRect('.fabricate-manager .manager-body'),
+      main: readRect('[data-tool-edit-view]')?.width > 0
+        ? readRect('.fabricate-manager .manager-main')
+        : readRect('.fabricate-manager .manager-body'),
+      inspector: readRect('.fabricate-manager .manager-inspector'),
+      libraryRow: readRect('.fabricate-manager [data-manager-tool-id]'),
+      editorHeader: readRect('[data-tool-editor-header]'),
+      editorActions: readRect('.manager-tool-edit-actions'),
+      tabs: readRect('.manager-tool-editor-tabs'),
+      tabButtons: Array.from(
+        document.querySelectorAll('.manager-tool-editor-tabs > [role="tab"]'),
+        (element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            id: element.id,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+          };
+        },
+      ),
+      tabsOverflow: readHorizontalOverflow('.manager-tool-editor-tabs'),
+      composition: readRect('.manager-tool-edit-composition')?.width > 0
+        ? readRect('.manager-tool-edit-composition')
+        : readRect('.fabricate-manager .manager-body'),
+      editorPanel: readRect('[data-tool-editor-panel]'),
+      firstSection: readRect('[data-tool-editor-panel] > *'),
+      preview: readRect('[data-tool-behavior-preview]'),
+      previewIdentity: readRect('[data-tool-preview-identity]'),
+      libraryNameType: readType('.manager-tools-library-copy > strong'),
+      inspectorNameType: readType('.manager-tool-inspector-hero h2'),
+      editorNameType: readType('.manager-tool-edit-identity h2'),
+      previewNameType: readType('.manager-tool-preview-identity h3'),
+      bodyOverflow: readOverflow('.fabricate-manager .manager-body'),
+      mainOverflow: readOverflow('.fabricate-manager .manager-main'),
+      panelOverflow: readOverflow('[data-tool-editor-panel]'),
+      previewOverflow: readOverflow('[data-tool-behavior-preview]'),
+      headerCount: document.querySelectorAll('[data-tool-editor-header]').length,
+      genericTitleCount: document.querySelectorAll('.manager-heading > .manager-title, .manager-heading > .manager-subtitle').length,
+    };
+  });
+}
+
+function assertHorizontalContainment(parent, child, label) {
+  if (!parent || !child || child.left < parent.left - 1 || child.right > parent.right + 1) {
+    throw new Error(`${label} escapes horizontal containment: ${JSON.stringify({ parent, child })}`);
+  }
+}
+
+function assertToolStudioTabContainment(report) {
+  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 4) {
+    throw new Error(`Tool editor must render four measurable tabs: ${JSON.stringify(report)}`);
+  }
+  const overflow = report.tabsOverflow;
+  if (
+    !overflow
+    || overflow.scrollLeft !== 0
+    || overflow.scrollWidth > overflow.clientWidth + 1
+    || !['hidden', 'clip'].includes(overflow.overflowX)
+  ) {
+    throw new Error(`Tool editor tabs remain horizontally scrollable: ${JSON.stringify(overflow)}`);
+  }
+  for (const tab of report.tabButtons) {
+    assertHorizontalContainment(report.tabs, tab, `${tab.id} within visible tab list`);
+    assertHorizontalContainment(report.manager, tab, `${tab.id} within Tool Studio product root`);
+  }
+}
+
+function assertToolStudioTypography(report, pairs) {
+  for (const [key, maximum, label] of pairs) {
+    const type = report[key];
+    if (!type || !Number.isFinite(type.fontSize) || type.fontSize > maximum) {
+      throw new Error(`${label} typography is not compact: ${JSON.stringify(type)}`);
+    }
+    if (type.whiteSpace !== 'nowrap' || !['hidden', 'clip'].includes(type.overflow)) {
+      throw new Error(`${label} does not bound long identity copy: ${JSON.stringify(type)}`);
+    }
+  }
+}
+
+async function assertToolStudioLibraryLayout(page) {
+  const report = await readToolStudioLayout(page);
+  assertHorizontalContainment(report.body, report.main, 'Tool library center');
+  assertHorizontalContainment(report.body, report.inspector, 'Tool library inspector');
+  assertHorizontalContainment(report.main, report.libraryRow, 'Tool library row');
+  if (!report.inspector || report.inspector.width < 330 || report.inspector.width > 342) {
+    throw new Error(`Tool library inspector is not the complete 340px rail: ${JSON.stringify(report.inspector)}`);
+  }
+  assertToolStudioTypography(report, [
+    ['libraryNameType', 14, 'Tool library name'],
+    ['inspectorNameType', 17, 'Tool inspector name'],
+  ]);
+}
+
+async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
+  const report = await readToolStudioLayout(page);
+  if (report.headerCount !== 1 || report.genericTitleCount !== 0) {
+    throw new Error(`Tool editor identity chrome drifted: ${JSON.stringify({ headerCount: report.headerCount, genericTitleCount: report.genericTitleCount })}`);
+  }
+  for (const [parent, child, label] of [
+    [report.main, report.editorHeader, 'Tool editor header'],
+    [report.editorHeader, report.editorActions, 'Tool editor actions'],
+    [report.main, report.tabs, 'Tool editor tabs'],
+    [report.composition, report.editorPanel, 'Tool editor panel'],
+    [report.composition, report.preview, 'Tool behavior preview'],
+    [report.preview, report.previewIdentity, 'Tool preview identity'],
+    [report.editorPanel, report.firstSection, 'Tool editor first section'],
+  ]) {
+    assertHorizontalContainment(parent, child, label);
+  }
+  assertToolStudioTabContainment(report);
+  assertToolStudioTypography(report, [
+    ['editorNameType', 20, 'Tool editor name'],
+    ['previewNameType', 17, 'Tool preview name'],
+  ]);
+  if (!stacked) {
+    if (!report.preview || report.preview.width < 318 || report.preview.width > 322) {
+      throw new Error(`Tool preview is not the complete 320px rail: ${JSON.stringify(report.preview)}`);
+    }
+    if (report.preview.top < report.composition.top - 1 || report.preview.bottom > report.composition.bottom + 1) {
+      throw new Error(`Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`);
+    }
+    return;
+  }
+  if (report.preview.height <= 0 || report.preview.top < report.editorPanel.top) {
+    throw new Error(`Tool preview is clipped or precedes the editor in stacked reading order: ${JSON.stringify(report.preview)}`);
+  }
+  if (report.bodyOverflow?.overflowY !== 'auto') {
+    throw new Error(`Tool stacked body does not own scrolling: ${JSON.stringify(report.bodyOverflow)}`);
+  }
+  for (const [key, label] of [
+    ['mainOverflow', 'main'],
+    ['panelOverflow', 'panel'],
+    ['previewOverflow', 'preview'],
+  ]) {
+    if (['auto', 'scroll'].includes(report[key]?.overflowY)) {
+      throw new Error(`Tool stacked ${label} unexpectedly owns nested scrolling: ${JSON.stringify(report[key])}`);
+    }
+  }
 }
 
 function managerSystemRowSelector(systemId) {
@@ -3364,6 +4177,887 @@ async function installNotificationHidingCss(page) {
       }
     `
   });
+}
+
+async function setupToolStudioFixture(page, { systemId, recipeId }) {
+  return page.evaluate(async ({ systemId, recipeId }) => {
+    const clone = (value) => foundry.utils.deepClone(value);
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    const system = csm.getSystem(systemId);
+    const recipe = rm.getRecipe(recipeId);
+    const sourceTemplate = game.items.find((item) => item.name === 'Herbalist Sickle');
+    if (!system || !recipe || !sourceTemplate) {
+      throw new Error('Tool Studio fixture requires Arcane Forge, Brew Healing Potion, and Herbalist Sickle');
+    }
+    const pack = game.packs.get('dnd5e.items');
+    const index = await pack?.getIndex?.();
+    const uncached = Array.from(index || []).find((entry) => entry?._id && !pack.get(entry._id));
+    if (!uncached) throw new Error('Tool Studio fixture requires an uncached dnd5e.items entry');
+    const sourceSystem = clone(sourceTemplate.system);
+    const parityDescription = '<p>A well-balanced forge hammer. Durable, but the haft splinters when hard used.</p>';
+    if (typeof sourceSystem?.description === 'string') {
+      sourceSystem.description = parityDescription;
+    } else if (sourceSystem?.description && typeof sourceSystem.description === 'object') {
+      sourceSystem.description.value = parityDescription;
+    } else {
+      sourceSystem.description = { value: parityDescription };
+    }
+    const source = await Item.create({
+      name: "Smith's Hammer",
+      type: sourceTemplate.type,
+      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
+      system: sourceSystem,
+    });
+    if (!source) throw new Error("Tool Studio fixture could not create Smith's Hammer");
+
+    const restore = {
+      tools: clone(system.tools || []),
+      characterPrerequisites: clone(system.characterPrerequisites || []),
+      toolBreakage: clone(system.toolBreakage || { authority: 'toolSpecific' }),
+      recipeToolIds: clone(recipe.toolIds || []),
+      recipeToolBonusModes: clone(recipe.toolBonusModes || {}),
+      sourceRoles: clone(source.getFlag('fabricate', 'fabricate.roles') || null),
+      sourceCreated: true,
+    };
+    const prerequisiteId = 'smoke-tool-studio-training';
+    const requestedToolId = 'smoke-tool-studio';
+    const components = (system.components || []).filter((component) => component.id !== source.id);
+    if (components.length < 2) throw new Error('Tool Studio repair fixture needs two managed Components');
+    const parityPrerequisites = [
+      ['smoke-tool-studio-expert', 'Expert Crafter', 'prof', 'gte', 4],
+      [prerequisiteId, "Proficient with Smith's Tools", 'prof', 'gte', 1],
+      ['smoke-tool-studio-weave', 'Attuned to the Weave', 'abilities.int.mod', 'gte', 2],
+      ['smoke-tool-studio-strong', 'Strength 13 or higher', 'abilities.str.value', 'gte', 13],
+      ['smoke-tool-studio-arena', 'Trained in Arcana', 'skills.arc.value', 'gte', 1],
+    ].map(([id, name, path, op, value]) => ({
+      id,
+      name,
+      icon: 'fa-solid fa-user-shield',
+      path,
+      op,
+      value,
+    }));
+    await csm.updateSystem(systemId, {
+      characterPrerequisites: parityPrerequisites,
+      // The parity frame owns an exact eight-row fixture. Clear the unrelated
+      // smoke tools first; restoration below reinstates the original array.
+      tools: [],
+      toolBreakage: { authority: 'toolSpecific' },
+    });
+    let { item: upsertedTool } = await csm.upsertTool(systemId, {
+      id: requestedToolId,
+      enabled: true,
+      label: "Smith's Hammer",
+      prerequisites: { enabled: true, ids: [prerequisiteId], gateMode: 'usability' },
+      bonus: { enabled: true, expression: '@prof' },
+      breakage: { mode: 'limitedUses', maxUses: 5 },
+      checkBreakable: true,
+      onBreak: { mode: 'destroy' },
+      repairRequirements: [{
+        id: 'smoke-tool-repair-group',
+        name: 'Restore the working edge',
+        options: components.slice(0, 2).map((component, index) => ({
+          id: `smoke-tool-repair-option-${index + 1}`,
+          quantity: 1,
+          extractEffects: false,
+          match: { type: 'component', componentId: component.id },
+        })),
+      }],
+    }, { itemUuid: source.uuid });
+    // dnd5e Item schemas vary in how they retain a cloned description. The parity
+    // fixture tests Tool Studio, not that system-specific schema edge, so pin the
+    // normalized Tool snapshot after the source-linked upsert has established its
+    // durable identity.
+    ({ item: upsertedTool } = await csm.upsertTool(systemId, {
+      ...upsertedTool,
+      description: 'A well-balanced forge hammer. Durable, but the haft splinters when hard used.',
+    }));
+    const toolId = upsertedTool.id;
+    const parityNames = [
+      'Arcane Forge',
+      "Alchemist's Supplies",
+      'Ley-Line Nexus',
+      "Master's Anvil",
+      'Moonwell',
+      'Volcanic Vent',
+      'Woodcarving Tools',
+    ];
+    for (const [index, label] of parityNames.entries()) {
+      await csm.upsertTool(systemId, {
+        id: `smoke-tool-studio-row-${index + 1}`,
+        enabled: true,
+        label,
+        componentId: components[index % components.length].id,
+        breakage: { mode: 'limitedUses', maxUses: 5 + index },
+        checkBreakable: true,
+        onBreak: { mode: index % 2 === 0 ? 'destroy' : 'flagBroken' },
+        prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+        bonus: { enabled: false, expression: '' },
+        repairRequirements: [],
+      });
+    }
+    await rm.updateRecipe(recipeId, {
+      toolIds: [...new Set([...(recipe.toolIds || []), toolId])],
+      toolBonusModes: { ...(recipe.toolBonusModes || {}), [toolId]: 'highestOnly' },
+    }, { allowIncomplete: true });
+    const registered = csm.getSystem(systemId).tools.find((tool) => tool.id === toolId);
+    const stampedToolId = source.getFlag('fabricate', 'fabricate.roles')?.[systemId]?.toolId;
+    if (!registered || stampedToolId !== toolId) {
+      throw new Error(`Tool Studio Item registration did not stamp roles.${systemId}.toolId`);
+    }
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+    return {
+      ...restore,
+      toolId,
+      sourceItemUuid: source.uuid,
+      uncachedReplacementUuid: `Compendium.dnd5e.items.Item.${uncached._id}`,
+    };
+  }, { systemId, recipeId });
+}
+
+async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
+  if (!fixture) return;
+  await page.evaluate(async ({ systemId, recipeId, fixture }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.();
+    await csm.updateSystem(systemId, {
+      tools: fixture.tools,
+      characterPrerequisites: fixture.characterPrerequisites,
+      toolBreakage: fixture.toolBreakage,
+    });
+    await rm.updateRecipe(recipeId, {
+      toolIds: fixture.recipeToolIds,
+      toolBonusModes: fixture.recipeToolBonusModes,
+    }, { allowIncomplete: true });
+    const source = await fromUuid(fixture.sourceItemUuid);
+    if (source) {
+      await source.unsetFlag('fabricate', 'fabricate.roles');
+      if (fixture.sourceRoles) await source.setFlag('fabricate', 'fabricate.roles', fixture.sourceRoles);
+      if (fixture.sourceCreated) await source.delete();
+    }
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+  }, { systemId, recipeId, fixture });
+}
+
+async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actorId, fixture }) {
+  return page.evaluate(async ({ systemId, recipeId, actorId, fixture }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    const actor = game.actors.get(actorId);
+    const source = await fromUuid(fixture.sourceItemUuid);
+    const system = csm.getSystem(systemId);
+    const tool = system.tools.find((entry) => entry.id === fixture.toolId);
+    if (!actor || !source || !tool) throw new Error('Tool Studio replacement fixture did not resolve');
+    if (game.packs.get('dnd5e.items')?.get(fixture.uncachedReplacementUuid.split('.').at(-1))) {
+      throw new Error('Tool Studio direct replacement source was cached before awaited resolution');
+    }
+    await csm.upsertTool(systemId, {
+      ...tool,
+      breakage: { mode: 'breakageChance', breakageChance: 100 },
+      onBreak: { mode: 'replaceWith', replacementTarget: { type: 'item', itemUuid: fixture.uncachedReplacementUuid } },
+    });
+    const itemData = source.toObject();
+    delete itemData._id;
+    itemData.name = 'Smoke Tool Studio Owned Sickle';
+    foundry.utils.setProperty(itemData, `flags.fabricate.fabricate.roles.${systemId}.toolId`, fixture.toolId);
+    const [owned] = await actor.createEmbeddedDocuments('Item', [itemData]);
+    const order = [];
+    const createdItems = [];
+    const createdPayloads = [];
+    const originalCreate = actor.createEmbeddedDocuments;
+    const originalDelete = owned.delete;
+    actor.createEmbeddedDocuments = async function (type, data, options) {
+      order.push('create');
+      createdPayloads.push(foundry.utils.deepClone(data));
+      const created = await originalCreate.call(this, type, data, options);
+      createdItems.push(...created);
+      return created;
+    };
+    owned.delete = async function (options) {
+      order.push('delete');
+      return originalDelete.call(this, options);
+    };
+    let evidence;
+    try {
+      evidence = await game.fabricate.getCraftingEngine()._applyToolBreakage(
+        rm.getRecipe(recipeId),
+        [{ tool: csm.getSystem(systemId).tools.find((entry) => entry.id === fixture.toolId), item: owned, breakable: true }],
+        { forceBreak: true, authority: 'toolSpecific' }
+      );
+    } finally {
+      actor.createEmbeddedDocuments = originalCreate;
+      if (createdItems.length > 0) {
+        await actor.deleteEmbeddedDocuments('Item', createdItems.map((item) => item.id)).catch(() => {});
+      }
+    }
+    const created = createdItems[0];
+    const createdData = createdPayloads[0]?.[0];
+    const componentIdentity = foundry.utils.getProperty(createdData, `flags.fabricate.fabricate.roles.${systemId}.componentId`);
+    const sourceId = foundry.utils.getProperty(createdData, 'flags.core.sourceId');
+    if (order.join(',') !== 'create,delete') throw new Error(`Tool replacement order was ${order.join(',')}`);
+    if (createdData?.system?.quantity !== 1) throw new Error('Tool replacement did not create quantity one');
+    if (sourceId !== fixture.uncachedReplacementUuid) throw new Error('Tool replacement did not preserve direct Item source identity');
+    if (componentIdentity) throw new Error('Direct Item replacement fabricated Component identity');
+    if (actor.items.get(owned.id)) throw new Error('Original Tool remained after successful replacement');
+    if (evidence?.[0]?.broken !== true || created?.documentName !== 'Item') {
+      throw new Error('Tool replacement did not report a successful broken Item replacement');
+    }
+    return { order, sourceId, quantity: createdData.system.quantity };
+  }, { systemId, recipeId, actorId, fixture });
+}
+
+async function waitForToolBreakageAuthority(page, systemId) {
+  try {
+    await page.waitForFunction((systemId) => {
+      const persistedAuthority = game.fabricate.getCraftingSystemManager().getSystem(systemId)?.toolBreakage?.authority;
+      let projectedAuthority = null;
+      const unsubscribe = globalThis.__fabricateSmokeManagerApp?._adminStore?.viewState?.subscribe?.((state) => {
+        projectedAuthority = state?.selectedSystem?.toolBreakage?.authority ?? null;
+      });
+      if (typeof unsubscribe === 'function') unsubscribe();
+      globalThis.__fabricateToolAuthorityObservation = { persistedAuthority, projectedAuthority };
+      return persistedAuthority === 'checkDriven' && projectedAuthority === 'checkDriven';
+    }, systemId, { timeout: 10_000, polling: 'raf' });
+  } catch (error) {
+    const observed = await page.evaluate(() => globalThis.__fabricateToolAuthorityObservation ?? null);
+    throw new Error(`Tool breakage authority did not settle to checkDriven: ${JSON.stringify(observed)}`, { cause: error });
+  } finally {
+    await page.evaluate(() => { delete globalThis.__fabricateToolAuthorityObservation; }).catch(() => {});
+  }
+}
+
+async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fixture }) {
+  // Request the prototype's outer geometry inside its exact source viewport.
+  // ApplicationV2 contributes its own frame and V13 truthfully clamps it to that
+  // viewport; capture the settled inner product rectangle rather than fabricating
+  // room outside the source. This path is shared by local and CI screenshot profiles.
+  let wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
+  await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  const liveManagerApp = await requireSingleLocator(page.locator('#fabricate-crafting-system-manager'), 'live Crafting System Manager app');
+  const manager = await requireSingleLocator(liveManagerApp.locator('.fabricate-manager'), 'live Fabricate manager');
+  const row = await requireSingleLocator(manager.locator(`[data-manager-tool-id="${fixture.toolId}"]`), 'Tool Studio fixture row');
+  await row.waitFor({ state: 'visible', timeout: 10_000 });
+  const visibleToolRows = manager.locator('.manager-tools-row');
+  const visibleToolRowCount = await visibleToolRows.count();
+  if (visibleToolRowCount !== 8) {
+    throw new Error(`Tool Studio parity library must render exactly 8 rows; found ${visibleToolRowCount}`);
+  }
+  const expectedToolNames = [
+    "Smith's Hammer",
+    'Arcane Forge',
+    "Alchemist's Supplies",
+    'Ley-Line Nexus',
+    "Master's Anvil",
+    'Moonwell',
+    'Volcanic Vent',
+    'Woodcarving Tools',
+  ];
+  const visibleToolNames = await visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
+  if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
+    throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
+  }
+  const selectTarget = row.locator('.manager-tools-select-target');
+  const enabledToggle = row.locator('.manager-tools-enabled-toggle');
+  const editButton = row.locator('.manager-icon-button');
+  await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection');
+  await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
+  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit');
+  const otherSelectTarget = visibleToolRows.nth(1).locator('.manager-tools-select-target');
+  const otherToolId = await visibleToolRows.nth(1).getAttribute('data-manager-tool-id');
+  if (!otherToolId) throw new Error('Tool Studio alternate row has no Tool ID');
+  await withSingleToolDraftTransition(
+    page,
+    otherToolId,
+    'Tool alternate-row selection',
+    () => otherSelectTarget.click(),
+    async () => {
+      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool alternate-row selection did not expose selected state');
+      }
+    },
+  );
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool parity-row selection',
+    () => selectTarget.click(),
+    async () => {
+      if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool row selection did not expose selected state');
+      }
+    },
+  );
+  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
+    throw new Error("Tool Studio parity library must select Smith's Hammer in the first row");
+  }
+  const inspectorDescription = await manager.locator('[data-tool-inspector-description]').textContent();
+  if (!inspectorDescription?.includes('well-balanced forge hammer')) {
+    throw new Error(`Tool Studio parity inspector has the wrong source description: ${inspectorDescription}`);
+  }
+  const enabledBefore = await enabledToggle.getAttribute('aria-pressed');
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle apply',
+    () => enabledToggle.click(),
+    async () => {
+      if (await enabledToggle.getAttribute('aria-pressed') === enabledBefore) {
+        throw new Error('Tool enabled toggle did not persist independently');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle restore',
+    () => enabledToggle.click(),
+    async () => {
+      if (await enabledToggle.getAttribute('aria-pressed') !== enabledBefore) {
+        throw new Error('Tool enabled toggle did not restore independently');
+      }
+    },
+  );
+  if (await liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]').count() > 0) {
+    throw new Error('Tool toggle incorrectly opened the editor');
+  }
+  await resetToolStudioScroll(page);
+  await assertToolStudioLibraryLayout(page);
+  await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', wideGeometry);
+
+  await setManagerWindowSize(page, {
+    width: 614,
+    height: 704,
+    sourceViewport: { width: 680, height: 700 },
+  });
+  await resetToolStudioScroll(page);
+  await withSingleToolDraftTransition(
+    page,
+    otherToolId,
+    'Tool 680px alternate-row selection',
+    () => visibleToolRows.nth(1).locator('.manager-tools-select-target').click(),
+    async () => {
+      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool 680px alternate-row selection did not expose selected state');
+      }
+    },
+  );
+  await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection at 680px');
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool row selection at 680px',
+    () => selectTarget.click(),
+    async () => {
+      if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool row selection at 680px did not expose selected state');
+      }
+    },
+  );
+  const selectedToolIds = await visibleToolRows.evaluateAll((rows) => rows
+    .filter((candidate) => candidate.classList.contains('is-selected'))
+    .map((candidate) => candidate.dataset.managerToolId));
+  if (JSON.stringify(selectedToolIds) !== JSON.stringify([fixture.toolId])) {
+    throw new Error(`Tool row selection at 680px did not select exactly the intended Tool: ${JSON.stringify(selectedToolIds)}`);
+  }
+  const persistedEnabledBefore = await page.evaluate(({ systemId, toolId }) => (
+    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled
+  ), { systemId, toolId: fixture.toolId });
+  await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle at 680px');
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle at 680px apply',
+    () => enabledToggle.click(),
+    () => page.waitForFunction(({ systemId, toolId, before }) => (
+      game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === !before
+    ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore }),
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle at 680px restore',
+    () => enabledToggle.click(),
+    () => page.waitForFunction(({ systemId, toolId, before }) => (
+      game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === before
+    ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore }),
+  );
+  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool Edit route at 680px',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-editor-header] h2')
+      .filter({ hasText: "Smith's Hammer" }).waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  await liveManagerApp.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool Edit route at 1280px',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
+      .waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  const editorManager = liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]');
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  // The route transition asks ApplicationV2 to adopt the editor's default size;
+  // re-apply the requested window through the live instance and retain V13's
+  // truthful viewport-clamped product geometry.
+  wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
+  const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
+  const sourceCard = editor.locator('[data-tool-source-card]');
+  await assertPointerTarget(page, sourceCard, '[data-tool-source-card]', 'Tool Item drop target');
+  const sourceDataTransfer = await page.evaluateHandle((uuid) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/plain', JSON.stringify({ type: 'Item', uuid }));
+    return dataTransfer;
+  }, fixture.sourceItemUuid);
+  try {
+    await withSingleToolStoreMutation(
+      page,
+      'stageToolDraftSource',
+      'Tool Item drop',
+      () => sourceCard.dispatchEvent('drop', { dataTransfer: sourceDataTransfer }),
+      () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
+    );
+  } finally {
+    await sourceDataTransfer.dispose();
+  }
+  const sourceUnlink = editor.locator('[data-tool-source-unlink]');
+  await assertPointerTarget(page, sourceUnlink, '[data-tool-source-unlink]', 'Tool Item unlink');
+  await withSingleToolStoreMutation(
+    page,
+    'unlinkToolDraftSource',
+    'Tool Item unlink',
+    () => sourceUnlink.click(),
+    () => sourceUnlink.waitFor({ state: 'detached', timeout: 5_000 }),
+  );
+  const sourceReplaceDetails = editor.locator('.manager-tool-source-replace');
+  const sourceReplaceDisclosure = sourceReplaceDetails.locator(':scope > summary');
+  await assertPointerTarget(page, sourceReplaceDisclosure, '.manager-tool-source-replace > summary', 'Tool Item replacement disclosure');
+  await sourceReplaceDisclosure.click();
+  const sourcePicker = editor.locator('[data-tool-source-picker]');
+  await assertPointerTarget(page, sourcePicker, '[data-tool-source-picker]', 'Tool Item picker');
+  await withSingleToolStoreMutation(
+    page,
+    'stageToolDraftSource',
+    'Tool Item picker',
+    () => selectOptionAndAssertSingleChange(
+      sourcePicker,
+      fixture.sourceItemUuid,
+      'Tool Item picker',
+      { expectRetainedValue: false },
+    ),
+    () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  if (await sourceReplaceDetails.getAttribute('open') !== null) {
+    await sourceReplaceDisclosure.click();
+  }
+  if (await sourceReplaceDetails.getAttribute('open') !== null) {
+    throw new Error('Tool Item replacement disclosure remained open after source restoration');
+  }
+  await saveToolStudioDraftIfDirty(editor);
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page);
+  await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, 'Overview parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', wideGeometry);
+  const displayLabel = editor.locator('[data-tool-label]');
+  await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-stress-long-name', wideGeometry);
+  await displayLabel.fill("Smith's Hammer");
+  await saveToolStudioDraftIfDirty(editor);
+
+  const tab = (name) => editor.locator(`#tool-tab-${name}`);
+  for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
+    await assertPointerTarget(page, tab(name), `#tool-tab-${name}`, `Tool ${name} tab`);
+  }
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 1280px');
+  await assertSavedToolStudioCapture(editor, 'Breakage parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', wideGeometry);
+  const flagBrokenChoice = editor.locator('input[name="tool-on-break"][value="flagBroken"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool flag-broken action',
+    () => flagBrokenChoice.check(),
+    async () => {
+      if (!(await flagBrokenChoice.isChecked())) throw new Error('Tool flag-broken action did not apply');
+    },
+  );
+  const initialRepairGroupCount = await editor.locator('[data-tool-repair-group]').count();
+  const addRepairGroup = editor.locator('[data-tool-repair-add-group="tags"]');
+  await assertPointerTarget(page, addRepairGroup, '[data-tool-repair-add-group="tags"]', 'Tool repair AND control');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair AND add',
+    () => addRepairGroup.click(),
+    async () => {
+      if (await editor.locator('[data-tool-repair-group]').count() !== initialRepairGroupCount + 1) {
+        throw new Error('Tool repair AND control did not add exactly one group');
+      }
+    },
+  );
+  const addedRepairGroupRemove = editor.locator('[data-tool-repair-group]').last().locator(':scope > .manager-icon-button');
+  await assertPointerTarget(page, addedRepairGroupRemove, '.manager-tool-repair-group > .manager-icon-button', 'Tool repair AND restore');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair AND restore',
+    () => addedRepairGroupRemove.click(),
+    async () => {
+      if (await editor.locator('[data-tool-repair-group]').count() !== initialRepairGroupCount) {
+        throw new Error('Tool repair AND restore did not remove exactly one group');
+      }
+    },
+  );
+  const firstRepairGroup = editor.locator('[data-tool-repair-group]').first();
+  const initialRepairOptionCount = await firstRepairGroup.locator('[data-recipe-option]').count();
+  const addRepairAlternative = firstRepairGroup.locator('[data-recipe-add="alternative-component"]');
+  await assertPointerTarget(page, addRepairAlternative, '[data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair OR add',
+    () => addRepairAlternative.click(),
+    async () => {
+      if (await firstRepairGroup.locator('[data-recipe-option]').count() !== initialRepairOptionCount + 1) {
+        throw new Error('Tool repair OR control did not add exactly one alternative');
+      }
+    },
+  );
+  const addedRepairAlternativeRemove = firstRepairGroup.locator('[data-recipe-option]').last()
+    .locator('[data-recipe-remove="alternative"]');
+  await assertPointerTarget(page, addedRepairAlternativeRemove, '[data-recipe-remove="alternative"]', 'Tool repair OR restore');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair OR restore',
+    () => addedRepairAlternativeRemove.click(),
+    async () => {
+      if (await firstRepairGroup.locator('[data-recipe-option]').count() !== initialRepairOptionCount) {
+        throw new Error('Tool repair OR restore did not remove exactly one alternative');
+      }
+    },
+  );
+  await assertNoScreenshotOverlays(page);
+  await scrollToolEditorPanelToReveal(
+    page,
+    editor,
+    '[data-tool-repair-group] [data-recipe-add="alternative-component"]',
+    'Populated repair',
+  );
+  await captureToolStudioProduct(page, 'manager-tool-stress-repair', wideGeometry);
+
+  const replaceWithChoice = editor.locator('input[name="tool-on-break"][value="replaceWith"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool replace-with action',
+    () => replaceWithChoice.check(),
+    async () => {
+      if (!(await replaceWithChoice.isChecked())) throw new Error('Tool replace-with action did not apply');
+    },
+  );
+  const replacementGrid = editor.locator('[data-tool-replacement-target]');
+  await replacementGrid.waitFor({ state: 'visible', timeout: 5_000 });
+  const replacementType = replacementGrid.locator('[data-tool-replacement-type]');
+  let replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
+  await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
+  const componentTarget = replacementPicker;
+  await assertPointerTarget(page, componentTarget, '[data-tool-replacement-target] select', 'Component replacement picker');
+  const componentOption = await componentTarget.locator('option:not([value=""])').first().getAttribute('value');
+  if (!componentOption) throw new Error('Tool Studio Component picker has no managed Component options');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Component replacement selection',
+    () => selectOptionAndAssertSingleChange(componentTarget, componentOption, 'Component replacement selection'),
+    async () => {
+      if (await componentTarget.inputValue() !== componentOption) {
+        throw new Error('Component replacement selection did not update the draft control');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement route',
+    () => selectOptionAndAssertSingleChange(replacementType, 'item', 'Direct Item replacement route'),
+    async () => {
+      if (await replacementType.inputValue() !== 'item') {
+        throw new Error('Direct Item replacement route did not update the target type');
+      }
+    },
+  );
+  replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
+  await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
+  const itemTarget = replacementPicker;
+  await assertPointerTarget(page, itemTarget, '[data-tool-replacement-target] select', 'direct Item replacement picker');
+  const itemOption = await itemTarget.locator('option:not([value=""])').first().getAttribute('value');
+  if (!itemOption) throw new Error('Tool Studio direct Item picker has no world Item options');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement selection',
+    () => selectOptionAndAssertSingleChange(itemTarget, itemOption, 'Direct Item replacement selection'),
+    async () => {
+      if (await itemTarget.inputValue() !== itemOption) {
+        throw new Error('Direct Item replacement selection did not update the draft control');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement unlink',
+    () => selectOptionAndAssertSingleChange(itemTarget, '', 'Direct Item replacement unlink'),
+    async () => {
+      if (await itemTarget.inputValue() !== '') {
+        throw new Error('Direct Item replacement unlink did not clear the draft control');
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Direct Item replacement restore',
+    () => selectOptionAndAssertSingleChange(itemTarget, itemOption, 'Direct Item replacement restore'),
+    async () => {
+      if (await itemTarget.inputValue() !== itemOption) {
+        throw new Error('Direct Item replacement restore did not update the draft control');
+      }
+    },
+  );
+  await assertNoScreenshotOverlays(page);
+  await scrollToolEditorPanelToReveal(
+    page,
+    editor,
+    '[data-tool-replacement-target] [data-tool-replacement-picker]',
+    'Direct Item replacement',
+  );
+  await captureToolStudioProduct(page, 'manager-tool-stress-replacement', wideGeometry);
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+
+  const checkDriven = await requireSingleLocator(
+    manager.locator('[data-manager-tools-authority] label:has(input[value="checkDriven"])'),
+    'check-driven authority control',
+  );
+  await assertPointerTarget(page, checkDriven, '[data-manager-tools-authority] label', 'check-driven authority');
+  await withSingleToolStoreMutation(
+    page,
+    'setToolBreakageAuthority',
+    'check-driven authority',
+    () => checkDriven.click(),
+    () => waitForToolBreakageAuthority(page, systemId),
+  );
+  await requireSingleLocator(manager, 'live Fabricate manager before check-driven Edit');
+  const checkDrivenEditButton = await requireSingleLocator(
+    manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`),
+    'check-driven Tool Edit button',
+  );
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'check-driven Tool Edit route',
+    () => checkDrivenEditButton.click(),
+    () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
+  await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'check-driven Tool Breakage tab');
+  const immuneChoice = editor.locator('input[name="tool-check-breakable"][value="immune"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'check-driven Immune choice',
+    () => immuneChoice.check(),
+    async () => {
+      if (!(await immuneChoice.isChecked())) throw new Error('check-driven Immune choice did not apply');
+    },
+  );
+  const immuneOnBreakFieldset = editor.locator('[data-tool-breakage-tab]:has(input[name="tool-check-breakable"][value="immune"]:checked) [data-tool-on-break-controls]:disabled');
+  await immuneOnBreakFieldset.waitFor({ state: 'visible', timeout: 10_000 });
+  await requireSingleLocator(immuneOnBreakFieldset, 'check-driven immune on-break fieldset');
+  await assertDisabledToolOnBreakFieldset(immuneOnBreakFieldset);
+  await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-stress-immune', wideGeometry);
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  const toolSpecific = manager.locator('[data-manager-tools-authority] label:has(input[value="toolSpecific"])');
+  await withSingleToolStoreMutation(
+    page,
+    'setToolBreakageAuthority',
+    'tool-specific authority restore',
+    () => toolSpecific.click(),
+    () => page.waitForFunction((id) => (
+      game.fabricate.getCraftingSystemManager().getSystem(id)?.toolBreakage?.authority === 'toolSpecific'
+    ), systemId, { timeout: 10_000, polling: 'raf' }),
+  );
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'tool-specific Tool Edit route',
+    () => manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click(),
+    () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'tool-specific Tool Breakage tab');
+  const destroyChoice = editor.locator('input[name="tool-on-break"][value="destroy"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool destroy action restore',
+    () => destroyChoice.check(),
+    async () => {
+      if (!(await destroyChoice.isChecked())) throw new Error('Tool destroy action did not restore');
+    },
+  );
+  await saveToolStudioDraftIfDirty(editor);
+
+  await tab('requirements').click();
+  await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  if (await editor.locator('[data-tool-prerequisite-row]').count() !== 5) {
+    throw new Error('Tool Studio parity Requirements must render exactly 5 prerequisite rows');
+  }
+  const expectedPrerequisiteNames = [
+    'Expert Crafter',
+    "Proficient with Smith's Tools",
+    'Attuned to the Weave',
+    'Strength 13 or higher',
+    'Trained in Arcana',
+  ];
+  const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] strong').allTextContents();
+  if (JSON.stringify(visiblePrerequisiteNames) !== JSON.stringify(expectedPrerequisiteNames)) {
+    throw new Error(`Tool Studio parity prerequisite order drifted: ${JSON.stringify(visiblePrerequisiteNames)}`);
+  }
+  await assertPointerTarget(page, editor.locator('[data-tool-prerequisites-enabled]'), '[data-tool-prerequisites-enabled]', 'Tool prerequisite toggle');
+  await assertPointerTarget(page, editor.locator('[data-tool-bonus-enabled]'), '[data-tool-bonus-enabled]', 'Tool bonus toggle');
+  await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, 'Requirements parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-04-requirements-1280x720', wideGeometry);
+
+  await tab('validation').click();
+  await editor.locator('[data-tool-validation-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  if (await editor.locator('[data-first-validation-failure]').count() !== 0) {
+    throw new Error('Tool Studio parity Validation must be the all-pass state');
+  }
+  await assertSavedToolStudioCapture(editor, 'Validation parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', wideGeometry);
+  await tab('requirements').click();
+  await editor.locator('[data-tool-bonus-expression]').fill('');
+  await tab('validation').click();
+  await editor.locator('[data-first-validation-failure]').waitFor({ state: 'visible', timeout: 5_000 });
+  await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', wideGeometry);
+  await tab('requirements').click();
+  await editor.locator('[data-tool-bonus-expression]').fill('@prof');
+  await saveToolStudioDraftIfDirty(editor);
+  await tab('breakage').click();
+  await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  const narrowGeometry = await setManagerWindowSize(page, {
+    width: 834,
+    height: 704,
+    sourceViewport: { width: 900, height: 700 },
+  });
+  await editor.locator('[data-tool-editor-header]').waitFor({ state: 'visible', timeout: 5_000 });
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page, { stacked: false });
+  await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, '832px Breakage parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry);
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 900px');
+  await toggleToolControlAndRestore(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 900px');
+  await saveToolStudioDraftIfDirty(editor);
+  await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 900px');
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click();
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements restore at 900px');
+
+  await setManagerWindowSize(page, {
+    width: 614,
+    height: 704,
+    sourceViewport: { width: 680, height: 700 },
+  });
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page, { stacked: true });
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 680px');
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 680px');
+  await toggleToolControlAndRestore(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 680px');
+  await saveToolStudioDraftIfDirty(editor);
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage capture restore at 680px');
+  await resetToolStudioScroll(page);
+  await screenshot(page, 'manager-tool-stress-wrapping-680', {
+    clip: { x: 0, y: 0, width: 680, height: 700 },
+  });
+  await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 680px');
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await openManagerRecipeEditor(page, recipeName);
+  await page.locator('[data-recipe-tab-button="tools"]').first().click();
+  const bonusMode = page.locator(`[data-recipe-tool-bonus-mode="${fixture.toolId}"]`).first();
+  await bonusMode.waitFor({ state: 'visible', timeout: 5_000 });
+  await assertPointerTarget(page, bonusMode, '[data-recipe-tool-bonus-mode]', 'recipe Tool bonus mode');
+  await bonusMode.selectOption('always');
+  await bonusMode.selectOption('highestOnly');
+
+  const saveRecipe = page.locator(
+    '.fabricate-manager .manager-header-actions .manager-button:has-text("Save recipe")',
+  ).first();
+  await saveRecipe.waitFor({ state: 'visible', timeout: 5_000 });
+  await saveRecipe.click();
+  await page.locator('.fabricate-manager[data-manager-view="recipe-edit"] .manager-chip:has-text("Unsaved")')
+    .waitFor({ state: 'detached', timeout: 10_000 });
+
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+  await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await page.locator('[data-checks-tab-button="crafting"]').first().click();
+  const natToggle = page.locator('[data-check-nat-stepping] input[type="checkbox"]').first();
+  await natToggle.waitFor({ state: 'visible', timeout: 5_000 });
+  await assertPointerTarget(page, natToggle, '[data-check-nat-stepping]', 'relative natural stepping');
+  const natBefore = await natToggle.isChecked();
+  await natToggle.click();
+  await natToggle.click();
+  if (await natToggle.isChecked() !== natBefore) throw new Error('Natural stepping toggle did not restore');
+  await page.evaluate(async (id) => {
+    await game.settings.set('fabricate', 'lastManagedCraftingSystem', id);
+  }, systemId);
 }
 
 /**
@@ -7101,18 +8795,45 @@ async function main() {
         await screenshot(page, 'manager-gathering-settings');
         }
 
-        // ── D0 section: tools + system-overview + interactables (issue #826) ──
-        // Enters via an absolute Tools nav click; the system-overview and
-        // interactables sub-blocks switch systems / open independent apps and
-        // restore the smoke-system selection + active scene inline.
+        // ── D0 section: Tool Studio (issue #784) ─────────────────────────────
+        // Screenshots-profile only scoping can run this section independently of all
+        // other D0 sections. Its setup snapshots every persisted writer it touches and
+        // the finally restore makes the section net-zero even when a capture fails.
+        if (shouldRunScreenshotSection('tools')) {
+          let toolStudioFixture = null;
+          try {
+            toolStudioFixture = await setupToolStudioFixture(page, {
+              systemId: craftingSetup.systemId,
+              recipeId: craftingSetup.healingPotionRecipeId,
+            });
+            await exerciseToolStudioPointerTargets(page, {
+              systemId: craftingSetup.systemId,
+              recipeName: 'Brew Healing Potion',
+              fixture: toolStudioFixture,
+            });
+            await verifyToolStudioLiveReplacement(page, {
+              systemId: craftingSetup.systemId,
+              recipeId: craftingSetup.healingPotionRecipeId,
+              actorId: cleanup.crafterId,
+              fixture: toolStudioFixture,
+            });
+            results.steps.push({ step: 'tool-studio-evidence', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'tool-studio-evidence', passed: false, error: err.message });
+            throw err;
+          } finally {
+            await restoreToolStudioFixture(page, {
+              systemId: craftingSetup.systemId,
+              recipeId: craftingSetup.healingPotionRecipeId,
+              fixture: toolStudioFixture,
+            });
+          }
+        }
+
+        // ── D0 section: system-overview + interactables (issue #826) ─────────
+        // The sub-blocks switch systems / open independent apps and restore the
+        // smoke-system selection + active scene inline.
         if (shouldRunScreenshotSection('overview-interactables')) {
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager .manager-tools-row:has-text("Herbalist Sickle")').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertManagerLayoutStable(page, 'tools normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-tools-normal');
 
         // ── System Overview tabbed page + system-blocker banner (issue 429 PR-2) ─
         // Select the deliberately-broken "Broken Workshop" system (progressive
@@ -9423,6 +11144,7 @@ async function main() {
     // signals — see AGENTS.md for how to read them.
     results.degraded = degraded;
     results.rendererCrashed = Boolean(results.rendererCrashed);
+    results.screenshotRun = screenshotRunIdentity;
     results.waivedConsoleErrors = waivedConsoleErrors;
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
@@ -9457,6 +11179,13 @@ async function main() {
     await writeFile(
       join(RESULTS_DIR, 'summary.json'),
       JSON.stringify(results, null, 2)
+    );
+    await writeFile(
+      join(RESULTS_DIR, 'screenshot-manifest.json'),
+      JSON.stringify({
+        ...screenshotRunIdentity,
+        captures: screenshotManifestEntries,
+      }, null, 2)
     );
 
     // Write console log
