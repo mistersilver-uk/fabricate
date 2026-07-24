@@ -2,10 +2,9 @@ name: CI
 
 on:
   pull_request:
-    # `edited` lets title/screenshot checks re-run when the PR title or body is
-    # fixed after opening. The expensive unit-tests job opts out of `edited`
-    # (see its `if:`), so description tweaks only re-run the cheap metadata jobs.
-    types: [opened, synchronize, reopened, edited]
+    # `edited` re-runs only title/screenshot metadata checks. `ready_for_review`
+    # starts a fresh full gate run after the draft-head preflight.
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches:
       - main
@@ -13,7 +12,8 @@ on:
       - '[0-9]+.[0-9]+.x'
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
+  # Metadata edits must not cancel an in-flight code-gate run for the same PR.
+  group: ci-${{ github.event.pull_request.number || github.sha }}-${{ github.event.action == 'edited' && 'metadata' || 'code' }}
   cancel-in-progress: true
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
   unit-tests:
     # Skip on `edited` PR events: editing the title/body doesn't change the head
     # commit, so the existing result for that SHA still stands. Runs on push and
-    # all other PR events (opened/synchronize/reopened).
+    # all other PR events, including `ready_for_review`.
     if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -82,6 +82,7 @@ jobs:
   validate-bindings:
     # Pure-Node consistency check for the agent role bindings (skills <-> Codex
     # <-> Claude <-> AGENTS.md table). No install needed — the script has no deps.
+    if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
