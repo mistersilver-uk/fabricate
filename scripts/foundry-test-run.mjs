@@ -5019,7 +5019,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await saveToolStudioDraftIfDirty(editor);
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage capture restore at 680px');
   await resetToolStudioScroll(page);
-  await screenshot(page, 'manager-tool-stress-wrapping-680');
+  await screenshot(page, 'manager-tool-stress-wrapping-680', {
+    clip: { x: 0, y: 0, width: 680, height: 700 },
+  });
   await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 680px');
   await editor.locator('[data-tool-editor-back]').click();
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });

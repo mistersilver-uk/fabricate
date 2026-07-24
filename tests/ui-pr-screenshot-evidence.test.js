@@ -98,7 +98,7 @@ const TOOL_STUDIO_VIEWS = [
   ['stress-replacement', 'manager-tool-stress-replacement', 1212, 682],
   ['stress-immune', 'manager-tool-stress-immune', 1212, 682],
   ['stress-invalid-validation', 'manager-tool-stress-invalid-validation', 1212, 682],
-  ['stress-wrapping-680', 'manager-tool-stress-wrapping-680', 612, 662],
+  ['stress-wrapping-680', 'manager-tool-stress-wrapping-680', 680, 700],
 ];
 
 const PNG_FIXTURES = new Map();
