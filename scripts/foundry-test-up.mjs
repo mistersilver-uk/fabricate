@@ -17,6 +17,10 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  prepareFoundryData,
+  startPreparedFoundryContainer,
+} from './lib/foundryDataPreparation.js';
 import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -133,6 +137,18 @@ function getContainerStatus() {
   return (result.stdout ?? '').trim() || null;
 }
 
+const cachedContainer = {
+  inspectStatus: getContainerStatus,
+  stop() {
+    process.stdout.write(`Stopping running Foundry container ${CONTAINER_NAME} before data setup...\n`);
+    compose('stop');
+  },
+  restart(status) {
+    process.stdout.write(`Starting cached Foundry container ${CONTAINER_NAME} (${status}).\n`);
+    compose('start');
+  }
+};
+
 function getContainerHostPort() {
   // NetworkSettings.Ports is the live binding (only populated when the
   // container has run at least once). HostConfig.PortBindings is the
@@ -222,24 +238,32 @@ async function main() {
     process.env.FOUNDRY_IMAGE = DEFAULT_FOUNDRY_IMAGE;
   }
 
-  // Ensure game systems are downloaded
-  await timed('fetch-systems', () => {
-    process.stdout.write('Fetching game systems...\n');
-    execSync(`"${process.execPath}" "${join(__dirname, 'foundry-fetch-systems.mjs')}"`, {
-      cwd: ROOT,
-      stdio: 'inherit',
-      env: process.env
-    });
-  });
+  // Both local and CI runs use this same per-worktree identity and recovery
+  // boundary. A live container must release its bind mount before setup replaces
+  // smoke data; a failed synchronous stop aborts before either preparation step.
+  let existingStatus = await prepareFoundryData({
+    cachedContainer,
+    async replaceBoundData() {
+      // Ensure game systems are downloaded
+      await timed('fetch-systems', () => {
+        process.stdout.write('Fetching game systems...\n');
+        execSync(`"${process.execPath}" "${join(__dirname, 'foundry-fetch-systems.mjs')}"`, {
+          cwd: ROOT,
+          stdio: 'inherit',
+          env: process.env
+        });
+      });
 
-  // Assemble the data directory with symlinks
-  await timed('setup-data', () => {
-    process.stdout.write('Setting up data directory...\n');
-    execSync(`"${process.execPath}" "${join(__dirname, 'foundry-setup-data.mjs')}"`, {
-      cwd: ROOT,
-      stdio: 'inherit',
-      env: process.env
-    });
+      // Assemble the data directory with symlinks
+      await timed('setup-data', () => {
+        process.stdout.write('Setting up data directory...\n');
+        execSync(`"${process.execPath}" "${join(__dirname, 'foundry-setup-data.mjs')}"`, {
+          cwd: ROOT,
+          stdio: 'inherit',
+          env: process.env
+        });
+      });
+    },
   });
 
   // Set container user to match the host user so bind-mounted volumes are writable.
@@ -281,7 +305,6 @@ async function main() {
   // Reuse the stopped container by default. The felddy image stores the
   // extracted Foundry application in the container filesystem, so preserving
   // the container avoids repeated release-service requests that can hit 429s.
-  let existingStatus = getContainerStatus();
   const recreate = process.env.FOUNDRY_RECREATE === '1';
   if (recreate && existingStatus) {
     process.stdout.write('FOUNDRY_RECREATE=1 set; removing cached Foundry container...\n');
@@ -303,15 +326,14 @@ async function main() {
 
   const cachedStatus = existingStatus;
   await timed('compose-up', () => {
-    if (cachedStatus === 'running') {
-      process.stdout.write(`Reusing running Foundry container ${CONTAINER_NAME}.\n`);
-    } else if (cachedStatus) {
-      process.stdout.write(`Starting cached Foundry container ${CONTAINER_NAME} (${cachedStatus}).\n`);
-      compose('start');
-    } else {
-      process.stdout.write('Creating Foundry container...\n');
-      compose('up -d');
-    }
+    startPreparedFoundryContainer({
+      cachedContainerStatus: cachedStatus,
+      cachedContainer,
+      createContainer() {
+        process.stdout.write('Creating Foundry container...\n');
+        compose('up -d');
+      },
+    });
   });
 
   // Wait for health check (max 120 seconds)
