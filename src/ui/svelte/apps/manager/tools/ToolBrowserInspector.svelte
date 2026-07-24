@@ -12,7 +12,6 @@
     managedItems = [],
     prerequisiteOptions = [],
     authority = 'toolSpecific',
-    onEdit = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -144,10 +143,6 @@
         <span><strong>{bonusSummary().heading}</strong><small>{bonusSummary().detail}</small></span>
       </div>
     </div>
-    <button type="button" class="manager-button manager-tool-inspector-edit" data-tool-inspector-edit onclick={() => onEdit(tool.id)}>
-      <i class="fas fa-pen" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Tools.Edit', 'Edit Tool')}</span>
-    </button>
   </section>
 {:else}
   <section class="manager-inspector-card manager-tool-browser-inspector is-empty" data-tool-browser-inspector-empty>

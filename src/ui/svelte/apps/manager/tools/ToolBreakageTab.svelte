@@ -69,9 +69,9 @@
   }
   function breakageModeDescription(mode) {
     return {
-      limitedUses: text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUsesHint', 'Break after a fixed number of uses.'),
-      breakageChance: text('FABRICATE.Admin.Manager.Tools.BreakageChanceHint', 'Roll a percentage chance after each use.'),
-      diceExpression: text('FABRICATE.Admin.Manager.Tools.BreakageDiceHint', 'Roll a formula against a break threshold.'),
+      limitedUses: text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUsesHint', 'A fixed number of uses, then it breaks.'),
+      breakageChance: text('FABRICATE.Admin.Manager.Tools.BreakageChanceHint', 'A % chance to break each use.'),
+      diceExpression: text('FABRICATE.Admin.Manager.Tools.BreakageDiceHint', 'Roll a separate breakage check.'),
     }[mode];
   }
   function breakageModeIcon(mode) {
@@ -83,16 +83,16 @@
   }
   function onBreakModeLabel(mode) {
     return {
-      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy item'),
+      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy the item'),
       flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlag', 'Mark as broken'),
       replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with item'),
     }[mode];
   }
   function onBreakModeDescription(mode) {
     return {
-      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroyHint', "The Item is removed from the actor's inventory."),
-      flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlagHint', 'The Item remains but is flagged as broken.'),
-      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplaceHint', 'The Item is replaced after it breaks.'),
+      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroyHint', 'The tool is consumed and removed.'),
+      flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlagHint', 'Sets a broken flag; appends " (Broken)".'),
+      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplaceHint', 'Swap it for another item.'),
     }[mode];
   }
   function onBreakModeIcon(mode) {
@@ -108,7 +108,7 @@
   <section class="manager-tool-authority-readonly" data-tool-breakage-authority-explanation>
     <span class="manager-tool-authority-icon"><i class="fas fa-sliders" aria-hidden="true"></i></span>
     <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</p><h3>{authority === 'checkDriven' ? text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven') : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')}</h3><p>{text('FABRICATE.Admin.Manager.Tools.Editor.AuthorityExplanation', 'Set for every Tool from the Tools library. Each Tool keeps its own settings for both models.')}</p></div>
-    <span class="manager-chip is-neutral"><i class="fas fa-lock" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System setting')}</span>
+    <span class="manager-chip is-neutral"><i class="fas fa-lock" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System-wide')}</span>
   </section>
 
   <section class="manager-tool-breakage-method">

@@ -25,7 +25,14 @@ async function readRenderedToolGeometry(width, view) {
       ? `<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
           <header class="manager-tool-edit-header" data-tool-editor-header><div class="manager-tool-edit-header-main"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2>Smith's Hammer with a deliberately long localized identity</h2><p>Linked game-world Item</p></div></div><div class="manager-tool-edit-actions"><button class="manager-button">Back</button><button class="manager-button">Delete</button><button class="manager-button" data-tool-editor-save>Save Tool</button></div></div></header>
           <div class="manager-tool-editor-tabs"><button>Overview</button><button>Breakage</button><button>Requirements</button><button>Validation</button></div>
-          <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack"><section style="height:540px">Editor</section></div></section><aside class="manager-tool-preview" data-tool-behavior-preview><div class="manager-tool-preview-identity"><div><h3>Smith's Hammer</h3></div></div></aside></div>
+          <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
+            <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><div class="manager-tool-choice-grid">
+              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">A</span><span class="manager-tool-choice-copy"><strong>Limited uses</strong><small>A fixed number of uses, then it breaks.</small></span></label>
+              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">B</span><span class="manager-tool-choice-copy"><strong>Break chance</strong><small>A % chance to break each use.</small></span></label>
+              <label class="manager-tool-choice-card"><span class="manager-tool-choice-icon">C</span><span class="manager-tool-choice-copy"><strong>Dice expression</strong><small>Roll a separate breakage check.</small></span></label>
+            </div></section>
+          </div></section><aside class="manager-tool-preview" data-tool-behavior-preview><div class="manager-tool-preview-identity"><div><h3>Smith's Hammer</h3></div></div><ul class="manager-tool-preview-rules"><li>5 uses</li></ul></aside></div>
         </main>`
       : `<main class="manager-main manager-tools-main"><div class="manager-tools-library-list"><article data-manager-tool-id="hammer"><button class="manager-tools-select-target"><span></span><span class="manager-tools-library-copy"><strong>Smith's Hammer</strong></span></button><div class="manager-tools-library-actions"></div></article></div></main><aside class="manager-inspector"><section data-tool-browser-inspector>Inspector</section></aside>`;
     await page.setContent(`<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="${view}"><div class="manager-body"><aside class="manager-rail">Rail</aside>${editor}</div></div></div>`);
@@ -33,6 +40,10 @@ async function readRenderedToolGeometry(width, view) {
       const rect = (selector) => {
         const value = document.querySelector(selector)?.getBoundingClientRect();
         return value ? { left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width } : null;
+      };
+      const styleValue = (selector, property) => {
+        const value = document.querySelector(selector);
+        return value ? getComputedStyle(value)[property] : null;
       };
       const root = document.querySelector('.fabricate-manager');
       return {
@@ -45,6 +56,20 @@ async function readRenderedToolGeometry(width, view) {
         tabs: rect('.manager-tool-editor-tabs'),
         panel: rect('[data-tool-editor-panel]'),
         preview: rect('[data-tool-behavior-preview]'),
+        authority: rect('.manager-tool-authority-readonly'),
+        authorityTitle: rect('.manager-tool-authority-readonly h3'),
+        authorityCopy: rect('.manager-tool-authority-readonly p:last-child'),
+        sectionHeading: rect('.manager-tool-section-heading'),
+        sectionTitle: rect('.manager-tool-section-heading h3'),
+        sectionHint: rect('.manager-tool-section-heading > p'),
+        choice: rect('.manager-tool-choice-card'),
+        choiceIcon: rect('.manager-tool-choice-icon'),
+        choiceTitle: rect('.manager-tool-choice-copy strong'),
+        panelPaddingInline: Number.parseFloat(styleValue('[data-tool-editor-panel]', 'paddingLeft')),
+        authorityTitleSize: Number.parseFloat(styleValue('.manager-tool-authority-readonly h3', 'fontSize')),
+        authorityCopySize: Number.parseFloat(styleValue('.manager-tool-authority-readonly p:last-child', 'fontSize')),
+        previewBackground: styleValue('[data-tool-behavior-preview]', 'backgroundColor'),
+        previewCardBackground: styleValue('.manager-tool-preview-identity', 'backgroundColor'),
         overflow: root.scrollWidth > root.clientWidth,
       };
     });
@@ -88,6 +113,22 @@ test('Tool editor header spans the 210px/editor/320px triptych and stacks only b
   const wrapped = await readRenderedToolGeometry(680, 'tool-edit');
   assert.ok(wrapped.actions.bottom <= wrapped.header.bottom + 1);
   assert.equal(wrapped.overflow, false);
+});
+
+test('Tool Breakage preserves compact vertical cards and a stacked heading at the 832px triptych', async () => {
+  const wide = await readRenderedToolGeometry(1212, 'tool-edit');
+  const narrow = await readRenderedToolGeometry(832, 'tool-edit');
+
+  assert.ok(wide.choiceIcon.bottom <= wide.choiceTitle.top + 1, 'wide choice cards keep icon above copy');
+  assert.ok(narrow.choiceIcon.bottom <= narrow.choiceTitle.top + 1, '832px choice cards keep icon above copy');
+  assert.ok(narrow.choice.width >= 78 && narrow.choice.width <= 82, `832px choice width is ${narrow.choice.width}`);
+  assert.ok(narrow.choice.bottom - narrow.choice.top >= 150 && narrow.choice.bottom - narrow.choice.top <= 158);
+  assert.ok(narrow.sectionHint.top >= narrow.sectionTitle.bottom - 1, '832px breakage hint follows the title');
+  assert.ok(narrow.authority.bottom - narrow.authority.top <= 125, '832px authority summary stays compact');
+  assert.ok(narrow.panelPaddingInline >= 20 && narrow.panelPaddingInline <= 22);
+  assert.ok(Math.abs(narrow.authorityTitleSize - 12.48) <= 0.6);
+  assert.ok(Math.abs(narrow.authorityCopySize - 10.24) <= 0.6);
+  assert.notEqual(narrow.previewBackground, narrow.previewCardBackground);
 });
 
 test('manager root defines a scoped responsive app container', () => {

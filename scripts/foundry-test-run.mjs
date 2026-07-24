@@ -1682,6 +1682,25 @@ async function assertSinglePointerDispatch(page, locator, label) {
   }
 }
 
+async function saveToolStudioDraftIfDirty(editor) {
+  if (await editor.locator('[data-tool-editor-dirty]').count() === 0) return;
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-dirty]').waitFor({
+    state: 'detached',
+    timeout: 10_000,
+  });
+}
+
+async function assertSavedToolStudioCapture(editor, label) {
+  if (await editor.locator('[data-tool-editor-dirty]').count() > 0) {
+    throw new Error(`${label} must capture a saved Tool draft`);
+  }
+  const status = (await editor.locator('[data-tool-editor-status]').textContent())?.trim();
+  if (status !== 'All changes saved') {
+    throw new Error(`${label} must expose All changes saved status; found ${JSON.stringify(status)}`);
+  }
+}
+
 async function requireSingleLocator(locator, label) {
   const count = await locator.count();
   if (count !== 1) {
@@ -3694,11 +3713,11 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     const components = (system.components || []).filter((component) => component.id !== source.id);
     if (components.length < 2) throw new Error('Tool Studio repair fixture needs two managed Components');
     const parityPrerequisites = [
-      [prerequisiteId, "Proficient with Smith's Tools", 'prof', 'gte', 1],
       ['smoke-tool-studio-expert', 'Expert Crafter', 'prof', 'gte', 4],
-      ['smoke-tool-studio-strong', 'Strength 13 or higher', 'abilities.str.value', 'gte', 13],
+      [prerequisiteId, "Proficient with Smith's Tools", 'prof', 'gte', 1],
       ['smoke-tool-studio-weave', 'Attuned to the Weave', 'abilities.int.mod', 'gte', 2],
-      ['smoke-tool-studio-arena', 'Trained for Arenas', 'skills.arc.value', 'gte', 1],
+      ['smoke-tool-studio-strong', 'Strength 13 or higher', 'abilities.str.value', 'gte', 13],
+      ['smoke-tool-studio-arena', 'Trained in Arcana', 'skills.arc.value', 'gte', 1],
     ].map(([id, name, path, op, value]) => ({
       id,
       name,
@@ -3986,6 +4005,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, 'Overview parity');
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', { width: 1212, height: 686 });
   const displayLabel = editor.locator('[data-tool-label]');
@@ -3993,6 +4013,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-stress-long-name', { width: 1212, height: 686 });
   await displayLabel.fill("Smith's Hammer");
+  await saveToolStudioDraftIfDirty(editor);
 
   const tab = (name) => editor.locator(`#tool-tab-${name}`);
   for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
@@ -4000,6 +4021,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   await tab('breakage').click();
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await assertSavedToolStudioCapture(editor, 'Breakage parity');
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', { width: 1212, height: 686 });
   await editor.locator('input[name="tool-on-break"][value="flagBroken"]').check();
@@ -4077,15 +4099,28 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
   await tab('breakage').click();
   await editor.locator('input[name="tool-on-break"][value="destroy"]').check();
+  await saveToolStudioDraftIfDirty(editor);
 
   await tab('requirements').click();
   await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
   if (await editor.locator('[data-tool-prerequisite-row]').count() !== 5) {
     throw new Error('Tool Studio parity Requirements must render exactly 5 prerequisite rows');
   }
+  const expectedPrerequisiteNames = [
+    'Expert Crafter',
+    "Proficient with Smith's Tools",
+    'Attuned to the Weave',
+    'Strength 13 or higher',
+    'Trained in Arcana',
+  ];
+  const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] strong').allTextContents();
+  if (JSON.stringify(visiblePrerequisiteNames) !== JSON.stringify(expectedPrerequisiteNames)) {
+    throw new Error(`Tool Studio parity prerequisite order drifted: ${JSON.stringify(visiblePrerequisiteNames)}`);
+  }
   await assertPointerTarget(page, editor.locator('[data-tool-prerequisites-enabled]'), '[data-tool-prerequisites-enabled]', 'Tool prerequisite toggle');
   await assertPointerTarget(page, editor.locator('[data-tool-bonus-enabled]'), '[data-tool-bonus-enabled]', 'Tool bonus toggle');
   await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, 'Requirements parity');
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-04-requirements-1280x720', { width: 1212, height: 686 });
 
@@ -4094,6 +4129,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (await editor.locator('[data-first-validation-failure]').count() !== 0) {
     throw new Error('Tool Studio parity Validation must be the all-pass state');
   }
+  await assertSavedToolStudioCapture(editor, 'Validation parity');
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', { width: 1212, height: 686 });
   await tab('requirements').click();
@@ -4105,6 +4141,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', { width: 1212, height: 686 });
   await tab('requirements').click();
   await editor.locator('[data-tool-bonus-expression]').fill('@prof');
+  await saveToolStudioDraftIfDirty(editor);
   await tab('breakage').click();
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
   await setManagerWindowSize(page, { width: 834, height: 704 });
@@ -4112,6 +4149,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page, { stacked: false });
   await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, '832px Breakage parity');
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', { width: 832, height: 666 });
   await assertSinglePointerDispatch(page, editor.locator('[data-tool-editor-back]'), 'Tool Back at 900px');

@@ -341,7 +341,21 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     'the hidden replacement picker must be exercised through its compact disclosure and closed before parity capture',
   );
   assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
+  assert.match(
+    toolStudioWalk,
+    /const expectedPrerequisiteNames = \[[\s\S]*?'Expert Crafter'[\s\S]*?"Proficient with Smith's Tools"[\s\S]*?'Attuned to the Weave'[\s\S]*?'Strength 13 or higher'[\s\S]*?'Trained in Arcana'[\s\S]*?Tool Studio parity prerequisite order drifted/,
+  );
   assert.ok(HARNESS.includes("editor.locator('[data-first-validation-failure]').count() !== 0"));
+  assert.match(
+    toolStudioWalk,
+    /input\[name="tool-on-break"\]\[value="destroy"\][\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('requirements'\)/,
+    'Requirements parity must be captured from a saved destroy-action baseline',
+  );
+  assert.match(
+    toolStudioWalk,
+    /data-tool-bonus-expression[\s\S]*?fill\('@prof'\)[\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('breakage'\)/,
+    'the narrow Breakage parity frame must restore and save the @prof baseline',
+  );
   for (const label of [
     'manager-tool-parity-01-library-1280x720',
     'manager-tool-parity-02-overview-1280x720',

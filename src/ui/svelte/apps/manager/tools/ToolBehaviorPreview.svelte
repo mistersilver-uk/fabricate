@@ -9,7 +9,7 @@
     toolSourceUuid,
   } from './toolStudio.js';
 
-  let { tool = null, authority = 'toolSpecific', managedItems = [] } = $props();
+  let { tool = null, authority = 'toolSpecific', managedItems = [], activeTab = 'overview' } = $props();
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -50,7 +50,7 @@
     return formattedText(
       'FABRICATE.Admin.Manager.Tools.BreakageSummaryLimited',
       { count: currentTool.breakage.maxUses },
-      '{count} max uses'
+      '{count} uses'
     );
   }
   function localizedOnBreak(currentTool, isImmune) {
@@ -62,7 +62,7 @@
     }
     const summary = toolOnBreakSummary(currentTool);
     const labels = {
-      destroy: ['OnBreakDestroy', 'Destroy item'],
+      destroy: ['OnBreakDestroy', 'Destroy the item'],
       flagBroken: ['OnBreakFlag', 'Mark as broken'],
       replaceWith: ['OnBreakReplace', 'Replace with item'],
     };
@@ -82,16 +82,27 @@
   const prerequisiteLabel = $derived(
     tool?.prerequisites?.enabled
       ? formattedText(
-          'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteCount',
+          tool.prerequisites.ids?.length === 1
+            ? 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteOne'
+            : 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteCount',
           { count: tool.prerequisites.ids?.length || 0 },
-          '{count} required'
+          tool.prerequisites.ids?.length === 1 ? '1 prerequisite' : '{count} prerequisites'
         )
+      : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+  );
+  const bonusValue = $derived(
+    tool?.bonus?.enabled
+      ? tool.bonus.expression ||
+          text('FABRICATE.Admin.Manager.Tools.Editor.StatusIncomplete', 'Incomplete')
       : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
   );
   const bonusLabel = $derived(
     tool?.bonus?.enabled
-      ? tool.bonus.expression ||
-          text('FABRICATE.Admin.Manager.Tools.Editor.StatusIncomplete', 'Incomplete')
+      ? formattedText(
+          'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue',
+          { expression: bonusValue },
+          'Adds {expression}'
+        )
       : text('FABRICATE.Admin.Manager.StatusOff', 'Off')
   );
   const rules = $derived([
@@ -106,7 +117,11 @@
     {
       id: 'on-break',
       icon: immune ? 'fas fa-shield' : 'fas fa-heart-crack',
-      title: onBreakLabel,
+      title: formattedText(
+        'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
+        { action: onBreakLabel.toLocaleLowerCase() },
+        'On break: {action}'
+      ),
       subtitle: immune
         ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewInactive', 'Inactive while this Tool is immune')
         : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak', 'Runs immediately after breakage'),
@@ -131,7 +146,7 @@
 </script>
 
 <aside class="manager-tool-preview" data-tool-behavior-preview aria-label={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}>
-  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}</p>
+  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}</p>
   <div class="manager-tool-preview-identity" data-tool-preview-identity>
     <img src={image} alt="" />
     <div>
@@ -144,7 +159,7 @@
     </span>
     <div class="manager-tool-preview-chips">
       <span class="manager-chip is-neutral"><i class="fas fa-heart-crack" aria-hidden="true"></i>{breakageLabel}</span>
-      <span class="manager-chip is-neutral"><i class="fas fa-plus-minus" aria-hidden="true"></i>{bonusLabel}</span>
+      <span class="manager-chip is-neutral"><i class="fas fa-plus-minus" aria-hidden="true"></i>{bonusValue}</span>
     </div>
   </div>
   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}</p>
@@ -164,5 +179,7 @@
       </li>
     {/each}
   </ul>
-  <aside class="manager-tool-preview-live" data-tool-preview-live-update><i class="fas fa-circle-info" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate', 'This preview updates live as you change the controls on the left.')}</span></aside>
+  {#if activeTab === 'validation'}
+    <aside class="manager-tool-preview-live" data-tool-preview-live-update><i class="fas fa-circle-check" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate', 'This preview updates live as you change the controls on the left.')}</span></aside>
+  {/if}
 </aside>

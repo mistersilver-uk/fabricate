@@ -10048,7 +10048,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const inspector = target.querySelector('[data-tool-browser-inspector]');
     assert.ok(inspector);
     assert.match(inspector.textContent, /Artisan Catalyst/);
-    assert.ok(inspector.querySelector('[data-tool-inspector-edit]'));
+    assert.equal(inspector.querySelector('[data-tool-inspector-edit]'), null);
     assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
   });
@@ -10113,12 +10113,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.match(inspector.querySelector('[data-tool-inspector-validation]').textContent, /1 issue/);
   });
 
-  it('routes the Tool library inspector Edit action to the focused editor', async () => {
+  it('keeps Edit on the Tool row instead of duplicating it in the inspector', async () => {
     const calls = await mountToolRoute();
     target.querySelector('[data-manager-tool-id="tool-catalyst"] .manager-tools-select-target').click();
     await tick();
     flushSync();
-    target.querySelector('[data-tool-inspector-edit]').click();
+    assert.equal(target.querySelector('[data-tool-inspector-edit]'), null);
+    target.querySelector(
+      '[data-manager-tool-id="tool-catalyst"] .manager-tools-library-actions .manager-icon-button'
+    ).click();
     await tick();
     flushSync();
 
