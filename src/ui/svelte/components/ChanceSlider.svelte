@@ -9,6 +9,7 @@
     rangeLabel = 'Percentage',
     unit = '%',
     resolveColor = () => 'var(--fab-mv2-accent)',
+    trackGradient = '',
     controlClass = '',
     stopPropagation = false,
     numberInputProps = {},
@@ -29,6 +30,12 @@
   let localValue = $state(0);
   let lastExternalValue = $state();
   const currentColor = $derived(resolveColor(localValue));
+  const continuousTrackGradient = $derived(String(trackGradient || '').trim());
+  const continuousTrackStyle = $derived(
+    continuousTrackGradient
+      ? ` --fab-chance-slider-track-gradient: ${continuousTrackGradient};`
+      : ''
+  );
   const percentage = $derived(
     Number(max) === Number(min)
       ? 0
@@ -100,8 +107,8 @@
     {#if unit}<span aria-hidden="true">{unit}</span>{/if}
   </span>
   <span
-    class={`manager-chance-slider-control manager-drop-rate-control ${controlClass}`}
-    style={`--fab-drop-rate-value: ${percentage}%; --fab-drop-rate-color: ${currentColor};`}
+    class={`manager-chance-slider-control manager-drop-rate-control ${controlClass}${continuousTrackGradient ? ' has-continuous-gradient' : ''}`}
+    style={`--fab-drop-rate-value: ${percentage}%; --fab-drop-rate-color: ${currentColor};${continuousTrackStyle}`}
   >
     <span class="manager-drop-rate-track" aria-hidden="true">
       <span class="manager-drop-rate-fill"></span>

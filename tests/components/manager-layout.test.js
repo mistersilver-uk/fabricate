@@ -1827,6 +1827,9 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropRateTrackBlock = blockFor('.fabricate-manager .manager-drop-rate-track');
   const dropRateFillBlock = blockFor('.fabricate-manager .manager-drop-rate-fill');
+  const continuousGradientFillBlock = blockFor(
+    '.fabricate-manager .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill'
+  );
   const dropRateRangeBlock = blockFor(
     '.fabricate-manager .manager-drop-rate-control input[type="range"]'
   );
@@ -2469,7 +2472,14 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(
     dropRateFillBlock.includes('width: var(--fab-drop-rate-value);') &&
       dropRateFillBlock.includes('background: var(--fab-drop-rate-color);'),
-    'drop chance slider should fill the active track segment with the current tier colour'
+    'Gathering chance sliders should retain their active-width rarity-derived fill'
+  );
+  assert.ok(
+    continuousGradientFillBlock.includes('width: 100%;') &&
+      continuousGradientFillBlock.includes(
+        'background: var(--fab-chance-slider-track-gradient);'
+      ),
+    'configured chance sliders should paint their semantic gradient across the complete inset track'
   );
   assert.ok(
     dropRateRangeBlock.includes('appearance: none;') &&
@@ -2797,6 +2807,83 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     false,
     'task rows should not render environment reorder controls'
   );
+});
+
+test('chance slider rails clip continuous Tool gradients at thumb-centre endpoints without changing Gathering fill', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({
+    viewport: { width: 640, height: 240 },
+    deviceScaleFactor: 1,
+  });
+
+  try {
+    await page.setContent(`
+      <style>${css}</style>
+      <main class="fabricate-manager" style="padding: 24px;">
+        <span
+          class="manager-drop-rate-control has-continuous-gradient"
+          data-slider="tool"
+          style="width: 240px; --fab-drop-rate-value: 62%; --fab-drop-rate-color: var(--fab-badge-gold); --fab-chance-slider-track-gradient: linear-gradient(90deg, var(--fab-success) 0%, var(--fab-warning) 33%, var(--fab-badge-gold) 66%, var(--fab-danger) 100%);"
+        >
+          <span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>
+          <input type="range" min="0" max="100" value="62">
+        </span>
+        <span
+          class="manager-drop-rate-control is-uncommon"
+          data-slider="gathering"
+          style="width: 240px; --fab-drop-rate-value: 40%; --fab-drop-rate-color: var(--fab-drop-rate-uncommon);"
+        >
+          <span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>
+          <input type="range" min="0" max="100" value="40">
+        </span>
+      </main>
+    `);
+
+    const report = await page.evaluate(() => {
+      const inspect = (kind) => {
+        const control = document.querySelector(`[data-slider="${kind}"]`);
+        const track = control.querySelector('.manager-drop-rate-track');
+        const fill = control.querySelector('.manager-drop-rate-fill');
+        const controlRect = control.getBoundingClientRect();
+        const trackRect = track.getBoundingClientRect();
+        const fillRect = fill.getBoundingClientRect();
+        const fillStyle = getComputedStyle(fill);
+        return {
+          leftInset: trackRect.left - controlRect.left,
+          rightInset: controlRect.right - trackRect.right,
+          trackWidth: trackRect.width,
+          fillWidth: fillRect.width,
+          fillOffset: fillRect.left - trackRect.left,
+          backgroundImage: fillStyle.backgroundImage,
+          backgroundColor: fillStyle.backgroundColor,
+        };
+      };
+      return {
+        tool: inspect('tool'),
+        gathering: inspect('gathering'),
+      };
+    });
+
+    assert.equal(report.tool.leftInset, 7);
+    assert.equal(report.tool.rightInset, 7);
+    assert.equal(report.gathering.leftInset, 7);
+    assert.equal(report.gathering.rightInset, 7);
+    assert.ok(
+      Math.abs(report.tool.fillWidth - (report.tool.trackWidth - 2)) <= 0.1,
+      'Tool gradient should occupy the full clipped track inside its border'
+    );
+    assert.equal(report.tool.fillOffset, 1);
+    assert.match(report.tool.backgroundImage, /^linear-gradient\(/);
+    assert.ok(
+      Math.abs(report.gathering.fillWidth / (report.gathering.trackWidth - 2) - 0.4) <= 0.01,
+      'Gathering should retain a percentage-width fill'
+    );
+    assert.equal(report.gathering.backgroundImage, 'none');
+    assert.notEqual(report.gathering.backgroundColor, 'rgba(0, 0, 0, 0)');
+  } finally {
+    await page.close();
+    await browser.close();
+  }
 });
 
 test('manager components browser defines drop target and compact responsive list geometry', () => {

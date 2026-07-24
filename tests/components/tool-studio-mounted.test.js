@@ -19,6 +19,7 @@ const harness = createMountedComponentHarness({
     'src/models/match/matchTypes.js',
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
+    'src/utils/plainTextDescription.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/chanceColorScale.js',
     'src/ui/svelte/util/dropRateTier.js',
@@ -390,10 +391,20 @@ describe('Tool Studio editor (mounted)', () => {
     assert.deepEqual(patches.at(-1), {
       breakage: { mode: 'breakageChance', breakageChance: 62 },
     });
+    const chanceControl = chanceCard.querySelector('.manager-tool-breakage-chance-control');
+    assert.ok(
+      chanceControl.classList.contains('has-continuous-gradient'),
+      'Tool breakage renders the optional full-track semantic gradient'
+    );
     assert.match(
-      chanceCard.querySelector('.manager-tool-breakage-chance-control').getAttribute('style'),
+      chanceControl.getAttribute('style'),
       /--fab-drop-rate-color: color-mix\(in srgb, var\(--fab-warning\).+var\(--fab-badge-gold\)/
     );
+    assert.match(
+      chanceControl.getAttribute('style'),
+      /--fab-chance-slider-track-gradient: linear-gradient\(90deg, var\(--fab-success\) 0%, var\(--fab-warning\) 33%, var\(--fab-badge-gold\) 66%, var\(--fab-danger\) 100%\)/
+    );
+    assert.ok(chanceControl.querySelector('.manager-drop-rate-fill'));
 
     chanceRange.value = '88';
     chanceRange.dispatchEvent(new Event('input', { bubbles: true }));

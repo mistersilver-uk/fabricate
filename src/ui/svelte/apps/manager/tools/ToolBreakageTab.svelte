@@ -8,6 +8,9 @@
   import SearchablePopover from '../SearchablePopover.svelte';
   import ToolRepairRequirements from './ToolRepairRequirements.svelte';
 
+  const BREAKAGE_CHANCE_TRACK_GRADIENT =
+    'linear-gradient(90deg, var(--fab-success) 0%, var(--fab-warning) 33%, var(--fab-badge-gold) 66%, var(--fab-danger) 100%)';
+
   let {
     tool = null,
     authority = 'toolSpecific',
@@ -189,6 +192,7 @@
             numberLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChancePercent', 'Break chance percent')}
             rangeLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}
             resolveColor={toolBreakageChanceColor}
+            trackGradient={BREAKAGE_CHANCE_TRACK_GRADIENT}
             controlClass="manager-tool-breakage-chance-control"
             numberInputProps={{ 'data-tool-breakage-chance-input': '' }}
             rangeInputProps={{ 'data-tool-breakage-chance-range': '' }}

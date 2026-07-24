@@ -11958,6 +11958,7 @@
 .fabricate-manager .manager-drop-rate-control {
   --fab-drop-rate-value: 1%;
   --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
+  --fab-chance-slider-track-gradient: var(--fab-drop-rate-color);
   --fab-chance-slider-thumb-radius: 7px;
 
   position: relative;
@@ -12014,6 +12015,11 @@
   width: var(--fab-drop-rate-value);
   height: 100%;
   background: var(--fab-drop-rate-color);
+}
+
+.fabricate-manager .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill {
+  width: 100%;
+  background: var(--fab-chance-slider-track-gradient);
 }
 
 .fabricate-manager .manager-drop-rate-control input[type="range"] {
