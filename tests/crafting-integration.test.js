@@ -1094,11 +1094,7 @@ test('routed check: a misconfiguration aborts BEFORE consuming ingredients (issu
   );
 
   // The load-bearing assertions for issue 85: ingredients are NOT consumed.
-  assert.equal(
-    herb._updates.length,
-    0,
-    'the ingredient must NOT be updated (not partially consumed)'
-  );
+  assert.equal(herb._updates.length, 0, 'the ingredient must NOT be updated (not partially consumed)');
   assert.equal(herb._deleted, false, 'the ingredient must NOT be deleted');
   assert.equal(herb.system.quantity, 5, 'the ingredient quantity is unchanged');
   assert.equal(craftingActor._createdDocs.length, 0, 'no items are created');
@@ -1147,11 +1143,7 @@ test('timed FINISH: an unrouted-tier misconfiguration fails the craft, never a f
     // Two groups; one is tier-routed to 'Standard' only, so the recipe opts into tier
     // routing but no group lists the matured 'Mythic' tier → unrouted-tier.
     resultGroups: [
-      {
-        id: 'rg-alpha',
-        name: 'Alpha',
-        results: [{ id: 'r-a', componentId: 'potion-a', quantity: 1 }],
-      },
+      { id: 'rg-alpha', name: 'Alpha', results: [{ id: 'r-a', componentId: 'potion-a', quantity: 1 }] },
       {
         id: 'rg-beta',
         name: 'Beta',
