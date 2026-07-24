@@ -4140,6 +4140,14 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await bonusMode.selectOption('always');
   await bonusMode.selectOption('highestOnly');
 
+  const saveRecipe = page.locator(
+    '.fabricate-manager .manager-header-actions .manager-button:has-text("Save recipe")',
+  ).first();
+  await saveRecipe.waitFor({ state: 'visible', timeout: 5_000 });
+  await saveRecipe.click();
+  await page.locator('.fabricate-manager[data-manager-view="recipe-edit"] .manager-chip:has-text("Unsaved")')
+    .waitFor({ state: 'detached', timeout: 10_000 });
+
   await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
   await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('[data-checks-tab-button="crafting"]').first().click();

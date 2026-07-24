@@ -420,6 +420,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\)/);
   assert.doesNotMatch(toolStudioWalk, /onBreakFieldset\.isDisabled\(\)/);
   assert.match(
+    toolStudioWalk,
+    /const saveRecipe = page\.locator\([\s\S]*?Save recipe[\s\S]*?await saveRecipe\.click\(\);[\s\S]*?manager-chip:has-text\("Unsaved"\)[\s\S]*?state: 'detached'[\s\S]*?manager-nav-button:has-text\("Checks"\)/,
+    'the recipe Tool-mode pointer check must save its restored value before leaving the dirty editor',
+  );
+  assert.match(
     HARNESS,
     /const fieldsetState = await fieldset\.evaluate\(\(element\) => \(\{[\s\S]*?disabled: element\.disabled === true,[\s\S]*?matchesDisabled: element\.matches\(':disabled'\),[\s\S]*?\}\)\);/,
   );
