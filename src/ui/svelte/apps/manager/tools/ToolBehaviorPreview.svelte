@@ -117,11 +117,13 @@
     {
       id: 'on-break',
       icon: immune ? 'fas fa-shield' : 'fas fa-heart-crack',
-      title: formattedText(
-        'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
-        { action: onBreakLabel.toLocaleLowerCase() },
-        'On break: {action}'
-      ),
+      title: immune
+        ? onBreakLabel
+        : formattedText(
+            'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
+            { action: onBreakLabel.toLocaleLowerCase() },
+            'On break: {action}'
+          ),
       subtitle: immune
         ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewInactive', 'Inactive while this Tool is immune')
         : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak', 'Runs immediately after breakage'),

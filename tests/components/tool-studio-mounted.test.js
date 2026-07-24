@@ -432,8 +432,13 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(root.querySelector('[data-tool-validation-check="breakage"]').classList.contains('is-invalid'), true);
     assert.equal(root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'), true);
     assert.equal(
-      root.querySelector('.manager-tool-validation-summary .manager-chip').getAttribute('aria-label'),
+      root.querySelector('.manager-tool-validation-chip').getAttribute('aria-label'),
       '3 issues'
+    );
+    assert.equal(
+      root.querySelector('.manager-tool-validation-summary .manager-chip'),
+      null,
+      'the sparse Validation heading does not pull the status chip back into its title row'
     );
     assert.ok(root.querySelector('[role="alert"]'));
     assert.match(root.querySelector('[data-tool-behavior-preview]').textContent, /Smith's Hammer/);
