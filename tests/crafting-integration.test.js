@@ -307,8 +307,18 @@ test('simple mode: craft consumes the owned item whose managed component carries
   const system = buildSystem({
     id: systemId,
     managedItems: [
-      { id: 'comp-867-matching', registeredItemUuid: matchingSource, name: 'Herb', tags: ['plant'] },
-      { id: 'comp-867-nonmatching', registeredItemUuid: nonMatchingSource, name: 'Stone', tags: ['mineral'] },
+      {
+        id: 'comp-867-matching',
+        registeredItemUuid: matchingSource,
+        name: 'Herb',
+        tags: ['plant'],
+      },
+      {
+        id: 'comp-867-nonmatching',
+        registeredItemUuid: nonMatchingSource,
+        name: 'Stone',
+        tags: ['mineral'],
+      },
     ],
   });
   setupGame(system);
@@ -332,12 +342,18 @@ test('simple mode: craft consumes the owned item whose managed component carries
     name: 'Tagged Poultice',
     craftingSystemId: systemId,
     ingredientSets: [ingredientSet.toJSON()],
-    resultGroups: [{ id: 'rg-867', results: [{ id: 'result-867', componentId: 'comp-result', quantity: 1 }] }],
+    resultGroups: [
+      { id: 'rg-867', results: [{ id: 'result-867', componentId: 'comp-result', quantity: 1 }] },
+    ],
   });
 
   const recipeManager = new RecipeManager();
   const engine = new CraftingEngine(recipeManager, null, buildResolutionService(system));
-  stubEngine(engine, { success: true, outcome: null, value: null, data: {} }, new FakeItem('result-867', 'Poultice'));
+  stubEngine(
+    engine,
+    { success: true, outcome: null, value: null, data: {} },
+    new FakeItem('result-867', 'Poultice')
+  );
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -348,8 +364,16 @@ test('simple mode: craft consumes the owned item whose managed component carries
   assert.equal(nonMatching.system.quantity, 2, 'non-matching stack quantity should be unchanged');
   assert.equal(nonMatching._updates.length, 0, 'non-matching stack should not be updated');
   assert.equal(nonMatching._deleted, false, 'non-matching stack should not be deleted');
-  assert.equal(matching.flags.fabricate, undefined, 'matching item has no item-level Fabricate tag flag');
-  assert.equal(nonMatching.flags.fabricate, undefined, 'non-matching item has no item-level Fabricate tag flag');
+  assert.equal(
+    matching.flags.fabricate,
+    undefined,
+    'matching item has no item-level Fabricate tag flag'
+  );
+  assert.equal(
+    nonMatching.flags.fabricate,
+    undefined,
+    'non-matching item has no item-level Fabricate tag flag'
+  );
 });
 
 test('simple mode: fails when ingredients missing', async () => {
@@ -1070,7 +1094,11 @@ test('routed check: a misconfiguration aborts BEFORE consuming ingredients (issu
   );
 
   // The load-bearing assertions for issue 85: ingredients are NOT consumed.
-  assert.equal(herb._updates.length, 0, 'the ingredient must NOT be updated (not partially consumed)');
+  assert.equal(
+    herb._updates.length,
+    0,
+    'the ingredient must NOT be updated (not partially consumed)'
+  );
   assert.equal(herb._deleted, false, 'the ingredient must NOT be deleted');
   assert.equal(herb.system.quantity, 5, 'the ingredient quantity is unchanged');
   assert.equal(craftingActor._createdDocs.length, 0, 'no items are created');
@@ -1119,7 +1147,11 @@ test('timed FINISH: an unrouted-tier misconfiguration fails the craft, never a f
     // Two groups; one is tier-routed to 'Standard' only, so the recipe opts into tier
     // routing but no group lists the matured 'Mythic' tier → unrouted-tier.
     resultGroups: [
-      { id: 'rg-alpha', name: 'Alpha', results: [{ id: 'r-a', componentId: 'potion-a', quantity: 1 }] },
+      {
+        id: 'rg-alpha',
+        name: 'Alpha',
+        results: [{ id: 'r-a', componentId: 'potion-a', quantity: 1 }],
+      },
       {
         id: 'rg-beta',
         name: 'Beta',
