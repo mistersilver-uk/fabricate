@@ -332,7 +332,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     assert.match(
       toolStudioWalk,
       new RegExp(
-        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(page, '${label}', \w+\)|screenshot\(page, '${label}'\));`
+        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(page, '${label}', \w+\)|screenshot\(page, '${label}'(?:, \{[\s\S]*?\})?\));`
       ),
       `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
     );
@@ -438,6 +438,11 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
       "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry)"
     ),
     'the 900px parity frame must capture the truthful settled narrow product frame',
+  );
+  assert.match(
+    toolStudioWalk,
+    /screenshot\(page, 'manager-tool-stress-wrapping-680', \{\s*clip: \{ x: 0, y: 0, width: 680, height: 700 \},\s*\}\)/,
+    'the 680px stress frame must declare its truthful full-viewport dimensions in the manifest',
   );
   assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?900px/);
   assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?680px/);
