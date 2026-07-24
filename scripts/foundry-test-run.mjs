@@ -1145,6 +1145,28 @@ async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {})
   }, undefined, { timeout, fallbackMs });
 }
 
+async function waitForManagerApplicationRendered(page) {
+  const outerSelector = '#fabricate-crafting-system-manager';
+  await page.locator(outerSelector).waitFor({ state: 'attached', timeout: 15_000 });
+  await page.locator(`${outerSelector} .fabricate-manager`).waitFor({
+    state: 'attached',
+    timeout: 15_000,
+  });
+  await page.waitForFunction(() => {
+    const app = globalThis.__fabricateSmokeManagerApp;
+    const appElement = app?.element?.[0] ?? app?.element;
+    const outer = document.querySelector('#fabricate-crafting-system-manager');
+    const manager = outer?.querySelector('.fabricate-manager');
+    return Boolean(
+      appElement
+      && appElement === outer
+      && appElement.isConnected
+      && appElement.style
+      && manager?.isConnected
+    );
+  }, undefined, { timeout: 15_000, polling: 'raf' });
+}
+
 /**
  * Resize the rendered Crafting System Manager application frame for
  * responsive screenshots and hit testing.
@@ -1168,6 +1190,7 @@ async function setManagerWindowSize(page, { width, height, sourceViewport = null
     15_000,
     `setViewportSize ${width}x${height}`
   );
+  await waitForManagerApplicationRendered(page);
   await withDeadline(
     page.evaluate(async ({ width, height, viewport }) => {
       const app = globalThis.__fabricateSmokeManagerApp;
