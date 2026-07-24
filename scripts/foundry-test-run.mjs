@@ -1801,28 +1801,56 @@ async function beginToolStoreMutationProbe(page, methodNames) {
       throw new Error('Tool mutation probe was already active');
     }
     const calls = [];
-    const originals = new Map();
+    const restorations = [];
+    const systemManager = game?.fabricate?.getCraftingSystemManager?.();
     for (const method of names) {
-      const original = store[method];
-      if (typeof original !== 'function') {
-        throw new Error(`Tool mutation probe could not wrap store.${method}`);
+      const persistentBoundary = {
+        toggleToolEnabled: 'upsertTool',
+        setToolBreakageAuthority: 'updateSystem',
+      }[method];
+      if (persistentBoundary) {
+        const original = systemManager?.[persistentBoundary];
+        if (typeof original !== 'function') {
+          throw new Error(`Tool mutation probe could not wrap systemManager.${persistentBoundary}`);
+        }
+        systemManager[persistentBoundary] = function (...args) {
+          calls.push({
+            method,
+            args: args.map((value) => {
+              try {
+                return JSON.parse(JSON.stringify(value));
+              } catch {
+                return String(value);
+              }
+            }),
+          });
+          return original.apply(this, args);
+        };
+        restorations.push(() => {
+          systemManager[persistentBoundary] = original;
+        });
+        continue;
       }
-      originals.set(method, original);
-      store[method] = function (...args) {
+      if (!store.viewState?.subscribe) {
+        throw new Error(`Tool mutation probe could not observe store.${method}`);
+      }
+      let initial = true;
+      const unsubscribe = store.viewState.subscribe((state) => {
+        if (initial) {
+          initial = false;
+          return;
+        }
         calls.push({
           method,
-          args: args.map((value) => {
-            try {
-              return JSON.parse(JSON.stringify(value));
-            } catch {
-              return String(value);
-            }
-          }),
+          args: [{
+            toolId: String(state?.toolDraft?.id || ''),
+            dirty: state?.toolDraftDirty === true,
+          }],
         });
-        return original.apply(this, args);
-      };
+      });
+      restorations.push(unsubscribe);
     }
-    globalThis.__fabricateToolMutationProbe = { store, calls, originals };
+    globalThis.__fabricateToolMutationProbe = { calls, restorations };
   }, methodNames);
 }
 
@@ -1830,9 +1858,7 @@ async function finishToolStoreMutationProbe(page) {
   return page.evaluate(() => {
     const probe = globalThis.__fabricateToolMutationProbe;
     if (!probe) return { calls: [], missing: true };
-    for (const [method, original] of probe.originals) {
-      probe.store[method] = original;
-    }
+    for (const restore of probe.restorations) restore();
     delete globalThis.__fabricateToolMutationProbe;
     return { calls: probe.calls };
   });
