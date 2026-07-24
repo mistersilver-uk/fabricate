@@ -4213,7 +4213,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     const replacementSource = await Item.create({
       name: 'Smoke Tool Studio Replacement Item',
       type: sourceTemplate.type,
-      img: 'icons/tools/hand/hammer-and-sickle-mechanical.webp',
+      img: sourceTemplate.img,
       system: clone(sourceSystem),
     });
     if (!replacementSource) throw new Error('Tool Studio fixture could not create its replacement Item');

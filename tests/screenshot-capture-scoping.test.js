@@ -637,6 +637,11 @@ test('the Tool Studio run writes one summary/manifest identity with head, target
 
 test('the Tool Studio fixture composes durable Tool identity through the canonical flag path', () => {
   assert.match(HARNESS, /source\.getFlag\('fabricate', 'fabricate\.roles'\)/);
+  assert.match(
+    HARNESS,
+    /name: 'Smoke Tool Studio Replacement Item'[\s\S]*?img: sourceTemplate\.img/,
+    'the replacement Item must reuse a resolved fixture image rather than request a missing core asset',
+  );
   assert.match(HARNESS, /source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\)/);
   assert.match(HARNESS, /source\.unsetFlag\('fabricate', 'fabricate\.roles'\)/);
   assert.match(
