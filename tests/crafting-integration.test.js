@@ -325,7 +325,8 @@ test('simple mode: craft consumes the owned item whose managed component carries
 
   const matching = new FakeItem('held-matching', 'Held Herb', 2, matchingSource);
   const nonMatching = new FakeItem('held-nonmatching', 'Held Stone', 2, nonMatchingSource);
-  const sourceActor = new FakeActor('TagCrafter', [matching, nonMatching]);
+  // Keep the non-matching decoy first: a broad matcher would consume it and fail below.
+  const sourceActor = new FakeActor('TagCrafter', [nonMatching, matching]);
   const craftingActor = new FakeActor('TagCrafter');
   const ingredientSet = IngredientSet.fromJSON({
     id: 'set-867-tags',
