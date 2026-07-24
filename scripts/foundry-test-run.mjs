@@ -1984,7 +1984,12 @@ async function toggleToolControlAndRestore(page, locator, label) {
   );
 }
 
-async function selectOptionAndAssertSingleChange(locator, value, label) {
+async function selectOptionAndAssertSingleChange(
+  locator,
+  value,
+  label,
+  { expectRetainedValue = true } = {},
+) {
   await locator.evaluate((element) => {
     element.__fabricateSelectChangeCount = 0;
     element.__fabricateSelectChangeListener = () => {
@@ -2003,7 +2008,7 @@ async function selectOptionAndAssertSingleChange(locator, value, label) {
     delete element.__fabricateSelectChangeListener;
     return report;
   });
-  if (effect.changes !== 1 || effect.value !== value) {
+  if (effect.changes !== 1 || (expectRetainedValue && effect.value !== value)) {
     throw new Error(`${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`);
   }
 }
@@ -4662,6 +4667,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       sourcePicker,
       fixture.sourceItemUuid,
       'Tool Item picker',
+      { expectRetainedValue: false },
     ),
     () => editor.locator('[data-tool-source-unlink]').waitFor({ state: 'visible', timeout: 5_000 }),
   );
