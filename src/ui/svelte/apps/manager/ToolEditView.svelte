@@ -10,7 +10,7 @@
   import {
     toolDisplayImage,
     toolDisplayName,
-    toolEditorChecks,
+    toolEditorValidation,
     toolSourceUuid,
   } from './tools/toolStudio.js';
 
@@ -55,7 +55,9 @@
       ? text('FABRICATE.Admin.Manager.Tools.Editor.HeaderLinked', 'Linked game-world Item')
       : text('FABRICATE.Admin.Manager.Tools.Editor.HeaderUnlinked', 'Unlinked Tool')
   );
-  const editorErrorCount = $derived(toolEditorChecks(tool, authority).filter((check) => !check.valid).length + (validation.errors?.length || 0));
+  const editorErrorCount = $derived(
+    toolEditorValidation(tool, authority, validation.errors).issueCount
+  );
   const requirementCount = $derived(
     (tool?.prerequisites?.enabled ? tool.prerequisites.ids?.length || 0 : 0) +
       (tool?.bonus?.enabled ? 1 : 0)

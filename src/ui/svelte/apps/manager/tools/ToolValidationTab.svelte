@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { toolEditorChecks, toolValidationPresentation } from './toolStudio.js';
+  import { toolEditorValidation, toolValidationPresentation } from './toolStudio.js';
 
   let { tool = null, authority = 'toolSpecific', validation = { valid: false, errors: [] }, saveError = '', focusValidationNonce = 0 } = $props();
   function text(key, fallback) {
@@ -18,12 +18,22 @@
     }
     return validationFallbacks[presentation.key] || validationFallbacks.ValidationErrorGeneric;
   }
+  function validationCheckText(check) {
+    const legacyKey = {
+      prerequisites: 'Requirements',
+      bonus: 'Repair',
+      repair: 'RepairRequirements',
+    }[check.id];
+    const suffix = legacyKey || `${check.id[0].toUpperCase()}${check.id.slice(1)}`;
+    return text(`FABRICATE.Admin.Manager.Tools.Editor.Check${suffix}`, labels[check.id]);
+  }
   const labels = {
     source: 'A game-world Item is linked',
     breakage: 'Breakage roll has an expression',
     onBreak: 'Replacement item is set',
-    requirements: 'At least one prerequisite is selected',
-    repair: 'Bonus expression is set',
+    prerequisites: 'At least one prerequisite is selected',
+    bonus: 'Bonus expression is set',
+    repair: 'Repair requirements are complete',
   };
   const validationFallbacks = {
     ValidationErrorSource: 'Link an Item or managed Component.',
@@ -40,8 +50,11 @@
     ValidationErrorBonus: 'Enter a bonus expression or turn the bonus off.',
     ValidationErrorGeneric: 'Some Tool settings are incomplete.',
   };
-  const checks = $derived(toolEditorChecks(tool, authority));
-  const invalidCount = $derived(checks.filter((check) => !check.valid).length + (validation.errors?.length || 0));
+  const editorValidation = $derived(
+    toolEditorValidation(tool, authority, validation.errors)
+  );
+  const checks = $derived(editorValidation.checks);
+  const invalidCount = $derived(editorValidation.issueCount);
   const issueCountLabel = $derived(
     text('FABRICATE.Admin.Manager.Tools.ValidationIssues', '{count} issues').replace(
       '{count}',
@@ -63,7 +76,7 @@
       {#each checks as check (check.id)}
         <li class:is-invalid={!check.valid} data-tool-validation-check={check.id}>
           <i class={check.valid ? 'fas fa-circle-check' : 'fas fa-circle-xmark'} aria-hidden="true"></i>
-          <span>{text(`FABRICATE.Admin.Manager.Tools.Editor.Check${check.id[0].toUpperCase()}${check.id.slice(1)}`, labels[check.id])}</span>
+          <span>{validationCheckText(check)}</span>
         </li>
       {/each}
     </ul>

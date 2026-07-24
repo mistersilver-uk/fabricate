@@ -51,6 +51,21 @@ const VALIDATION_ERROR_PROJECTIONS = [
   ['bonus.expression', 'ValidationErrorBonus'],
 ];
 
+const VALIDATION_CHECK_BY_ERROR = {
+  ValidationErrorSource: 'source',
+  ValidationErrorMaxUses: 'breakage',
+  ValidationErrorChance: 'breakage',
+  ValidationErrorFormula: 'breakage',
+  ValidationErrorThreshold: 'breakage',
+  ValidationErrorBreakageMode: 'breakage',
+  ValidationErrorOnBreakMode: 'onBreak',
+  ValidationErrorReplacement: 'onBreak',
+  ValidationErrorReplacementSame: 'onBreak',
+  ValidationErrorPrerequisites: 'prerequisites',
+  ValidationErrorBonus: 'bonus',
+  ValidationErrorRepair: 'repair',
+};
+
 /**
  * Project model validation details onto stable presentation categories.
  * Unknown model or service details deliberately collapse to a safe generic
@@ -161,12 +176,14 @@ function validOnBreak(tool, authority) {
     : target?.type === 'item' && Boolean(target.itemUuid);
 }
 
-function validRequirements(tool) {
+function validPrerequisites(tool) {
   const prerequisites = tool?.prerequisites || {};
+  return prerequisites.enabled !== true || (Array.isArray(prerequisites.ids) && prerequisites.ids.length > 0);
+}
+
+function validBonus(tool) {
   const bonus = tool?.bonus || {};
-  const prerequisitesValid = prerequisites.enabled !== true || (Array.isArray(prerequisites.ids) && prerequisites.ids.length > 0);
-  const bonusValid = bonus.enabled !== true || Boolean(String(bonus.expression || '').trim());
-  return prerequisitesValid && bonusValid;
+  return bonus.enabled !== true || Boolean(String(bonus.expression || '').trim());
 }
 
 function validRepair(tool) {
@@ -189,12 +206,28 @@ function validRepair(tool) {
   );
 }
 
-export function toolEditorChecks(tool, authority = 'toolSpecific') {
-  return [
+export function toolEditorValidation(tool, authority = 'toolSpecific', errors = []) {
+  const checks = [
     { id: 'source', valid: Boolean(tool?.componentId || toolSourceUuid(tool)) },
     { id: 'breakage', valid: validBreakage(tool, authority) },
     { id: 'onBreak', valid: validOnBreak(tool, authority) },
-    { id: 'requirements', valid: validRequirements(tool) },
+    { id: 'prerequisites', valid: validPrerequisites(tool) },
+    { id: 'bonus', valid: validBonus(tool) },
     { id: 'repair', valid: validRepair(tool) },
   ];
+  const invalidChecks = new Set(checks.filter((check) => !check.valid).map((check) => check.id));
+  const domainFailures = new Set();
+  for (const error of errors || []) {
+    const checkId = VALIDATION_CHECK_BY_ERROR[toolValidationPresentation(error).key];
+    if (checkId) invalidChecks.delete(checkId);
+    domainFailures.add(String(error ?? ''));
+  }
+  return {
+    checks,
+    issueCount: invalidChecks.size + domainFailures.size,
+  };
+}
+
+export function toolEditorChecks(tool, authority = 'toolSpecific') {
+  return toolEditorValidation(tool, authority).checks;
 }

@@ -410,7 +410,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(patches.some((patch) => patch.bonus?.expression === '1d4'));
   });
 
-  it('renders five compact validation checks, a Validation-only live preview note, and alert semantics', async () => {
+  it('renders six compact validation checks, a Validation-only live preview note, and alert semantics', async () => {
     const invalidTool = tool({ breakage: { mode: 'breakageChance', breakageChance: 101 }, repairRequirements: [{ id: 'empty', options: [] }] });
     const root = await harness.mount(props({
       activeTab: 'validation',
@@ -418,7 +418,7 @@ describe('Tool Studio editor (mounted)', () => {
       validation: { valid: false, errors: ['breakage.breakageChance must be an integer between 0 and 100'] },
       focusValidationNonce: 1,
     }));
-    assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 5);
+    assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 6);
     assert.deepEqual(
       [...root.querySelectorAll('[data-tool-validation-check] span')].map((node) => node.textContent),
       [
@@ -427,13 +427,14 @@ describe('Tool Studio editor (mounted)', () => {
         'Replacement item is set',
         'At least one prerequisite is selected',
         'Bonus expression is set',
+        'Repair requirements are complete',
       ]
     );
     assert.equal(root.querySelector('[data-tool-validation-check="breakage"]').classList.contains('is-invalid'), true);
     assert.equal(root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'), true);
     assert.equal(
       root.querySelector('.manager-tool-validation-chip').getAttribute('aria-label'),
-      '3 issues'
+      '2 issues'
     );
     assert.equal(
       root.querySelector('.manager-tool-validation-summary .manager-chip'),
@@ -453,6 +454,69 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(root.querySelector('[data-tool-validation-tab] > .manager-tool-editor-card'), null);
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
     assert.ok(root.querySelector('[data-tool-preview-live-update]'));
+  });
+
+  it('reports a missing bonus independently without duplicating its domain blocker and preserves all-pass state', async () => {
+    const root = await harness.mount(props({
+      activeTab: 'validation',
+      tool: tool({ bonus: { enabled: true, expression: '' } }),
+      validation: {
+        valid: false,
+        errors: ['bonus.expression is required when bonus is enabled'],
+      },
+    }));
+
+    assert.equal(
+      root.querySelector('[data-tool-validation-check="prerequisites"]').classList.contains('is-invalid'),
+      false
+    );
+    assert.equal(
+      root.querySelector('[data-tool-validation-check="bonus"]').classList.contains('is-invalid'),
+      true
+    );
+    assert.equal(
+      root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'),
+      false
+    );
+    assert.equal(
+      root.querySelector('[data-tool-validation-check="prerequisites"] span').textContent,
+      'At least one prerequisite is selected'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-validation-check="bonus"] span').textContent,
+      'Bonus expression is set'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-validation-check="repair"] span').textContent,
+      'Repair requirements are complete'
+    );
+    assert.equal(
+      root.querySelector('.manager-tool-validation-chip').getAttribute('aria-label'),
+      '1 issues'
+    );
+    assert.equal(root.querySelector('#tool-tab-validation span').textContent, '1');
+    assert.equal(
+      root.querySelector('#tool-tab-validation span').getAttribute('aria-label'),
+      '1 errors'
+    );
+    assert.match(
+      root.querySelector('[data-tool-validation-errors]').textContent,
+      /Enter a bonus expression or turn the bonus off/
+    );
+
+    harness.remount();
+    const validRoot = await harness.mount(props({ activeTab: 'validation' }));
+    assert.equal(validRoot.querySelectorAll('[data-tool-validation-check]').length, 6);
+    assert.equal(validRoot.querySelectorAll('[data-tool-validation-check].is-invalid').length, 0);
+    assert.equal(
+      validRoot.querySelector('.manager-tool-validation-chip').textContent.trim(),
+      'All checks pass'
+    );
+    assert.equal(validRoot.querySelector('#tool-tab-validation span').textContent, '✓');
+    assert.equal(
+      validRoot.querySelector('#tool-tab-validation span').getAttribute('aria-label'),
+      'All checks pass'
+    );
   });
 
   it('uses prototype preview copy and omits the live-update note outside Validation', async () => {
