@@ -3719,7 +3719,7 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       tools: [],
       toolBreakage: { authority: 'toolSpecific' },
     });
-    const { item: upsertedTool } = await csm.upsertTool(systemId, {
+    let { item: upsertedTool } = await csm.upsertTool(systemId, {
       id: requestedToolId,
       enabled: true,
       label: "Smith's Hammer",
@@ -3739,6 +3739,14 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
         })),
       }],
     }, { itemUuid: source.uuid });
+    // dnd5e Item schemas vary in how they retain a cloned description. The parity
+    // fixture tests Tool Studio, not that system-specific schema edge, so pin the
+    // normalized Tool snapshot after the source-linked upsert has established its
+    // durable identity.
+    ({ item: upsertedTool } = await csm.upsertTool(systemId, {
+      ...upsertedTool,
+      description: 'A well-balanced forge hammer. Durable, but the haft splinters when hard used.',
+    }));
     const toolId = upsertedTool.id;
     const parityNames = [
       'Arcane Forge',
