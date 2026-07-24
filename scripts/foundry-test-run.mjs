@@ -1147,9 +1147,62 @@ async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {})
 
 async function waitForManagerApplicationRendered(page) {
   const outerSelector = '#fabricate-crafting-system-manager';
+  const resolveRegisteredManager = () => {
+    const instances = foundry?.applications?.instances;
+    const registeredApps = instances?.values
+      ? Array.from(instances.values())
+      : (instances ? Array.from(instances) : []);
+    const uniqueApps = Array.from(new Set(registeredApps));
+    const registryCandidates = uniqueApps.map((app, index) => {
+      const rawElement = app?.element ?? app?._element ?? null;
+      const element = rawElement?.[0] ?? rawElement;
+      const manager = element?.matches?.('.fabricate-manager')
+        ? element
+        : element?.querySelector?.('.fabricate-manager')
+          ?? element?.closest?.('.fabricate-manager');
+      const ownsManager = Boolean(
+        manager?.isConnected
+        && (
+          element === manager
+          || element?.contains?.(manager)
+          || manager?.contains?.(element)
+        )
+      );
+      return {
+        app,
+        index,
+        appType: app?.constructor?.name ?? typeof app,
+        appRendered: app?.rendered ?? null,
+        elementType: element?.constructor?.name ?? typeof element,
+        elementId: element?.id ?? null,
+        elementConnected: Boolean(element?.isConnected),
+        elementHasStyle: Boolean(element?.style),
+        managerConnected: Boolean(manager?.isConnected),
+        ownsManager,
+        liveMatch: Boolean(
+          element?.isConnected
+          && element?.style
+          && manager?.isConnected
+          && (element.id === 'fabricate-crafting-system-manager' || ownsManager)
+        ),
+      };
+    });
+    const liveMatches = registryCandidates.filter((candidate) => candidate.liveMatch);
+    if (liveMatches.length !== 1) {
+      const diagnostics = registryCandidates.map(({ app: _app, ...candidate }) => candidate);
+      throw new Error(
+        `Crafting System Manager registry resolution found ${liveMatches.length} live instances: `
+        + JSON.stringify({ registryCandidates: diagnostics })
+      );
+    }
+    globalThis.__fabricateSmokeManagerApp = liveMatches[0].app;
+    const { app: _app, ...selected } = liveMatches[0];
+    return selected;
+  };
   const inspectReadiness = (diagnostic = false) => {
     const app = globalThis.__fabricateSmokeManagerApp;
-    const appElement = app?.element?.[0] ?? app?.element;
+    const rawElement = app?.element ?? app?._element ?? null;
+    const appElement = rawElement?.[0] ?? rawElement;
     const manager = appElement?.matches?.('.fabricate-manager')
       ? appElement
       : appElement?.querySelector?.('.fabricate-manager')
@@ -1175,6 +1228,7 @@ async function waitForManagerApplicationRendered(page) {
       state: 'attached',
       timeout: 15_000,
     });
+    await page.evaluate(resolveRegisteredManager);
     await page.waitForFunction(inspectReadiness, false, { timeout: 15_000, polling: 'raf' });
   } catch (error) {
     const readiness = await page.evaluate(inspectReadiness, true).catch((diagnosticError) => ({

@@ -336,6 +336,13 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /async function waitForManagerApplicationRendered[\s\S]*?__fabricateSmokeManagerApp[\s\S]*?app\?\.element[\s\S]*?#fabricate-crafting-system-manager[\s\S]*?\.fabricate-manager[\s\S]*?isConnected/,
   );
   assert.doesNotMatch(managerReadiness, /appElement === outer/);
+  assert.match(managerReadiness, /foundry\?\.applications\?\.instances[\s\S]*?instances\.values\(\)/);
+  assert.match(managerReadiness, /app\?\.element \?\? app\?\._element[\s\S]*?rawElement\?\.\[0\] \?\? rawElement/);
+  assert.match(managerReadiness, /element\.id === 'fabricate-crafting-system-manager'[\s\S]*?ownsManager/);
+  assert.match(
+    managerReadiness,
+    /liveMatches\.length !== 1[\s\S]*?registryCandidates[\s\S]*?globalThis\.__fabricateSmokeManagerApp = liveMatches\[0\]\.app/,
+  );
   assert.match(managerReadiness, /appElement\?\.matches\?\.\('\.fabricate-manager'\)[\s\S]*?appElement\?\.querySelector\?\.\('\.fabricate-manager'\)/);
   for (const diagnostic of [
     'appRendered',
