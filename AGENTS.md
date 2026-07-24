@@ -495,9 +495,13 @@ Do not add scoped focus CSS in components — it duplicates the area block and n
 New top-level app surfaces need their own focus block; a partial rule reads as "handled" but isn't.
 See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
 - Preserve `flags.core.sourceId` when embedded items must map back to a world item.
-- Fabricate runs configured macros through `MacroExecutor.run(uuid, context)` (`src/utils/MacroExecutor.js`), **not** `Macro#execute`.
-  It compiles `macro.command` into an `AsyncFunction` invoked with `(context, args, game, foundry, ui, fromUuid)` — so a Fabricate macro receives `context` (also aliased as `args`) and the explicit globals, and does **not** get Foundry's `Macro#execute` locals (`actor`/`token`/`speaker`/`character`/`scope`).
-  A thrown error propagates to the caller (no Foundry notification-swallow), which is why a currency payment-gate macro that throws aborts the craft loudly instead of silently passing.
+- Fabricate runs configured macros through `MacroExecutor.run(uuid, payload)` (`src/utils/MacroExecutor.js`), **not** `Macro#execute`.
+Foundry V13.351 `client/documents/macro.mjs` gates `Macro#execute(scope)` on the current user's Macro permission and requires LIMITED permission.
+Fabricate evaluates the configured command directly so player-initiated crafting can run GM-selected automation; this bypasses only that client-side Macro document gate and grants the current player no additional server or document authority.
+The generated `AsyncFunction` receives `(context, args, scope)`, with all three names referencing the identical Fabricate payload object.
+This is identifier-level compatibility, not full native execution semantics: Foundry constructs its native `scope` as a rest copy and also provides `actor` / `token` / `speaker` / `character` locals, while Fabricate provides neither the copy nor those additional locals.
+Foundry V13.351 `client/client.mjs` publishes `game`, `foundry`, `ui`, and `fromUuid` on `globalThis`, so Fabricate macros consume those runtime globals directly instead of receiving redundant function parameters.
+A thrown error propagates to the caller (no Foundry notification-swallow), which is why a currency payment-gate macro that throws aborts the craft loudly instead of silently passing.
 - `CraftingSystemManager` uses `getSystems()` and `getItems(systemId)`.
 - V13 `CalendarData#timeToComponents().day` is the day-*of-year* (0-based, and it resets every year), NOT a cumulative campaign day.
 Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).

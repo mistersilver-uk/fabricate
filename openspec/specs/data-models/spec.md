@@ -2082,6 +2082,29 @@ They are unrelated mechanisms.
 
 ## Macro Contracts
 
+### Dynamic DC Macro Contract
+
+A configured dynamic DC macro receives one payload object containing:
+
+- `recipe`
+- `craftingSystem`
+- `craftingActor`
+- `candidateIngredientSet`
+
+Fabricate exposes that exact object with identity as `scope`, `context`, and `args`.
+The `scope` identifier provides Foundry-facing familiarity while `context` and `args` remain backward-compatible aliases.
+This is not full native `Macro#execute` behavior: Foundry's native `scope` is a rest copy, and Fabricate does not add Foundry's native `speaker`, `actor`, `token`, or `character` locals.
+
+Fabricate applies `Number(result)` to the macro's return value.
+When the coerced value is finite, Fabricate truncates it to an integer and uses it as the dynamic DC.
+An absent configured macro, a thrown error, or a result whose numeric coercion is non-finite falls back to the configured static DC.
+
+The shared executor deliberately evaluates the selected script Macro command instead of calling `Macro#execute`.
+This keeps player-initiated workflows from being blocked by Foundry's current-user Macro permission gate.
+The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
+Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
+Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the dynamic DC fallback above.
+
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
 The crafting-check macro / built-in game-system adapter path has been removed.
