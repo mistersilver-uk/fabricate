@@ -221,7 +221,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(buttons[0].getAttribute('aria-controls'), 'tool-panel-overview');
     assert.equal(buttons.slice(1).every((button) => !button.hasAttribute('aria-controls')), true);
     assert.equal(root.querySelector('#tool-panel-overview')?.getAttribute('role'), 'tabpanel');
-    assert.equal(buttons[3].querySelector('span').getAttribute('aria-label'), '2 errors');
+    assert.equal(buttons[3].querySelector('span').getAttribute('aria-label'), '2 issues');
 
     buttons[0].focus();
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
@@ -437,6 +437,10 @@ describe('Tool Studio editor (mounted)', () => {
       '2 issues'
     );
     assert.equal(
+      root.querySelector('.manager-tool-validation-chip').textContent.trim(),
+      '2 issues'
+    );
+    assert.equal(
       root.querySelector('.manager-tool-validation-summary .manager-chip'),
       null,
       'the sparse Validation heading does not pull the status chip back into its title row'
@@ -492,12 +496,16 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(
       root.querySelector('.manager-tool-validation-chip').getAttribute('aria-label'),
-      '1 issues'
+      '1 issue'
+    );
+    assert.equal(
+      root.querySelector('.manager-tool-validation-chip').textContent.trim(),
+      '1 issue'
     );
     assert.equal(root.querySelector('#tool-tab-validation span').textContent, '1');
     assert.equal(
       root.querySelector('#tool-tab-validation span').getAttribute('aria-label'),
-      '1 errors'
+      '1 issue'
     );
     assert.match(
       root.querySelector('[data-tool-validation-errors]').textContent,
