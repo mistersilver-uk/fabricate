@@ -19,11 +19,11 @@
     return validationFallbacks[presentation.key] || validationFallbacks.ValidationErrorGeneric;
   }
   const labels = {
-    source: 'Linked Item or managed Component',
-    breakage: 'Breakage range and formula',
-    onBreak: 'On-break action and replacement',
-    requirements: 'Prerequisites and bonus expression',
-    repair: 'Repair group completeness',
+    source: 'A game-world Item is linked',
+    breakage: 'Breakage roll has an expression',
+    onBreak: 'Replacement item is set',
+    requirements: 'At least one prerequisite is selected',
+    repair: 'Bonus expression is set',
   };
   const validationFallbacks = {
     ValidationErrorSource: 'Link an Item or managed Component.',
@@ -56,9 +56,9 @@
 <div class="manager-tool-tab-stack" data-tool-validation-tab>
   <section class="manager-tool-validation">
     <div class="manager-tool-validation-heading manager-tool-validation-summary" data-tool-validation-heading>
-      <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}</p><h3>{text('FABRICATE.Admin.Manager.Tools.Editor.ValidationHint', 'Check this Tool before saving')}</h3></div>
-      <span class={`manager-chip ${invalidCount > 0 ? 'is-danger' : 'is-positive'}`} aria-label={invalidCount > 0 ? issueCountLabel : undefined}><i class={invalidCount > 0 ? 'fas fa-circle-exclamation' : 'fas fa-circle-check'} aria-hidden="true"></i>{invalidCount > 0 ? issueCountLabel : text('FABRICATE.Admin.Manager.Tools.ValidationValid', 'Ready to save')}</span>
+      <h3><i class="fas fa-clipboard-check" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}</h3>
     </div>
+    <span class={`manager-chip manager-tool-validation-chip ${invalidCount > 0 ? 'is-danger' : 'is-positive'}`} aria-label={invalidCount > 0 ? issueCountLabel : undefined}><i class={invalidCount > 0 ? 'fas fa-circle-exclamation' : 'fas fa-circle-check'} aria-hidden="true"></i>{invalidCount > 0 ? issueCountLabel : text('FABRICATE.Admin.Manager.Tools.Editor.AllValid', 'All checks pass')}</span>
     <ul class="manager-tool-validation-checks" aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.ValidationChecks', 'Tool validation checks')}>
       {#each checks as check (check.id)}
         <li class:is-invalid={!check.valid} data-tool-validation-check={check.id}>

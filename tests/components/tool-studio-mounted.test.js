@@ -49,11 +49,11 @@ const worldItems = [
   { uuid: 'Item.replacement', name: 'Bent Hammer', img: managedItems[0].img, description: 'Still useful.' }
 ];
 const prerequisites = [
-  { id: 'smith', name: "Proficient with Smith's Tools", expression: '@prof' },
-  { id: 'strong', name: 'Strong', expression: '@abilities.str.mod >= 2' },
   { id: 'expert', name: 'Expert Crafter', expression: '@prof >= 4' },
+  { id: 'smith', name: "Proficient with Smith's Tools", expression: '@prof' },
   { id: 'attuned', name: 'Attuned to the Weave', expression: '@abilities.int.mod >= 2' },
-  { id: 'arena', name: 'Trained for Arenas', expression: '@skills.arcana >= 1' },
+  { id: 'strong', name: 'Strength 13 or higher', expression: '@abilities.str.mod >= 2' },
+  { id: 'arena', name: 'Trained in Arcana', expression: '@skills.arcana >= 1' },
 ];
 const itemTags = ['metal', 'salvage'];
 const essenceOptions = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
@@ -83,7 +83,7 @@ function props(overrides = {}) {
   return {
     tool: tool(),
     validation: { valid: true, errors: [] },
-    dirty: true,
+    dirty: false,
     activeTab: 'overview',
     worldItems,
     managedItems,
@@ -124,16 +124,20 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-editor-source-context]').textContent,
       'Linked game-world Item'
     );
-    assert.ok(root.querySelector('[data-tool-editor-back][aria-label="Back to Tools"]'));
+    assert.equal(root.querySelector('[data-tool-editor-status]').textContent.trim(), 'All changes saved');
+    assert.equal(root.querySelector('[data-tool-editor-back][aria-label="Back to Tools"]').textContent.trim(), 'Back');
     assert.ok(root.querySelector('[data-tool-editor-delete]'));
     assert.ok(root.querySelector('[data-tool-editor-save]'));
+    assert.equal(root.querySelector('[data-tool-editor-delete]').textContent.trim(), 'Delete');
+    assert.equal(root.querySelector('[data-tool-editor-save]').textContent.trim(), 'Save tool');
     assert.equal(root.querySelectorAll('[role="tab"]').length, 4);
     const tabPanel = root.querySelector('[role="tabpanel"]');
     assert.equal(tabPanel.id, 'tool-panel-overview');
     assert.equal(tabPanel.getAttribute('aria-labelledby'), 'tool-tab-overview');
     assert.equal(tabPanel.getAttribute('tabindex'), '0');
     assert.match(root.querySelector('[data-tool-source-card]').textContent, /Smith's Hammer/);
-    assert.match(root.querySelector('[data-tool-source-card]').textContent, /Item\.hammer/);
+    assert.equal(root.querySelector('[data-tool-source-card] code').textContent, 'hammer');
+    assert.equal(root.querySelector('[data-tool-source-card] code').title, 'Item.hammer');
     assert.match(root.querySelector('[data-tool-description]').value, /well-balanced forge hammer/);
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Smith's Hammer/);
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Linked game-world Item/);
@@ -150,7 +154,27 @@ describe('Tool Studio editor (mounted)', () => {
       ['source', 'guidance', 'identity', 'enabled']
     );
     assert.ok(root.querySelector('[data-tool-source-card][data-tool-source-layout="compact"]'));
+    const sourceCard = root.querySelector('[data-tool-source-card]');
+    assert.ok(sourceCard.querySelector('[data-tool-source-unlink]'));
+    assert.ok(sourceCard.querySelector('.manager-tool-source-replace:not([open])'));
+    assert.equal(
+      root.querySelector('[data-tool-overview-region="source"] > .manager-tool-source-replace'),
+      null,
+      'replacement access stays inside the compact source card'
+    );
     assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 3);
+    assert.match(
+      root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
+      /supplies the name, art, and description/
+    );
+    assert.match(
+      root.querySelector('[data-tool-how-it-works] li:nth-child(2)').textContent,
+      /fixed station like a forge.*inventory and surroundings/
+    );
+    assert.match(
+      root.querySelector('[data-tool-how-it-works] li:nth-child(3)').textContent,
+      /Breakage tab.*Requirements/
+    );
     assert.ok(root.querySelector('[data-tool-how-it-works] [data-tool-guidance-tab="breakage"]'));
     assert.ok(root.querySelector('[data-tool-how-it-works] [data-tool-guidance-tab="requirements"]'));
     assert.equal(root.querySelector('[data-tool-name]').readOnly, true);
@@ -227,6 +251,14 @@ describe('Tool Studio editor (mounted)', () => {
       assert.ok(choice.querySelector('[data-tool-choice-description]'));
     }
     assert.ok(root.querySelector('[data-tool-breakage-authority-explanation]'));
+    assert.match(
+      root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
+      /Set for every Tool from the Tools library\..*System-wide/
+    );
+    assert.doesNotMatch(
+      root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
+      /settings for both models/
+    );
     assert.ok(root.querySelector('[data-tool-breakage-method-heading]'));
     assert.ok(root.querySelector('[data-tool-limited-uses-stepper]'));
     assert.ok(root.querySelector('[data-tool-limited-uses-info]'));
@@ -355,6 +387,20 @@ describe('Tool Studio editor (mounted)', () => {
     const root = await harness.mount(props({ activeTab: 'requirements', onPatch: (patch) => patches.push(patch) }));
     assert.equal(root.querySelectorAll('.manager-tool-prerequisite-list input[type="checkbox"]').length, 5);
     assert.equal(root.querySelectorAll('[data-tool-prerequisite-row]').length, 5);
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-tool-prerequisite-row] strong')].map((node) => node.textContent),
+      [
+        'Expert Crafter',
+        "Proficient with Smith's Tools",
+        'Attuned to the Weave',
+        'Strength 13 or higher',
+        'Trained in Arcana',
+      ]
+    );
+    assert.ok(root.querySelector('[data-tool-prerequisites-enabled]').closest('.manager-status-toggle'));
+    assert.ok(root.querySelector('[data-tool-bonus-enabled]').closest('.manager-status-toggle'));
+    assert.equal(root.querySelector('[data-tool-prerequisites-enabled]').closest('.manager-status-toggle').textContent.trim(), '');
+    assert.equal(root.querySelector('[data-tool-bonus-enabled]').closest('.manager-status-toggle').textContent.trim(), '');
     assert.ok(root.querySelector('[data-tool-requirements-divider]'));
     root.querySelector('.manager-tool-prerequisite-list input[value="strong"]').click();
     root.querySelector('input[name="tool-gate-mode"][value="bonus"]').click();
@@ -364,7 +410,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(patches.some((patch) => patch.bonus?.expression === '1d4'));
   });
 
-  it('renders five validation checks, range/repair failures, live preview, and alert semantics', async () => {
+  it('renders five compact validation checks, a Validation-only live preview note, and alert semantics', async () => {
     const invalidTool = tool({ breakage: { mode: 'breakageChance', breakageChance: 101 }, repairRequirements: [{ id: 'empty', options: [] }] });
     const root = await harness.mount(props({
       activeTab: 'validation',
@@ -373,6 +419,16 @@ describe('Tool Studio editor (mounted)', () => {
       focusValidationNonce: 1,
     }));
     assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 5);
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-tool-validation-check] span')].map((node) => node.textContent),
+      [
+        'A game-world Item is linked',
+        'Breakage roll has an expression',
+        'Replacement item is set',
+        'At least one prerequisite is selected',
+        'Bonus expression is set',
+      ]
+    );
     assert.equal(root.querySelector('[data-tool-validation-check="breakage"]').classList.contains('is-invalid'), true);
     assert.equal(root.querySelector('[data-tool-validation-check="repair"]').classList.contains('is-invalid'), true);
     assert.equal(
@@ -387,9 +443,23 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(document.activeElement, root.querySelector('[data-first-validation-failure]'));
     assert.doesNotMatch(root.textContent, /breakage\.breakageChance|breakageChance/);
     assert.ok(root.querySelector('[data-tool-validation-heading]'));
+    assert.equal(root.querySelector('[data-tool-validation-heading] h3').textContent.trim(), 'Validation');
+    assert.doesNotMatch(root.querySelector('[data-tool-validation-heading]').textContent, /Check this Tool before saving/);
     assert.equal(root.querySelector('[data-tool-validation-tab] > .manager-tool-editor-card'), null);
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
     assert.ok(root.querySelector('[data-tool-preview-live-update]'));
+  });
+
+  it('uses prototype preview copy and omits the live-update note outside Validation', async () => {
+    const root = await harness.mount(props({ activeTab: 'breakage' }));
+
+    assert.equal(root.querySelector('[data-tool-behavior-preview] > .manager-kicker').textContent, 'How it behaves');
+    assert.equal(root.querySelector('[data-tool-preview-breakage]').textContent, '5 uses');
+    assert.equal(root.querySelector('[data-tool-preview-on-break]').textContent, 'On break: destroy the item');
+    assert.equal(root.querySelector('[data-tool-preview-prerequisites]').textContent, '1 prerequisite');
+    assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof');
+    assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /5 uses.*@prof/);
+    assert.equal(root.querySelector('[data-tool-preview-live-update]'), null);
   });
 
   it('localizes effective behavior states instead of exposing stored mode tokens', async () => {

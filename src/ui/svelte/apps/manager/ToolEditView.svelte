@@ -84,12 +84,12 @@
       <div class="manager-tool-edit-actions">
         <span class={`manager-tool-edit-status ${dirty ? 'is-warning' : 'is-positive'}`} data-tool-editor-status>
           <i class={dirty ? 'fas fa-pen' : 'fas fa-circle-check'} aria-hidden="true"></i>
-          {dirty ? text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved') : text('FABRICATE.Admin.Manager.Tools.Editor.Saved', 'Saved')}
+          {dirty ? text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved') : text('FABRICATE.Admin.Manager.Tools.Editor.Saved', 'All changes saved')}
         </span>
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
-        <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Back', 'Back to Tools')}</span></button>
-        <button type="button" class="manager-button is-danger" data-tool-editor-delete onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete Tool')}</span></button>
-        <button type="button" class="manager-button is-primary" data-tool-editor-save onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save Tool')}</span></button>
+        <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Back', 'Back')}</span></button>
+        <button type="button" class="manager-button is-danger" data-tool-editor-delete aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.DeleteLabel', 'Delete Tool')} onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete')}</span></button>
+        <button type="button" class="manager-button is-primary" data-tool-editor-save aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool')} onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save tool')}</span></button>
       </div>
     </div>
   </header>
@@ -125,6 +125,6 @@
         <ToolValidationTab {tool} {authority} {validation} {saveError} {focusValidationNonce} />
       {/if}
     </div>
-    <ToolBehaviorPreview {tool} {authority} {managedItems} />
+    <ToolBehaviorPreview {tool} {authority} {managedItems} {activeTab} />
   </div>
 </main>
