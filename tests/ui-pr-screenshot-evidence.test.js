@@ -86,18 +86,18 @@ function withScreenshotFixtures(fixtures, runAssert) {
 }
 
 const TOOL_STUDIO_VIEWS = [
-  ['01-library-1280x720', 'manager-tool-parity-01-library-1280x720', 1212, 686],
-  ['02-overview-1280x720', 'manager-tool-parity-02-overview-1280x720', 1212, 686],
-  ['03-breakage-1280x720', 'manager-tool-parity-03-breakage-1280x720', 1212, 686],
-  ['04-requirements-1280x720', 'manager-tool-parity-04-requirements-1280x720', 1212, 686],
-  ['05-validation-1280x720', 'manager-tool-parity-05-validation-1280x720', 1212, 686],
-  ['06-breakage-900x700', 'manager-tool-parity-06-breakage-900x700', 832, 666],
-  ['stress-long-name', 'manager-tool-stress-long-name', 1212, 686],
-  ['stress-repair', 'manager-tool-stress-repair', 1212, 686],
-  ['stress-replacement', 'manager-tool-stress-replacement', 1212, 686],
-  ['stress-immune', 'manager-tool-stress-immune', 1212, 686],
-  ['stress-invalid-validation', 'manager-tool-stress-invalid-validation', 1212, 686],
-  ['stress-wrapping-680', 'manager-tool-stress-wrapping-680', 612, 666],
+  ['01-library-1280x720', 'manager-tool-parity-01-library-1280x720', 1212, 682],
+  ['02-overview-1280x720', 'manager-tool-parity-02-overview-1280x720', 1212, 682],
+  ['03-breakage-1280x720', 'manager-tool-parity-03-breakage-1280x720', 1212, 682],
+  ['04-requirements-1280x720', 'manager-tool-parity-04-requirements-1280x720', 1212, 682],
+  ['05-validation-1280x720', 'manager-tool-parity-05-validation-1280x720', 1212, 682],
+  ['06-breakage-900x700', 'manager-tool-parity-06-breakage-900x700', 832, 662],
+  ['stress-long-name', 'manager-tool-stress-long-name', 1212, 682],
+  ['stress-repair', 'manager-tool-stress-repair', 1212, 682],
+  ['stress-replacement', 'manager-tool-stress-replacement', 1212, 682],
+  ['stress-immune', 'manager-tool-stress-immune', 1212, 682],
+  ['stress-invalid-validation', 'manager-tool-stress-invalid-validation', 1212, 682],
+  ['stress-wrapping-680', 'manager-tool-stress-wrapping-680', 612, 662],
 ];
 
 function toolStudioEvidenceFixtures({
@@ -826,7 +826,7 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  it('rejects duplicate candidates, wrong parity dimensions, and stress-substituted parity evidence', () => {
+  it('rejects duplicate candidates, old or wrong parity dimensions, and stress-substituted evidence', () => {
     const duplicateLabel = TOOL_STUDIO_VIEWS[0][1];
     const cases = [
       [
@@ -841,6 +841,18 @@ describe('UI PR screenshot evidence', () => {
           capturePatch: ({ index }) => index === 0 ? { width: 1200 } : {},
         }),
         /Wrong Tool Studio dimensions/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ index }) => index === 0 ? { height: 686 } : {},
+        }),
+        /Wrong Tool Studio dimensions for 01-library-1280x720: 1212x686; expected 1212x682/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ index }) => index === 5 ? { height: 666 } : {},
+        }),
+        /Wrong Tool Studio dimensions for 06-breakage-900x700: 832x666; expected 832x662/,
       ],
       [
         toolStudioEvidenceFixtures({
