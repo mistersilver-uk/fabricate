@@ -67,6 +67,26 @@
       </li>
     {/each}
   </ul>
+  <section class="manager-tool-how-it-works" data-tool-how-it-works>
+    <h3><i class="fas fa-circle-question" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.HowToolsWorkTitle', 'How Tools work in Fabricate')}</h3>
+    <ol>
+      <li><i class="fas fa-link" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFrom', 'Made from a game-world Item.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFromHint', 'Drag any Item into the Tool Studio to turn it into a Tool. The Item supplies the name, art, and description.')}</span></li>
+      <li><i class="fas fa-list-check" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceRequired', 'Required by recipes.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceRequiredHint', 'Recipes refer to this Tool’s library identity when they require it for crafting.')}</span></li>
+      <li><i class="fas fa-recycle" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvage', 'Used when salvaging components.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvageHint', 'Component salvage can require this Tool and apply its eligible check bonus.')}</span></li>
+      <li><i class="fas fa-user-shield" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisites', 'Character prerequisites.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisitesHint', 'Shared character prerequisites decide who can use the Tool or receive its bonus.')}</span></li>
+      <li><i class="fas fa-plus-minus" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceBonus', 'Check bonus.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceBonusHint', 'An enabled bonus adds its expression to eligible crafting checks.')}</span></li>
+      <li><i class="fas fa-heart-crack" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceWearOut', 'Breakage.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceWearOutHint', 'Breakage controls decide when this Tool wears out and what happens next.')}</span></li>
+    </ol>
+    <a
+      class="manager-button is-ghost manager-tool-docs-link"
+      href="https://mistersilver-uk.github.io/fabricate/tools"
+      target="_blank"
+      rel="noreferrer"
+    >
+      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Tools.Editor.ReadDocs', 'Read the docs')}</span>
+    </a>
+  </section>
   {#if activeTab === 'validation'}
     <aside class="manager-tool-preview-live" data-tool-preview-live-update><i class="fas fa-circle-check" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate', 'This preview updates live as you change the controls on the left.')}</span></aside>
   {/if}

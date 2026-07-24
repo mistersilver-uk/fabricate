@@ -1,8 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
+  import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Stepper from '../../../components/Stepper.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
   import ToolRepairRequirements from './ToolRepairRequirements.svelte';
@@ -11,13 +12,11 @@
     tool = null,
     authority = 'toolSpecific',
     componentOptions = [],
-    worldItems = [],
     itemTags = [],
     essenceOptions = [],
     currencyUnits = [],
     currencyEnabled = false,
     onPatch = () => {},
-    onReplacementItemDrop = () => {},
   } = $props();
   function text(key, fallback) {
     const translated = localize(key);
@@ -32,14 +31,12 @@
   }
   let configs = $state(createBreakageConfigs());
   let cachedToolId = $state(Symbol('uncached-tool'));
-  let replacementTypeChoice = $state('component');
   const immune = $derived(authority === 'checkDriven' && tool?.checkBreakable === false);
   const onBreak = $derived(tool?.onBreak || { mode: 'destroy' });
 
   $effect(() => {
     if (tool?.id === cachedToolId) return;
     configs = createBreakageConfigs(tool?.breakage);
-    replacementTypeChoice = tool?.onBreak?.replacementTarget?.type || 'component';
     cachedToolId = tool?.id ?? null;
   });
 
@@ -55,14 +52,13 @@
     onPatch({ onBreak: { ...onBreak, ...patch } });
   }
   function setOnBreakMode(mode) {
-    onPatch({ onBreak: mode === 'replaceWith' ? { mode, replacementTarget: onBreak.replacementTarget || null } : { mode } });
+    const retainedTarget = onBreak.replacementTarget?.type === 'component'
+      ? onBreak.replacementTarget
+      : null;
+    onPatch({ onBreak: mode === 'replaceWith' ? { mode, replacementTarget: retainedTarget } : { mode } });
   }
-  function setReplacement(type, value) {
-    patchOnBreak({ replacementTarget: type === 'component' ? { type, componentId: value } : { type, itemUuid: value } });
-  }
-  function setReplacementType(type) {
-    replacementTypeChoice = type;
-    setReplacement(type, '');
+  function setReplacement(componentId) {
+    patchOnBreak({ replacementTarget: { type: 'component', componentId } });
   }
   const breakageModeOptions = $derived(['limitedUses', 'breakageChance', 'diceExpression'].map((mode) => ({
     value: mode,
@@ -90,20 +86,6 @@
     description: onBreakModeDescription(mode),
     icon: onBreakModeIcon(mode),
   })));
-  const replacementTypeOptions = $derived([
-    {
-      value: 'component',
-      label: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponent', 'Managed Component'),
-      description: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponentHint', 'Replace with a Component managed by this crafting system.'),
-      icon: 'fas fa-cube',
-    },
-    {
-      value: 'item',
-      label: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementItem', 'Direct Item'),
-      description: text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementItemHint', 'Replace with a dropped world or compendium Item.'),
-      icon: 'fas fa-box',
-    },
-  ]);
   const componentPickerOptions = $derived(componentOptions.map((option) => ({
     id: option.id,
     label: option.name,
@@ -112,12 +94,6 @@
   const selectedComponent = $derived(
     componentOptions.find((option) => option.id === onBreak.replacementTarget?.componentId)
   );
-  const replacementItem = $derived.by(() => {
-    if (onBreak.replacementTarget?.type !== 'item' || !onBreak.replacementTarget.itemUuid) return null;
-    const uuid = onBreak.replacementTarget.itemUuid;
-    const resolved = worldItems.find((item) => item.uuid === uuid);
-    return resolved || { uuid, name: uuid, img: 'icons/svg/item-bag.svg' };
-  });
   function breakageModeLabel(mode) {
     return {
       limitedUses: text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses'),
@@ -143,14 +119,14 @@
     return {
       destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy the item'),
       flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlag', 'Mark as broken'),
-      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with item'),
+      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with component'),
     }[mode];
   }
   function onBreakModeDescription(mode) {
     return {
       destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroyHint', 'The tool is consumed and removed.'),
       flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlagHint', 'Sets a broken flag; appends " (Broken)".'),
-      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplaceHint', 'Swap it for another item.'),
+      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplaceHint', 'Replace it with a managed Component that can participate in repair routes.'),
     }[mode];
   }
   function onBreakModeIcon(mode) {
@@ -187,6 +163,7 @@
         optionDataAttr="data-tool-breakage-choice"
         onChange={changeMode}
       />
+      <hr class="manager-tool-breakage-config-divider" data-tool-breakage-config-divider />
       {#if tool?.breakage?.mode === 'limitedUses'}
         <div class="manager-tool-breakage-config" data-tool-limited-uses-stepper>
           <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopy', 'Uses per copy')}</p><small>{text('FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopyHint', 'A fresh copy starts with this many uses.')}</small></div>
@@ -202,9 +179,24 @@
         </div>
         <aside class="manager-tool-info-strip" data-tool-limited-uses-info><i class="fas fa-circle-info" aria-hidden="true"></i><p>{text('FABRICATE.Admin.Manager.Tools.Editor.PerCopyInfo', 'Each copy tracks its own remaining uses. A character inventory, not this archetype, records that remaining count.')}</p></aside>
       {:else if tool?.breakage?.mode === 'breakageChance'}
-        <label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageChancePercent', 'Break chance (%)')}</span><input data-tool-breakage-chance type="number" min="0" max="100" value={tool.breakage.breakageChance ?? 0} oninput={(event) => patchBreakage({ breakageChance: Number(event.currentTarget.value) })} /></label>
+        <section class="manager-tool-breakage-chance-card" data-tool-breakage-chance>
+          <div>
+            <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.BreakageChancePerUse', 'Break chance per use')}</p>
+            <p>{text('FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint', 'Each time the Tool is used, this percentage is its chance to break.')}</p>
+          </div>
+          <ChanceSlider
+            value={tool.breakage.breakageChance ?? 0}
+            numberLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChancePercent', 'Break chance percent')}
+            rangeLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}
+            resolveColor={toolBreakageChanceColor}
+            controlClass="manager-tool-breakage-chance-control"
+            numberInputProps={{ 'data-tool-breakage-chance-input': '' }}
+            rangeInputProps={{ 'data-tool-breakage-chance-range': '' }}
+            onChange={(breakageChance) => patchBreakage({ breakageChance })}
+          />
+        </section>
       {:else}
-        <div class="manager-tool-inline-fields"><label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span><input data-tool-breakage-formula value={tool?.breakage?.formula || ''} oninput={(event) => patchBreakage({ formula: event.currentTarget.value })} /></label><label><span>{text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}</span><input data-tool-breakage-threshold type="number" value={tool?.breakage?.threshold ?? 0} oninput={(event) => patchBreakage({ threshold: Number(event.currentTarget.value) })} /></label></div>
+        <div class="manager-tool-inline-fields"><label class="manager-recipe-field"><span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span><input class="manager-recipe-name-input" data-tool-breakage-formula value={tool?.breakage?.formula || ''} oninput={(event) => patchBreakage({ formula: event.currentTarget.value })} /></label><label class="manager-recipe-field"><span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}</span><input class="manager-recipe-name-input" data-tool-breakage-threshold type="number" value={tool?.breakage?.threshold ?? 0} oninput={(event) => patchBreakage({ threshold: Number(event.currentTarget.value) })} /></label></div>
       {/if}
     {:else}
       <RadioCardGroup
@@ -235,42 +227,28 @@
       optionDataAttr="data-tool-on-break-choice"
       onChange={setOnBreakMode}
     />
+    <hr class="manager-tool-on-break-divider" data-tool-on-break-divider />
     {#if onBreak.mode === 'replaceWith'}
-      <div class="manager-tool-replacement-stack" data-tool-replacement-target>
-        <RadioCardGroup
-          legend={text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementType', 'Replacement target type')}
-          options={replacementTypeOptions}
-          selectedValue={replacementTypeChoice}
-          groupName="tool-replacement-type"
-          columns={2}
-          dataGroup="tool-replacement-type"
-          onChange={setReplacementType}
+      <section class="manager-tool-repair manager-tool-replacement-card" data-tool-replacement-target>
+        <div>
+          <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponent', 'Replacement component')}</p>
+          <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}</h3>
+          <p>{text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponentHint', 'Choose the managed Component produced when this Tool breaks.')}</p>
+        </div>
+        <SearchablePopover
+          options={componentPickerOptions}
+          value={selectedComponent?.id || ''}
+          triggerClass="manager-button manager-tool-replacement-component-trigger"
+          triggerIcon="fas fa-cube"
+          triggerImg={selectedComponent?.img || ''}
+          triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+          valueClass="manager-tool-replacement-component-name"
+          triggerAriaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+          dialogAriaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
+          onChoose={setReplacement}
         />
-        {#if replacementTypeChoice === 'component'}
-          <SearchablePopover
-            options={componentPickerOptions}
-            value={selectedComponent?.id || ''}
-            triggerClass="manager-button manager-tool-replacement-component-trigger"
-            triggerIcon="fas fa-cube"
-            triggerImg={selectedComponent?.img || ''}
-            triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
-            triggerAriaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
-            dialogAriaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
-            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-            onChoose={(value) => setReplacement('component', value)}
-          />
-        {:else}
-          <ItemDropZone
-            kind="tool-replacement"
-            item={replacementItem}
-            title={text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementDropTitle', 'Drop a replacement Item here')}
-            hint={text('FABRICATE.Admin.Manager.Tools.Editor.ReplacementDropHint', 'Drop a world or compendium Item to replace the current target.')}
-            onDrop={onReplacementItemDrop}
-            unlinkLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ClearReplacement', 'Clear replacement Item')}
-            onUnlink={replacementItem ? () => setReplacement('item', '') : null}
-          />
-        {/if}
-      </div>
+      </section>
     {/if}
     {#if onBreak.mode === 'flagBroken'}
       <ToolRepairRequirements

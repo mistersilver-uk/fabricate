@@ -67,6 +67,7 @@ import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -1926,9 +1927,13 @@ export class InventoryListingBuilder {
     for (const group of Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []) {
       this._indexIngredientOptions(group, ctx);
     }
-    for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
-      const componentId = ctx.toolComponentById.get(toolId);
-      if (componentId) ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+    if (ingredientSetToolsAreActive(ctx.system, set)) {
+      for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
+        const componentId = ctx.toolComponentById.get(toolId);
+        if (componentId) {
+          ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+        }
+      }
     }
     for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
       if (Number(quantity) > 0) {

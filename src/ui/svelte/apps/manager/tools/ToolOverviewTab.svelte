@@ -47,18 +47,6 @@
     </div>
   </section>
 
-  <section class="manager-tool-how-it-works" data-tool-overview-region="guidance" data-tool-how-it-works>
-    <h3><i class="fas fa-circle-question" aria-hidden="true"></i>{text('FABRICATE.Admin.Manager.Tools.Editor.HowToolsWorkTitle', 'How Tools work in Fabricate')}</h3>
-    <ol>
-      <li><i class="fas fa-link" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFrom', 'Made from a game-world Item.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFromHint', 'Drag any Item into the Tool Studio to turn it into a Tool. The Item supplies the name, art, and description above.')}</span></li>
-      <li><i class="fas fa-list-check" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceRequired', 'Required by recipes.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceRequiredHint', 'Recipes refer to this Tool’s library identity when they require it for crafting.')}</span></li>
-      <li><i class="fas fa-recycle" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvage', 'Used when salvaging components.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvageHint', 'Component salvage can require this Tool and apply its eligible check bonus.')}</span></li>
-      <li><i class="fas fa-user-shield" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisites', 'Character prerequisites.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisitesHint', 'Shared character prerequisites decide who can use the Tool or receive its bonus.')}</span></li>
-      <li><i class="fas fa-plus-minus" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceBonus', 'Check bonus.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceBonusHint', 'An enabled bonus adds its expression to eligible crafting checks.')}</span></li>
-      <li><i class="fas fa-heart-crack" aria-hidden="true"></i><span><strong>{text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceWearOut', 'Breakage.')}</strong> {text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceWearOutHint', 'Breakage controls decide when this Tool wears out and what happens next.')}</span></li>
-    </ol>
-  </section>
-
   <section class="manager-tool-overview-fields" data-tool-overview-region="identity">
     <label class="manager-recipe-field"><span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Tools.LabelField', 'Display label')}</span><input class="manager-recipe-name-input" data-tool-label value={tool?.label || ''} placeholder={toolDisplayName(tool, managedItems)} oninput={(event) => onPatch({ label: event.currentTarget.value })} /><small>{text('FABRICATE.Admin.Manager.Tools.Editor.LabelFallback', 'Leave blank to use the linked Item name.')}</small></label>
   </section>
@@ -66,7 +54,7 @@
   <section class="manager-tool-overview-enabled" data-tool-overview-region="enabled" data-tool-enabled>
     <ToggleCard
       variant="is-enabled"
-      icon="fas fa-circle-check"
+      icon="fas fa-power-off"
       title={text('FABRICATE.Admin.Manager.Tools.Editor.Enabled', 'Tool enabled')}
       sub={text('FABRICATE.Admin.Manager.Tools.Editor.EnabledHint', 'Recipes can require this Tool while it is enabled.')}
       on={tool?.enabled !== false}

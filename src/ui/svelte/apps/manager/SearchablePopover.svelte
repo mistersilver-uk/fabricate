@@ -112,16 +112,24 @@
   });
   const isGrouped = $derived(groupedOptions.length > 0);
 
-  function close() {
+  function close({ restoreFocus = true } = {}) {
     open = false;
     search = '';
+    if (restoreFocus) {
+      queueMicrotask(() => {
+        if (triggerButton?.isConnected !== false) triggerButton?.focus?.();
+      });
+    }
   }
 
   function toggle(event) {
     event.stopPropagation();
     if (disabled) return;
-    open = !open;
-    if (!open) search = '';
+    if (open) {
+      close({ restoreFocus: false });
+      return;
+    }
+    open = true;
   }
 
   function choose(id) {
@@ -214,7 +222,7 @@
 <div
   class={`manager-travel-picker ${pickerClass}`}
   bind:this={pickerRoot}
-  use:dismissOnOutsideClick={{ enabled: open, onDismiss: close, additionalNodes: () => [popoverRoot] }}
+  use:dismissOnOutsideClick={{ enabled: open, onDismiss: () => close(), additionalNodes: () => [popoverRoot] }}
 >
   <button
     type="button"

@@ -43,7 +43,7 @@ const RAW_MODULES = [
   // leaf (issue 549).
   'src/utils/recipeActivationMessages.js',
   // The resolution-mode banner reuses the CANONICAL option list (value/icon/label/
-   // desc) rather than re-authoring a MODE_INFO table. It was not in this allowlist
+  // desc) rather than re-authoring a MODE_INFO table. It was not in this allowlist
   // before, and a missing raw module HANGS the suite (`# cancelled`) instead of
   // failing it.
   'src/ui/svelte/apps/manager/resolutionModeOptions.js',
@@ -99,7 +99,6 @@ const editHarness = createMountedComponentHarness({
   compiledModules: RECIPE_COMPILED,
   componentPath: 'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 });
-
 
 const stepsHarness = createMountedComponentHarness({
   repoRoot,
@@ -211,7 +210,10 @@ const POPULATED_SET = Object.freeze({
     Object.freeze({
       id: 'grp-3',
       options: [
-        Object.freeze({ quantity: 1, match: { type: 'essence', essenceId: 'ess-life', amount: 3 } }),
+        Object.freeze({
+          quantity: 1,
+          match: { type: 'essence', essenceId: 'ess-life', amount: 3 },
+        }),
       ],
     }),
   ],
@@ -370,7 +372,9 @@ describe('RecipeEditView (mounted)', () => {
       identityProps({ visibilityEffect: { showAccess: false, showBooksScrolls: true } })
     );
     assert.deepEqual(
-      [...knowledge.querySelectorAll('[data-recipe-tab-button]')].map((b) => b.dataset.recipeTabButton),
+      [...knowledge.querySelectorAll('[data-recipe-tab-button]')].map(
+        (b) => b.dataset.recipeTabButton
+      ),
       ['overview', 'ingredients', 'results', 'tools', 'books-scrolls', 'validation'],
       'an item/knowledge system teaches through books, so Books & Scrolls joins the strip'
     );
@@ -380,7 +384,9 @@ describe('RecipeEditView (mounted)', () => {
       identityProps({ visibilityEffect: { showAccess: true, showBooksScrolls: false } })
     );
     assert.deepEqual(
-      [...restricted.querySelectorAll('[data-recipe-tab-button]')].map((b) => b.dataset.recipeTabButton),
+      [...restricted.querySelectorAll('[data-recipe-tab-button]')].map(
+        (b) => b.dataset.recipeTabButton
+      ),
       ['overview', 'ingredients', 'results', 'tools', 'access', 'validation'],
       'a restricted system grants per recipe, so Access joins the strip'
     );
@@ -418,7 +424,11 @@ describe('RecipeEditView (mounted)', () => {
     select.value = 'tier-hard';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await flushRender();
-    assert.deepEqual(patches.at(-1), { checkTierId: 'tier-hard' }, 'selecting a tier stages checkTierId');
+    assert.deepEqual(
+      patches.at(-1),
+      { checkTierId: 'tier-hard' },
+      'selecting a tier stages checkTierId'
+    );
     editHarness.remount();
   });
 
@@ -438,7 +448,10 @@ describe('RecipeEditView (mounted)', () => {
       })
     );
     const field = target.querySelector('[data-recipe-min-success-tier]');
-    assert.ok(field, 'the Minimum success tier dropdown renders when the wrapper forwards the options');
+    assert.ok(
+      field,
+      'the Minimum success tier dropdown renders when the wrapper forwards the options'
+    );
     const select = field.querySelector('[data-recipe-field="minSuccessOutcomeId"]');
     const values = [...select.querySelectorAll('option')].map((o) => o.value);
     assert.deepEqual(values, ['', 'tier-b', 'tier-c'], 'default option + the two success tiers');
@@ -470,7 +483,10 @@ describe('RecipeEditView (mounted)', () => {
       })
     );
     const field = target.querySelector('[data-recipe-crafting-modifier]');
-    assert.ok(field, 'the crafting-modifier override control renders when the wrapper forwards options');
+    assert.ok(
+      field,
+      'the crafting-modifier override control renders when the wrapper forwards options'
+    );
     const select = field.querySelector('[data-recipe-field="craftingModifierPolicy"]');
     assert.equal(select.value, 'byRecipe', 'reflects the recipe override policy');
     assert.deepEqual(
@@ -481,8 +497,15 @@ describe('RecipeEditView (mounted)', () => {
     // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
     assert.ok(picker, 'the eligible-modifier picker shows for an active override');
-    assert.ok(picker.querySelector('[data-modifier-pill="med"]'), 'the selected modifier renders as a pill');
-    assert.equal(picker.querySelector('[data-modifier-pill="alch"]'), null, 'an unselected modifier is not a pill');
+    assert.ok(
+      picker.querySelector('[data-modifier-pill="med"]'),
+      'the selected modifier renders as a pill'
+    );
+    assert.equal(
+      picker.querySelector('[data-modifier-pill="alch"]'),
+      null,
+      'an unselected modifier is not a pill'
+    );
     // Opening the menu and picking alch stages the combined set.
     picker.querySelector('[data-modifier-pill-menu-button]').click();
     await flushRender();
@@ -551,7 +574,11 @@ describe('RecipeEditView (mounted)', () => {
     );
     const toggle = target.querySelector('[data-recipe-field="enabled"]');
     assert.ok(toggle, 'enable toggle renders');
-    assert.equal(toggle.disabled, true, 'enable is disabled while a blocker is present, not throwing on click');
+    assert.equal(
+      toggle.disabled,
+      true,
+      'enable is disabled while a blocker is present, not throwing on click'
+    );
     editHarness.remount();
   });
 
@@ -779,7 +806,11 @@ describe('RecipeEditView (mounted)', () => {
         recipe: {
           ...RECIPE,
           resultGroups: [
-            { id: 'rg-ok', name: 'On success', results: [{ componentId: 'cmp-herb', quantity: 1 }] },
+            {
+              id: 'rg-ok',
+              name: 'On success',
+              results: [{ componentId: 'cmp-herb', quantity: 1 }],
+            },
           ],
         },
         onUpdateRecipe: () => {},
@@ -919,10 +950,16 @@ describe('RecipeEditView (mounted)', () => {
 
     // No tiers authored at all → "define tiers first".
     const noTiers = await mountResultGroups(groups, {
-      props: { routingProvider: 'check', routedOutcomeTierOptions: [], routedOutcomeTiersDefined: false },
+      props: {
+        routingProvider: 'check',
+        routedOutcomeTierOptions: [],
+        routedOutcomeTiersDefined: false,
+      },
     });
     assert.match(
-      noTiers.target.querySelector('[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty').textContent,
+      noTiers.target.querySelector(
+        '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
+      ).textContent,
       /Define outcome tiers/,
       'with no tiers defined, the hint asks to define tiers'
     );
@@ -930,10 +967,16 @@ describe('RecipeEditView (mounted)', () => {
 
     // Tiers exist but none is a Success → success-filtered options empty, distinct hint.
     const noSuccess = await mountResultGroups(groups, {
-      props: { routingProvider: 'check', routedOutcomeTierOptions: [], routedOutcomeTiersDefined: true },
+      props: {
+        routingProvider: 'check',
+        routedOutcomeTierOptions: [],
+        routedOutcomeTiersDefined: true,
+      },
     });
     assert.match(
-      noSuccess.target.querySelector('[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty').textContent,
+      noSuccess.target.querySelector(
+        '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
+      ).textContent,
       /marked as a Success/,
       'with failure-only tiers, the hint points to marking a tier as Success'
     );
@@ -1080,7 +1123,10 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(durationSection, 'the single-step Overview shows the Duration section');
     // The steppers are ALWAYS visible now (no popover trigger) — the tab is no longer
     // the sole path behind a click (issue 643 §10).
-    assert.ok(durationSection.querySelector('[data-recipe-duration-steppers]'), 'inline duration steppers render');
+    assert.ok(
+      durationSection.querySelector('[data-recipe-duration-steppers]'),
+      'inline duration steppers render'
+    );
     assert.equal(
       durationSection.querySelector('[data-recipe-duration-trigger]'),
       null,
@@ -1180,9 +1226,7 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('hides the single-step Duration card when time requirements are disabled (issue 714)', async () => {
-    const target = await editHarness.mount(
-      identityProps({ timeRequirementsEnabled: false })
-    );
+    const target = await editHarness.mount(identityProps({ timeRequirementsEnabled: false }));
     assert.equal(
       target.querySelector('[data-recipe-section="duration"]'),
       null,
@@ -1192,9 +1236,7 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('shows the single-step Duration card when time requirements are enabled (issue 714)', async () => {
-    const target = await editHarness.mount(
-      identityProps({ timeRequirementsEnabled: true })
-    );
+    const target = await editHarness.mount(identityProps({ timeRequirementsEnabled: true }));
     assert.ok(
       target.querySelector('[data-recipe-section="duration"]'),
       'the single-step Duration card renders when the system time toggle is on'
@@ -1314,7 +1356,11 @@ describe('RecipeEditView (mounted)', () => {
     // shows the recipe's OWN img, never a linked item image.
     const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, recipeItemId: 'ri1', img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
+        recipe: {
+          ...RECIPE,
+          recipeItemId: 'ri1',
+          img: 'icons/consumables/potions/potion-tube-corked-red.webp',
+        },
         onPickImagePath: async () => 'icons/should-not-be-used.webp',
       })
     );
@@ -1343,7 +1389,10 @@ describe('RecipeEditView (mounted)', () => {
       })
     );
     const src = target.querySelector('button[data-recipe-field="img"] img').getAttribute('src');
-    assert.ok(src.includes('blueprint-recipe-alchemical'), 'the bag resolves to the alchemical blueprint');
+    assert.ok(
+      src.includes('blueprint-recipe-alchemical'),
+      'the bag resolves to the alchemical blueprint'
+    );
     assert.equal(src.includes('item-bag'), false, 'the generic bag is not shown');
     editHarness.remount();
   });
@@ -1574,7 +1623,10 @@ describe('RecipeEditView (mounted)', () => {
               resultGroupId: 'grp-out',
               resultMapping: [{ from: 'a', to: 'b' }],
               ingredientGroups: [
-                { id: 'grp-1', options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] },
+                {
+                  id: 'grp-1',
+                  options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
+                },
               ],
             },
             { id: 'set-2', name: 'Secondary', ingredientGroups: [] },
@@ -1606,14 +1658,21 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(copy.name, 'Primary (Copy)', 'the copy name is suffixed for clarity');
     assert.equal(copy.resultGroupId, null, 'the copy drops the result-group routing assignment');
     assert.deepEqual(copy.resultMapping, [], 'the copy drops the result mapping');
-    assert.ok(copy.ingredientGroups[0].id && copy.ingredientGroups[0].id !== 'grp-1', 'nested group ids are re-minted');
+    assert.ok(
+      copy.ingredientGroups[0].id && copy.ingredientGroups[0].id !== 'grp-1',
+      'nested group ids are re-minted'
+    );
     assert.deepEqual(
       copy.ingredientGroups[0].options,
       [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
       'the requirement content is carried verbatim'
     );
     // The deep clone shares no references with the original group.
-    assert.notEqual(copy.ingredientGroups[0], nextSets[0].ingredientGroups[0], 'the copy is a deep clone, not a shared reference');
+    assert.notEqual(
+      copy.ingredientGroups[0],
+      nextSets[0].ingredientGroups[0],
+      'the copy is a deep clone, not a shared reference'
+    );
     editHarness.remount();
   });
 
@@ -1681,9 +1740,7 @@ describe('RecipeEditView (mounted)', () => {
   // Fire a native drag lifecycle event (the handlers read no dataTransfer, so a
   // plain bubbling Event suffices).
   function fireDrag(node, type) {
-    node.dispatchEvent(
-      new globalThis.window.Event(type, { bubbles: true, cancelable: true })
-    );
+    node.dispatchEvent(new globalThis.window.Event(type, { bubbles: true, cancelable: true }));
   }
 
   // Issue 676: grip and order are SIBLINGS, matching the progressive salvage stage row.
@@ -1733,11 +1790,7 @@ describe('RecipeEditView (mounted)', () => {
       ['cmp-water', 'cmp-herb'],
       'the dragged result moves after its drop target'
     );
-    assert.equal(
-      patches.at(-1).resultGroups[0].id,
-      'grp-1',
-      'the group id survives the reorder'
-    );
+    assert.equal(patches.at(-1).resultGroups[0].id, 'grp-1', 'the group id survives the reorder');
     editHarness.remount();
   });
 
@@ -1786,11 +1839,7 @@ describe('RecipeEditView (mounted)', () => {
       ['cmp-herb', 'cmp-herb'],
       'both ordered entries reference the same component'
     );
-    assert.equal(
-      results[0].quantity,
-      1,
-      'the existing entry is untouched (no quantity bump)'
-    );
+    assert.equal(results[0].quantity, 1, 'the existing entry is untouched (no quantity bump)');
     assert.equal(
       Object.prototype.hasOwnProperty.call(results[1], 'quantity'),
       false,
@@ -1859,7 +1908,10 @@ describe('RecipeEditView (mounted)', () => {
     const dc = row.querySelector('[data-recipe-result-difficulty]');
     const move = row.querySelector('[data-recipe-result-move]');
     const remove = row.querySelector('[data-recipe-remove="result-item"]');
-    assert.ok(move.closest('.manager-recipe-option-controls'), 'reorder lives in the row controls, right of the component');
+    assert.ok(
+      move.closest('.manager-recipe-option-controls'),
+      'reorder lives in the row controls, right of the component'
+    );
     assert.ok(
       dc.compareDocumentPosition(move) & Node.DOCUMENT_POSITION_FOLLOWING,
       'reorder follows the difficulty badge'
@@ -1887,7 +1939,11 @@ describe('RecipeEditView (mounted)', () => {
     );
     const status = target.querySelector('[data-recipe-result-order-status]');
     assert.equal(status.getAttribute('aria-live'), 'polite', 'the change is announced politely');
-    assert.match(status.textContent, /Pure Water moved to position 1 of 2/, 'and it names the move');
+    assert.match(
+      status.textContent,
+      /Pure Water moved to position 1 of 2/,
+      'and it names the move'
+    );
     editHarness.remount();
   });
 
@@ -1926,7 +1982,9 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(card.classList.contains('is-info'), 'it wears the info variant');
     assert.ok(card.classList.contains('is-on'), 'an unset recipe reads default-true');
     assert.equal(
-      card.querySelector('[data-recipe-field="allowPlayerResultReorder"]').getAttribute('aria-pressed'),
+      card
+        .querySelector('[data-recipe-field="allowPlayerResultReorder"]')
+        .getAttribute('aria-pressed'),
       'true'
     );
     editHarness.remount();
@@ -1961,12 +2019,29 @@ describe('RecipeEditView (mounted)', () => {
     // through a dropped projection/prop, because the default re-supplies true.
     const { target } = await mountProgressiveResults(
       [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
-      { props: { recipe: { ...RECIPE, complex: false, allowPlayerResultReorder: false, resultGroups: [{ id: 'grp-1', name: '', results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }] }] } } }
+      {
+        props: {
+          recipe: {
+            ...RECIPE,
+            complex: false,
+            allowPlayerResultReorder: false,
+            resultGroups: [
+              {
+                id: 'grp-1',
+                name: '',
+                results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+              },
+            ],
+          },
+        },
+      }
     );
     const card = reorderCard(target);
     assert.ok(card.classList.contains('is-off'), 'an authored false renders off');
     assert.equal(
-      card.querySelector('[data-recipe-field="allowPlayerResultReorder"]').getAttribute('aria-pressed'),
+      card
+        .querySelector('[data-recipe-field="allowPlayerResultReorder"]')
+        .getAttribute('aria-pressed'),
       'false'
     );
     editHarness.remount();
@@ -2142,7 +2217,11 @@ describe('RecipeEditView (mounted)', () => {
 
     const blankRow = target.querySelector('[data-recipe-tool-id="tool-blank"]');
     assert.ok(blankRow, 'a row renders for the unlabelled tool');
-    assert.match(blankRow.textContent, /Iron Tongs/, 'unlabelled tool falls back to the component name');
+    assert.match(
+      blankRow.textContent,
+      /Iron Tongs/,
+      'unlabelled tool falls back to the component name'
+    );
     assert.equal(
       blankRow.textContent.includes('tool-blank') || blankRow.textContent.includes('cmp-tongs'),
       false,
@@ -2150,9 +2229,14 @@ describe('RecipeEditView (mounted)', () => {
     );
 
     const orphanRow = target.querySelector('[data-recipe-tool-id="tool-orphan"]');
-    assert.match(orphanRow.textContent, /Unnamed tool/, 'a tool with no label or component name shows a placeholder');
+    assert.match(
+      orphanRow.textContent,
+      /Unnamed tool/,
+      'a tool with no label or component name shows a placeholder'
+    );
     assert.equal(
-      orphanRow.textContent.includes('tool-orphan') || orphanRow.textContent.includes('cmp-missing'),
+      orphanRow.textContent.includes('tool-orphan') ||
+        orphanRow.textContent.includes('cmp-missing'),
       false,
       'an orphaned tool never shows a raw id'
     );
@@ -2759,12 +2843,7 @@ describe('RecipeEditView (mounted)', () => {
       [...listbox.querySelectorAll('[data-recipe-add]')].map((option) =>
         option.getAttribute('data-recipe-add')
       ),
-      [
-        'alternative-component',
-        'alternative-tag',
-        'alternative-currency',
-        'alternative-essence',
-      ],
+      ['alternative-component', 'alternative-tag', 'alternative-currency', 'alternative-essence'],
       'all four kinds are flat OR alternatives, in order'
     );
     editHarness.remount();
@@ -2783,8 +2862,14 @@ describe('RecipeEditView (mounted)', () => {
     );
     const NEUTRAL = 'Accept instead';
 
-    const trigger = target.querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-or-trigger');
-    assert.equal(trigger.getAttribute('aria-label'), NEUTRAL, 'the trigger is named for the flat Accept instead list');
+    const trigger = target.querySelector(
+      '[data-recipe-group-id="grp-1"] .manager-recipe-or-trigger'
+    );
+    assert.equal(
+      trigger.getAttribute('aria-label'),
+      NEUTRAL,
+      'the trigger is named for the flat Accept instead list'
+    );
 
     await openOrMenu(target, 'grp-1');
     const dialog = document.querySelector('.manager-travel-popover[role="dialog"]');
@@ -2889,7 +2974,9 @@ describe('RecipeEditView (mounted)', () => {
     );
     // A 2-option group renders the box footer of dashed add-buttons.
     assert.ok(
-      target.querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]'),
+      target.querySelector(
+        '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]'
+      ),
       'the essence alternative stays available even with an essence already present'
     );
     assert.equal(patches.length, 0, 'rendering authors nothing');
@@ -3521,77 +3608,100 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('authors the recipe-level Tool bonus map with absent meaning Always', async () => {
-    const patches = [];
-    const target = await editHarness.mount(
-      identityProps({
-        recipe: { ...RECIPE, toolIds: ['tool-hammer'] },
-        toolsLibrary: TOOLS_LIBRARY,
-        onUpdateRecipe: (patch) => patches.push(patch),
-      })
-    );
-    clickTab(target, 'tools');
-    await flushRender();
-    const mode = target.querySelector('[data-recipe-section="tools"] [data-recipe-tool-bonus-mode="tool-hammer"]');
-    assert.equal(mode.value, 'always', 'an absent map entry reads as Always');
-    assert.deepEqual(Array.from(mode.options).map((option) => option.value), ['always', 'highestOnly', 'never']);
-    mode.value = 'highestOnly';
-    mode.dispatchEvent(new Event('change', { bubbles: true }));
-    assert.deepEqual(patches.at(-1).toolBonusModes, { 'tool-hammer': 'highestOnly' });
-    editHarness.remount();
-  });
-
-  it('round-trips Highest only and Never, while choosing Always removes the map entry', async () => {
-    for (const authored of ['highestOnly', 'never']) {
-      const patches = [];
-      const target = await editHarness.mount(
-        identityProps({
-          recipe: { ...RECIPE, toolIds: ['tool-hammer'], toolBonusModes: { 'tool-hammer': authored } },
-          toolsLibrary: TOOLS_LIBRARY,
-          onUpdateRecipe: (patch) => patches.push(patch),
-        })
-      );
-      clickTab(target, 'tools');
-      await flushRender();
-      const mode = target.querySelector('[data-recipe-tool-bonus-mode="tool-hammer"]');
-      assert.equal(mode.value, authored, `${authored} reads back from the recipe map`);
-      mode.value = 'always';
-      mode.dispatchEvent(new Event('change', { bubbles: true }));
-      assert.deepEqual(patches.at(-1).toolBonusModes, {}, 'Always is represented by an absent entry');
-      editHarness.remount();
-    }
-  });
-
-  it('uses one recipe-level bonus map across global, step, and ingredient-set Tool scopes', async () => {
-    const patches = [];
+  it('renders Recipe Tool rows as identity and removal only', async () => {
     const target = await editHarness.mount(
       identityProps({
         recipe: {
           ...RECIPE,
           toolIds: ['tool-hammer'],
           toolBonusModes: { 'tool-hammer': 'never' },
-          steps: [{
-            id: 'sa',
-            name: 'Forge',
-            toolIds: ['tool-hammer'],
-            ingredientSets: [{ id: 'set-a', name: 'Hot forge', toolIds: ['tool-hammer'], ingredientGroups: [] }],
-          }],
         },
-        multiStepEnabled: true,
         toolsLibrary: TOOLS_LIBRARY,
-        onUpdateRecipe: (patch) => patches.push(patch),
       })
     );
     clickTab(target, 'tools');
     await flushRender();
 
-    const selectors = target.querySelectorAll('[data-recipe-tool-bonus-mode="tool-hammer"]');
-    assert.equal(selectors.length, 3, 'global, step, and ingredient-set rows each expose the policy');
-    assert.ok(Array.from(selectors).every((select) => select.value === 'never'));
-    const ingredientSetMode = target.querySelector('[data-recipe-section="step-sa-set-set-a-tools"] [data-recipe-tool-bonus-mode="tool-hammer"]');
-    ingredientSetMode.value = 'highestOnly';
-    ingredientSetMode.dispatchEvent(new Event('change', { bubbles: true }));
-    assert.deepEqual(patches.at(-1).toolBonusModes, { 'tool-hammer': 'highestOnly' });
+    const row = target.querySelector(
+      '[data-recipe-section="tools"] [data-recipe-tool-id="tool-hammer"]'
+    );
+    assert.ok(row, 'the required Tool identity renders');
+    assert.equal(
+      row.querySelectorAll('select, [data-recipe-tool-bonus-mode]').length,
+      0,
+      'Recipe Tool rows expose no policy control'
+    );
+    assert.doesNotMatch(row.textContent, /not consumed|Highest only|Never|Always/i);
+    assert.ok(row.querySelector('[data-recipe-remove="tool"]'), 'the remove action remains');
+    editHarness.remount();
+  });
+
+  it('shows per-set Tool authoring only for named routed-by-ingredients sets', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [
+            {
+              id: 'set-a',
+              name: 'Hot forge',
+              toolIds: ['tool-hammer'],
+              ingredientGroups: [],
+            },
+            {
+              id: 'set-b',
+              name: '  ',
+              toolIds: ['tool-anvil'],
+              ingredientGroups: [],
+            },
+          ],
+        },
+        toolsLibrary: TOOLS_LIBRARY,
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+
+    const cards = target.querySelectorAll('[data-recipe-tools-ingredient-set]');
+    assert.equal(cards.length, 1, 'only the named eligible set gets Tool authoring');
+    assert.equal(cards[0].dataset.recipeToolsIngredientSet, 'set-a');
+    const label = cards[0].querySelector('[data-recipe-tool-set-label]');
+    assert.equal(label.textContent.trim(), 'Hot forge');
+    assert.ok(
+      label.closest('.manager-recipe-ingredient-set-head'),
+      'the Tool scope reuses the Results card header hierarchy'
+    );
+    editHarness.remount();
+  });
+
+  it('hides all per-set Tool authoring outside routed-by-ingredients mode', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'check',
+        recipe: {
+          ...RECIPE,
+          toolIds: ['tool-hammer'],
+          ingredientSets: [
+            {
+              id: 'set-a',
+              name: 'Hot forge',
+              toolIds: ['tool-anvil'],
+              ingredientGroups: [],
+            },
+          ],
+        },
+        toolsLibrary: TOOLS_LIBRARY,
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+
+    assert.equal(target.querySelectorAll('[data-recipe-tools-ingredient-set]').length, 0);
+    assert.ok(
+      target.querySelector('[data-recipe-section="tools"] [data-recipe-tool-id="tool-hammer"]'),
+      'recipe-wide Tool requirements remain visible'
+    );
     editHarness.remount();
   });
 
@@ -3849,7 +3959,11 @@ describe('RecipeEditView (mounted)', () => {
     // Routed modes need multiple result groups (one per outcome / ingredient set), so
     // they keep the Add result set affordance even when no group exists yet.
     const { target } = await mountResultGroups([], {
-      props: { routingProvider: 'check', routedOutcomeTierOptions: TIER_OPTIONS, routedOutcomeTiersDefined: true },
+      props: {
+        routingProvider: 'check',
+        routedOutcomeTierOptions: TIER_OPTIONS,
+        routedOutcomeTiersDefined: true,
+      },
     });
     assert.ok(
       target.querySelector('[data-recipe-add="result-set"]'),
@@ -4477,7 +4591,9 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
 
     // Even a multi-set / multi-step recipe gets no toggle — there is nothing to toggle.
     const multi = await editHarness.mount(
-      identityProps({ recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] } })
+      identityProps({
+        recipe: { ...RECIPE, steps: [{ id: 's1', name: 'Step 1', description: '' }] },
+      })
     );
     assert.equal(
       multi.querySelector('[data-recipe-section="recipe-mode"]'),
@@ -4529,9 +4645,22 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
   const COMPLETE_RECIPE = {
     ...RECIPE,
     ingredientSets: [
-      { id: 'set-1', name: 'Set 1', ingredientGroups: [{ id: 'g1', options: [{ id: 'o1', match: { type: 'component', componentId: 'cmp-herb' }, quantity: 1 }] }] },
+      {
+        id: 'set-1',
+        name: 'Set 1',
+        ingredientGroups: [
+          {
+            id: 'g1',
+            options: [
+              { id: 'o1', match: { type: 'component', componentId: 'cmp-herb' }, quantity: 1 },
+            ],
+          },
+        ],
+      },
     ],
-    resultGroups: [{ id: 'grp-1', name: '', results: [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }] }],
+    resultGroups: [
+      { id: 'grp-1', name: '', results: [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }] },
+    ],
   };
 
   it('renders the aggregate summary + count table as a header on the Validation tab', async () => {
@@ -4547,7 +4676,8 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const firstGroup = target.querySelector('[data-validation-group]');
     assert.ok(firstGroup, 'the grouped checks still render below it');
     assert.ok(
-      summary.compareDocumentPosition(firstGroup) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      summary.compareDocumentPosition(firstGroup) &
+        globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
       'the checks follow the summary'
     );
     editHarness.remount();
@@ -4561,7 +4691,10 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       'no summary while another tab is active'
     );
     await openTab(target, 'validation');
-    assert.ok(target.querySelector('[data-recipe-validation-summary]'), 'it appears on the Validation tab');
+    assert.ok(
+      target.querySelector('[data-recipe-validation-summary]'),
+      'it appears on the Validation tab'
+    );
     editHarness.remount();
   });
 
@@ -4624,8 +4757,16 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
   it('does not reintroduce the rail check mini-list', async () => {
     const target = await openValidation(COMPLETE_RECIPE);
     assert.equal(target.querySelector('[data-recipe-rail-check]'), null, 'no rail check list');
-    assert.equal(target.querySelector('[data-recipe-validation-issues]'), null, 'no rail issue list');
-    assert.equal(target.querySelector('[data-recipe-validation-clear]'), null, 'no rail All-clear pill');
+    assert.equal(
+      target.querySelector('[data-recipe-validation-issues]'),
+      null,
+      'no rail issue list'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-validation-clear]'),
+      null,
+      'no rail All-clear pill'
+    );
     editHarness.remount();
   });
 });

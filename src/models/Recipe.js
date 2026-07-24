@@ -1,4 +1,4 @@
-import { normalizeToolBonusModes } from '../systems/toolCheckBonus.js';
+import { ingredientSetToolsAreActive } from '../systems/toolCheckBonus.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
@@ -65,9 +65,6 @@ export class Recipe {
 
     // Recipe-level shared library tool references (per-system Tool ids).
     this.toolIds = this._normalizeToolIds(data.toolIds);
-    // One recipe-level policy map applies to every Tool scope. Missing entries read
-    // as `always` through getToolBonusMode, keeping legacy recipes unchanged.
-    this.toolBonusModes = normalizeToolBonusModes(data.toolBonusModes);
 
     // Recipe-level duration for the implicit (single) step. Multi-step recipes
     // carry their own per-step `timeRequirement`; this feeds the implicit step
@@ -189,9 +186,10 @@ export class Recipe {
 
   /**
    * Check if this is a simple recipe (no advanced features)
+   * @param {object|null} [craftingSystem]
    * @returns {boolean}
    */
-  isSimpleRecipe() {
+  isSimpleRecipe(craftingSystem = null) {
     // Single ingredient set with exact item matching (no tags)
     const firstSet = this.ingredientSets[0];
     const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
@@ -215,7 +213,10 @@ export class Recipe {
 
     const hasNoTools =
       (this.toolIds?.length || 0) === 0 &&
-      this.ingredientSets.every((set) => (set.toolIds?.length || 0) === 0);
+      this.ingredientSets.every(
+        (set) =>
+          !ingredientSetToolsAreActive(craftingSystem, set) || (set.toolIds?.length || 0) === 0
+      );
     const hasNoVariableOutput = !this.isVariable;
     const hasNoEffectTransfer = !this.transferEffects;
 
@@ -550,7 +551,6 @@ export class Recipe {
         results: group.results.map((r) => r.toJSON()),
       })),
       toolIds: [...this.toolIds],
-      toolBonusModes: { ...this.toolBonusModes },
       timeRequirement: this.timeRequirement,
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map((r) => r.toJSON()),
@@ -845,11 +845,6 @@ export class Recipe {
       out.push(id);
     }
     return out;
-  }
-
-  getToolBonusMode(toolId) {
-    const id = typeof toolId === 'string' ? toolId.trim() : '';
-    return this.toolBonusModes[id] || 'always';
   }
 
   _normalizeVisibility(visibility) {

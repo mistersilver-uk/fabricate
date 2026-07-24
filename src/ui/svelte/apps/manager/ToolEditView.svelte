@@ -42,7 +42,6 @@
     onPatch = () => {},
     onToggleEnabled = () => {},
     onSourceDrop = () => {},
-    onReplacementItemDrop = () => {},
     onCopySourceUuid = () => {},
     onUnlinkSource = () => {},
   } = $props();
@@ -86,7 +85,7 @@
           <p data-tool-editor-source-context>{sourceContext}</p>
         </div>
       </div>
-      <div class="manager-tool-edit-actions">
+      <div class="manager-header-actions manager-tool-edit-actions">
         {#if dirty}<span class="manager-chip is-warning" data-tool-editor-status>{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</span>{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
         <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.BackToTools', 'Back to tools')}</span></button>
@@ -114,13 +113,11 @@
           {tool}
           {authority}
           componentOptions={managedItems}
-          {worldItems}
           {itemTags}
           {essenceOptions}
           {currencyUnits}
           {currencyEnabled}
           {onPatch}
-          {onReplacementItemDrop}
         />
       {:else if activeTab === 'requirements'}
         <ToolRequirementsTab {tool} {prerequisiteOptions} {onPatch} />

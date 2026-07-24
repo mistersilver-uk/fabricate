@@ -483,6 +483,139 @@ test('craft(): records usedTools on the success run record and increments toolUs
   assert.deepEqual(getPath(toolItem._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 1 });
 });
 
+test('craft(): consumes one matching copy and reserves a different physical copy as the Tool', async () => {
+  installSystem();
+  const actorRef = { uuid: 'Actor.a1' };
+  const consumedVial = new FakeItem('vial-consumed', { parent: actorRef });
+  const retainedVial = new FakeItem('vial-retained', {
+    flags: { fabricate: { toolUsage: { timesUsed: 0 } } },
+    parent: actorRef,
+  });
+  consumedVial.componentKind = 'empty-vial';
+  retainedVial.componentKind = 'empty-vial';
+  const fakeTool = {
+    componentId: 'empty-vial',
+    breakage: { mode: 'limitedUses', maxUses: 3 },
+    onBreak: { mode: 'destroy' },
+  };
+  const ingredientSet = fakeIngredientSet(consumedVial);
+  const recipeManager = {
+    canCraft() {
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [], tools: [] },
+      };
+    },
+    getToolsForSet() {
+      return [fakeTool];
+    },
+    toolMatchesItem: (_recipe, tool, item) =>
+      tool === fakeTool && item?.componentKind === 'empty-vial',
+    ingredientMatchesItem: (_recipe, _ingredient, item) => item === consumedVial,
+  };
+  let successPayload = null;
+  const runManager = {
+    findActiveRunForRecipe: () => null,
+    getActiveRun: () => null,
+    async createRun() {
+      return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 };
+    },
+    canProceedTimeGate: () => true,
+    async markStepInProgress(_actor, run) {
+      return run;
+    },
+    async markStepWaitingForTime(_actor, run) {
+      return run;
+    },
+    async completeStepSuccess(_actor, run, _idx, payload) {
+      successPayload = payload;
+      return { ...run, status: 'succeeded' };
+    },
+    async completeStepFailure() {
+      return {};
+    },
+  };
+  const engine = new CraftingEngine(recipeManager, runManager, null);
+  engine._runCraftingCheck = async () => ({
+    success: true,
+    message: 'ok',
+    outcome: null,
+    value: null,
+    data: {},
+  });
+  engine._createResultItems = async () => ({
+    items: [],
+    rollTableMeta: null,
+    resolutionMeta: {},
+  });
+  engine._postCraftChatMessage = async () => {};
+  const sourceActor = {
+    id: 'a1',
+    uuid: 'Actor.a1',
+    items: [consumedVial, retainedVial],
+  };
+  const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
+
+  const result = await engine.craft(
+    craftingActor,
+    [sourceActor],
+    fakeRecipe(ingredientSet),
+    null,
+    {}
+  );
+
+  assert.equal(result.success, true);
+  assert.equal(consumedVial.deleted, true, 'the selected ingredient Item is consumed');
+  assert.equal(retainedVial.deleted, false, 'the distinct Tool Item remains owned');
+  assert.deepEqual(getPath(retainedVial._flags.fabricate, 'fabricate.toolUsage'), {
+    timesUsed: 1,
+  });
+  assert.equal(successPayload.usedTools[0].itemUuid, retainedVial.uuid);
+});
+
+test('craft(): one overlapping physical item blocks before ingredient mutation', async () => {
+  installSystem();
+  const onlyVial = new FakeItem('vial-only');
+  onlyVial.componentKind = 'empty-vial';
+  const fakeTool = {
+    componentId: 'empty-vial',
+    breakage: { mode: 'limitedUses', maxUses: 3 },
+    onBreak: { mode: 'destroy' },
+  };
+  const ingredientSet = fakeIngredientSet(onlyVial);
+  const recipeManager = {
+    canCraft() {
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [], tools: [] },
+      };
+    },
+    getToolsForSet() {
+      return [fakeTool];
+    },
+    toolMatchesItem: (_recipe, tool, item) =>
+      tool === fakeTool && item?.componentKind === 'empty-vial',
+    ingredientMatchesItem: (_recipe, _ingredient, item) => item === onlyVial,
+  };
+  const engine = new CraftingEngine(recipeManager, null, null);
+  const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [onlyVial] };
+  const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
+
+  const result = await engine.craft(
+    craftingActor,
+    [sourceActor],
+    fakeRecipe(ingredientSet),
+    null,
+    {}
+  );
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /Missing required tool/);
+  assert.equal(onlyVial.deleted, false, 'validation fails before any ingredient mutation');
+});
+
 // ---------------------------------------------------------------------------
 // Virtual-present tools (Phase 4: activeCanvasTool injection)
 // ---------------------------------------------------------------------------

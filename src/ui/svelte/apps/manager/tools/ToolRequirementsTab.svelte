@@ -2,7 +2,6 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
-  import { displayRollDataExpression } from '../../../../../systems/characterModifierPrerequisiteCopy.js';
   import ChecklistCardRow from '../ChecklistCardRow.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
@@ -42,7 +41,6 @@
       icon: 'fas fa-plus-minus',
     },
   ]);
-  const bonusPresets = ['@prof', '@abilities.str.mod', '@abilities.dex.mod', '1d4'];
 </script>
 
 <div class="manager-tool-tab-stack" data-tool-requirements-tab>
@@ -91,11 +89,10 @@
         <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
       </label>
     </div>
-    <fieldset disabled={!bonus.enabled}>
-      <label><span>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpression', 'Bonus expression')}</span><RollDataExpressionInput dataField="tool-bonus" value={bonus.expression || ''} placeholder="prof" disabled={!bonus.enabled} onChange={(expression) => patchBonus({ expression })} /></label>
-      <div class="manager-tool-bonus-presets" aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BonusPresets', 'Bonus presets')}>
-        {#each bonusPresets as preset (preset)}<button type="button" class="manager-chip is-neutral" data-tool-bonus-preset={preset} onclick={() => patchBonus({ expression: preset })}>{displayRollDataExpression(preset)}</button>{/each}
-      </div>
-    </fieldset>
+    <label class="manager-tool-bonus-field">
+      <span>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpression', 'Bonus expression')}</span>
+      <RollDataExpressionInput dataField="tool-bonus" value={bonus.expression || ''} placeholder="prof" disabled={!bonus.enabled} onChange={(expression) => patchBonus({ expression })} />
+      <small>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpressionHint', 'Enter a roll-data path without @, or a numeric or dice expression. Roll-data paths are stored with @ automatically.')}</small>
+    </label>
   </section>
 </div>

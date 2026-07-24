@@ -27,10 +27,9 @@
     linkedItem = null,
     onPatch = () => {},
     onLinkItem = () => {},
-    onUnlinkItem = () => {}
+    onUnlinkItem = () => {},
+    onCopyItemUuid = () => {}
   } = $props();
-
-  let copied = $state(false);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -50,17 +49,6 @@
     onLinkItem(droppedUuid);
   }
 
-  async function copyUuid() {
-    if (!uuid) return;
-    try {
-      await globalThis.navigator?.clipboard?.writeText?.(uuid);
-      copied = true;
-      globalThis.setTimeout?.(() => { copied = false; }, 1200);
-    } catch {
-      copied = false;
-    }
-  }
-
   function toggleEnabled() {
     onPatch({ enabled: !enabled });
   }
@@ -76,12 +64,10 @@
         ? text('FABRICATE.Admin.Manager.RecipeItem.Overview.ReplaceHint', 'Drop another Item to replace the linked source.')
         : text('FABRICATE.Admin.Manager.RecipeItem.Overview.DropSub', 'The Item sets this recipe item’s name and description.')}
       kind="recipe-item"
-      copyLabel={copied
-        ? text('FABRICATE.Common.Copied', 'Copied')
-        : text('FABRICATE.Admin.Manager.RecipeItem.Overview.CopyUuid', 'Copy UUID')}
+      copyLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.CopyUuid', 'Copy UUID')}
       unlinkLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Unlink', 'Unlink item')}
       onDrop={handleItemDrop}
-      onCopy={hasLink ? copyUuid : null}
+      onCopy={hasLink ? () => onCopyItemUuid(uuid) : null}
       onUnlink={hasLink ? onUnlinkItem : null}
     />
   </div>

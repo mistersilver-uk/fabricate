@@ -20,7 +20,7 @@ Then choose the system's **Tool breakage outcome** under **Gathering Rules**.
 
 1. Open the Crafting System Manager and select the crafting system.
 2. Open the top-level **Tools** page.
-3. Create the Tool from a world or compendium Item, or drop a managed Component onto the library.
+3. Create the Tool by dropping a world or compendium Item onto the library.
 4. Open **Breakage** in the Tool editor.
 5. Under a **Tool-specific** breakage source, choose **Limited uses**, **Breakage chance**, or **Dice expression**.
 6. Under a **Check-driven** breakage source, choose whether this Tool is **Breakable** or **Immune**.
@@ -68,8 +68,8 @@ See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-n
 ## Learn more
 
 - [Tools]({% link tools.md %}).
-Learn the complete shared Tool authoring workflow.
+  Learn the complete shared Tool authoring workflow.
 - [Degrading Tools]({% link how-to/degrading-tools.md %}).
-Build a limited-use crafting Tool.
+  Build a limited-use crafting Tool.
 - [Canvas Interactables]({% link canvas-interactables.md %}).
-Provide a Tool station without requiring actor ownership.
+  Provide a Tool station without requiring actor ownership.

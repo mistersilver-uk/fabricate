@@ -23,7 +23,7 @@ import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
-import { normalizeToolBonusModes, resolveToolPrerequisites } from './toolCheckBonus.js';
+import { ingredientSetToolsAreActive, resolveToolPrerequisites } from './toolCheckBonus.js';
 
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
@@ -34,6 +34,22 @@ const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 // resolves to an inventory item — always shows a coin icon.
 const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
 const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
+
+/**
+ * The concrete owned Item documents reserved by an ingredient selection.
+ * A physical Item cannot simultaneously be consumed as an ingredient and
+ * participate as a reusable Tool in the same attempt.
+ *
+ * @param {object|null} selection
+ * @returns {Set<object>}
+ */
+function selectedIngredientItems(selection) {
+  return new Set(
+    (Array.isArray(selection?.plan) ? selection.plan : [])
+      .map((entry) => entry?.item)
+      .filter(Boolean)
+  );
+}
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -512,6 +528,10 @@ export class RecipeManager {
     // the fallback display path.
     let satisfiableSet = null;
     let satisfiableSetSelection = null;
+    let satisfiableToolStates = null;
+    let ingredientSatisfiableSet = null;
+    let ingredientSatisfiableSelection = null;
+    let ingredientSatisfiableToolStates = null;
 
     // Also keep the first-set selection for the "unsatisfied" display fallback.
     let firstSetSelection = null;
@@ -556,9 +576,25 @@ export class RecipeManager {
       }
 
       if (selection.success && essencesMet) {
-        satisfiableSet = ingredientSet;
-        satisfiableSetSelection = selection;
-        break;
+        const candidateTools = this.getToolsForSet(recipe, ingredientSet);
+        const candidateToolStates = this.resolveToolStates(recipe, candidateTools, sourceActors, {
+          presentTools,
+          primaryActor: craftingActor,
+          excludedItems: selectedIngredientItems(selection),
+        });
+
+        if (ingredientSatisfiableSet === null) {
+          ingredientSatisfiableSet = ingredientSet;
+          ingredientSatisfiableSelection = selection;
+          ingredientSatisfiableToolStates = candidateToolStates;
+        }
+
+        if (candidateToolStates.every((state) => state?.available === true)) {
+          satisfiableSet = ingredientSet;
+          satisfiableSetSelection = selection;
+          satisfiableToolStates = candidateToolStates;
+          break;
+        }
       }
     }
 
@@ -566,25 +602,29 @@ export class RecipeManager {
     // (or first set as fallback). Reuses the gathering tool matcher path so the
     // presence check agrees with attempt validation. Tools resolve from the
     // per-system library via `toolIds`.
-    const displaySet = satisfiableSet || firstSet;
+    const displaySet = satisfiableSet || ingredientSatisfiableSet || firstSet;
+    const displaySelection =
+      satisfiableSetSelection || ingredientSatisfiableSelection || firstSetSelection;
     const toolsForSet = this.getToolsForSet(recipe, displaySet);
-    const toolStates = this.resolveToolStates(recipe, toolsForSet, sourceActors, {
-      presentTools,
-      primaryActor: craftingActor,
-      ingredientSet: displaySet,
-    });
+    const toolStates =
+      satisfiableToolStates ||
+      ingredientSatisfiableToolStates ||
+      this.resolveToolStates(recipe, toolsForSet, sourceActors, {
+        presentTools,
+        primaryActor: craftingActor,
+        excludedItems: selectedIngredientItems(displaySelection),
+      });
     const missingTools = toolsForSet.filter((_tool, idx) => !toolStates[idx].available);
 
     // Final craftability: ingredients satisfied AND tools present.
-    const canCraft = satisfiableSet !== null && missingTools.length === 0;
+    const canCraft = satisfiableSet !== null;
 
     // Build ingredient display states from the selection result that matches
     // the craftability decision — ensuring they are always consistent.
     //
     // If craftable: use satisfiableSetSelection (all groups satisfied).
     // If not craftable: use firstSetSelection (shows what is missing from set 0).
-    const displaySelection = canCraft ? satisfiableSetSelection : firstSetSelection;
-    const displayIngredientSet = canCraft ? satisfiableSet : firstSet;
+    const displayIngredientSet = displaySet;
 
     const ingredientStates = this._buildIngredientStates(
       recipe,
@@ -742,7 +782,7 @@ export class RecipeManager {
         sourceActors,
         {
           primaryActor: craftingActor,
-          ingredientSet: set,
+          excludedItems: selectedIngredientItems(selection),
         }
       );
       for (const tool of toolStates) {
@@ -784,14 +824,16 @@ export class RecipeManager {
     recipe,
     tools,
     sourceActors,
-    { presentTools = null, primaryActor = null, ingredientSet = null } = {}
+    { presentTools = null, primaryActor = null, excludedItems = null } = {}
   ) {
     const actors = Array.isArray(sourceActors) ? sourceActors : sourceActors ? [sourceActors] : [];
-    const availableItems = actors.flatMap((actor) => [...(actor?.items ?? [])]);
+    const excluded = excludedItems instanceof Set ? excludedItems : new Set(excludedItems);
+    const availableItems = actors
+      .flatMap((actor) => [...(actor?.items ?? [])])
+      .filter((item) => !excluded.has(item));
     return this._buildToolStates(recipe, tools, availableItems, presentTools, {
       sourceActors: actors,
       primaryActor,
-      ingredientSet,
     });
   }
 
@@ -800,7 +842,7 @@ export class RecipeManager {
     tools,
     availableItems,
     presentTools = null,
-    { sourceActors = [], primaryActor = null, ingredientSet = null } = {}
+    { sourceActors = [], primaryActor = null } = {}
   ) {
     if (!Array.isArray(tools) || tools.length === 0) return [];
     // `matchGatheringTools` scopes the virtual-present set to the system passed
@@ -826,8 +868,6 @@ export class RecipeManager {
     // breakage/usage by the caller).
     const matchedByTool = new Map(matched.items.map((entry) => [entry.tool, entry]));
     const prerequisiteDefinitions = this._getToolPrerequisiteDefinitions(recipe);
-    const recipeModes = normalizeToolBonusModes(recipe?.toolBonusModes);
-    const setModes = normalizeToolBonusModes(ingredientSet?.toolBonusModes);
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
       const componentId = tool?.componentId || tool?.systemItemId;
@@ -837,7 +877,6 @@ export class RecipeManager {
           ? primaryActor
           : this._resolveToolItemActor(entry?.item, sourceActors);
       const gate = this._evaluateToolPrerequisiteGate(tool, actor, prerequisiteDefinitions);
-      const bonusMode = setModes[tool?.id] || recipeModes[tool?.id] || 'always';
       const state = {
         name:
           toolDisplayName ||
@@ -845,7 +884,7 @@ export class RecipeManager {
         img:
           tool?.img ||
           (componentId ? this.resolveComponentImg(recipe, componentId) : FALLBACK_COMPONENT_IMG),
-        available: entry !== null && gate.usable,
+        available: tool?.enabled !== false && entry !== null && gate.usable,
         needsRepair: stateByTool.get(tool) === 'damaged',
         actor,
         bonusEligible: gate.bonusEligible,
@@ -855,7 +894,6 @@ export class RecipeManager {
           matchedItem: entry?.item ?? null,
           primaryActor: actor,
           prerequisiteDefinitions,
-          bonusMode,
         },
       };
       if (entry?.virtual === true) state.virtual = true;
@@ -1480,20 +1518,24 @@ export class RecipeManager {
   }
 
   /**
-   * Resolve the union of recipe-level and ingredient-set-level `toolIds` to
-   * library Tool objects from the recipe's crafting system. Unknown ids are
-   * skipped (resolved to nothing) rather than throwing. Ids are deduped across
-   * the recipe + set tiers so a tool referenced at both granularities resolves
-   * once.
+   * Resolve recipe-wide Tool ids plus any active ingredient-set Tool ids to
+   * library Tool objects from the recipe's crafting system. Set ids are active
+   * only for a named set in routed-by-ingredients mode. Unknown ids are skipped
+   * rather than throwing, and duplicate references resolve once.
    *
    * @param {Recipe} recipe
    * @param {IngredientSet} ingredientSet
    * @returns {Array<object>} resolved library Tool objects
    */
   getToolsForSet(recipe, ingredientSet) {
+    const system = this._resolveCraftingSystem(recipe?.craftingSystemId);
+    if (!system) return [];
+    const ingredientSetToolIds = ingredientSetToolsAreActive(system, ingredientSet)
+      ? ingredientSet?.toolIds
+      : [];
     const ids = [
       ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
-      ...(Array.isArray(ingredientSet?.toolIds) ? ingredientSet.toolIds : []),
+      ...(Array.isArray(ingredientSetToolIds) ? ingredientSetToolIds : []),
     ];
     const seen = new Set();
     const tools = [];
@@ -1501,7 +1543,7 @@ export class RecipeManager {
       const id = String(rawId ?? '').trim();
       if (!id || seen.has(id)) continue;
       seen.add(id);
-      const tool = this._getTool(recipe, id);
+      const tool = (system.tools || []).find((entry) => entry?.id === id) || null;
       if (tool) tools.push(tool);
     }
     return tools;

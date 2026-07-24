@@ -122,7 +122,7 @@ The two heroes' ids are recorded at seed time, and Travel seeding selects the pa
 Grant-only actors seeded for the Access-tab grid are additionally namespaced with `flags.fabricate.smokeSeedRole = 'access-grant'` to distinguish them from the two hero fixtures; cleanup still keys solely on `smokeSeed` so both cohorts are torn down.
 Sorted by name, the first two heroes are used by current flows; the rest fill the gathering actor-selection bar:
 
-- crafter — first hero alphabetically (inventory: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale); owned by the Fabricate Gatherer user and remembered as the default gathering actor
+- crafter — first hero alphabetically (inventory: 3x Mystic Herb, 3x Empty Vial, 1x Dragon Scale); owned by the Fabricate Gatherer user and remembered as the default gathering actor
 - travel-party member — second hero alphabetically (inventory: 3x Iron Ore, 1x Dragon Scale)
 
 **World Items (7):**

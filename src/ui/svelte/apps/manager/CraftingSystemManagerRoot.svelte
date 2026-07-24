@@ -143,6 +143,7 @@
   // clones) so JSON comparison drives the dirty flag and Discard reverts.
   let recipeItemDraft = $state(null);
   let recipeItemDraftBaseline = $state(null);
+  let recipeItemLinkedSourceSnapshot = $state(null);
   let recipeItemEditSaving = $state(false);
   let recipeItemSaveFailed = $state(false);
   let recipeItemActiveTab = $state('overview');
@@ -1529,6 +1530,9 @@
   const recipeItemEditorLinkedItem = $derived.by(() => {
     const uuid = String(recipeItemDraft?.originItemUuid || '');
     if (!uuid) return null;
+    if (recipeItemLinkedSourceSnapshot?.uuid === uuid) {
+      return { ...recipeItemLinkedSourceSnapshot };
+    }
     const persisted = (recipeItemDefinitions || []).find((def) => def.originItemUuid === uuid);
     if (persisted) {
       return {
@@ -2291,6 +2295,7 @@
     // Discard: roll the draft back to the last-persisted baseline so the dirty
     // flag clears, then let the caller proceed with navigation.
     recipeItemDraft = cloneRecipeItemDraft(recipeItemDraftBaseline);
+    recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(recipeItemDraftBaseline);
     return true;
   }
 
@@ -3602,27 +3607,9 @@
   async function stageToolEditorSourceDrop(data) {
     const uuid = resolveDropUuid(data);
     if (!uuid) return false;
-    const snapshot = worldItemOptions.find((item) => item.uuid === uuid)
-      || await services?.resolveToolSource?.(uuid);
+    const snapshot = await services?.resolveToolSource?.(uuid);
     if (!snapshot) return false;
     store.stageToolDraftSource?.(snapshot.uuid || uuid, snapshot);
-    return true;
-  }
-
-  async function stageToolReplacementItemDrop(data) {
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source || !focusedToolDraft) return false;
-    store.patchToolDraft?.({
-      onBreak: {
-        ...(focusedToolDraft.onBreak || {}),
-        replacementTarget: {
-          type: 'item',
-          itemUuid: source.uuid || uuid,
-        },
-      },
-    });
     return true;
   }
 
@@ -3873,6 +3860,18 @@
     return source ? JSON.parse(JSON.stringify(source)) : null;
   }
 
+  function recipeItemSourceSnapshot(source) {
+    const uuid = String(source?.originItemUuid || '');
+    if (!uuid) return null;
+    return {
+      uuid,
+      name: source?.resolvedName || source?.name || '',
+      img: source?.resolvedImg || source?.img || '',
+      type: source?.derivedType || source?.type || '',
+      description: source?.description || '',
+    };
+  }
+
   // Recursively deep-merge a partial patch into the recipe-item draft. The editor
   // emits nested caps patches (`{ caps: { item|learn: {...} } }`), so a shallow
   // spread would clobber sibling cap fields; merge object values, replace scalars.
@@ -3905,6 +3904,7 @@
       const source = (recipeItemDefinitions || []).find((def) => def.id === recipeItemId) || null;
       recipeItemDraft = cloneRecipeItemDraft(source);
       recipeItemDraftBaseline = cloneRecipeItemDraft(source);
+      recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
       activeView = 'recipe-item-edit';
       craftingMenuExpanded = true;
       Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
@@ -3916,6 +3916,7 @@
   function clearRecipeItemDraft() {
     recipeItemDraft = null;
     recipeItemDraftBaseline = null;
+    recipeItemLinkedSourceSnapshot = null;
     recipeItemSaveFailed = false;
   }
 
@@ -3968,11 +3969,13 @@
     if (!uuid) return false;
     const source = await services?.resolveToolSource?.(uuid);
     if (!source) return false;
+    recipeItemLinkedSourceSnapshot = { ...source, uuid: source.uuid || uuid };
     patchRecipeItemDraft({ originItemUuid: source.uuid || uuid });
     return true;
   }
 
   function unlinkRecipeItemSource() {
+    recipeItemLinkedSourceSnapshot = null;
     patchRecipeItemDraft({ originItemUuid: null });
   }
 
@@ -4030,7 +4033,7 @@
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
     if (!uuid) return;
-    services?.onCopySourceUuid?.(uuid);
+    return services?.onCopySourceUuid?.(uuid);
   }
 
   function selectedEssenceSourceUuid() {
@@ -5030,35 +5033,41 @@
 
   <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
     <aside class="manager-rail" aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}>
-      {#if !isToolStudioRoute}
-      <button
-        type="button"
-        class="manager-rail-toggle"
-        aria-pressed={railCollapsed}
-        aria-label={railCollapsed
-          ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-          : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
-        title={railCollapsed
-          ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-          : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
-        onclick={toggleManagerRail}
-      >
-        <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
-      </button>
-      {/if}
+      <!--
+        Name the workspace before its scope controls. Every manager route, including
+        the Tool library/editor, shares this one rail branch.
+      -->
+      <p class="manager-rail-title" data-manager-rail-section>{text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}</p>
+
       <!--
         The rail's crafting-system card. The kicker names what the card CONTAINS
         ("Crafting system"), not the product — the product name is already on the
         titlebar. The card is a real `<select>`, so the rail can switch system without
         a round trip through the system library, and a back link out to that library.
         The "GM management workspace" caption that used to hang below it is gone: the
-        section label beneath the card already says GM management.
+        rail's section label already names the workspace above this card.
       -->
-      {#if !isToolStudioRoute}
       <section class="manager-rail-block" aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}>
         {#if selectedSystem}
           <div class="manager-scope-card">
-            <p class="manager-kicker">{text('FABRICATE.Admin.Manager.CraftingSystem', 'Crafting system')}</p>
+            <div class="manager-scope-card-head">
+              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.CraftingSystem', 'Crafting system')}</p>
+              <button
+                type="button"
+                class="manager-rail-toggle manager-scope-collapse"
+                data-manager-rail-toggle
+                aria-pressed={railCollapsed}
+                aria-label={railCollapsed
+                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                title={railCollapsed
+                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                onclick={toggleManagerRail}
+              >
+                <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
+              </button>
+            </div>
             <select
               class="manager-scope-select"
               data-manager-scope-select
@@ -5090,18 +5099,29 @@
             </button>
           </div>
         {:else}
-          <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Product', 'Fabricate')}</p>
-          <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</h2>
+          <div class="manager-scope-card">
+            <div class="manager-scope-card-head">
+              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Product', 'Fabricate')}</p>
+              <button
+                type="button"
+                class="manager-rail-toggle manager-scope-collapse"
+                data-manager-rail-toggle
+                aria-pressed={railCollapsed}
+                aria-label={railCollapsed
+                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                title={railCollapsed
+                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                onclick={toggleManagerRail}
+              >
+                <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
+              </button>
+            </div>
+            <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</h2>
+          </div>
         {/if}
       </section>
-      {/if}
-
-      <!--
-        The rail's uppercase section label. Hidden entirely in the 56px collapsed
-        rail (with the scope card and the count badges) so the icon gutter stays the
-        only thing that has to fit.
-      -->
-      <p class="manager-rail-title" data-manager-rail-section>{text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}</p>
 
       <nav class="manager-nav" aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}>
         {#if selectedSystem}
@@ -5478,7 +5498,6 @@
         onTabChange={(tab) => { toolEditorActiveTab = tab; }}
         onPatch={(patch) => store.patchToolDraft?.(patch)}
         onSourceDrop={stageToolEditorSourceDrop}
-        onReplacementItemDrop={stageToolReplacementItemDrop}
         onToggleEnabled={toggleFocusedToolEnabled}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
         onUnlinkSource={() => store.unlinkToolDraftSource?.()}
@@ -5670,6 +5689,7 @@
         onPatch={(patch) => patchRecipeItemDraft(patch)}
         onLinkItem={(uuid) => linkRecipeItemSource(uuid)}
         onUnlinkItem={() => unlinkRecipeItemSource()}
+        onCopyItemUuid={(uuid) => copyComponentSource(uuid)}
         onLinkRecipe={(id) => linkRecipeToItem(id)}
         onRemoveRecipe={(id) => unlinkRecipeFromItem(id)}
       />

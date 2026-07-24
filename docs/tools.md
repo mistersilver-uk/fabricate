@@ -10,7 +10,7 @@ Tools are reusable items that an actor must have for crafting, salvage, or gathe
 They can grant a check bonus, wear out, break, or turn into a damaged item.
 
 Each crafting system owns one shared **Tools** library.
-Recipes, steps, ingredient sets, salvage configurations, and gathering tasks all select Tools from that library.
+Recipes, steps, named routed-by-ingredients sets, salvage configurations, and gathering tasks all select Tools from that library.
 
 ## Open the Tool Studio
 
@@ -30,20 +30,15 @@ Changing this setting takes effect immediately and does not erase the inactive T
 
 ## Create or link a Tool
 
-You can create a Tool in three ways:
-
-- Choose an Item under **Start unlinked or from an Item**, then choose **Create from Item**.
-- Drop a world or compendium Item onto the creation area.
-- Choose **Create unlinked**, then link an Item from the **Overview** tab.
-
-You can also drop a managed Component onto the Tools library to start a Component-linked Tool.
-Use this when the same item is both a Tool and a crafting material.
+Create a Tool by dragging a world or compendium Item onto the creation area.
+The Tool Studio has no browse button or blank Tool shortcut.
 
 Fabricate records the linked Item's name, image, and description when you create or relink the Tool.
 Later changes to the source Item do not refresh that stored display automatically.
-Open **Overview** and use **Replace linked Item** when you want a new source and a fresh display snapshot.
+Open **Overview** and drop another Item onto the linked source card when you want a new source and a fresh display snapshot.
 
 A **Display label** overrides the stored source name in Fabricate without changing the Item.
+The source name and description are read-only in the Tool Studio.
 Unlinking the Item preserves the draft, but the Tool cannot be saved until it has a linked Item or managed Component.
 
 ## Edit a Tool
@@ -56,12 +51,14 @@ The editor has four tabs:
 - **Validation** lists every issue that blocks saving.
 
 The behavior preview summarizes the draft while you work.
+Its **How Tools work in Fabricate** card remains available on every tab.
 The **Unsaved** state appears after a change.
 Leaving the editor with unsaved changes offers **Save**, **Discard**, and **Keep editing**.
 
-Choose **Save changes** when the Tool is ready.
+Choose **Save Tool** when the Tool is ready.
 An invalid or failed save keeps the editor open and moves attention to **Validation**.
 Validation and operation failures use safe descriptions instead of technical error details.
+Changing **Tool enabled** takes effect immediately and does not stage the other editor changes.
 
 ## Presence and prerequisites
 
@@ -73,6 +70,7 @@ Usage and breakage require a durable identity match because those actions can ch
 A loosely recognized copy can satisfy presence while being spared from usage and breakage.
 
 {: .note }
+
 > Use **Repair Item Data** or issue a fresh copy from the source Item when a Tool is present but does not track use or break.
 > See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
 
@@ -90,18 +88,13 @@ Choose what happens when those prerequisites fail:
 
 Enable **Tool check bonus** in the **Requirements** tab and enter a bonus expression.
 The expression is evaluated against the actor who supplies the Tool.
+Enter a roll-data path without its leading `@`.
+Fabricate adds the `@` when it stores the path.
+Numeric and dice expressions are stored as entered.
 
-Recipes decide how each required Tool bonus contributes:
-
-- **Always** adds the bonus.
-- **Highest only** competes with other Tools in that mode, and only the greatest value is added.
-- **Never** ignores the Tool's bonus for that recipe.
-
-All **Always** bonuses and the greatest **Highest only** bonus can contribute to the same crafting check.
-Salvage applies every eligible Tool bonus.
+Crafting and salvage add every distinct eligible Tool bonus to the check.
+Recipes store only which Tools they require; bonus behavior is configured on the Tool itself.
 Gathering checks do not apply numeric Tool bonuses.
-
-See [Recipes]({% link recipes/index.md %}#tool-bonus-modes) for recipe authoring.
 
 ## Tool breakage source
 
@@ -109,10 +102,10 @@ The library's **Tool breakage source** setting decides what determines whether a
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Source | Behaviour |
-|:-------|:----------|
-| Tool-specific | Each Tool's own **Limited uses**, **Breakage chance**, or **Dice expression** configuration decides whether it breaks. |
-| Check-driven | The active check's breakage settings decide whether required Tools break. The Tool-specific configuration is retained but not evaluated. |
+| Source        | Behaviour                                                                                                                                |
+| :------------ | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| Tool-specific | Each Tool's own **Limited uses**, **Breakage chance**, or **Dice expression** configuration decides whether it breaks.                   |
+| Check-driven  | The active check's breakage settings decide whether required Tools break. The Tool-specific configuration is retained but not evaluated. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -132,16 +125,18 @@ Under **Tool-specific**, choose one breakage mechanic:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Mechanic | Behaviour |
-|:---------|:----------|
-| Limited uses | The Item's usage counter increases on each attempt. The Tool breaks after the chosen maximum has been reached. A blank maximum means unlimited use while still tracking usage. |
-| Breakage chance | A percentage from 0 to 100 is tested on each attempt. Zero never breaks and 100 always breaks. |
-| Dice expression | Fabricate rolls the expression against the acting actor and breaks the Tool when the result is below **Break below**. |
+| Mechanic        | Behaviour                                                                                                                                                                      |
+| :-------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Limited uses    | The Item's usage counter increases on each attempt. The Tool breaks after the chosen maximum has been reached. A blank maximum means unlimited use while still tracking usage. |
+| Breakage chance | A percentage from 0 to 100 is tested on each attempt. Zero never breaks and 100 always breaks.                                                                                 |
+| Dice expression | Fabricate rolls the expression against the acting actor and breaks the Tool when the result is below **Break below**.                                                          |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Only **Limited uses** stores an Item usage counter.
 Switching to **Check-driven** retains the configured mechanic for a later switch back.
+For **Breakage chance**, the number field and slider stay synchronized.
+The control moves continuously from green through yellow and amber to red as the chance increases.
 
 ## On-break actions
 
@@ -149,19 +144,23 @@ Choose one **On-break action**:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Action | Behaviour |
-|:-------|:----------|
-| Destroy item | Removes the owned Tool Item. |
-| Mark as broken | Keeps the Item, marks it broken, and appends " (broken)" to its name. The broken Item cannot satisfy future Tool requirements until a GM clears the mark and restores its name. |
-| Replace with item | Creates one replacement Item and then removes the original Tool. The target can be a managed Component or a direct Item. |
+| Action                 | Behaviour                                                                                                                                                                       |
+| :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Destroy item           | Removes the owned Tool Item.                                                                                                                                                    |
+| Mark as broken         | Keeps the Item, marks it broken, and appends " (broken)" to its name. The broken Item cannot satisfy future Tool requirements until a GM clears the mark and restores its name. |
+| Replace with component | Creates one Item from the selected managed Component and then removes the original Tool.                                                                                        |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Replacement is lossless when the target cannot be resolved or created.
 Fabricate keeps the original Tool rather than deleting it without a replacement.
 
-Use a managed Component target when the damaged item should participate in Fabricate recipes and Component matching.
-Use a direct Item target when the replacement does not need to be a managed Component.
+Select a managed Component so the damaged item can participate in Fabricate recipes, repair routes, and Component matching.
+
+{: .note }
+
+> Tools saved by an older Fabricate version can still carry a direct Item replacement.
+> That legacy replacement continues to run, but the Tool Studio does not offer direct Item replacement for new authoring.
 
 ## Repair materials
 
@@ -173,6 +172,7 @@ You can add requirements for Components, tags, essences, and currency.
 Every added group must be complete and every option must have a positive quantity before the Tool can be saved.
 
 {: .warning }
+
 > Repair execution is planned and is not yet available.
 > The Tool Studio saves and validates the repair materials now, but it does not provide a repair action.
 
@@ -214,10 +214,10 @@ Gathering Tools stored by early versions are also reconciled into the system lib
 ## See Also
 
 - [Recipes]({% link recipes/index.md %}).
-Configure recipe Tool requirements and bonus modes.
+  Configure recipe Tool requirements and bonus modes.
 - [Degrading Tools]({% link how-to/degrading-tools.md %}).
-Build a Tool that wears out through repeated crafting.
+  Build a Tool that wears out through repeated crafting.
 - [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
-Apply the shared Tool setup to gathering.
+  Apply the shared Tool setup to gathering.
 - [Canvas Interactables]({% link canvas-interactables.md %}).
-Provide virtual Tool presence from a Scene Region station.
+  Provide virtual Tool presence from a Scene Region station.

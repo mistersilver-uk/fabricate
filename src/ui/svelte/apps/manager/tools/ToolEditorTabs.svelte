@@ -56,7 +56,7 @@
       role="tab"
       id={`tool-tab-${tab[0]}`}
       aria-selected={activeTab === tab[0]}
-      aria-controls={activeTab === tab[0] ? `tool-panel-${tab[0]}` : undefined}
+      aria-controls={`tool-panel-${tab[0]}`}
       tabindex={activeTab === tab[0] ? 0 : -1}
       class="manager-editor-tab-button"
       class:is-active={activeTab === tab[0]}

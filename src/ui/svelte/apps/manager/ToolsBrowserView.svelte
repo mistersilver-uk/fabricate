@@ -139,14 +139,12 @@
       </label>
     </section>
 
-    <section class="manager-tools-create-card" data-tool-create-card>
-      <ItemDropZone
-        kind="tool-create"
-        title={text('FABRICATE.Admin.Manager.Tools.CreateDropTitle', 'Drag an Item here to make it a Tool')}
-        hint={text('FABRICATE.Admin.Manager.Tools.CreateDropHint', 'Drop an Item from the Items directory or a compendium.')}
-        onDrop={onCreateToolDrop}
-      />
-    </section>
+    <ItemDropZone
+      kind="tool-create"
+      title={text('FABRICATE.Admin.Manager.Tools.CreateDropTitle', 'Drag an Item here to make it a Tool')}
+      hint={text('FABRICATE.Admin.Manager.Tools.CreateDropHint', 'Drop an Item from the Items directory or a compendium.')}
+      onDrop={onCreateToolDrop}
+    />
 
     <section class="manager-tools-library-card" data-manager-tools-browser>
       <p class="manager-tools-result-summary" data-tool-result-count>{countLabel(filteredTools.length)}</p>

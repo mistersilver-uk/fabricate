@@ -6,7 +6,7 @@
     item = null,
     title = '',
     hint = '',
-    emptyIcon = 'fas fa-hand-pointer',
+    emptyIcon = 'fas fa-arrow-down-to-bracket',
     kind = '',
     disabled = false,
     copyLabel = '',
@@ -15,6 +15,11 @@
     onCopy = null,
     onUnlink = null,
   } = $props();
+
+  function handleDrop(data) {
+    if (data?.type !== 'Item' || typeof data.uuid !== 'string' || !data.uuid.trim()) return;
+    onDrop(data);
+  }
 </script>
 
 <div
@@ -24,11 +29,12 @@
   data-manager-item-drop-zone
   data-item-drop-zone={kind || undefined}
   data-tool-source-card={kind === 'tool-source' ? true : undefined}
+  data-tool-create-card={kind === 'tool-create' ? true : undefined}
   data-tool-create-drop-prompt={kind === 'tool-create' ? true : undefined}
   data-tool-source-layout={kind === 'tool-source' ? 'compact' : undefined}
   data-recipe-item-link={kind === 'recipe-item' && item ? true : undefined}
   data-recipe-item-dropzone={kind === 'recipe-item' && !item ? true : undefined}
-  use:dragDrop={{ onDrop, activeClass: 'is-drop-active', disabled }}
+  use:dragDrop={{ onDrop: handleDrop, activeClass: 'is-drop-active', disabled }}
 >
   <span class="manager-item-drop-zone-icon" aria-hidden="true">
     {#if item?.img}<img src={item.img} alt="" />{:else}<i class={emptyIcon}></i>{/if}

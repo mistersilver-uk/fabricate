@@ -21,15 +21,17 @@ let generatedToolId = 0;
 
 function normalizeToolShape(tool = {}) {
   const t = tool && typeof tool === 'object' ? tool : {};
-  const originItemUuid = t.originItemUuid || t.registeredItemUuid || t.sourceItemUuid || t.sourceUuid || null;
-  const registeredItemUuid = t.registeredItemUuid || t.originItemUuid || t.sourceUuid || t.sourceItemUuid || null;
+  const originItemUuid =
+    t.originItemUuid || t.registeredItemUuid || t.sourceItemUuid || t.sourceUuid || null;
+  const registeredItemUuid =
+    t.registeredItemUuid || t.originItemUuid || t.sourceUuid || t.sourceItemUuid || null;
   const aliasItemUuids = Array.isArray(t.aliasItemUuids) ? t.aliasItemUuids : t.fallbackItemIds;
   return Tool.fromJSON({
     ...t,
     id: String(t.id || `test-tool-${++generatedToolId}`),
     registeredItemUuid,
     originItemUuid,
-    aliasItemUuids
+    aliasItemUuids,
   }).toJSON();
 }
 
@@ -51,7 +53,7 @@ function makeSystem(overrides = {}) {
     tools: (Array.isArray(overrides.tools) ? overrides.tools : []).map(normalizeToolShape),
     ...overrides,
     // Ensure tools is the normalized array even when overrides spread a raw `tools`.
-    ...(overrides.tools ? { tools: overrides.tools.map(normalizeToolShape) } : {})
+    ...(overrides.tools ? { tools: overrides.tools.map(normalizeToolShape) } : {}),
   };
 }
 
@@ -63,19 +65,19 @@ function createMockServices(overrides = {}) {
       id: 'sys1',
       name: 'System One',
       components: overrides.components || [],
-      tools: overrides.systemTools || []
-    })
+      tools: overrides.systemTools || [],
+    }),
   ];
 
   const mockSystemManager = {
     getSystems: () => systems,
-    getSystem: (id) => systems.find(s => s.id === id) || null,
+    getSystem: (id) => systems.find((s) => s.id === id) || null,
     createSystem: async () => systems[0],
     // Round-trips library tools onto the system, mirroring the real manager:
     // tools are normalized and stored on the system object.
     updateSystem: async (id, updates = {}) => {
       calls.push(['updateSystem', id, updates]);
-      const sys = systems.find(s => s.id === id);
+      const sys = systems.find((s) => s.id === id);
       if (!sys) return null;
       if (Object.prototype.hasOwnProperty.call(updates, 'tools')) {
         sys.tools = (Array.isArray(updates.tools) ? updates.tools : []).map(normalizeToolShape);
@@ -86,7 +88,7 @@ function createMockServices(overrides = {}) {
     upsertTool: async (id, data, options = {}) => {
       calls.push(['upsertTool', id, data, options]);
       if (overrides.upsertToolError) throw overrides.upsertToolError;
-      const sys = systems.find(system => system.id === id);
+      const sys = systems.find((system) => system.id === id);
       if (!sys) throw new Error(`Missing system ${id}`);
       const staged = normalizeToolShape({
         ...data,
@@ -95,11 +97,11 @@ function createMockServices(overrides = {}) {
               componentId: null,
               registeredItemUuid: options.itemUuid,
               originItemUuid: options.itemUuid,
-              name: data.name || 'Linked source'
+              name: data.name || 'Linked source',
             }
-          : {})
+          : {}),
       });
-      const index = sys.tools.findIndex(tool => tool.id === staged.id);
+      const index = sys.tools.findIndex((tool) => tool.id === staged.id);
       if (index >= 0) sys.tools[index] = staged;
       else sys.tools.push(staged);
       return { item: staged, action: index >= 0 ? 'updated' : 'added' };
@@ -107,17 +109,17 @@ function createMockServices(overrides = {}) {
     deleteTool: async (id, toolId) => {
       calls.push(['deleteTool', id, toolId]);
       if (overrides.deleteToolError) throw overrides.deleteToolError;
-      const sys = systems.find(system => system.id === id);
+      const sys = systems.find((system) => system.id === id);
       const before = sys?.tools.length || 0;
-      if (sys) sys.tools = sys.tools.filter(tool => tool.id !== toolId);
+      if (sys) sys.tools = sys.tools.filter((tool) => tool.id !== toolId);
       return { deleted: (sys?.tools.length || 0) !== before };
     },
     deleteSystem: async () => {},
     getItems: (systemId) => {
-      const sys = systems.find(s => s.id === systemId);
+      const sys = systems.find((s) => s.id === systemId);
       return sys?.components || sys?.items || [];
     },
-    deleteItem: async () => {}
+    deleteItem: async () => {},
   };
 
   const mockRecipeManager = {
@@ -127,12 +129,14 @@ function createMockServices(overrides = {}) {
     updateRecipe: async () => {},
     deleteRecipe: async () => {},
     importRecipes: async () => {},
-    exportRecipes: () => []
+    exportRecipes: () => [],
   };
 
   const base = {
     getSetting: (key) => store[key] ?? null,
-    setSetting: async (key, value) => { store[key] = value; },
+    setSetting: async (key, value) => {
+      store[key] = value;
+    },
     getCraftingSystemManager: () => mockSystemManager,
     getRecipeManager: () => mockRecipeManager,
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
@@ -143,7 +147,7 @@ function createMockServices(overrides = {}) {
     localize: (key) => key,
     copyToClipboard: async () => {},
     openRecipeEditor: () => {},
-    renderImportDialog: async () => {}
+    renderImportDialog: async () => {},
   };
 
   const merged = { ...base, ...overrides };
@@ -155,7 +159,6 @@ function createMockServices(overrides = {}) {
 }
 
 describe('adminStore library tools (system-owned)', () => {
-
   // ---------------------------------------------------------------------------
   // Normalization (via system-tools round-trip surfaced on viewState)
   // ---------------------------------------------------------------------------
@@ -183,18 +186,20 @@ describe('adminStore library tools (system-owned)', () => {
         breakage: { mode: 'limitedUses', maxUses: null },
         checkBreakable: true,
         onBreak: { mode: 'destroy' },
-        repairRequirements: []
+        repairRequirements: [],
       });
     });
 
     it('accepts LEGACY source fields and emits the renamed names (issue 560)', async () => {
       const services = createMockServices({
-        systemTools: [{
-          id: 't1',
-          sourceUuid: 'Item.old-live',
-          sourceItemUuid: 'Compendium.old-origin',
-          fallbackItemIds: ['Item.old-alias']
-        }]
+        systemTools: [
+          {
+            id: 't1',
+            sourceUuid: 'Item.old-live',
+            sourceItemUuid: 'Compendium.old-origin',
+            fallbackItemIds: ['Item.old-alias'],
+          },
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -209,12 +214,14 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('preserves NEW-named source fields without drop (issue 560)', async () => {
       const services = createMockServices({
-        systemTools: [{
-          id: 't1',
-          registeredItemUuid: 'Item.new-live',
-          originItemUuid: 'Compendium.new-origin',
-          aliasItemUuids: ['Item.new-alias']
-        }]
+        systemTools: [
+          {
+            id: 't1',
+            registeredItemUuid: 'Item.new-live',
+            originItemUuid: 'Compendium.new-origin',
+            aliasItemUuids: ['Item.new-alias'],
+          },
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -226,12 +233,14 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('coerces unknown breakage / on-break modes to defaults', async () => {
       const services = createMockServices({
-        systemTools: [{
-          id: 't1',
-          componentId: 'comp-axe',
-          breakage: { mode: 'frobnicate', maxUses: 7 },
-          onBreak: { mode: 'banana' }
-        }]
+        systemTools: [
+          {
+            id: 't1',
+            componentId: 'comp-axe',
+            breakage: { mode: 'frobnicate', maxUses: 7 },
+            onBreak: { mode: 'banana' },
+          },
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -243,12 +252,14 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('preserves valid breakageChance and replaceWith configuration', async () => {
       const services = createMockServices({
-        systemTools: [{
-          id: 't1',
-          componentId: 'comp-axe',
-          breakage: { mode: 'breakageChance', breakageChance: 25 },
-          onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' }
-        }]
+        systemTools: [
+          {
+            id: 't1',
+            componentId: 'comp-axe',
+            breakage: { mode: 'breakageChance', breakageChance: 25 },
+            onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe-broken' },
+          },
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -258,7 +269,7 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(tool.onBreak.mode, 'replaceWith');
       assert.deepEqual(tool.onBreak.replacementTarget, {
         type: 'component',
-        componentId: 'comp-axe-broken'
+        componentId: 'comp-axe-broken',
       });
     });
 
@@ -278,7 +289,7 @@ describe('adminStore library tools (system-owned)', () => {
   describe('task toolIds normalization', () => {
     it('legacy tasks without toolIds default to an empty array', async () => {
       const services = createMockServices({
-        gatheringConfig: { systems: { sys1: { tasks: [{ id: 'task-a' }] } } }
+        gatheringConfig: { systems: { sys1: { tasks: [{ id: 'task-a' }] } } },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -288,10 +299,18 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('stores task.toolIds as trimmed string ids and drops empties', async () => {
       const services = createMockServices({
-        gatheringConfig: { systems: { sys1: { tasks: [{
-          id: 'task-a',
-          toolIds: ['  tool-a  ', '', null, 42, 'tool-b']
-        }] } } }
+        gatheringConfig: {
+          systems: {
+            sys1: {
+              tasks: [
+                {
+                  id: 'task-a',
+                  toolIds: ['  tool-a  ', '', null, 42, 'tool-b'],
+                },
+              ],
+            },
+          },
+        },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -325,7 +344,7 @@ describe('adminStore library tools (system-owned)', () => {
       await store.updateGatheringLibraryTool('sys1', tool.id, {
         label: 'Iron Pickaxe',
         componentId: 'comp-pick',
-        breakage: { mode: 'breakageChance', breakageChance: 40 }
+        breakage: { mode: 'breakageChance', breakageChance: 40 },
       });
       const updated = services._systemTools()[0];
       assert.equal(updated.label, 'Iron Pickaxe');
@@ -437,7 +456,11 @@ describe('adminStore library tools (system-owned)', () => {
       store.enterToolsDraft('sys1');
       // User clicks "Add tool" but never assigns a component (invalid + blank).
       const added = store.addToolToDraft();
-      assert.equal(store.validateToolDraft(added.id).valid, false, 'blank new tool is invalid (no component)');
+      assert.equal(
+        store.validateToolDraft(added.id).valid,
+        false,
+        'blank new tool is invalid (no component)'
+      );
 
       const saved = await store.saveToolDraft();
       assert.equal(saved, false);
@@ -473,11 +496,22 @@ describe('adminStore library tools (system-owned)', () => {
       store.updateToolInDraft(added.id, { label: 'Unfinished Tool' });
 
       const saved = await store.saveAllDirtyToolDrafts();
-      assert.equal(saved, false, 'a partially-edited invalid tool blocks the save so the caller can warn');
+      assert.equal(
+        saved,
+        false,
+        'a partially-edited invalid tool blocks the save so the caller can warn'
+      );
       const state = get(store.viewState);
-      assert.ok(state.toolsDraft.some(tool => tool.id === added.id), 'the edited invalid tool is preserved, not discarded');
+      assert.ok(
+        state.toolsDraft.some((tool) => tool.id === added.id),
+        'the edited invalid tool is preserved, not discarded'
+      );
       const validation = store.validateToolsDraft();
-      assert.equal(validation.valid, false, 'validateToolsDraft reports the offending tool for the warning');
+      assert.equal(
+        validation.valid,
+        false,
+        'validateToolsDraft reports the offending tool for the warning'
+      );
       assert.equal(validation.errors[0].id, added.id);
     });
 
@@ -485,8 +519,8 @@ describe('adminStore library tools (system-owned)', () => {
       const services = createMockServices({
         systemTools: [
           { id: 't1', componentId: 'comp-axe', label: 'Axe', enabled: true },
-          { id: 't2', componentId: 'comp-pick', label: 'Pick', enabled: true }
-        ]
+          { id: 't2', componentId: 'comp-pick', label: 'Pick', enabled: true },
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -549,8 +583,8 @@ describe('adminStore library tools (system-owned)', () => {
       const services = createMockServices({
         systemTools: [
           { id: 't1', componentId: 'comp-axe', label: 'Axe', enabled: true },
-          { id: 't2', componentId: 'comp-pick', label: 'Pick', enabled: true }
-        ]
+          { id: 't2', componentId: 'comp-pick', label: 'Pick', enabled: true },
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -558,9 +592,18 @@ describe('adminStore library tools (system-owned)', () => {
 
       const deleted = await store.deleteToolFromDraft('t1');
       assert.equal(deleted, true);
-      assert.deepEqual(services._systemTools().map(tool => tool.id), ['t2']);
-      assert.deepEqual(get(store.viewState).toolsDraft.map(tool => tool.id), ['t2']);
-      assert.deepEqual(get(store.viewState).toolsDraftBaseline.map(tool => tool.id), ['t2']);
+      assert.deepEqual(
+        services._systemTools().map((tool) => tool.id),
+        ['t2']
+      );
+      assert.deepEqual(
+        get(store.viewState).toolsDraft.map((tool) => tool.id),
+        ['t2']
+      );
+      assert.deepEqual(
+        get(store.viewState).toolsDraftBaseline.map((tool) => tool.id),
+        ['t2']
+      );
       assert.deepEqual(get(store.viewState).toolsDraftDirtyToolIds, []);
     });
   });
@@ -587,14 +630,17 @@ describe('adminStore library tools (system-owned)', () => {
         store.stageToolDraftSource('Compendium.tools.hammer', {
           name: 'Smith Hammer',
           img: 'icons/tools/hammer.webp',
-          description: 'Heavy.'
+          description: 'Heavy.',
         }),
         true
       );
       let state = get(store.viewState);
       assert.equal(state.toolDraftSourceItemUuid, 'Compendium.tools.hammer');
       assert.equal(state.toolDraft.description, 'Heavy.');
-      assert.equal(services._calls.some(call => call[0] === 'upsertTool'), false);
+      assert.equal(
+        services._calls.some((call) => call[0] === 'upsertTool'),
+        false
+      );
       assert.equal(store.unlinkToolDraftSource(), true);
       state = get(store.viewState);
       assert.equal(state.toolDraft.registeredItemUuid, null);
@@ -603,21 +649,23 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('preserves every expanded field through open, patch, and discard', async () => {
       const services = createMockServices({
-        systemTools: [{
-          id: 'expanded',
-          componentId: 'comp-hammer',
-          label: 'Forge Hammer',
-          description: 'Snapshot description',
-          prerequisites: { enabled: true, ids: ['trained'], gateMode: 'bonus' },
-          bonus: { enabled: true, expression: '2' },
-          breakage: { mode: 'diceExpression', formula: '1d20', threshold: 5 },
-          checkBreakable: false,
-          onBreak: {
-            mode: 'replaceWith',
-            replacementTarget: { type: 'item', itemUuid: 'Item.broken-hammer' }
+        systemTools: [
+          {
+            id: 'expanded',
+            componentId: 'comp-hammer',
+            label: 'Forge Hammer',
+            description: 'Snapshot description',
+            prerequisites: { enabled: true, ids: ['trained'], gateMode: 'bonus' },
+            bonus: { enabled: true, expression: '2' },
+            breakage: { mode: 'diceExpression', formula: '1d20', threshold: 5 },
+            checkBreakable: false,
+            onBreak: {
+              mode: 'replaceWith',
+              replacementTarget: { type: 'item', itemUuid: 'Item.broken-hammer' },
+            },
+            repairRequirements: [{ id: 'repair', options: [] }],
           },
-          repairRequirements: [{ id: 'repair', options: [] }]
-        }]
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -631,7 +679,8 @@ describe('adminStore library tools (system-owned)', () => {
       assert.deepEqual(draft.bonus, { enabled: true, expression: '2' });
       assert.equal(draft.checkBreakable, false);
       assert.deepEqual(draft.onBreak.replacementTarget, {
-        type: 'item', itemUuid: 'Item.broken-hammer'
+        type: 'item',
+        itemUuid: 'Item.broken-hammer',
       });
       assert.equal(draft.repairRequirements.length, 1);
       assert.equal(get(store.viewState).toolDraftDirty, false);
@@ -644,7 +693,7 @@ describe('adminStore library tools (system-owned)', () => {
       store.createToolDraft({ label: 'Hammer' });
       store.stageToolDraftSource('Item.hammer', { name: 'Hammer' });
       assert.equal(await store.saveToolDraft(), true);
-      const call = services._calls.find(entry => entry[0] === 'upsertTool');
+      const call = services._calls.find((entry) => entry[0] === 'upsertTool');
       assert.equal(call[1], 'sys1');
       assert.deepEqual(call[3], { itemUuid: 'Item.hammer' });
       const state = get(store.viewState);
@@ -657,9 +706,11 @@ describe('adminStore library tools (system-owned)', () => {
       const services = createMockServices({
         upsertToolError: new Error('adapter leaked secret save detail'),
         notify: { error: (message) => errors.push(message) },
-        localize: (key) => ({
-          'FABRICATE.Admin.Manager.Tools.Editor.SaveFailed': 'The Tool could not be saved. Try again.'
-        })[key] || key
+        localize: (key) =>
+          ({
+            'FABRICATE.Admin.Manager.Tools.Editor.SaveFailed':
+              'The Tool could not be saved. Try again.',
+          })[key] || key,
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -675,8 +726,10 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('reports localized operation errors without exposing adapter details', async () => {
       const localized = {
-        'FABRICATE.Admin.Manager.Tools.Editor.DeleteFailed': 'The Tool could not be deleted. Try again.',
-        'FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed': 'The Tool status could not be changed. Try again.'
+        'FABRICATE.Admin.Manager.Tools.Editor.DeleteFailed':
+          'The Tool could not be deleted. Try again.',
+        'FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed':
+          'The Tool status could not be changed. Try again.',
       };
 
       for (const operation of ['delete', 'toggle']) {
@@ -688,7 +741,7 @@ describe('adminStore library tools (system-owned)', () => {
             ? { deleteToolError: new Error(rawMessage) }
             : { upsertToolError: new Error(rawMessage) }),
           notify: { error: (message) => errors.push(message) },
-          localize: (key) => localized[key] || key
+          localize: (key) => localized[key] || key,
         });
         const store = createAdminStore(services);
         await store.selectSystem('sys1');
@@ -712,7 +765,7 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('deletes through manager behavior and toggles library enabled state live', async () => {
       const services = createMockServices({
-        systemTools: [{ id: 'hammer', componentId: 'comp-hammer', enabled: true }]
+        systemTools: [{ id: 'hammer', componentId: 'comp-hammer', enabled: true }],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -720,7 +773,10 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(services._systemTools()[0].enabled, false);
       store.openToolDraft('hammer');
       assert.equal(await store.deleteToolDraft(), true);
-      assert.equal(services._calls.some(call => call[0] === 'deleteTool'), true);
+      assert.equal(
+        services._calls.some((call) => call[0] === 'deleteTool'),
+        true
+      );
       assert.equal(get(store.viewState).toolDraft, null);
     });
 
@@ -742,12 +798,64 @@ describe('adminStore library tools (system-owned)', () => {
       assert.equal(services._systemTools()[0].enabled, false);
     });
 
+    it('persists Enabled without overwriting a dirty draft or a legacy direct-Item target', async () => {
+      const legacyTarget = {
+        type: 'item',
+        itemUuid: 'Compendium.mythwright.items.Item.broken-hammer',
+      };
+      const services = createMockServices({
+        systemTools: [
+          {
+            id: 'hammer',
+            componentId: 'comp-hammer',
+            enabled: true,
+            onBreak: { mode: 'replaceWith', replacementTarget: legacyTarget },
+          },
+        ],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.openToolDraft('hammer');
+      store.patchToolDraft({ label: 'Unsaved label' });
+
+      assert.equal(await store.toggleToolEnabled('hammer', false), true);
+
+      const state = get(store.viewState);
+      assert.equal(state.toolDraft.label, 'Unsaved label');
+      assert.equal(state.toolDraft.enabled, false);
+      assert.equal(state.toolDraftBaseline.enabled, false);
+      assert.equal(state.toolDraftDirty, true);
+      assert.deepEqual(state.toolDraft.onBreak.replacementTarget, legacyTarget);
+      assert.deepEqual(state.toolDraftBaseline.onBreak.replacementTarget, legacyTarget);
+      assert.deepEqual(services._systemTools()[0].onBreak.replacementTarget, legacyTarget);
+    });
+
+    it('does not persist Enabled for a new unsaved Tool draft', async () => {
+      const services = createMockServices({ systemTools: [] });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.createToolDraft({
+        registeredItemUuid: 'Item.hammer',
+        originItemUuid: 'Item.hammer',
+        name: 'Hammer',
+      });
+
+      const stateBefore = get(store.viewState);
+      assert.equal(stateBefore.toolDraftBaseline, null);
+      assert.equal(await store.toggleToolEnabled(stateBefore.toolDraft.id, false), false);
+      assert.equal(
+        services._calls.some((call) => call[0] === 'upsertTool'),
+        false
+      );
+      assert.equal(get(store.viewState).toolDraft.enabled, true);
+    });
+
     it('updates breakage authority and replaces the draft on a system-scope open', async () => {
       const services = createMockServices({
         systems: [
           makeSystem({ id: 'sys1', tools: [{ id: 'one', componentId: 'comp-one' }] }),
-          makeSystem({ id: 'sys2', tools: [{ id: 'two', componentId: 'comp-two' }] })
-        ]
+          makeSystem({ id: 'sys2', tools: [{ id: 'two', componentId: 'comp-two' }] }),
+        ],
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');

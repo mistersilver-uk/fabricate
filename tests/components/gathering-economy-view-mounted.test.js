@@ -23,7 +23,12 @@ function rewriteClientImports(code) {
 
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, { filename: sourcePath, generate: 'client', dev: true, css: 'injected' });
+  const compiled = compile(source, {
+    filename: sourcePath,
+    generate: 'client',
+    dev: true,
+    css: 'injected',
+  });
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
@@ -34,11 +39,27 @@ function makeServices(initialEconomy, actors = []) {
   let economy = initialEconomy;
   const services = {
     getGatheringEconomy: () => economy,
-    setGatheringEconomy: (opts) => { calls.setEconomy.push(opts); economy = opts.economy; return Promise.resolve(opts.economy); },
-    getGatheringStaminaState: () => { calls.getStamina += 1; return actors; },
-    setGatheringStamina: (opts) => { calls.setStamina.push(opts); return Promise.resolve({}); },
-    adjustGatheringStamina: (opts) => { calls.adjustStamina.push(opts); return Promise.resolve({}); },
-    rollGatheringStamina: (opts) => { calls.roll.push(opts); return Promise.resolve({}); }
+    setGatheringEconomy: (opts) => {
+      calls.setEconomy.push(opts);
+      economy = opts.economy;
+      return Promise.resolve(opts.economy);
+    },
+    getGatheringStaminaState: () => {
+      calls.getStamina += 1;
+      return actors;
+    },
+    setGatheringStamina: (opts) => {
+      calls.setStamina.push(opts);
+      return Promise.resolve({});
+    },
+    adjustGatheringStamina: (opts) => {
+      calls.adjustStamina.push(opts);
+      return Promise.resolve({});
+    },
+    rollGatheringStamina: (opts) => {
+      calls.roll.push(opts);
+      return Promise.resolve({});
+    },
   };
   return { services, calls };
 }
@@ -57,20 +78,28 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     setupDOM();
     globalThis.Text = document.createTextNode('').constructor;
     globalThis.Comment = document.createComment('').constructor;
-    globalThis.game = { i18n: { localize: (key) => key, format: (key, data) => `${key}:${JSON.stringify(data)}` } };
+    globalThis.game = {
+      i18n: { localize: (key) => key, format: (key, data) => `${key}:${JSON.stringify(data)}` },
+    };
 
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-economy-view-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     const util = join(tempRoot, 'src/ui/svelte/util/foundryBridge.js');
     mkdirSync(dirname(util), { recursive: true });
-    writeFileSync(util, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
+    writeFileSync(
+      util,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8')
+    );
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
-    const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js')).href);
+    const mod = await import(
+      pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js'))
+        .href
+    );
     GatheringEconomyView = mod.default;
   });
 
@@ -82,21 +111,31 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
   });
 
   it('shows two toggle pills; neither active = no limit (with an empty-state hint)', async () => {
-    const { services } = makeServices({ stamina: { enabled: false, regen: { policy: 'none' } }, nodes: { enabled: false } });
+    const { services } = makeServices({
+      stamina: { enabled: false, regen: { policy: 'none' } },
+      nodes: { enabled: false },
+    });
     await mountView({ services, systemId: 'sys-1' });
     const options = target.querySelectorAll('[data-economy-mode-option]');
     assert.equal(options.length, 2); // stamina + nodes only — no explicit "none"
-    const values = Array.from(options).map(o => o.getAttribute('data-economy-mode-option')).sort();
+    const values = Array.from(options)
+      .map((o) => o.getAttribute('data-economy-mode-option'))
+      .sort();
     assert.deepEqual(values, ['nodes', 'stamina']);
     // No pill active and the muted no-limit hint is shown.
     assert.equal(target.querySelector('[data-economy-mode-option].is-active'), null);
-    options.forEach(o => assert.equal(o.getAttribute('aria-pressed'), 'false'));
+    options.forEach((o) => assert.equal(o.getAttribute('aria-pressed'), 'false'));
     assert.ok(target.querySelector('[data-economy-no-limit-hint]'));
-    unmount(mounted); mounted = null; target.remove();
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('renders a gathering resolution-mode card above limitation mode (d100 live, others coming soon)', async () => {
-    const { services, calls } = makeServices({ stamina: { enabled: false, regen: { policy: 'none' } }, nodes: { enabled: false } });
+    const { services, calls } = makeServices({
+      stamina: { enabled: false, regen: { policy: 'none' } },
+      nodes: { enabled: false },
+    });
     await mountView({ services, systemId: 'sys-1' });
 
     const resolutionCard = target.querySelector('[data-gathering-resolution-mode]');
@@ -113,33 +152,56 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
     const rows = [...resolutionCard.querySelectorAll('[data-gathering-resolution-mode-option]')];
     assert.deepEqual(
-      rows.map(row => row.getAttribute('data-gathering-resolution-mode-option')),
+      rows.map((row) => row.getAttribute('data-gathering-resolution-mode-option')),
       ['d100', 'progressive', 'routed'],
       'gathering card lists d100, progressive, routed in order'
     );
 
-    const radioFor = (value) => resolutionCard.querySelector(`[data-gathering-resolution-mode-option="${value}"] input[type="radio"]`);
+    const radioFor = (value) =>
+      resolutionCard.querySelector(
+        `[data-gathering-resolution-mode-option="${value}"] input[type="radio"]`
+      );
     assert.equal(radioFor('d100').disabled, false, 'd100 is selectable');
     assert.equal(radioFor('progressive').disabled, true, 'progressive is disabled (coming soon)');
     assert.equal(radioFor('routed').disabled, true, 'routed is disabled (coming soon)');
+    assert.deepEqual(
+      rows
+        .slice(1)
+        .map((row) => row.querySelector('.manager-resolution-option-badge')?.textContent.trim()),
+      ['Coming soon', 'Coming soon'],
+      'disabled shared radio cards retain their visible availability explanation'
+    );
 
     // Clicking a disabled option persists nothing.
     const before = calls.setEconomy.length;
     radioFor('progressive').click();
     flushSync();
-    assert.equal(calls.setEconomy.length, before, 'clicking a disabled option pushes no setEconomy call');
+    assert.equal(
+      calls.setEconomy.length,
+      before,
+      'clicking a disabled option pushes no setEconomy call'
+    );
 
     // Selecting d100 round-trips resolutionMode === 'd100'.
     const d100 = radioFor('d100');
     d100.checked = true;
     d100.dispatchEvent(new window.Event('change', { bubbles: true }));
     flushSync();
-    assert.equal(calls.setEconomy.at(-1).economy.resolutionMode, 'd100', 'selecting d100 persists resolutionMode d100');
-    unmount(mounted); mounted = null; target.remove();
+    assert.equal(
+      calls.setEconomy.at(-1).economy.resolutionMode,
+      'd100',
+      'selecting d100 persists resolutionMode d100'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('marks both pills active when both flags are on (anti-dogpiling combination)', async () => {
-    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: true } });
+    const { services } = makeServices({
+      stamina: { enabled: true, regen: { policy: 'none' } },
+      nodes: { enabled: true },
+    });
     await mountView({ services, systemId: 'sys-1' });
     const stamina = target.querySelector('[data-economy-mode-option="stamina"]');
     const nodes = target.querySelector('[data-economy-mode-option="nodes"]');
@@ -152,11 +214,16 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.ok(target.querySelector('[data-economy-nodes-note]'));
     // No empty-state hint when at least one is on.
     assert.equal(target.querySelector('[data-economy-no-limit-hint]'), null);
-    unmount(mounted); mounted = null; target.remove();
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('toggles each flag independently and persists via setStamina/setNodes', async () => {
-    const { services, calls } = makeServices({ stamina: { enabled: false, regen: { policy: 'none' } }, nodes: { enabled: false } });
+    const { services, calls } = makeServices({
+      stamina: { enabled: false, regen: { policy: 'none' } },
+      nodes: { enabled: false },
+    });
     await mountView({ services, systemId: 'sys-1' });
 
     // Turn stamina on: persists stamina.enabled = true, nodes still off.
@@ -178,12 +245,31 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, true);
     // No legacy `mode` key is ever written.
     assert.equal('mode' in calls.setEconomy.at(-1).economy, false);
-    unmount(mounted); mounted = null; target.remove();
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('persists config edits and reveals regen + actor controls when stamina is enabled', async () => {
-    const actors = [{ actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: false }];
-    const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } }, nodes: { enabled: false } }, actors);
+    const actors = [
+      {
+        actorId: 'a1',
+        name: 'Aria',
+        img: '',
+        current: 3,
+        max: 10,
+        rolledMax: 10,
+        maxOverride: null,
+        maxReadOnly: false,
+      },
+    ];
+    const { services, calls } = makeServices(
+      {
+        stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } },
+        nodes: { enabled: false },
+      },
+      actors
+    );
     await mountView({ services, systemId: 'sys-1' });
 
     // Stamina mode reveals the regen card and the actor list.
@@ -227,22 +313,49 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     flushSync();
     assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, true);
     assert.equal(calls.setEconomy.at(-1).economy.stamina.enabled, true);
-    unmount(mounted); mounted = null; target.remove();
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('bulk-saves rolled characters (current + max override) from the header Save', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 3, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: false },
-      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, maxReadOnly: false } // un-rolled
+      {
+        actorId: 'a1',
+        name: 'Aria',
+        img: '',
+        current: 3,
+        max: 10,
+        rolledMax: 10,
+        maxOverride: null,
+        maxReadOnly: false,
+      },
+      {
+        actorId: 'a2',
+        name: 'Borin',
+        img: '',
+        current: null,
+        max: null,
+        rolledMax: null,
+        maxOverride: null,
+        maxReadOnly: false,
+      }, // un-rolled
     ];
-    const { services, calls } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
+    const { services, calls } = makeServices(
+      { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
+      actors
+    );
     await mountView({ services, systemId: 'sys-1' });
 
     // Set an override on the rolled character, then bulk-save from the header.
     const override = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-max]');
     // With no override set, the placeholder shows the base (rolled) max so the GM
     // sees the value they would be overriding.
-    assert.equal(override.getAttribute('placeholder'), '10', 'max-override placeholder shows the un-overridden rolled max');
+    assert.equal(
+      override.getAttribute('placeholder'),
+      '10',
+      'max-override placeholder shows the un-overridden rolled max'
+    );
     override.value = '15';
     override.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
@@ -255,55 +368,139 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     assert.equal(calls.setStamina[0].maxOverride, 15);
     assert.equal(calls.setStamina[0].current, 3);
     // No per-row save buttons remain.
-    assert.equal(target.querySelector('[data-economy-actor-id="a1"] .manager-economy-actor-save'), null);
-    unmount(mounted); mounted = null; target.remove();
+    assert.equal(
+      target.querySelector('[data-economy-actor-id="a1"] .manager-economy-actor-save'),
+      null
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('disables the max-override cell for a rolled character whose max is read-only', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 6, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: true }, // rolled, read-only max
-      { actorId: 'a2', name: 'Borin', img: '', current: 4, max: 8, rolledMax: 8, maxOverride: null, maxReadOnly: false } // rolled, writable max
+      {
+        actorId: 'a1',
+        name: 'Aria',
+        img: '',
+        current: 6,
+        max: 10,
+        rolledMax: 10,
+        maxOverride: null,
+        maxReadOnly: true,
+      }, // rolled, read-only max
+      {
+        actorId: 'a2',
+        name: 'Borin',
+        img: '',
+        current: 4,
+        max: 8,
+        rolledMax: 8,
+        maxOverride: null,
+        maxReadOnly: false,
+      }, // rolled, writable max
     ];
-    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
+    const { services } = makeServices(
+      { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
+      actors
+    );
     await mountView({ services, systemId: 'sys-1' });
 
-    const readOnlyMax = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-max]');
+    const readOnlyMax = target.querySelector(
+      '[data-economy-actor-id="a1"] [data-economy-actor-max]'
+    );
     assert.equal(readOnlyMax.disabled, true, 'read-only max-override cell is disabled');
-    const writableMax = target.querySelector('[data-economy-actor-id="a2"] [data-economy-actor-max]');
+    const writableMax = target.querySelector(
+      '[data-economy-actor-id="a2"] [data-economy-actor-max]'
+    );
     assert.equal(writableMax.disabled, false, 'writable max-override cell is enabled');
-    unmount(mounted); mounted = null; target.remove();
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('shows un-rolled characters as disabled with an emphasised dice button; rolled get a reset button', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 6, max: 10, rolledMax: 10, maxOverride: null, maxReadOnly: false }, // rolled
-      { actorId: 'a2', name: 'Borin', img: '', current: null, max: null, rolledMax: null, maxOverride: null, maxReadOnly: false } // un-rolled
+      {
+        actorId: 'a1',
+        name: 'Aria',
+        img: '',
+        current: 6,
+        max: 10,
+        rolledMax: 10,
+        maxOverride: null,
+        maxReadOnly: false,
+      }, // rolled
+      {
+        actorId: 'a2',
+        name: 'Borin',
+        img: '',
+        current: null,
+        max: null,
+        rolledMax: null,
+        maxOverride: null,
+        maxReadOnly: false,
+      }, // un-rolled
     ];
-    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
+    const { services } = makeServices(
+      { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
+      actors
+    );
     await mountView({ services, systemId: 'sys-1' });
 
     // Un-rolled: inputs disabled, dice button emphasised.
-    const unrolledCurrent = target.querySelector('[data-economy-actor-id="a2"] [data-economy-actor-current]');
+    const unrolledCurrent = target.querySelector(
+      '[data-economy-actor-id="a2"] [data-economy-actor-current]'
+    );
     assert.equal(unrolledCurrent.disabled, true);
-    const unrolledRoll = target.querySelector('[data-economy-actor-id="a2"] [data-economy-actor-roll]');
+    const unrolledRoll = target.querySelector(
+      '[data-economy-actor-id="a2"] [data-economy-actor-roll]'
+    );
     assert.ok(unrolledRoll.classList.contains('is-roll-needed'));
     assert.ok(unrolledRoll.querySelector('.fa-dice-d20'));
 
     // Rolled: inputs enabled, the button is a reset (arrows-rotate), not emphasised.
-    const rolledCurrent = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-current]');
+    const rolledCurrent = target.querySelector(
+      '[data-economy-actor-id="a1"] [data-economy-actor-current]'
+    );
     assert.equal(rolledCurrent.disabled, false);
-    const rolledRoll = target.querySelector('[data-economy-actor-id="a1"] [data-economy-actor-roll]');
+    const rolledRoll = target.querySelector(
+      '[data-economy-actor-id="a1"] [data-economy-actor-roll]'
+    );
     assert.equal(rolledRoll.classList.contains('is-roll-needed'), false);
     assert.ok(rolledRoll.querySelector('.fa-arrows-rotate'));
-    unmount(mounted); mounted = null; target.remove();
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 
   it('filters the character list by the search box', async () => {
     const actors = [
-      { actorId: 'a1', name: 'Aria', img: '', current: 1, max: 5, rolledMax: 5, maxOverride: null, maxReadOnly: false },
-      { actorId: 'a2', name: 'Borin', img: '', current: 2, max: 8, rolledMax: 8, maxOverride: null, maxReadOnly: false }
+      {
+        actorId: 'a1',
+        name: 'Aria',
+        img: '',
+        current: 1,
+        max: 5,
+        rolledMax: 5,
+        maxOverride: null,
+        maxReadOnly: false,
+      },
+      {
+        actorId: 'a2',
+        name: 'Borin',
+        img: '',
+        current: 2,
+        max: 8,
+        rolledMax: 8,
+        maxOverride: null,
+        maxReadOnly: false,
+      },
     ];
-    const { services } = makeServices({ stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } }, actors);
+    const { services } = makeServices(
+      { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
+      actors
+    );
     await mountView({ services, systemId: 'sys-1' });
     assert.equal(target.querySelectorAll('[data-economy-actor-id]').length, 2);
 
@@ -314,6 +511,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     const rows = target.querySelectorAll('[data-economy-actor-id]');
     assert.equal(rows.length, 1);
     assert.equal(rows[0].getAttribute('data-economy-actor-id'), 'a2');
-    unmount(mounted); mounted = null; target.remove();
+    unmount(mounted);
+    mounted = null;
+    target.remove();
   });
 });

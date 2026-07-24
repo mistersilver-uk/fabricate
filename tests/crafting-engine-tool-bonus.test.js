@@ -6,7 +6,9 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 globalThis.foundry = {
   utils: {
     getProperty: (object, path) =>
-      String(path).split('.').reduce((value, key) => value?.[key], object),
+      String(path)
+        .split('.')
+        .reduce((value, key) => value?.[key], object),
     setProperty: () => {},
     deepClone: (value) => JSON.parse(JSON.stringify(value)),
   },
@@ -41,7 +43,7 @@ function contribution({
   label = id,
   expression,
   value,
-  mode = 'always',
+  enabled = true,
   owner = actor(`${id}-owner`, { value }),
   matchedItem = { parent: owner },
   prerequisites = { enabled: false, ids: [], gateMode: 'bonus' },
@@ -52,13 +54,13 @@ function contribution({
       tool: {
         id,
         label,
+        enabled,
         prerequisites,
         bonus: { enabled: true, expression: expression ?? '@value' },
       },
       matchedItem,
       primaryActor: owner,
       prerequisiteDefinitions,
-      bonusMode: mode,
     },
   };
 }
@@ -67,17 +69,16 @@ function makeEngine() {
   return new CraftingEngine({});
 }
 
-test('crafting composes always plus numeric max highestOnly, excludes never, and dedupes tools', async () => {
+test('crafting adds each distinct eligible Tool contribution once', async () => {
   const engine = makeEngine();
   const formula = await engine._appendToolCheckBonuses('1d20', [
-    contribution({ id: 'always', label: 'Always [Tool]', value: 2 }),
-    contribution({ id: 'low', label: 'Low', value: -5, mode: 'highestOnly' }),
-    contribution({ id: 'high', label: 'High', value: -2, mode: 'highestOnly' }),
-    contribution({ id: 'never', label: 'Never', value: 50, mode: 'never' }),
-    contribution({ id: 'always', label: 'Duplicate', value: 20 }),
+    contribution({ id: 'hammer', label: 'Hammer [Tool]', value: 2 }),
+    contribution({ id: 'saw', label: 'Saw', value: -2 }),
+    contribution({ id: 'anvil', label: 'Anvil', value: 5 }),
+    contribution({ id: 'hammer', label: 'Duplicate', value: 20 }),
   ]);
 
-  assert.equal(formula, '1d20 + 2[Always Tool] - 2[High]');
+  assert.equal(formula, '1d20 + 2[Hammer Tool] - 2[Saw] + 5[Anvil]');
 });
 
 test('owned and virtual contributions evaluate against their already-bound actor', async () => {
@@ -117,40 +118,33 @@ test('bonus-only prerequisite failure and expression errors contribute zero with
   assert.equal(await engine._appendToolCheckBonuses('1d20', [gated, broken]), '1d20');
 });
 
-test('salvage treats every eligible Tool mode as always', async () => {
+test('disabled Tools contribute nothing', async () => {
   const engine = makeEngine();
-  const formula = await engine._appendToolCheckBonuses(
-    '1d20',
-    [
-      contribution({ id: 'highest', value: -4, mode: 'highestOnly' }),
-      contribution({ id: 'never', value: 6, mode: 'never' }),
-    ],
-    { salvage: true }
-  );
+  const formula = await engine._appendToolCheckBonuses('1d20', [
+    contribution({ id: 'enabled', value: 2 }),
+    contribution({ id: 'disabled', value: 6, enabled: false }),
+  ]);
 
-  assert.equal(formula, '1d20 - 4[highest] + 6[never]');
+  assert.equal(formula, '1d20 + 2[enabled]');
 });
 
-test('step view merges recipe and step Tool bonus modes with step precedence', () => {
+test('step view merges recipe and step Tool ids without policy state', () => {
   const engine = makeEngine();
   const view = engine._buildStepRecipeView(
-    { toolIds: ['recipe'], toolBonusModes: { recipe: 'never', shared: 'always' } },
-    { toolIds: ['step'], toolBonusModes: { step: 'highestOnly', shared: 'never' } }
+    { toolIds: ['recipe'], toolBonusModes: { recipe: 'never' } },
+    { toolIds: ['step'], toolBonusModes: { step: 'highestOnly' } }
   );
 
-  assert.deepEqual(view.toolBonusModes, {
-    recipe: 'never',
-    shared: 'never',
-    step: 'highestOnly',
-  });
+  assert.deepEqual(view.toolIds, ['recipe', 'step']);
+  assert.equal('toolBonusModes' in view, false);
 });
 
 test('simple, routed, progressive, and salvage runners append Tool terms to their formulas', async () => {
   const engine = makeEngine();
   const toolItems = [contribution({ id: 'bonus', value: 2 })];
   const seen = [];
-  engine._appendToolCheckBonuses = async (formula, received, options) => {
-    seen.push({ formula, received, options });
+  engine._appendToolCheckBonuses = async (formula, received) => {
+    seen.push({ formula, received });
     return formula;
   };
   engine._resolveSimpleCheckDc = async () => 10;
@@ -190,12 +184,9 @@ test('simple, routed, progressive, and salvage runners append Tool terms to thei
     { toolItems }
   );
 
-  assert.deepEqual(seen.map((entry) => entry.formula), [
-    'simple',
-    'routed',
-    'progressive',
-    'salvage',
-  ]);
-  assert.ok(seen.slice(0, 3).every((entry) => entry.received === toolItems));
-  assert.equal(seen[3].options.salvage, true);
+  assert.deepEqual(
+    seen.map((entry) => entry.formula),
+    ['simple', 'routed', 'progressive', 'salvage']
+  );
+  assert.ok(seen.every((entry) => entry.received === toolItems));
 });

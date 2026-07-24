@@ -149,6 +149,41 @@ function mapConsumedIngredientRef({ item, quantity }) {
 }
 
 /**
+ * Return the concrete owned Item documents selected for ingredient consumption.
+ * Tool validation excludes these documents so a single physical Item cannot be
+ * consumed and subsequently mutated as a reusable Tool in the same attempt.
+ *
+ * @param {object|null} selection
+ * @returns {Set<object>}
+ */
+function selectedIngredientItems(selection) {
+  return new Set(
+    (Array.isArray(selection?.plan) ? selection.plan : [])
+      .map((entry) => entry?.item)
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Return the concrete owned Item documents that a quantity-based consumption
+ * plan will touch, in the same order used by `_consumeComponentItems`.
+ *
+ * @param {object[]} items
+ * @param {number} quantity
+ * @returns {Set<object>}
+ */
+function selectedQuantityItems(items, quantity) {
+  const selected = new Set();
+  let remaining = Number(quantity) || 0;
+  for (const item of Array.isArray(items) ? items : []) {
+    if (remaining <= 0) break;
+    selected.add(item);
+    remaining -= Number(item?.system?.quantity) || 1;
+  }
+  return selected;
+}
+
+/**
  * Stamp the durable per-system component identity on a crafted OUTPUT item's data,
  * BEFORE creation, so the inventory matcher attributes it to its OWN component
  * regardless of naming collisions or Foundry's transitive `_stats.duplicateSource`
@@ -592,7 +627,7 @@ export class CraftingEngine {
         toolsForSet,
         presentTools,
         craftingActor,
-        ingredientSet
+        { excludedItems: selectedIngredientItems(craftSelection) }
       );
       if (!toolValidation.valid) {
         return {
@@ -1117,7 +1152,7 @@ export class CraftingEngine {
       toolsForSet,
       presentTools,
       craftingActor,
-      ingredientSet
+      { excludedItems: selectedIngredientItems(craftSelection) }
     );
     if (!toolValidation.valid) {
       return abort(toolValidation.message);
@@ -1270,8 +1305,7 @@ export class CraftingEngine {
       executionRecipe,
       toolsForSet,
       presentTools,
-      craftingActor,
-      ingredientSet
+      craftingActor
     );
     const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];
 
@@ -2613,6 +2647,9 @@ export class CraftingEngine {
    * @param {Recipe} recipe
    * @param {Array<object>} tools - resolved library Tool objects
    * @param {{ systemId?: string|null, componentIds?: string[] }|null} [presentTools] - virtual-present payload
+   * @param {object} [options]
+   * @param {Set<Item>|Item[]} [options.excludedItems] - concrete owned Items already
+   *   reserved for ingredient consumption in this attempt
    * @returns {Promise<{ valid: boolean, message?: string, tools?: Array<{tool: object, item: Item|null, virtual?: boolean, breakable?: boolean}> }>}
    */
   async _validateTools(
@@ -2621,13 +2658,14 @@ export class CraftingEngine {
     tools = [],
     presentTools = null,
     primaryActor = null,
-    ingredientSet = null
+    { excludedItems = null } = {}
   ) {
+    const excluded = excludedItems instanceof Set ? excludedItems : new Set(excludedItems);
     if (typeof this.recipeManager?.resolveToolStates === 'function') {
       const states = this.recipeManager.resolveToolStates(recipe, tools, actors, {
         presentTools,
         primaryActor,
-        ingredientSet,
+        excludedItems: excluded,
       });
       const missingIndex = states.findIndex((state) => state?.available !== true);
       if (missingIndex !== -1) {
@@ -2678,6 +2716,7 @@ export class CraftingEngine {
       let presenceItem = null;
       for (const actor of actors) {
         for (const item of actor?.items ?? []) {
+          if (excluded.has(item)) continue;
           if (isToolBroken(item)) continue;
           if (!presenceItem && this.recipeManager.toolMatchesItem(recipe, tool, item)) {
             presenceItem = item;
@@ -2715,7 +2754,7 @@ export class CraftingEngine {
     return { valid: true, tools: toolItems };
   }
 
-  async _appendToolCheckBonuses(formula, toolItems = [], { salvage = false } = {}) {
+  async _appendToolCheckBonuses(formula, toolItems = []) {
     const contributions = [];
     const seenToolIds = new Set();
     for (const toolItem of Array.isArray(toolItems) ? toolItems : []) {
@@ -2727,7 +2766,6 @@ export class CraftingEngine {
       contributions.push(
         await evaluateToolCheckContribution({
           ...input,
-          bonusMode: salvage ? 'always' : input.bonusMode,
           evaluatePrerequisite: ({ actor, prerequisite }) =>
             evaluatePrerequisite(actor?.getRollData?.() ?? actor?.system ?? {}, prerequisite),
           evaluateExpression: async ({ actor, expression }) => {
@@ -4351,8 +4389,10 @@ export class CraftingEngine {
   }
 
   _buildStepRecipeView(recipe, step) {
+    const recipeWithoutToolBonusModes = { ...recipe };
+    delete recipeWithoutToolBonusModes.toolBonusModes;
     return {
-      ...recipe,
+      ...recipeWithoutToolBonusModes,
       ingredientSets: step?.ingredientSets || recipe.ingredientSets || [],
       resultGroups: step?.resultGroups || recipe.resultGroups || [],
       outcomeRouting: step?.outcomeRouting || recipe.outcomeRouting || null,
@@ -4364,10 +4404,6 @@ export class CraftingEngine {
         ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
         ...(Array.isArray(step?.toolIds) ? step.toolIds : []),
       ],
-      toolBonusModes: {
-        ...recipe?.toolBonusModes,
-        ...step?.toolBonusModes,
-      },
     };
   }
 
@@ -4527,7 +4563,8 @@ export class CraftingEngine {
       syntheticRecipe,
       salvageTools,
       null,
-      actor
+      actor,
+      { excludedItems: selectedQuantityItems(componentItems, ingredientQuantity) }
     );
     if (!toolValidation.valid) {
       if (salvageRunManager && salvageRun) {
@@ -5081,9 +5118,7 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const dc = this._resolveSalvageDc(simple, component);
-    const formula = await this._appendToolCheckBonuses(simple.rollFormula, toolItems, {
-      salvage: true,
-    });
+    const formula = await this._appendToolCheckBonuses(simple.rollFormula, toolItems);
     const result = await runFormulaPassFail({
       formula,
       dc,
@@ -5114,9 +5149,7 @@ export class CraftingEngine {
     actor,
     { interactive = false, toolItems = [] } = {}
   ) {
-    const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems, {
-      salvage: true,
-    });
+    const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
     const result = await runFormulaProgressive({
       formula,
       triggers: progressive.checkBreakage?.triggers,
@@ -5149,9 +5182,7 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const dc = this._resolveSalvageDc(routed, component);
-    const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems, {
-      salvage: true,
-    });
+    const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems);
     const result = await runFormulaRouted({
       formula,
       dc,

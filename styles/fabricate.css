@@ -1656,14 +1656,37 @@
 }
 
 .fabricate-manager .manager-body.is-rail-collapsed .manager-rail-block {
+  display: flex;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card-head {
+  justify-content: center;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card-head .manager-kicker,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-select,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-return,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card > .manager-title {
   display: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-collapse {
+  width: 30px;
+  height: 30px;
 }
 
 /*
   The 56px collapsed rail keeps ONLY the icon gutter. Every element the Studio rail
   adds has to opt out explicitly, or it blows the column out: the crafting-system card
-  and its `<select>` (above, via `.manager-rail-block`), the uppercase section label,
-  and the mono count numerals.
+  content (above), the uppercase section label, and the mono count numerals. The scope
+  card's compact toggle remains so the rail can be expanded again.
 */
 .fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title {
   display: none;
@@ -5132,12 +5155,29 @@
   overflow: hidden;
 }
 
+.fabricate-manager .manager-scope-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
 /* The card's own micro-label is tighter and quieter than a page kicker. */
 .fabricate-manager .manager-scope-card .manager-kicker {
   margin: 0;
   color: var(--fab-text-subtle);
   font-size: 0.6rem;
   letter-spacing: 0.1em;
+}
+
+.fabricate-manager .manager-scope-collapse {
+  align-self: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  font-size: 0.62rem;
 }
 
 /* The system's name is set in the display face wherever it is named — including here,
@@ -7797,26 +7837,6 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-recipe-tool-bonus-mode {
-  flex: 0 1 140px;
-  min-width: 112px;
-}
-
-.fabricate-manager .manager-recipe-tool-bonus-mode select {
-  width: 100%;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-tools-ingredient-set {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-03);
-}
-
 .fabricate-manager .manager-recipe-req-label,
 .fabricate-manager .manager-recipe-tool-label {
   flex: 1 1 auto;
@@ -7878,7 +7898,7 @@
   gap: var(--fab-space-2);
 }
 
-/* Rebuilt tool row: medallion + name + right-aligned "not consumed" + subtle ×. */
+/* Rebuilt tool row: medallion + identity + subtle ×. */
 .fabricate-manager .manager-recipe-tool-row {
   display: flex;
   align-items: center;
@@ -7912,11 +7932,6 @@
   flex: 1 1 auto;
   min-width: 0;
   font-weight: 600;
-}
-
-.fabricate-manager .manager-recipe-tool-note {
-  flex: 0 0 auto;
-  font-size: 0.72rem;
 }
 
 /* Subtle × remove — never a loud red trash button (§D1). */
@@ -8470,7 +8485,8 @@
    between rows that are meant to be the same surface. Stating it here makes them equal
    by rule rather than by luck of the ancestry. */
 .fabricate-manager .manager-button.manager-salvage-component-trigger,
-.fabricate-manager .manager-button.manager-recipe-component-trigger {
+.fabricate-manager .manager-button.manager-recipe-component-trigger,
+.fabricate-manager .manager-button.manager-tool-replacement-component-trigger {
   justify-content: flex-start;
   width: max-content;
   min-width: 0;
@@ -8482,7 +8498,8 @@
 }
 
 .fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait,
-.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait {
+.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait,
+.fabricate-manager .manager-tool-replacement-component-trigger .manager-travel-portrait {
   width: 24px;
   height: 24px;
 }
@@ -8492,7 +8509,8 @@
    a row-wide button. */
 .fabricate-manager .manager-salvage-component-name,
 .fabricate-manager .manager-recipe-component-name,
-.fabricate-manager .manager-recipe-stage-trigger-name {
+.fabricate-manager .manager-recipe-stage-trigger-name,
+.fabricate-manager .manager-tool-replacement-component-name {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -8816,6 +8834,28 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
+}
+
+/* Shared read-only Recipe scope label. Results use it for fixed outcome slots;
+   Tools use it for named routed-by-ingredients scopes. */
+.fabricate-manager .manager-recipe-result-set-static-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fab-mv2-text, var(--fab-text));
+}
+
+.fabricate-manager .manager-recipe-result-set-static-label.is-warning {
+  color: var(--fab-warning-text);
+}
+
+.fabricate-manager .manager-recipe-result-set-static-label i {
+  font-size: 0.8rem;
 }
 
 /* A routed result-set head stacks a label over the chips + "Add outcome" row, so a
@@ -11885,7 +11925,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-drop-rate-percent input[type="text"] {
+.fabricate-manager .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
   width: 100%;
   min-width: 0;
   height: 28px;
@@ -11900,7 +11940,7 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input[type="text"] {
+.fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
   background: var(--fab-overlay-dark-18);
@@ -11918,6 +11958,7 @@
 .fabricate-manager .manager-drop-rate-control {
   --fab-drop-rate-value: 1%;
   --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
+  --fab-chance-slider-thumb-radius: 7px;
 
   position: relative;
   display: grid;
@@ -11955,8 +11996,8 @@
 
 .fabricate-manager .manager-drop-rate-track {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: var(--fab-chance-slider-thumb-radius);
+  right: var(--fab-chance-slider-thumb-radius);
   top: 50%;
   z-index: 0;
   height: 6px;
@@ -11983,14 +12024,17 @@
   width: 100%;
   min-width: 0;
   height: 28px;
+  padding: 0;
   border: 0;
+  background: transparent;
+  box-shadow: none;
   accent-color: var(--fab-drop-rate-color);
   cursor: pointer;
 }
 
 .fabricate-manager .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
-  border: 1px solid var(--fab-overlay-light-10);
+  border: 0;
   border-radius: 999px;
   background: transparent;
 }
@@ -12008,15 +12052,15 @@
 
 .fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-track {
   height: 6px;
-  border: 1px solid var(--fab-overlay-light-10);
+  border: 0;
   border-radius: 999px;
-  background: var(--fab-overlay-dark-18);
+  background: transparent;
 }
 
 .fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-progress {
   height: 6px;
   border-radius: 999px;
-  background: var(--fab-drop-rate-color);
+  background: transparent;
 }
 
 .fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-thumb {
@@ -12028,67 +12072,7 @@
 }
 
 .fabricate-manager .manager-tool-breakage-chance-control {
-  --fab-tool-breakage-chance-thumb-radius: 7px;
-  --fab-tool-breakage-chance-low: var(--fab-success);
-  --fab-tool-breakage-chance-mid: var(--fab-warning);
-  --fab-tool-breakage-chance-high: var(--fab-danger);
-  --fab-tool-breakage-chance-color: var(--fab-success);
-  --fab-tool-breakage-chance-track: linear-gradient(
-    90deg,
-    var(--fab-tool-breakage-chance-low) 0%,
-    var(--fab-tool-breakage-chance-mid) 50%,
-    var(--fab-tool-breakage-chance-high) 100%
-  );
-
-  height: 28px;
-  min-height: 28px;
-  padding: 0 var(--fab-tool-breakage-chance-thumb-radius);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-18);
-  box-sizing: border-box;
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
-  overflow: hidden;
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control .manager-drop-rate-track {
-  left: var(--fab-tool-breakage-chance-thumb-radius);
-  right: var(--fab-tool-breakage-chance-thumb-radius);
-  border: 0;
-  background: var(--fab-tool-breakage-chance-track);
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control .manager-drop-rate-fill {
-  display: none;
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control input[type="range"] {
-  padding: 0;
-  box-shadow: none;
-  background: transparent;
-  accent-color: var(--fab-tool-breakage-chance-color);
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control input[type="range"]::-webkit-slider-runnable-track {
-  border: 0;
-  background: transparent;
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control input[type="range"]::-webkit-slider-thumb {
-  background: var(--fab-tool-breakage-chance-color);
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control input[type="range"]::-moz-range-track {
-  border: 0;
-  background: transparent;
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control input[type="range"]::-moz-range-progress {
-  background: transparent;
-}
-
-.fabricate-manager .manager-tool-breakage-chance-control input[type="range"]::-moz-range-thumb {
-  background: var(--fab-tool-breakage-chance-color);
+  min-width: 0;
 }
 
 .fabricate-manager .manager-drop-quantity-cell input[type="text"] {
@@ -13680,8 +13664,7 @@
 .fabricate-manager .manager-tool-edit-identity,
 .fabricate-manager .manager-tool-edit-actions,
 .fabricate-manager .manager-tool-editor-card-heading,
-.fabricate-manager .manager-tool-validation-summary,
-.fabricate-manager .manager-tool-bonus-presets {
+.fabricate-manager .manager-tool-validation-summary {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
@@ -14180,16 +14163,11 @@
   cursor: not-allowed;
 }
 
-.fabricate-manager .manager-tool-inline-fields,
-.fabricate-manager .manager-tool-replacement-grid {
+.fabricate-manager .manager-tool-inline-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fab-space-3);
   align-items: end;
-}
-
-.fabricate-manager .manager-tool-replacement-grid > span {
-  display: none;
 }
 
 .fabricate-manager .manager-tool-on-break:disabled,
@@ -14383,6 +14361,9 @@
 }
 
 .fabricate-manager .manager-tool-how-it-works {
+  display: grid;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
@@ -14393,7 +14374,7 @@
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
-  margin: 0 0 var(--fab-space-2);
+  margin: 0;
   font-size: 0.625rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -14405,6 +14386,11 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.fabricate-manager .manager-tool-docs-link {
+  justify-self: stretch;
+  min-height: 32px;
 }
 
 .fabricate-manager .manager-tool-how-it-works li {
@@ -14603,10 +14589,29 @@
   overflow-wrap: anywhere;
 }
 
-.fabricate-manager .manager-tool-replacement-stack,
 .fabricate-manager .manager-tool-inspector-sections {
   display: grid;
   gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-tool-replacement-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fabricate-manager .manager-tool-replacement-card .manager-travel-picker,
+.fabricate-manager .manager-tool-replacement-card .manager-tool-replacement-component-trigger {
+  width: 100%;
+}
+
+.fabricate-manager .manager-tool-replacement-card .manager-tool-replacement-component-trigger {
+  justify-content: flex-start;
+  min-height: 0;
+  padding: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-tool-replacement-card .manager-tool-replacement-component-trigger > i:last-child {
+  margin-left: auto;
 }
 
 .fabricate-manager .manager-tool-repair > fieldset {
@@ -14684,6 +14689,66 @@
   color: var(--fab-mv2-text-muted);
 }
 
+.fabricate-manager .manager-tool-breakage-chance-card {
+  display: grid;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-tool-breakage-chance-card > div > p:last-child {
+  margin: var(--fab-space-1) 0 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.68rem;
+}
+
+.fabricate-manager .manager-tool-breakage-chance-card .manager-chance-slider {
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-tool-breakage-config-divider {
+  width: 100%;
+  min-height: 0;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: none;
+  box-shadow: none;
+}
+
+.fabricate-manager [data-tool-limited-uses-info] {
+  align-items: flex-start;
+}
+
+.fabricate-manager [data-tool-limited-uses-info] > i {
+  flex: 0 0 auto;
+  margin-top: 0.15em;
+  font-size: 0.64rem;
+  line-height: 1;
+}
+
+.fabricate-manager [data-tool-limited-uses-info] > p {
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.fabricate-manager .manager-tool-breakage-method > .manager-recipe-field input,
+.fabricate-manager .manager-tool-inline-fields .manager-recipe-field input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  box-sizing: border-box;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
 .fabricate-manager .manager-tool-on-break {
   margin: 0;
   padding: var(--fab-space-4) 0 0;
@@ -14716,8 +14781,15 @@
   font-size: 0.68rem;
 }
 
-.fabricate-manager .manager-tool-replacement-grid {
-  grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1fr);
+.fabricate-manager .manager-tool-on-break-divider {
+  width: 100%;
+  min-height: 0;
+  height: 0;
+  margin: var(--fab-space-1) 0 0;
+  border: 0;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: none;
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-tool-prerequisite-check {
@@ -14749,17 +14821,35 @@
 
 .fabricate-manager [data-tool-requirements-divider] {
   width: 100%;
+  min-height: 0;
+  height: 0;
   margin: 0;
   border: 0;
   border-top: 1px solid var(--fab-mv2-border);
+  background: none;
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-tool-requirements-section fieldset {
   margin: 0;
 }
 
-.fabricate-manager .manager-tool-requirements-section input[data-tool-bonus-expression] {
-  font-family: var(--fab-font-mono);
+.fabricate-manager .manager-tool-bonus-field {
+  display: grid;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-bonus-field > small {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.fabricate-manager .manager-tool-bonus-field .manager-roll-data-expression-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .fabricate-manager .manager-tool-validation {
@@ -14919,7 +15009,6 @@
 
   .fabricate-manager .manager-tool-source-card,
   .fabricate-manager .manager-tool-inline-fields,
-  .fabricate-manager .manager-tool-replacement-grid,
   .fabricate-manager .manager-tool-prerequisite-list,
   .fabricate-manager .manager-tool-choice-grid,
   .fabricate-manager .manager-tool-choice-grid.is-two-up {
@@ -19759,6 +19848,11 @@
   width: 1px;
   height: 1px;
   opacity: 0;
+}
+
+.fabricate-manager [data-tool-create-card] {
+  flex: 0 0 auto;
+  width: 100%;
 }
 
 .fabricate-manager .manager-tools-create-card.is-drop-active {

@@ -90,7 +90,7 @@ function getFolderCollectionValues(folders) {
 function getFolderById(folders, id) {
   if (!folders || !id) return null;
   if (typeof folders.get === 'function') return folders.get(id) || null;
-  return getFolderCollectionValues(folders).find(folder => folder?.id === id) || null;
+  return getFolderCollectionValues(folders).find((folder) => folder?.id === id) || null;
 }
 
 function resolveDroppedFolder(data, folders) {
@@ -111,10 +111,14 @@ function folderDocumentType(folder) {
 function folderChildFolders(folder, folders) {
   const explicitChildren = Array.isArray(folder?.children) ? folder.children : [];
   const explicitFolderChildren = explicitChildren
-    .map(child => child?.folder || child)
-    .filter(child => child && child !== folder);
-  const collectionChildren = getFolderCollectionValues(folders)
-    .filter(candidate => candidate?.folder?.id === folder?.id || candidate?.parent?.id === folder?.id || candidate?.parent === folder?.id);
+    .map((child) => child?.folder || child)
+    .filter((child) => child && child !== folder);
+  const collectionChildren = getFolderCollectionValues(folders).filter(
+    (candidate) =>
+      candidate?.folder?.id === folder?.id ||
+      candidate?.parent?.id === folder?.id ||
+      candidate?.parent === folder?.id
+  );
   return [...explicitFolderChildren, ...collectionChildren];
 }
 
@@ -123,9 +127,12 @@ function collectFolderItems(folder, folders, visited = new Set()) {
   visited.add(folder.id);
   if (folderDocumentType(folder) && folderDocumentType(folder) !== 'Item') return [];
 
-  const directItems = (folder.contents || []).filter(document => document?.documentName === 'Item' && document?.uuid);
-  const nestedItems = folderChildFolders(folder, folders)
-    .flatMap(child => collectFolderItems(child, folders, visited));
+  const directItems = (folder.contents || []).filter(
+    (document) => document?.documentName === 'Item' && document?.uuid
+  );
+  const nestedItems = folderChildFolders(folder, folders).flatMap((child) =>
+    collectFolderItems(child, folders, visited)
+  );
   return [...directItems, ...nestedItems];
 }
 
@@ -139,8 +146,8 @@ function collectCompendiumFolderItemUuids(folder) {
   if (folderDocumentType(folder) && folderDocumentType(folder) !== 'Item') return [];
   const subfolders = typeof folder.getSubfolders === 'function' ? folder.getSubfolders(true) : [];
   return [folder, ...subfolders]
-    .flatMap(current => current?.contents || [])
-    .map(entry => entry?.uuid)
+    .flatMap((current) => current?.contents || [])
+    .map((entry) => entry?.uuid)
     .filter(Boolean);
 }
 
@@ -165,21 +172,23 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     window: {
       title: 'FABRICATE.Admin.Manager.WindowTitle',
       icon: 'fa-solid fa-layer-group',
-      resizable: true
+      resizable: true,
     },
     position: {
       width: 1280,
-      height: 940
-    }
+      height: 940,
+    },
   };
 
   _buildServices() {
     const managerInitialized = (manager) => manager?.initialized === true;
     const isFabricateReady = () => {
       const fabricate = game?.fabricate;
-      return fabricate?.ready === true
-        && managerInitialized(fabricate?.getRecipeManager?.())
-        && managerInitialized(fabricate?.getCraftingSystemManager?.());
+      return (
+        fabricate?.ready === true &&
+        managerInitialized(fabricate?.getRecipeManager?.()) &&
+        managerInitialized(fabricate?.getCraftingSystemManager?.())
+      );
     };
 
     return {
@@ -201,7 +210,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // when Foundry globals / the region are unavailable (headless / no canvas).
       getActorUuidsInSceneRegion: (sceneRegionUuid, actorUuids) => {
         const resolveSync = globalThis.fromUuidSync;
-        if (typeof resolveSync !== 'function' || !sceneRegionUuid || !Array.isArray(actorUuids)) return [];
+        if (typeof resolveSync !== 'function' || !sceneRegionUuid || !Array.isArray(actorUuids))
+          return [];
         let regionDoc = null;
         try {
           regionDoc = resolveSync(String(sceneRegionUuid));
@@ -220,14 +230,15 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             } catch (_) {
               actor = null;
             }
-            const token = actor?.getActiveTokens?.(false, true)?.find(candidate =>
-              getTokenSceneUuid(candidate) === sceneUuid
-            ) ?? null;
+            const token =
+              actor
+                ?.getActiveTokens?.(false, true)
+                ?.find((candidate) => getTokenSceneUuid(candidate) === sceneUuid) ?? null;
             if (!token) return null;
             // Use the DOCUMENT-derived centre so a just-moved marker resolves to its
             // new position (the placeable centre lags during the move animation).
             return tokenDocumentCenter(token);
-          }
+          },
         });
       },
       getFoundrySystemId: () => game?.system?.id || '',
@@ -269,16 +280,17 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           hooks?.off?.('fabricate.recipesChanged', recipeListener);
         };
       },
-      setGatheringConditions: async (conditions) => game?.fabricate?.gathering?.setConditions?.(conditions),
+      setGatheringConditions: async (conditions) =>
+        game?.fabricate?.gathering?.setConditions?.(conditions),
       getScriptMacros: () =>
         Array.from(game.macros?.contents || [])
-          .filter(m => (m.type || '').toLowerCase() === 'script')
-          .map(m => ({ uuid: m.uuid, name: m.name }))
+          .filter((m) => (m.type || '').toLowerCase() === 'script')
+          .map((m) => ({ uuid: m.uuid, name: m.name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       getSceneOptions: () =>
         Array.from(game.scenes?.contents || [])
-          .map(scene => normalizeSceneOption(scene))
-          .filter(scene => scene.uuid && scene.name)
+          .map((scene) => normalizeSceneOption(scene))
+          .filter((scene) => scene.uuid && scene.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       // Non-GM world users ({ id, name, role, color, avatar }), name-sorted: the
       // Access tab's grantable Players list and the recipe editor's context rail.
@@ -291,7 +303,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // `User#isGM` is `hasRole(ASSISTANT)`, so this drops Assistant GMs too.
       getWorldUsers: () =>
         this._playerUsers()
-          .map(user => ({
+          .map((user) => ({
             id: user.id,
             name: user.name,
             role: this._userRoleLabel(user.role),
@@ -301,14 +313,14 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .sort((a, b) => a.name.localeCompare(b.name)),
       getActorOptions: () =>
         Array.from(game.actors?.contents || [])
-          .map(actor => ({
+          .map((actor) => ({
             uuid: actor.uuid,
             id: actor.id,
             name: actor.name,
             img: actor.img || '',
-            type: actor.type || ''
+            type: actor.type || '',
           }))
-          .filter(actor => actor.uuid && actor.name)
+          .filter((actor) => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       // Player-character actors, name-sorted, for the Access tab's grantable
       // Characters roster under the `restricted` visibility mode. A character is a
@@ -318,9 +330,12 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // `_describeAccessActor`.
       getPlayerCharacterActors: () =>
         Array.from(game.actors?.contents || [])
-          .filter(actor => game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character')
-          .map(actor => this._describeAccessActor(actor))
-          .filter(actor => actor.id && actor.name)
+          .filter(
+            (actor) =>
+              game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'
+          )
+          .map((actor) => this._describeAccessActor(actor))
+          .filter((actor) => actor.id && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       // EVERY world actor, name-sorted — deliberately NOT the
       // `isPlayerCharacterActor`-filtered roster above. The runtime access predicate
@@ -331,26 +346,27 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // display and under-report who has access.
       getAccessCharacterActors: () =>
         Array.from(game.actors?.contents || [])
-          .map(actor => this._describeAccessActor(actor))
-          .filter(actor => actor.id && actor.name)
+          .map((actor) => this._describeAccessActor(actor))
+          .filter((actor) => actor.id && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       // Game-world Items ({ uuid, name, img, type }), name-sorted, for resolving
       // linked Item previews after drag-and-drop.
       getWorldItemOptions: () =>
         Array.from(game.items?.contents || [])
-          .map(item => ({
+          .map((item) => ({
             uuid: item.uuid,
             name: item.name,
             img: item.img || '',
-            type: item.type || ''
+            type: item.type || '',
           }))
-          .filter(item => item.uuid && item.name)
+          .filter((item) => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       resolveToolSource: (uuid) => resolveItemSourceSnapshot(uuid),
       pickImagePath: async (currentPath = '') => {
-        const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation
-          || foundry?.applications?.apps?.FilePicker
-          || globalThis.FilePicker;
+        const FilePickerClass =
+          foundry?.applications?.apps?.FilePicker?.implementation ||
+          foundry?.applications?.apps?.FilePicker ||
+          globalThis.FilePicker;
         if (!FilePickerClass) {
           ui.notifications.warn(localize('FABRICATE.Admin.Environments.ImagePickerUnavailable'));
           return null;
@@ -368,11 +384,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               type: 'image',
               current: currentPath || '',
               callback: (path) => settle(path),
-              close: () => settle(null)
+              close: () => settle(null),
             });
             picker.render(true);
           } catch (err) {
-            ui.notifications.warn(err?.message || localize('FABRICATE.Admin.Environments.ImagePickerUnavailable'));
+            ui.notifications.warn(
+              err?.message || localize('FABRICATE.Admin.Environments.ImagePickerUnavailable')
+            );
             settle(null);
           }
         });
@@ -380,7 +398,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       notify: {
         info: (msg) => ui.notifications.info(msg),
         warn: (msg) => ui.notifications.warn(msg),
-        error: (msg) => ui.notifications.error(msg)
+        error: (msg) => ui.notifications.error(msg),
       },
       localize: (key, data) => localize(key, data),
       confirmDialog: (options) => confirmDialog(options),
@@ -414,13 +432,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               const raw = button.form?.elements?.importJson?.value || '';
               const overwrite = button.form?.elements?.overwrite?.checked || false;
               return { raw, overwrite };
-            }
+            },
           },
-          rejectClose: false
+          rejectClose: false,
         });
         if (result) {
           try {
-            const data = JSON.parse(result.raw).map(r => ({ ...r, craftingSystemId: systemId }));
+            const data = JSON.parse(result.raw).map((r) => ({ ...r, craftingSystemId: systemId }));
             await game.fabricate.getRecipeManager().importRecipes(data, result.overwrite);
             await this._adminStore.refresh();
           } catch (err) {
@@ -429,11 +447,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         }
       },
       copyToClipboard: async (text) => {
-        if (foundry?.utils?.copyPlainText) {
-          await foundry.utils.copyPlainText(text);
-        } else {
-          await navigator.clipboard.writeText(text);
+        const clipboard = game?.clipboard;
+        if (!clipboard?.copyPlainText) {
+          throw new Error('Foundry clipboard helper is unavailable');
         }
+        await clipboard.copyPlainText(text);
       },
       getModuleVersion: () => game.modules?.get('fabricate')?.version || '0.0.0',
       downloadFile: async (json, filename) => {
@@ -475,11 +493,12 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             callback: (event, button) => {
               const fileInput = button.form?.querySelector('input[name="importFile"]');
               const file = fileInput?.files?.[0] || null;
-              const conflictMode = button.form?.querySelector('input[name="conflictMode"]:checked')?.value || 'skip';
+              const conflictMode =
+                button.form?.querySelector('input[name="conflictMode"]:checked')?.value || 'skip';
               return { file, conflictMode };
-            }
+            },
           },
-          rejectClose: false
+          rejectClose: false,
         });
         if (!result || !result.file) return;
 
@@ -510,10 +529,10 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             environmentStore: game.fabricate.getGatheringEnvironmentStore?.() ?? null,
             getSetting: (key) => getSetting(key),
             setSetting: (key, value) => setSetting(key, value),
-            isGM: () => game.user?.isGM === true
+            isGM: () => game.user?.isGM === true,
           });
           summary = await importer.importFromPackData(packData, {
-            overwriteExisting: result.conflictMode === 'overwrite'
+            overwriteExisting: result.conflictMode === 'overwrite',
           });
         } catch (err) {
           // Hard failures stay on the DISTINCT error-toast path (never the report).
@@ -528,8 +547,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           return;
         }
 
-        const verb = summary.collisions.some(c => c.type === 'system' && c.resolution === 'overwritten')
-          ? 'Updated' : 'Imported';
+        const verb = summary.collisions.some(
+          (c) => c.type === 'system' && c.resolution === 'overwritten'
+        )
+          ? 'Updated'
+          : 'Imported';
         const message = `${verb} "${summary.system.name}" with ${summary.components.total} components, ${summary.recipes.imported} imported recipes, ${summary.recipes.skipped} skipped recipes, and ${summary.recipes.errors.length} failed recipes.`;
         if (summary.recipes.errors.length > 0) {
           ui.notifications.warn(message);
@@ -544,10 +566,12 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         await DialogV2.wait({
           window: { title: content.title },
           content: renderImportReportHtml(content),
-          buttons: [{ action: 'ok', label: localize('FABRICATE.Admin.ImportReport.Close'), default: true }],
-          rejectClose: false
+          buttons: [
+            { action: 'ok', label: localize('FABRICATE.Admin.ImportReport.Close'), default: true },
+          ],
+          rejectClose: false,
         });
-      }
+      },
     };
   }
 
@@ -561,9 +585,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     const resolveSingleItemDropUuid = (data) => {
       const dropInfo = resolveDropData(data);
       if (dropInfo.type && dropInfo.type !== 'Item' && dropInfo.type !== 'Compendium') {
-        ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNotAnItem', {
-          type: dropInfo.type
-        }));
+        ui.notifications.warn(
+          localize('FABRICATE.Admin.Items.DropNotAnItem', {
+            type: dropInfo.type,
+          })
+        );
         return null;
       }
 
@@ -579,19 +605,23 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     const notifySingleSourceFallback = (fallbacks = []) => {
       const fallback = Array.isArray(fallbacks) ? fallbacks[0] : null;
       if (!fallback) return;
-      ui.notifications.warn(localize('FABRICATE.Admin.Items.SourceFallbackWarning', {
-        name: fallback.itemName || fallback.fallbackUuid,
-        brokenUuid: fallback.brokenUuid,
-        fallbackUuid: fallback.fallbackUuid
-      }));
+      ui.notifications.warn(
+        localize('FABRICATE.Admin.Items.SourceFallbackWarning', {
+          name: fallback.itemName || fallback.fallbackUuid,
+          brokenUuid: fallback.brokenUuid,
+          fallbackUuid: fallback.fallbackUuid,
+        })
+      );
     };
 
     const notifyBulkSourceFallback = (fallbacks = []) => {
       const count = Array.isArray(fallbacks) ? fallbacks.length : 0;
       if (count <= 0) return;
-      ui.notifications.warn(localize('FABRICATE.Admin.Items.SourceFallbackSummary', {
-        count
-      }));
+      ui.notifications.warn(
+        localize('FABRICATE.Admin.Items.SourceFallbackSummary', {
+          count,
+        })
+      );
     };
 
     const importSingleManagedItemFromDrop = async (data) => {
@@ -608,9 +638,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       try {
         const result = await systemManager.addItemFromUuid(systemId, uuid);
         if (result.action === 'updated') {
-          ui.notifications.info(localize('FABRICATE.Admin.Items.ItemUpdated', {
-            name: result.item.name
-          }));
+          ui.notifications.info(
+            localize('FABRICATE.Admin.Items.ItemUpdated', {
+              name: result.item.name,
+            })
+          );
         }
         notifySingleSourceFallback(result.sourceFallbacks);
         await this._adminStore.refresh();
@@ -646,7 +678,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
             const pack = game.packs?.get?.(data.collection);
             if (!pack || pack.metadata?.type !== 'Item') return null;
-            try { await pack.getIndex(); } catch { /* index may already be loaded */ }
+            try {
+              await pack.getIndex();
+            } catch {
+              /* index may already be loaded */
+            }
             return groupsWithFolders(collectPackFolderGroups(pack, { unfiledName }));
           }
 
@@ -668,7 +704,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             if (folder.pack) {
               const pack = game.packs?.get?.(folder.pack);
               if (!pack || pack.metadata?.type !== 'Item') return null;
-              try { await pack.getIndex(); } catch { /* best effort */ }
+              try {
+                await pack.getIndex();
+              } catch {
+                /* best effort */
+              }
               return groupsWithFolders(
                 collectPackFolderGroups(pack, { rootFolderId: folder.id, unfiledName })
               );
@@ -688,7 +728,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
             return;
           }
-          const summary = await applyFolderImportDecisions(systemManager, systemId, decisions || []);
+          const summary = await applyFolderImportDecisions(
+            systemManager,
+            systemId,
+            decisions || []
+          );
           ui.notifications.info(
             localize('FABRICATE.Admin.Items.ImportMapping.Summary', {
               added: summary.added,
@@ -709,16 +753,19 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
             const packId = data.collection;
             if (!packId || !systemId) {
-              if (!systemId) ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+              if (!systemId)
+                ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
               return;
             }
             const result = await systemManager.addItemsFromPack(systemId, packId);
-            ui.notifications.info(localize('FABRICATE.Admin.Items.BulkImportUpdated', {
-              added: result.added,
-              updated: result.updated,
-              skipped: result.skipped,
-              total: result.total
-            }));
+            ui.notifications.info(
+              localize('FABRICATE.Admin.Items.BulkImportUpdated', {
+                added: result.added,
+                updated: result.updated,
+                skipped: result.skipped,
+                total: result.total,
+              })
+            );
             notifyBulkSourceFallback(result.sourceFallbacks);
             await this._adminStore.refresh();
             return;
@@ -740,11 +787,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             // packId string for compendium folders and null/undefined for world folders.
             const itemUuids = folder.pack
               ? collectCompendiumFolderItemUuids(folder)
-              : collectFolderItems(folder, game.folders).map(folderItem => folderItem.uuid);
+              : collectFolderItems(folder, game.folders).map((folderItem) => folderItem.uuid);
             if (itemUuids.length === 0) {
-              ui.notifications.info(localize('FABRICATE.Admin.Items.FolderEmpty', {
-                name: folder.name || data.id
-              }));
+              ui.notifications.info(
+                localize('FABRICATE.Admin.Items.FolderEmpty', {
+                  name: folder.name || data.id,
+                })
+              );
               return;
             }
             let added = 0;
@@ -756,15 +805,18 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               if (result.action === 'added') added++;
               else if (result.action === 'updated') updated++;
               else skipped++;
-              if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+              if (Array.isArray(result.sourceFallbacks))
+                sourceFallbacks.push(...result.sourceFallbacks);
             }
-            ui.notifications.info(localize('FABRICATE.Admin.Items.FolderImportSummary', {
-              added,
-              updated,
-              skipped,
-              total: itemUuids.length,
-              name: folder.name || data.id
-            }));
+            ui.notifications.info(
+              localize('FABRICATE.Admin.Items.FolderImportSummary', {
+                added,
+                updated,
+                skipped,
+                total: itemUuids.length,
+                name: folder.name || data.id,
+              })
+            );
             notifyBulkSourceFallback(sourceFallbacks);
             await this._adminStore.refresh();
             return;
@@ -777,7 +829,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const systemManager = game.fabricate.getCraftingSystemManager();
           const systemId = get(this._adminStore.selectedSystemId) || '';
           if (!systemId || !itemId) {
-            if (!systemId) ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+            if (!systemId)
+              ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
             return;
           }
 
@@ -787,9 +840,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           try {
             const result = await systemManager.replaceItemSource(systemId, itemId, uuid);
             const item = result.item;
-            ui.notifications.info(localize('FABRICATE.Admin.Items.SourceReplaced', {
-              name: item.name
-            }));
+            ui.notifications.info(
+              localize('FABRICATE.Admin.Items.SourceReplaced', {
+                name: item.name,
+              })
+            );
             notifySingleSourceFallback(result.sourceFallbacks);
             await this._adminStore.refresh();
           } catch (err) {
@@ -835,18 +890,19 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           if (!systemId || !itemId) return;
           SvelteComponentEditorApp.show(itemId, systemId, this);
         },
-        confirmDiscardEssenceDraft: () => confirmDialog({
-          title: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyTitle'),
-          content: `<p>${localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyContent')}</p>`,
-          yes: {
-            label: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyConfirm'),
-            callback: () => true
-          },
-          no: {
-            label: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyCancel'),
-            callback: () => false
-          }
-        }),
+        confirmDiscardEssenceDraft: () =>
+          confirmDialog({
+            title: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyTitle'),
+            content: `<p>${localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyContent')}</p>`,
+            yes: {
+              label: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyConfirm'),
+              callback: () => true,
+            },
+            no: {
+              label: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyCancel'),
+              callback: () => false,
+            },
+          }),
         confirmDirtyToolsNavigation: async () => {
           const action = await choiceDialog({
             title: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Title'),
@@ -855,35 +911,36 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               {
                 action: 'save',
                 label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Save'),
-                icon: 'fas fa-save'
+                icon: 'fas fa-save',
               },
               {
                 action: 'discard',
                 label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Discard'),
-                icon: 'fas fa-trash'
+                icon: 'fas fa-trash',
               },
               {
                 action: 'cancel',
                 label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.KeepEditing'),
-                icon: 'fas fa-times'
-              }
+                icon: 'fas fa-times',
+              },
             ],
-            defaultAction: 'save'
+            defaultAction: 'save',
           });
           return action === 'cancel' ? false : action;
         },
-        confirmDeleteTool: ({ tool } = {}) => confirmDialog({
-          title: localize('FABRICATE.Admin.Manager.Tools.DeleteConfirm.Title'),
-          content: `<p>${localize('FABRICATE.Admin.Manager.Tools.DeleteConfirm.Content').replace('{name}', tool?.label || tool?.name || '')}</p>`,
-          yes: {
-            label: localize('FABRICATE.Admin.Manager.Tools.Delete'),
-            callback: () => true
-          },
-          no: {
-            label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.KeepEditing'),
-            callback: () => false
-          }
-        }),
+        confirmDeleteTool: ({ tool } = {}) =>
+          confirmDialog({
+            title: localize('FABRICATE.Admin.Manager.Tools.DeleteConfirm.Title'),
+            content: `<p>${localize('FABRICATE.Admin.Manager.Tools.DeleteConfirm.Content').replace('{name}', tool?.label || tool?.name || '')}</p>`,
+            yes: {
+              label: localize('FABRICATE.Admin.Manager.Tools.Delete'),
+              callback: () => true,
+            },
+            no: {
+              label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.KeepEditing'),
+              callback: () => false,
+            },
+          }),
         registerEssenceDirtyGuard: (guard) => {
           this._confirmDiscardDirtyEssenceDraft = typeof guard === 'function' ? guard : null;
         },
@@ -899,7 +956,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         // stamina expressions change (both flags unchanged) to avoid per-keystroke
         // churn.
         setGatheringEconomy: async (opts = {}) => {
-          const prevEconomy = get(this._adminStore?.viewState)?.gatheringConfig?.systems?.[opts?.systemId]?.economy;
+          const prevEconomy = get(this._adminStore?.viewState)?.gatheringConfig?.systems?.[
+            opts?.systemId
+          ]?.economy;
           const prevStamina = prevEconomy?.stamina?.enabled === true;
           const prevNodes = prevEconomy?.nodes?.enabled === true;
           const prevResolution = prevEconomy?.resolutionMode ?? 'd100';
@@ -907,15 +966,21 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const nextNodes = opts?.economy?.nodes?.enabled === true;
           const nextResolution = opts?.economy?.resolutionMode ?? 'd100';
           const result = await game?.fabricate?.setGatheringEconomy?.(opts);
-          if (nextStamina !== prevStamina || nextNodes !== prevNodes || nextResolution !== prevResolution) this._adminStore?.refreshGatheringConfig?.();
+          if (
+            nextStamina !== prevStamina ||
+            nextNodes !== prevNodes ||
+            nextResolution !== prevResolution
+          )
+            this._adminStore?.refreshGatheringConfig?.();
           return result;
         },
-        getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
+        getGatheringStaminaState: (opts = {}) =>
+          game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
         rollGatheringStamina: (opts = {}) => game?.fabricate?.rollGatheringStamina?.(opts),
         setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),
         adjustGatheringStamina: (opts = {}) => game?.fabricate?.adjustGatheringStamina?.(opts),
-        restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts)
-      }
+        restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts),
+      },
     };
   }
 
@@ -1000,7 +1065,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       })
       .filter(Boolean)
       // Assigned-first, then by name — the assigned player is the one the GM means.
-      .sort((a, b) => (a.assigned === b.assigned ? a.name.localeCompare(b.name) : a.assigned ? -1 : 1));
+      .sort((a, b) =>
+        a.assigned === b.assigned ? a.name.localeCompare(b.name) : a.assigned ? -1 : 1
+      );
 
     const defaultLevel = Number(actor.ownership?.default ?? LEVELS.NONE);
     return {
@@ -1046,18 +1113,23 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   }
 
   async close(options) {
-    const canCloseTool = await this._confirmDiscardDirtyToolDraft?.();
-    if (canCloseTool === false) return this;
+    // Foundry and the smoke harness use `force` for lifecycle teardown where a
+    // confirmation dialog cannot be serviced. Normal user-initiated closes keep
+    // every dirty-draft guard below.
+    if (!options?.force) {
+      const canCloseTool = await this._confirmDiscardDirtyToolDraft?.();
+      if (canCloseTool === false) return this;
 
-    const canCloseEssence = await this._confirmDiscardDirtyEssenceDraft?.();
-    if (canCloseEssence === false) return this;
+      const canCloseEssence = await this._confirmDiscardDirtyEssenceDraft?.();
+      if (canCloseEssence === false) return this;
 
-    if (this._adminStore) {
-      const action = await this._adminStore.confirmDiscardDirtyEnvironmentDraft?.();
-      if (action === 'cancel') return this;
-      if (action === 'save') {
-        const result = await this._adminStore.saveEnvironmentDraft?.();
-        if (result && result.ok === false) return this;
+      if (this._adminStore) {
+        const action = await this._adminStore.confirmDiscardDirtyEnvironmentDraft?.();
+        if (action === 'cancel') return this;
+        if (action === 'save') {
+          const result = await this._adminStore.saveEnvironmentDraft?.();
+          if (result && result.ok === false) return this;
+        }
       }
     }
 
@@ -1102,7 +1174,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         if (typeof whenReady === 'function') {
           Promise.resolve(whenReady.call(game.fabricate))
             .then(openWhenReady)
-            .catch(() => { SvelteCraftingSystemManagerApp._pendingReadyOpen = false; });
+            .catch(() => {
+              SvelteCraftingSystemManagerApp._pendingReadyOpen = false;
+            });
         } else if (typeof hooks?.once === 'function') {
           hooks.once('fabricate.ready', openWhenReady);
         } else {
@@ -1119,9 +1193,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
   static _isFabricateReady() {
     const fabricate = game?.fabricate;
-    return fabricate?.ready === true
-      && fabricate?.getRecipeManager?.()?.initialized === true
-      && fabricate?.getCraftingSystemManager?.()?.initialized === true;
+    return (
+      fabricate?.ready === true &&
+      fabricate?.getRecipeManager?.()?.initialized === true &&
+      fabricate?.getCraftingSystemManager?.()?.initialized === true
+    );
   }
 }
 

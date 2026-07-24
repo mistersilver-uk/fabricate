@@ -358,7 +358,13 @@ describe('createAdminStore', () => {
           {
             id: 'trg1',
             label: 'Natural 1',
-            condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+            condition: {
+              type: 'diceGroup',
+              groupId: 0,
+              aggregate: 'anyDie',
+              operator: '==',
+              value: 1,
+            },
           },
         ],
       };
@@ -2578,9 +2584,7 @@ describe('createAdminStore', () => {
         resultGroups: [{ id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] }],
         steps: [],
       };
-      services._getRecipesMutable().push(
-        makeRecipe({ ...recipeData, toJSON: () => recipeData })
-      );
+      services._getRecipesMutable().push(makeRecipe({ ...recipeData, toJSON: () => recipeData }));
       let updateCount = 0;
       const origUpdateRecipe = recipeManager.updateRecipe;
       recipeManager.updateRecipe = async (id, updates, options) => {
@@ -2826,7 +2830,10 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
       const gathering = vs.selectedSystem?.gatheringCraftingCheck;
-      assert.ok(gathering?.progressive, 'progressive gathering config should be surfaced, not dropped');
+      assert.ok(
+        gathering?.progressive,
+        'progressive gathering config should be surfaced, not dropped'
+      );
       assert.equal(gathering.progressive.awardMode, 'equal');
       assert.ok(gathering?.routed, 'routed gathering config should be surfaced, not dropped');
       assert.equal(gathering.routed.relativeOutcomes?.[0]?.name, 'Rich Vein');
@@ -2838,7 +2845,10 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.gatheringCraftingCheck = { enabled: true, routed: { type: 'fixed', fixedOutcomes: [] } };
+        sys.gatheringCraftingCheck = {
+          enabled: true,
+          routed: { type: 'fixed', fixedOutcomes: [] },
+        };
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -2859,7 +2869,10 @@ describe('createAdminStore', () => {
       assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.progressive, progressive);
       // existing fields are preserved by the shallow merge
       assert.equal(updateArgs.updates.gatheringCraftingCheck.enabled, true);
-      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.routed, { type: 'fixed', fixedOutcomes: [] });
+      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.routed, {
+        type: 'fixed',
+        fixedOutcomes: [],
+      });
     });
 
     it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
@@ -3192,7 +3205,9 @@ describe('createAdminStore', () => {
       assert.ok(updateCall !== null);
       assert.equal(updateCall.systemId, 'sys1');
       assert.equal(updateCall.recipeItemId, 'book-1');
-      assert.deepEqual(updateCall.patch, { caps: { learn: { limitRecipes: true, maxRecipes: 4 } } });
+      assert.deepEqual(updateCall.patch, {
+        caps: { learn: { limitRecipes: true, maxRecipes: 4 } },
+      });
     });
 
     it('updateRecipeItemCaps is a no-op without a recipe item id', async () => {
@@ -5913,6 +5928,7 @@ describe('createAdminStore', () => {
 
     it('viewState.recipes derives browser display counts from execution steps', async () => {
       const services = createMockServices();
+      services._getSystemsMutable()[0].resolutionMode = 'routedByIngredients';
       const origManager = services.getRecipeManager();
       const multiStepRecipe = makeRecipe({
         id: 'r-multi',
@@ -5930,6 +5946,7 @@ describe('createAdminStore', () => {
             ingredientSets: [
               {
                 id: 'set-herbs',
+                name: 'Herb route',
                 ingredientGroups: [
                   { id: 'group-herb', options: [{ componentId: 'mint' }, { componentId: 'sage' }] },
                   { id: 'group-water', options: [{ componentId: 'water' }] },
@@ -5945,6 +5962,7 @@ describe('createAdminStore', () => {
             ingredientSets: [
               {
                 id: 'set-finish',
+                name: 'Finish route',
                 ingredients: [{ componentId: 'ash' }, { componentId: 'salt' }],
                 toolIds: ['filter', 'vial'],
               },
@@ -5997,7 +6015,7 @@ describe('createAdminStore', () => {
           ingredientSetSummaries: [
             {
               id: 'set-herbs',
-              name: 'Set 1',
+              name: 'Herb route',
               ingredientCount: 3,
               toolCount: 1,
             },
@@ -6015,7 +6033,7 @@ describe('createAdminStore', () => {
           ingredientSetSummaries: [
             {
               id: 'set-finish',
-              name: 'Set 1',
+              name: 'Finish route',
               ingredientCount: 2,
               toolCount: 2,
             },
@@ -6026,6 +6044,7 @@ describe('createAdminStore', () => {
 
     it('viewState.recipes falls back to recipe-level ingredientSets and preserves alternatives for requirementsPreview', async () => {
       const services = createMockServices();
+      services._getSystemsMutable()[0].resolutionMode = 'routedByIngredients';
       const origManager = services.getRecipeManager();
       const fallbackRecipe = makeRecipe({
         id: 'r-single',
@@ -6034,6 +6053,7 @@ describe('createAdminStore', () => {
         ingredientSets: [
           {
             id: 'set-main',
+            name: 'Main route',
             ingredientGroups: [
               { id: 'group-main', options: [{ componentId: 'root' }, { componentId: 'mushroom' }] },
             ],
@@ -6041,6 +6061,7 @@ describe('createAdminStore', () => {
           },
           {
             id: 'set-alt',
+            name: 'Alternative route',
             ingredients: [
               { componentId: 'fish' },
               { componentId: 'salt' },
@@ -6084,19 +6105,55 @@ describe('createAdminStore', () => {
           ingredientSetSummaries: [
             {
               id: 'set-main',
-              name: 'Set 1',
+              name: 'Main route',
               ingredientCount: 2,
               toolCount: 1,
             },
             {
               id: 'set-alt',
-              name: 'Set 2',
+              name: 'Alternative route',
               ingredientCount: 3,
               toolCount: 0,
             },
           ],
         },
       ]);
+    });
+
+    it('viewState.recipes omits inactive per-set Tools from browser Tool counts', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipeWithStaleSetTools = makeRecipe({
+        id: 'r-stale-set-tools',
+        name: 'Simple Recipe',
+        craftingSystemId: 'sys1',
+        toolIds: ['global-tool'],
+        ingredientSets: [
+          {
+            id: 'set-main',
+            name: 'Named but not routed',
+            ingredientGroups: [{ id: 'group-main', options: [{ componentId: 'root' }] }],
+            toolIds: ['stale-set-tool'],
+          },
+        ],
+        resultGroups: [{ id: 'success' }],
+      });
+
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [recipeWithStaleSetTools].filter(
+            (recipe) =>
+              !filter?.craftingSystemId || recipe.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const recipe = get(store.viewState).recipes.find((entry) => entry.id === 'r-stale-set-tools');
+      assert.equal(recipe.toolCount, 1);
+      assert.equal(recipe.requirementsPreview[0].ingredientSetSummaries[0].toolCount, 0);
     });
 
     it('surfaces recipe routing fields (resultSelection, checkTierId, checkOutcomeIds) in the view state', async () => {

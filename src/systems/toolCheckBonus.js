@@ -6,17 +6,21 @@
  * being satisfied by different actors during a multi-actor attempt.
  */
 
-export const TOOL_BONUS_MODES = Object.freeze(['always', 'highestOnly', 'never']);
-
-export function normalizeToolBonusModes(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
-  const normalized = {};
-  for (const [rawId, rawMode] of Object.entries(input)) {
-    const id = String(rawId || '').trim();
-    if (!id || !TOOL_BONUS_MODES.includes(rawMode)) continue;
-    normalized[id] = rawMode;
-  }
-  return normalized;
+/**
+ * Whether Ingredient Set Tool references are active for this system/set pair.
+ * Inactive references remain serialized so switching modes or restoring a set
+ * name is lossless, but every read-side consumer uses this predicate before
+ * treating those ids as requirements.
+ *
+ * @param {object|null} system
+ * @param {object|null} ingredientSet
+ * @returns {boolean}
+ */
+export function ingredientSetToolsAreActive(system, ingredientSet) {
+  return (
+    system?.resolutionMode === 'routedByIngredients' &&
+    String(ingredientSet?.name ?? '').trim().length > 0
+  );
 }
 
 export function resolveToolPrerequisites({ prerequisiteIds, definitions } = {}) {
@@ -90,6 +94,7 @@ async function evaluateEnabledBonus({ tool, actor, eligible, evaluateExpression 
   const bonus = tool?.bonus || {};
   const expression = typeof bonus.expression === 'string' ? bonus.expression.trim() : '';
   if (
+    tool?.enabled === false ||
     bonus.enabled !== true ||
     !eligible ||
     !expression ||
@@ -113,7 +118,6 @@ export async function evaluateToolCheckContribution({
   prerequisiteDefinitions = [],
   evaluatePrerequisite,
   evaluateExpression,
-  bonusMode = 'always',
 } = {}) {
   const actor = matchedItem?.parent || primaryActor || null;
   const gate = await evaluateToolPrerequisiteGate({
@@ -134,24 +138,16 @@ export async function evaluateToolCheckContribution({
     toolId: tool?.id ?? null,
     label: String(tool?.label || tool?.name || 'Tool'),
     value,
-    mode: TOOL_BONUS_MODES.includes(bonusMode) ? bonusMode : 'always',
   };
 }
 
 export function composeToolBonusTerms(contributions) {
-  const always = [];
-  let highest = null;
+  const terms = [];
   for (const contribution of Array.isArray(contributions) ? contributions : []) {
     const value = Number(contribution?.value);
-    if (!Number.isFinite(value) || value === 0 || contribution?.mode === 'never') continue;
-    const term = { ...contribution, value };
-    if (contribution?.mode === 'highestOnly') {
-      if (highest === null || value > highest.value) highest = term;
-    } else {
-      always.push(term);
-    }
+    if (!Number.isFinite(value) || value === 0) continue;
+    terms.push({ ...contribution, value });
   }
-  const terms = highest ? [...always, highest] : always;
   return {
     terms,
     total: terms.reduce((sum, term) => sum + term.value, 0),

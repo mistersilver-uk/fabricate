@@ -156,7 +156,12 @@ describe('InventoryListingBuilder — ownership aggregation', () => {
     const system = makeSystem({
       components: [
         { id: 'c1', name: 'Iron', img: 'icons/iron.webp', description: REPORTER_RESOLVED_EXPECTED },
-        { id: 'c2', name: 'Coal', img: 'icons/coal.webp', description: REPORTER_ENRICHER_DESCRIPTION },
+        {
+          id: 'c2',
+          name: 'Coal',
+          img: 'icons/coal.webp',
+          description: REPORTER_ENRICHER_DESCRIPTION,
+        },
       ],
       tools: [],
     });
@@ -179,6 +184,7 @@ describe('InventoryListingBuilder — used-by index', () => {
     ingredientSets: [
       {
         id: 's1',
+        name: 'Forge route',
         ingredientGroups: [
           { id: 'g1', options: [{ componentId: 'c1' }] },
           { id: 'g2', options: [{ match: { componentId: 'c2' } }] },
@@ -192,7 +198,10 @@ describe('InventoryListingBuilder — used-by index', () => {
   };
 
   function ownAll() {
-    const { builder, getRecipesCalls } = makeBuilder({ recipes: [recipe] });
+    const { builder, getRecipesCalls } = makeBuilder({
+      systems: [makeSystem({ resolutionMode: 'routedByIngredients' })],
+      recipes: [recipe],
+    });
     const listing = builder.buildListing({
       craftingActor: actor('a1', 'Akra', [item('Iron', 2), item('Coal', 1), item('Hammerhead', 1)]),
     });
@@ -219,6 +228,30 @@ describe('InventoryListingBuilder — used-by index', () => {
     ]);
     // A tool is never "used by" (consumed) — that list stays empty for a pure tool.
     assert.deepEqual(rowByComponent(listing, 'c3').usedBy, []);
+  });
+
+  it('does not index stale per-set Tools outside named routed-by-ingredients sets', () => {
+    for (const system of [
+      makeSystem({ resolutionMode: 'simple' }),
+      makeSystem({ resolutionMode: 'routedByIngredients' }),
+    ]) {
+      const staleRecipe = {
+        ...recipe,
+        ingredientSets: recipe.ingredientSets.map((set, index) =>
+          index === 0
+            ? {
+                ...set,
+                name: system.resolutionMode === 'routedByIngredients' ? '  ' : set.name,
+              }
+            : set
+        ),
+      };
+      const { builder } = makeBuilder({ systems: [system], recipes: [staleRecipe] });
+      const listing = builder.buildListing({
+        craftingActor: actor('a1', 'Akra', [item('Hammerhead', 1)]),
+      });
+      assert.deepEqual(rowByComponent(listing, 'c3').requiredFor, []);
+    }
   });
 
   it('records essence usage on the essence row', () => {
@@ -1445,7 +1478,11 @@ describe('InventoryListingBuilder - salvage view-model', () => {
         salvage: {
           resultGroups: [
             { id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] },
-            { id: 'g-fail', role: 'failure', results: [{ id: 'r2', componentId: 'c3', quantity: 1 }] },
+            {
+              id: 'g-fail',
+              role: 'failure',
+              results: [{ id: 'r2', componentId: 'c3', quantity: 1 }],
+            },
           ],
         },
       })
@@ -1473,7 +1510,9 @@ describe('InventoryListingBuilder - salvage view-model', () => {
         mode: 'simple',
         salvage: {
           enabled: false,
-          resultGroups: [{ id: 'g-fail', role: 'failure', results: [{ id: 'r1', componentId: 'c2' }] }],
+          resultGroups: [
+            { id: 'g-fail', role: 'failure', results: [{ id: 'r1', componentId: 'c2' }] },
+          ],
         },
       })
     );
@@ -1755,10 +1794,9 @@ describe('InventoryListingBuilder - salvage view-model', () => {
   });
 
   it('skips an unknown/disabled tool id when resolving required tools', () => {
-    const salvage = salvageOf(
-      toolSystem({ salvage: { toolIds: ['tool-lw', 'no-such-tool'] } }),
-      { items: [item('Iron', 1), item('Slag', 1)] }
-    );
+    const salvage = salvageOf(toolSystem({ salvage: { toolIds: ['tool-lw', 'no-such-tool'] } }), {
+      items: [item('Iron', 1), item('Slag', 1)],
+    });
     assert.equal(salvage.toolStates.length, 1, 'the unresolvable id is skipped');
     assert.equal(salvage.toolStates[0].componentId, 'c3');
   });

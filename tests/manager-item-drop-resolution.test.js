@@ -28,8 +28,7 @@ test('manager Item drops resolve world and compendium Items to one shared snapsh
   const worldUuid = resolveDropUuid({ type: 'Item', uuid: 'Item.hammer' });
   const compendiumUuid = resolveDropUuid({
     type: 'Item',
-    pack: 'mythwright.items',
-    id: 'hammer',
+    uuid: 'Compendium.mythwright.items.Item.hammer',
   });
 
   assert.deepEqual(await resolveItemSourceSnapshot(worldUuid), {
@@ -40,7 +39,7 @@ test('manager Item drops resolve world and compendium Items to one shared snapsh
     description: 'A working hammer.',
   });
   assert.equal((await resolveItemSourceSnapshot(compendiumUuid))?.uuid, compendiumUuid);
-  assert.deepEqual(requested, ['Item.hammer', 'Compendium.mythwright.items.hammer']);
+  assert.deepEqual(requested, ['Item.hammer', 'Compendium.mythwright.items.Item.hammer']);
 });
 
 test('manager Item drops reject missing, malformed, and non-Item documents', async () => {

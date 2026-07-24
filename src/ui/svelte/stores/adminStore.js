@@ -91,6 +91,7 @@ import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js'
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
 import { SignatureValidator } from '../../../systems/SignatureValidator.js';
+import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js';
 import {
   localizeRecipeActivationError,
   localizeRecipePersistenceError,
@@ -342,13 +343,21 @@ function _usesExplicitRecipeSteps(recipe, executionSteps) {
   return (Array.isArray(recipe?.steps) && recipe.steps.length > 0) || executionSteps.length > 1;
 }
 
-function _buildRequirementPreviewStep(step, index, sharedRecipeToolIds = []) {
+function _buildRequirementPreviewStep(
+  step,
+  index,
+  sharedRecipeToolIds = [],
+  craftingSystem = null
+) {
   const ingredientSets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
   const ingredientSetSummaries = ingredientSets.map((set, setIndex) => ({
     id: set?.id || `set-${setIndex + 1}`,
     name: set?.name || `Set ${setIndex + 1}`,
     ingredientCount: _ingredientCountForSet(set),
-    toolCount: Array.isArray(set?.toolIds) ? set.toolIds.length : 0,
+    toolCount:
+      ingredientSetToolsAreActive(craftingSystem, set) && Array.isArray(set?.toolIds)
+        ? set.toolIds.length
+        : 0,
   }));
   const stepToolCount = Array.isArray(step?.toolIds) ? step.toolIds.length : 0;
   const previewIngredientCount =
@@ -436,15 +445,16 @@ function _isRecipeIncomplete(recipe) {
   return _isRecipeIncompleteByCounts(recipe);
 }
 
-function _buildRecipeBrowserDisplay(recipe) {
+function _buildRecipeBrowserDisplay(recipe, craftingSystem = null) {
   const executionSteps = _getRecipeExecutionSteps(recipe);
-  const isSimple = typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe() : true;
+  const isSimple =
+    typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe(craftingSystem) : true;
   const sharedRecipeToolIds =
     _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.toolIds)
       ? recipe.toolIds
       : [];
   const requirementsPreview = executionSteps.map((step, index) =>
-    _buildRequirementPreviewStep(step, index, sharedRecipeToolIds)
+    _buildRequirementPreviewStep(step, index, sharedRecipeToolIds, craftingSystem)
   );
   const structure = _recipeStructure(isSimple, requirementsPreview.length);
 
@@ -974,9 +984,17 @@ function _normalizeToolOnBreak(input) {
 
 function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID) {
   const originItemUuid =
-    tool.originItemUuid || tool.registeredItemUuid || tool.sourceItemUuid || tool.sourceUuid || null;
+    tool.originItemUuid ||
+    tool.registeredItemUuid ||
+    tool.sourceItemUuid ||
+    tool.sourceUuid ||
+    null;
   const registeredItemUuid =
-    tool.registeredItemUuid || tool.originItemUuid || tool.sourceUuid || tool.sourceItemUuid || null;
+    tool.registeredItemUuid ||
+    tool.originItemUuid ||
+    tool.sourceUuid ||
+    tool.sourceItemUuid ||
+    null;
   const rawAliasItemUuids = Array.isArray(tool.aliasItemUuids)
     ? tool.aliasItemUuids
     : Array.isArray(tool.fallbackItemIds)
@@ -1609,7 +1627,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const prepared = recipes.map((recipe) => {
-    const display = _buildRecipeBrowserDisplay(recipe);
+    const display = _buildRecipeBrowserDisplay(recipe, selectedSystem);
     // Book membership (many-to-many): the books that contain this recipe. The
     // legacy scalar `recipeItemId`/name/img reflect the FIRST containing book.
     const containingDefinitions = _recipeItemDefinitionsContaining(
@@ -1672,7 +1690,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
         playerIds: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds : [],
       },
       accessSummary: {
-        characterCount: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds.length : 0,
+        characterCount: Array.isArray(raw.access?.characterIds)
+          ? raw.access.characterIds.length
+          : 0,
         playerCount: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds.length : 0,
       },
       locked: recipe.locked === true,
@@ -1954,7 +1974,10 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
     const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
     const linkedRecipes =
       memberIds.length > 0
-        ? memberIds.map((id) => recipeById.get(String(id))).filter(Boolean).map(toRecipeRef)
+        ? memberIds
+            .map((id) => recipeById.get(String(id)))
+            .filter(Boolean)
+            .map(toRecipeRef)
         : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
     const learnedActors = new Set();
     for (const recipe of linkedRecipes) {
@@ -1996,7 +2019,11 @@ function _stableStringify(value) {
 function _itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
   const essenceResolution = Object.keys(item?.essences || {})
     .sort((a, b) => a.localeCompare(b))
-    .map((id) => [id, essenceDefinitionById.get(id)?.name || id, essenceDefinitionById.get(id)?.icon]);
+    .map((id) => [
+      id,
+      essenceDefinitionById.get(id)?.name || id,
+      essenceDefinitionById.get(id)?.icon,
+    ]);
   return _stableStringify({
     item,
     showTags,
@@ -2292,7 +2319,9 @@ function _buildSelectedSystemViewData(
     // System-owned character prerequisite library (issue 544). Surfaced through
     // the allowlist projection (like `tools`) so the System Settings accordion
     // and the recipe-item learning-gate picker read them.
-    characterPrerequisites: normalizeCharacterPrerequisiteList(selectedSystem.characterPrerequisites),
+    characterPrerequisites: normalizeCharacterPrerequisiteList(
+      selectedSystem.characterPrerequisites
+    ),
 
     requirements: selectedSystem.requirements || {
       time: { enabled: true },
@@ -2611,9 +2640,7 @@ export function createAdminStore(services) {
   function _recomputeToolsDraftDirty() {
     const current = get(toolDraft);
     const baseline = get(toolDraftBaseline);
-    toolDraftDirty.set(
-      current !== null && JSON.stringify(current) !== JSON.stringify(baseline)
-    );
+    toolDraftDirty.set(current !== null && JSON.stringify(current) !== JSON.stringify(baseline));
   }
 
   function enterToolsDraft(systemId = get(selectedSystemId)) {
@@ -6002,8 +6029,7 @@ export function createAdminStore(services) {
         'Existing multi-step recipes will run as one combined action and show only their final results for editing. Their steps are kept and restored if you turn multi-step recipes back on. No recipe data is deleted.'
       }</p>`,
       yes: {
-        label:
-          services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
+        label: services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
         callback: () => true,
       },
       no: () => false,
@@ -6222,8 +6248,8 @@ export function createAdminStore(services) {
     for (const { id, tags: nextTags } of planTagRemovals(_getManagedItems(system), tag)) {
       await systemManager.updateItem(sysId, id, { tags: nextTags });
     }
-    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map((recipe) =>
-      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
+    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map(
+      (recipe) => (typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe)
     );
     for (const { id, updates } of planRecipeTagRemovals(recipes, tag)) {
       await recipeManager.updateRecipe(id, updates, { allowIncomplete: true, notify: false });
@@ -7584,7 +7610,8 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  const saveGatheringCheckActive = (enabled) => _saveGatheringCheckPatch({ enabled: enabled === true });
+  const saveGatheringCheckActive = (enabled) =>
+    _saveGatheringCheckPatch({ enabled: enabled === true });
   const saveGatheringCheckProgressive = (progressive) => _saveGatheringCheckPatch({ progressive });
   const saveGatheringCheckRouted = (routed) => _saveGatheringCheckPatch({ routed });
 
@@ -7891,11 +7918,15 @@ export function createAdminStore(services) {
       : [];
     let changed = false;
     for (const def of definitions) {
-      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) => String(id));
+      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) =>
+        String(id)
+      );
       const has = currentIds.includes(rid);
       const want = wanted.has(String(def.id));
       if (has === want) continue;
-      const next = want ? [...new Set([...currentIds, rid])] : currentIds.filter((id) => id !== rid);
+      const next = want
+        ? [...new Set([...currentIds, rid])]
+        : currentIds.filter((id) => id !== rid);
       await systemManager.updateRecipeItemDefinition(sysId, def.id, { recipeIds: next });
       changed = true;
     }
@@ -7909,7 +7940,9 @@ export function createAdminStore(services) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId || !recipeItemId) return;
-    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, { enabled: enabled !== false });
+    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, {
+      enabled: enabled !== false,
+    });
     await refresh();
   }
 
@@ -7939,7 +7972,9 @@ export function createAdminStore(services) {
     const sysId = get(selectedSystemId);
     if (!sysId || !recipeItemId) return false;
     const confirmed = await services.confirmDialog?.({
-      title: services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') || 'Delete recipe item?',
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') ||
+        'Delete recipe item?',
       content: `<p>${services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteContent') || 'Delete this recipe item? Recipes linked to it will be unlinked.'}</p>`,
       yes: () => true,
       no: () => false,
@@ -8068,7 +8103,11 @@ export function createAdminStore(services) {
     try {
       // notify:false — the toggle is the GM's own explicit editor action with immediate
       // visual feedback, so the "Recipe updated" toast is noise.
-      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true, notify: false });
+      await recipeManager.updateRecipe(
+        recipeId,
+        { enabled },
+        { allowIncomplete: true, notify: false }
+      );
       await refresh();
       return true;
     } catch (err) {
@@ -8108,7 +8147,11 @@ export function createAdminStore(services) {
     try {
       // notify:false — same as the enabled toggle: an explicit editor action with
       // immediate visual feedback needs no "Recipe updated" toast.
-      await recipeManager.updateRecipe(recipeId, { locked: locked === true }, { allowIncomplete: true, notify: false });
+      await recipeManager.updateRecipe(
+        recipeId,
+        { locked: locked === true },
+        { allowIncomplete: true, notify: false }
+      );
       await refresh();
       return true;
     } catch (err) {

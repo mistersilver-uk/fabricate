@@ -51,6 +51,7 @@
     onPatch = () => {},
     onLinkItem = () => {},
     onUnlinkItem = () => {},
+    onCopyItemUuid = () => {},
     onLinkRecipe = () => {},
     onRemoveRecipe = () => {}
   } = $props();
@@ -266,6 +267,7 @@
               {onPatch}
               {onLinkItem}
               {onUnlinkItem}
+              {onCopyItemUuid}
             />
           {:else if activeTab === 'contents'}
             <RecipeItemContentsTab

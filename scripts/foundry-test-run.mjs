@@ -1147,13 +1147,32 @@ async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {})
 
 async function waitForManagerApplicationRendered(page) {
   const outerSelector = '#fabricate-crafting-system-manager';
-  const resolveRegisteredManager = () => {
+  const resolveRegisteredManager = (selector) => {
+    const renderedOuters = Array.from(document.querySelectorAll(selector))
+      .filter((element) => element?.isConnected);
+    const renderedManagers = renderedOuters
+      .map((element) => element.querySelector('.fabricate-manager'))
+      .filter((element) => element?.isConnected);
+    if (renderedOuters.length !== 1 || renderedManagers.length !== 1) {
+      throw new Error(
+        'Crafting System Manager DOM resolution was not unique: '
+        + JSON.stringify({
+          renderedOuterCount: renderedOuters.length,
+          renderedManagerCount: renderedManagers.length,
+        })
+      );
+    }
+    const renderedOuter = renderedOuters[0];
+    const renderedManager = renderedManagers[0];
+    const explicitApp = globalThis.__fabricateSmokeManagerApp ?? null;
     const instances = foundry?.applications?.instances;
     const registeredApps = instances?.values
       ? Array.from(instances.values())
       : (instances ? Array.from(instances) : []);
-    const uniqueApps = Array.from(new Set(registeredApps));
-    const registryCandidates = uniqueApps.map((app, index) => {
+    const uniqueApps = Array.from(
+      new Set([explicitApp, ...registeredApps].filter(Boolean))
+    );
+    const applicationCandidates = uniqueApps.map((app, index) => {
       const rawElement = app?.element ?? app?._element ?? null;
       const element = rawElement?.[0] ?? rawElement;
       const manager = element?.matches?.('.fabricate-manager')
@@ -1168,9 +1187,16 @@ async function waitForManagerApplicationRendered(page) {
           || manager?.contains?.(element)
         )
       );
+      const ownsRenderedManager = Boolean(
+        element === renderedOuter
+        || element === renderedManager
+        || element?.contains?.(renderedManager)
+        || renderedManager?.contains?.(element)
+      );
       return {
         app,
         index,
+        source: app === explicitApp ? 'explicit' : 'registry',
         appType: app?.constructor?.name ?? typeof app,
         appRendered: app?.rendered ?? null,
         elementType: element?.constructor?.name ?? typeof element,
@@ -1179,20 +1205,27 @@ async function waitForManagerApplicationRendered(page) {
         elementHasStyle: Boolean(element?.style),
         managerConnected: Boolean(manager?.isConnected),
         ownsManager,
+        ownsRenderedManager,
         liveMatch: Boolean(
           element?.isConnected
           && element?.style
           && manager?.isConnected
-          && (element.id === 'fabricate-crafting-system-manager' || ownsManager)
+          && ownsManager
+          && ownsRenderedManager
         ),
       };
     });
-    const liveMatches = registryCandidates.filter((candidate) => candidate.liveMatch);
+    const liveMatches = applicationCandidates.filter((candidate) => candidate.liveMatch);
     if (liveMatches.length !== 1) {
-      const diagnostics = registryCandidates.map(({ app: _app, ...candidate }) => candidate);
+      const diagnostics = applicationCandidates.map(({ app: _app, ...candidate }) => candidate);
       throw new Error(
-        `Crafting System Manager registry resolution found ${liveMatches.length} live instances: `
-        + JSON.stringify({ registryCandidates: diagnostics })
+        `Crafting System Manager application resolution found ${liveMatches.length} owners `
+        + 'for the connected Manager DOM: '
+        + JSON.stringify({
+          renderedOuterCount: renderedOuters.length,
+          renderedManagerCount: renderedManagers.length,
+          applicationCandidates: diagnostics,
+        })
       );
     }
     globalThis.__fabricateSmokeManagerApp = liveMatches[0].app;
@@ -1228,14 +1261,16 @@ async function waitForManagerApplicationRendered(page) {
       state: 'attached',
       timeout: 15_000,
     });
-    await page.evaluate(resolveRegisteredManager);
+    await page.evaluate(resolveRegisteredManager, outerSelector);
     await page.waitForFunction(inspectReadiness, false, { timeout: 15_000, polling: 'raf' });
   } catch (error) {
     const readiness = await page.evaluate(inspectReadiness, true).catch((diagnosticError) => ({
       diagnosticError: diagnosticError.message,
     }));
+    const causeMessage = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Crafting System Manager ApplicationV2 render readiness failed: ${JSON.stringify(readiness)}`,
+      `Crafting System Manager ApplicationV2 render readiness failed (${causeMessage}): `
+      + JSON.stringify(readiness),
       { cause: error }
     );
   }
@@ -1912,10 +1947,18 @@ async function withSingleToolDraftTransition(page, expectedToolId, label, action
       return { transitions: probe.transitions };
     });
   }
-  const matching = report.transitions.filter(({ toolId }) => toolId === String(expectedToolId));
-  if (report.transitions.length !== 1 || matching.length !== 1) {
+  const distinctTransitions = report.transitions.filter((transition, index, transitions) => (
+    index === 0
+    || transition.toolId !== transitions[index - 1].toolId
+    || transition.dirty !== transitions[index - 1].dirty
+  ));
+  const matching = distinctTransitions.filter(({ toolId }) => toolId === String(expectedToolId));
+  if (distinctTransitions.length !== 1 || matching.length !== 1) {
     throw new Error(
-      `${label} must publish exactly one Tool draft transition for ${expectedToolId}: ${JSON.stringify(report)}`
+      `${label} must publish exactly one distinct Tool draft transition for ${expectedToolId}: ${JSON.stringify({
+        ...report,
+        distinctTransitions,
+      })}`
     );
   }
 }
@@ -2026,9 +2069,9 @@ async function assertSavedToolStudioCapture(editor, label) {
   if (await editor.locator('[data-tool-editor-dirty]').count() > 0) {
     throw new Error(`${label} must capture a saved Tool draft`);
   }
-  const status = (await editor.locator('[data-tool-editor-status]').textContent())?.trim();
-  if (status !== 'All changes saved') {
-    throw new Error(`${label} must expose All changes saved status; found ${JSON.stringify(status)}`);
+  const save = editor.locator('[data-tool-editor-save]');
+  if (await save.count() !== 1 || !await save.isDisabled()) {
+    throw new Error(`${label} must expose the recipe-parity clean state with Save tool disabled`);
   }
 }
 
@@ -2084,7 +2127,7 @@ async function readToolStudioHorizontalScroll(page, { reset = false } = {}) {
       '.fabricate-manager [data-tool-behavior-preview]',
       '.fabricate-manager .manager-inspector',
       '.fabricate-manager .manager-tool-repair',
-      '.fabricate-manager [data-tool-repair-group]',
+      '.fabricate-manager [data-tool-repair-requirements] [data-recipe-group]',
     ];
     const elements = new Set([document.scrollingElement]);
     for (const selector of explicitSelectors) {
@@ -2167,7 +2210,10 @@ async function scrollToolEditorPanelToReveal(page, editor, selector, label) {
       preview: read('[data-tool-behavior-preview]'),
     };
   });
-  await target.scrollIntoViewIfNeeded();
+  await target.evaluate((element) => element.scrollIntoView({
+    block: 'center',
+    inline: 'nearest',
+  }));
   await resetToolStudioHorizontalScroll(page, label);
   const report = await panel.evaluate((element, targetSelector) => {
     const targetElement = element.querySelector(targetSelector);
@@ -2347,7 +2393,6 @@ function assertToolStudioTabContainment(report) {
     !overflow
     || overflow.scrollLeft !== 0
     || overflow.scrollWidth > overflow.clientWidth + 1
-    || !['hidden', 'clip'].includes(overflow.overflowX)
   ) {
     throw new Error(`Tool editor tabs remain horizontally scrollable: ${JSON.stringify(overflow)}`);
   }
@@ -4440,6 +4485,30 @@ async function waitForToolBreakageAuthority(page, systemId) {
   }
 }
 
+async function readPersistedToolEnabled(page, systemId, toolId) {
+  return page.evaluate(({ systemId, toolId }) => (
+    game.fabricate
+      .getCraftingSystemManager()
+      .getSystem(systemId)
+      ?.tools?.find((tool) => tool.id === toolId)
+      ?.enabled
+  ), { systemId, toolId });
+}
+
+async function waitForToolEnabledState(page, systemId, toolId, expected) {
+  await page.waitForFunction(({ systemId, toolId, expected }) => {
+    const persisted = game.fabricate
+      .getCraftingSystemManager()
+      .getSystem(systemId)
+      ?.tools?.find((tool) => tool.id === toolId)
+      ?.enabled;
+    const rendered = document.querySelector(
+      `.fabricate-manager [data-manager-tool-id="${toolId}"] .manager-tools-enabled-toggle`
+    );
+    return persisted === expected && rendered?.getAttribute('aria-pressed') === String(expected);
+  }, { systemId, toolId, expected }, { timeout: 10_000, polling: 'raf' });
+}
+
 async function withSingleToolClipboardWrite(page, expectedUuid, action) {
   await page.evaluate(() => {
     const app = globalThis.__fabricateSmokeManagerApp;
@@ -4496,7 +4565,7 @@ async function withSingleToolClipboardWrite(page, expectedUuid, action) {
 }
 
 async function assertToolLibraryPagination(page, { expectedTotal, expectedPage = 1, expectScrollable }) {
-  const browser = page.locator('.fabricate-manager [data-manager-tools-browser]').first();
+  const browser = page.locator('.fabricate-manager [data-tool-library]').first();
   const list = browser.locator('[data-tool-library-scroll]');
   const footer = browser.locator('[data-tool-browser-pagination]');
   await list.waitFor({ state: 'visible', timeout: 5_000 });
@@ -4711,28 +4780,23 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await page.waitForFunction((toolId) => document
     .querySelector(`[data-manager-tool-id="${toolId}"]`)
     ?.classList.contains('is-selected'), fixture.toolId, { timeout: 5_000 });
-  const enabledBefore = await enabledToggle.getAttribute('aria-pressed');
+  const persistedEnabledBefore = await readPersistedToolEnabled(page, systemId, fixture.toolId);
+  if (await enabledToggle.getAttribute('aria-pressed') !== String(persistedEnabledBefore)) {
+    throw new Error('Tool enabled toggle did not initially match persisted state');
+  }
   await withSingleToolStoreMutation(
     page,
     'toggleToolEnabled',
     'Tool enabled toggle apply',
     () => enabledToggle.click(),
-    async () => {
-      if (await enabledToggle.getAttribute('aria-pressed') === enabledBefore) {
-        throw new Error('Tool enabled toggle did not persist independently');
-      }
-    },
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, !persistedEnabledBefore),
   );
   await withSingleToolStoreMutation(
     page,
     'toggleToolEnabled',
     'Tool enabled toggle restore',
     () => enabledToggle.click(),
-    async () => {
-      if (await enabledToggle.getAttribute('aria-pressed') !== enabledBefore) {
-        throw new Error('Tool enabled toggle did not restore independently');
-      }
-    },
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, persistedEnabledBefore),
   );
   if (await liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]').count() > 0) {
     throw new Error('Tool toggle incorrectly opened the editor');
@@ -4812,27 +4876,21 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (JSON.stringify(selectedToolIds) !== JSON.stringify([fixture.toolId])) {
     throw new Error(`Tool row selection at 680px did not select exactly the intended Tool: ${JSON.stringify(selectedToolIds)}`);
   }
-  const persistedEnabledBefore = await page.evaluate(({ systemId, toolId }) => (
-    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled
-  ), { systemId, toolId: fixture.toolId });
+  const persistedEnabledBefore680 = await readPersistedToolEnabled(page, systemId, fixture.toolId);
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle at 680px');
   await withSingleToolStoreMutation(
     page,
     'toggleToolEnabled',
     'Tool enabled toggle at 680px apply',
     () => enabledToggle.click(),
-    () => page.waitForFunction(({ systemId, toolId, before }) => (
-      game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === !before
-    ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore }),
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, !persistedEnabledBefore680),
   );
   await withSingleToolStoreMutation(
     page,
     'toggleToolEnabled',
     'Tool enabled toggle at 680px restore',
     () => enabledToggle.click(),
-    () => page.waitForFunction(({ systemId, toolId, before }) => (
-      game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools?.find((tool) => tool.id === toolId)?.enabled === before
-    ), { systemId, toolId: fixture.toolId, before: persistedEnabledBefore }),
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, persistedEnabledBefore680),
   );
   await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
   await withSingleToolDraftTransition(
@@ -4979,34 +5037,35 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       if (!(await flagBrokenChoice.isChecked())) throw new Error('Tool flag-broken action did not apply');
     },
   );
-  const initialRepairGroupCount = await editor.locator('[data-tool-repair-group]').count();
-  const addRepairGroup = editor.locator('[data-tool-repair-add-group="tags"]');
-  await assertPointerTarget(page, addRepairGroup, '[data-tool-repair-add-group="tags"]', 'Tool repair AND control');
+  const repairGroups = editor.locator('[data-tool-repair-requirements] [data-recipe-group]');
+  const initialRepairGroupCount = await repairGroups.count();
+  const addRepairGroup = editor.locator('[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]');
+  await assertPointerTarget(page, addRepairGroup, '[data-recipe-add="tag-requirement"]', 'Tool repair AND control');
   await withSingleToolStoreMutation(
     page,
     'patchToolDraft',
     'Tool repair AND add',
     () => addRepairGroup.click(),
     async () => {
-      if (await editor.locator('[data-tool-repair-group]').count() !== initialRepairGroupCount + 1) {
+      if (await repairGroups.count() !== initialRepairGroupCount + 1) {
         throw new Error('Tool repair AND control did not add exactly one group');
       }
     },
   );
-  const addedRepairGroupRemove = editor.locator('[data-tool-repair-group]').last().locator(':scope > .manager-icon-button');
-  await assertPointerTarget(page, addedRepairGroupRemove, '.manager-tool-repair-group > .manager-icon-button', 'Tool repair AND restore');
+  const addedRepairGroupRemove = repairGroups.last().locator('[data-recipe-remove="alternative"]');
+  await assertPointerTarget(page, addedRepairGroupRemove, '[data-recipe-remove="alternative"]', 'Tool repair AND restore');
   await withSingleToolStoreMutation(
     page,
     'patchToolDraft',
     'Tool repair AND restore',
     () => addedRepairGroupRemove.click(),
     async () => {
-      if (await editor.locator('[data-tool-repair-group]').count() !== initialRepairGroupCount) {
+      if (await repairGroups.count() !== initialRepairGroupCount) {
         throw new Error('Tool repair AND restore did not remove exactly one group');
       }
     },
   );
-  const firstRepairGroup = editor.locator('[data-tool-repair-group]').first();
+  const firstRepairGroup = repairGroups.first();
   const initialRepairOptionCount = await firstRepairGroup.locator('[data-recipe-option]').count();
   const addRepairAlternative = firstRepairGroup.locator('[data-recipe-add="alternative-component"]');
   await assertPointerTarget(page, addRepairAlternative, '[data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
@@ -5039,7 +5098,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await scrollToolEditorPanelToReveal(
     page,
     editor,
-    '[data-tool-repair-group] [data-recipe-add="alternative-component"]',
+    '[data-tool-repair-requirements] [data-recipe-group] [data-recipe-add="alternative-component"]',
     'Populated repair',
   );
   await captureToolStudioProduct(page, 'manager-tool-stress-repair', wideGeometry);
@@ -5056,71 +5115,21 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   );
   const replacementGrid = editor.locator('[data-tool-replacement-target]');
   await replacementGrid.waitFor({ state: 'visible', timeout: 5_000 });
-  const replacementType = replacementGrid.locator('[data-tool-replacement-type]');
-  let replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
-  await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
-  const componentTarget = replacementPicker;
-  await assertPointerTarget(page, componentTarget, '[data-tool-replacement-target] select', 'Component replacement picker');
-  const componentOption = await componentTarget.locator('option:not([value=""])').first().getAttribute('value');
-  if (!componentOption) throw new Error('Tool Studio Component picker has no managed Component options');
+  const componentTarget = replacementGrid.locator('.manager-tool-replacement-component-trigger');
+  await assertPointerTarget(page, componentTarget, '.manager-tool-replacement-component-trigger', 'Component replacement picker');
+  await componentTarget.click();
+  const componentOption = page.locator('.manager-travel-popover .manager-travel-option').first();
+  await componentOption.waitFor({ state: 'visible', timeout: 5_000 });
+  const componentLabel = (await componentOption.textContent())?.trim();
+  if (!componentLabel) throw new Error('Tool Studio Component picker has no managed Component options');
   await withSingleToolStoreMutation(
     page,
     'patchToolDraft',
     'Component replacement selection',
-    () => selectOptionAndAssertSingleChange(componentTarget, componentOption, 'Component replacement selection'),
+    () => componentOption.click(),
     async () => {
-      if (await componentTarget.inputValue() !== componentOption) {
+      if (!((await componentTarget.textContent()) || '').includes(componentLabel)) {
         throw new Error('Component replacement selection did not update the draft control');
-      }
-    },
-  );
-  await withSingleToolStoreMutation(
-    page,
-    'patchToolDraft',
-    'Direct Item replacement route',
-    () => selectOptionAndAssertSingleChange(replacementType, 'item', 'Direct Item replacement route'),
-    async () => {
-      if (await replacementType.inputValue() !== 'item') {
-        throw new Error('Direct Item replacement route did not update the target type');
-      }
-    },
-  );
-  replacementPicker = replacementGrid.locator('[data-tool-replacement-picker]');
-  await replacementPicker.waitFor({ state: 'visible', timeout: 5_000 });
-  const itemTarget = replacementPicker;
-  await assertPointerTarget(page, itemTarget, '[data-tool-replacement-target] select', 'direct Item replacement picker');
-  const itemOption = await itemTarget.locator('option:not([value=""])').first().getAttribute('value');
-  if (!itemOption) throw new Error('Tool Studio direct Item picker has no world Item options');
-  await withSingleToolStoreMutation(
-    page,
-    'patchToolDraft',
-    'Direct Item replacement selection',
-    () => selectOptionAndAssertSingleChange(itemTarget, itemOption, 'Direct Item replacement selection'),
-    async () => {
-      if (await itemTarget.inputValue() !== itemOption) {
-        throw new Error('Direct Item replacement selection did not update the draft control');
-      }
-    },
-  );
-  await withSingleToolStoreMutation(
-    page,
-    'patchToolDraft',
-    'Direct Item replacement unlink',
-    () => selectOptionAndAssertSingleChange(itemTarget, '', 'Direct Item replacement unlink'),
-    async () => {
-      if (await itemTarget.inputValue() !== '') {
-        throw new Error('Direct Item replacement unlink did not clear the draft control');
-      }
-    },
-  );
-  await withSingleToolStoreMutation(
-    page,
-    'patchToolDraft',
-    'Direct Item replacement restore',
-    () => selectOptionAndAssertSingleChange(itemTarget, itemOption, 'Direct Item replacement restore'),
-    async () => {
-      if (await itemTarget.inputValue() !== itemOption) {
-        throw new Error('Direct Item replacement restore did not update the draft control');
       }
     },
   );
@@ -5128,8 +5137,8 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await scrollToolEditorPanelToReveal(
     page,
     editor,
-    '[data-tool-replacement-target] [data-tool-replacement-picker]',
-    'Direct Item replacement',
+    '[data-tool-replacement-target]',
+    'Component replacement',
   );
   await captureToolStudioProduct(page, 'manager-tool-stress-replacement', wideGeometry);
   await editor.locator('[data-tool-editor-save]').click();
@@ -5239,21 +5248,60 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
 
   await tab('validation').click();
   await editor.locator('[data-tool-validation-tab]').waitFor({ state: 'visible', timeout: 5_000 });
-  if (await editor.locator('[data-first-validation-failure]').count() !== 0) {
+  await editor.locator('[data-editor-validation-summary="pass"]').waitFor({
+    state: 'visible',
+    timeout: 5_000,
+  });
+  if (await editor.locator('[data-tool-validation-check].is-invalid').count() !== 0) {
     throw new Error('Tool Studio parity Validation must be the all-pass state');
   }
   await assertSavedToolStudioCapture(editor, 'Validation parity');
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', wideGeometry);
   await tab('requirements').click();
-  await editor.locator('[data-tool-bonus-expression]').fill('');
+  const selectedPrerequisite = editor.locator(
+    '[data-tool-prerequisite-row] input[type="checkbox"]:checked',
+  ).first();
+  const selectedPrerequisiteId = await selectedPrerequisite.getAttribute('value');
+  if (!selectedPrerequisiteId) throw new Error('Tool Studio invalid-state fixture has no selected prerequisite');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool invalid prerequisite fixture',
+    () => selectedPrerequisite.click(),
+    async () => {
+      if (await editor.locator('[data-tool-prerequisite-row] input[type="checkbox"]:checked').count() !== 0) {
+        throw new Error('Tool invalid prerequisite fixture did not clear the selected prerequisite');
+      }
+    },
+  );
   await tab('validation').click();
-  await editor.locator('[data-first-validation-failure]').waitFor({ state: 'visible', timeout: 5_000 });
+  await editor.locator('[data-editor-validation-summary="block"]').waitFor({
+    state: 'visible',
+    timeout: 5_000,
+  });
+  await editor.locator('[data-tool-validation-check="prerequisites"].is-invalid').waitFor({
+    state: 'visible',
+    timeout: 5_000,
+  });
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', wideGeometry);
   await tab('requirements').click();
-  await editor.locator('[data-tool-bonus-expression]').fill('@prof');
+  const prerequisiteToRestore = editor.locator(
+    `[data-tool-prerequisite-row] input[type="checkbox"][value="${selectedPrerequisiteId}"]`,
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool prerequisite fixture restore',
+    () => prerequisiteToRestore.click(),
+    async () => {
+      if (!(await prerequisiteToRestore.isChecked())) {
+        throw new Error('Tool prerequisite fixture did not restore its selected prerequisite');
+      }
+    },
+  );
   await saveToolStudioDraftIfDirty(editor);
   await tab('breakage').click();
   await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
@@ -5300,19 +5348,21 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
   await openManagerRecipeEditor(page, recipeName);
   await page.locator('[data-recipe-tab-button="tools"]').first().click();
-  const bonusMode = page.locator(`[data-recipe-tool-bonus-mode="${fixture.toolId}"]`).first();
-  await bonusMode.waitFor({ state: 'visible', timeout: 5_000 });
-  await assertPointerTarget(page, bonusMode, '[data-recipe-tool-bonus-mode]', 'recipe Tool bonus mode');
-  await bonusMode.selectOption('always');
-  await bonusMode.selectOption('highestOnly');
+  const recipeToolRow = page.locator(`[data-recipe-tool-id="${fixture.toolId}"]`).first();
+  await recipeToolRow.waitFor({ state: 'visible', timeout: 5_000 });
+  if (await recipeToolRow.locator('select, [data-recipe-tool-bonus-mode]').count() > 0) {
+    throw new Error('Recipe Tools tab must not expose Tool breakage or check-bonus policy controls');
+  }
+  await assertPointerTarget(
+    page,
+    recipeToolRow.locator('[data-recipe-remove="tool"]'),
+    '[data-recipe-remove="tool"]',
+    'recipe Tool remove control',
+  );
 
-  const saveRecipe = page.locator(
-    '.fabricate-manager .manager-header-actions .manager-button:has-text("Save recipe")',
-  ).first();
-  await saveRecipe.waitFor({ state: 'visible', timeout: 5_000 });
-  await saveRecipe.click();
-  await page.locator('.fabricate-manager[data-manager-view="recipe-edit"] .manager-chip:has-text("Unsaved")')
-    .waitFor({ state: 'detached', timeout: 10_000 });
+  if (await page.locator('.fabricate-manager[data-manager-view="recipe-edit"] .manager-chip:has-text("Unsaved")').count() > 0) {
+    throw new Error('Recipe Tools policy-removal check unexpectedly dirtied the Recipe draft');
+  }
 
   await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
   await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5345,7 +5395,12 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
  */
 async function waitForFabricateWindowsClosed(page, { timeout = 800, fallbackMs = 500 } = {}) {
   await waitForSettled(page, () => {
-    const windows = document.querySelectorAll('.fabricate-manager, .fabricate-app').length;
+    const windows = document.querySelectorAll([
+      '.fabricate-manager',
+      '.fabricate-app',
+      '.application[id^="fabricate-"]',
+      '.window-app[id^="fabricate-"]',
+    ].join(', ')).length;
     const hasDiscard = Array.from(document.querySelectorAll('button'))
       .some(button => /Discard Changes/.test(button.textContent || ''));
     return windows === 0 && !hasDiscard;
@@ -5379,7 +5434,6 @@ async function closeOpenApplications(page) {
     await discardDirtyDraft();
     await page.evaluate(async (selector) => {
       const closePromises = [];
-      let closedApplicationV2 = false;
 
       if (ui.windows) {
         for (const app of Object.values(ui.windows)) {
@@ -5396,19 +5450,19 @@ async function closeOpenApplications(page) {
         if (!element || element.id === 'sidebar') continue;
         if (element.querySelector?.('.fabricate-manager, .fabricate-app') || element.id?.startsWith?.('fabricate-')) {
           try {
-            closedApplicationV2 = true;
-            app.close({ force: true });
+            closePromises.push(Promise.resolve(app.close({ force: true })));
           } catch { /* ignore */ }
         }
       }
 
       await Promise.allSettled(closePromises);
 
-      if (!closedApplicationV2) {
-        document.querySelectorAll(selector).forEach(btn => {
-          try { btn.click(); } catch { /* ignore */ }
-        });
-      }
+      // ApplicationV2 registries can retain a stale instance after its close
+      // promise settles. Always sweep any close controls that remain in the DOM;
+      // when the registry close succeeded there is simply nothing left to click.
+      document.querySelectorAll(selector).forEach(btn => {
+        try { btn.click(); } catch { /* ignore */ }
+      });
     }, closeSelector);
     await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
@@ -5420,8 +5474,28 @@ async function closeOpenApplications(page) {
     await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
 
-    const remaining = await page.locator('.fabricate-manager, .fabricate-app, button:has-text("Discard Changes")').count();
+    const remaining = await page.locator([
+      '.fabricate-manager',
+      '.fabricate-app',
+      '.application[id^="fabricate-"]',
+      '.window-app[id^="fabricate-"]',
+      'button:has-text("Discard Changes")',
+    ].join(', ')).count();
     if (remaining === 0) break;
+  }
+
+  const remaining = page.locator([
+    '.fabricate-manager',
+    '.fabricate-app',
+    '.application[id^="fabricate-"]',
+    '.window-app[id^="fabricate-"]',
+    'button:has-text("Discard Changes")',
+  ].join(', '));
+  if (await remaining.count() > 0) {
+    const ids = await remaining.evaluateAll(elements => elements.map(element => (
+      element.id || element.closest?.('[id]')?.id || element.tagName
+    )));
+    throw new Error(`Failed to close Fabricate application(s): ${ids.join(', ')}.`);
   }
 }
 
@@ -5637,6 +5711,12 @@ async function main() {
   // These in-source defaults stay in source, where their justification lives.
   const ignoredErrorPatternDefaults = [
     /favicon/i,
+    // The screenshot walk deliberately exercises the responsive Manager at
+    // these three evidence viewports. Foundry emits its own minimum-resolution
+    // warning even though the application remains usable and is the subject of
+    // the capture. Keep this waiver dimension-specific so an unexpected
+    // low-resolution run still fails the smoke.
+    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater\..*display has a resolution of (?:1280px by 720px|900px by 700px|680px by 700px)\./i,
     // Headless canvas-draw race: activating/redrawing a scene that gains new
     // placeables mid-capture (e.g. the issue-335 Manage-Interactables marker
     // fixtures) can momentarily read a canvas layer constant before the layer is
@@ -5857,7 +5937,17 @@ async function main() {
           try { await csm.deleteSystem(sys.id); } catch { /* ok */ }
         }
 
-        // 2. Clean stale smoke actors (tagged flags.fabricate.smokeSeed) so the
+        // 2. Clear stale smoke-world chat before any later phase opens the chat
+        //    sidebar. Old crafting cards retain image URLs from the product version
+        //    that created them; allowing them to render makes an otherwise clean run
+        //    fail the zero-console-error gate on obsolete asset 404s.
+        const staleMessages = game.messages?.contents ?? [];
+        if (staleMessages.length > 0) {
+          console.log(`Cleaning ${staleMessages.length} stale smoke chat messages`);
+          await ChatMessage.deleteDocuments(staleMessages.map(message => message.id));
+        }
+
+        // 3. Clean stale smoke actors (tagged flags.fabricate.smokeSeed) so the
         //    per-run re-import of the dnd5e Starter Heroes pack stays idempotent.
         const staleActors = game.actors.contents.filter(a => a.flags?.fabricate?.smokeSeed === true);
         if (staleActors.length > 0) {
@@ -5873,7 +5963,7 @@ async function main() {
           await User.deleteDocuments(staleUsers.map(u => u.id));
         }
 
-        // 3. Clean stale items (the fixed smoke set plus the issue #489
+        // 4. Clean stale items (the fixed smoke set plus the issue #489
         //    craft-execution world items, all uniquely 'Smoke '-prefixed).
         const staleItems = game.items.contents.filter(i =>
           ['Iron Ore', 'Mystic Herb', 'Dragon Scale', 'Empty Vial',
@@ -6037,10 +6127,13 @@ async function main() {
             flags: { core: { sourceId: item.uuid } }
           }));
 
-        // Crafter gets: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale
+        // Crafter gets: 3x Mystic Herb, 3x Empty Vial, 1x Dragon Scale.
+        // The UI evidence phases share this actor and may stage one vial in another
+        // workflow. Keep two concrete copies for the final potion attempt so one
+        // can be consumed while a distinct physical copy remains the reusable Tool.
         await crafter.createEmbeddedDocuments('Item', [
           ...copies(byName('Mystic Herb'), 3),
-          ...copies(byName('Empty Vial'), 2),
+          ...copies(byName('Empty Vial'), 3),
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
@@ -8294,6 +8387,10 @@ async function main() {
         // revert + system-switch re-selects all inline).
         if (shouldRunScreenshotSection('components-checks')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+        // Required sections establish their own scope. Optional recipe captures
+        // above may have visited another system and intentionally own their cleanup.
+        await returnToSystemLibrary(page);
+        await selectSmokeSystemInManager(page, craftingSetup.systemId);
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
@@ -8422,8 +8519,29 @@ async function main() {
 
         const inspectorFlavour = () =>
           page.locator('.fabricate-manager [data-component-inspector] .manager-component-browser-inspector-flavour').first();
+        const componentSearch = () =>
+          page.getByRole('searchbox', { name: 'Search components' }).first();
         const selectComponent = async (componentId) => {
-          await page.locator(`.fabricate-manager .manager-component-row[data-component-id="${componentId}"] .manager-component-identity`).first().click();
+          const componentName = await page.evaluate(
+            ({ systemId, id }) =>
+              game.fabricate
+                .getCraftingSystemManager()
+                .getSystem(systemId)
+                ?.components?.find((component) => component?.id === id)
+                ?.name ?? null,
+            { systemId: craftingSetup.systemId, id: componentId }
+          );
+          if (!componentName) {
+            throw new Error(`issue 800: component ${componentId} is absent from the owning system`);
+          }
+          // Components are paginated. Search by resolved identity before clicking
+          // so a newly ingested component cannot be hidden on another page.
+          await componentSearch().fill(componentName);
+          const identity = page
+            .locator(`.fabricate-manager .manager-component-row[data-component-id="${componentId}"] .manager-component-identity`)
+            .first();
+          await identity.waitFor({ state: 'visible', timeout: 5_000 });
+          await identity.click();
           await inspectorFlavour().waitFor({ state: 'visible', timeout: 5_000 });
           return (await inspectorFlavour().textContent() ?? '').trim();
         };
@@ -8513,11 +8631,13 @@ async function main() {
           delete globalThis.__fabricateSmoke800Restore;
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         }, { sysId: craftingSetup.systemId, ingestedId: ingestedComponentId });
+        await componentSearch().fill('Mystic Herb');
         await page.locator('.fabricate-manager .manager-component-row:has-text("Mystic Herb")').first().waitFor({ state: 'visible', timeout: 5_000 });
         process.stdout.write('  D0: components description fixture restored\n');
 
         // Components → open the editor so the identity card (central column) and the
         // linked-source inspector (right context panel) are captured (#398).
+        await componentSearch().fill('Iron Ore');
         await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-pen)').first().click();
         await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-component-edit-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -8544,6 +8664,7 @@ async function main() {
         // Return to the components browser for the remaining navigation.
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await componentSearch().fill('Iron Sword');
 
         // The OFF salvage body (issue 676, AC4). Iron Sword has authored result groups
         // with `enabled` absent — the accurate state decision 6 guarantees every
@@ -8579,6 +8700,7 @@ async function main() {
         await selectSmokeSystemInManager(page, executionFixtures.simple.systemId);
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await componentSearch().fill('Smoke Relic');
         await page.locator('.fabricate-manager .manager-component-row:has-text("Smoke Relic") button:has(i.fa-pen)')
           .first().click();
         await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
@@ -9355,6 +9477,8 @@ async function main() {
           // Sweep any window left over from the config block before opening +
           // capturing, so a still-fading ApplicationV2 cannot bleed through.
           await closeOpenApplications(page);
+          await page.locator('#fabricate-crafting-system-manager')
+            .waitFor({ state: 'detached', timeout: 10_000 });
 
           const interactableRef = craftingSetup.interactable;
           // Ensure the seeded interactable's scene is the active/viewed scene so the
@@ -10955,6 +11079,13 @@ async function main() {
           if (!crafter) throw new Error(`Actor ${crafterId} not found`);
 
           console.log(`Crafting with ${crafter.name} (${crafter.id}), ${crafter.items.size} items in inventory`);
+          const vialCopies = crafter.items.contents.filter((item) => item.name === 'Empty Vial');
+          if (vialCopies.length < 2) {
+            throw new Error(
+              `Brew Healing Potion fixture retained ${vialCopies.length} Empty Vial copies; `
+              + 'the attempt requires distinct ingredient and Tool documents'
+            );
+          }
 
           const rm = game.fabricate.getRecipeManager();
           const recipe = rm.getRecipe(recipeId);

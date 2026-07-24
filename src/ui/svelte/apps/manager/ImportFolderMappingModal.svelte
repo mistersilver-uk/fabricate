@@ -5,8 +5,8 @@
   lets the GM assign (or inline-create) a category and/or tags per folder — or skip a
   folder — before importing.
 
-  Chrome mirrors ItemPickerModal (portaled to `.fabricate-manager`, dim overlay,
-  Escape / outside-click dismiss). Each per-folder row mirrors the compact
+  The modal is portaled to `.fabricate-manager` with the Manager's dim overlay and
+  Escape / outside-click dismissal. Each per-folder row mirrors the compact
   RecipeRoutingAssignment + SearchablePopover "assign X per Y" pattern: a folder name, a
   `tabular-nums` item-count badge, a category `<select>` with an inline "＋ New" (the
   shared InlineVocabularyAdd), a tags multi-assign (RecipeRoutingAssignment chips +
@@ -102,9 +102,7 @@
       matchByName = true;
       creatingCategoryFor = -1;
       seedAssignments();
-      // Land keyboard focus on the match-by-name toggle when the modal opens (parity
-      // with ItemPickerModal autofocusing its search), on the next microtask so the
-      // portaled node is mounted.
+      // Land keyboard focus on the match-by-name toggle after the portaled node mounts.
       queueMicrotask(() => matchToggle?.focus?.());
     }
   });
@@ -253,7 +251,7 @@
           type="button"
           class="manager-icon-button"
           data-import-mapping-close
-          aria-label={text('FABRICATE.Admin.Manager.ItemPicker.Close', 'Close')}
+          aria-label={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
           onclick={() => onClose()}
         >
           <i class="fas fa-xmark" aria-hidden="true"></i>

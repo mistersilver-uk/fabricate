@@ -9,7 +9,12 @@ function managedItemFor(tool, managedItems = []) {
 }
 
 export function toolDisplayName(tool, managedItems = [], fallback = 'Untitled tool') {
-  return String(tool?.label || '').trim() || tool?.name || managedItemFor(tool, managedItems)?.name || fallback;
+  return (
+    String(tool?.label || '').trim() ||
+    tool?.name ||
+    managedItemFor(tool, managedItems)?.name ||
+    fallback
+  );
 }
 
 export function toolDisplayImage(tool, managedItems = []) {
@@ -92,9 +97,8 @@ export function projectToolBehaviorFacts(
     {
       destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy the item'),
       flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlag', 'Mark as broken'),
-      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with item'),
-    }[onBreakKey] ||
-    text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy the item');
+      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with component'),
+    }[onBreakKey] || text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy the item');
   const prerequisiteCount = tool?.prerequisites?.ids?.length || 0;
   const prerequisiteTitle = tool?.prerequisites?.enabled
     ? format(
@@ -235,9 +239,7 @@ export function toolValidationPresentation(error) {
     };
   }
 
-  const projection = VALIDATION_ERROR_PROJECTIONS.find(([fragment]) =>
-    message.includes(fragment)
-  );
+  const projection = VALIDATION_ERROR_PROJECTIONS.find(([fragment]) => message.includes(fragment));
   return {
     key: projection?.[1] || 'ValidationErrorGeneric',
     data: {},
@@ -250,11 +252,16 @@ export function toolSearchText(tool, managedItems = []) {
     toolDescription(tool, managedItems),
     tool?.name,
     tool?.bonus?.expression,
-  ].filter(Boolean).join(' ').toLowerCase();
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 }
 
 export function filterTools(tools = [], term = '', managedItems = []) {
-  const needle = String(term || '').trim().toLowerCase();
+  const needle = String(term || '')
+    .trim()
+    .toLowerCase();
   if (!needle) return [...tools];
   return tools.filter((tool) => toolSearchText(tool, managedItems).includes(needle));
 }
@@ -307,14 +314,19 @@ function validBreakage(tool, authority) {
   if (authority === 'checkDriven') return typeof tool?.checkBreakable === 'boolean';
   const breakage = tool?.breakage || {};
   if (breakage.mode === 'limitedUses') {
-    return breakage.maxUses == null || (Number.isInteger(Number(breakage.maxUses)) && Number(breakage.maxUses) >= 1);
+    return (
+      breakage.maxUses == null ||
+      (Number.isInteger(Number(breakage.maxUses)) && Number(breakage.maxUses) >= 1)
+    );
   }
   if (breakage.mode === 'breakageChance') {
     const chance = Number(breakage.breakageChance);
     return Number.isInteger(chance) && chance >= 0 && chance <= 100;
   }
   if (breakage.mode === 'diceExpression') {
-    return Boolean(String(breakage.formula || '').trim()) && Number.isFinite(Number(breakage.threshold));
+    return (
+      Boolean(String(breakage.formula || '').trim()) && Number.isFinite(Number(breakage.threshold))
+    );
   }
   return false;
 }
@@ -332,7 +344,10 @@ function validOnBreak(tool, authority) {
 
 function validPrerequisites(tool) {
   const prerequisites = tool?.prerequisites || {};
-  return prerequisites.enabled !== true || (Array.isArray(prerequisites.ids) && prerequisites.ids.length > 0);
+  return (
+    prerequisites.enabled !== true ||
+    (Array.isArray(prerequisites.ids) && prerequisites.ids.length > 0)
+  );
 }
 
 function validBonus(tool) {
@@ -342,21 +357,23 @@ function validBonus(tool) {
 
 function validRepair(tool) {
   const groups = Array.isArray(tool?.repairRequirements) ? tool.repairRequirements : [];
-  return groups.every((group) =>
-    Array.isArray(group?.options) &&
-    group.options.length > 0 &&
-    group.options.every((option) => {
-      const quantity = option?.quantity;
-      if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) return false;
-      if (option?.itemUuid) return true;
+  return groups.every(
+    (group) =>
+      Array.isArray(group?.options) &&
+      group.options.length > 0 &&
+      group.options.every((option) => {
+        const quantity = option?.quantity;
+        if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0)
+          return false;
+        if (option?.itemUuid) return true;
 
-      const match = option?.match;
-      const handler = getMatchHandler(match);
-      return (
-        handler.isComplete(match) &&
-        handler.validate(match, { requireComplete: true }).length === 0
-      );
-    })
+        const match = option?.match;
+        const handler = getMatchHandler(match);
+        return (
+          handler.isComplete(match) &&
+          handler.validate(match, { requireComplete: true }).length === 0
+        );
+      })
   );
 }
 

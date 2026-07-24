@@ -6,6 +6,7 @@ const {
   composeToolBonusTerms,
   evaluateToolCheckContribution,
   evaluateToolPrerequisiteGate,
+  ingredientSetToolsAreActive,
   resolveToolPrerequisites,
 } = await import('../src/systems/toolCheckBonus.js');
 
@@ -35,7 +36,11 @@ test('resolveToolPrerequisites preserves selected order and reports stale ids', 
 test('enabled prerequisite gates use AND semantics and unresolved ids fail closed', async () => {
   const result = await evaluateToolPrerequisiteGate({
     tool: {
-      prerequisites: { enabled: true, ids: ['strong', 'trained', 'missing'], gateMode: 'usability' },
+      prerequisites: {
+        enabled: true,
+        ids: ['strong', 'trained', 'missing'],
+        gateMode: 'usability',
+      },
     },
     actor: actor('primary', { 'abilities.str': 3, 'skills.craft': 2 }),
     prerequisiteDefinitions: definitions,
@@ -140,24 +145,60 @@ test('virtual-present contribution binds to the primary actor and evaluation fai
   assert.equal(result.value, 0);
 });
 
-test('composition sums always and selects the numeric maximum highestOnly including negatives', () => {
+test('disabled Tools never evaluate or contribute their bonus', async () => {
+  let evaluations = 0;
+  const result = await evaluateToolCheckContribution({
+    tool: {
+      id: 'disabled',
+      enabled: false,
+      prerequisites: { enabled: false, ids: [], gateMode: 'bonus' },
+      bonus: { enabled: true, expression: '@abilities.str' },
+    },
+    primaryActor: actor('primary', { 'abilities.str': 4 }),
+    evaluateExpression: () => {
+      evaluations += 1;
+      return 4;
+    },
+  });
+
+  assert.equal(evaluations, 0);
+  assert.equal(result.value, 0);
+});
+
+test('composition adds every finite non-zero contribution', () => {
   const composed = composeToolBonusTerms([
-    { toolId: 'a', label: 'A', value: 2, mode: 'always' },
-    { toolId: 'never', label: 'Never', value: 50, mode: 'never' },
-    { toolId: 'h1', label: 'H1', value: -5, mode: 'highestOnly' },
-    { toolId: 'h2', label: 'H2', value: -2, mode: 'highestOnly' },
+    { toolId: 'a', label: 'A', value: 2 },
+    { toolId: 'b', label: 'B', value: 5 },
+    { toolId: 'penalty', label: 'Penalty', value: -2 },
+    { toolId: 'zero', label: 'Zero', value: 0 },
   ]);
 
-  assert.equal(composed.total, 0);
-  assert.deepEqual(composed.terms.map((term) => term.toolId), ['a', 'h2']);
+  assert.equal(composed.total, 5);
+  assert.deepEqual(
+    composed.terms.map((term) => term.toolId),
+    ['a', 'b', 'penalty']
+  );
+});
+
+test('Ingredient Set Tool references require routed-by-ingredients and a non-blank name', () => {
+  assert.equal(
+    ingredientSetToolsAreActive({ resolutionMode: 'routedByIngredients' }, { name: ' Ore route ' }),
+    true
+  );
+  assert.equal(
+    ingredientSetToolsAreActive({ resolutionMode: 'simple' }, { name: 'Ore route' }),
+    false
+  );
+  assert.equal(
+    ingredientSetToolsAreActive({ resolutionMode: 'routedByIngredients' }, { name: '  ' }),
+    false
+  );
 });
 
 test('labeled formula terms strip bracket and control characters', () => {
   const controlCharacters = String.fromCodePoint(0, 9, 10, 31, 127);
   assert.equal(
-    appendToolBonusTerms('1d20', [
-      { label: `Odd${controlCharacters}[Tool]\nName`, value: 3 },
-    ]),
+    appendToolBonusTerms('1d20', [{ label: `Odd${controlCharacters}[Tool]\nName`, value: 3 }]),
     '1d20 + 3[Odd Tool Name]'
   );
 });
