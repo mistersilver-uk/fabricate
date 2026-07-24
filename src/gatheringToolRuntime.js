@@ -151,14 +151,14 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
  * yields `present`):
  *   1. The matched item(s) for the tool's OWN component all carry the
  *      `flags.fabricate.toolBroken` flag (the `flagBroken` breakage form).
- *   2. The tool's `onBreak.mode === 'replaceWith'` with a non-empty
- *      `replacementComponentId`, and the actor holds an item matching that
- *      separate replacement component (the `replaceWith` repair-stock broken
- *      variant). This recognition is display-only and does NOT change attempt
- *      validation in {@link matchGatheringTools}.
+ *   2. The tool's `onBreak.mode === 'replaceWith'`, and the actor holds an item
+ *      matching its discriminated replacement target. A Component target matches
+ *      that managed Component. A direct-Item target matches its source reference.
+ *      This recognition is display-only and does NOT change attempt validation in
+ *      {@link matchGatheringTools}.
  *
- * Tolerant of a null/empty actor (all `missing`); never throws. A null/empty/
- * missing `replacementComponentId` never produces a synthetic probe.
+ * Tolerant of a null/empty actor (all `missing`); never throws. An absent or
+ * malformed replacement target never produces a replacement probe.
  *
  * @returns {Array<{ tool: object, state: 'present'|'damaged'|'missing' }>}
  */

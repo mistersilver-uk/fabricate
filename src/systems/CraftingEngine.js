@@ -702,13 +702,10 @@ export class CraftingEngine {
           }
           if (failurePolicy.breakToolsOnFail) {
             usedToolPairs = toolValidation.tools;
-            // The single shared `evaluateCheckBreakage` seam decides forced breakage
-            // on the check-failure path too (gated by `breakToolsOnFail`, as
-            // today). Under `toolSpecific` an engine-evaluated crit/tier
-            // `data.breakTools` force-break applies; under `checkDriven` the active
-            // check's `checkBreakage` triggers decide. The no-check passthrough
-            // result is not engine-evaluated, so it never force-breaks (the
-            // `engineEvaluated` guard lives inside the seam).
+            // The single shared `evaluateCheckBreakage` seam applies failure-path
+            // breakage too, gated by `breakToolsOnFail`. Only `checkDriven` lets the
+            // active check's `checkBreakage` triggers force breakage. Under
+            // `toolSpecific`, the matched Tools' own retained breakage modes decide.
             const breakDecision = this._resolveCraftingBreakageDecision(
               this._getRecipeSystem(executionRecipe),
               executionRecipe,
@@ -900,13 +897,11 @@ export class CraftingEngine {
       await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
       // Apply tool usage/breakage for the recipe's resolved library Tools via the
-      // single shared `evaluateCheckBreakage` seam. Under `toolSpecific` an
-      // engine-evaluated crit/tier `breakTools` forces every matched tool to break (the
-      // no-check passthrough result is not engine-evaluated, so it does not); under
-      // `checkDriven` the active
-      // check's `checkBreakage` triggers decide whether all required non-immune tools
-      // break. The SUCCESS path always applies breakage (no `breakToolsOnFail`
-      // gate exists here).
+      // single shared `evaluateCheckBreakage` seam. Under `toolSpecific`, each
+      // matched Tool's retained breakage mode decides. Under `checkDriven`, the
+      // active check's `checkBreakage` triggers decide whether each participating
+      // required Tool breaks. The SUCCESS path always applies breakage. It has no
+      // `breakToolsOnFail` gate.
       const successBreakDecision = this._resolveCraftingBreakageDecision(
         this._getRecipeSystem(executionRecipe),
         executionRecipe,
@@ -2841,9 +2836,9 @@ export class CraftingEngine {
       }
       const actor = item?.parent ?? null;
       const isImmune = tool.checkBreakable === false || tool.breakage?.mode === 'immune';
-      // checkDriven: immune tools are filtered out of the forced set (never break);
-      // every other required tool breaks when forceBreak. toolSpecific: the legacy
-      // forceBreak override applies, else the tool's own mode decides.
+      // checkDriven: `checkBreakable: false` excludes a Tool from the forced set;
+      // every other required Tool breaks when forceBreak. toolSpecific: this flag
+      // does not grant immunity. The retained Tool-specific breakage mode decides.
       let planned;
       const extra = {};
       if (checkDriven) {
@@ -2862,9 +2857,8 @@ export class CraftingEngine {
           extra.authority = authority;
         }
       } else if (isImmune) {
-        // An immune tool never breaks under EITHER authority — a legacy crit/tier
-        // forceBreak must not break it either. Defer to the tool's own (never-break)
-        // evaluation rather than forcing it.
+        // `checkBreakable` governs check-driven participation only. Under
+        // toolSpecific, defer to the Tool's retained breakage-mode evaluation.
         planned = undefined;
       } else {
         planned = forceBreak ? { mode: 'forced', broken: true, evidence: {} } : undefined;

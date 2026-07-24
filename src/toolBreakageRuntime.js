@@ -118,8 +118,10 @@ export function createToolReplacementCreator({
  * The runtime is deliberately matcher-agnostic: callers inject
  *   - `matchTools`      — resolves required tools to owned `{ tool, item }` pairs
  *   - `buildItemRef`    — builds a run-record `{ actorUuid, itemUuid, quantity }`
- *   - `resolveReplacementSource` — resolves a `replaceWith` componentId to a
- *     source item/component (optional; only needed for the `replaceWith` mode)
+ *   - `resolveReplacementSource` — resolves a Component replacement target to a
+ *     source item/component (optional; only needed for component replacement)
+ *   - `resolveItemUuid` — resolves a direct Item replacement target (optional;
+ *     only needed for direct-Item replacement)
  *   - `evaluateExpression` — async dice/expression evaluator (optional)
  *
  * Usage (`limitedUses`) semantics are preserved exactly: only `limitedUses`
