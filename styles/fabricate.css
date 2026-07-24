@@ -12078,6 +12078,14 @@
 }
 
 .fabricate-manager .manager-tool-breakage-chance-control {
+  --fab-tool-breakage-chance-track-gradient: linear-gradient(
+    90deg,
+    var(--fab-success) 0%,
+    var(--fab-warning) 33%,
+    var(--fab-badge-gold) 66%,
+    var(--fab-danger) 100%
+  );
+
   min-width: 0;
 }
 
