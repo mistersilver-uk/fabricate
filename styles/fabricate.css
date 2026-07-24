@@ -13627,6 +13627,11 @@
   border-bottom: 0;
 }
 
+.fabricate-manager[data-manager-view="tool-edit"] .manager-rail {
+  grid-column: 1;
+  grid-row: 2 / 4;
+}
+
 .fabricate-manager[data-manager-view="tool-edit"] {
   grid-template-rows: minmax(0, 1fr);
 }
