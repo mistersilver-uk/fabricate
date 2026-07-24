@@ -1025,6 +1025,7 @@ const TOOL_PARITY_DIMENSIONS = new Map([
   ['05-validation-1280x720', [1212, 682]],
   ['06-breakage-900x700', [832, 662]],
 ]);
+const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
 
 function readJsonEvidence(path, label) {
   if (!existsSync(path)) throw new Error(`Missing ${label}: ${relative(ROOT, path)}`);
@@ -1086,7 +1087,42 @@ function validateToolStudioCapture(view, source, evidence) {
         `Wrong Tool Studio dimensions for ${view.id}: ${capture.width}x${capture.height}; expected ${width}x${height}`
       );
     }
+    const actual = readToolStudioPngDimensions(view, source);
+    if (actual.width !== width || actual.height !== height) {
+      throw new Error(
+        `Wrong Tool Studio PNG dimensions for ${view.id}: ${actual.width}x${actual.height}; expected ${width}x${height}`
+      );
+    }
+    return;
   }
+  const actual = readToolStudioPngDimensions(view, source);
+  if (actual.width !== capture.width || actual.height !== capture.height) {
+    throw new Error(
+      `Tool Studio PNG dimensions do not match its manifest for ${view.id}: ` +
+      `${actual.width}x${actual.height} actual; ${capture.width}x${capture.height} declared`
+    );
+  }
+}
+
+function readToolStudioPngDimensions(view, source) {
+  if (extensionOf(source) !== '.png') {
+    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} is not a .png file`);
+  }
+  const bytes = readFileSync(source);
+  const hasPngHeader =
+    bytes.length >= 33 &&
+    bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) &&
+    bytes.readUInt32BE(8) === 13 &&
+    bytes.toString('ascii', 12, 16) === 'IHDR';
+  if (!hasPngHeader) {
+    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has no valid PNG header`);
+  }
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  if (width === 0 || height === 0) {
+    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has zero dimensions`);
+  }
+  return { width, height };
 }
 
 export function cleanPrScreenshotEvidence({ prNumber, root = ROOT } = {}) {
