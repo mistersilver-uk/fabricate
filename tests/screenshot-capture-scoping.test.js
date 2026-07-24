@@ -475,8 +475,13 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(HARNESS, /itemTarget\.selectOption\(fixture\.replacementItemUuid\)/);
   assert.match(
     toolStudioWalk,
-    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),[\s\S]*?withSingleToolStoreMutation\(\s*page,\s*'openToolDraft',\s*'check-driven Tool Edit route'/,
+    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),[\s\S]*?withSingleToolDraftTransition\(\s*page,\s*fixture\.toolId,\s*'check-driven Tool Edit route'/,
     'the persisted + projected authority mutation must settle before the exactly-once Edit route',
+  );
+  assert.match(
+    HARNESS,
+    /async function withSingleToolDraftTransition[\s\S]*?viewState\.subscribe[\s\S]*?transitions\.length !== 1[\s\S]*?publish exactly one Tool draft transition/,
+    'selection and Edit must count one live view-state transition instead of monkey-patching a captured method',
   );
   assert.match(
     HARNESS,
