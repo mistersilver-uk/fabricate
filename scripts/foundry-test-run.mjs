@@ -258,7 +258,7 @@ const screenshotManifestEntries = [];
 const screenshotRunIdentity = {
   runId: randomUUID(),
   headSha: String(process.env.FOUNDRY_SCREENSHOT_HEAD_SHA || process.env.GITHUB_SHA || '').trim(),
-  targetLabels: [...SCREENSHOT_TARGET_LABELS].sort(),
+  targetLabels: [...SCREENSHOT_TARGET_LABELS].sort((a, b) => a.localeCompare(b)),
 };
 
 // ── Phase timings ───────────────────────────────────────────────────────────
