@@ -1646,10 +1646,14 @@ describe('CraftingSystemManager source contract', () => {
       'Breakage should render its icon heading and immediate hint before the method cards'
     );
     assert.ok(!toolBreakageSource.includes('BreakageKicker'), 'Breakage should not restore the redundant BREAKAGE kicker');
+    assert.ok(!toolOverviewSource.includes('compactSourceId'), 'Overview should not expose the raw or compact source UUID');
+    assert.ok(!toolOverviewSource.includes('<code title={source.uuid'), 'Overview should not render the source UUID below the source name');
     assert.ok(
-      /manager-tool-source-copy"><strong>\{source\.name\}<\/strong><code title=\{source\.uuid \|\| ''\}>\{compactSourceId\}<\/code>/.test(toolOverviewSource),
-      'Overview should keep the compact source UUID subline directly under the source name'
+      /data-tool-source-copy-uuid[\s\S]*?data-tool-source-unlink/.test(toolOverviewSource),
+      'Overview should place the Copy source UUID action before Unlink'
     );
+    assert.ok(toolOverviewSource.includes('data-tool-source-drop-hint'), 'Overview should explain that dropping an Item replaces the linked source');
+    assert.ok(!toolOverviewSource.includes('data-tool-source-replace'), 'Overview should not offer the removed source picker');
     assert.ok(toolOverviewSource.includes('manager-tool-source-actions'), 'Overview should retain compact trailing source actions');
     assert.ok(
       /manager-tool-validation-errors[\s\S]*?<h3>\{text\('FABRICATE\.Admin\.Manager\.Tools\.Editor\.DomainErrors', 'Save blockers'\)\}<\/h3>/.test(toolValidationSource),
