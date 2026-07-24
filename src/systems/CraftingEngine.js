@@ -2894,8 +2894,9 @@ export class CraftingEngine {
   }
 
   /**
-   * Build a `replaceWith` creator that resolves the replacement component from
-   * the recipe's crafting system and creates the item on the actor.
+   * Build a `replaceWith` creator that resolves component targets through the
+   * recipe's crafting system and direct-Item targets by UUID, then creates the
+   * replacement item on the actor.
    * @private
    */
   _makeToolReplacementCreator(recipe) {
