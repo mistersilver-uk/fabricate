@@ -320,6 +320,17 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(toolStudioWalk, /sourceViewport: \{ width: 900, height: 700 \}/);
   assert.match(toolStudioWalk, /sourceViewport: \{ width: 680, height: 700 \}/);
   assert.match(managerSizing, /globalThis\.__fabricateSmokeManagerApp[\s\S]*?app\.setPosition\(\{/);
+  const readinessIndex = managerSizing.indexOf('await waitForManagerApplicationRendered(page);');
+  const setPositionIndex = managerSizing.indexOf('await app.setPosition({');
+  assert.ok(readinessIndex >= 0, 'manager sizing must wait for the live ApplicationV2 element to render');
+  assert.ok(
+    setPositionIndex > readinessIndex,
+    'ApplicationV2 render readiness must settle before setPosition touches the live element',
+  );
+  assert.match(
+    HARNESS,
+    /async function waitForManagerApplicationRendered[\s\S]*?__fabricateSmokeManagerApp[\s\S]*?app\?\.element[\s\S]*?#fabricate-crafting-system-manager[\s\S]*?\.fabricate-manager[\s\S]*?isConnected/,
+  );
   assert.match(HARNESS, /browser:[\s\S]*?outer:[\s\S]*?product:/);
   assert.doesNotMatch(managerSizing, /Object\.assign\(app\.style/);
   assert.doesNotMatch(managerSizing, /const viewportWidth = Math\.max\(1366/);
