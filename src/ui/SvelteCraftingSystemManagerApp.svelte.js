@@ -27,6 +27,29 @@ import {
 } from './svelte/util/importFolderGroups.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 import { buildImportReportContent } from '../systems/importReportContent.js';
+import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
+import { getFabricateFlag } from '../config/flags.js';
+import { DEFAULT_QUANTITY_PATH } from '../systems/componentStacking.js';
+
+/** Knowledge-surface result keys. Static literals so the lang gates can see them. */
+const KNOWLEDGE_MESSAGES = Object.freeze({
+  gmOnly: 'FABRICATE.Knowledge.Manage.GMOnly',
+  unavailable: 'FABRICATE.Knowledge.Manage.Unavailable',
+  noActor: 'FABRICATE.Knowledge.Manage.NoActor',
+  noItem: 'FABRICATE.Knowledge.Manage.NoItem',
+  noDefinition: 'FABRICATE.Knowledge.Manage.NoDefinition',
+  deleted: 'FABRICATE.Knowledge.Manage.Deleted',
+  deleteFailed: 'FABRICATE.Knowledge.Manage.DeleteFailed',
+  erased: 'FABRICATE.Knowledge.Manage.Erased',
+  eraseFailed: 'FABRICATE.Knowledge.Manage.EraseFailed',
+  expendFailed: 'FABRICATE.Knowledge.Manage.ExpendFailed',
+});
+
+function readItemQuantity(item) {
+  const raw = DEFAULT_QUANTITY_PATH.split('.').reduce((value, key) => value?.[key], item);
+  const quantity = Number(raw);
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+}
 
 /** Minimal HTML-escape for values interpolated into DialogV2 raw HTML (F4). */
 function escapeImportReportHtml(value) {
@@ -362,6 +385,17 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .filter((item) => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       resolveToolSource: (uuid) => resolveItemSourceSnapshot(uuid),
+      // --- GM Knowledge surface seam (issue 785) ---
+      //
+      // Every Foundry-facing read and write for the Knowledge surface lives here:
+      // actor/item enumeration, `matchRecipeItemDefinition` (its tier-1 durable
+      // identity read needs the LIVE Item document), cap resolution, and the four
+      // mutations. `adminStore` derives; `knowledgeStudio` projects.
+      getKnowledgeSnapshot: (systemId) => this._buildKnowledgeSnapshot(systemId),
+      expendRecipeItemUse: (options) => this._expendRecipeItemUse(options),
+      deleteOwnedRecipeItem: (options) => this._deleteOwnedRecipeItem(options),
+      eraseLearnedRecipe: (options) => this._eraseLearnedRecipe(options),
+      resetActorKnowledge: (options) => this._resetActorKnowledge(options),
       pickImagePath: async (currentPath = '') => {
         const FilePickerClass =
           foundry?.applications?.apps?.FilePicker?.implementation ||
@@ -1079,6 +1113,304 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // GM Knowledge surface seam (issue 785)
+  // ---------------------------------------------------------------------------
+
+  _recipeVisibilityService() {
+    return game?.fabricate?.getRecipeVisibilityService?.() ?? null;
+  }
+
+  // Caps MUST resolve through the engine's reader, never raw `definition.caps` —
+  // `_getRecipeItemCaps` folds every legacy derivation (`destroyWhenExhausted` →
+  // `whenSpent`, `limitRecipes`/`maxRecipes` → `limitLearning`/`learnsAllowed`,
+  // `learningMode` → `learnScope`) that the projection's derivations assume.
+  // `_capsForDefinition` is the definition-only extraction of it.
+  _recipeItemCaps(service, definition) {
+    if (typeof service?._capsForDefinition === 'function') {
+      return service._capsForDefinition(definition);
+    }
+    if (typeof service?._getRecipeItemCaps === 'function') {
+      return service._getRecipeItemCaps(null, definition);
+    }
+    return { item: {}, learn: {} };
+  }
+
+  // The Knowledge roster is player characters only — the SAME predicate the Access
+  // surface roster uses. An NPC's knowledge state stays reachable through
+  // `game.fabricate.resetActorKnowledge`. Returns LIVE Actor documents, because
+  // the projection needs `actor.items` and the actor's flags.
+  _knowledgeRosterActors() {
+    return Array.from(game.actors?.contents || [])
+      .filter(
+        (actor) => game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'
+      )
+      .filter((actor) => actor?.id && actor?.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Enumerate one system's runtime knowledge state across the player-character
+   * roster. Returns PLAIN data only — every derivation (remaining/spent/inert,
+   * the source-name ladder, the D8 hazard) belongs to `knowledgeStudio`.
+   *
+   * @param {string} systemId
+   * @returns {{systemId: string, definitionCount: number, characters: object[]}}
+   */
+  _buildKnowledgeSnapshot(systemId) {
+    const fabricate = game?.fabricate;
+    const system = systemId ? fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId) : null;
+    const definitions = Array.isArray(system?.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    const service = this._recipeVisibilityService();
+
+    const capsById = new Map();
+    const recipeCountById = new Map();
+    // Rung 2 of the learned-source ladder: the MEMBER recipe-item definition name,
+    // which is what survives deletion of the copy a recipe was learned from.
+    const definitionNameByRecipeId = new Map();
+    for (const definition of definitions) {
+      const id = String(definition?.id || '');
+      const memberIds = Array.isArray(definition?.recipeIds) ? definition.recipeIds : [];
+      capsById.set(id, this._recipeItemCaps(service, definition));
+      recipeCountById.set(id, memberIds.length);
+      for (const recipeId of memberIds) {
+        const key = String(recipeId);
+        if (!definitionNameByRecipeId.has(key)) {
+          definitionNameByRecipeId.set(key, definition?.name || '');
+        }
+      }
+    }
+
+    const context = {
+      systemId: String(systemId || ''),
+      definitions,
+      capsById,
+      recipeCountById,
+      definitionNameByRecipeId,
+      recipeManager: fabricate?.getRecipeManager?.() ?? null,
+    };
+    return {
+      systemId: context.systemId,
+      definitionCount: definitions.length,
+      characters: this._knowledgeRosterActors().map((actor) =>
+        this._describeKnowledgeActor(actor, context)
+      ),
+    };
+  }
+
+  _describeKnowledgeActor(actor, context) {
+    const items = Array.from(actor.items || []);
+    return {
+      id: actor.id,
+      name: actor.name,
+      img: actor.img || '',
+      ownedCopies: this._collectKnowledgeOwnedCopies(items, context),
+      ...this._collectKnowledgeLearnedEntries(actor, items, context),
+    };
+  }
+
+  _collectKnowledgeOwnedCopies(items, context) {
+    const copies = [];
+    for (const item of items) {
+      const { definition, tier } = matchRecipeItemDefinition(
+        item,
+        context.definitions,
+        context.systemId
+      );
+      if (!definition) continue;
+      const definitionId = String(definition.id || '');
+      const caps = context.capsById.get(definitionId) || { item: {}, learn: {} };
+      const usage = getFabricateFlag(item, 'recipeItemUsage', {}) || {};
+      copies.push({
+        itemId: item.id,
+        itemUuid: item.uuid || '',
+        name: item.name || '',
+        img: item.img || '',
+        quantity: readItemQuantity(item),
+        timesUsed: usage.timesUsed,
+        inert: usage.inert === true,
+        matchTier: tier,
+        definitionId,
+        definitionName: definition.name || '',
+        recipeCount: context.recipeCountById.get(definitionId) || 0,
+        limitUses: caps.item?.limitUses === true,
+        maxUses: caps.item?.maxUses,
+        learnScope: caps.learn?.learnScope || 'perInstance',
+      });
+    }
+    return copies;
+  }
+
+  // `learnedRecipes` is system-AGNOSTIC while definitions are per-system, so an
+  // entry belonging to another system, or to a recipe that no longer resolves at
+  // all, becomes a roll-up rather than a row. The orphan roll-up is the only
+  // pointer to the all-systems reset grain, which is the only grain that can
+  // clear those keys (`forgetSystemLearnedRecipes` leaves them in place).
+  _collectKnowledgeLearnedEntries(actor, items, context) {
+    const learnedMap = getFabricateFlag(actor, 'learnedRecipes', {}) || {};
+    const ownedByUuid = new Map(items.map((item) => [item.uuid, item]));
+    const learnedRecipes = [];
+    let otherSystemCount = 0;
+    let orphanCount = 0;
+
+    for (const [recipeId, entry] of Object.entries(learnedMap)) {
+      const recipe = context.recipeManager?.getRecipe?.(recipeId) || null;
+      if (!recipe) {
+        orphanCount += 1;
+        continue;
+      }
+      if (String(recipe.craftingSystemId || '') !== context.systemId) {
+        otherSystemCount += 1;
+        continue;
+      }
+      const sourceItemUuid = entry?.sourceItemUuid || null;
+      const ownedSource = sourceItemUuid ? ownedByUuid.get(sourceItemUuid) || null : null;
+      const sourceDefinition = ownedSource
+        ? matchRecipeItemDefinition(ownedSource, context.definitions, context.systemId).definition
+        : null;
+      const sourceCaps = sourceDefinition
+        ? context.capsById.get(String(sourceDefinition.id || ''))
+        : null;
+      learnedRecipes.push({
+        recipeId: String(recipeId),
+        recipeName: recipe.name || '',
+        recipeImg: recipe.img || '',
+        recipeCategory: recipe.category || '',
+        craftingSystemId: recipe.craftingSystemId || '',
+        learnedAt: entry?.learnedAt || 0,
+        sourceItemUuid,
+        sourceOwned: !!ownedSource,
+        sourceItemName: ownedSource?.name || '',
+        sourceDefinitionName: context.definitionNameByRecipeId.get(String(recipeId)) || '',
+        // Only a CAPPED book consumes learn budget, so only a capped book can
+        // release any on erase.
+        sourceCapped: sourceCaps?.learn?.limitLearning === true,
+      });
+    }
+    return { learnedRecipes, otherSystemCount, orphanCount };
+  }
+
+  // GM gate for every Knowledge mutation. `isGM`, NOT `activeGM`: this is a
+  // single-client, user-initiated mutation from a GM-only Application, so there is
+  // no N-client duplicate-execution risk, and `activeGM` would lock out the
+  // assistant GMs `SvelteCraftingSystemManagerApp.show()` already admits. Foundry
+  // authorises the writes for an assistant too (`testUserPermission` short-circuits
+  // any `isGM` to OWNER). The merged `resetActorKnowledge` gates identically.
+  _knowledgeActor(actorId) {
+    if (game.user?.isGM !== true)
+      return { denied: { success: false, message: KNOWLEDGE_MESSAGES.gmOnly } };
+    const actor = game.actors?.get?.(actorId);
+    if (!actor) return { denied: { success: false, message: KNOWLEDGE_MESSAGES.noActor } };
+    return { actor };
+  }
+
+  // Prefer the definition the projected row already resolved, so the GM's click
+  // acts on exactly the book the row displayed; fall back to a live match when the
+  // row is stale.
+  _resolveKnowledgeDefinition({ item, definitionId, systemId }) {
+    const definitions = Array.isArray(
+      game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)?.recipeItemDefinitions
+    )
+      ? game.fabricate.getCraftingSystemManager().getSystem(systemId).recipeItemDefinitions
+      : [];
+    const named = definitionId
+      ? definitions.find((definition) => String(definition?.id) === String(definitionId))
+      : null;
+    return named || matchRecipeItemDefinition(item, definitions, systemId).definition;
+  }
+
+  /**
+   * Spend one charge of an owned recipe-item copy. Applies no visibility or
+   * knowledge-mode gate: the GM named the copy. Takes document IDS, never uuids,
+   * and never throws past the store.
+   */
+  async _expendRecipeItemUse({ actorId, itemId, definitionId, systemId } = {}) {
+    const { actor, denied } = this._knowledgeActor(actorId);
+    if (denied) return denied;
+    const item = actor.items?.get?.(itemId);
+    if (!item) return { success: false, message: KNOWLEDGE_MESSAGES.noItem };
+    const service = this._recipeVisibilityService();
+    if (typeof service?.expendRecipeItemUse !== 'function') {
+      return { success: false, message: KNOWLEDGE_MESSAGES.unavailable };
+    }
+    const definition = this._resolveKnowledgeDefinition({ item, definitionId, systemId });
+    if (!definition) return { success: false, message: KNOWLEDGE_MESSAGES.noDefinition };
+    try {
+      return await service.expendRecipeItemUse(actor, itemId, definition);
+    } catch (err) {
+      console.error('Fabricate | Failed to expend a recipe item use:', err);
+      return { success: false, message: KNOWLEDGE_MESSAGES.expendFailed };
+    }
+  }
+
+  /**
+   * Delete one owned copy. A plain `item.delete()` — no engine method, no learn
+   * budget, no `learnedRecipes` write. A stacked copy deletes the WHOLE document:
+   * `recipeItemUsage.timesUsed` and `recipeItemLearning.learnedCount` are
+   * per-document counters shared by every unit, so the stack-quantity path is
+   * never decremented (a deliberate exception to the component-consumption
+   * convention, and what all three existing disposal paths already do).
+   */
+  async _deleteOwnedRecipeItem({ actorId, itemId } = {}) {
+    const { actor, denied } = this._knowledgeActor(actorId);
+    if (denied) return denied;
+    const item = actor.items?.get?.(itemId);
+    if (!item) return { success: false, message: KNOWLEDGE_MESSAGES.noItem };
+    const name = item.name || '';
+    try {
+      await item.delete();
+    } catch (err) {
+      console.error('Fabricate | Failed to delete an owned recipe item:', err);
+      return { success: false, message: KNOWLEDGE_MESSAGES.deleteFailed };
+    }
+    return { success: true, message: KNOWLEDGE_MESSAGES.deleted, messageData: { name } };
+  }
+
+  /**
+   * Erase one learned recipe. BOTH option values are pinned: `freeLearnBudget`
+   * must be passed explicitly even though it defaults true, and `clearDiscovery`
+   * is deliberately false — an erase is an un-learn, a reset is an amnesia.
+   */
+  async _eraseLearnedRecipe({ actorId, recipeId } = {}) {
+    const { actor, denied } = this._knowledgeActor(actorId);
+    if (denied) return denied;
+    const service = this._recipeVisibilityService();
+    if (typeof service?.forgetLearnedRecipes !== 'function') {
+      return { success: false, message: KNOWLEDGE_MESSAGES.unavailable };
+    }
+    try {
+      const result = await service.forgetLearnedRecipes(actor, [recipeId], {
+        freeLearnBudget: true,
+        clearDiscovery: false,
+      });
+      return {
+        success: result?.success === true,
+        message: KNOWLEDGE_MESSAGES.erased,
+        messageData: { count: result?.count || 0 },
+      };
+    } catch (err) {
+      console.error('Fabricate | Failed to erase a learned recipe:', err);
+      return { success: false, message: KNOWLEDGE_MESSAGES.eraseFailed };
+    }
+  }
+
+  /**
+   * Both reset grains route through the merged GM API rather than reimplementing
+   * either. A null `systemId` is the all-systems grain — the only one that can
+   * clear orphan learned keys.
+   */
+  async _resetActorKnowledge({ actorId, systemId = null } = {}) {
+    const { denied } = this._knowledgeActor(actorId);
+    if (denied) return denied;
+    const reset = game?.fabricate?.resetActorKnowledge;
+    if (typeof reset !== 'function') {
+      return { success: false, message: KNOWLEDGE_MESSAGES.unavailable };
+    }
+    return await reset.call(game.fabricate, { actorId, systemId });
+  }
+
   // Keep the access rosters (`worldUsers` + `accessCharacters`) live while the
   // manager is open: they back the Access tab's grantable lists and the recipe
   // editor's context rail. Each entry is `[hook, id]` so `_unregisterUserHooks` can
@@ -1088,19 +1420,55 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   // `actor.ownership`, name and img — but `updateActor` is NOISY (every HP tick
   // fires it), so it is key-filtered on the `changed` diff. (`noHook` on core's
   // ownership dialog gates only the `pre*` hooks, so `updateActor` does fire.)
+  // The Knowledge surface (issue 785) adds the item hooks. Nothing re-rendered on a
+  // learn/expend/delete before it: `onFabricateDataChanged` hooks only
+  // `craftingSystemsChanged` / `recipesChanged`, and `updateActor` is key-filtered.
+  // `knowledgeActive` inside the store makes the noisy `updateItem` hook free while
+  // the surface is closed, and while it is open the handlers coalesce through the
+  // store's microtask scheduler so a burst of item writes collapses into one scan.
+  //
+  // The parent Actor CRUD refreshes are LOAD-BEARING, not belt-and-braces: hook
+  // dispatch is per-operation-type only, and embedded documents are materialised
+  // through `EmbeddedCollection#_initialize`, a path with NO lifecycle hook dispatch
+  // — so an `Actor.create` carrying `items[]` from an import, duplicate or
+  // compendium drop fires `createActor` and ZERO `createItem`; `deleteActor` is
+  // symmetric.
   _registerUserHooks() {
     if (this._userHooks) return;
     const reproject = () => this._adminStore?.refreshAccessRosters?.();
+    const reprojectKnowledge = () => this._adminStore?.scheduleKnowledgeRefresh?.();
+    const reprojectOnActorCrud = () => {
+      reproject();
+      reprojectKnowledge();
+    };
     const reprojectOnRelevantActorChange = (_actor, changed) => {
       const diff = changed || {};
       if ('ownership' in diff || 'name' in diff || 'img' in diff) reproject();
+      // Learned recipes, usage counts and learn counts all live under `flags`.
+      if ('flags' in diff) reprojectKnowledge();
     };
+    // An Item embedded in a COMPENDIUM Actor also has an Actor parent and could
+    // never change the projection. `Document#pack` falls back to `this.parent?.pack`,
+    // so the compendium clause is readable straight off the embedded doc.
+    const reprojectOnOwnedItemChange = (doc) => {
+      if (doc?.parent?.documentName !== 'Actor') return;
+      if (doc?.pack) return;
+      reprojectKnowledge();
+    };
+    // Every entry is an `[hookName, id]` TUPLE — a bare id makes
+    // `_unregisterUserHooks` destructure `undefined` and leak the listener across
+    // every manager reopen.
     this._userHooks = [
-      ...['createUser', 'updateUser', 'deleteUser', 'createActor', 'deleteActor'].map((hook) => [
+      ...['createUser', 'updateUser', 'deleteUser'].map((hook) => [
         hook,
         Hooks.on(hook, reproject),
       ]),
+      ...['createActor', 'deleteActor'].map((hook) => [hook, Hooks.on(hook, reprojectOnActorCrud)]),
       ['updateActor', Hooks.on('updateActor', reprojectOnRelevantActorChange)],
+      ...['createItem', 'updateItem', 'deleteItem'].map((hook) => [
+        hook,
+        Hooks.on(hook, reprojectOnOwnedItemChange),
+      ]),
     ];
   }
 
