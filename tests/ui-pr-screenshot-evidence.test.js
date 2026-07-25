@@ -866,7 +866,10 @@ describe('UI PR screenshot evidence', () => {
       ciHeadSha: 'ci-head',
       runGit: gitHead,
     }), 'ci-head');
-    assert.equal(resolveScreenshotHeadSha({ runGit: gitHead }), 'local-head');
+    // An explicit empty CI input disables the process.env.GITHUB_SHA default so
+    // this assertion deterministically exercises the local git-head fallback in
+    // both local and CI environments.
+    assert.equal(resolveScreenshotHeadSha({ ciHeadSha: '', runGit: gitHead }), 'local-head');
     assert.deepEqual(calls, [['rev-parse', '--verify', 'HEAD']]);
   });
 
