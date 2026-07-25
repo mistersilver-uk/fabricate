@@ -824,6 +824,7 @@ The other tiers are diagnostic rather than actionable and are carried in the row
 - Expend does **not** move focus: the row survives, so its own button keeps focus and a keyboard GM can walk a multi-use copy without re-tabbing.
 Only the destructive actions, whose row unmounts, move focus to the owning tab panel.
 - A learned row whose source copy is gone states that fact in its source line, and any learned row whose erase will free no budget carries a per-row "Frees no slot" sub-label rather than a banner promise the erase cannot keep.
+The sub-label's condition is the full four-condition rule in Knowledge Reset / Erase, which includes a still-owned source copy whose definition simply carries no learn cap — a case the three early-returns do not cover.
 
 **Confirmation affordance.** The two high-frequency row actions (Delete a copy, Erase a memory) use an inline two-step arm rather than a modal: the first click arms the control, the second executes.
 It is a real focusable `button`, its icon swaps as well as its label so the state survives greyscale, its `aria-label` carries the full consequence sentence, and `data-armed` is the test hook.
