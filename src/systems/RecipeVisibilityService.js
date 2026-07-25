@@ -1799,6 +1799,10 @@ export class RecipeVisibilityService {
    * rendered; a copy that has vanished between render and click yields a result shape,
    * never a throw past a caller that expects one.
    *
+   * An already-spent copy, or a copy from an uncapped book, performs NO write at
+   * all — `_applyRecipeItemUse` short-circuits on both outcomes — and this returns a
+   * failure result rather than a silent success.
+   *
    * @param {object} actor the owning actor
    * @param {string} itemId the owned copy's document id
    * @param {object} definition the recipe item definition the copy matched

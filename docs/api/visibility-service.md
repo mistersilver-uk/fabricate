@@ -111,6 +111,22 @@ This requirement applies to every caller, including a GM.
 `message` is an i18n key such as `FABRICATE.Knowledge.AlreadyLearned`.
 UI callers are expected to localize it at the presentation boundary, using `messageData` for interpolation when present.
 
+### expendRecipeItemUse(actor, itemId, definition)
+
+Spends one use of a single owned recipe item copy, the same accounting the recipe-driven craft path applies when a limited-use item is consumed.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `actor` | `Actor` | The actor that owns the copy |
+| `itemId` | `string` | The owned copy's document id (not a uuid) |
+| `definition` | `object` | The recipe item definition the copy matches |
+
+Applies no visibility-mode or knowledge-mode gate, and no GM check of its own.
+The Knowledge surface's **Expend use** action is the intended caller, and it applies the GM gate itself before calling this method.
+An already-spent copy, or a copy from a book with no use cap, performs no write at all and returns a failure result.
+
+**Returns:** `Promise<{ success: boolean, message: string, messageData?: object }>`
+
 ### cleanupLearnedRecipes(validRecipeIds)
 
 Removes learned records for recipes that no longer exist.
@@ -129,8 +145,8 @@ This is the shared deletion primitive behind erasing a single recipe, resetting 
 | `options.freeLearnBudget` | `boolean` | Free the consumed learn budget so a capped book permits re-learning (default `true`) |
 | `options.clearDiscovery` | `boolean` | Also clear each recipe's discovery progress (default `false`) |
 
-When `freeLearnBudget` is `true`, each cleared entry frees one consumed learn slot against a source book the actor still holds.
-An entry with no held source book, or whose recipe no longer exists, frees nothing.
+When `freeLearnBudget` is `true`, each cleared entry frees one consumed learn slot against a source book, but only when all of the following hold: the entry names a source book, the actor still owns that copy, the recipe still exists, and that book's definition actually limits how many recipes it teaches.
+An auto-learned entry (no recorded source book), an entry whose source copy is no longer owned, an entry whose recipe no longer exists, or an entry whose source book has no learn cap, all free nothing.
 
 **Returns:** `Promise<{ success: boolean, count: number }>`
 
@@ -162,5 +178,6 @@ await game.fabricate.resetActorKnowledge({
 The facade is GM-only and takes an actor id, not an actor uuid.
 It never throws.
 It returns `{ success, message, messageData }` so a macro can branch on the outcome and localize `message` at the presentation boundary.
-This is the interim console and macro path.
-A Books and Scrolls Knowledge tab that surfaces the same reset in the UI is planned and not yet available.
+The Knowledge surface's per-character reset control, in the Crafting Admin panel, routes through this same facade for both of its reset grains.
+It remains available to macros and the console for the same reset outside that UI.
+See [Visibility & Knowledge]({% link visibility.md %}#resetting-a-characters-knowledge) for the GM-facing surface.
