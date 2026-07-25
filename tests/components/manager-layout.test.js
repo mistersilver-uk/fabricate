@@ -4398,6 +4398,152 @@ test('every view-specific manager-body grid override narrows the rail column whe
   }
 });
 
+// The GM Knowledge surface (issue 785). Its layout is FIVE pieces, and the failure
+// mode of doing only some of them is silent: a dead 300px inspector strip, or an
+// action cluster clipped with no scrollbar. The paired `.is-rail-collapsed` sibling
+// is already covered by the generic guard above; the rest is pinned here.
+test('the Knowledge surface owns its third column and wraps its row action clusters', () => {
+  const bodyBlock = blockFor('.fabricate-manager[data-manager-view="knowledge"] .manager-body');
+  const collapsedBlock = blockFor(
+    '.fabricate-manager[data-manager-view="knowledge"] .manager-body.is-rail-collapsed'
+  );
+  const mainBlock = blockFor('.fabricate-manager .manager-knowledge-main');
+  const rowBlock = blockFor(
+    '.fabricate-manager .manager-knowledge-copy-row,\n.fabricate-manager .manager-knowledge-learned-row'
+  );
+  const copyColumnBlock = blockFor('.fabricate-manager .manager-knowledge-copy-identity');
+  const factBlock = blockFor('.fabricate-manager .manager-knowledge-fact-cluster .manager-fact');
+  const spentBlock = blockFor(
+    '.fabricate-manager .manager-knowledge-copy-row.is-spent .manager-knowledge-copy-identity'
+  );
+
+  assert.ok(
+    bodyBlock.includes('grid-template-columns: 220px 250px minmax(0, 1fr);'),
+    'the knowledge route re-templates the body as rail, roster, detail'
+  );
+  assert.ok(
+    collapsedBlock.includes('grid-template-columns: 56px 250px minmax(0, 1fr);'),
+    'the collapsed rail keeps the roster and detail columns'
+  );
+  assert.ok(
+    mainBlock.includes('display: contents;'),
+    "the view's own main must not become a fourth grid item"
+  );
+  // The 832-1000px band is the real hazard: three columns still hold while the
+  // detail pane is at its narrowest, so the action cluster has to wrap.
+  assert.ok(rowBlock.includes('flex-wrap: wrap;'), 'rows wrap rather than clip');
+  assert.ok(copyColumnBlock.includes('min-width: 0;'), 'the copy column may shrink');
+  assert.ok(
+    factBlock.includes('width: auto;'),
+    '.manager-fact is authored width:100% for grids and must hug content in this flex cluster'
+  );
+  // `.manager-button:disabled` already carries opacity 0.62, so stacking a row-level
+  // dim on the actions would composite the disabled Expend button to about 0.38.
+  assert.ok(
+    spentBlock.includes('opacity:'),
+    'the spent dim applies to the identity column'
+  );
+  assert.equal(
+    css.includes('.manager-knowledge-copy-row.is-spent .manager-knowledge-row-actions'),
+    false,
+    'the spent dim must not reach the action cluster'
+  );
+  assert.ok(
+    css.includes(
+      '  .fabricate-manager[data-manager-view="knowledge"] .manager-body,\n  .fabricate-manager[data-manager-view="knowledge"] .manager-body.is-rail-collapsed {'
+    ),
+    'the knowledge surface collapses to one column in the 831px container query'
+  );
+});
+
+test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
+  const armedBlock = blockFor('.fabricate-manager .manager-button.is-danger.is-armed');
+  const rosterRowBlock = blockFor('.fabricate-manager .manager-knowledge-roster-row');
+  const rosterFocusBlock = blockFor(
+    '.fabricate-manager .manager-knowledge-roster-row:focus-visible'
+  );
+
+  assert.ok(armedBlock.includes('background: var(--fab-danger);'), 'armed uses the danger fill');
+  assert.ok(
+    armedBlock.includes('border-color: var(--fab-danger);'),
+    'armed uses the danger edge'
+  );
+  assert.ok(
+    armedBlock.includes('color: var(--fab-on-danger);'),
+    'armed text uses the dedicated on-danger token, not on-accent or danger-text'
+  );
+
+  // Without the reset, the host's fixed global button height crops the roster
+  // portrait — a defect no mounted test can see, because it does not compute the
+  // host cascade. Modelled on `.manager-tools-select-target`.
+  for (const declaration of [
+    'appearance: none;',
+    'height: auto;',
+    'min-height: 52px;',
+    'justify-content: flex-start;',
+  ]) {
+    assert.ok(
+      rosterRowBlock.includes(declaration),
+      `the roster row should reset ${declaration} like the tools select target`
+    );
+  }
+  assert.ok(
+    rosterFocusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    'the roster row owns its keyboard focus ring'
+  );
+});
+
+// The one Knowledge hazard source text cannot prove: at 832-1000px three columns
+// still hold while the detail pane is at its narrowest, so a non-wrapping row clips
+// its action cluster with no scrollbar. Measured, not asserted from CSS text.
+async function readRenderedKnowledgeGeometry(width) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  try {
+    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong></span><span class="manager-knowledge-copy-chips"><span class="manager-chip">Book</span><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span><small class="manager-knowledge-copy-meta">4 recipes inside</small></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
+    await page.setContent(
+      `<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search manager-knowledge-roster-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+    );
+    return await page.evaluate(() => {
+      const box = (selector) => {
+        const value = document.querySelector(selector)?.getBoundingClientRect();
+        return value ? { left: value.left, right: value.right, width: value.width } : null;
+      };
+      const root = document.querySelector('.fabricate-manager');
+      const rowNode = document.querySelector('.manager-knowledge-copy-row');
+      return {
+        rail: box('.manager-rail'),
+        roster: box('.manager-knowledge-roster'),
+        detail: box('.manager-knowledge-detail'),
+        row: box('.manager-knowledge-copy-row'),
+        actions: box('.manager-knowledge-row-actions'),
+        inspectorPresent: Boolean(document.querySelector('.manager-inspector')),
+        rowOverflow: rowNode.scrollWidth > rowNode.clientWidth + 1,
+        overflow: root.scrollWidth > root.clientWidth + 1,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions from 1000px to 832px', async () => {
+  for (const width of [1212, 1000, 880, 832]) {
+    const report = await readRenderedKnowledgeGeometry(width);
+    assert.equal(Math.round(report.rail.width), 220, `${width}px rail column`);
+    assert.equal(Math.round(report.roster.width), 250, `${width}px roster column`);
+    assert.ok(report.roster.left >= report.rail.right - 1, `${width}px roster follows the rail`);
+    assert.ok(report.detail.left >= report.roster.right - 1, `${width}px detail follows the roster`);
+    assert.equal(report.inspectorPresent, false, `${width}px no fourth inspector column`);
+    assert.ok(
+      report.actions.right <= report.row.right + 1,
+      `${width}px row actions stay inside the row`
+    );
+    assert.equal(report.rowOverflow, false, `${width}px row does not overflow`);
+    assert.equal(report.overflow, false, `${width}px surface does not overflow`);
+  }
+});
+
 test('recipe tag chips zero their list-item margins so a host list rule cannot inflate one chip', async () => {
   // Regression: chips are <li>s, and a host (Foundry) global list rule giving
   // non-last items a margin-bottom inflated only the first chip's box (e.g. it

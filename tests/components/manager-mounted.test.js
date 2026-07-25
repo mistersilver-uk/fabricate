@@ -137,6 +137,22 @@ function compileManagerRoot() {
   // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
   writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
+  // The GM Knowledge surface (issue 785). Adding a `knowledge` branch to the root
+  // puts this WHOLE subtree into the compiled root's STATIC module graph regardless
+  // of `{#if}`, so every child is enumerated by name: omitting one HANGS every
+  // mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
+  for (const knowledgeComponent of [
+    'KnowledgeTabs',
+    'KnowledgeRoster',
+    'KnowledgeRecipeItemsTab',
+    'KnowledgeLearnedRecipesTab',
+    'KnowledgeOwnedCopyRow',
+    'KnowledgeLearnedRow',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/knowledge/${knowledgeComponent}.svelte`);
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SegmentedControl.svelte');
@@ -384,6 +400,10 @@ function compileManagerRoot() {
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The Knowledge surface's pure projection (issue 785). `adminStore` imports it
+    // too, but it lands here because the compiled Knowledge components import it
+    // directly; it is a dependency-free leaf, so this single entry suffices.
+    'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
     // SystemEditView imports the pure modifier↔prerequisite copy-mapping helpers
     // (issue 768); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -7482,19 +7502,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'Collapse crafting menu'
     );
     // The Crafting sub-tabs are a conditional set keyed on the system's
-    // visibilityMode (issue 511, PR-B). The default fixture has no visibilityMode
-    // (→ 'knowledge'), so Access is hidden and Books & Scrolls is shown; order is
-    // Recipes · Books & Scrolls · Settings.
+    // visibilityMode (issue 511, PR-B) plus, for Knowledge, its resolutionMode
+    // (issue 785). The default fixture has no visibilityMode (→ 'knowledge') and a
+    // resolutionMode of 'alchemy', so BOTH Knowledge disjuncts are true: Access is
+    // hidden, Books & Scrolls is shown, and Knowledge appears in every mounted
+    // manager test. Order is Recipes · Books & Scrolls · Knowledge · Settings.
     const craftingItems = Array.from(submenu.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       craftingItems.map((item) => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Recipes', 'Books & Scrolls', 'Settings']
+      ['Recipes', 'Books & Scrolls', 'Knowledge', 'Settings']
     );
     assert.deepEqual(
       craftingItems.map((item) => item.id),
       [
         'manager-crafting-nav-recipes',
         'manager-crafting-nav-books-scrolls',
+        'manager-crafting-nav-knowledge',
         'manager-crafting-nav-settings',
       ]
     );
@@ -7559,6 +7582,46 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), false);
     assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
     assert.equal(craftingSubitem('Books & Scrolls').getAttribute('aria-current'), null);
+  });
+
+  // The Knowledge surface's ROOT wiring (issue 785). The surface's own behaviour is
+  // covered by tests/components/knowledge-view-mounted.test.js; what only the root
+  // can prove is that the sub-item routes, that the shared inspector aside is
+  // suppressed (leaving it rendered would hold a dead 300px strip open beside the
+  // surface's own roster · detail columns), and that the global roll-up chip lands
+  // in the page header rather than the per-character fact cluster.
+  it('routes the Knowledge sub-item to a full-width three-pane surface with no shared inspector', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+    craftingSubitem('Knowledge').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'knowledge');
+    assert.equal(craftingSubitem('Knowledge').getAttribute('aria-current'), 'page');
+    assert.equal(craftingSubitem('Knowledge').classList.contains('is-active'), true);
+    assert.ok(target.querySelector('[data-knowledge-view]'), 'the knowledge surface renders');
+    assert.ok(target.querySelector('[data-knowledge-search]'), 'the roster search renders');
+    assert.equal(
+      target.querySelector('.manager-inspector'),
+      null,
+      'the shared inspector aside is suppressed for the knowledge route'
+    );
+    assert.ok(
+      target.querySelector('[data-knowledge-tracked-chip]'),
+      'the tracked-characters roll-up renders in the page header'
+    );
   });
 
   // Navigate the mounted manager to the Books & Scrolls surface via the Crafting

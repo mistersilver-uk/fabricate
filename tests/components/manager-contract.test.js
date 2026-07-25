@@ -65,6 +65,15 @@ const gatheringTasksBrowserPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte'
 );
+// The GM Knowledge surface (issue 785). `KnowledgeView` and the reusable
+// `ArmedDangerButton` sit at the manager root; the surface's own children live
+// under `knowledge/`, which is also where the pure projection lives.
+const knowledgePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/KnowledgeView.svelte');
+const armedDangerButtonPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte'
+);
+const knowledgeComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/knowledge');
 const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
 const toolEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolEditView.svelte');
 const toolBreakagePath = resolve(
@@ -105,6 +114,8 @@ const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
+const knowledgeSource = readFileSync(knowledgePath, 'utf8');
+const armedDangerButtonSource = readFileSync(armedDangerButtonPath, 'utf8');
 const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
 const toolEditSource = readFileSync(toolEditPath, 'utf8');
 const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
@@ -155,6 +166,11 @@ function staticTextCalls(source) {
 
 function isChangedManagerEnvironmentLocalizationKey(key) {
   return (
+    // The Knowledge surface's whole string tree is authored fresh in issue 785, so
+    // every fallback it renders is compared against en.json rather than only the
+    // keys an older change happened to touch.
+    key.startsWith('FABRICATE.Admin.Manager.Knowledge.') ||
+    key === 'FABRICATE.Admin.Manager.Nav.Knowledge' ||
     key.startsWith('FABRICATE.Admin.Manager.Environment.') ||
     key.startsWith('FABRICATE.Admin.Manager.EnvironmentEditor.') ||
     key.startsWith('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.') ||
@@ -939,9 +955,14 @@ describe('CraftingSystemManager source contract', () => {
       rootPath,
       environmentEditPath,
       environmentsBrowserPath,
+      knowledgePath,
+      armedDangerButtonPath,
       ...readdirSync(environmentComponentDir)
         .filter((name) => name.endsWith('.svelte'))
         .map((name) => resolve(environmentComponentDir, name)),
+      ...readdirSync(knowledgeComponentDir)
+        .filter((name) => name.endsWith('.svelte'))
+        .map((name) => resolve(knowledgeComponentDir, name)),
     ];
     const failures = [];
 
@@ -2692,6 +2713,127 @@ describe('CraftingSystemManager source contract', () => {
         appSource.includes('foundry.utils.copyPlainText'),
       false,
       'Manager UUID copies should not bypass the Foundry clipboard service'
+    );
+  });
+
+  // The GM Knowledge surface (issue 785). Everything asserted here is a wiring
+  // decision whose absence is SILENT at runtime: an un-suppressed inspector holds a
+  // dead 300px strip open, an un-threaded `resolutionMode` hides the rail entry from
+  // the `global` + alchemy configuration that motivated the widened gate, and an
+  // ungated `setKnowledgeActive` puts a whole-world actors x items scan on every one
+  // of `refresh()`'s callers.
+  it('routes the Knowledge surface, releases its third column, and gates its projection', () => {
+    assert.ok(
+      rootSource.includes("import KnowledgeView from './KnowledgeView.svelte';"),
+      'root should import the Knowledge surface'
+    );
+    for (const snippet of [
+      "currentView === 'knowledge'",
+      'knowledge={knowledgeState}',
+      "const knowledgeState = $derived($viewState.knowledge || null)",
+      "store.setKnowledgeActive?.(currentView === 'knowledge')",
+      'store.selectKnowledgeActor?.(actorId)',
+      'store.expendRecipeItemUse?.(actorId, itemId)',
+      'store.deleteOwnedRecipeItem?.(actorId, itemId)',
+      'store.eraseLearnedRecipe?.(actorId, recipeId)',
+      'store.resetActorSystemKnowledge?.(actorId)',
+      'store.resetActorAllKnowledge?.(actorId)',
+      'resolutionMode: craftingResolutionMode,',
+      "const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '')",
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
+    }
+    // The CSS column release and this aside suppression are ONE decision expressed
+    // twice; doing only the first leaves an empty 300px inspector holding the strip.
+    assert.ok(
+      rootSource.includes("currentView !== 'knowledge'") &&
+        rootSource.includes('class="manager-inspector"'),
+      'the shared inspector is suppressed for the full-width knowledge surface'
+    );
+    // The projection is published TOP-LEVEL, never hung off selectedSystem.
+    assert.equal(
+      rootSource.includes('selectedSystem.knowledge'),
+      false,
+      'the knowledge projection must not be read off selectedSystem'
+    );
+
+    // The view owns the single armed token and every disarm rule.
+    for (const snippet of [
+      'data-knowledge-view',
+      'KnowledgeRoster',
+      'KnowledgeTabs',
+      'KnowledgeRecipeItemsTab',
+      'KnowledgeLearnedRecipesTab',
+      'filterKnowledgeRoster',
+      'let armedToken = $state',
+      "role=\"tabpanel\"",
+    ]) {
+      assert.ok(knowledgeSource.includes(snippet), `KnowledgeView should include ${snippet}`);
+    }
+    // The default tab is seeded ONCE from the store, never derived live from the
+    // definition count: a GM authoring the system's first recipe item elsewhere
+    // would otherwise yank the open tab and silently disarm an armed row.
+    assert.ok(
+      knowledgeSource.includes('let tabSeeded = $state(false)'),
+      'the default tab should be seeded once on surface entry'
+    );
+
+    // The armed control is a REAL focusable button, and its token is keyed on the
+    // target document id — never a row index, which the asynchronous re-projection
+    // would turn into a destructive misfire.
+    assert.ok(
+      armedDangerButtonSource.includes('<button\n  type="button"'),
+      'the armed confirmation should be a real button element'
+    );
+    assert.equal(
+      /sc-on-click/.test(armedDangerButtonSource),
+      false,
+      'the prototype span affordance must not be copied'
+    );
+    for (const snippet of [
+      "data-armed={armed ? 'true' : 'false'}",
+      'data-arm-token={token}',
+      'aria-label={consequence}',
+      "event.key !== 'Escape'",
+      'function handleBlur()',
+      'armedIcon = \'fas fa-triangle-exclamation\'',
+    ]) {
+      assert.ok(
+        armedDangerButtonSource.includes(snippet),
+        `ArmedDangerButton should include ${snippet}`
+      );
+    }
+    const copyRowSource = readFileSync(
+      resolve(knowledgeComponentDir, 'KnowledgeOwnedCopyRow.svelte'),
+      'utf8'
+    );
+    const learnedRowSource = readFileSync(
+      resolve(knowledgeComponentDir, 'KnowledgeLearnedRow.svelte'),
+      'utf8'
+    );
+    assert.ok(
+      copyRowSource.includes('`delete:${copy?.itemId'),
+      'the delete token should be keyed on the item document id'
+    );
+    assert.ok(
+      learnedRowSource.includes('`erase:${learned?.recipeId'),
+      'the erase token should be keyed on the recipe id'
+    );
+    // Only `spent` disables Expend. An `!inert` term would apply a gate the engine
+    // does not: `_filterNonExhausted` reads `timesUsed` alone.
+    assert.ok(
+      copyRowSource.includes('disabled={!copy.canExpend}'),
+      'Expend should be disabled purely from the projected affordance'
+    );
+    assert.equal(
+      /!\s*copy\.inert/.test(copyRowSource),
+      false,
+      'inert must not gate the Expend affordance'
+    );
+    // `inert` is an INDEPENDENT chip, so the fused "Spent · inert" label is retired.
+    assert.ok(
+      copyRowSource.includes('data-knowledge-inert'),
+      'inert should render as its own chip'
     );
   });
 

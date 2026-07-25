@@ -29,6 +29,11 @@ export const CRAFTING_VIEWS = Object.freeze([
   'access',
   'books-scrolls',
   'recipe-item-edit',
+  // The GM Knowledge surface (issue 785). Membership here is load-bearing: without
+  // it `isCraftingRoute('knowledge')` is false, the Crafting group collapses the
+  // moment the surface opens and the rail highlight is dropped — with no existing
+  // test failing.
+  'knowledge',
   'crafting-settings',
 ]);
 
@@ -40,6 +45,7 @@ const TAB_BY_VIEW = {
   access: 'access',
   'books-scrolls': 'books-scrolls',
   'recipe-item-edit': 'books-scrolls',
+  knowledge: 'knowledge',
   'crafting-settings': 'settings',
 };
 
@@ -49,16 +55,30 @@ const TAB_BY_VIEW = {
  * Recipes and Settings are always shown. Access appears only when the visibility
  * mode grants per-recipe access (`restricted`); Books & Scrolls appears only when
  * the mode is item- or knowledge-gated. Order is: Recipes, Access, Books &
- * Scrolls, Settings.
+ * Scrolls, Knowledge, Settings.
+ *
+ * Knowledge's gate is deliberately WIDER than Books & Scrolls': it is shown when
+ * the visibility effect grants Books & Scrolls OR the system resolves as alchemy.
+ * `learnRecipeOnCraft` writes `learnedRecipes` under every visibility mode, and
+ * under `global` alchemy those entries are the sole reveal source, so a
+ * `showBooksScrolls`-only gate would leave the GM no lever at all in that
+ * documented discovery-only configuration.
  *
  * @param {object} args
  * @param {string} [args.visibilityMode] One of the visibility modes; unknown or
  *   absent input resolves via {@link craftingEffect} (→ knowledge).
+ * @param {string} [args.resolutionMode] The system's recipe resolution mode; only
+ *   `alchemy` widens the Knowledge gate.
  * @param {number} [args.recipeCount] Badge count for the Recipes tab.
  * @param {number} [args.recipeItemCount] Badge count for the Books & Scrolls tab.
  * @returns {Array<{ id: string, view: string, icon: string, labelKey: string, labelFallback: string, count?: number }>}
  */
-export function buildCraftingNavItems({ visibilityMode, recipeCount, recipeItemCount } = {}) {
+export function buildCraftingNavItems({
+  visibilityMode,
+  resolutionMode,
+  recipeCount,
+  recipeItemCount,
+} = {}) {
   const effect = craftingEffect(visibilityMode);
   const items = [
     {
@@ -89,6 +109,20 @@ export function buildCraftingNavItems({ visibilityMode, recipeCount, recipeItemC
       labelKey: 'FABRICATE.Admin.Manager.Nav.BooksScrolls',
       labelFallback: 'Books & Scrolls',
       count: recipeItemCount ?? 0,
+    });
+  }
+
+  // No count property by design: the roll-up would need the per-character
+  // projection, which is a no-op precisely while the rail is rendered. The sibling
+  // Access entry is count-less for the same reason, and `craftingNavCount` sums
+  // `item.count || 0`, so this leaves the Crafting parent badge unchanged.
+  if (effect.showBooksScrolls || resolutionMode === 'alchemy') {
+    items.push({
+      id: 'knowledge',
+      view: 'knowledge',
+      icon: 'fas fa-boxes-stacked',
+      labelKey: 'FABRICATE.Admin.Manager.Nav.Knowledge',
+      labelFallback: 'Knowledge',
     });
   }
 
