@@ -723,7 +723,10 @@ test('Tool evidence contracts reject leaked horizontal state and duplicate store
 });
 
 test('the Tool Studio run writes one summary/manifest identity with head, target labels, and measured clips', () => {
-  assert.match(HARNESS, /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha:[\s\S]*?targetLabels:/);
+  assert.match(
+    HARNESS,
+    /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha: resolveScreenshotHeadSha\(\{[\s\S]*?explicitHeadSha: process\.env\.FOUNDRY_SCREENSHOT_HEAD_SHA,[\s\S]*?ciHeadSha: process\.env\.GITHUB_SHA,[\s\S]*?\}\),[\s\S]*?targetLabels:/,
+  );
   assert.match(HARNESS, /results\.screenshotRun = screenshotRunIdentity/);
   assert.match(
     HARNESS,

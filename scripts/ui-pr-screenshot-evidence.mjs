@@ -1426,6 +1426,30 @@ function runGit(args, { root = ROOT } = {}) {
   return spawnSync('git', args, { cwd: root, encoding: 'utf8' }); // NOSONAR S4036 — git-from-PATH is the intended dev-tool contract (see note above)
 }
 
+// Resolve the exact source revision shared by the screenshot producer and collector.
+// Explicit command/environment inputs win for reproducible automation, then GitHub's
+// checked-out SHA, while the documented local flow derives the current repository HEAD.
+// A missing or invalid revision is fatal: provenance validation must never weaken merely
+// because the caller omitted an override.
+export function resolveScreenshotHeadSha({
+  explicitHeadSha,
+  ciHeadSha = process.env.GITHUB_SHA,
+  root = ROOT,
+  runGit: gitRunner = runGit,
+} = {}) {
+  const explicitHead = normalizeHeadShaSegment(explicitHeadSha);
+  if (explicitHead) return explicitHead;
+  const ciHead = normalizeHeadShaSegment(ciHeadSha);
+  if (ciHead) return ciHead;
+  const result = gitRunner(['rev-parse', '--verify', 'HEAD'], { root });
+  if (!result || result.status !== 0) {
+    throw new Error(result?.stderr?.trim() || 'Could not resolve screenshot provenance from git HEAD');
+  }
+  const gitHead = normalizeHeadShaSegment(result.stdout);
+  if (!gitHead) throw new Error('Git returned an empty HEAD for screenshot provenance');
+  return gitHead;
+}
+
 function readChangedFilesFromGit(base, { root = ROOT } = {}) {
   // Three-dot `<base>...HEAD` is merge-base semantics: "what did THIS branch change
   // since it forked from <base>", applied to BOTH the resolved-default and explicit
@@ -1505,7 +1529,14 @@ export function loadChangedFiles(args, { resolveBase = resolveDefaultBase, readC
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0] || 'plan';
-  const { resolveBase, readChangedFiles, runGh, putObject, config } = deps;
+  const {
+    resolveBase,
+    resolveHeadSha = resolveScreenshotHeadSha,
+    readChangedFiles,
+    runGh,
+    putObject,
+    config,
+  } = deps;
   // Base resolution is scoped to the commands that CONSUME the changed-file set.
   // `publish` derives its files from tmp/pr-screenshots/<pr>/ and `clean` just removes
   // a local dir — neither must spawn git, print the default-base note, or throw when no
@@ -1576,7 +1607,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       sourceDir: args.sourceDir || 'test-results',
       outputDir: args.outputDir,
       allowMissing: args.allowMissing === true,
-      headSha: args.headSha,
+      headSha: resolveHeadSha({ explicitHeadSha: args.headSha }),
     });
     for (const item of result.copied) {
       console.log(`${relative(ROOT, item.destination).replaceAll(sep, '/')} <= ${relative(ROOT, item.source).replaceAll(sep, '/')}`);

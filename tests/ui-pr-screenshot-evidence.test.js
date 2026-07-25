@@ -29,6 +29,7 @@ import {
   publishScreenshotEvidence,
   readLabelList,
   resolveDefaultBase,
+  resolveScreenshotHeadSha,
   sanitizeLabel,
   smokeLabelsForChangedFiles,
   upsertScreenshotsBlock,
@@ -847,6 +848,71 @@ describe('UI PR screenshot evidence', () => {
       });
       assert.deepEqual(result.copied.map(({ view }) => view.id), ['manager-environments']);
     });
+  });
+
+  it('resolves screenshot provenance from explicit, CI, then local git head inputs', () => {
+    const calls = [];
+    const gitHead = (args) => {
+      calls.push(args);
+      return { status: 0, stdout: 'local-head\n', stderr: '' };
+    };
+
+    assert.equal(resolveScreenshotHeadSha({
+      explicitHeadSha: 'manual-head',
+      ciHeadSha: 'ci-head',
+      runGit: gitHead,
+    }), 'manual-head');
+    assert.equal(resolveScreenshotHeadSha({
+      ciHeadSha: 'ci-head',
+      runGit: gitHead,
+    }), 'ci-head');
+    assert.equal(resolveScreenshotHeadSha({ runGit: gitHead }), 'local-head');
+    assert.deepEqual(calls, [['rev-parse', '--verify', 'HEAD']]);
+  });
+
+  it('runs the documented local producer/collect provenance path against the exact git head', () => {
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const gitHead = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    }).stdout.trim();
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshot-cli-'));
+    try {
+      const sourceDir = join(root, 'test-results');
+      const outputDir = join(root, 'collected');
+      const changedFilesPath = join(root, 'changed-files.txt');
+      mkdirSync(sourceDir, { recursive: true });
+      writeFileSync(changedFilesPath, `${changedFiles.join('\n')}\n`);
+      for (const [name, content] of Object.entries(
+        changedFileEvidenceFixtures(changedFiles, { headSha: gitHead }),
+      )) {
+        writeFileSync(join(sourceDir, name), content);
+      }
+      const env = { ...process.env };
+      delete env.GITHUB_SHA;
+      const result = spawnSync(
+        process.execPath,
+        [
+          'scripts/ui-pr-screenshot-evidence.mjs',
+          'collect',
+          '--changed-files',
+          changedFilesPath,
+          '--source-dir',
+          sourceDir,
+          '--output-dir',
+          outputDir,
+          '--pr',
+          '456',
+        ],
+        { cwd: process.cwd(), encoding: 'utf8', env },
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /manager-environments\.png/);
+      assert.equal(existsSync(join(outputDir, 'manager-environments.png')), true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('validates ordinary and Tool Studio captures as one mixed exact run', () => {
