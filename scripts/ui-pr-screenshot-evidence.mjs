@@ -49,7 +49,10 @@ const toolStudioFrame = (id, label, smokeLabel, matches) => ({
 const KNOWLEDGE_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:KnowledgeView|ArmedDangerButton)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/knowledge\/knowledgeStudio\.js$/,
+  // Every plain-JS module in the surface's own folder: the pure projection
+  // (`knowledgeStudio.js`) and the mutation collaborator (`knowledgeMutations.js`)
+  // both change what the captured frames show.
+  /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.js$/,
 ];
 const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:CraftingSystemManagerRoot|ToolsBrowserView|ToolEditView)\.svelte$/,

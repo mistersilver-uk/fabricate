@@ -275,14 +275,49 @@ describe('KnowledgeView mounted behaviour', () => {
     const expended = [];
     const target = await harness.mount(makeProps({ onExpend: (...args) => expended.push(args) }));
 
-    target.querySelector('[data-knowledge-expend="i1"]').click();
+    const expend = target.querySelector('[data-knowledge-expend="i1"]');
+    expend.focus();
+    expend.click();
     assert.deepEqual(expended, [['a1', 'i1']]);
-    assert.match(target.querySelector('[data-knowledge-copy="i1"]').textContent, /2 recipes inside/);
+    // Expend is NOT destructive: the row survives, so focus MUST stay on the button a
+    // keyboard GM is walking a multi-use copy with. Moving it here would force a
+    // re-tab after every single charge.
+    assert.equal(target.ownerDocument.activeElement, expend, 'Expend keeps its own focus');
+    assert.match(
+      target.querySelector('[data-knowledge-copy="i1"]').textContent,
+      /2 recipe\(s\) inside/
+    );
     assert.equal(
       target.querySelector('[data-knowledge-copy="i1"] [data-knowledge-type]').dataset
         .knowledgeType,
       'Book'
     );
+  });
+
+  it('shows the match-tier chip only for the actionable duplicate tier', async () => {
+    const durable = await harness.mount(makeProps());
+    const durableRow = durable.querySelector('[data-knowledge-copy="i1"]');
+    assert.equal(
+      durableRow.querySelector('[data-knowledge-match-tier]'),
+      null,
+      'a durable match is diagnostic, not actionable, so it earns no chip'
+    );
+    // The tier is still disclosed — in the row's title, where it costs no width in the
+    // pane the geometry guard measures at its narrowest.
+    assert.match(durableRow.getAttribute('title'), /Durable match/);
+    harness.remount();
+
+    const ambiguous = await harness.mount(
+      makeProps({
+        knowledge: makeKnowledge({
+          characters: [rawCharacter({ ownedCopies: [rawCopy({ matchTier: 'duplicate' })] })],
+        }),
+      })
+    );
+    const chip = ambiguous.querySelector('[data-knowledge-match-tier="duplicate"]');
+    assert.ok(chip, 'the low-confidence tier the auto-learn gate refuses earns a chip');
+    assert.match(chip.getAttribute('title'), /auto-learn refuses/i);
+    assert.equal(chip.getAttribute('aria-label'), chip.getAttribute('title'));
   });
 
   it('raises the party-pool ordering warning only when the hazard is real', async () => {
@@ -412,6 +447,13 @@ describe('KnowledgeView mounted behaviour', () => {
     await harness.setProps({});
     assert.deepEqual(deleted, [['a1', 'i1']]);
     assert.equal(armedState(target, 'delete:i1'), 'false');
+    // A destructive action DOES unmount the row that held focus, so focus is moved to
+    // the owning tab panel rather than falling through to `<body>`.
+    assert.equal(
+      target.ownerDocument.activeElement,
+      target.querySelector('[data-knowledge-panel]'),
+      'focus lands on the owning tab panel after a destructive row action'
+    );
   });
 
   it('holds exactly one armed token across rows and tabs', async () => {

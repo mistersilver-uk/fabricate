@@ -2837,6 +2837,128 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  // The Knowledge SEAM (issue 785). Every rule here is invisible at unit level and
+  // silent at runtime if it regresses: dropping `reprojectKnowledge` from the item
+  // handler leaves a learn/expend/delete on another client unrendered, inverting the
+  // `doc?.pack` guard re-projects the whole world for a compendium write, flattening a
+  // `[hook, id]` tuple leaks the listener across every manager reopen, and removing an
+  // `isGM` gate hands a player a GM mutation.
+  it('registers the Knowledge hook set as tuples, filters it, and GM-gates every mutation', () => {
+    // Only actor-owned, NON-compendium items can change the projection. `Document#pack`
+    // falls back to `this.parent?.pack`, so an Item embedded in a compendium Actor is
+    // readable straight off the embedded doc.
+    assert.ok(
+      appSource.includes("if (doc?.parent?.documentName !== 'Actor') return;"),
+      'the item handler drops a world/compendium-root item'
+    );
+    assert.ok(
+      appSource.includes('if (doc?.pack) return;'),
+      'the item handler drops an item embedded in a COMPENDIUM actor'
+    );
+    // `updateActor` is key-filtered because it is noisy (every HP tick fires it);
+    // learned recipes, usage counts and learn counts all live under `flags`.
+    assert.ok(
+      appSource.includes("if ('flags' in diff) reprojectKnowledge();"),
+      "updateActor re-projects knowledge only on a 'flags' diff"
+    );
+    // Parent CRUD is load-bearing, not belt-and-braces: an `Actor.create` carrying
+    // `items[]` fires createActor and ZERO createItem.
+    assert.ok(
+      appSource.includes(
+        "...['createActor', 'deleteActor'].map((hook) => [hook, Hooks.on(hook, reprojectOnActorCrud)])"
+      ),
+      'createActor/deleteActor route through the knowledge reprojection too'
+    );
+    assert.ok(
+      appSource.includes('const reprojectKnowledge = () =>') &&
+        appSource.includes('scheduleKnowledgeRefresh'),
+      'the knowledge reprojection coalesces through the store scheduler'
+    );
+    for (const hook of ['createItem', 'updateItem', 'deleteItem']) {
+      assert.ok(appSource.includes(`'${hook}'`), `${hook} is registered`);
+    }
+
+    // EVERY `_userHooks` entry is an `[hookName, id]` tuple, and the unregister side
+    // destructures exactly that shape. A bare id makes it destructure `undefined`.
+    const hooksBlock = appSource.slice(
+      appSource.indexOf('this._userHooks = ['),
+      appSource.indexOf('_unregisterUserHooks() {')
+    );
+    assert.ok(hooksBlock.length > 0, 'the hook registration block is locatable');
+    const flatHooks = hooksBlock.replaceAll(/\s+/g, ' ');
+    const registrations = flatHooks.match(/Hooks\.on\(/g) || [];
+    const tuples = flatHooks.match(/\[ ?(?:hook|'[a-zA-Z]+') ?, ?Hooks\.on\(/g) || [];
+    assert.ok(registrations.length >= 4, 'the user hooks are registered here');
+    assert.equal(
+      tuples.length,
+      registrations.length,
+      'every Hooks.on id is registered inside a [hookName, id] tuple'
+    );
+    assert.ok(
+      appSource.includes('for (const [hook, id] of this._userHooks)'),
+      'the unregister side destructures the tuple'
+    );
+
+    // The GM gate is `isGM`, NOT `activeGM`: this is a single-client, user-initiated
+    // mutation from a GM-only Application, and `activeGM` would lock out the assistant
+    // GMs `show()` already admits.
+    assert.ok(
+      appSource.includes('if (game.user?.isGM !== true)') &&
+        appSource.includes('KNOWLEDGE_MESSAGES.gmOnly'),
+      'the knowledge gate denies a non-GM with the GM-only message'
+    );
+    assert.equal(
+      /activeGM/.test(appSource.slice(appSource.indexOf('_knowledgeActor('))),
+      false,
+      'the Knowledge seam must never gate on activeGM'
+    );
+    // All four mutating methods reach that gate — directly, or through the shared
+    // `_knowledgeTarget` resolver which calls it first.
+    for (const method of [
+      '_expendRecipeItemUse({',
+      '_deleteOwnedRecipeItem({',
+      '_eraseLearnedRecipe({',
+      '_resetActorKnowledge({',
+    ]) {
+      const start = appSource.indexOf(`async ${method}`);
+      assert.ok(start > 0, `${method} exists`);
+      const body = appSource.slice(start, start + 700);
+      assert.match(
+        body,
+        /this\._knowledge(Actor|Target)\(/,
+        `${method} resolves through the GM-gated helper`
+      );
+      assert.ok(body.includes('if (denied) return denied;'), `${method} returns the denial`);
+    }
+    assert.ok(
+      appSource.includes('const { actor, denied } = this._knowledgeActor(actorId);'),
+      '_knowledgeTarget itself runs the GM gate before any document lookup'
+    );
+
+    // The Foundry-free mutation bodies live in the collaborator, so the seam only
+    // resolves documents and delegates.
+    assert.ok(
+      appSource.includes(
+        "} from './svelte/apps/manager/knowledge/knowledgeMutations.js';"
+      ),
+      'the seam delegates its mutations to the plain-JS collaborator'
+    );
+    for (const call of [
+      'await expendOwnedRecipeItemUse({',
+      'await deleteOwnedRecipeItemCopy({',
+      'await eraseLearnedRecipeEntry({',
+      'await resetActorKnowledgeState({',
+    ]) {
+      assert.ok(appSource.includes(call), `the seam calls ${call}`);
+    }
+
+    // The roster is player characters only — the same predicate the Access roster uses.
+    assert.ok(
+      appSource.includes('game.fabricate?.isPlayerCharacterActor?.(actor)'),
+      'the Knowledge roster reuses the shared player-character predicate'
+    );
+  });
+
   it('wires a collapsible left rail persisted via the manager setting seam', () => {
     assert.ok(
       rootSource.includes(

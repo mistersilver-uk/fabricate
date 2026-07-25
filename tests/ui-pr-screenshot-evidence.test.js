@@ -255,6 +255,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte',
       'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
       'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+      'src/ui/svelte/apps/manager/knowledge/knowledgeMutations.js',
     ]) {
       const ids = mapChangedFilesToViews([file]).map((view) => view.id);
       assert.ok(ids.includes('manager-knowledge'), file);

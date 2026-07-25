@@ -69,8 +69,28 @@
     if (tier === 'identity') return text('FABRICATE.Admin.Manager.Knowledge.MatchIdentity', 'Durable match');
     if (tier === 'uuid') return text('FABRICATE.Admin.Manager.Knowledge.MatchUuid', 'Source match');
     if (tier === 'compendium') return text('FABRICATE.Admin.Manager.Knowledge.MatchCompendium', 'Compendium match');
-    if (tier === 'duplicate') return text('FABRICATE.Admin.Manager.Knowledge.MatchDuplicate', 'Ambiguous match');
+    if (tier === 'duplicate') return text('FABRICATE.Admin.Manager.Knowledge.MatchDuplicate', 'Copy-source match');
     return '';
+  }
+
+  // The match tier is GM DIAGNOSTIC info, so only the actionable tier earns a chip:
+  // `duplicate` is the low-confidence provenance tier the bulk auto-learn gate already
+  // refuses. The other three would put a fourth bare, unexplained chip on every row in
+  // the pane that is narrowest exactly where the geometry guard measures, so they are
+  // carried in the row's title instead.
+  function matchTierTitle(row) {
+    const label = matchTierLabel(row.matchTier);
+    if (!label) return '';
+    return fill(text('FABRICATE.Admin.Manager.Knowledge.MatchTierTitle', 'Definition link: {tier}'), {
+      tier: label,
+    });
+  }
+
+  function duplicateMatchHint() {
+    return text(
+      'FABRICATE.Admin.Manager.Knowledge.MatchDuplicateHint',
+      'This copy is linked to its recipe item only by duplicate-source provenance, the weakest tier. Bulk auto-learn refuses that link.'
+    );
   }
 
   function usesChipLabel(row) {
@@ -120,48 +140,54 @@
     class="manager-knowledge-copy-row"
     class:is-spent={copy.spent}
     data-knowledge-copy={copy.itemId}
+    title={matchTierTitle(copy)}
   >
     <span class="manager-knowledge-copy-identity">
       <Medallion src={copy.img} icon="fas fa-book" size={44} alt="" />
       <span class="manager-knowledge-copy-copy">
+        <!-- Line 1 is the prototype's rhythm: name, type, quantity. Keeping the type
+             pill here rather than in the chip row is what lets line 2 carry the whole
+             state vocabulary and saves a line in the narrow band. -->
         <span class="manager-knowledge-copy-heading">
           <strong class="manager-knowledge-copy-name" title={copy.name}>{copy.name}</strong>
+          <span class="manager-chip" data-knowledge-type={copy.type}>{typeLabel(copy.type)}</span>
           {#if copy.quantity > 1}
-            <span class="manager-chip manager-knowledge-quantity-chip" data-knowledge-quantity>
-              {fill(text('FABRICATE.Admin.Manager.Knowledge.Quantity', 'x{quantity}'), { quantity: copy.quantity })}
+            <span class="manager-chip" data-knowledge-quantity>
+              {fill(text('FABRICATE.Admin.Manager.Knowledge.Quantity', '×{quantity}'), { quantity: copy.quantity })}
             </span>
           {/if}
         </span>
         <span class="manager-knowledge-copy-chips">
-          <span class="manager-chip manager-knowledge-type-pill" data-knowledge-type={copy.type}>
-            {typeLabel(copy.type)}
-          </span>
           <span
-            class={`manager-chip ${usesChipTone(copy)} manager-knowledge-uses-chip`}
+            class={`manager-chip ${usesChipTone(copy)}`}
             data-knowledge-uses-chip={copy.usesChip}
           >
             <i class={usesChipIcon(copy)} aria-hidden="true"></i>
             <span>{usesChipLabel(copy)}</span>
           </span>
           {#if copy.inert}
-            <span class="manager-chip is-danger manager-knowledge-inert-chip" data-knowledge-inert>
+            <span class="manager-chip is-danger" data-knowledge-inert>
               <i class="fas fa-ban" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Knowledge.Inert', 'Inert')}</span>
             </span>
           {/if}
-          {#if copy.matchTier}
+          {#if copy.matchTier === 'duplicate'}
             <span
-              class="manager-chip manager-knowledge-match-chip"
-              class:is-warning={copy.matchTier === 'duplicate'}
+              class="manager-chip is-warning"
               data-knowledge-match-tier={copy.matchTier}
-            >{matchTierLabel(copy.matchTier)}</span>
+              title={duplicateMatchHint()}
+              aria-label={duplicateMatchHint()}
+            >
+              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+              <span>{matchTierLabel(copy.matchTier)}</span>
+            </span>
           {/if}
+          <span class="manager-chip is-neutral" data-knowledge-recipe-count>
+            {fill(text('FABRICATE.Admin.Manager.Knowledge.RecipesInside', '{count} recipe(s) inside'), {
+              count: copy.recipeCount,
+            })}
+          </span>
         </span>
-        <small class="manager-knowledge-copy-meta">
-          {fill(text('FABRICATE.Admin.Manager.Knowledge.RecipesInside', '{count} recipes inside'), {
-            count: copy.recipeCount,
-          })}
-        </small>
       </span>
     </span>
 
@@ -172,14 +198,16 @@
     >
       <button
         type="button"
-        class="manager-button manager-knowledge-expend"
+        class="manager-button"
         data-knowledge-expend={copy.itemId}
         disabled={!copy.canExpend}
         title={expendTitle(copy)}
         aria-label={expendTitle(copy)}
         onclick={() => onExpend(copy.itemId)}
       >
-        <i class="fas fa-fire-flame-curved" aria-hidden="true"></i>
+        <!-- Deliberately NOT `fa-fire-flame-curved`: that is the remaining-uses chip's
+             glyph, and repeating it on the action beside it reads as the same thing. -->
+        <i class="fas fa-fire" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Knowledge.Expend', 'Expend use')}</span>
       </button>
       <ArmedDangerButton

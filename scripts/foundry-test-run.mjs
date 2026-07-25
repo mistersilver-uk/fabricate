@@ -4515,12 +4515,22 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
     const definitionIds = [];
     const ownedByKey = {};
     const createdItems = new Map();
+    // PASS 1 — register the definitions and grant the owned copies while every
+    // definition's `recipeIds` is still EMPTY.
+    //
+    // This ordering is load-bearing, not stylistic. `RecipeItemLearningHook` listens on
+    // `createItem`, and for an uncapped book `caps.learn.consumeOnLearn` DEFAULTS TO
+    // TRUE (`learn.consumeOnLearn !== false`), so `learnRecipesFromOwnedItem` would
+    // learn the copy's recipes and then `item.delete()` the copy itself. Seeding
+    // membership first therefore destroyed the first granted copy outright (the later
+    // ones survived only because the recipe was by then already learned) and left an
+    // auto-learned entry behind on the holder that this fixture never cleaned up.
+    // With `recipeIds` empty, `_getRecipeItemDefinitions(recipe)` returns no member
+    // book for these definitions, so the hook finds zero learning candidates, emits no
+    // notification, and consumes nothing.
     for (const [index, entry] of plan.entries()) {
       const { item: definition } = await csm.addRecipeItemFromUuid(systemId, sources[index].uuid);
-      await csm.updateRecipeItemDefinition(systemId, definition.id, {
-        recipeIds: [recipeId],
-        caps: entry.caps,
-      });
+      await csm.updateRecipeItemDefinition(systemId, definition.id, { caps: entry.caps });
       definitionIds.push(definition.id);
       // The owned copy claims its definition through the durable per-system roles map
       // (`flags.fabricate.fabricate.roles.<systemId>.recipeItemDefinitionId`), which is
@@ -4540,6 +4550,22 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
       createdItems.set(entry.holder.id, [...(createdItems.get(entry.holder.id) || []), owned.id]);
     }
 
+    // Fail HERE, with the cause named, if anything ever consumes a seeded copy again —
+    // rather than several hundred lines later as an opaque row-count mismatch.
+    for (const [key, granted] of Object.entries(ownedByKey)) {
+      if (!game.actors.get(granted.actorId)?.items?.get(granted.itemId)) {
+        throw new Error(
+          `Knowledge fixture lost the ${key} copy during seeding — a createItem consumer (auto-learn consumeOnLearn) destroyed it`
+        );
+      }
+    }
+
+    // PASS 2 — link membership now that every copy exists. The Type pill and the
+    // "N recipe(s) inside" sub-label read truthfully from here on.
+    for (const definitionId of definitionIds) {
+      await csm.updateRecipeItemDefinition(systemId, definitionId, { recipeIds: [recipeId] });
+    }
+
     const learnedTargets = [
       // Still-owned party-pool source → the D8 hazard band's precondition.
       { actor: partyPoolActor, sourceItemUuid: ownedByKey.partyPool.itemUuid },
@@ -4547,10 +4573,19 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
       // resolves rung 2 of the source ladder and frees no learn budget on erase.
       { actor: learnedOnlyActor, sourceItemUuid: `Actor.${learnedOnlyActor.id}.Item.${foundry.utils.randomID()}` },
     ];
-    const learnedRestores = [];
+    // Snapshot the learned map of EVERY actor this section can touch, not only the two
+    // it seeds, so any entry gained while the section runs is rolled back too.
+    const learnedRestores = [
+      chipStatesActor,
+      partyPoolActor,
+      learnedOnlyActor,
+      untrackedActor,
+    ].map((actor) => ({
+      actorId: actor.id,
+      learnedRecipes: clone(actor.getFlag('fabricate', 'fabricate.learnedRecipes') || null),
+    }));
     for (const target of learnedTargets) {
       const current = target.actor.getFlag('fabricate', 'fabricate.learnedRecipes') || null;
-      learnedRestores.push({ actorId: target.actor.id, learnedRecipes: clone(current) });
       await target.actor.update({
         'flags.fabricate.fabricate.learnedRecipes': {
           ...(current || {}),

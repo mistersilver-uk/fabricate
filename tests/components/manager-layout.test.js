@@ -4407,14 +4407,18 @@ test('the Knowledge surface owns its third column and wraps its row action clust
   const collapsedBlock = blockFor(
     '.fabricate-manager[data-manager-view="knowledge"] .manager-body.is-rail-collapsed'
   );
-  const mainBlock = blockFor('.fabricate-manager .manager-knowledge-main');
+  // `display: contents` is authored ONCE for every view that owns its own columns,
+  // so the Knowledge main shares the Tool editor's rule rather than restating it.
+  const mainBlock = blockFor(
+    '.fabricate-manager .manager-tool-edit-main,\n.fabricate-manager .manager-knowledge-main'
+  );
   const rowBlock = blockFor(
     '.fabricate-manager .manager-knowledge-copy-row,\n.fabricate-manager .manager-knowledge-learned-row'
   );
   const copyColumnBlock = blockFor('.fabricate-manager .manager-knowledge-copy-identity');
   const factBlock = blockFor('.fabricate-manager .manager-knowledge-fact-cluster .manager-fact');
   const spentBlock = blockFor(
-    '.fabricate-manager .manager-knowledge-copy-row.is-spent .manager-knowledge-copy-identity'
+    '.fabricate-manager .manager-knowledge-copy-row.is-spent .manager-knowledge-copy-name'
   );
 
   assert.ok(
@@ -4437,23 +4441,89 @@ test('the Knowledge surface owns its third column and wraps its row action clust
     factBlock.includes('width: auto;'),
     '.manager-fact is authored width:100% for grids and must hug content in this flex cluster'
   );
-  // `.manager-button:disabled` already carries opacity 0.62, so stacking a row-level
-  // dim on the actions would composite the disabled Expend button to about 0.38.
+  // A spent row is muted by COLOUR on its name, never by a group `opacity`: a group
+  // dim composites the chips — the row's only status signal — below the 4.5:1 floor
+  // their 10px text needs, in six of the seven themes. And `.manager-button:disabled`
+  // already carries opacity 0.62, so a row-level dim would take the disabled Expend
+  // button to about 0.38.
   assert.ok(
-    spentBlock.includes('opacity:'),
-    'the spent dim applies to the identity column'
+    spentBlock.includes('color: var(--fab-mv2-text-muted);'),
+    'the spent row is muted by colour on its name'
   );
   assert.equal(
-    css.includes('.manager-knowledge-copy-row.is-spent .manager-knowledge-row-actions'),
+    spentBlock.includes('opacity'),
     false,
-    'the spent dim must not reach the action cluster'
+    'the spent state must not use a group opacity'
   );
+  for (const forbidden of [
+    '.manager-knowledge-copy-row.is-spent .manager-knowledge-row-actions',
+    '.manager-knowledge-copy-row.is-spent .manager-knowledge-copy-identity',
+    '.manager-knowledge-copy-row.is-spent .manager-knowledge-copy-chips',
+  ]) {
+    assert.equal(css.includes(forbidden), false, `the spent mute must not reach ${forbidden}`);
+  }
   assert.ok(
     css.includes(
       '  .fabricate-manager[data-manager-view="knowledge"] .manager-body,\n  .fabricate-manager[data-manager-view="knowledge"] .manager-body.is-rail-collapsed {'
     ),
     'the knowledge surface collapses to one column in the 831px container query'
   );
+});
+
+// Every Knowledge rule that an existing rule already expressed is authored ONCE, as a
+// joined selector list. A byte-identical second block is what the maintainer's
+// "do not duplicate CSS for minor variations" instruction rules out, and it is also
+// what SonarCloud's duplication gate reads.
+test('the Knowledge surface joins the rules it shares instead of restating them', () => {
+  const occurrences = (needle) => css.split(needle).length - 1;
+
+  for (const [shared, ruleOpener, expected] of [
+    [
+      '.fabricate-manager .manager-tool-edit-main,\n.fabricate-manager .manager-knowledge-main {',
+      '.manager-knowledge-main {',
+      1,
+    ],
+    [
+      '.fabricate-manager .manager-tools-library-chips .manager-chip,\n.fabricate-manager .manager-knowledge-copy-chips .manager-chip {',
+      '.manager-knowledge-copy-chips .manager-chip {',
+      1,
+    ],
+    [
+      '.fabricate-manager .manager-access-roster .manager-search,\n.fabricate-manager .manager-knowledge-roster .manager-search {',
+      // The class the markup used to carry solely to re-derive the Access roster's
+      // rule; it is gone from both the stylesheet and the component.
+      '.manager-knowledge-roster-search',
+      0,
+    ],
+    [
+      // The header pills container previously had NO rule at all, so its tracked chip
+      // rendered with no top margin — a live visual defect as well as a reuse miss.
+      '.fabricate-manager .manager-environment-header-pills,\n.fabricate-manager .manager-knowledge-header-pills {',
+      '.manager-knowledge-header-pills {',
+      1,
+    ],
+  ]) {
+    assert.ok(css.includes(shared), `expected the joined rule ${shared}`);
+    assert.equal(
+      occurrences(ruleOpener),
+      expected,
+      `${ruleOpener} should appear ${expected} time(s) — a second block is a restatement`
+    );
+  }
+
+  // Class names that carry no CSS and no consumer: each sat beside a `data-knowledge-*`
+  // attribute already doing the hook job.
+  for (const dead of [
+    'manager-knowledge-quantity-chip',
+    'manager-knowledge-type-pill',
+    'manager-knowledge-uses-chip',
+    'manager-knowledge-inert-chip',
+    'manager-knowledge-match-chip',
+    'manager-knowledge-category-pill',
+    'manager-knowledge-expend',
+  ]) {
+    assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
+  }
 });
 
 test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
@@ -4500,9 +4570,11 @@ async function readRenderedKnowledgeGeometry(width) {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
   try {
-    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong></span><span class="manager-knowledge-copy-chips"><span class="manager-chip">Book</span><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span><small class="manager-knowledge-copy-meta">4 recipes inside</small></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
+    // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
+    // whole state vocabulary as chips on line 2.
+    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span><span class="manager-chip is-neutral">4 recipe(s) inside</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
-      `<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search manager-knowledge-roster-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+      `<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
     );
     return await page.evaluate(() => {
       const box = (selector) => {

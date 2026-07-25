@@ -41,7 +41,7 @@
     <i class="fas fa-circle-info" aria-hidden="true"></i>
     <span>{text(
       'FABRICATE.Admin.Manager.Knowledge.RecipeItemsBanner',
-      'These are the copies this character carries right now. Changing a copy here never edits the recipe item definition.'
+      'Expending a use spends one charge as if the character read the item. Deleting removes the copy from their pack entirely.'
     )}</span>
   </p>
 
@@ -50,7 +50,7 @@
       <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
       <span>{text(
         'FABRICATE.Admin.Manager.Knowledge.PartyPoolWarning',
-        'This character holds a party-pool copy. Erase the memory before deleting the copy — a party-pool slot deleted first can never be reclaimed.'
+        'This character holds a party-pool copy. Erase the memory before deleting the copy — deleting the copy first strands its party-pool slot permanently.'
       )}</span>
     </p>
   {/if}

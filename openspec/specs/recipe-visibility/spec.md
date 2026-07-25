@@ -373,6 +373,10 @@ It is shared by the recipe-driven craft path (`applyRecipeItemUseOnCraft`, which
 - The GM path applies **no** visibility-mode or knowledge-mode gate: the GM named the copy.
 - An **uncapped** book (`caps.item.limitUses !== true`) performs **zero** writes on either path — not a zero-delta write.
 A surface offering the action MUST therefore render it disabled rather than as a silent no-op.
+- An **already-spent** copy performs zero writes too, and the guard is the exact complement of `_filterNonExhausted`: a capped book whose `maxUses` is a finite number greater than zero and whose current `timesUsed` is at or above it is refused inside the core.
+This is behaviour-preserving on the craft path, which only ever reaches the core with a candidate that predicate already kept.
+It is load-bearing on the GM path, which has no such pre-filter: without it a stale row — an asynchronous re-projection, a second GM window, a macro spending the last charge — would drive one further increment and, under `whenSpent: "destroyed"`, silently delete the copy while reporting success.
+The refusal MUST be reported distinctly from the uncapped refusal, because the two are different facts about the copy.
 - Caps MUST come from `_getRecipeItemCaps` (via `_capsForDefinition` when only a definition is in hand), never a raw `definition.caps` read, so the legacy `destroyWhenExhausted` / `limitRecipes` / `learningMode` derivations stay applied.
 - The current count is re-read from the document inside the core rather than taken from a caller-supplied candidate snapshot.
 On the craft path the two are provably equal today (nothing awaits between candidate collection and the write), so the re-read is strictly safer and never behaviour-changing: it closes a staleness window that would open the moment an `await` is inserted between the two.

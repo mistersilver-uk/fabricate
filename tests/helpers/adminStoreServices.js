@@ -1,13 +1,16 @@
 /**
  * Shared `createAdminStore` test fixtures (issue 785).
  *
- * The `makeRecipe` / `makeSystem` / `createServices` triple was near-duplicated
- * across the adminStore suites; SonarCloud counts `tests/**` like `src/`, so a
- * fresh copy fails the new-code duplication gate. New adminStore suites build
- * their services from here instead of copying the triple.
+ * The `makeRecipe` / `makeSystem` / `createServices` triple was duplicated across
+ * adminStore suites; SonarCloud counts `tests/**` like `src/`, so a fresh copy fails
+ * the new-code duplication gate — and extracting a helper only helps if the copies it
+ * was extracted FROM are deleted, since CPD needs just two copies to report. The
+ * suites whose triple was token-identical therefore import from here.
  *
  * `createServices` takes an `overrides` object so a suite can add or replace any
- * single service (a spy, a seam stub) without forking the whole factory.
+ * single service (a spy, a seam stub) without forking the whole factory. Two
+ * recipe-manager writes are threadable through it: `updateRecipe` replaces the
+ * default capturing stub outright.
  */
 
 export function makeRecipe(overrides = {}) {
@@ -53,6 +56,7 @@ export function makeSystem(overrides = {}) {
 }
 
 export function createServices(system, recipes = [], capture = [], overrides = {}) {
+  const { updateRecipe, ...serviceOverrides } = overrides;
   const systems = [system];
   const systemManager = {
     getSystems: () => systems,
@@ -72,6 +76,11 @@ export function createServices(system, recipes = [], capture = [], overrides = {
         ? recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId)
         : recipes,
     getRecipe: (id) => recipes.find((r) => r.id === id) || null,
+    updateRecipe:
+      updateRecipe ||
+      (async (id, updates, options) => {
+        capture.push({ id, updates, options });
+      }),
   };
   return {
     getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
@@ -83,7 +92,7 @@ export function createServices(system, recipes = [], capture = [], overrides = {
     getWorldUsers: () => [],
     localize: (key) => key,
     notify: { info: () => {}, warn: () => {}, error: () => {} },
-    ...overrides,
+    ...serviceOverrides,
   };
 }
 

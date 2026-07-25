@@ -774,6 +774,26 @@ test('the Knowledge walk seeds every projected state, proves the inert merge, an
   assert.match(setup, /untrackedActor = grantOnlyActors\[1\]/);
   // Owned copies claim their definition through the durable per-system roles map.
   assert.match(setup, /roles: \{ \[systemId\]: \{ recipeItemDefinitionId: definition\.id \} \}/);
+  // Membership is linked in a SECOND pass, AFTER every owned copy exists.
+  // `RecipeItemLearningHook` fires on `createItem`, and for an uncapped book
+  // `caps.learn.consumeOnLearn` DEFAULTS TO TRUE — so seeding `recipeIds` first made
+  // the auto-learn path delete the first granted copy outright and leave an
+  // auto-learned entry on the holder that the fixture never cleaned up.
+  const grantAt = setup.indexOf("createEmbeddedDocuments('Item'");
+  const membershipAt = setup.indexOf('recipeIds: [recipeId]');
+  assert.ok(grantAt > 0, 'the fixture grants owned copies');
+  assert.ok(
+    membershipAt > grantAt,
+    'recipe membership must be linked only after every owned copy exists, or the createItem auto-learn consumes one',
+  );
+  assert.match(
+    setup,
+    /a createItem consumer \(auto-learn consumeOnLearn\) destroyed it/,
+    'seeding must fail loudly, naming the cause, if a copy is ever consumed again',
+  );
+  // Every actor the section can touch has its learned map snapshotted, not only the
+  // two it seeds, so nothing it gains mid-run survives the restore.
+  assert.match(setup, /const learnedRestores = \[\s*chipStatesActor,\s*partyPoolActor,\s*learnedOnlyActor,\s*untrackedActor,\s*\]/);
 
   // The seeded learned entry is removed by a real KEY DELETION, never a merge rewrite
   // (which would resurrect it on reload and leave the section not net-zero).

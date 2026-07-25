@@ -45,7 +45,10 @@
   class="manager-knowledge-roster"
   aria-label={text('FABRICATE.Admin.Manager.Knowledge.RosterLabel', 'Characters')}
 >
-  <label class="manager-search manager-knowledge-roster-search">
+  <!-- The `flex: 0 0 auto` roster override is authored against
+       `.manager-knowledge-roster .manager-search`, alongside the Access roster's
+       identical one, so this needs no class of its own. -->
+  <label class="manager-search">
     <i class="fas fa-search" aria-hidden="true"></i>
     <input
       type="search"

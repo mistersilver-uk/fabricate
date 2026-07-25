@@ -815,13 +815,18 @@ The rule keys on the definition count, never on the selected character's row cou
 That yields five renderable combinations, including **inert-but-not-spent** — the visible form of the "nothing ever clears `inert`" gap.
 - Expend is **disabled** for a spent copy and for an uncapped copy (which would write nothing), and is **not** gated on `inert`: an inert-but-not-spent copy still has charges the runtime will spend, so disabling it there would apply a gate the engine does not.
 - Delete deletes the **whole document** even for a stacked copy, behind a `services.confirmDialog` naming the quantity when `quantity > 1`.
-- The spent-row dim is scoped to the row's identity and meta and MUST NOT reach the action cluster, whose disabled button already carries its own reduced opacity.
+- A spent row is muted by **colour on its name only**, never by a group `opacity`.
+The chips are the row's only status signal, and compositing them through a group dim drops them below the 4.5:1 floor their 10px text needs; the disabled action button already carries its own reduced opacity, so the mute MUST NOT reach the action cluster either.
+- `matchTier` earns a chip only for the actionable `duplicate` tier, which additionally carries a title naming the consequence (bulk auto-learn refuses that link).
+The other tiers are diagnostic rather than actionable and are carried in the row's title, so the narrowest pane is not given a bare fourth chip on every row.
+- Expend does **not** move focus: the row survives, so its own button keeps focus and a keyboard GM can walk a multi-use copy without re-tabbing.
+Only the destructive actions, whose row unmounts, move focus to the owning tab panel.
 - A learned row whose source copy is gone states that fact in its source line, and any learned row whose erase will free no budget carries a per-row "Frees no slot" sub-label rather than a banner promise the erase cannot keep.
 
 **Confirmation affordance.** The two high-frequency row actions (Delete a copy, Erase a memory) use an inline two-step arm rather than a modal: the first click arms the control, the second executes.
 It is a real focusable `button`, its icon swaps as well as its label so the state survives greyscale, its `aria-label` carries the full consequence sentence, and `data-armed` is the test hook.
 The armed token is keyed on the **target document id**, never a row index, because the projection re-publishes asynchronously from actor and item hooks.
-Exactly one armed token exists at a time, and it is dropped on: character selection change, tab switch, roster search-query change, any executed action (including Expend), `Escape`, `blur`, arming a different row, and any projection publish that no longer contains the armed id.
+Exactly one armed token exists at a time, and it is dropped on: character selection change, tab switch, roster search-query change, any executed action (including Expend, which clears the token but deliberately leaves focus alone), `Escape`, `blur`, arming a different row, and any projection publish that no longer contains the armed id.
 There is no auto-disarm timer.
 `services.confirmDialog` is retained for the heavyweight cases: a stacked delete and both reset grains.
 
@@ -830,7 +835,8 @@ Both are required: reset-one-system deliberately leaves orphan learned keys in p
 The dialog body is where the erase-versus-reset discovery-progress asymmetry is disclosed.
 
 **Disclosure placement — one idea per strip, never a banner stack.**
-The Recipe items tab carries one persistent info banner stating that the surface edits play state and never definitions.
+The Recipe items tab carries one persistent info banner naming what its two row actions do — expending a use spends one charge as if the character read the item, and deleting removes the copy from their pack entirely.
+It is not a restatement of the page subtitle two rows above it.
 The party-pool ordering hazard renders as a **conditional** warning band, raised only when the selected character owns a `learnScope: "total"` copy that is the source of a still-learned entry; a permanent band for a conditional hazard is noise.
 The Learned recipes tab's band states the general rule without promising slot recovery, and the per-row "Frees no slot" sub-label carries the per-row truth.
 

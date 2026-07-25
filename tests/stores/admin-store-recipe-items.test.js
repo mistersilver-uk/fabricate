@@ -10,79 +10,14 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
-import { makeFlaggedActor } from '../helpers/adminStoreServices.js';
+import {
+  createServices,
+  makeFlaggedActor,
+  makeRecipe,
+  makeSystem,
+} from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
-
-function makeRecipe(overrides = {}) {
-  const id = overrides.id || `recipe-${Math.random().toString(36).slice(2)}`;
-  return {
-    id,
-    name: overrides.name || `Recipe ${id}`,
-    description: '',
-    img: 'recipe.png',
-    category: overrides.category || 'general',
-    enabled: overrides.enabled !== undefined ? overrides.enabled : true,
-    locked: false,
-    visibility: {},
-    ingredientSets: [],
-    recipeItemId: overrides.recipeItemId || '',
-    craftingSystemId: overrides.craftingSystemId || 'sys1',
-    isSimpleRecipe: () => true,
-    toJSON: () => ({ id, name: overrides.name || `Recipe ${id}`, craftingSystemId: overrides.craftingSystemId || 'sys1' }),
-    ...overrides
-  };
-}
-
-function makeSystem(overrides = {}) {
-  return {
-    id: 'sys1',
-    name: 'System One',
-    description: '',
-    resolutionMode: 'simple',
-    visibilityMode: 'item',
-    features: {},
-    categories: [],
-    itemTags: [],
-    essenceDefinitions: [],
-    items: [],
-    requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
-    craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
-    recipeVisibility: { listMode: 'global' },
-    recipeItemDefinitions: [],
-    ...overrides
-  };
-}
-
-function createServices(system, recipes, capture) {
-  const systems = [system];
-  const systemManager = {
-    getSystems: () => systems,
-    getSystem: (id) => systems.find((s) => s.id === id) || null,
-    getItems: () => [],
-    updateRecipeItemDefinition: async (systemId, recipeItemId, patch) => {
-      capture.push({ systemId, recipeItemId, patch });
-      const def = (system.recipeItemDefinitions || []).find((d) => d.id === recipeItemId);
-      if (def && Object.prototype.hasOwnProperty.call(patch, 'enabled')) def.enabled = patch.enabled;
-    }
-  };
-  const recipeManager = {
-    getRecipes: (filter) =>
-      filter?.craftingSystemId ? recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId) : recipes,
-    getRecipe: (id) => recipes.find((r) => r.id === id) || null
-  };
-  return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
-    getCraftingSystemManager: () => systemManager,
-    getRecipeManager: () => recipeManager,
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
-    localize: (key) => key,
-    notify: { info: () => {}, warn: () => {}, error: () => {} }
-  };
-}
 
 function recipeItemById(vs, id) {
   return (vs.selectedSystem?.recipeItemDefinitions || []).find((d) => d.id === id);

@@ -45,6 +45,12 @@ globalThis.game = { actors: [] };
 // ---------------------------------------------------------------------------
 
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
+// The Knowledge projection's `spent` predicate, imported HERE so the two can be driven
+// over the same axes and required to agree (issue 785). It is a pure module and takes
+// no Foundry globals, so the deferred import above does not apply to it.
+const { isRecipeItemSpent } = await import(
+  '../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js'
+);
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -3850,6 +3856,35 @@ const APPLY_USE_CASES = [
     expectedDeletes: 1,
   },
   {
+    // The GM path has no `_filterNonExhausted` pre-filter, so the core owns the
+    // already-spent refusal itself. Without it a stale row would drive one further
+    // increment and, under `whenSpent: 'destroyed'`, silently delete a player's book
+    // while reporting success.
+    name: 'already spent — no write, no delete',
+    itemCaps: { limitUses: true, maxUses: 5, whenSpent: 'destroyed' },
+    usage: { timesUsed: 5 },
+    expectedWrites: [],
+    expectedDeletes: 0,
+  },
+  {
+    name: 'over-spent — no write, no delete',
+    itemCaps: { limitUses: true, maxUses: 2, whenSpent: 'destroyed' },
+    usage: { timesUsed: 9 },
+    expectedWrites: [],
+    expectedDeletes: 0,
+  },
+  {
+    // A corrupt truthy non-numeric count. The craft path double-coerced
+    // (`Number(selected.timesUsed || 0) + 1` over an already-coerced value), so this
+    // has always produced 1; a single coercion would write `null`, force `exhausted`
+    // false, and make the `whenSpent` disposal branch unreachable for the copy.
+    name: 'corrupt non-numeric timesUsed coerces to zero, not NaN',
+    itemCaps: { limitUses: true, maxUses: 3, whenSpent: 'destroyed' },
+    usage: { timesUsed: 'abc' },
+    expectedWrites: [{ timesUsed: 1 }],
+    expectedDeletes: 0,
+  },
+  {
     // The fifth (inert-but-not-spent) state: `_filterNonExhausted` reads `timesUsed`
     // only, so this copy still has charges and is expendable. The write MUST carry
     // `timesUsed` alone — Foundry's recursive ObjectField merge is then what
@@ -3995,8 +4030,77 @@ test('785 expendRecipeItemUse writes NOTHING for an uncapped copy', async () => 
   );
 
   assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.Manage.NoLimitedUses');
   assert.deepEqual(item.setFlagCalls, [], 'zero writes of any kind');
   assert.equal(item.deleteCount, 0);
+});
+
+test('785 expendRecipeItemUse writes NOTHING for an ALREADY-SPENT copy and says so distinctly', async () => {
+  // The GM path is the one with no `_filterNonExhausted` pre-filter, so a stale row
+  // (async re-projection, a second GM window, a macro spending the last charge) is
+  // reachable here and MUST NOT destroy the copy while reporting success.
+  const service = buildService();
+  const item = buildOwnedCopy({ usage: { timesUsed: 5 } });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+
+  const result = await service.expendRecipeItemUse(
+    actor,
+    OWNED_COPY_ID,
+    buildUseCapDefinition({ limitUses: true, maxUses: 5, whenSpent: 'destroyed' })
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(
+    result.message,
+    'FABRICATE.Knowledge.Manage.AlreadySpent',
+    'a spent copy is a different fact from an uncapped one and must read differently'
+  );
+  assert.deepEqual(item.setFlagCalls, [], 'zero writes of any kind');
+  assert.equal(item.deleteCount, 0, 'the copy survives');
+});
+
+// --- spent-predicate parity between the engine and the projection ----------
+//
+// `knowledgeStudio.isRecipeItemSpent` is a hand-written mirror of
+// `_filterNonExhausted`. A hand transcription is only as good as its last edit, so
+// the two are driven over the SAME generated axes here and required to agree. A
+// divergence would let a row claim a copy is spent while the runtime still grants
+// craftability from it — or the reverse, offering Expend on a dead copy.
+test('785 the projection\'s `spent` is the exact complement of `_filterNonExhausted`', () => {
+  const service = buildService();
+  const limitUsesAxis = [true, false, undefined];
+  const maxUsesAxis = [0, -1, 1, 3, '3', undefined, null, Number.NaN, Number.POSITIVE_INFINITY];
+  const timesUsedAxis = [undefined, null, 0, -1, 1, 3, 9, '3', 'abc', true];
+  let compared = 0;
+
+  for (const limitUses of limitUsesAxis) {
+    for (const maxUses of maxUsesAxis) {
+      for (const timesUsed of timesUsedAxis) {
+        const label = `limitUses=${String(limitUses)} maxUses=${String(maxUses)} timesUsed=${String(timesUsed)}`;
+        const definition = buildUseCapDefinition({ limitUses, maxUses });
+        const item = buildOwnedCopy({ usage: { timesUsed } });
+        // `_filterNonExhausted` anchors each candidate on the book that candidate IS,
+        // so pinning that resolution is what lets the axes reach the real predicate
+        // body unchanged. `_getRecipeItemCaps` reads `recipe` only to default the
+        // definition, so a null recipe is inert here.
+        service._matchDefinitionForItem = () => definition;
+        const engineSpent =
+          service._filterNonExhausted(null, [
+            { item, timesUsed: service._getRecipeItemUsage(item) },
+          ]).length === 0;
+        // The projection is handed the SEAM's shape: resolved caps plus the raw,
+        // un-coerced `timesUsed` straight off the usage flag.
+        const projectionSpent = isRecipeItemSpent({
+          ...service._capsForDefinition(definition).item,
+          timesUsed,
+        });
+        assert.equal(projectionSpent, engineSpent, label);
+        compared += 1;
+      }
+    }
+  }
+
+  assert.equal(compared, limitUsesAxis.length * maxUsesAxis.length * timesUsedAxis.length);
 });
 
 // --- craft-path extraction parity -----------------------------------------

@@ -127,16 +127,19 @@
     if (armedToken === token) armedToken = '';
   }
 
-  // Every executed action disarms and moves focus to the owning tab panel, because
-  // the row that held focus unmounts — leaving focus on `<body>` otherwise.
+  // A DESTRUCTIVE action unmounts the row that held focus, so focus would land on
+  // `<body>`; it is moved to the owning tab panel instead.
   function afterAction() {
     armedToken = '';
     panelElement?.focus?.();
   }
 
+  // Expend is NOT destructive: the row survives, so its own button keeps focus. Moving
+  // focus here would make a keyboard GM re-tab back to the row after every single
+  // charge of a five-use copy. Only the armed token is cleared.
   function handleExpend(itemId) {
+    armedToken = '';
     onExpend(selectedCharacter?.id || '', itemId);
-    afterAction();
   }
 
   function handleDelete(itemId) {

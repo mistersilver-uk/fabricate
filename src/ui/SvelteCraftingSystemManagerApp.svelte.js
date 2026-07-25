@@ -30,20 +30,13 @@ import { buildImportReportContent } from '../systems/importReportContent.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { DEFAULT_QUANTITY_PATH } from '../systems/componentStacking.js';
-
-/** Knowledge-surface result keys. Static literals so the lang gates can see them. */
-const KNOWLEDGE_MESSAGES = Object.freeze({
-  gmOnly: 'FABRICATE.Knowledge.Manage.GMOnly',
-  unavailable: 'FABRICATE.Knowledge.Manage.Unavailable',
-  noActor: 'FABRICATE.Knowledge.Manage.NoActor',
-  noItem: 'FABRICATE.Knowledge.Manage.NoItem',
-  noDefinition: 'FABRICATE.Knowledge.Manage.NoDefinition',
-  deleted: 'FABRICATE.Knowledge.Manage.Deleted',
-  deleteFailed: 'FABRICATE.Knowledge.Manage.DeleteFailed',
-  erased: 'FABRICATE.Knowledge.Manage.Erased',
-  eraseFailed: 'FABRICATE.Knowledge.Manage.EraseFailed',
-  expendFailed: 'FABRICATE.Knowledge.Manage.ExpendFailed',
-});
+import {
+  KNOWLEDGE_MESSAGES,
+  deleteOwnedRecipeItemCopy,
+  eraseLearnedRecipeEntry,
+  expendOwnedRecipeItemUse,
+  resetActorKnowledgeState,
+} from './svelte/apps/manager/knowledge/knowledgeMutations.js';
 
 function readItemQuantity(item) {
   const raw = DEFAULT_QUANTITY_PATH.split('.').reduce((value, key) => value?.[key], item);
@@ -1321,94 +1314,60 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     return named || matchRecipeItemDefinition(item, definitions, systemId).definition;
   }
 
+  // Resolve the GM-nominated copy on the GM-nominated actor. Every seam mutation
+  // takes document IDS, never uuids, and a target that vanished between render and
+  // click yields a result shape rather than a throw past a store that expects one.
+  _knowledgeTarget(actorId, itemId) {
+    const { actor, denied } = this._knowledgeActor(actorId);
+    if (denied) return { denied };
+    const item = actor.items?.get?.(itemId);
+    if (!item) return { denied: { success: false, message: KNOWLEDGE_MESSAGES.noItem } };
+    return { actor, item };
+  }
+
   /**
    * Spend one charge of an owned recipe-item copy. Applies no visibility or
-   * knowledge-mode gate: the GM named the copy. Takes document IDS, never uuids,
-   * and never throws past the store.
+   * knowledge-mode gate: the GM named the copy.
    */
   async _expendRecipeItemUse({ actorId, itemId, definitionId, systemId } = {}) {
-    const { actor, denied } = this._knowledgeActor(actorId);
+    const { actor, item, denied } = this._knowledgeTarget(actorId, itemId);
     if (denied) return denied;
-    const item = actor.items?.get?.(itemId);
-    if (!item) return { success: false, message: KNOWLEDGE_MESSAGES.noItem };
-    const service = this._recipeVisibilityService();
-    if (typeof service?.expendRecipeItemUse !== 'function') {
-      return { success: false, message: KNOWLEDGE_MESSAGES.unavailable };
-    }
-    const definition = this._resolveKnowledgeDefinition({ item, definitionId, systemId });
-    if (!definition) return { success: false, message: KNOWLEDGE_MESSAGES.noDefinition };
-    try {
-      return await service.expendRecipeItemUse(actor, itemId, definition);
-    } catch (err) {
-      console.error('Fabricate | Failed to expend a recipe item use:', err);
-      return { success: false, message: KNOWLEDGE_MESSAGES.expendFailed };
-    }
+    return await expendOwnedRecipeItemUse({
+      actor,
+      item,
+      service: this._recipeVisibilityService(),
+      definition: this._resolveKnowledgeDefinition({ item, definitionId, systemId }),
+    });
   }
 
-  /**
-   * Delete one owned copy. A plain `item.delete()` — no engine method, no learn
-   * budget, no `learnedRecipes` write. A stacked copy deletes the WHOLE document:
-   * `recipeItemUsage.timesUsed` and `recipeItemLearning.learnedCount` are
-   * per-document counters shared by every unit, so the stack-quantity path is
-   * never decremented (a deliberate exception to the component-consumption
-   * convention, and what all three existing disposal paths already do).
-   */
+  /** Delete one owned copy — whole document, never a stack decrement. */
   async _deleteOwnedRecipeItem({ actorId, itemId } = {}) {
-    const { actor, denied } = this._knowledgeActor(actorId);
+    const { item, denied } = this._knowledgeTarget(actorId, itemId);
     if (denied) return denied;
-    const item = actor.items?.get?.(itemId);
-    if (!item) return { success: false, message: KNOWLEDGE_MESSAGES.noItem };
-    const name = item.name || '';
-    try {
-      await item.delete();
-    } catch (err) {
-      console.error('Fabricate | Failed to delete an owned recipe item:', err);
-      return { success: false, message: KNOWLEDGE_MESSAGES.deleteFailed };
-    }
-    return { success: true, message: KNOWLEDGE_MESSAGES.deleted, messageData: { name } };
+    return await deleteOwnedRecipeItemCopy({ item });
   }
 
-  /**
-   * Erase one learned recipe. BOTH option values are pinned: `freeLearnBudget`
-   * must be passed explicitly even though it defaults true, and `clearDiscovery`
-   * is deliberately false — an erase is an un-learn, a reset is an amnesia.
-   */
+  /** Erase one learned recipe through the merged issue 773 primitive. */
   async _eraseLearnedRecipe({ actorId, recipeId } = {}) {
     const { actor, denied } = this._knowledgeActor(actorId);
     if (denied) return denied;
-    const service = this._recipeVisibilityService();
-    if (typeof service?.forgetLearnedRecipes !== 'function') {
-      return { success: false, message: KNOWLEDGE_MESSAGES.unavailable };
-    }
-    try {
-      const result = await service.forgetLearnedRecipes(actor, [recipeId], {
-        freeLearnBudget: true,
-        clearDiscovery: false,
-      });
-      return {
-        success: result?.success === true,
-        message: KNOWLEDGE_MESSAGES.erased,
-        messageData: { count: result?.count || 0 },
-      };
-    } catch (err) {
-      console.error('Fabricate | Failed to erase a learned recipe:', err);
-      return { success: false, message: KNOWLEDGE_MESSAGES.eraseFailed };
-    }
+    return await eraseLearnedRecipeEntry({
+      actor,
+      service: this._recipeVisibilityService(),
+      recipeId,
+    });
   }
 
-  /**
-   * Both reset grains route through the merged GM API rather than reimplementing
-   * either. A null `systemId` is the all-systems grain — the only one that can
-   * clear orphan learned keys.
-   */
+  /** Both reset grains, routed through the merged GM API. */
   async _resetActorKnowledge({ actorId, systemId = null } = {}) {
     const { denied } = this._knowledgeActor(actorId);
     if (denied) return denied;
-    const reset = game?.fabricate?.resetActorKnowledge;
-    if (typeof reset !== 'function') {
-      return { success: false, message: KNOWLEDGE_MESSAGES.unavailable };
-    }
-    return await reset.call(game.fabricate, { actorId, systemId });
+    return await resetActorKnowledgeState({
+      reset: game?.fabricate?.resetActorKnowledge,
+      thisArg: game?.fabricate,
+      actorId,
+      systemId,
+    });
   }
 
   // Keep the access rosters (`worldUsers` + `accessCharacters`) live while the

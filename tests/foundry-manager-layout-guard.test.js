@@ -138,9 +138,14 @@ test('the Knowledge surface pins its owned-copy row at BOTH widths (issue 785)',
   assert.deepEqual(expectedSelectorsForManagerSurface('knowledge narrow'), [
     '.manager-knowledge-copy-row',
   ]);
-  // The pinned class must be recoverable by the drift guard's `/'(\.[a-z-]+)'/g`
-  // scan, so it can carry neither a digit nor an uppercase letter.
-  assert.match('.manager-knowledge-copy-row', /^'?\.[a-z-]+'?$/);
+  // The pinned selectors must be recoverable by the drift guard's `/'(\.[a-z-]+)'/g`
+  // scan, so they can carry neither a digit nor an uppercase letter. Asserted over the
+  // MAP's real values — matching a literal against a regex could never fail.
+  for (const label of ['knowledge normal', 'knowledge narrow']) {
+    for (const selector of expectedSelectorsForManagerSurface(label)) {
+      assert.match(selector, /^\.[a-z-]+$/, `${label}: ${selector} is not recoverable`);
+    }
+  }
   assert.throws(() =>
     assertExpectedSelectorsPresent(
       elementMetrics('.manager-knowledge-learned-row'),

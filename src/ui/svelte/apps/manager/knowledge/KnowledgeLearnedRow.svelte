@@ -73,12 +73,13 @@
       <span class="manager-knowledge-copy-copy">
         <span class="manager-knowledge-copy-heading">
           <strong class="manager-knowledge-copy-name" title={learned.name}>{learned.name}</strong>
-          <span class="manager-chip manager-knowledge-category-pill" data-knowledge-category>
+          <span class="manager-chip" data-knowledge-category>
             {getRecipeCategoryLabel(learned.category, localize)}
           </span>
         </span>
         <small class="manager-knowledge-copy-meta" data-knowledge-source={learned.sourceKind}>
-          {sourceLine(learned)}
+          <i class="fas fa-book-sparkles" aria-hidden="true"></i>
+          <span>{sourceLine(learned)}</span>
         </small>
         {#if learned.freesNoSlot}
           <small class="manager-knowledge-frees-no-slot" data-knowledge-frees-no-slot>

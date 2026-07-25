@@ -10095,11 +10095,14 @@
 }
 
 /* The shared .manager-search is `flex: 1 1 260px` for the horizontal filter bar;
-   inside the vertical Access roster column that flex-grow stretches the search box
-   tall (and floats its absolutely-positioned icon mid-gap). Pin it to its content
-   height in the roster context — issue 511. */
-.fabricate-manager .manager-access-roster .manager-search {
+   inside a vertical roster column that flex-grow stretches the search box tall (and
+   floats its absolutely-positioned icon mid-gap). Pin it to its content height in
+   every roster context — issue 511, and the GM Knowledge roster in issue 785, which
+   additionally needs to be allowed to shrink inside its 250px column. */
+.fabricate-manager .manager-access-roster .manager-search,
+.fabricate-manager .manager-knowledge-roster .manager-search {
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .fabricate-manager .manager-gathering-panel {
@@ -13660,7 +13663,11 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
-.fabricate-manager .manager-tool-edit-main {
+/* Views that OWN their own columns hand the grid their children directly, so the
+   view's `<main>` must not become a grid item itself. Identical for every such view
+   — the Tool editor and the GM Knowledge surface (issue 785) — so it is one rule. */
+.fabricate-manager .manager-tool-edit-main,
+.fabricate-manager .manager-knowledge-main {
   /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
   display: contents;
   min-width: 0;
@@ -16609,8 +16616,10 @@
   opacity: 0.6;
 }
 
-/* Header status pills (chrome, for environment-edit) */
-.fabricate-manager .manager-environment-header-pills {
+/* Header status pills (chrome, for environment-edit and the GM Knowledge surface's
+   global "N player characters" roll-up, issue 785) */
+.fabricate-manager .manager-environment-header-pills,
+.fabricate-manager .manager-knowledge-header-pills {
   display: flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -20086,7 +20095,11 @@
   clip-path: inset(50%);
 }
 
-.fabricate-manager .manager-tools-library-chips .manager-chip {
+/* The compact chip scale, shared by the Tools library rows and the GM Knowledge
+   surface's owned-copy rows (issue 785). One rule with two consumers rather than two
+   byte-identical blocks. */
+.fabricate-manager .manager-tools-library-chips .manager-chip,
+.fabricate-manager .manager-knowledge-copy-chips .manager-chip {
   min-height: 20px;
   padding: 0 var(--fab-space-chip);
   font-size: 0.62rem;
@@ -20403,14 +20416,8 @@
   grid-template-columns: 56px 250px minmax(0, 1fr);
 }
 
-.fabricate-manager .manager-knowledge-main {
-  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
-  display: contents;
-  min-width: 0;
-  min-height: 0;
-  padding: 0;
-  overflow: hidden;
-}
+/* `.manager-knowledge-main` is `display: contents` — authored once alongside
+   `.manager-tool-edit-main`, the other view that owns its own columns. */
 
 /* -- Roster column -------------------------------------------------------- */
 
@@ -20426,13 +20433,8 @@
   overflow: hidden;
 }
 
-/* `.manager-search` is authored `flex: 1 1 260px` for horizontal toolbars; inside
-   this vertical column that would let it absorb the roster's height. The Access
-   roster needs the same override. */
-.fabricate-manager .manager-knowledge-roster-search {
-  flex: 0 0 auto;
-  min-width: 0;
-}
+/* The roster's `.manager-search` override is authored alongside the Access roster's,
+   which needs the identical `flex: 0 0 auto`. */
 
 .fabricate-manager .manager-knowledge-roster-scroll {
   flex: 1 1 auto;
@@ -20677,14 +20679,12 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-knowledge-copy-chips .manager-chip {
-  min-height: 20px;
-  padding: 0 var(--fab-space-chip);
-  font-size: 0.62rem;
-  line-height: 1;
-}
+/* The compact chip scale is authored once, alongside `.manager-tools-library-chips`. */
 
 .fabricate-manager .manager-knowledge-copy-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
   min-width: 0;
   color: var(--fab-mv2-text-muted);
   font-size: 0.62rem;
@@ -20709,11 +20709,15 @@
   flex: 0 0 auto;
 }
 
-/* The spent dim is deliberately scoped to identity + meta and MUST NOT reach the
-   action cluster: `.manager-button:disabled` already carries `opacity: 0.62`, so a
-   row-level dim would composite the disabled Expend button to about 0.38. */
-.fabricate-manager .manager-knowledge-copy-row.is-spent .manager-knowledge-copy-identity {
-  opacity: 0.68;
+/* The spent row is muted by COLOUR on its name and meta only — never by a group
+   `opacity`. A group dim composited the row's only status signal (the "Spent" and
+   "Inert" chips) to 3.62-4.35:1 against a 4.5:1 floor for 10px text, in six of the
+   seven themes; the rendered-contrast fixture cannot catch it because it renders an
+   undimmed control. Chips, icons and the whole action cluster therefore stay at full
+   opacity — `.manager-button:disabled` already carries `opacity: 0.62`, and the
+   "Spent" chip already carries the state as icon + word. */
+.fabricate-manager .manager-knowledge-copy-row.is-spent .manager-knowledge-copy-name {
+  color: var(--fab-mv2-text-muted);
 }
 
 @container fabricate-manager (max-width: 831px) {

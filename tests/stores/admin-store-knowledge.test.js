@@ -154,6 +154,13 @@ function makeHarness({ snapshot = rawSnapshot(), confirmResult = true } = {}) {
 async function settled(harness) {
   await harness.store.refresh();
   await new Promise((resolve) => setTimeout(resolve, 0));
+  // Prove the "did refresh() run" probe is STILL WIRED before zeroing it. Without
+  // this, `refresh()` dropping its `getAccessCharacterActors` call would silently
+  // vacate every `assert.equal(harness.calls.refresh, 0)` below into a tautology.
+  assert.ok(
+    harness.calls.refresh > 0,
+    'refresh() must still call getAccessCharacterActors, or the probe proves nothing'
+  );
   harness.calls.refresh = 0;
   harness.calls.snapshot.length = 0;
   return harness;
