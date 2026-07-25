@@ -20,6 +20,7 @@
     "lint:css": "stylelint \"styles/**/*.{css,scss}\" --max-warnings=0",
     "lint:css:fix": "npm run lint:css -- --fix",
     "lint:md": "markdownlint-cli2",
+    "lint:md:files": "markdownlint-cli2 --no-globs",
     "lint:md:fix": "markdownlint-cli2 --fix",
     "screenshots:ui": "node scripts/ui-pr-screenshot-evidence.mjs collect",
     "screenshots:ui:plan": "node scripts/ui-pr-screenshot-evidence.mjs plan",

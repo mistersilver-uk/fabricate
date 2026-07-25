@@ -986,9 +986,8 @@ export function collectScreenshotEvidence({
   const copied = [];
   const missing = [];
   const allImages = existsSync(sourceRoot) ? listImages(sourceRoot).sort((a, b) => a.localeCompare(b)) : [];
-  const toolViews = views.filter(isToolStudioView);
-  const toolEvidence = toolViews.length > 0
-    ? validateToolStudioRunEvidence({ sourceRoot, views, headSha })
+  const runEvidence = views.length > 0
+    ? validateScreenshotRunEvidence({ sourceRoot, views, headSha })
     : null;
 
   mkdirSync(destinationRoot, { recursive: true });
@@ -998,13 +997,11 @@ export function collectScreenshotEvidence({
       missing.push(view);
       continue;
     }
-    if (toolEvidence && isToolStudioView(view) && candidates.length !== 1) {
+    if (isToolStudioView(view) && candidates.length !== 1) {
       throw new Error(`Duplicate Tool Studio screenshot evidence for ${view.id}: ${candidates.length} candidates`);
     }
     const source = candidates[0];
-    if (toolEvidence && isToolStudioView(view)) {
-      validateToolStudioCapture(view, source, toolEvidence);
-    }
+    validateScreenshotCapture(view, source, runEvidence);
     const destination = join(destinationRoot, `${view.id}${extensionOf(source)}`);
     copyFileSync(source, destination);
     copied.push({ view, source, destination });
@@ -1042,11 +1039,11 @@ function readJsonEvidence(path, label) {
   }
 }
 
-function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
-  const summary = readJsonEvidence(join(sourceRoot, 'summary.json'), 'Tool Studio smoke summary');
+function validateScreenshotRunEvidence({ sourceRoot, views, headSha }) {
+  const summary = readJsonEvidence(join(sourceRoot, 'summary.json'), 'smoke summary');
   const manifest = readJsonEvidence(
     join(sourceRoot, 'screenshot-manifest.json'),
-    'Tool Studio screenshot manifest'
+    'screenshot manifest'
   );
   if (
     summary.passed !== true ||
@@ -1055,15 +1052,15 @@ function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
     summary.degraded !== false ||
     summary.rendererCrashed !== false
   ) {
-    throw new Error('Tool Studio screenshot evidence comes from a failed or degraded smoke summary');
+    throw new Error('Screenshot evidence comes from a failed or degraded smoke summary');
   }
   const summaryRun = summary.screenshotRun || {};
   if (!summaryRun.runId || summaryRun.runId !== manifest.runId) {
-    throw new Error('Tool Studio summary and manifest do not share one run identity');
+    throw new Error('Screenshot summary and manifest do not share one run identity');
   }
   const expectedHead = normalizeHeadShaSegment(headSha);
   if (!expectedHead || summaryRun.headSha !== expectedHead || manifest.headSha !== expectedHead) {
-    throw new Error('Tool Studio screenshot evidence is stale for the requested PR head SHA');
+    throw new Error('Screenshot evidence is stale for the requested PR head SHA');
   }
   const expectedLabels = views
     .flatMap((view) => view.smokeLabels)
@@ -1074,20 +1071,31 @@ function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
     JSON.stringify(summaryLabels) !== JSON.stringify(expectedLabels) ||
     JSON.stringify(manifestLabels) !== JSON.stringify(expectedLabels)
   ) {
-    throw new Error('Tool Studio screenshot evidence belongs to another target-label set');
+    throw new Error('Screenshot evidence belongs to another target-label set');
   }
   return { manifest, capturesByFile: new Map((manifest.captures || []).map((entry) => [entry.file, entry])) };
 }
 
-function validateToolStudioCapture(view, source, evidence) {
+function validateScreenshotCapture(view, source, evidence) {
   const file = basename(source);
   const capture = evidence.capturesByFile.get(file);
-  if (TOOL_PARITY_DIMENSIONS.has(view.id) && capture?.label?.includes('stress')) {
+  if (isToolStudioView(view) && TOOL_PARITY_DIMENSIONS.has(view.id) && capture?.label?.includes('stress')) {
     throw new Error(`Stress evidence cannot substitute for Tool Studio parity frame ${view.id}`);
   }
   if (!capture || !view.smokeLabels.includes(capture.label)) {
-    throw new Error(`Tool Studio manifest does not bind ${file} to ${view.id}`);
+    throw new Error(`Screenshot manifest does not bind ${file} to ${view.id}`);
   }
+  const actual = readPngDimensions(view, source);
+  if (isToolStudioView(view)) validateToolStudioCaptureRules(view, capture, actual);
+  if (actual.width !== capture.width || actual.height !== capture.height) {
+    throw new Error(
+      `PNG dimensions do not match its manifest for ${view.id}: ` +
+      `${actual.width}x${actual.height} actual; ${capture.width}x${capture.height} declared`
+    );
+  }
+}
+
+function validateToolStudioCaptureRules(view, capture, actual) {
   if (TOOL_PARITY_DIMENSIONS.has(view.id)) {
     const [width, height] = TOOL_PARITY_DIMENSIONS.get(view.id);
     if (capture.width !== width || capture.height !== height) {
@@ -1095,26 +1103,18 @@ function validateToolStudioCapture(view, source, evidence) {
         `Wrong Tool Studio dimensions for ${view.id}: ${capture.width}x${capture.height}; expected ${width}x${height}`
       );
     }
-    const actual = readToolStudioPngDimensions(view, source);
     if (actual.width !== width || actual.height !== height) {
       throw new Error(
         `Wrong Tool Studio PNG dimensions for ${view.id}: ${actual.width}x${actual.height}; expected ${width}x${height}`
       );
     }
-    return;
-  }
-  const actual = readToolStudioPngDimensions(view, source);
-  if (actual.width !== capture.width || actual.height !== capture.height) {
-    throw new Error(
-      `Tool Studio PNG dimensions do not match its manifest for ${view.id}: ` +
-      `${actual.width}x${actual.height} actual; ${capture.width}x${capture.height} declared`
-    );
   }
 }
 
-function readToolStudioPngDimensions(view, source) {
+function readPngDimensions(view, source) {
+  const kind = isToolStudioView(view) ? 'Tool Studio PNG' : 'PNG';
   if (extensionOf(source) !== '.png') {
-    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} is not a .png file`);
+    throw new Error(`Invalid ${kind} for ${view.id}: ${basename(source)} is not a .png file`);
   }
   const bytes = readFileSync(source);
   const hasPngHeader =
@@ -1123,12 +1123,12 @@ function readToolStudioPngDimensions(view, source) {
     bytes.readUInt32BE(8) === 13 &&
     bytes.toString('ascii', 12, 16) === 'IHDR';
   if (!hasPngHeader) {
-    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has no valid PNG header`);
+    throw new Error(`Invalid ${kind} for ${view.id}: ${basename(source)} has no valid PNG header`);
   }
   const width = bytes.readUInt32BE(16);
   const height = bytes.readUInt32BE(20);
   if (width === 0 || height === 0) {
-    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has zero dimensions`);
+    throw new Error(`Invalid ${kind} for ${view.id}: ${basename(source)} has zero dimensions`);
   }
   return { width, height };
 }
@@ -1426,6 +1426,30 @@ function runGit(args, { root = ROOT } = {}) {
   return spawnSync('git', args, { cwd: root, encoding: 'utf8' }); // NOSONAR S4036 — git-from-PATH is the intended dev-tool contract (see note above)
 }
 
+// Resolve the exact source revision shared by the screenshot producer and collector.
+// Explicit command/environment inputs win for reproducible automation, then GitHub's
+// checked-out SHA, while the documented local flow derives the current repository HEAD.
+// A missing or invalid revision is fatal: provenance validation must never weaken merely
+// because the caller omitted an override.
+export function resolveScreenshotHeadSha({
+  explicitHeadSha,
+  ciHeadSha = process.env.GITHUB_SHA,
+  root = ROOT,
+  runGit: gitRunner = runGit,
+} = {}) {
+  const explicitHead = normalizeHeadShaSegment(explicitHeadSha);
+  if (explicitHead) return explicitHead;
+  const ciHead = normalizeHeadShaSegment(ciHeadSha);
+  if (ciHead) return ciHead;
+  const result = gitRunner(['rev-parse', '--verify', 'HEAD'], { root });
+  if (!result || result.status !== 0) {
+    throw new Error(result?.stderr?.trim() || 'Could not resolve screenshot provenance from git HEAD');
+  }
+  const gitHead = normalizeHeadShaSegment(result.stdout);
+  if (!gitHead) throw new Error('Git returned an empty HEAD for screenshot provenance');
+  return gitHead;
+}
+
 function readChangedFilesFromGit(base, { root = ROOT } = {}) {
   // Three-dot `<base>...HEAD` is merge-base semantics: "what did THIS branch change
   // since it forked from <base>", applied to BOTH the resolved-default and explicit
@@ -1505,7 +1529,14 @@ export function loadChangedFiles(args, { resolveBase = resolveDefaultBase, readC
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0] || 'plan';
-  const { resolveBase, readChangedFiles, runGh, putObject, config } = deps;
+  const {
+    resolveBase,
+    resolveHeadSha = resolveScreenshotHeadSha,
+    readChangedFiles,
+    runGh,
+    putObject,
+    config,
+  } = deps;
   // Base resolution is scoped to the commands that CONSUME the changed-file set.
   // `publish` derives its files from tmp/pr-screenshots/<pr>/ and `clean` just removes
   // a local dir — neither must spawn git, print the default-base note, or throw when no
@@ -1576,7 +1607,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       sourceDir: args.sourceDir || 'test-results',
       outputDir: args.outputDir,
       allowMissing: args.allowMissing === true,
-      headSha: args.headSha,
+      headSha: resolveHeadSha({ explicitHeadSha: args.headSha }),
     });
     for (const item of result.copied) {
       console.log(`${relative(ROOT, item.destination).replaceAll(sep, '/')} <= ${relative(ROOT, item.source).replaceAll(sep, '/')}`);

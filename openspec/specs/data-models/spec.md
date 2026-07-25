@@ -2195,6 +2195,21 @@ Crafting outcomes are resolved entirely by the engine (check formula, resolution
 The step-level failure macro has been removed.
 A step failure is handled entirely by the engine's failure-consumption policy; there is no GM-authored failure-side macro hook.
 
+## Foundry Multi-Write Invariants
+
+When one Fabricate operation uses multiple separate sequential Foundry settings, flag, or document API calls to establish one invariant, it MUST treat the calls as a compensating transaction.
+Equality of the primary setting, flag, or document value MUST NOT short-circuit the operation when an ancillary invariant may still require repair.
+
+Before the first write, the operation MUST snapshot the complete pre-state needed to restore every affected key or document, including whether each key existed separately from its stored value.
+It MUST perform forward writes in a declared order.
+If a forward write fails, it MUST compensate every completed write in reverse order and restore both prior values and prior key presence.
+If compensation also fails, the operation MUST report the original failure and every compensation failure rather than presenting a successful rollback.
+
+Tests MUST cover a same-primary-value call that repairs an unsatisfied ancillary invariant, each forward-write failure boundary, reverse compensation after every partially completed prefix, restoration of absent versus present-with-undefined or equivalent values, and compensation failure reporting.
+
+This requirement applies only when the application composes separate sequential API calls into one invariant.
+A single Foundry atomic or batched document operation does not require application-level compensation merely because its one API call writes several documents or fields.
+
 ## Behavioural Ownership
 
 - Resolution mode semantics and mode validation: `resolution-modes/spec.md`

@@ -29,6 +29,7 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 
 - `openspec/specs/ui-integration/spec.md` first, then other UI-related specs as needed
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` — the `--fab-*` token, component, and pattern reference — when proposing or reviewing visual design or building a new surface
+- `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md` — the mandatory reference matrix, reuse-inventory, provenance, and maintainer-manual-evidence procedure for non-trivial UI work
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
 - embedded screenshot images in the PR description (S3-hosted, from `npm run screenshots:ui:publish`) and smoke screenshots when no live dev session is available
@@ -38,18 +39,20 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 1. Read the relevant UI spec before making recommendations.
 2. Complete the assigned worktree identity checks before reviewing or editing, and stop with `BLOCKED` on any mismatch.
 3. Inspect the current Svelte components, stores, styles, and localized strings.
-4. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
-5. If no live dev session is available, check the PR body/comments/artifacts for recent smoke evidence before trying to generate fresh screenshots.
-6. Ask the workflow driver for container-backed Foundry validation when UI PR screenshot evidence must be created from real smoke artifacts, then inspect the returned evidence.
-7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main` and ask the workflow driver to run the authoritative smoke, collection, publication, and cleanup commands from the integrated coordinator branch.
+4. For non-trivial UI work, open every supplied prototype, screenshot, defect matrix, named sibling, and CSS record, then complete the per-control/state reference matrix and `Reference surfaces / reuse inventory` before approval.
+5. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
+6. If no live dev session is available, check the PR body/comments/artifacts for recent smoke evidence before trying to generate fresh screenshots.
+7. Ask the workflow driver for container-backed Foundry validation when UI PR screenshot evidence must be created from real smoke artifacts, then inspect the returned evidence.
+8. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main` and ask the workflow driver to run the authoritative smoke, collection, publication, and cleanup commands from the integrated coordinator branch.
 Review the resulting `npm run test:foundry` output and the S3-hosted images embedded by `npm run screenshots:ui:publish`.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label.
-8. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
+An issue-specific maintainer instruction may replace the producer, but visual approval stays pending until qualifying evidence is embedded and inspected, and the instruction does not waive the gate.
+9. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
 Verify the published evidence against the fix itself: at least one frame must show the changed state, and you judge that frame for both correctness (it does what the change claims) and polish.
 A frame that only satisfies the `check-screenshots` gate without depicting the changed state is missing evidence — call for a capture state that reaches it rather than approving on an unrelated frame.
-9. Compare the implementation against the spec and against Foundry-native interaction patterns.
-10. Turn confirmed problems into specific design guidance or backlog issues.
-11. For explicitly assigned mutable work, commit only owned spec, design, or workflow paths locally and return the commit handoff to the workflow driver.
+10. Compare the implementation against the spec and against Foundry-native interaction patterns.
+11. Turn confirmed problems into specific design guidance or backlog issues.
+12. For explicitly assigned mutable work, commit only owned spec, design, or workflow paths locally and return the commit handoff to the workflow driver.
 
 ## Review checklist
 
@@ -87,6 +90,7 @@ When reviewing a plan, audit the UI portion of the issue delta against these con
 - Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.
 - Treat unrelated image markdown, artifact names, and file lists in a PR as missing normal UI evidence; screenshots must be embedded images of the changed view (produced by `npm run screenshots:ui:publish`, S3-hosted).
 There is no `SCREENSHOTS_NEEDED:` handoff; only a maintainer-applied `screenshots-exempt` label can waive the requirement.
+- Validate every automated affected view against the provenance procedure in `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`; generic provenance is mandatory and any view-specific parity constraints remain stricter additions.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## PR description template

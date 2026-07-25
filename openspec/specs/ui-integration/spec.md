@@ -37,6 +37,17 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Changing the theme setting applies a stable theme attribute to `document.documentElement` and open Fabricate app roots so already-open Fabricate UI surfaces that consume `--fab-*` tokens update without requiring a reload or reopen cycle.
 - Generated documentation output and third-party/vendor theme assets are out of scope for this rule unless they are explicitly restyled as Fabricate product UI.
 
+### Semantic slider geometry
+
+Shared semantic sliders MUST define one canonical geometry in which the custom visible track is inset by the rendered thumb radius and the range input spans the full control width.
+At the minimum and maximum values, the thumb centre MUST coincide with the corresponding visible track endpoint.
+Native and Foundry-host track rendering MUST be suppressed for the range input, including transparent WebKit runnable-track rendering and transparent Firefox track and progress rendering, so only the custom track communicates the scale.
+The thumb MUST resolve its colour or semantic tier from the same normalized value scale as the visible track treatment.
+
+A value-width fill MUST set its width from the normalized current percentage and use the current semantic colour.
+A full-track semantic scale MUST render its semantic gradient across the complete inset track and MUST keep the custom fill at full width rather than clipping the gradient at the current value.
+Controls MUST distinguish those meanings explicitly: a full-track scale describes the semantics available across the range, while a value-width fill describes progress to the current value.
+
 ### Typographic contract
 
 Product UI type must come from a shared, self-hosted three-family contract declared in the `:root` block of `styles/fabricate.css`, alongside the theme tokens and the spacing scale.

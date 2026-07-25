@@ -29,6 +29,7 @@ import {
   publishScreenshotEvidence,
   readLabelList,
   resolveDefaultBase,
+  resolveScreenshotHeadSha,
   sanitizeLabel,
   smokeLabelsForChangedFiles,
   upsertScreenshotsBlock,
@@ -147,9 +148,30 @@ function toolStudioEvidenceFixtures({
   headSha = 'abc1234',
   targetLabels = TOOL_STUDIO_VIEWS.map(([, label]) => label),
   summaryPatch = {},
+  manifestPatch = {},
   capturePatch = () => ({}),
 } = {}) {
-  const captures = TOOL_STUDIO_VIEWS.map(([, label, width, height], index) => ({
+  return automatedEvidenceFixtures({
+    frames: TOOL_STUDIO_VIEWS,
+    runId,
+    headSha,
+    targetLabels,
+    summaryPatch,
+    manifestPatch,
+    capturePatch,
+  });
+}
+
+function automatedEvidenceFixtures({
+  frames,
+  runId = 'smoke-run-1',
+  headSha = 'abc1234',
+  targetLabels = frames.map(([, label]) => label),
+  summaryPatch = {},
+  manifestPatch = {},
+  capturePatch = () => ({}),
+} = {}) {
+  const captures = frames.map(([, label, width, height], index) => ({
     label,
     file: `screenshot-${String(index + 1).padStart(2, '0')}-${label}.png`,
     width,
@@ -167,8 +189,29 @@ function toolStudioEvidenceFixtures({
       screenshotRun: { runId, headSha, targetLabels },
       ...summaryPatch,
     }),
-    'screenshot-manifest.json': JSON.stringify({ runId, headSha, targetLabels, captures }),
+    'screenshot-manifest.json': JSON.stringify({
+      runId,
+      headSha,
+      targetLabels,
+      captures,
+      ...manifestPatch,
+    }),
   };
+}
+
+function changedFileEvidenceFixtures(changedFiles, options = {}) {
+  const views = mapChangedFilesToViews(changedFiles);
+  const frames = views.map((view, index) => [
+    view.id,
+    view.smokeLabels[0],
+    800 + index,
+    600 + index,
+  ]);
+  return automatedEvidenceFixtures({
+    frames,
+    targetLabels: views.flatMap(view => view.smokeLabels),
+    ...options,
+  });
 }
 
 describe('UI PR screenshot evidence', () => {
@@ -683,53 +726,21 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('collects the thirteen recipe-edit frames into thirteen separate files', () => {
+    const changedFiles = ['src/ui/svelte/apps/manager/RecipeEditView.svelte'];
     withScreenshotFixtures(
-      {
-        'screenshot-01-manager-recipe-edit-normal.png': 'normal',
-        'screenshot-02-manager-recipe-edit-ingredients.png': 'ingredients',
-        // Issue 684: the `-cost` label ENDS in `-cost.png`, so `matchesSmokeLabel`
-        // (anchored `…<label>\.png$`) keeps it distinct from the `-ingredients` frame
-        // even though `manager-recipe-edit-ingredients` is a string prefix of it.
-        'screenshot-03-manager-recipe-edit-ingredients-cost.png': 'ingredients-cost',
-        'screenshot-04-manager-recipe-edit-validation.png': 'validation',
-        'screenshot-05-manager-recipe-edit-multistep.png': 'multistep',
-        'screenshot-06-manager-recipe-edit-results.png': 'results',
-        'screenshot-07-manager-recipe-edit-results-multistep.png': 'results-multistep',
-        'screenshot-08-manager-recipe-edit-collapsed.png': 'collapsed',
-        'screenshot-09-manager-recipe-edit-results-progressive.png': 'results-progressive',
-        'screenshot-10-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
-        'screenshot-11-manager-recipe-edit-tools.png': 'tools',
-        'screenshot-12-manager-recipe-edit-access-rail.png': 'access-rail',
-        'screenshot-13-manager-recipe-edit-books-scrolls.png': 'books-scrolls',
-      },
+      changedFileEvidenceFixtures(changedFiles),
       (root) => {
         const result = collectScreenshotEvidence({
-          changedFiles: ['src/ui/svelte/apps/manager/RecipeEditView.svelte'],
+          changedFiles,
           prNumber: 654,
           root,
+          headSha: 'abc1234',
         });
         assert.equal(result.copied.length, 13);
-        const byName = Object.fromEntries(
-          result.copied.map(item => [
-            item.destination.replaceAll('\\', '/').split('/').pop(),
-            readFileSync(item.destination, 'utf8'),
-          ]),
+        assert.deepEqual(
+          result.copied.map(item => item.destination.replaceAll('\\', '/').split('/').pop()),
+          mapChangedFilesToViews(changedFiles).map(view => `${view.id}.png`),
         );
-        assert.deepEqual(byName, {
-          'manager-recipe-edit-normal.png': 'normal',
-          'manager-recipe-edit-ingredients.png': 'ingredients',
-          'manager-recipe-edit-ingredients-cost.png': 'ingredients-cost',
-          'manager-recipe-edit-validation.png': 'validation',
-          'manager-recipe-edit-multistep.png': 'multistep',
-          'manager-recipe-edit-results.png': 'results',
-          'manager-recipe-edit-results-multistep.png': 'results-multistep',
-          'manager-recipe-edit-collapsed.png': 'collapsed',
-          'manager-recipe-edit-results-progressive.png': 'results-progressive',
-          'manager-recipe-edit-results-alchemy.png': 'results-alchemy',
-          'manager-recipe-edit-tools.png': 'tools',
-          'manager-recipe-edit-access-rail.png': 'access-rail',
-          'manager-recipe-edit-books-scrolls.png': 'books-scrolls',
-        });
       },
     );
   });
@@ -798,22 +809,19 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps smoke screenshot collection available as an explicit fallback', () => {
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
     withScreenshotFixtures(
-      {
-        'screenshot-09-manager-environments-browse-normal-retry.png': 'wrong',
-        'screenshot-08-manager-environments-browse-normal.png': 'png',
-        'screenshot-07-manager-environments-browse-stacked.png': 'stacked',
-      },
+      changedFileEvidenceFixtures(changedFiles),
       (root) => {
         const result = collectScreenshotEvidence({
-          changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
+          changedFiles,
           prNumber: 456,
           root,
+          headSha: 'abc1234',
         });
         assert.equal(result.copied.length, 1);
         const relativeDestination = result.copied[0].destination.replace(root, '').replaceAll('\\', '/');
         assert.equal(relativeDestination, '/tmp/pr-screenshots/456/manager-environments.png');
-        assert.equal(readFileSync(result.copied[0].destination, 'utf8'), 'stacked');
       },
     );
   });
@@ -825,8 +833,180 @@ describe('UI PR screenshot evidence', () => {
         prNumber: 456,
         root,
         headSha: 'abc1234',
-      }), /Missing Tool Studio smoke summary/);
+      }), /Missing smoke summary/);
     });
+  });
+
+  it('requires exact-run provenance for an ordinary collected view', () => {
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    withScreenshotFixtures(changedFileEvidenceFixtures(changedFiles), (root) => {
+      const result = collectScreenshotEvidence({
+        changedFiles,
+        prNumber: 456,
+        root,
+        headSha: 'abc1234',
+      });
+      assert.deepEqual(result.copied.map(({ view }) => view.id), ['manager-environments']);
+    });
+  });
+
+  it('resolves screenshot provenance from explicit, CI, then local git head inputs', () => {
+    const calls = [];
+    const gitHead = (args) => {
+      calls.push(args);
+      return { status: 0, stdout: 'local-head\n', stderr: '' };
+    };
+
+    assert.equal(resolveScreenshotHeadSha({
+      explicitHeadSha: 'manual-head',
+      ciHeadSha: 'ci-head',
+      runGit: gitHead,
+    }), 'manual-head');
+    assert.equal(resolveScreenshotHeadSha({
+      ciHeadSha: 'ci-head',
+      runGit: gitHead,
+    }), 'ci-head');
+    // An explicit empty CI input disables the process.env.GITHUB_SHA default so
+    // this assertion deterministically exercises the local git-head fallback in
+    // both local and CI environments.
+    assert.equal(resolveScreenshotHeadSha({ ciHeadSha: '', runGit: gitHead }), 'local-head');
+    assert.deepEqual(calls, [['rev-parse', '--verify', 'HEAD']]);
+  });
+
+  it('runs the documented local producer/collect provenance path against the exact git head', () => {
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const gitHead = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    }).stdout.trim();
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshot-cli-'));
+    try {
+      const sourceDir = join(root, 'test-results');
+      const outputDir = join(root, 'collected');
+      const changedFilesPath = join(root, 'changed-files.txt');
+      mkdirSync(sourceDir, { recursive: true });
+      writeFileSync(changedFilesPath, `${changedFiles.join('\n')}\n`);
+      for (const [name, content] of Object.entries(
+        changedFileEvidenceFixtures(changedFiles, { headSha: gitHead }),
+      )) {
+        writeFileSync(join(sourceDir, name), content);
+      }
+      const env = { ...process.env };
+      delete env.GITHUB_SHA;
+      const result = spawnSync(
+        process.execPath,
+        [
+          'scripts/ui-pr-screenshot-evidence.mjs',
+          'collect',
+          '--changed-files',
+          changedFilesPath,
+          '--source-dir',
+          sourceDir,
+          '--output-dir',
+          outputDir,
+          '--pr',
+          '456',
+        ],
+        { cwd: process.cwd(), encoding: 'utf8', env },
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /manager-environments\.png/);
+      assert.equal(existsSync(join(outputDir, 'manager-environments.png')), true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('validates ordinary and Tool Studio captures as one mixed exact run', () => {
+    const changedFiles = [
+      'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+      'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
+    ];
+    const views = mapChangedFilesToViews(changedFiles);
+    withScreenshotFixtures(
+      automatedEvidenceFixtures({
+        frames: [
+          ['manager-environments', 'manager-environments-browse-normal', 800, 600],
+          ...TOOL_STUDIO_VIEWS,
+        ],
+        targetLabels: views.flatMap(view => view.smokeLabels),
+      }),
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles,
+          prNumber: 456,
+          root,
+          headSha: 'abc1234',
+        });
+        assert.deepEqual(result.copied.map(({ view }) => view.id), views.map(view => view.id));
+      },
+    );
+  });
+
+  it('rejects failed, degraded, mismatched, stale, and wrong-target ordinary runs', () => {
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const cases = [
+      [changedFileEvidenceFixtures(changedFiles, { summaryPatch: { passed: false } }), /failed or degraded/],
+      [changedFileEvidenceFixtures(changedFiles, { summaryPatch: { degraded: true } }), /failed or degraded/],
+      [
+        changedFileEvidenceFixtures(changedFiles, { manifestPatch: { runId: 'another-run' } }),
+        /one run identity/,
+      ],
+      [
+        changedFileEvidenceFixtures(changedFiles, { manifestPatch: { headSha: 'another-head' } }),
+        /stale/,
+      ],
+      [changedFileEvidenceFixtures(changedFiles, { headSha: 'stale123' }), /stale/],
+      [
+        changedFileEvidenceFixtures(changedFiles, {
+          targetLabels: ['manager-environments-browse-normal'],
+        }),
+        /another target-label set/,
+      ],
+      [
+        changedFileEvidenceFixtures(changedFiles, {
+          manifestPatch: { targetLabels: ['manager-environments-browse-normal'] },
+        }),
+        /another target-label set/,
+      ],
+    ];
+    for (const [fixtures, message] of cases) {
+      withScreenshotFixtures(fixtures, (root) => {
+        assert.throws(() => collectScreenshotEvidence({
+          changedFiles,
+          prNumber: 456,
+          root,
+          headSha: 'abc1234',
+        }), message);
+      });
+    }
+  });
+
+  it('rejects an ordinary capture without binding or truthful PNG dimensions', () => {
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const dimensionsMismatch = changedFileEvidenceFixtures(changedFiles);
+    const image = Object.keys(dimensionsMismatch).find(name => name.endsWith('.png'));
+    dimensionsMismatch[image] = minimalPng(799, 600);
+    const cases = [
+      [
+        changedFileEvidenceFixtures(changedFiles, {
+          capturePatch: () => ({ label: 'unselected-label' }),
+        }),
+        /manifest does not bind/,
+      ],
+      [dimensionsMismatch, /PNG dimensions do not match its manifest/],
+    ];
+    for (const [fixtures, message] of cases) {
+      withScreenshotFixtures(fixtures, (root) => {
+        assert.throws(() => collectScreenshotEvidence({
+          changedFiles,
+          prNumber: 456,
+          root,
+          headSha: 'abc1234',
+        }), message);
+      });
+    }
   });
 
   it('collects truthful r15-shaped Tool Studio parity and stress PNGs from one green current-head run', () => {
@@ -950,12 +1130,16 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('reports missing non-Tool screenshots and supports allowMissing', () => {
-    withScreenshotFixtures({}, (root) => {
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const fixtures = changedFileEvidenceFixtures(changedFiles);
+    for (const file of Object.keys(fixtures).filter(name => name.endsWith('.png'))) delete fixtures[file];
+    withScreenshotFixtures(fixtures, (root) => {
       const result = collectScreenshotEvidence({
-        changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
+        changedFiles,
         prNumber: 456,
         root,
         allowMissing: true,
+        headSha: 'abc1234',
       });
       assert.deepEqual(result.missing.map(view => view.id), ['manager-environments']);
     });

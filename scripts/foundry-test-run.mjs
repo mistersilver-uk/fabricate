@@ -26,6 +26,7 @@
  * Environment variables:
  *   FOUNDRY_ADMIN_KEY     — admin password (default: fabricate-test-admin)
  *   FOUNDRY_URL           — base URL (default: http://localhost:30100)
+ *   FOUNDRY_SCREENSHOT_HEAD_SHA — optional exact-head override (defaults to git HEAD)
  */
 
 import { chromium } from 'playwright';
@@ -50,6 +51,7 @@ import {
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
+import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being
 // killed while a final screenshot click is still in flight) can leave a FLOATING page
@@ -257,7 +259,10 @@ let screenshotCounter = 0;
 const screenshotManifestEntries = [];
 const screenshotRunIdentity = {
   runId: randomUUID(),
-  headSha: String(process.env.FOUNDRY_SCREENSHOT_HEAD_SHA || process.env.GITHUB_SHA || '').trim(),
+  headSha: resolveScreenshotHeadSha({
+    explicitHeadSha: process.env.FOUNDRY_SCREENSHOT_HEAD_SHA,
+    ciHeadSha: process.env.GITHUB_SHA,
+  }),
   targetLabels: [...SCREENSHOT_TARGET_LABELS].sort((a, b) => a.localeCompare(b)),
 };
 

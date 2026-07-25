@@ -185,13 +185,33 @@ sans; mono is only for dice formulas and run IDs.
   not in scoped Svelte `<style>` — see the "Foundry vs Fabricate CSS overrides" section of
   `CONTRIBUTING.md` and the focus-ring rule in the UX-designer `SKILL.md`.
 
-## 5. Components (copy-paste)
+## 5. Shipped primitive inventory
 
-All examples reference `var(--fab-*)` via short local aliases (`--sans` etc.); substitute the
-full token names in product.
-Assume a Font Awesome 6 `<link>` is present.
-These are illustrative shapes — a component's own runtime colour may be applied inline via
-`style=`, but never a source colour literal.
+Reuse shipped primitives before adapting the illustrative shapes below.
+The component and its live CSS are authoritative; examples in this document explain intent and are not copy-paste implementation templates.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Primitive or contract | Shipped source | Reuse for |
+|---|---|---|
+| `Medallion` | `src/ui/svelte/components/Medallion.svelte` | Manager entity imagery with the canonical fallback icon, surface, radius, and sizing |
+| `StatusPill` | `src/ui/svelte/components/StatusPill.svelte` | Semantic icon-plus-label state chips; never hand-roll a local status ramp |
+| `DropZone` | `src/ui/svelte/components/DropZone.svelte` | Shared drag/drop activation, disabled state, label, and active-class behavior |
+| `ChanceSlider` | `src/ui/svelte/components/ChanceSlider.svelte` | Synchronized number/range input, normalized value, semantic thumb, value fill, or full-track semantic scale |
+| `CraftingThumb` | `src/ui/svelte/apps/crafting/CraftingThumb.svelte` | Player-facing item/recipe imagery and missing-art fallback |
+| `CraftButton` | `src/ui/svelte/apps/crafting/CraftButton.svelte` | Player craft-action treatment and disabled/action state |
+| `RollResultBox` | `src/ui/svelte/apps/crafting/detail/RollResultBox.svelte` | Post-roll result hierarchy, total, message, and awarded-item presentation |
+| Manager row/card selection | `.manager-recipe-row` and sibling manager selectors in `styles/fabricate.css` | One consistent selected-row signal, spacing, action placement, and host-CSS override |
+| Manager form/control shell | `.fabricate-manager` rules in `styles/fabricate.css` | Foundry-safe input, button, focus, range, and responsive behavior |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The reuse inventory is not limited to globally shared components.
+A feature-local primitive is the correct source when the new control belongs to that feature's vocabulary, such as `CraftButton` or `RollResultBox`.
+If reuse is impossible, record the behavioral mismatch in the plan's `Reference surfaces / reuse inventory` and prefer a shared extraction over duplicated scoped styles.
+
+The examples below reference `var(--fab-*)` via short local aliases such as `--sans`.
+A component's own runtime colour may be applied inline via `style=`, but never a source colour literal.
 
 ### 5.1 Buttons
 
@@ -286,7 +306,25 @@ The success bar gradients to guaranteed; loot bars take the rarity colour.
 <div style="height:5px;border-radius:999px;background:var(--fab-surface-active);overflow:hidden"><div style="width:40%;height:100%;background:var(--fab-drop-rate-uncommon)"></div></div>
 ```
 
-### 5.8 Nav rail item (Player, 60–84px)
+### 5.8 Semantic slider geometry
+
+Use the shipped `ChanceSlider` and its `.manager-drop-rate-control` contract in `styles/fabricate.css`.
+The visible track is inset from each input edge by the rendered thumb radius, so the thumb centre at `min` and `max` lands exactly on the visible track endpoints.
+The range input spans the full control width while the custom visible track owns the inset.
+
+Suppress native and host rendering on every engine path: the range input background and border are transparent, the WebKit runnable track is transparent, and both the Firefox track and progress pseudo-elements are transparent.
+Only the custom track and fill communicate the scale.
+The thumb colour resolves from the same semantic value function or tier as the track treatment.
+
+Distinguish the two supported track meanings:
+
+- A value-width fill sets the custom fill width to the normalized percentage and uses one semantic colour for the current tier.
+- A full-track semantic scale renders its meaningful gradient across the complete inset track and keeps the fill at 100%; it is not a progress fill.
+
+Do not apply a value-width clip to a green-to-red risk scale, because that falsely hides the future semantic range.
+Do not render a full-width solid tier colour for a progress-style chance control, because that falsely implies the entire scale has the current value.
+
+### 5.9 Nav rail item (Player, 60–84px)
 
 Active = accent-soft fill + accent-border.
 Count badge = success pill, top-right.
@@ -297,7 +335,7 @@ Count badge = success pill, top-right.
 <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;padding:10px 0;border-radius:8px;color:var(--fab-text-muted);position:relative"><i class="fa-solid fa-book-open" style="font-size:16px"></i><span style="font:500 10px var(--sans)">Journal</span><span style="position:absolute;top:6px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fab-success);border:1px solid var(--fab-success-border);color:var(--fab-on-accent);font:700 9px/16px var(--sans);text-align:center">2</span></div>
 ```
 
-### 5.9 Stat box
+### 5.10 Stat box
 
 Icon · serif number · tiny label.
 The border turns **danger** when the count is a problem.
@@ -306,7 +344,7 @@ The border turns **danger** when the count is a problem.
 <div style="flex:1;padding:12px 8px;background:var(--fab-bg-1);border:1px solid var(--fab-border);border-radius:9px;text-align:center"><i class="fa-solid fa-scroll" style="color:var(--fab-accent);font-size:13px"></i><div style="font:700 17px/1.1 var(--serif);color:var(--fab-text);margin-top:6px">1</div><div style="font:500 9px var(--sans);color:var(--fab-text-subtle);margin-top:2px">Planned</div></div>
 ```
 
-### 5.10 Labeled cell (world conditions / run meta)
+### 5.11 Labeled cell (world conditions / run meta)
 
 An uppercase micro-label over a value or meter.
 

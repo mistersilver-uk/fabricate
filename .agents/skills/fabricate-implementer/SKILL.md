@@ -44,6 +44,8 @@ When the state is not reachable by the existing capture walk in `scripts/foundry
 8. Return screenshot and smoke-test recommendations to the workflow driver.
 Do not generate, collect, publish, upload, or clean screenshot evidence from the lane, and do not update S3 or a PR.
 If capture appears impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
+When an issue-specific maintainer instruction replaces automated screenshot production, report the affected views and pending maintainer visual gate.
+The instruction does not itself supply or waive evidence: the PR still needs qualifying embedded maintainer evidence or a maintainer-applied `screenshots-exempt` label.
 9. If implementation reveals a durable product rule, update the relevant canonical spec under `openspec/specs/` (and flag it for the issue delta when it changes the planned contract).
 10. Run only the focused checks explicitly allowed by the assignment brief.
 Do not install dependencies or run the complete unit-test, build, lint, format, Foundry, Docker, or screenshot gates from the lane.
@@ -88,6 +90,7 @@ Report any focused check that cannot run with the existing lane environment.
 These mirrors rot silently otherwise.
 - Recommend `npm run test:foundry` when the task depends on Foundry runtime integration or the user asks for live Foundry evidence; for PR screenshot evidence recommend the scoped `npm run test:foundry:screenshots` producer, which captures only the changed-file-affected views (from `mapChangedFilesToViews`) as full real-Foundry app windows.
 The workflow driver owns that run and separates harness infrastructure failures from product regressions.
+- For non-trivial UI work, return the plan's reference/reuse inventory and identify the shipped primitive or CSS contract used for each repeated control; a hand-rolled replacement needs a justified incompatibility.
 - For card, overlay, menu, disabled-state, and icon-button interactions, real browser pointer hit-tests are required whenever the change adds or repositions an overlay, menu, disabled state, card action, or icon-only control; skip them only when the rendered DOM and CSS stacking of the control are unchanged, and say so in the handoff. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss — see `.agents/skills/fabricate-implementer/references/pointer-hit-tests.md` for the `assertPointerTarget` recipe and where to wire it into the smoke harness.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data so at least one screenshot proves the linked image path as well as fallback behavior; when no linked-image fixture exists, name that gap explicitly in the handoff.

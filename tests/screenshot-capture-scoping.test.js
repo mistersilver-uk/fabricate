@@ -50,6 +50,41 @@ const TOOL_STUDIO_LABELS = [
   'manager-tool-parity-06-breakage-900x700',
   'manager-tool-stress-wrapping-680',
 ];
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
+function writeScopedRunEvidence(results, changedFiles, frames = []) {
+  const runId = 'scoped-capture-test-run';
+  const headSha = 'scope123';
+  const targetLabels = mapChangedFilesToViews(changedFiles)
+    .flatMap(view => view.smokeLabels);
+  const captures = frames.map(({ file, label }) => ({
+    file,
+    label,
+    width: 1,
+    height: 1,
+  }));
+  for (const { file } of captures) {
+    writeFileSync(join(results, file), ONE_PIXEL_PNG);
+  }
+  writeFileSync(join(results, 'summary.json'), JSON.stringify({
+    passed: true,
+    stepFailures: 0,
+    consoleErrorCount: 0,
+    degraded: false,
+    rendererCrashed: false,
+    screenshotRun: { runId, headSha, targetLabels },
+  }));
+  writeFileSync(join(results, 'screenshot-manifest.json'), JSON.stringify({
+    runId,
+    headSha,
+    targetLabels,
+    captures,
+  }));
+  return headSha;
+}
 
 function harnessFunctionSpan(start, end) {
   const match = HARNESS.match(new RegExp(
@@ -162,14 +197,18 @@ test('a player/craft target set needs phase-E; collect throws when a mapped view
 
   const root = mkdtempSync(join(tmpdir(), 'fabricate-scope-'));
   try {
-    mkdirSync(join(root, 'test-results'), { recursive: true });
+    const results = join(root, 'test-results');
+    mkdirSync(results, { recursive: true });
+    const changedFiles = ['src/ui/svelte/apps/inventory/InventoryView.svelte'];
+    const headSha = writeScopedRunEvidence(results, changedFiles);
     // No frame for the mapped view → collect throws (a silently-empty scoped run
     // must fail loudly, never publish a missing view).
     assert.throws(
       () => collectScreenshotEvidence({
-        changedFiles: ['src/ui/svelte/apps/inventory/InventoryView.svelte'],
+        changedFiles,
         prNumber: 826,
         root,
+        headSha,
       }),
       /Missing smoke screenshots/,
     );
@@ -193,21 +232,35 @@ test('a scoped run renumbers the counter yet still selects the intended candidat
   try {
     const results = join(root, 'test-results');
     mkdirSync(results, { recursive: true });
+    const changedFiles = ['src/ui/svelte/apps/manager/SystemsBrowserView.svelte'];
     // A scoped `screenshots` run captures ONLY manager-systems' three labels and
     // renumbers the screenshot counter from 01 — a different absolute number than the
     // full walk, but the SAME relative capture order (filtering never reorders).
-    writeFileSync(join(results, 'screenshot-01-manager-default-selection.png'), 'default');
-    writeFileSync(join(results, 'screenshot-02-manager-selected-normal.png'), 'normal');
-    writeFileSync(join(results, 'screenshot-03-manager-selected-stacked.png'), 'stacked');
+    const frames = [
+      {
+        file: 'screenshot-01-manager-default-selection.png',
+        label: 'manager-default-selection',
+      },
+      {
+        file: 'screenshot-02-manager-selected-normal.png',
+        label: 'manager-selected-normal',
+      },
+      {
+        file: 'screenshot-03-manager-selected-stacked.png',
+        label: 'manager-selected-stacked',
+      },
+    ];
+    const headSha = writeScopedRunEvidence(results, changedFiles, frames);
 
     const result = collectScreenshotEvidence({
-      changedFiles: ['src/ui/svelte/apps/manager/SystemsBrowserView.svelte'],
+      changedFiles,
       prNumber: 826,
       root,
+      headSha,
     });
     assert.equal(result.copied.length, 1);
     // candidates[0] is the lowest-numbered = first-captured = manager-default-selection.
-    assert.equal(readFileSync(result.copied[0].destination, 'utf8'), 'default');
+    assert.match(result.copied[0].source, /screenshot-01-manager-default-selection\.png$/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -670,7 +723,10 @@ test('Tool evidence contracts reject leaked horizontal state and duplicate store
 });
 
 test('the Tool Studio run writes one summary/manifest identity with head, target labels, and measured clips', () => {
-  assert.match(HARNESS, /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha:[\s\S]*?targetLabels:/);
+  assert.match(
+    HARNESS,
+    /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha: resolveScreenshotHeadSha\(\{[\s\S]*?explicitHeadSha: process\.env\.FOUNDRY_SCREENSHOT_HEAD_SHA,[\s\S]*?ciHeadSha: process\.env\.GITHUB_SHA,[\s\S]*?\}\),[\s\S]*?targetLabels:/,
+  );
   assert.match(HARNESS, /results\.screenshotRun = screenshotRunIdentity/);
   assert.match(
     HARNESS,

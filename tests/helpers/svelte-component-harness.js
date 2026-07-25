@@ -1,14 +1,91 @@
 // Shared harness for mounted Svelte component tests. Compiling each `.svelte`
 // into a temp dir and rewriting its client imports is identical across every
 // component test, so it lives here rather than being copy-pasted per file.
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile, compileModule } from 'svelte/compiler';
 import { createClassComponent } from 'svelte/legacy';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
+
+const STATIC_IMPORT_PATTERN = /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+
+function toRepoPath(repoRoot, absolutePath) {
+  return relative(repoRoot, absolutePath).replaceAll('\\', '/');
+}
+
+function resolveLocalModule(repoRoot, importerPath, specifier) {
+  const absolutePath = resolve(repoRoot, dirname(importerPath), specifier);
+  const candidates = [
+    absolutePath,
+    `${absolutePath}.js`,
+    `${absolutePath}.svelte`,
+    `${absolutePath}.svelte.js`,
+    join(absolutePath, 'index.js'),
+    join(absolutePath, 'index.svelte')
+  ];
+  const match = candidates.find((candidate) => existsSync(candidate));
+  return match ? toRepoPath(repoRoot, match) : null;
+}
+
+function declarationListFor(modulePath) {
+  if (modulePath.endsWith('.svelte.js')) return 'runeModules';
+  if (modulePath.endsWith('.svelte')) return 'compiledModules';
+  return 'rawModules';
+}
+
+function formatImporterChain(importerChain) {
+  return importerChain.join(' -> ');
+}
+
+function validateMountedComponentDependencies({ repoRoot, rawModules, runeModules, compiledModules, componentPath }) {
+  const declaredModules = new Set([...rawModules, ...runeModules, ...compiledModules, componentPath]);
+  const pending = [
+    ...[...declaredModules]
+      .filter((modulePath) => modulePath !== componentPath)
+      .map((modulePath) => ({ modulePath, importerChain: [modulePath] })),
+    { modulePath: componentPath, importerChain: [componentPath] }
+  ];
+  const visited = new Set();
+  const missing = [];
+
+  while (pending.length > 0) {
+    const { modulePath: importerPath, importerChain } = pending.pop();
+    if (visited.has(importerPath)) continue;
+    visited.add(importerPath);
+
+    const sourcePath = resolve(repoRoot, importerPath);
+    if (!existsSync(sourcePath)) {
+      missing.push(`declared module ${importerPath} does not exist`);
+      continue;
+    }
+
+    const source = readFileSync(sourcePath, 'utf8');
+    for (const match of source.matchAll(STATIC_IMPORT_PATTERN)) {
+      const specifier = match[1];
+      if (!specifier.startsWith('.')) continue;
+
+      const importedPath = resolveLocalModule(repoRoot, importerPath, specifier);
+      if (!importedPath) {
+        missing.push(`${importerPath} imports ${specifier}, but no local module resolves from it`);
+        continue;
+      }
+      if (!declaredModules.has(importedPath)) {
+        missing.push(
+          `${formatImporterChain([...importerChain, importedPath])}; ${importerPath} imports ${specifier} (${importedPath}); add it to ${declarationListFor(importedPath)}`
+        );
+        continue;
+      }
+      pending.push({ modulePath: importedPath, importerChain: [...importerChain, importedPath] });
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Mounted Svelte harness dependency closure is incomplete:\n- ${missing.join('\n- ')}`);
+  }
+}
 
 /**
  * Rewrite a compiled component's imports so they resolve against the temp dir:
@@ -183,6 +260,7 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
 
   return {
     async setup() {
+      validateMountedComponentDependencies({ repoRoot, rawModules, runeModules, compiledModules, componentPath });
       setupDOM();
       installComponentTestGlobals();
       tempRoot = mkdtempSync(join(tmpdir(), tmpPrefix));

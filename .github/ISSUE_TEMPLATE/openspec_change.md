@@ -33,6 +33,7 @@ confirmed with the user.
 
 Implementation and architecture decisions; dependency boundaries, split points, and
 test seams where JavaScript structure is part of the task.
+For non-trivial UI work, include a `Reference surfaces / reuse inventory` that names every supplied visual artifact and analogous shipped surface, the canonical primitives and CSS contracts selected for reuse, and each justified non-reuse or extraction gap.
 
 ### Tasks
 

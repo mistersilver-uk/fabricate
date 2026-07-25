@@ -154,6 +154,41 @@ Use the next revision suffix in its branch and directory name.
 An escalated lane is not a feedback revision and is never a reused lane.
 It is recreated at the **same** assigned base with the **same** owned paths and the **same** revision number, differing only in model tier, so its branch and directory carry the new model-tiered token rather than the next revision suffix.
 
+### Explicit feedback batching
+
+When a maintainer explicitly asks to batch feedback, the driver records findings without starting piecemeal revisions.
+It waits for the maintainer's stated batch boundary, then produces one cohesive revision ordered first by severity and then by path owner and dependency order.
+Only a safety or data-loss blocker interrupts the batch.
+Ordinary correctness, polish, documentation, and test findings remain queued even when individually actionable.
+
+Before starting the batch revision, the driver restates the complete queued set, resolves overlaps and superseded comments, assigns each path exactly one owner, and records which findings share a validation pass.
+The driver preserves the original findings-to-commit mapping so review can prove the single revision addressed the full batch.
+
+## Manual-test candidate handoff
+
+Before asking a maintainer to test, the driver MUST integrate the candidate into the intended checkout or deliberately serve it from another exact worktree.
+The handoff reports:
+
+- the absolute worktree root containing the candidate;
+- its branch name and exact `HEAD` SHA;
+- the URL and launch command the maintainer should use;
+- tracked, meaningful untracked, and relevant ignored dirty-state status;
+- the checkout or running process the maintainer asked to use; and
+- mechanical proof that the requested checkout or launch surface can see the candidate SHA.
+
+Branch and SHA claims alone do not prove visibility.
+For a dev server, report the process working directory and the source SHA it serves.
+For a Foundry module, report the module path or link target visible to Foundry and prove that it resolves into the candidate root.
+For an already-running process, restart it when necessary and prove the new process uses the candidate rather than assuming hot reload crossed worktrees.
+
+Record coordinator branch, `HEAD`, and `git status --short` before and after preparing the candidate.
+Prefer a separate clean coordinator or serving worktree.
+When the coordinator contains unrelated user-owned tracked, untracked, or ignored state, preserve it in place and use another clean worktree; do not stash, delete, overwrite, or absorb that state merely to make a candidate visible.
+If a requested checkout cannot safely expose the candidate without disturbing unrelated state, say so and provide the exact alternate root and launch command instead of claiming the requested checkout is ready.
+
+The manual handoff proves only which candidate the maintainer will exercise.
+It does not replace implementation review, authoritative gates, or screenshot evidence.
+
 ## Integration checks
 
 Before integrating each lane, the driver mechanically verifies:
@@ -201,6 +236,10 @@ If the explicit lease is rejected, stop and investigate the remote change; never
 7. Mark the PR ready for review, then wait for every required GitHub Actions and external check associated with that exact remote head.
 Both SonarCloud checks, Automatic Analysis and Quality Gate, must report success.
 Pending, skipped when required, cancelled, stale-head, and failing results do not satisfy the gate.
+Select one authoritative full check-suite attempt for that exact head, normally the attempt triggered by `ready_for_review`.
+Require every full gate from that attempt to succeed, and do not assemble a green rollup from successful jobs spread across duplicate attempts.
+Metadata-only `edited` attempts are never authoritative code-gate attempts.
+Skipped or cancelled duplicate attempts do not invalidate a separately identified authoritative attempt, but they also cannot fill a missing gate in it.
 8. If any check fails, return the PR to draft before gathering evidence, reconciling the issue, and routing fixes through isolated implementation and review lanes.
 Repeat rebase, local validation, explicit-lease push, ready transition, and exact-head CI after a fix.
 Repeat detached review only when the fix or rebase materially changes the reviewer's owned concern or an unresolved finding remains.
