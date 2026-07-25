@@ -145,8 +145,10 @@ This is the shared deletion primitive behind erasing a single recipe, resetting 
 | `options.freeLearnBudget` | `boolean` | Free the consumed learn budget so a capped book permits re-learning (default `true`) |
 | `options.clearDiscovery` | `boolean` | Also clear each recipe's discovery progress (default `false`) |
 
-When `freeLearnBudget` is `true`, each cleared entry frees one consumed learn slot against a source book, but only when all of the following hold: the entry names a source book, the actor still owns that copy, the recipe still exists, and that book's definition actually limits how many recipes it teaches.
-An auto-learned entry (no recorded source book), an entry whose source copy is no longer owned, an entry whose recipe no longer exists, or an entry whose source book has no learn cap, all free nothing.
+When `freeLearnBudget` is `true`, a cleared entry frees one consumed learn slot only when four things all hold: it names a source book, the actor still holds that book, the recipe still resolves, and that book actually caps learning.
+An entry failing any of the first three is an orphan case and gets no budget math at all: an auto-learned entry (no recorded source book), a source book the actor no longer holds, or a recipe id that no longer resolves.
+The fourth is not an orphan case: the source book is present and the recipe resolves, so the decrement runs, but an uncapped book's learn count was never incremented in the first place, so the decrement has nothing to give back.
+See [Knowledge]({% link visibility.md %}#learned-recipes-tab) for how the Knowledge surface states this to a GM before they erase a row.
 
 **Returns:** `Promise<{ success: boolean, count: number }>`
 

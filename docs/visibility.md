@@ -390,22 +390,23 @@ See [Resetting a Character's Knowledge](#resetting-a-characters-knowledge) below
 This tab lists every copy of a recipe item the selected character is carrying, one row per copy.
 Each row shows the item's image and name, its type, a chip for its remaining uses, and how many recipes it teaches.
 A copy that has run out of uses shows a **Spent** chip.
-A copy that ran out of uses while set to **Become inert**, rather than **Destroyed**, also shows a separate **Inert** chip alongside its uses chip.
+A copy that ran out of uses while set to **Becomes inert**, rather than **Destroyed**, also shows a separate **Inert** chip alongside its uses chip.
 That marker is a record of the moment the copy ran out, and it does not by itself change whether the copy still has charges.
 If you later raise the copy's use limit, it can show the Inert marker alongside a chip that says it still has charges left.
 Fabricate does not currently offer a way to clear the Inert marker.
 
 Each row has two actions.
 
-- **Expend use** spends one use of the copy, exactly as if the character had spent it during play.
-  It is disabled once the copy is spent, and disabled for a copy with unlimited uses, because there is nothing to spend.
+- **Expend use** spends one use of the copy immediately, exactly as if the character had spent it during play.
+  There is no confirmation step, so a click takes effect at once.
+  Spending a copy's last use applies the book's **When the last use is spent** setting right away, which can delete the copy.
+  The button is disabled once the copy is spent, and disabled for a copy with unlimited uses, because there is nothing to spend.
 - **Delete** removes the copy entirely.
-  For a stacked copy, deleting removes the whole stack, not one unit at a time.
+  It asks you to confirm first: click once to arm the button, then click again to confirm, or click elsewhere to back out.
+  For a stacked copy, deleting removes the whole stack, not one unit at a time, and asks for confirmation in a full dialog naming the quantity instead of the quick arm-and-click.
   Deleting a copy never touches anything the character has already learned from it.
   When deleting this copy would strand a shared learning budget, the tab shows a warning explaining why, so you know to erase memory first.
   See [Erase Memory Before Delete](#erase-memory-before-delete) below.
-
-Both actions ask you to confirm before acting: a quick inline confirmation for a single, unstacked copy, and a full confirmation dialog for a stacked copy.
 
 ### Learned Recipes Tab
 
@@ -415,8 +416,9 @@ Each row shows the recipe's image, name, and category, and a line naming where i
 When the source copy is gone, the line still names the book or scroll it came from, marked as no longer owned.
 
 Each row has one action, **Erase memory**, which un-learns the recipe for this character.
+It asks you to confirm first, the same click-to-arm, click-to-confirm pattern as Delete on the Recipe items tab.
 Erasing frees up a learning slot on the source book only when that book still has a copy this character owns, and only when that book's **Limited learning** is on.
-An automatically learned recipe, or one whose source copy is gone, frees nothing when erased.
+An automatically learned recipe, one whose source copy is gone, or one whose source book has no learning limit, all free nothing when erased.
 Such a row is labelled **Frees no slot** so you know what to expect before you act.
 Erasing leaves the character's discovery progress on that recipe untouched, unlike the reset control below.
 
