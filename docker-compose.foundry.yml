@@ -29,7 +29,14 @@
 services:
   foundry:
     image: "${FOUNDRY_IMAGE:-felddy/foundryvtt:13}"
-    container_name: fabricate-foundry-test
+    # Per-worktree-stable identity (issue #827). foundry-test-up.mjs derives both from
+    # the worktree root via scripts/lib/foundryRunIdentity.js so the name is unique
+    # across worktrees (no more fixed-name collision + manual `docker rm -f`) yet stable
+    # within a worktree — which keeps the container-reuse cache AND felddy's cached
+    # signed license valid (the license binds to the hostname). The literal fallbacks
+    # preserve the historic single-worktree behaviour when the vars are unset.
+    container_name: "${FOUNDRY_CONTAINER_NAME:-fabricate-foundry-test}"
+    hostname: "${FOUNDRY_CONTAINER_HOSTNAME:-fabricate-foundry-test}"
     # Run the container as the host user so bind-mounted volumes are writable.
     # The v13 image runs as 1000:1000 by default; on GitHub Actions the runner
     # is 1001:1001. foundry-test-up.mjs sets FOUNDRY_HOST_UID/GID before

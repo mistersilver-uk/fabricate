@@ -1,5 +1,16 @@
 # Resolution Modes
 
+## Relative Routed Natural Stepping
+
+`craftingCheck.routed.natStepping` and `salvageCraftingCheck.routed.natStepping` are default-off booleans owned by their relative routed check configurations.
+Fixed routed checks ignore the setting, and gathering exposes and persists no corresponding setting.
+
+After relative-margin matching and before result delivery, the shared check runner inspects the kept active face of the first d20 dice group.
+A kept natural 20 steps the matched tier once toward the next higher tier, and a kept natural 1 steps it once toward the next lower tier.
+A forced outcome takes precedence and bypasses natural stepping.
+Fixed tiers never step, and a natural at the existing cap or floor is a no-op.
+Only an actual tier change records `data.natStep` evidence and produces the localized crafting or salvage chat note.
+
 ## Purpose
 
 Define semantics and validation rules for crafting-system resolution modes.
@@ -66,6 +77,11 @@ This built-in dice-expression check is the low-complexity path for GMs who do no
 - A check is **usable** IFF its mode's `rollFormula` is authored.
 The historical macro-as-check-source and the `checkSource: "builtIn"` game-system adapter (`builtIn: { ability, skill, dc, advantage }`) were removed in 1.8.0 and are not part of the model; see `data-models` requirement 30 and its *Crafting Check Macro Contract* section.
 - The legacy `craftingCheck.mode` discriminator has the single valid value `passFail` and drives nothing; the active check sub-object is selected by `resolutionMode` (see `data-models` requirement 29).
+- A check roll formula MAY reference **`@craftingmod`**, a Fabricate-resolved scalar computed from the system's **`checkModifiers`** catalogue (`{id,label,icon?,expression}[]`) under a **`defaultModifierPolicy`** (`addAll` → sum, `highest` → deterministic `max(...)` scalar, `byRecipe` → the recipe's own set summed), optionally overridden per recipe by **`Recipe.craftingModifier`** (`{policy?, modifierIds?}`; absent = inherit the system default policy + `defaultModifierIds`).
+Each eligible entry's `expression` is a roll-data fragment (e.g. `@abilities.med.mod`) evaluated against the crafter's roll data to a number (a missing/failed expression contributes 0, never NaN).
+Resolution is **deterministic** in Phase 1 (no new interactive branch — whether the player is prompted stays governed by the existing `interactive` flag); `@craftingmod` is resolved to a scalar and substituted **before** the string reaches Foundry's `Roll` (Foundry would otherwise treat an unresolved `@craftingmod` as 0), feeding **both** evaluation (`checkRoll.js` `evaluateCheckRoll`) and display (`resolveCheckFormulaDisplay`) so the shown formula equals what evaluates.
+A formula with no `@craftingmod` token is unchanged (full single-formula back-compat).
+The interactive `playerPicks` selection policy is out of scope for this phase (Phase 2).
 
 ## Player-Facing Mode Labels
 
@@ -318,12 +334,18 @@ An item's own `flags.fabricate.essences` still take precedence over any componen
 This alchemy-scoped resolution MUST NOT be pushed into the shared `findMatchingComponent`, `resolveComponentForItem`, or `getItemSourceReferences`; gathering, inventory, and standard crafting keep the narrower ladder unchanged, so the same tier-4-only item remains unrecognized in a standard (non-alchemy) craft.
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack `system.quantity`; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
-- Signature overlap is invalid across all recipes in the system.
-Two ingredient sets overlap only when they are genuinely ambiguous: a single plausible submission satisfies BOTH sets' group requirements at once.
-A pair conflicts iff some **transversal** of one set — the natural "the ingredients each requirement calls for" craft, choosing one satisfying option per group and supplying exactly its required quantity of units — also satisfies every group of the other set (in either direction).
-The transversal is quantity-aware: a `quantity: N` option can supply up to `N` DISTINCT components, so a `{metal x2}` group crafted iron + gold overlaps a `{iron},{gold}` set.
-This transversal condition is a sound (never under-rejecting) approximation of the ambiguity the superset-tolerant, first-match runtime exhibits; it treats a target group as covered by the mere presence of one matching component rather than re-checking that group's own quantity, so it may over-reject rather than miss a genuine collision.
-Merely sharing a common base component (water, reagent, flask) is NOT overlap when the sets are otherwise distinguishable (e.g. `{Water},{Herb}` vs `{Water},{Mineral}`); overlap DOES include a set whose group requirements are a subset of another's (e.g. `{Water}` vs `{Water},{Herb}`, since every transversal of the larger set also satisfies the smaller), and two single-group sets sharing a component that satisfies both.
+- The runtime matcher resolves a submission to the **most-specific matching set**, not the first authored match.
+It collects EVERY enabled set whose every group is satisfied by the submission (superset-tolerant, `>= required`, extras consumed as essence contributors) and picks the unique maximum under a specificity partial order: set A is MORE SPECIFIC than B when a natural transversal of A also satisfies every group of B (A's required-group structure is a proper superset of B's — required-group containment, NOT units consumed) while no transversal of B satisfies A.
+When no unique maximum exists — two incomparable co-matching sets (e.g. an over-submission satisfying both siblings `{S,V,E}` and `{S,V,R}`) — the runtime FAILS SAFE to a no-signature-match fizzle; it MUST NOT pick one by iteration order.
+This is the runtime counterpart of the enable-time guard below and consumes the SAME domination predicate, so the two can never disagree about which set is more specific.
+- Signature INSEPARABILITY is invalid across all recipes in the system.
+Two ingredient sets are inseparable only when they are ambiguous in a way no added or different ingredient can ever resolve: a plausible submission of EACH set also satisfies the OTHER — the **symmetric** transversal condition.
+A pair conflicts iff some **transversal** of one set — the natural "the ingredients each requirement calls for" craft, choosing one satisfying option per group and supplying exactly its required quantity of units — satisfies every group of the other set AND vice versa (BOTH directions).
+The transversal is quantity-aware: a `quantity: N` option can supply up to `N` DISTINCT components.
+Symmetric-transversal inseparability covers exactly: identical signatures; two single-group sets sharing a component that satisfies both (e.g. a `mithril` tagged both `rare` and `metal` for `{rare}` vs `{metal}`); and an OR-option set that fully shadows a narrower one.
+A strict subset/superset pair (e.g. `{Water}` vs `{Water},{Herb}`, or a `{metal x2}` group vs its distinct `{iron},{gold}` components) is ONE-directional and is now ALLOWED — the runtime's most-specific pick brews the superset when the extra ingredient is present and the base when it is not.
+Incomparable siblings (`{S,V,E}` vs `{S,V,R}`) satisfy neither direction and are ALLOWED; an ambiguous over-submission of both fizzles safely rather than brewing the wrong one.
+Merely sharing a common base component (water, reagent, flask) is NOT inseparability when the sets are otherwise distinguishable (e.g. `{Water},{Herb}` vs `{Water},{Mineral}`).
 - No-signature-match (a fizzle) is treated as a failed attempt: the player sees a specific failure message and the submitted ingredients are consumed (per `alchemy.consumeOnFail`).
 Learning is never granted by a fizzle.
 - The matched-but-unroutable **misconfiguration** path applies to **Tiered only** (None/Simple do not route by name): the craft aborts with ZERO mutation BEFORE any consumption (no ingredients, currency, or tools consumed or broken), reports failure (never a player success with zero items), and returns actionable GM diagnostics.
@@ -350,7 +372,7 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 
 #### Workbench Status Model (five modes)
 
-- The bench drives a five-mode status model that governs the status pill, the Produces panel, and the Brew affordance: `empty`; `assembling` (the bench is a strict subset of a selected known recipe's signature); `ready` (the bench equals a known signature); `untried` (the bench matches no known recipe AND is not a remembered fizzle); `no-reaction` (the bench matches no known recipe AND IS a remembered fizzle).
+- The bench drives a five-mode status model that governs the status pill, the Produces panel, and the Brew affordance: `empty`; `assembling` (the bench is a strict subset of a selected known recipe's signature); `ready` (the bench matches a known signature — superset-tolerant and resolved to the same MOST-SPECIFIC pick as the engine, so a bench that CONTAINS one known concrete while being a superset of another does not read a false `ready` for the smaller, and a non-unique maximum reads no confident `ready`); `untried` (the bench matches no known recipe AND is not a remembered fizzle); `no-reaction` (the bench matches no known recipe AND IS a remembered fizzle).
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
 - **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
 It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
@@ -397,7 +419,7 @@ Simple additionally tolerates the reserved `role: 'failure'` group, whose ABSENC
   - **Tiered** — at least one result group; reserved/duplicate `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, Tiered only), exactly like `routedByCheck`.
 - A Simple- or Tiered-check-mode system requires an authored crafting-check roll formula (`craftingCheck.simple` for Simple, `craftingCheck.routed` for Tiered): a missing formula is an unconditional system-level blocker (`alchemyCheckNoFormula`) surfaced by `systemValidation`, not a per-recipe error.
 The retired provider required/enum rules no longer apply (issue 554).
-- All recipes must satisfy alchemy-wide signature uniqueness invariants; any signature collision blocks save/import operations system-wide until resolved.
+- All recipes must satisfy alchemy-wide signature separability invariants; a signature collision — now narrowed to an INSEPARABLE (symmetric-transversal) pair, no longer a mere subset/superset — blocks save/import operations system-wide until resolved.
 
 ## Testing Requirements
 

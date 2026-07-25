@@ -32,7 +32,7 @@ const harness = createMountedComponentHarness({
     // The salvage bodies render the house chip primitive. The preview never reaches them,
     // but the compiled router imports them statically, so it is still in the graph.
     'src/ui/svelte/components/StatusPill.svelte',
-    'src/ui/svelte/apps/manager/ItemPickerModal.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
@@ -51,7 +51,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
+    // The multi-system participation selector InventoryComponentDetail imports (issue 766).
+    'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',

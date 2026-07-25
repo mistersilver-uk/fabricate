@@ -11,6 +11,7 @@
   the step.
 -->
 <script>
+  import { ingredientSetToolsAreActive } from '../../../../../systems/toolCheckBonus.js';
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeToolsSection from './RecipeToolsSection.svelte';
@@ -24,10 +25,13 @@
     collapsed = false,
     toolIds = [],
     toolsLibrary = [],
+    routingProvider = null,
     onAddTool = () => {},
     onRemoveTool = () => {},
     onAddStepTool = () => {},
     onRemoveStepTool = () => {},
+    onAddIngredientSetTool = () => {},
+    onRemoveIngredientSetTool = () => {},
     onDeleteStep = () => {}
   } = $props();
 
@@ -41,12 +45,27 @@
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
   }
+
+  function ingredientSets(scope) {
+    return Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
+  }
+
+  function setToolIds(set) {
+    return Array.isArray(set?.toolIds) ? set.toolIds : [];
+  }
+
+  function toolEligibleIngredientSets(scope) {
+    const system = {
+      resolutionMode: routingProvider === 'ingredientSet' ? 'routedByIngredients' : null
+    };
+    return ingredientSets(scope).filter((set) => ingredientSetToolsAreActive(system, set));
+  }
 </script>
 
 <section class="manager-recipe-tab manager-recipe-tools-tab" data-recipe-tab="tools" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Tools', 'Tools')}>
   <div class="manager-recipe-tab-intro">
     <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.Recipe.ToolsSection', 'Tools')}</h2>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ToolsIntro', 'Required to craft but not consumed — a forge, a cauldron, a whetstone.')}</p>
+    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ToolsIntro', 'Required for crafting — configure their behavior in Tool Studio.')}</p>
   </div>
 
   {#if collapsed}
@@ -85,6 +104,23 @@
           onAddTool={(toolId) => onAddStepTool(step.id, toolId)}
           onRemoveTool={(toolId) => onRemoveStepTool(step.id, toolId)}
         />
+        {#each toolEligibleIngredientSets(step) as set (set.id)}
+          <div class="manager-recipe-ingredient-set manager-recipe-tools-ingredient-set" data-recipe-tools-ingredient-set={set.id}>
+            <div class="manager-recipe-ingredient-set-head">
+              <div class="manager-recipe-result-set-static-label" data-recipe-tool-set-label>
+                <span>{set.name}</span>
+              </div>
+            </div>
+            <RecipeToolsSection
+              idPrefix={`step-${step.id}-set-${set.id}-`}
+              toolIds={setToolIds(set)}
+              {toolsLibrary}
+              emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyIngredientSet', 'No tools needed for this ingredient set.')}
+              onAddTool={(toolId) => onAddIngredientSetTool(step.id, set.id, toolId)}
+              onRemoveTool={(toolId) => onRemoveIngredientSetTool(step.id, set.id, toolId)}
+            />
+          </div>
+        {/each}
       {/snippet}
     </RecipeStepAccordion>
   {:else}
@@ -95,5 +131,22 @@
       {onAddTool}
       {onRemoveTool}
     />
+    {#each toolEligibleIngredientSets(recipe) as set (set.id)}
+      <div class="manager-recipe-ingredient-set manager-recipe-tools-ingredient-set" data-recipe-tools-ingredient-set={set.id}>
+        <div class="manager-recipe-ingredient-set-head">
+          <div class="manager-recipe-result-set-static-label" data-recipe-tool-set-label>
+            <span>{set.name}</span>
+          </div>
+        </div>
+        <RecipeToolsSection
+          idPrefix={`set-${set.id}-`}
+          toolIds={setToolIds(set)}
+          {toolsLibrary}
+          emptyLabel={text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyIngredientSet', 'No tools needed for this ingredient set.')}
+          onAddTool={(toolId) => onAddIngredientSetTool(null, set.id, toolId)}
+          onRemoveTool={(toolId) => onRemoveIngredientSetTool(null, set.id, toolId)}
+        />
+      </div>
+    {/each}
   {/if}
 </section>

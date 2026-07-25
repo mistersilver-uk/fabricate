@@ -152,8 +152,8 @@ One case needs your attention.
 If a Routed by ingredients check used a dynamic difficulty, switching into Routed by check drops the dynamic difficulty, because Routed by check does not support one.
 Re-author the DC on the **Crafting check** page after switching into Routed by check so the tier check uses the difficulty you intend.
 
-Recipes are authored through the API only today.
-See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+You author routed recipes in the recipe editor in the Crafting Admin panel, and the public API can create them too.
+See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for those methods.
 
 ---
 

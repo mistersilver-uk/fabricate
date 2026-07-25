@@ -11,6 +11,8 @@
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
 import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
 
+import { applyCraftingModifier } from './craftingModifierResolver.js';
+
 /**
  * Summarise an evaluated Roll's dice as
  * `{ groupId, group: "NdS", sum, results: number[] }` entries.
@@ -123,6 +125,9 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
  * @param {string} [options.flavor] Chat message flavor / dialog label.
  * @param {object} [options.speaker] Chat message speaker.
  * @param {*} [options.dc] The DC surfaced to the prompt (display only).
+ * @param {object} [options.craftingModifier] The `@craftingmod` modifier context
+ *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`.
+ *   Resolved to a scalar and substituted before the formula reaches Foundry's `Roll`.
  * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
  *   resolvedFormula: string|null, cancelled?: boolean}>}
  */
@@ -130,13 +135,18 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  // Resolve the Fabricate-owned `@craftingmod` placeholder (issue 770) to a scalar
+  // and substitute it BEFORE anything downstream reads the formula, so the dialog,
+  // roll, and journal all agree (eval == display). A formula without `@craftingmod`
+  // (or no modifier context) is returned unchanged — full single-formula back-compat.
+  const baseFormula = applyCraftingModifier(String(formula), actor, options?.craftingModifier);
   // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
   // can show the actual modifiers, not the authored `@abilities…` placeholders.
   // Recomputed from the COMBINED formula below when a valid situational bonus is
   // applied, so the journal display reconciles with the rolled total (FIX 3).
-  let resolved = resolveCheckFormulaDisplay(formula, actor);
+  let resolved = resolveCheckFormulaDisplay(baseFormula, actor);
 
-  let effectiveFormula = String(formula);
+  let effectiveFormula = baseFormula;
   let effectiveRollMode = options?.rollMode;
 
   // Interactive roll (opt-in): confirm with the player and optionally append a
@@ -229,16 +239,26 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
  * or a non-numeric substitution) — `missing: 'NaN'` makes those detectable, since
  * Foundry would otherwise silently leave or zero an unmatched key.
  *
+ * The optional `craftingModifier` context (issue 770) resolves the Fabricate-owned
+ * `@craftingmod` placeholder to a scalar FIRST — using the SAME pure resolver the
+ * eval path uses — so the displayed formula equals what evaluates (eval == display).
+ *
  * @param {string} formula
  * @param {object|null} actor
+ * @param {object|null} [craftingModifier] The `@craftingmod` modifier context
+ *   (`{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`); omit for
+ *   salvage/gathering or a formula with no `@craftingmod` token.
  * @returns {{ display: string, resolved: boolean }|null}
  */
-export function resolveCheckFormulaDisplay(formula, actor) {
+export function resolveCheckFormulaDisplay(formula, actor, craftingModifier = null) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   const Roll = globalThis.Roll;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  const display = Roll.replaceFormulaData(String(formula), rollData, {
+  // Substitute `@craftingmod` before Foundry's placeholder pass — Foundry would treat
+  // an unresolved `@craftingmod` as 0 and silently swallow it.
+  const substituted = applyCraftingModifier(String(formula), actor, craftingModifier, Roll);
+  const display = Roll.replaceFormulaData(substituted, rollData, {
     missing: 'NaN',
     warn: false,
   });
@@ -269,6 +289,7 @@ export async function runFormulaPassFail({
   actor,
   label = 'Crafting',
   rollOptions = null,
+  craftingModifier = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -277,7 +298,7 @@ export async function runFormulaPassFail({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc });
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc, craftingModifier });
     } catch (error) {
       console.error(`Fabricate | ${label} check roll failed (${formula})`, error);
       return {
@@ -347,6 +368,7 @@ export async function runFormulaProgressive({
   actor,
   label = 'Crafting',
   rollOptions = null,
+  craftingModifier = null,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -355,7 +377,7 @@ export async function runFormulaProgressive({
   if (formula) {
     let rolled;
     try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions });
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
     } catch (error) {
       console.error(`Fabricate | ${label} progressive check roll failed (${formula})`, error);
       return {
@@ -513,6 +535,46 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
 }
 
 /**
+ * Step a naturally matched relative tier once for an active natural 20/1.
+ *
+ * Dice groups already contain active-only raw faces, so advantage/disadvantage
+ * pools expose only their kept face. A group with multiple active faces has no
+ * single kept face and is deliberately ineligible. Returns no evidence unless a
+ * neighbouring tier actually exists.
+ */
+function stepNaturalRoutedOutcome({ matched, type, natStepping, diceGroups, relativeOutcomes }) {
+  if (natStepping !== true || type !== 'relative' || !matched) {
+    return { matched, natStep: null };
+  }
+  const d20Group = (Array.isArray(diceGroups) ? diceGroups : []).find((group) =>
+    /^\d+d20$/i.test(String(group?.group || ''))
+  );
+  const activeFaces = Array.isArray(d20Group?.results) ? d20Group.results : [];
+  if (activeFaces.length !== 1 || (activeFaces[0] !== 1 && activeFaces[0] !== 20)) {
+    return { matched, natStep: null };
+  }
+
+  const ranked = (Array.isArray(relativeOutcomes) ? relativeOutcomes : [])
+    .filter((outcome) => outcome && Number.isFinite(Number(outcome.dc)))
+    .toSorted((left, right) => Number(left.dc) - Number(right.dc));
+  const matchedIndex = ranked.indexOf(matched);
+  const direction = activeFaces[0] === 20 ? 'up' : 'down';
+  const steppedIndex = matchedIndex + (direction === 'up' ? 1 : -1);
+  const stepped = ranked[steppedIndex];
+  if (matchedIndex < 0 || !stepped) return { matched, natStep: null };
+
+  return {
+    matched: stepped,
+    natStep: {
+      face: activeFaces[0],
+      direction,
+      fromOutcomeId: matched.id ?? null,
+      toOutcomeId: stepped.id ?? null,
+    },
+  };
+}
+
+/**
  * Run a routed formula check: roll the formula and map the total onto one of the
  * configured outcome tiers (relative DC deltas or fixed value ranges), returning
  * the matched tier's NAME as `outcome` for the activity's outcome→result-group
@@ -544,6 +606,9 @@ function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes
  *   not fire). Optional and no-op by default — only the crafting routedByCheck caller
  *   threads it, so salvage/gathering are unaffected. Ignored for relative type and
  *   bypassed by a forced (crit) outcome.
+ * @param {boolean} [params.natStepping] Relative-mode only: the active kept face of
+ *   the first d20 group steps a naturally matched tier once on a natural 20/1.
+ *   Forced outcomes win and no evidence is emitted at the tier cap/floor.
  * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
  */
 export async function runFormulaRouted({
@@ -559,6 +624,8 @@ export async function runFormulaRouted({
   rollOptions = null,
   clampToNearest = false,
   minOutcomeId = null,
+  craftingModifier = null,
+  natStepping = false,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -573,7 +640,7 @@ export async function runFormulaRouted({
       // so the prompt shows no DC chip; numeric otherwise). Re-adding `dc` would
       // clobber that and re-surface the meaningless DC on a fixed check (mirrors
       // `runFormulaProgressive`, which also spreads `rollOptions` with no `dc`).
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions });
+      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
     } catch (error) {
       console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
       return {
@@ -635,6 +702,17 @@ export async function runFormulaRouted({
     });
   }
 
+  const naturalStep = forced
+    ? { matched, natStep: null }
+    : stepNaturalRoutedOutcome({
+        matched,
+        type,
+        natStepping,
+        diceGroups,
+        relativeOutcomes,
+      });
+  matched = naturalStep.matched;
+
   // Recipe minimum-success-tier gate (FIXED type only): when the naturally-rolled
   // tier ranks below the recipe's required tier (by `start`), the craft fails
   // outright. A forced (crit) outcome BYPASSES the gate — a natural crit must not be
@@ -684,6 +762,7 @@ export async function runFormulaRouted({
       success,
       breakTools,
       diceGroups,
+      ...(naturalStep.natStep && { natStep: naturalStep.natStep }),
       // Additive on a min-tier failure only: the tier that WAS rolled, for a richer
       // chat/journal explanation later. Absent on a normal route.
       ...(minTierFailed && { minTierFailed: true, rolledOutcomeId: matched?.id ?? null }),

@@ -1,5 +1,18 @@
 # Gathering and Harvesting
 
+## Tool Eligibility, Bonuses, and Replacement
+
+Gathering resolves `task.toolIds` against the owning Crafting System's canonical Tool library and preserves the existing gathering-only Tool formula gate for backward compatibility.
+An enabled shared-prerequisite `usability` gate additionally evaluates all selected prerequisite ids with AND semantics against the matched owned Item's actor.
+A virtual-present Tool uses the primary acting actor, and an unresolved enabled prerequisite reference fails closed.
+Gathering does not evaluate or apply numeric Tool bonuses.
+
+Damaged/broken Tool projection and execution recognize both replacement discriminators: `{ type: "component", componentId }` and `{ type: "item", itemUuid }`.
+The shared target-aware creator resolves a direct UUID asynchronously and accepts only a returned Document whose `documentName` is `Item`.
+It creates exactly one quantity-one replacement before deleting the original.
+Managed Component targets receive that Component's durable identity, while direct Item targets preserve the source Item identity without receiving fabricated Component identity.
+Stale or non-Item resolution, a missing creation API, a thrown creation, or a null/empty creation result is a failure that preserves the original and is not reported as `replaced`.
+
 ## Purpose
 
 Define Fabricate's environment-based gathering workflow and clarify the domain boundary for harvesting.
@@ -597,28 +610,10 @@ It uses the unified `Tool` data model defined in `openspec/specs/data-models/spe
 ### Properties
 
 ```js
-GatheringToolLibraryEntry = {
-  id: string,                                  // client-generated, stable
-  label: string,                               // optional display label; "" falls back to the component name
-  enabled: boolean,                            // disabled tools cannot be referenced by tasks
-  componentId: string | null,
-  requirement: null | {
-    formula: string,
-  },
-  breakage: {
-    mode: "limitedUses" | "breakageChance" | "diceExpression" | "immune",
-    maxUses?: number | null,                   // limitedUses; null is unlimited
-    breakageChance?: number,                   // breakageChance; integer 0..100
-    formula?: string,                          // diceExpression
-    threshold?: number,                        // diceExpression
-    // "immune": no fields; never breaks under either authority; still recorded as used.
-  },
-  onBreak: {
-    mode: "destroy" | "flagBroken" | "replaceWith",
-    replacementComponentId?: string,           // replaceWith; must !== componentId
-  },
-}
+GatheringToolLibraryEntry = Tool
 ```
+
+The persisted shape is the canonical `data-models` Tool, including source identity and description snapshots, `prerequisites`, `bonus`, the three retained tool-specific breakage modes, separate `checkBreakable`, repair `IngredientGroup`s, and the discriminated Component/direct-Item replacement target.
 
 ### Requirements
 
@@ -847,7 +842,8 @@ Allow supported system expressions to configure gathering checks, condition modi
 3. Expression evaluation uses the selected gathering actor as the primary actor context.
 4. Expression fields support roll terms, not only static numeric expressions.
 5. Fabricate core must not invent a parallel replacement formula language for the game system.
-6. Visibility gates, gathering checks, tool requirements, and character modifiers are formula-only: each carries a free-text `formula`/`expression` with no provider discriminator and no macro support.
+6. Visibility gates, gathering checks, the legacy Tool requirement, and character modifiers are formula-only: each carries a free-text `formula`/`expression` with no provider discriminator and no macro support.
+Tool shared-prerequisite gates are the separate id-referencing contract defined above.
 7. Diagnostics from invalid expressions, unsupported data paths, missing required fields, or malformed return values are GM-fix-required diagnostics, not normal player failure outcomes.
 8. Player-facing UI must show safe failure/blocking copy for these diagnostics without exposing expression source or GM-only data to non-GM users.
 9. Fabricate core must not hardcode game-system-specific actor paths for character modifiers.
@@ -1338,15 +1334,15 @@ Tool usage/breakage semantics for terminal gathering attempts:
 - A task may reference zero or more required Tools via `toolIds`.
 - A Tool's usage/breakage is applied only for a **terminal** attempt (`succeeded` or `failed`).
 - Blocked or misconfiguration-aborted attempts do not apply tool usage/breakage.
-- Usage tracking and breakage follow the Tool `breakage` / `onBreak` semantics (`limitedUses` / `breakageChance` / `diceExpression` / `immune`).
-- An `immune` Tool never breaks under either authority and is excluded from breakage, but it is still included in the usage record (no `toolUsage` flag is written, because that flag is `limitedUses`-only).
+- Usage tracking and breakage follow the Tool's retained `limitedUses`, `breakageChance`, or `diceExpression` configuration and its `onBreak` action.
+- Under check-driven authority a Tool with `checkBreakable: false` is excluded from forced breakage while its inactive tool-specific configuration is retained.
 - Gathering tasks do not draw Tools from component source actors; tool presence and terminal tool usage/breakage are both evaluated against the selected acting actor.
 - Terminal tool usage/breakage is applied only after the gathering outcome has resolved to `succeeded` or `failed`.
 - A virtual-present Tool injected by a canvas Tool station (`presentTools`, system-scoped) satisfies the gate without an owned item and is excluded from usage/breakage.
 - A required tool resolves to a first-class per-system library Tool carrying its OWN source references and durable `flags.fabricate.roles[systemId].toolId` identity (issue 561); tool matching resolves the owned item against the Tool's own identity, not through a managed component.
 - Tool **presence** uses the wide shared matcher (durable `roles[systemId].toolId`, the Tool's own source references, then its snapshot-name fallback), but terminal tool **usage/breakage** applies only to an owned item matching the required tool by **durable-identity matching** per `data-models` (the Tool's own `roles[systemId].toolId`, or the item's own uuid/compendium source — never a transitive `_stats.duplicateSource` reference and never name alone).
 A presence-only match is spared from usage/breakage and recorded as skipped, and where an actor owns both, the durable-identity item is the one used or broken.
-- Under `CraftingSystem.toolBreakage.authority === "checkDriven"`, the active gathering check's `checkBreakage` triggers decide whether **all required tools** break for the attempt via the single shared evaluator (`evaluateCheckBreakage`), reaching parity with crafting and salvage; each Tool's own `breakage.mode` is ignored except `immune`.
+- Under `CraftingSystem.toolBreakage.authority === "checkDriven"`, the active gathering check's `checkBreakage` triggers decide whether **all required Tools with `checkBreakable !== false`** break for the attempt via the single shared evaluator (`evaluateCheckBreakage`), reaching parity with crafting and salvage; each Tool's own `breakage.mode` is ignored.
 This is orthogonal to the realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`), which still governs whether a broken tool fails the gather outcome and is applied independently.
 Crafting and gathering route the same trigger + roll through the same evaluator, so the break decision cannot drift between surfaces.
 - **Acknowledged limit (issue 419):** `d100` gathering resolution has no check sub-object, so `checkDriven` `checkBreakage` triggers cannot fire for `d100` gathering attempts; only `progressive`/`routed` gathering checks (which run through the shared Check engine) carry a `checkBreakage` block.
@@ -1359,30 +1355,13 @@ A `d100` task's required tools therefore never force-break under `checkDriven`, 
 Tools are the unified required-but-reusable, breakable prerequisite primitive (shared with crafting; the retired Catalyst concept folded into it).
 Gathering tasks reference **system-owned** library Tools (`system.tools`, the single canonical library) via `toolIds`; there is no separate gathering-scoped tools store (the 0.7.0 migration reconciles any legacy `gatheringConfig.systems[id].tools` onto the system).
 Composition exposes the library to the engine as the `__libraryTools` map on the composed environment.
-Tools may break across attempts and may need an actor-side requirement (for example a system-specific proficiency flag).
+Tools may break across attempts and may use the legacy gathering formula gate plus shared character-prerequisite usability gates.
 The full `Tool` model and validation matrix are defined once in `openspec/specs/data-models/spec.md`.
 
 ### Properties
 
 ```js
-Tool = {
-  componentId: string,
-  requirement: null | {
-    formula: string,
-  },
-  breakage: {
-    mode: "limitedUses" | "breakageChance" | "diceExpression" | "immune",
-    maxUses?: number | null,         // limitedUses
-    breakageChance?: number,         // breakageChance; integer 0..100
-    formula?: string,                // diceExpression
-    threshold?: number,              // diceExpression; broken when result < threshold
-    // "immune": no fields; never breaks under either authority; still recorded as used.
-  },
-  onBreak: {
-    mode: "destroy" | "flagBroken" | "replaceWith",
-    replacementComponentId?: string  // replaceWith; must !== componentId
-  }
-}
+GatheringTask.toolIds = string[] // references canonical system.tools[].id entries
 ```
 
 ### Requirements
@@ -1391,20 +1370,25 @@ Tool = {
 Each id references an entry in the system-owned library `system.tools[]` (the single canonical Tools library); the composed environment's `__libraryTools` Map (sourced from `system.tools` by `GatheringRichStateService.composeEnvironment`) resolves each id to a `Tool` object at runtime.
 References whose id is no longer in the library, or that resolve to a disabled library tool, block start with `TOOL_BLOCKED` because the task's required equipment is misconfigured.
 Task authoring UI lets the GM add and remove tool ids; inline `Tool` authoring on tasks is not supported — the per-system library is the single source of truth.
-All resolved tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any resolved tool is missing from the actor, broken, or fails its requirement.
+All resolved Tools are required; the start-attempt gate blocks with `TOOL_BLOCKED` when one is missing, broken, fails the legacy formula gate, or fails an enabled shared-prerequisite usability gate.
 2. Owned items with `flags.fabricate.toolBroken === true` do not satisfy tool presence; the gate must treat them as not-present until a GM clears the flag.
-3. The optional `requirement` is formula-only and is evaluated against the selected acting actor through the existing system-agnostic expression adapter.
+3. The optional legacy `requirement` remains formula-only and is evaluated against the selected acting actor through the existing system-agnostic expression adapter.
 A truthy resolved value (non-zero number, non-empty string, `true`) satisfies the requirement.
 There is no provider discriminator and no macro support on this surface.
-4. Exactly one `breakage.mode` is configured per tool. `limitedUses` uses the `flags.fabricate.toolUsage = { timesUsed }` item flag, incremented on each attempt; the tool breaks when `timesUsed >= maxUses` (after the increment) when `maxUses` is non-null. `breakageChance` breaks when `Math.random() * 100 < breakageChance`. `diceExpression` evaluates `formula` through the expression adapter; the tool breaks when the numeric result is `< threshold`. `immune` carries no fields and never breaks under either authority (still recorded as used).
-5. Exactly one `onBreak.mode` is configured per tool. `destroy` deletes the owned item. `flagBroken` sets `flags.fabricate.toolBroken = true` and appends a localized `" (broken)"` suffix to the owned item's name (display-only; idempotent; not auto-cleared). `replaceWith` deletes the original and creates the `replacementComponentId` managed component on the actor; the replacement is a normal managed component that recipes can consume to repair the tool.
+An enabled Tool `prerequisites` gate resolves its shared ids with AND semantics and fails closed on an unresolved id.
+The same matched owned Item's actor supplies presence and prerequisite evaluation; virtual presence binds to the primary acting actor.
+`gateMode: "usability"` blocks gathering on failure, while `gateMode: "bonus"` does not; gathering never evaluates the Tool's numeric bonus expression.
+4. Exactly one of `limitedUses`, `breakageChance`, or `diceExpression` is retained in `breakage`; `checkBreakable` separately controls check-driven immunity.
+5. Exactly one `onBreak.mode` is configured per Tool.
+`destroy` deletes the owned Item, and `flagBroken` flags it and appends the idempotent localized broken suffix.
+`replaceWith` accepts either a managed Component or direct Item target and uses the shared create-before-delete, lossless replacement contract above.
 6. Tool breakage is planned before result creation so the system-level `toolBreakagePolicy` can override the outcome.
 The `failureOnBreak` policy (default) flips a successful attempt to `failed` and clears `outcome.resultGroups` when any tool breaks.
 The `successDespiteBreak` policy leaves the outcome untouched.
 Either way, tool destruction/flagging/replacement always commits.
 7. The terminal response includes a `usedTools` array describing each matched tool's breakage decision and on-break action.
 8. Legacy tasks without a `tools` field normalize to `tools: []` on load; no migration runner entry is required.
-9. Tool authoring is rejected when the tool carries NEITHER a `componentId` NOR its own source references (issue 561), when a `replaceWith` action uses the same id as the tool's `componentId` (checked only when `componentId` is present), or when mode-specific fields are absent or out of range (`maxUses` not a positive integer, `breakageChance` not an integer in `0..100`, `formula` empty, `threshold` non-finite).
+9. Tool authoring uses the complete validation contract in `data-models`, including source identity, enabled prerequisite/bonus settings, repair-group completeness, replacement discriminator validity, and breakage mode-specific fields.
 
 ## Canvas Gathering-Task Interactables
 

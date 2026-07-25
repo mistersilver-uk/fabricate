@@ -17,7 +17,15 @@ import assert from 'node:assert/strict';
 
 globalThis.foundry = {
   utils: {
-    getProperty: (obj, path) => String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj)
+    getProperty: (obj, path) => String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj),
+    setProperty: (obj, path, value) => {
+      const parts = String(path).split('.');
+      const last = parts.pop();
+      let target = obj;
+      for (const part of parts) target = target[part] ??= {};
+      target[last] = value;
+    },
+    deepClone: (value) => JSON.parse(JSON.stringify(value)),
   }
 };
 
@@ -27,8 +35,11 @@ const {
   evaluateToolBreakagePlan,
   plannedToolBreakageOutcome,
   applyToolUsageAndBreakage,
-  createToolBreakageRuntime
+  createToolReplacementCreator,
+  createToolBreakageRuntime,
+  stampReplacementComponentIdentity
 } = await import('../src/toolBreakageRuntime.js');
+const { resolveToolForItem, itemIsToolByDurableIdentity } = await import('../src/utils/sourceUuid.js');
 
 // ---------------------------------------------------------------------------
 // FakeItem — getFlag('fabricate', 'fabricate.<key>') dot-path resolution,
@@ -127,7 +138,7 @@ test('plannedToolBreakageOutcome shapes each onBreak mode', () => {
   assert.deepEqual(plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'flagBroken' } })), { action: 'flagged' });
   assert.deepEqual(
     plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'replaceWith', replacementComponentId: 'r' } })),
-    { action: 'replaced', replacementComponentId: 'r' }
+    { action: 'replaced', replacementTarget: { type: 'component', componentId: 'r' } }
   );
 });
 
@@ -193,11 +204,31 @@ test('applyToolUsageAndBreakage: replaceWith deletes and invokes createReplaceme
     tool,
     item,
     buildItemRef: () => ({}),
-    createReplacement: async ({ componentId }) => { replacedWith = componentId; }
+    createReplacement: async ({ target }) => {
+      replacedWith = target;
+      return { documentName: 'Item' };
+    }
   });
   assert.equal(item.deleted, true);
-  assert.equal(replacedWith, 'r');
+  assert.deepEqual(replacedWith, { type: 'component', componentId: 'r' });
   assert.equal(entry.onBreak.action, 'replaced');
+});
+
+test('applyToolUsageAndBreakage: failed replacement preserves the original Tool', async () => {
+  const tool = Tool.fromJSON({
+    componentId: 'c',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: { mode: 'replaceWith', replacementTarget: { type: 'item', itemUuid: 'Item.r' } },
+  });
+  const item = new FakeItem({});
+  const entry = await applyToolUsageAndBreakage({
+    tool,
+    item,
+    createReplacement: async () => null,
+  });
+
+  assert.equal(item.deleted, false);
+  assert.deepEqual(entry.onBreak, { action: 'none' });
 });
 
 test('applyToolUsageAndBreakage: prefers a prior plan decision over re-evaluating', async () => {
@@ -310,6 +341,267 @@ test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage ex
   const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 5 }, catalystItemUsage: { timesUsed: 2 } } });
   await tool.applyUsage(item);
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 6 });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 780: the broken-tool REPLACEMENT grant stamps the replacement's durable
+// per-system identity onto the CREATED item's payload. Driven through the REAL
+// createToolBreakageRuntime apply() → makeCreateReplacement path, asserting on the
+// captured createEmbeddedDocuments payload (never a read-back).
+// ---------------------------------------------------------------------------
+
+const REPLACEMENT_COMPONENT_ID = 'comp-replacement';
+const REPLACEMENT_SOURCE = {
+  uuid: 'Item.replacement-src',
+  toObject: () => ({ name: 'Whetstone', type: 'loot', system: { quantity: 1 }, flags: {} }),
+};
+
+// Wrap a captured create payload in a getFlag reader mirroring Foundry's Document#getFlag,
+// so the durable-identity matchers in sourceUuid.js can read its roles map.
+function asOwnedItem(itemData) {
+  return {
+    ...itemData,
+    getFlag(scope, key) {
+      if (scope !== 'fabricate') return undefined;
+      return getPath(itemData.flags?.fabricate, key);
+    },
+  };
+}
+
+// Run the REAL replacement path for a broken replaceWith tool and return the captured
+// createEmbeddedDocuments payload array.
+async function runReplacement({ system, resolveReplacementSource }) {
+  const captured = [];
+  const actor = {
+    uuid: 'Actor.a',
+    createEmbeddedDocuments: async (_type, data) => {
+      captured.push(...data);
+      return data.map((entry) => ({ ...entry, documentName: 'Item' }));
+    },
+  };
+  const item = new FakeItem({}, { uuid: 'Item.broken-tool' });
+  const toolData = {
+    componentId: 'c-tool',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: { mode: 'replaceWith', replacementComponentId: REPLACEMENT_COMPONENT_ID },
+  };
+  const runtime = createToolBreakageRuntime({
+    matchTools: () => ({ items: [{ tool: toolData, item }], missing: [] }),
+    buildItemRef: (_a, i) => ({ actorUuid: 'Actor.a', itemUuid: i.uuid, quantity: 1 }),
+    resolveReplacementSource,
+  });
+  await runtime.apply({ actor, system, task: { id: 't' }, tools: [toolData] });
+  return captured;
+}
+
+const resolveToReplacementSource = () => REPLACEMENT_SOURCE;
+
+test('target-aware replacement creates direct Items at quantity one without component identity', async () => {
+  const captured = [];
+  const source = {
+    documentName: 'Item',
+    uuid: 'Item.direct-source',
+    toObject: () => ({ name: 'Direct', type: 'loot', system: { quantity: 9 }, flags: {} }),
+  };
+  const creator = createToolReplacementCreator({
+    system: { id: 'sys-1', tools: [] },
+    resolveItemUuid: async (uuid) => (uuid === source.uuid ? source : null),
+  });
+  const created = await creator({
+    actor: {
+      async createEmbeddedDocuments(_type, data) {
+        captured.push(...data);
+        return data.map((entry) => ({ ...entry, documentName: 'Item' }));
+      },
+    },
+    target: { type: 'item', itemUuid: source.uuid },
+  });
+
+  assert.equal(created.documentName, 'Item');
+  assert.equal(captured[0].system.quantity, 1);
+  assert.equal(captured[0].flags.core.sourceId, source.uuid);
+  assert.equal(captured[0].flags.fabricate?.fabricate?.roles, undefined);
+});
+
+test('target-aware replacement rejects stale, index, non-Item, API, throw, and empty failures', async () => {
+  const invalidSources = [null, { uuid: 'Item.index' }, { documentName: 'Actor' }];
+  for (const source of invalidSources) {
+    let creates = 0;
+    const creator = createToolReplacementCreator({ resolveItemUuid: async () => source });
+    const result = await creator({
+      actor: { createEmbeddedDocuments: async () => { creates += 1; } },
+      target: { type: 'item', itemUuid: 'Item.bad' },
+    });
+    assert.equal(result, null);
+    assert.equal(creates, 0);
+  }
+
+  const source = {
+    documentName: 'Item',
+    toObject: () => ({ name: 'Direct', type: 'loot', system: {}, flags: {} }),
+  };
+  for (const createResult of [null, [], [{ documentName: 'Actor' }]]) {
+    const creator = createToolReplacementCreator({ resolveItemUuid: async () => source });
+    assert.equal(
+      await creator({
+        actor: { createEmbeddedDocuments: async () => createResult },
+        target: { type: 'item', itemUuid: 'Item.source' },
+      }),
+      null
+    );
+  }
+  const throwingResolver = createToolReplacementCreator({
+    resolveItemUuid: async () => { throw new Error('stale'); },
+  });
+  assert.equal(
+    await throwingResolver({
+      actor: { createEmbeddedDocuments: async () => [] },
+      target: { type: 'item', itemUuid: 'Item.source' },
+    }),
+    null
+  );
+  const throwingCreate = createToolReplacementCreator({ resolveItemUuid: async () => source });
+  assert.equal(
+    await throwingCreate({
+      actor: { createEmbeddedDocuments: async () => { throw new Error('create'); } },
+      target: { type: 'item', itemUuid: 'Item.source' },
+    }),
+    null
+  );
+  assert.equal(
+    await throwingCreate({ actor: {}, target: { type: 'item', itemUuid: 'Item.source' } }),
+    null
+  );
+});
+
+test('replacement is created successfully before the original Tool is deleted', async () => {
+  const events = [];
+  const item = new FakeItem({});
+  item.delete = async () => { events.push('delete'); item.deleted = true; };
+  const tool = Tool.fromJSON({
+    componentId: 'c-tool',
+    breakage: { mode: 'breakageChance', breakageChance: 100 },
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-replacement' },
+  });
+  const creator = createToolReplacementCreator({
+    system: { id: 'sys-1', tools: [] },
+    resolveComponentSource: async () => REPLACEMENT_SOURCE,
+  });
+  const entry = await applyToolUsageAndBreakage({
+    tool,
+    item,
+    createReplacement: async (args) => {
+      events.push('create');
+      return creator({
+        ...args,
+        actor: {
+          createEmbeddedDocuments: async (_type, data) =>
+            data.map((value) => ({ ...value, documentName: 'Item' })),
+        },
+      });
+    },
+  });
+
+  assert.deepEqual(events, ['create', 'delete']);
+  assert.equal(entry.onBreak.action, 'replaced');
+});
+
+test('780 replacement: always stamps roles[systemId].componentId = replacementComponentId', async () => {
+  const system = { id: 'sys-1', tools: [] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(captured.length, 1, 'the replacement item is created');
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
+    REPLACEMENT_COMPONENT_ID
+  );
+});
+
+test('780 replacement: co-stamps toolId when EXACTLY ONE first-class tool links the component', async () => {
+  const linkingTool = {
+    id: 'tool-link',
+    componentId: REPLACEMENT_COMPONENT_ID,
+    name: 'Whetstone Tool',
+    // Source ref that does NOT intersect the created item, so only the toolId claim can match.
+    registeredItemUuid: 'Item.unrelated-tool-src',
+  };
+  const system = { id: 'sys-1', tools: [linkingTool] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, 'tool-link');
+
+  // Round-trip: the stamped replacement resolves to that exact tool by durable identity,
+  // with the name and source-ref tiers disregarded (a componentId-only stamp would fail this).
+  const owned = asOwnedItem(captured[0]);
+  assert.equal(
+    resolveToolForItem(owned, system.tools, 'sys-1')?.id,
+    'tool-link',
+    'resolveToolForItem resolves the replacement to the linking tool via roles.toolId'
+  );
+  assert.equal(
+    itemIsToolByDurableIdentity(owned, linkingTool, system.tools, 'sys-1'),
+    true,
+    'itemIsToolByDurableIdentity confirms the replacement IS that tool'
+  );
+});
+
+test('780 replacement: skips toolId when NO first-class tool links the component', async () => {
+  const system = { id: 'sys-1', tools: [{ id: 't-other', componentId: 'comp-unrelated' }] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
+    REPLACEMENT_COMPONENT_ID
+  );
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId,
+    undefined,
+    'zero linking tools ⇒ no toolId co-stamp'
+  );
+});
+
+test('780 replacement: skips toolId when MULTIPLE first-class tools link the component (ambiguous)', async () => {
+  const system = {
+    id: 'sys-1',
+    tools: [
+      { id: 't1', componentId: REPLACEMENT_COMPONENT_ID },
+      { id: 't2', componentId: REPLACEMENT_COMPONENT_ID },
+    ],
+  };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
+    REPLACEMENT_COMPONENT_ID
+  );
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId,
+    undefined,
+    'multiple linking tools ⇒ ambiguous ⇒ no toolId co-stamp'
+  );
+});
+
+test('780 replacement: an unresolvable replacement stamps nothing (no item created)', async () => {
+  const system = { id: 'sys-1', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
+  const captured = await runReplacement({ system, resolveReplacementSource: () => null });
+  assert.equal(captured.length, 0, 'no replacement item is created when the component does not resolve');
+});
+
+test('780 replacement: a dotted systemId stamps nothing', async () => {
+  const system = { id: 'sys.with.dots', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
+  assert.equal(captured.length, 1);
+  assert.equal(
+    captured[0].flags?.fabricate?.fabricate?.roles,
+    undefined,
+    'a dotted system id can never be a roles map key'
+  );
+});
+
+test('780 replacement: the shared helper is faithful when called directly (componentId + single toolId)', () => {
+  const itemData = {};
+  const system = { id: 'sys-1', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
+  stampReplacementComponentIdentity(itemData, system, REPLACEMENT_COMPONENT_ID);
+  assert.deepEqual(itemData.flags.fabricate.fabricate.roles['sys-1'], {
+    componentId: REPLACEMENT_COMPONENT_ID,
+    toolId: 'tool-link',
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -465,6 +757,52 @@ test('checkDriven runtime: no trigger match breaks nothing', async () => {
   const applied = await runtime.apply(args);
   assert.equal(applied[0].broken, false, 'limitedUses own-mode is ignored under checkDriven; no trigger then no break');
 });
+
+for (const [label, checkResult] of [
+  ['matched trigger', FORCE_RESULT],
+  [
+    'unmatched trigger',
+    engineCheckResult({
+      diceGroups: [{ groupId: 0, group: '1d20', sum: 15, results: [15] }],
+    }),
+  ],
+]) {
+  test(`checkDriven runtime: ${label} never applies retained limitedUses usage`, async () => {
+    const tool = Tool.fromJSON({
+      componentId: 'axe',
+      breakage: { mode: 'limitedUses', maxUses: 10 },
+      onBreak: { mode: 'flagBroken' },
+    });
+    const item = new FakeItem(
+      { fabricate: { toolUsage: { timesUsed: 4 } } },
+      { uuid: 'Item.axe' }
+    );
+    const originalApplyUsage = tool.applyUsage.bind(tool);
+    let applyUsageCalls = 0;
+    tool.applyUsage = async (...args) => {
+      applyUsageCalls += 1;
+      return originalApplyUsage(...args);
+    };
+    const runtime = checkDrivenRuntime([{ tool, item }]);
+    const args = {
+      actor: { uuid: 'Actor.a' },
+      task: { id: `usage-${label}` },
+      system: checkDrivenSystem,
+      checkResult,
+      checkBreakage: FORCE_TRIGGER,
+    };
+
+    await runtime.plan(args);
+    await runtime.apply(args);
+
+    assert.equal(applyUsageCalls, 0, 'checkDriven authority never calls Tool.applyUsage');
+    assert.equal(
+      getPath(item._flags.fabricate, 'fabricate.toolUsage.timesUsed'),
+      4,
+      'the retained toolSpecific limitedUses counter is unchanged'
+    );
+  });
+}
 
 test('checkDriven runtime: virtual-present tools are recorded as skipped, not mutated', async () => {
   const runtime = checkDrivenRuntime([

@@ -17,10 +17,13 @@
  * Build the settings key a player's stored order lives under.
  *
  * Keys are namespaced by scope because recipe ids and component ids are drawn from
- * different id spaces and can collide. One key per recipe (not per step).
+ * different id spaces and can collide. One key per recipe (not per step). The salvage
+ * caller passes a composite `<systemId>:<componentId>` id (issue 766), because component
+ * ids are not globally unique across systems; the store's write and the engine's capture
+ * must pass the identical id or the captured order silently reads empty.
  *
  * @param {{ scope: 'recipe'|'salvage', id: string }} entry
- * @returns {string|null} `recipe:<id>` / `salvage:<componentId>`, or null when unusable
+ * @returns {string|null} `recipe:<recipeId>` / `salvage:<systemId>:<componentId>`, or null when unusable
  */
 export function progressiveOrderKey({ scope, id } = {}) {
   if (scope !== 'recipe' && scope !== 'salvage') return null;

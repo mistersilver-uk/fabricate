@@ -29,6 +29,7 @@
  */
 
 import { chromium } from 'playwright';
+import { randomUUID } from 'node:crypto';
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,12 +39,17 @@ import {
   classifyCapturedError,
   computeSmokeSignal,
   evaluateSmokeOutcome,
-  isTransientPageTeardown
+  isTransientPageTeardown,
+  shouldTolerateSmokeTeardown,
+  TRANSIENT_TEARDOWN_SKIP_PREFIX
 } from './lib/foundrySmokeSignal.js';
 import {
   assertExpectedSelectorsPresent,
   expectedSelectorsForManagerSurface
 } from './lib/managerLayoutGuards.js';
+import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
+import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
+import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being
 // killed while a final screenshot click is still in flight) can leave a FLOATING page
@@ -66,22 +72,96 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const RESULTS_DIR = join(ROOT, 'test-results');
 
-const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
+// Self-derive the endpoint so a standalone `test:foundry:run` (invoked as its own process
+// after `test:foundry:up`) targets the SAME per-worktree port up bound, instead of the old
+// fixed :30100 (issue #827). No free-port scan here — up.mjs also uses identity.port
+// directly without scanning, so deriving it the same way keeps them in agreement. When the
+// parent pipeline set FOUNDRY_URL/FOUNDRY_HOST_PORT, those win by env inheritance.
+const FOUNDRY_URL = reconcileFoundryEndpoint({
+  url: process.env.FOUNDRY_URL,
+  hostPort: process.env.FOUNDRY_HOST_PORT,
+  fallbackPort: deriveRunIdentity(ROOT).port
+}).url;
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 
-// Smoke profile selector. Three profiles:
+// Smoke profile selector. Four profiles:
 //   - `rc`   release-candidate happy path: real Foundry boot, fixture creation,
 //            one gathering success, craft a Healing Potion, console-error
 //            health. Minimal screenshot budget. Used by the CI workflow.
 //   - `ci`   alias for `rc`; kept for one release for back-compat.
 //   - `full` (default) every phase, full screenshot regen. Local + scheduled
 //            visual-regression workflow.
+//   - `screenshots` (issue #826) real-Foundry PR evidence, SCOPED: same rendering
+//            path and screenshot budget as `full`, but captures only the labels a
+//            PR's changed files affect (`FOUNDRY_SCREENSHOT_TARGET_LABELS`, fed from
+//            `mapChangedFilesToViews`) and skips a view-bearing phase whose labels are
+//            all off-target. It runs the SCREENSHOT phases but NOT the full-only
+//            behavioral assert phases — so `rc`/`ci`/`full` truth values are untouched.
 const RAW_SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
-const SMOKE_PROFILE = RAW_SMOKE_PROFILE === 'ci' ? 'rc' : RAW_SMOKE_PROFILE;
-const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full';
+// `resolveSmokeProfile` replicates the exact normalization RAW_SMOKE_PROFILE feeds
+// (nullish-default `'full'`, lowercase, `'ci'` → `'rc'`); shared with the parent
+// wrapper so they can never drift on what `full`/`ci` mean.
+const SMOKE_PROFILE = resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE);
+const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full' || SMOKE_PROFILE === 'screenshots';
 const RUN_FULL_ONLY_BEHAVIORS = SMOKE_PROFILE === 'full';
 const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
+
+// The scoped `screenshots` profile target set (issue #826). A comma/whitespace-
+// separated list of smoke labels — exactly the `smokeLabels` of the views
+// `mapChangedFilesToViews(changedFiles)` returns — supplied via
+// `FOUNDRY_SCREENSHOT_TARGET_LABELS` or `--target-labels=<csv>`. When empty (a bare
+// `test:foundry:screenshots` debug run) the profile captures the FULL label set, so
+// scoping never silently drops evidence when the wiring is absent.
+function readScreenshotTargetLabels(argv = process.argv.slice(2), env = process.env) {
+  const FLAG = '--target-labels';
+  let csv = '';
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === FLAG) { csv = argv[i + 1] ?? ''; break; }
+    if (arg.startsWith(`${FLAG}=`)) { csv = arg.slice(FLAG.length + 1); break; }
+  }
+  if (!csv) csv = env.FOUNDRY_SCREENSHOT_TARGET_LABELS ?? '';
+  return new Set(csv.split(/[\s,]+/).map(label => label.trim()).filter(Boolean));
+}
+
+const SCREENSHOT_TARGET_LABELS = readScreenshotTargetLabels();
+// Scoping is active only under `screenshots` AND when a non-empty target set was
+// supplied. `rc`/`ci`/`full` never see it (dead condition), so their captured-frame
+// set and phase execution are provably unchanged.
+const SCREENSHOT_SCOPING_ACTIVE = SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
+
+/**
+ * Whether the given view-bearing phase must run for this invocation. Always true
+ * except under an actively-scoped `screenshots` run, where a phase whose labels are
+ * all off-target is skipped. Inert (returns true) for `rc`/`ci`/`full`.
+ * @param {string} phase
+ * @returns {boolean}
+ */
+function shouldRunScreenshotPhase(phase) {
+  if (!SCREENSHOT_SCOPING_ACTIVE) return true;
+  return isPhaseNeededForTargets(phase, SCREENSHOT_TARGET_LABELS);
+}
+
+/**
+ * Whether a skippable Phase-D0 capture SECTION must run (issue #826 increment 2).
+ * ALWAYS true for `rc`/`ci`/`full` (scoping inactive) — so every section body is
+ * DEAD CODE under those profiles and the walk is byte-behaviour-identical by
+ * construction; the section skips exist ONLY on an actively-scoped `screenshots`
+ * run, where a section whose mapped labels are all off-target is skipped along with
+ * its expensive navigate+settle work. The always-run D0 spine (manager open + system
+ * select + fixture seeding + currency config) is NOT a section, so it never skips.
+ * @param {string} sectionName
+ * @returns {boolean}
+ */
+function shouldRunScreenshotSection(sectionName) {
+  if (!SCREENSHOT_SCOPING_ACTIVE) return true;
+  const needed = isD0SectionNeededForTargets(sectionName, SCREENSHOT_TARGET_LABELS);
+  if (!needed) {
+    process.stdout.write(`Phase D0: ${sectionName} section skipped (off scoped target set).\n`);
+  }
+  return needed;
+}
 
 // Exact set of screenshot labels the `rc` profile captures. Every other
 // `screenshot(page, label)` call is a no-op under `rc` (the surrounding
@@ -174,6 +254,12 @@ async function echoWaivedConsoleErrorsToStepSummary(waived) {
 
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
+const screenshotManifestEntries = [];
+const screenshotRunIdentity = {
+  runId: randomUUID(),
+  headSha: String(process.env.FOUNDRY_SCREENSHOT_HEAD_SHA || process.env.GITHUB_SHA || '').trim(),
+  targetLabels: [...SCREENSHOT_TARGET_LABELS].sort((a, b) => a.localeCompare(b)),
+};
 
 // ── Phase timings ───────────────────────────────────────────────────────────
 /** @type {Array<{ phase: string, startedAt: string, durationMs: number }>} */
@@ -288,19 +374,30 @@ function formatSlowestViewsTable(timings, limit = 12) {
 
 /**
  * Take a screenshot with an auto-incrementing numeric prefix. Under the
- * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; all
- * other labels are no-ops (the surrounding assertions still run).
+ * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; under an
+ * actively-scoped `screenshots` run only labels in the PR's target set are captured;
+ * all other labels are no-ops (the surrounding assertions still run). Because scoping
+ * only FILTERS which labels are written — never reorders the walk — a captured view's
+ * frames keep their relative capture order, so `collect`'s `candidates[0]` still picks
+ * the intended (first-captured) frame.
  * @param {import('playwright').Page} page
  * @param {string} label
  */
 async function screenshot(page, label, options = {}) {
   if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
+  if (SCREENSHOT_SCOPING_ACTIVE && !SCREENSHOT_TARGET_LABELS.has(label)) return;
   screenshotCounter++;
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
   // `options` forwards Playwright screenshot options (e.g. a `clip` box for a
   // region capture such as the chat sidebar); default is a full-page shot.
   await page.screenshot({ path, ...options });
+  screenshotManifestEntries.push({
+    label,
+    file: `screenshot-${num}-${label}.png`,
+    width: options.clip?.width ?? null,
+    height: options.clip?.height ?? null,
+  });
   markViewTiming(label);
 }
 
@@ -973,22 +1070,52 @@ async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs
  * @param {{ width: number, height: number }} size
  * @param {{ timeout?: number, fallbackMs?: number }} [options]
  */
-async function waitForManagerGeometrySettled(page, { width, height }, { timeout = 1500, fallbackMs = 500 } = {}) {
+async function waitForManagerGeometrySettled(page, { timeout = 1500, fallbackMs = 500 } = {}) {
   await page.evaluate(() => { delete window.__fabGeomSettle; }).catch(() => {});
-  await waitForSettled(page, ({ width, height }) => {
+  await waitForSettled(page, () => {
     const manager = document.querySelector('.fabricate-manager');
     const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
     if (!app) return false;
-    const rect = app.getBoundingClientRect();
-    const w = Math.round(rect.width);
-    const h = Math.round(rect.height);
-    if (Math.abs(w - width) > 3 || Math.abs(h - height) > 3) { window.__fabGeomSettle = null; return false; }
+    const outer = app.getBoundingClientRect();
+    const product = manager.getBoundingClientRect();
     const state = window.__fabGeomSettle || { sig: null, stable: 0 };
-    const sig = `${w}x${h}`;
+    const sig = [
+      window.innerWidth,
+      window.innerHeight,
+      Math.round(outer.left),
+      Math.round(outer.top),
+      Math.round(outer.width),
+      Math.round(outer.height),
+      Math.round(product.left),
+      Math.round(product.top),
+      Math.round(product.width),
+      Math.round(product.height),
+    ].join(':');
     if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
     window.__fabGeomSettle = state;
     return state.stable >= 4; // ~4 steady RAF samples ≈ 65ms of quiescence.
-  }, { width, height }, { timeout, fallbackMs });
+  }, undefined, { timeout, fallbackMs });
+  return page.evaluate(() => {
+    const manager = document.querySelector('.fabricate-manager');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
+    if (!manager || !app) throw new Error('Crafting System Manager geometry is unavailable');
+    const rectangle = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+      };
+    };
+    return {
+      browser: { width: window.innerWidth, height: window.innerHeight },
+      outer: rectangle(app),
+      product: rectangle(manager),
+    };
+  });
 }
 
 /**
@@ -1018,61 +1145,198 @@ async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {})
   }, undefined, { timeout, fallbackMs });
 }
 
+async function waitForManagerApplicationRendered(page) {
+  const outerSelector = '#fabricate-crafting-system-manager';
+  const resolveRegisteredManager = (selector) => {
+    const renderedOuters = Array.from(document.querySelectorAll(selector))
+      .filter((element) => element?.isConnected);
+    const renderedManagers = renderedOuters
+      .map((element) => element.querySelector('.fabricate-manager'))
+      .filter((element) => element?.isConnected);
+    if (renderedOuters.length !== 1 || renderedManagers.length !== 1) {
+      throw new Error(
+        'Crafting System Manager DOM resolution was not unique: '
+        + JSON.stringify({
+          renderedOuterCount: renderedOuters.length,
+          renderedManagerCount: renderedManagers.length,
+        })
+      );
+    }
+    const renderedOuter = renderedOuters[0];
+    const renderedManager = renderedManagers[0];
+    const explicitApp = globalThis.__fabricateSmokeManagerApp ?? null;
+    const instances = foundry?.applications?.instances;
+    const registeredApps = instances?.values
+      ? Array.from(instances.values())
+      : (instances ? Array.from(instances) : []);
+    const uniqueApps = Array.from(
+      new Set([explicitApp, ...registeredApps].filter(Boolean))
+    );
+    const applicationCandidates = uniqueApps.map((app, index) => {
+      const rawElement = app?.element ?? app?._element ?? null;
+      const element = rawElement?.[0] ?? rawElement;
+      const manager = element?.matches?.('.fabricate-manager')
+        ? element
+        : element?.querySelector?.('.fabricate-manager')
+          ?? element?.closest?.('.fabricate-manager');
+      const ownsManager = Boolean(
+        manager?.isConnected
+        && (
+          element === manager
+          || element?.contains?.(manager)
+          || manager?.contains?.(element)
+        )
+      );
+      const ownsRenderedManager = Boolean(
+        element === renderedOuter
+        || element === renderedManager
+        || element?.contains?.(renderedManager)
+        || renderedManager?.contains?.(element)
+      );
+      return {
+        app,
+        index,
+        source: app === explicitApp ? 'explicit' : 'registry',
+        appType: app?.constructor?.name ?? typeof app,
+        appRendered: app?.rendered ?? null,
+        elementType: element?.constructor?.name ?? typeof element,
+        elementId: element?.id ?? null,
+        elementConnected: Boolean(element?.isConnected),
+        elementHasStyle: Boolean(element?.style),
+        managerConnected: Boolean(manager?.isConnected),
+        ownsManager,
+        ownsRenderedManager,
+        liveMatch: Boolean(
+          element?.isConnected
+          && element?.style
+          && manager?.isConnected
+          && ownsManager
+          && ownsRenderedManager
+        ),
+      };
+    });
+    const liveMatches = applicationCandidates.filter((candidate) => candidate.liveMatch);
+    if (liveMatches.length !== 1) {
+      const diagnostics = applicationCandidates.map(({ app: _app, ...candidate }) => candidate);
+      throw new Error(
+        `Crafting System Manager application resolution found ${liveMatches.length} owners `
+        + 'for the connected Manager DOM: '
+        + JSON.stringify({
+          renderedOuterCount: renderedOuters.length,
+          renderedManagerCount: renderedManagers.length,
+          applicationCandidates: diagnostics,
+        })
+      );
+    }
+    globalThis.__fabricateSmokeManagerApp = liveMatches[0].app;
+    const { app: _app, ...selected } = liveMatches[0];
+    return selected;
+  };
+  const inspectReadiness = (diagnostic = false) => {
+    const app = globalThis.__fabricateSmokeManagerApp;
+    const rawElement = app?.element ?? app?._element ?? null;
+    const appElement = rawElement?.[0] ?? rawElement;
+    const manager = appElement?.matches?.('.fabricate-manager')
+      ? appElement
+      : appElement?.querySelector?.('.fabricate-manager')
+        ?? appElement?.closest?.('.fabricate-manager');
+    const report = {
+      ready: Boolean(appElement?.isConnected && appElement?.style && manager?.isConnected),
+      appRendered: app?.rendered ?? null,
+      elementType: appElement?.constructor?.name ?? typeof appElement,
+      elementId: appElement?.id ?? null,
+      elementConnected: Boolean(appElement?.isConnected),
+      elementHasStyle: Boolean(appElement?.style),
+      managerConnected: Boolean(manager?.isConnected),
+      selectorManagerConnected: Boolean(
+        document.querySelector('#fabricate-crafting-system-manager .fabricate-manager')?.isConnected
+      ),
+    };
+    if (diagnostic || report.ready) return report;
+    return false;
+  };
+  try {
+    await page.locator(outerSelector).waitFor({ state: 'attached', timeout: 15_000 });
+    await page.locator(`${outerSelector} .fabricate-manager`).waitFor({
+      state: 'attached',
+      timeout: 15_000,
+    });
+    await page.evaluate(resolveRegisteredManager, outerSelector);
+    await page.waitForFunction(inspectReadiness, false, { timeout: 15_000, polling: 'raf' });
+  } catch (error) {
+    const readiness = await page.evaluate(inspectReadiness, true).catch((diagnosticError) => ({
+      diagnosticError: diagnosticError.message,
+    }));
+    const causeMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Crafting System Manager ApplicationV2 render readiness failed (${causeMessage}): `
+      + JSON.stringify(readiness),
+      { cause: error }
+    );
+  }
+}
+
 /**
  * Resize the rendered Crafting System Manager application frame for
  * responsive screenshots and hit testing.
  *
- * R4 (#750): the D0 walk issues many consecutive identical
- * `setManagerWindowSize(1280, 820)` calls; each otherwise repaid a viewport
- * resize and a fixed settle for a no-op. Short-circuit when the app is ALREADY
- * at the requested geometry (verified against the live DOM — a fresh `.show()`
- * resets the app size, so a cached size alone is not trusted), which batches
- * same-width frames by eliminating the redundant resizes between them. When a
- * resize IS needed, settle on the app reaching a stable measured geometry
- * instead of a blanket 500ms wait.
+ * A supplied source viewport is exact screenshot evidence; ordinary manager
+ * callers retain the roomy shared viewport. The outer frame is always resized
+ * through the live ApplicationV2 instance, then the browser, outer frame, and
+ * inner product rectangles are measured after they settle. Foundry V13 may
+ * clamp the requested outer height to the exact browser viewport.
  * @param {import('playwright').Page} page
- * @param {{ width: number, height: number }} size
+ * @param {{ width: number, height: number, sourceViewport?: {width: number, height: number} }} size
  */
-async function setManagerWindowSize(page, { width, height }) {
-  const viewportWidth = Math.max(1366, width + 80);
-  const viewportHeight = Math.max(768, height + 80);
-  const alreadySized = await page.evaluate(({ width, height, viewportWidth, viewportHeight }) => {
-    const manager = document.querySelector('.fabricate-manager');
-    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-    if (!app) return false;
-    const rect = app.getBoundingClientRect();
-    return Math.abs(window.innerWidth - viewportWidth) <= 2
-      && Math.abs(window.innerHeight - viewportHeight) <= 2
-      && Math.abs(rect.width - width) <= 2
-      && Math.abs(rect.height - height) <= 2;
-  }, { width, height, viewportWidth, viewportHeight }).catch(() => false);
-  if (alreadySized) return;
+async function setManagerWindowSize(page, { width, height, sourceViewport = null }) {
+  const viewport = sourceViewport || {
+    width: Math.max(1366, width + 80),
+    height: Math.max(768, height + 80),
+  };
 
   await withDeadline(
-    page.setViewportSize({ width: viewportWidth, height: viewportHeight }),
+    page.setViewportSize(viewport),
     15_000,
     `setViewportSize ${width}x${height}`
   );
+  await waitForManagerApplicationRendered(page);
   await withDeadline(
-    page.evaluate(({ width, height }) => {
-      const manager = document.querySelector('.fabricate-manager');
-      const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-      if (!app) return null;
-      Object.assign(app.style, {
-        width: `${width}px`,
-        height: `${height}px`,
-        left: '20px',
-        top: '20px'
+    page.evaluate(async ({ width, height, viewport }) => {
+      const app = globalThis.__fabricateSmokeManagerApp;
+      if (!app || typeof app.setPosition !== 'function') {
+        throw new Error('Live Crafting System Manager ApplicationV2 instance has no setPosition');
+      }
+      await app.setPosition({
+        width,
+        height,
+        left: Math.max(0, Math.round((viewport.width - width) / 2)),
+        top: 0,
       });
-      return {
-        width: app.getBoundingClientRect().width,
-        height: app.getBoundingClientRect().height
-      };
-    }, { width, height }),
+    }, { width, height, viewport }),
     15_000,
     `setManagerWindowSize evaluate ${width}x${height}`
   );
-  await waitForManagerGeometrySettled(page, { width, height }, { timeout: 1500, fallbackMs: 500 });
+  const geometry = await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
+  if (geometry.browser.width !== viewport.width || geometry.browser.height !== viewport.height) {
+    throw new Error(`Manager source viewport drifted: ${JSON.stringify({ expected: viewport, actual: geometry.browser })}`);
+  }
+  if (
+    geometry.outer.left < 0
+    || geometry.outer.top < 0
+    || geometry.outer.right > geometry.browser.width
+    || geometry.outer.bottom > geometry.browser.height
+  ) {
+    throw new Error(`ApplicationV2 outer rectangle escapes the browser viewport: ${JSON.stringify(geometry)}`);
+  }
+  if (
+    geometry.product.left < geometry.outer.left
+    || geometry.product.top < geometry.outer.top
+    || geometry.product.right > geometry.outer.right
+    || geometry.product.bottom > geometry.outer.bottom
+  ) {
+    throw new Error(`Tool Studio product rectangle escapes the ApplicationV2 frame: ${JSON.stringify(geometry)}`);
+  }
+  return geometry;
 }
 
 /**
@@ -1090,6 +1354,175 @@ async function captureStableManagerView(page, { width, height, layout, label, se
   await assertManagerLayoutStable(page, layout);
   await assertNoScreenshotOverlays(page);
   await screenshot(page, label);
+}
+
+/**
+ * Issue 801 — capture a GM library's grouped-category CONTINUATION frame: seed one
+ * category large enough to span a page boundary, shrink the pager to page size 10, advance
+ * to the continuation page (the category's remaining slice, "N of M", at the head), and
+ * screenshot. The seeded rows are torn down afterward so no downstream frame sees them, and
+ * the page size is reset FIRST — while the seeded rows still keep the pager on screen — so a
+ * shrink-to-10 can never leak into a downstream frame even if the capture threw after the
+ * shrink. Guarded so a hiccup records a failed step rather than aborting the phase.
+ *
+ * The recipe and component libraries share this exact scaffold; only the seed/cleanup
+ * callbacks, the nav + group selectors, the settle timings, and the label differ, so they
+ * are passed in. Preserves each browser's original order of operations and timings verbatim.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
+ * @param {{
+ *   seed: () => Promise<*>, hasSeed: (handle: *) => boolean, cleanup: (handle: *) => Promise<void>,
+ *   openBrowser: () => Promise<void>, settle: () => Promise<void>, settleAfterReset: () => Promise<void>,
+ *   groupCountSelector: string, layout: string, label: string, stepName: string, failMessage: string
+ * }} options
+ */
+async function captureGroupedContinuationFrame(page, results, options) {
+  const {
+    seed, hasSeed, cleanup, openBrowser, settle, settleAfterReset,
+    groupCountSelector, layout, label, stepName, failMessage,
+  } = options;
+  let handle = null;
+  try {
+    handle = await seed();
+    await openBrowser();
+    const size = page.locator('.fabricate-manager [data-pagination-size]').first();
+    await size.selectOption('10');
+    await settle();
+    await page.locator('.fabricate-manager [data-pagination-next]').first().click();
+    await settle();
+    await page.locator(groupCountSelector).first().waitFor({ state: 'visible', timeout: 5_000 });
+    await captureStableManagerView(page, { layout, label });
+    results.steps.push({ step: stepName, passed: true });
+  } catch (err) {
+    results.steps.push({ step: stepName, passed: false, error: err.message });
+    process.stderr.write(`${failMessage}: ${err.message}\n`);
+  } finally {
+    const sizeReset = page.locator('.fabricate-manager [data-pagination-size]').first();
+    if (await sizeReset.count() > 0) {
+      await sizeReset.selectOption('25').catch(() => {});
+      await settleAfterReset();
+    }
+    if (handle && hasSeed(handle)) {
+      await cleanup(handle);
+    }
+    await openBrowser();
+  }
+}
+
+/**
+ * Issue 806 — the editor round-trip preservation frame for the recipe library. Opening a
+ * recipe editor unmounts the browser and returning remounts it; the persisted `systemId`
+ * sentinel now stops that remount being misread as a system switch, so the page, filters
+ * and per-category collapse the GM left are preserved rather than wiped.
+ *
+ * The frame demonstrates it with the two round-trip-lost fields that fit a small fixture:
+ * a NON-DEFAULT category filter (a visible chip + a filtered single-group list) and a
+ * COLLAPSED category group, both set BEFORE opening the editor and photographed AFTER
+ * returning. Opening the editor from a collapsed group is impossible from the browser (a
+ * collapsed group renders no rows), so the recipe is SELECTED into the shared shell
+ * inspector first — the selection survives the collapse, so the inspector's Edit action
+ * drives the round-trip without a visible row. Page-index preservation is bound by the
+ * mounted tests, not this frame, to keep the smoke fixture small.
+ *
+ * Seeded rows are torn down and the category filter reset afterwards so no downstream frame
+ * inherits them. Guarded so a hiccup records a failed step rather than aborting the phase.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
+ * @param {{systemId: string}} craftingSetup
+ */
+async function captureRecipeEditorRoundtrip(page, results, craftingSetup) {
+  const CATEGORY = 'Roundtrip Brews';
+  let ids = [];
+  try {
+    ids = await page.evaluate(async ({ sysId, category }) => {
+      const rm = game.fabricate.getRecipeManager();
+      const created = [];
+      for (let index = 1; index <= 3; index += 1) {
+        const recipe = await rm.createRecipe({
+          name: `Roundtrip Draught ${String(index).padStart(2, '0')}`,
+          description: 'Issue 806 editor round-trip preservation fixture.',
+          craftingSystemId: sysId,
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Any reagent',
+              options: [{ quantity: 1, match: { type: 'tags', tags: ['reagent'], tagMatch: 'any' } }]
+            }]
+          }]
+        }, { allowIncomplete: true, notify: false });
+        await rm.updateRecipe(recipe.id, { category }, { allowIncomplete: true, notify: false });
+        created.push(recipe.id);
+      }
+      await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+      return created;
+    }, { sysId: craftingSetup.systemId, category: CATEGORY });
+
+    await openManagerCraftingSection(page, 'recipes', 'recipes');
+
+    // Filter to the seeded category: a visible chip and a single-group filtered list.
+    const categoryFilter = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
+    await categoryFilter.selectOption(CATEGORY);
+    await settleManagerNav(page);
+    await page.locator('.fabricate-manager [data-recipe-filter-chip="category"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Select a row into the shared shell inspector, so its Edit action survives the
+    // collapse below (a collapsed group renders no rows to click).
+    await page.locator('.fabricate-manager .manager-recipe-row .manager-recipe-identity').first().click();
+    const inspectorEdit = page.locator('.fabricate-manager .manager-recipe-browser-inspector [data-recipe-action="edit"]').first();
+    await inspectorEdit.waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Collapse the category group, then open the editor from the inspector.
+    const header = page.locator('.fabricate-manager .manager-recipe-group [data-group-header]').first();
+    await header.click();
+    await settleManagerNav(page);
+    await inspectorEdit.click();
+    await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+
+    // Return to the browser: the category filter chip and the collapsed group both survive.
+    await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to recipes")').first().click();
+    await page.locator('.fabricate-manager[data-manager-view="recipes"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    await page.locator('.fabricate-manager [data-recipe-filter-chip="category"]').first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    const stillCollapsed = await page.locator('.fabricate-manager .manager-recipe-group [data-group-header]').first()
+      .getAttribute('aria-expanded');
+    if (stillCollapsed !== 'false') {
+      throw new Error(`Expected the collapsed group to survive the round-trip; aria-expanded=${stillCollapsed}`);
+    }
+
+    // The collapsed single-category group renders ZERO rows on purpose, so
+    // `assertManagerLayoutStable` (which throws "Manager rendered no table rows" when no
+    // row and no edit-form is present) does not apply here — the recipe-item validation
+    // and recipe-editor tab captures skip it for the same reason. Settle explicitly (we
+    // lose `captureStableManagerView`'s internal settle) and guard overlays only.
+    await settleManagerNav(page);
+    await page.waitForTimeout(200);
+    await assertNoScreenshotOverlays(page);
+    await screenshot(page, 'manager-recipes-editor-roundtrip');
+    results.steps.push({ step: 'recipes-editor-roundtrip', passed: true });
+  } catch (err) {
+    results.steps.push({ step: 'recipes-editor-roundtrip', passed: false, error: err.message });
+    process.stderr.write(`Recipes editor round-trip capture failed: ${err.message}\n`);
+  } finally {
+    const categoryReset = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
+    if (await categoryReset.count() > 0) {
+      await categoryReset.selectOption('all').catch(() => {});
+      await settleManagerNav(page);
+    }
+    if (ids.length > 0) {
+      await page.evaluate(async (recipeIds) => {
+        const rm = game.fabricate.getRecipeManager();
+        for (const id of recipeIds) {
+          await rm.deleteRecipe(id, { notify: false }).catch(() => {});
+        }
+        await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+      }, ids);
+    }
+    await openManagerCraftingSection(page, 'recipes', 'recipes');
+  }
 }
 
 /**
@@ -1120,6 +1553,8 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-gathering-task-row',
       '.manager-gathering-event-row',
       '.manager-tools-row',
+      '[data-manager-tool-id]',
+      '[data-tool-edit-view]',
       '.manager-inspector-card',
       '.manager-system-edit-form',
       '.manager-edit-card',
@@ -1175,7 +1610,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-vocabulary-row'
       || metric.selector === '.manager-gathering-task-row'
       || metric.selector === '.manager-gathering-event-row'
-      || metric.selector === '.manager-tools-row'
+      || metric.selector === '[data-manager-tool-id]'
       || metric.selector === '.manager-travel-parties-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
@@ -1186,6 +1621,7 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-event-edit-view'
       || metric.selector === '.manager-essence-edit-view'
       || metric.selector === '.manager-recipe-edit-main'
+      || metric.selector === '[data-tool-edit-view]'
       || metric.selector === '.manager-component-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
@@ -1362,6 +1798,681 @@ async function assertProgressiveStageListSound(page, label, { expectAnnouncement
 async function softClick(locator, options = {}) {
   if (await locator.count() === 0) return;
   await locator.first().click(options).catch(() => {});
+}
+
+async function assertPointerTarget(page, locator, targetSelector, label) {
+  await locator.scrollIntoViewIfNeeded();
+  await locator.waitFor({ state: 'visible', timeout: 5_000 });
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`No pointer box found for ${label}`);
+  const hit = await page.evaluate(({ x, y, targetSelector }) => {
+    const element = document.elementFromPoint(x, y);
+    return {
+      matched: Boolean(element?.closest?.(targetSelector)),
+      tag: element?.tagName || 'none',
+      className: String(element?.className || ''),
+    };
+  }, { x: box.x + box.width / 2, y: box.y + box.height / 2, targetSelector });
+  if (!hit.matched) {
+    throw new Error(`${label} pointer missed ${targetSelector}; hit ${hit.tag} ${hit.className}`);
+  }
+}
+
+function assertSingleToolMutation(report, expectedMethod, label) {
+  const matchingCalls = report?.calls?.filter((call) => call.method === expectedMethod) ?? [];
+  const unexpectedCalls = report?.calls?.filter((call) => call.method !== expectedMethod) ?? [];
+  if (matchingCalls.length !== 1 || unexpectedCalls.length > 0) {
+    throw new Error(
+      `${label} must dispatch exactly one ${expectedMethod} mutation: ${JSON.stringify(report)}`
+    );
+  }
+}
+
+async function beginToolStoreMutationProbe(page, methodNames) {
+  await page.evaluate((names) => {
+    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+    if (!store) throw new Error('Tool mutation probe could not resolve the live manager store');
+    if (globalThis.__fabricateToolMutationProbe) {
+      throw new Error('Tool mutation probe was already active');
+    }
+    const calls = [];
+    const restorations = [];
+    const systemManager = game?.fabricate?.getCraftingSystemManager?.();
+    for (const method of names) {
+      const persistentBoundary = {
+        toggleToolEnabled: 'upsertTool',
+        setToolBreakageAuthority: 'updateSystem',
+      }[method];
+      if (persistentBoundary) {
+        const original = systemManager?.[persistentBoundary];
+        if (typeof original !== 'function') {
+          throw new Error(`Tool mutation probe could not wrap systemManager.${persistentBoundary}`);
+        }
+        systemManager[persistentBoundary] = function (...args) {
+          calls.push({
+            method,
+            args: args.map((value) => {
+              try {
+                return JSON.parse(JSON.stringify(value));
+              } catch {
+                return String(value);
+              }
+            }),
+          });
+          return original.apply(this, args);
+        };
+        restorations.push(() => {
+          systemManager[persistentBoundary] = original;
+        });
+        continue;
+      }
+      if (!store.viewState?.subscribe) {
+        throw new Error(`Tool mutation probe could not observe store.${method}`);
+      }
+      let initial = true;
+      const unsubscribe = store.viewState.subscribe((state) => {
+        if (initial) {
+          initial = false;
+          return;
+        }
+        calls.push({
+          method,
+          args: [{
+            toolId: String(state?.toolDraft?.id || ''),
+            dirty: state?.toolDraftDirty === true,
+          }],
+        });
+      });
+      restorations.push(unsubscribe);
+    }
+    globalThis.__fabricateToolMutationProbe = { calls, restorations };
+  }, methodNames);
+}
+
+async function finishToolStoreMutationProbe(page) {
+  return page.evaluate(() => {
+    const probe = globalThis.__fabricateToolMutationProbe;
+    if (!probe) return { calls: [], missing: true };
+    for (const restore of probe.restorations) restore();
+    delete globalThis.__fabricateToolMutationProbe;
+    return { calls: probe.calls };
+  });
+}
+
+async function withSingleToolStoreMutation(page, method, label, action, assertEffect) {
+  await beginToolStoreMutationProbe(page, [method]);
+  let report;
+  try {
+    await action();
+    await assertEffect();
+  } finally {
+    report = await finishToolStoreMutationProbe(page);
+  }
+  assertSingleToolMutation(report, method, label);
+}
+
+async function withSingleToolDraftTransition(page, expectedToolId, label, action, assertEffect) {
+  await page.evaluate(() => {
+    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+    if (!store?.viewState?.subscribe) {
+      throw new Error('Tool draft transition probe could not resolve the live manager view state');
+    }
+    if (globalThis.__fabricateToolDraftTransitionProbe) {
+      throw new Error('Tool draft transition probe was already active');
+    }
+    const transitions = [];
+    let initial = true;
+    const unsubscribe = store.viewState.subscribe((state) => {
+      if (initial) {
+        initial = false;
+        return;
+      }
+      transitions.push({
+        toolId: String(state?.toolDraft?.id || ''),
+        dirty: state?.toolDraftDirty === true,
+      });
+    });
+    globalThis.__fabricateToolDraftTransitionProbe = { transitions, unsubscribe };
+  });
+  let report;
+  try {
+    await action();
+    await assertEffect();
+  } finally {
+    report = await page.evaluate(() => {
+      const probe = globalThis.__fabricateToolDraftTransitionProbe;
+      if (!probe) return { transitions: [], missing: true };
+      probe.unsubscribe();
+      delete globalThis.__fabricateToolDraftTransitionProbe;
+      return { transitions: probe.transitions };
+    });
+  }
+  const distinctTransitions = report.transitions.filter((transition, index, transitions) => (
+    index === 0
+    || transition.toolId !== transitions[index - 1].toolId
+    || transition.dirty !== transitions[index - 1].dirty
+  ));
+  const matching = distinctTransitions.filter(({ toolId }) => toolId === String(expectedToolId));
+  if (distinctTransitions.length !== 1 || matching.length !== 1) {
+    throw new Error(
+      `${label} must publish exactly one distinct Tool draft transition for ${expectedToolId}: ${JSON.stringify({
+        ...report,
+        distinctTransitions,
+      })}`
+    );
+  }
+}
+
+async function clickToolTabAndAssertEffect(page, editor, name, label) {
+  const target = editor.locator(`#tool-tab-${name}`);
+  await assertPointerTarget(page, target, `#tool-tab-${name}`, label);
+  if (await target.getAttribute('aria-selected') !== 'false') {
+    throw new Error(`${label} must begin on a different Tool tab`);
+  }
+  await target.evaluate((element) => {
+    const transitions = [];
+    const observer = new MutationObserver(() => {
+      transitions.push(element.getAttribute('aria-selected'));
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ['aria-selected'] });
+    element.__fabricateToolTabProbe = { observer, transitions };
+  });
+  await target.click();
+  await editor.locator(`[data-tool-editor-panel="${name}"]`).waitFor({ state: 'visible', timeout: 5_000 });
+  const effect = await target.evaluate((element) => {
+    const probe = element.__fabricateToolTabProbe;
+    probe?.observer?.disconnect();
+    delete element.__fabricateToolTabProbe;
+    const tablist = element.closest('[role="tablist"]');
+    return {
+      selected: tablist?.querySelectorAll('[role="tab"][aria-selected="true"]').length ?? 0,
+      expectedSelected: element.getAttribute('aria-selected'),
+      selectedTransitions: probe?.transitions?.filter((value) => value === 'true').length ?? 0,
+      transitions: probe?.transitions ?? [],
+    };
+  });
+  if (
+    effect.selected !== 1
+    || effect.expectedSelected !== 'true'
+    || effect.selectedTransitions !== 1
+  ) {
+    throw new Error(`${label} did not transition exactly once to ${name}: ${JSON.stringify(effect)}`);
+  }
+}
+
+async function toggleToolControlAndRestore(page, locator, label) {
+  await assertPointerTarget(page, locator, 'input', label);
+  const before = await locator.isChecked();
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    `${label} apply`,
+    () => locator.click(),
+    async () => {
+      if (await locator.isChecked() === before) {
+        throw new Error(`${label} did not apply its observable toggle effect`);
+      }
+    },
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    `${label} restore`,
+    () => locator.click(),
+    async () => {
+      if (await locator.isChecked() !== before) {
+        throw new Error(`${label} did not restore its original persisted state`);
+      }
+    },
+  );
+}
+
+async function selectOptionAndAssertSingleChange(
+  locator,
+  value,
+  label,
+  { expectRetainedValue = true } = {},
+) {
+  await locator.evaluate((element) => {
+    element.__fabricateSelectChangeCount = 0;
+    element.__fabricateSelectChangeListener = () => {
+      element.__fabricateSelectChangeCount += 1;
+    };
+    element.addEventListener('change', element.__fabricateSelectChangeListener);
+  });
+  await locator.selectOption(value);
+  const effect = await locator.evaluate((element) => {
+    element.removeEventListener('change', element.__fabricateSelectChangeListener);
+    const report = {
+      changes: element.__fabricateSelectChangeCount,
+      value: element.value,
+    };
+    delete element.__fabricateSelectChangeCount;
+    delete element.__fabricateSelectChangeListener;
+    return report;
+  });
+  if (effect.changes !== 1 || (expectRetainedValue && effect.value !== value)) {
+    throw new Error(`${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`);
+  }
+}
+
+async function saveToolStudioDraftIfDirty(editor) {
+  if (await editor.locator('[data-tool-editor-dirty]').count() === 0) return;
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-dirty]').waitFor({
+    state: 'detached',
+    timeout: 10_000,
+  });
+}
+
+async function assertSavedToolStudioCapture(editor, label) {
+  if (await editor.locator('[data-tool-editor-dirty]').count() > 0) {
+    throw new Error(`${label} must capture a saved Tool draft`);
+  }
+  const save = editor.locator('[data-tool-editor-save]');
+  if (await save.count() !== 1 || !await save.isDisabled()) {
+    throw new Error(`${label} must expose the recipe-parity clean state with Save tool disabled`);
+  }
+}
+
+async function requireSingleLocator(locator, label) {
+  const count = await locator.count();
+  if (count !== 1) {
+    throw new Error(`${label} expected exactly one match, found ${count}`);
+  }
+  return locator;
+}
+
+async function assertDisabledToolOnBreakFieldset(fieldset) {
+  const fieldsetState = await fieldset.evaluate((element) => ({
+    disabled: element.disabled === true,
+    matchesDisabled: element.matches(':disabled'),
+  }));
+  if (!fieldsetState.disabled || !fieldsetState.matchesDisabled) {
+    throw new Error(`Check-driven immune fieldset did not expose native disabled state: ${JSON.stringify(fieldsetState)}`);
+  }
+  const controls = fieldset.locator('button, input, select, textarea');
+  const controlCount = await controls.count();
+  if (controlCount === 0) {
+    throw new Error('Check-driven immune fieldset exposed no actionable controls');
+  }
+  for (let index = 0; index < controlCount; index += 1) {
+    if (!(await controls.nth(index).isDisabled())) {
+      throw new Error(`Check-driven immune on-break control ${index + 1} remained interactive`);
+    }
+  }
+}
+
+function assertToolStudioHorizontalScrollSettled(positions, label) {
+  const unsettled = (positions || []).filter(({ scrollLeft }) => scrollLeft !== 0);
+  if (unsettled.length > 0) {
+    throw new Error(`${label} leaked horizontal scroll: ${JSON.stringify(unsettled)}`);
+  }
+}
+
+async function readToolStudioHorizontalScroll(page, { reset = false } = {}) {
+  return page.evaluate((shouldReset) => {
+    const manager = document.querySelector('#fabricate-crafting-system-manager .fabricate-manager');
+    if (!manager) return [];
+    const explicitSelectors = [
+      'html',
+      'body',
+      '#fabricate-crafting-system-manager',
+      '.fabricate-manager',
+      '.fabricate-manager .manager-body',
+      '.fabricate-manager .manager-main',
+      '.fabricate-manager [data-tool-edit-view]',
+      '.fabricate-manager .manager-tool-editor-tabs',
+      '.fabricate-manager [data-tool-editor-panel]',
+      '.fabricate-manager [data-tool-behavior-preview]',
+      '.fabricate-manager .manager-inspector',
+      '.fabricate-manager .manager-tool-repair',
+      '.fabricate-manager [data-tool-repair-requirements] [data-recipe-group]',
+    ];
+    const elements = new Set([document.scrollingElement]);
+    for (const selector of explicitSelectors) {
+      for (const element of document.querySelectorAll(selector)) elements.add(element);
+    }
+    for (const element of manager.querySelectorAll('*')) {
+      if (element.scrollWidth > element.clientWidth + 1) elements.add(element);
+    }
+    const positions = [];
+    let index = 0;
+    for (const element of elements) {
+      if (!element) continue;
+      if (shouldReset) element.scrollLeft = 0;
+      positions.push({
+        index,
+        tag: element.tagName,
+        id: element.id || '',
+        className: String(element.className || ''),
+        scrollLeft: element.scrollLeft,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      });
+      index += 1;
+    }
+    return positions;
+  }, reset);
+}
+
+async function assertToolStudioHorizontalScroll(page, label) {
+  const positions = await readToolStudioHorizontalScroll(page);
+  assertToolStudioHorizontalScrollSettled(positions, label);
+}
+
+async function resetToolStudioHorizontalScroll(page, label = 'Tool Studio') {
+  await readToolStudioHorizontalScroll(page, { reset: true });
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await assertToolStudioHorizontalScroll(page, `${label} horizontal reset`);
+}
+
+async function resetToolStudioScroll(page) {
+  const selectors = [
+    '.fabricate-manager .manager-body',
+    '.fabricate-manager .manager-main',
+    '.fabricate-manager [data-tool-editor-panel]',
+    '.fabricate-manager [data-tool-behavior-preview]',
+    '.fabricate-manager .manager-inspector',
+  ];
+  await page.evaluate((targets) => {
+    for (const selector of targets) {
+      for (const element of document.querySelectorAll(selector)) element.scrollTop = 0;
+    }
+  }, selectors);
+  await resetToolStudioHorizontalScroll(page);
+  const scroll = await page.evaluate((targets) => targets.flatMap((selector) => (
+    Array.from(document.querySelectorAll(selector), (element, index) => ({
+      selector,
+      index,
+      scrollTop: element.scrollTop,
+    }))
+  )), selectors);
+  const unsettled = scroll.filter(({ scrollTop }) => scrollTop !== 0);
+  if (unsettled.length > 0) {
+    throw new Error(`Tool Studio vertical scroll reset failed: ${JSON.stringify(unsettled)}`);
+  }
+}
+
+async function scrollToolEditorPanelToReveal(page, editor, selector, label) {
+  const panel = editor.locator('[data-tool-editor-panel]');
+  const target = editor.locator(selector);
+  const fixedBefore = await editor.evaluate(() => {
+    const read = (selector) => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    };
+    return {
+      header: read('[data-tool-editor-header]'),
+      tabs: read('.manager-tool-editor-tabs'),
+      preview: read('[data-tool-behavior-preview]'),
+    };
+  });
+  await target.evaluate((element) => element.scrollIntoView({
+    block: 'center',
+    inline: 'nearest',
+  }));
+  await resetToolStudioHorizontalScroll(page, label);
+  const report = await panel.evaluate((element, targetSelector) => {
+    const targetElement = element.querySelector(targetSelector);
+    if (!targetElement) return null;
+    const panelRect = element.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    return {
+      scrollTop: element.scrollTop,
+      targetVisible: targetRect.top >= panelRect.top && targetRect.bottom <= panelRect.bottom,
+      targetContained: targetRect.left >= panelRect.left - 1 && targetRect.right <= panelRect.right + 1,
+    };
+  }, selector);
+  if (!report || report.scrollTop <= 0 || !report.targetVisible || !report.targetContained) {
+    throw new Error(`${label} stress control was not visibly scrolled into the editor pane: ${JSON.stringify(report)}`);
+  }
+  const fixedAfter = await editor.evaluate(() => {
+    const read = (selector) => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    };
+    return {
+      header: read('[data-tool-editor-header]'),
+      tabs: read('.manager-tool-editor-tabs'),
+      preview: read('[data-tool-behavior-preview]'),
+    };
+  });
+  for (const key of ['header', 'tabs', 'preview']) {
+    for (const edge of ['left', 'right', 'top', 'bottom']) {
+      if (Math.abs((fixedBefore[key]?.[edge] ?? 0) - (fixedAfter[key]?.[edge] ?? 0)) > 1) {
+        throw new Error(
+          `${label} moved fixed ${key} context while revealing stress content: `
+          + `${JSON.stringify({ fixedBefore, fixedAfter })}`
+        );
+      }
+    }
+  }
+  for (const [identitySelector, identityLabel] of [
+    ['[data-tool-editor-header]', 'header'],
+    ['.manager-tool-editor-tabs', 'tabs'],
+    ['[data-tool-behavior-preview]', 'preview'],
+  ]) {
+    if (!(await editor.locator(identitySelector).isVisible())) {
+      throw new Error(`${label} lost ${identityLabel} identity context`);
+    }
+  }
+}
+
+async function captureToolStudioProduct(page, label, expectedGeometry) {
+  const manager = await requireSingleLocator(
+    page.locator('#fabricate-crafting-system-manager .fabricate-manager'),
+    `${label} live Tool Studio manager`
+  );
+  const box = await manager.boundingBox();
+  if (!box) throw new Error(`${label} Tool Studio product rectangle is not measurable`);
+  const measured = { width: Math.round(box.width), height: Math.round(box.height) };
+  const expected = expectedGeometry?.product;
+  if (!expected || measured.width !== expected.width || measured.height !== expected.height) {
+    throw new Error(
+      `${label} Tool Studio product rectangle drifted: ${JSON.stringify({ measured, expectedGeometry })}`
+    );
+  }
+  await assertToolStudioHorizontalScroll(page, `${label} before capture`);
+  await screenshot(page, label, {
+    clip: { x: box.x, y: box.y, width: box.width, height: box.height },
+  });
+  await assertToolStudioHorizontalScroll(page, `${label} after capture`);
+}
+
+async function readToolStudioLayout(page) {
+  return page.evaluate(() => {
+    const readRect = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const readType = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        fontSize: Number.parseFloat(style.fontSize),
+        lineHeight: style.lineHeight,
+        overflow: style.overflow,
+        textOverflow: style.textOverflow,
+        whiteSpace: style.whiteSpace,
+      };
+    };
+    const readOverflow = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        overflowY: style.overflowY,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      };
+    };
+    const readHorizontalOverflow = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        overflowX: style.overflowX,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        scrollLeft: element.scrollLeft,
+      };
+    };
+    return {
+      manager: readRect('.fabricate-manager'),
+      body: readRect('.fabricate-manager .manager-body'),
+      main: readRect('[data-tool-edit-view]')?.width > 0
+        ? readRect('.fabricate-manager .manager-main')
+        : readRect('.fabricate-manager .manager-body'),
+      inspector: readRect('.fabricate-manager .manager-inspector'),
+      libraryRow: readRect('.fabricate-manager [data-manager-tool-id]'),
+      editorHeader: readRect('[data-tool-editor-header]'),
+      editorActions: readRect('.manager-tool-edit-actions'),
+      tabs: readRect('.manager-tool-editor-tabs'),
+      tabButtons: Array.from(
+        document.querySelectorAll('.manager-tool-editor-tabs > [role="tab"]'),
+        (element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            id: element.id,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+          };
+        },
+      ),
+      tabsOverflow: readHorizontalOverflow('.manager-tool-editor-tabs'),
+      composition: readRect('.manager-tool-edit-composition')?.width > 0
+        ? readRect('.manager-tool-edit-composition')
+        : readRect('.fabricate-manager .manager-body'),
+      editorPanel: readRect('[data-tool-editor-panel]'),
+      firstSection: readRect('[data-tool-editor-panel] > *'),
+      preview: readRect('[data-tool-behavior-preview]'),
+      previewIdentity: readRect('[data-tool-preview-identity]'),
+      libraryNameType: readType('.manager-tools-library-copy > strong'),
+      inspectorNameType: readType('.manager-tool-inspector-hero h2'),
+      editorNameType: readType('.manager-tool-edit-identity h2'),
+      previewNameType: readType('.manager-tool-preview-identity h3'),
+      bodyOverflow: readOverflow('.fabricate-manager .manager-body'),
+      mainOverflow: readOverflow('.fabricate-manager .manager-main'),
+      panelOverflow: readOverflow('[data-tool-editor-panel]'),
+      previewOverflow: readOverflow('[data-tool-behavior-preview]'),
+      headerCount: document.querySelectorAll('[data-tool-editor-header]').length,
+      genericTitleCount: document.querySelectorAll('.manager-heading > .manager-title, .manager-heading > .manager-subtitle').length,
+    };
+  });
+}
+
+function assertHorizontalContainment(parent, child, label) {
+  if (!parent || !child || child.left < parent.left - 1 || child.right > parent.right + 1) {
+    throw new Error(`${label} escapes horizontal containment: ${JSON.stringify({ parent, child })}`);
+  }
+}
+
+function assertToolStudioTabContainment(report) {
+  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 4) {
+    throw new Error(`Tool editor must render four measurable tabs: ${JSON.stringify(report)}`);
+  }
+  const overflow = report.tabsOverflow;
+  if (
+    !overflow
+    || overflow.scrollLeft !== 0
+    || overflow.scrollWidth > overflow.clientWidth + 1
+  ) {
+    throw new Error(`Tool editor tabs remain horizontally scrollable: ${JSON.stringify(overflow)}`);
+  }
+  for (const tab of report.tabButtons) {
+    assertHorizontalContainment(report.tabs, tab, `${tab.id} within visible tab list`);
+    assertHorizontalContainment(report.manager, tab, `${tab.id} within Tool Studio product root`);
+  }
+}
+
+function assertToolStudioTypography(report, pairs) {
+  for (const [key, maximum, label] of pairs) {
+    const type = report[key];
+    if (!type || !Number.isFinite(type.fontSize) || type.fontSize > maximum) {
+      throw new Error(`${label} typography is not compact: ${JSON.stringify(type)}`);
+    }
+    if (type.whiteSpace !== 'nowrap' || !['hidden', 'clip'].includes(type.overflow)) {
+      throw new Error(`${label} does not bound long identity copy: ${JSON.stringify(type)}`);
+    }
+  }
+}
+
+async function assertToolStudioLibraryLayout(page) {
+  const report = await readToolStudioLayout(page);
+  assertHorizontalContainment(report.body, report.main, 'Tool library center');
+  assertHorizontalContainment(report.body, report.inspector, 'Tool library inspector');
+  assertHorizontalContainment(report.main, report.libraryRow, 'Tool library row');
+  if (!report.inspector || report.inspector.width < 330 || report.inspector.width > 342) {
+    throw new Error(`Tool library inspector is not the complete 340px rail: ${JSON.stringify(report.inspector)}`);
+  }
+  assertToolStudioTypography(report, [
+    ['libraryNameType', 14, 'Tool library name'],
+    ['inspectorNameType', 17, 'Tool inspector name'],
+  ]);
+}
+
+async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
+  const report = await readToolStudioLayout(page);
+  if (report.headerCount !== 1 || report.genericTitleCount !== 0) {
+    throw new Error(`Tool editor identity chrome drifted: ${JSON.stringify({ headerCount: report.headerCount, genericTitleCount: report.genericTitleCount })}`);
+  }
+  for (const [parent, child, label] of [
+    [report.main, report.editorHeader, 'Tool editor header'],
+    [report.editorHeader, report.editorActions, 'Tool editor actions'],
+    [report.main, report.tabs, 'Tool editor tabs'],
+    [report.composition, report.editorPanel, 'Tool editor panel'],
+    [report.composition, report.preview, 'Tool behavior preview'],
+    [report.preview, report.previewIdentity, 'Tool preview identity'],
+    [report.editorPanel, report.firstSection, 'Tool editor first section'],
+  ]) {
+    assertHorizontalContainment(parent, child, label);
+  }
+  assertToolStudioTabContainment(report);
+  assertToolStudioTypography(report, [
+    ['editorNameType', 20, 'Tool editor name'],
+    ['previewNameType', 17, 'Tool preview name'],
+  ]);
+  if (!stacked) {
+    if (!report.preview || report.preview.width < 318 || report.preview.width > 322) {
+      throw new Error(`Tool preview is not the complete 320px rail: ${JSON.stringify(report.preview)}`);
+    }
+    if (report.preview.top < report.composition.top - 1 || report.preview.bottom > report.composition.bottom + 1) {
+      throw new Error(`Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`);
+    }
+    return;
+  }
+  if (report.preview.height <= 0 || report.preview.top < report.editorPanel.top) {
+    throw new Error(`Tool preview is clipped or precedes the editor in stacked reading order: ${JSON.stringify(report.preview)}`);
+  }
+  if (report.bodyOverflow?.overflowY !== 'auto') {
+    throw new Error(`Tool stacked body does not own scrolling: ${JSON.stringify(report.bodyOverflow)}`);
+  }
+  for (const [key, label] of [
+    ['mainOverflow', 'main'],
+    ['panelOverflow', 'panel'],
+    ['previewOverflow', 'preview'],
+  ]) {
+    if (['auto', 'scroll'].includes(report[key]?.overflowY)) {
+      throw new Error(`Tool stacked ${label} unexpectedly owns nested scrolling: ${JSON.stringify(report[key])}`);
+    }
+  }
 }
 
 function managerSystemRowSelector(systemId) {
@@ -1669,6 +2780,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Bracket', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
       { name: 'Smoke Relic', img: 'icons/commodities/treasure/crown-gold-laurel-wreath.webp' },
       { name: 'Smoke Shard', img: 'icons/commodities/gems/gem-fragments-red.webp' },
+      // Issue 777: the required-tools salvage subject (see the salvage config below).
+      { name: 'Smoke Toolchest', img: 'icons/containers/chest/chest-wooden-tied-white.webp' },
       // simple system — multi-option ingredient recipe (issue #552): two
       // interchangeable coil components the crafter holds + the woven result.
       { name: 'Smoke Copper Coil', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
@@ -1694,7 +2807,12 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Cracked Amphora', img: 'icons/containers/kitchenware/vase-clay-painted-blue-gold.webp' },
       { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' },
       { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/paver-tile-blue.webp' },
-      { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' }
+      { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' },
+      // Issue 766: ONE physical world item registered as a salvageable component in TWO
+      // crafting systems (the simple forge and the progressive forge). A single crafter
+      // copy of it must collapse to ONE inventory card carrying a system selector — the
+      // reported "same item shows twice, once per system" defect and its fix.
+      { name: 'Smoke Air Shard', img: 'icons/commodities/gems/pearl-turquoise.webp' }
     ];
     const createdItems = await Item.createDocuments(
       worldSpecs.map((s) => ({ name: s.name, type: itemType, img: s.img }))
@@ -1738,9 +2856,32 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       'Smoke Plank', 'Smoke Crate', 'Smoke Mallet', 'Smoke Toy',
       'Smoke Chisel', 'Smoke Dowel', 'Smoke Anvil', 'Smoke Bracket',
       'Smoke Relic', 'Smoke Shard',
+      // Issue 777: the required-tools salvage subject — salvaging it needs the Mallet
+      // (which the crafter holds) and the Anvil (which it does not), so the player-salvage-
+      // tools frame shows one available and one unavailable required-tool row.
+      'Smoke Toolchest',
       // Multi-option ingredient recipe (issue #552) components.
-      'Smoke Copper Coil', 'Smoke Bronze Coil', 'Smoke Filigree'
+      'Smoke Copper Coil', 'Smoke Bronze Coil', 'Smoke Filigree',
+      // Issue 766: also registered in the progressive forge below — one physical stack,
+      // two systems, one collapsed card.
+      'Smoke Air Shard'
     ]);
+    // Issue 766: Smoke Air Shard salvage in the SIMPLE forge (simple mode, yields Smoke
+    // Shard). Its progressive-forge participation (below) salvages differently, so the
+    // collapsed card's two participations carry genuinely distinct salvage surfaces.
+    await csm.updateItem(simpleSystemId, simpleMap['Smoke Air Shard'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [
+          {
+            id: 'smoke-air-simple-salvage',
+            name: 'Air Fragments',
+            results: [{ id: 'smoke-air-simple-shard', componentId: simpleMap['Smoke Shard'], quantity: 1 }]
+          }
+        ]
+      }
+    });
     const malletToolId = 'smoke-mallet-tool';
     const chiselToolId = 'smoke-chisel-tool';
     const anvilToolId = 'smoke-anvil-tool';
@@ -1748,6 +2889,17 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     await csm.updateSystem(simpleSystemId, {
       resolutionMode: 'simple',
       salvageResolutionMode: 'simple',
+      // Issue 765: unlock explicit multi-step authoring so the simple system can host
+      // a stepped recipe (the player-crafting-multistep screenshot subject).
+      features: { multiStepRecipes: true, essences: true },
+      essenceDefinitions: [
+        {
+          id: 'smoke-star-essence',
+          name: 'Smoke Star Essence',
+          description: 'Distinctive authored essence icon fixture for player Crafting evidence.',
+          icon: 'fas fa-star-of-life'
+        }
+      ],
       tools: [
         {
           // Always breaks (rng()*100 ∈ [0,100) < 100) → deterministic breakageChance break.
@@ -1793,6 +2945,22 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
           id: 'smoke-relic-parts',
           name: 'Salvaged Parts',
           results: [{ id: 'smoke-shard-result', componentId: simpleMap['Smoke Shard'], quantity: 2 }]
+        }]
+      }
+    });
+    // Issue 777: required-tools salvage subject. Simple no-check salvage (same shape as
+    // Smoke Relic) with `toolIds` naming two library tools — the Mallet the crafter holds
+    // (available) and the Anvil it does not (unavailable) — so the player-salvage-tools
+    // frame shows both availability states and the disabled pre-roll action in one panel.
+    await csm.updateItem(simpleSystemId, simpleMap['Smoke Toolchest'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        toolIds: [malletToolId, anvilToolId],
+        resultGroups: [{
+          id: 'smoke-toolchest-parts',
+          name: 'Reclaimed Parts',
+          results: [{ id: 'smoke-toolchest-shard', componentId: simpleMap['Smoke Shard'], quantity: 1 }]
         }]
       }
     });
@@ -1856,14 +3024,12 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     });
     await rm.updateRecipe(negativeToolRecipe.id, { toolIds: [anvilToolId] });
 
-    // Multi-option ingredient recipe (issue #552): a single ingredient group that
-    // offers TWO interchangeable components the crafter actually holds, so the
-    // player detail renders the IngredientOptionSelector "Alternatives"
-    // radiogroup with two satisfiable, selectable rows. Additive — no execution
-    // assert consumes it — so it never perturbs the #489 consumption pins.
+    // Multi-option ingredient recipe (issue #552): a component OR authored essence
+    // choice. The held component keeps the recipe selectable while the essence option
+    // deterministically exercises its distinctive authored glyph.
     const multiOptionRecipe = await rm.createRecipe({
       name: 'Smoke Weave Filigree',
-      description: 'Simple-mode craft with one ingredient group offering two interchangeable coils (issue #552).',
+      description: 'Simple-mode craft with one component-or-essence ingredient choice (issue #552).',
       craftingSystemId: simpleSystemId,
       img: 'icons/commodities/metal/ingot-gold.webp',
       ingredientSets: [{
@@ -1872,7 +3038,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
           name: 'Coil',
           options: [
             { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Copper Coil'] } },
-            { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Bronze Coil'] } }
+            { quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 2 } }
           ]
         }]
       }],
@@ -1880,6 +3046,80 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         name: 'Filigree',
         results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }]
       }]
+    });
+
+    await rm.createRecipe({
+      name: 'Smoke Legacy Essence Seal',
+      description: 'Legacy set-level essence requirement with an authored icon.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/commodities/treasure/token-gold-gem-purple.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          name: 'Plank',
+          options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+        }],
+        essences: { 'smoke-star-essence': 2 }
+      }],
+      resultGroups: [{ name: 'Seal', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
+    });
+
+    await rm.createRecipe({
+      name: 'Smoke First-Class Essence Draught',
+      description: 'First-class essence ingredient and shopping-list shortage fixture.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/commodities/treasure/token-gold-gem-purple.webp',
+      ingredientSets: [{
+        ingredientGroups: [{
+          id: 'smoke-star-essence-group',
+          name: 'Star Essence',
+          options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 3 } }]
+        }]
+      }],
+      resultGroups: [{ name: 'Draught', results: [{ componentId: simpleMap['Smoke Toy'], quantity: 1 }] }]
+    });
+
+    // Explicit multi-step simple recipe (issue 765): the reported defect. Its sets
+    // live on steps[] with empty top-level arrays, so the step-aware listing
+    // projection must surface each step's materials, evaluate the first step's
+    // craftability, and resolve PRODUCES from the TERMINAL step. Checks stay off
+    // (the simple system has no authored formula), so no check card renders — the
+    // player-crafting-multistep screenshot subject. Additive: no execution assert
+    // consumes it. Step 1 consumes held planks (craftable/available); step 2's
+    // dowel is the intermediate, and the final product is the crate.
+    const multiStepRecipe = await rm.createRecipe({
+      name: 'Smoke Raise Tent',
+      description:
+        'Simple-mode multi-step craft (issue #765): step 1 cuts planks, step 2 raises the frame.',
+      craftingSystemId: simpleSystemId,
+      // A Foundry core raster already exercised by this fixture (the crate world item)
+      // so the recipe thumbnail never 404s in the capture.
+      img: 'icons/containers/boxes/box-gift-white.webp',
+      ingredientSets: [],
+      resultGroups: [],
+      steps: [
+        {
+          name: 'Cut Planks',
+          timeRequirement: { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Plank',
+              options: [{ quantity: 2, match: { type: 'component', componentId: simpleMap['Smoke Plank'] } }]
+            }]
+          }],
+          resultGroups: [{ name: 'Dowel', results: [{ componentId: simpleMap['Smoke Dowel'], quantity: 1 }] }]
+        },
+        {
+          name: 'Raise Frame',
+          timeRequirement: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 },
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Dowel',
+              options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Dowel'] } }]
+            }]
+          }],
+          resultGroups: [{ name: 'Crate', results: [{ componentId: simpleMap['Smoke Crate'], quantity: 1 }] }]
+        }
+      ]
     });
 
     // ── 3. ROUTED-BY-INGREDIENTS system (multi-set → differing groups) ──────
@@ -2004,7 +3244,10 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         // formula (so it renders the no-check body) and `Iron Ore` is seeded for the
         // component EDITOR, not player inventory — so the player salvage surface's
         // headline feature, the reorderable stage list, had no capturable frame.
-        'Smoke Cracked Amphora'
+        'Smoke Cracked Amphora',
+        // Issue 766: the SAME world item already registered in the simple forge — so one
+        // owned copy resolves to a component in both systems and collapses to one card.
+        'Smoke Air Shard'
       ],
       1
     );
@@ -2075,6 +3318,23 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         ]
       }
     });
+    // Issue 766: Smoke Air Shard salvage in the PROGRESSIVE forge (simple mode here for a
+    // deterministic capture, yielding Smoke Brick). Its simple-forge participation yields
+    // Smoke Shard — so the collapsed card's System selector switches between two genuinely
+    // different salvage surfaces, proving the whole body re-scopes to the chosen system.
+    await csm.updateItem(progressiveSystemId, progressiveMap['Smoke Air Shard'], {
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [
+          {
+            id: 'smoke-air-prog-salvage',
+            name: 'Air Fragments',
+            results: [{ id: 'smoke-air-prog-brick', componentId: progressiveMap['Smoke Brick'], quantity: 1 }]
+          }
+        ]
+      }
+    });
     const progressiveRecipe = await rm.createRecipe({
       name: 'Smoke Mold Brick',
       description: 'progressive: one low-difficulty result awarded in a single advance.',
@@ -2128,13 +3388,17 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // copy is inert. The player-salvage capture below does NOT commit a salvage; if it
       // ever does, this must become 3.
       ...invCopies('Smoke Relic', 2),                 // salvageable component
+      ...invCopies('Smoke Toolchest', 1),             // issue 777: required-tools salvage subject
       ...invCopies('Smoke Copper Coil', 1),           // multi-option recipe alternative A (#552)
       ...invCopies('Smoke Bronze Coil', 1),           // multi-option recipe alternative B (#552)
       ...invCopies('Smoke Ingot A', 1),               // routedByIngredients set A
       ...invCopies('Smoke Ingot B', 1),               // routedByIngredients set B (asserted NOT produced)
       ...invCopies('Smoke Bar', 1),                   // routedByCheck stock
       ...invCopies('Smoke Clay', 1),                  // progressive stock
-      ...invCopies('Smoke Cracked Amphora', 1)        // progressive-salvage subject (#675)
+      ...invCopies('Smoke Cracked Amphora', 1),       // progressive-salvage subject (#675)
+      // Issue 766: ONE physical copy registered in BOTH forges. It must collapse to a
+      // SINGLE card (quantity ×1, counted once — never ×2) with a system selector.
+      ...invCopies('Smoke Air Shard', 1)              // multi-system collapse subject (#766)
     ]);
 
     // ── 7. Always-run guaranteed-success gather (Arcane Forge, scene-less) ──
@@ -2960,6 +4224,1161 @@ async function installNotificationHidingCss(page) {
   });
 }
 
+async function setupToolStudioFixture(page, { systemId, recipeId }) {
+  return page.evaluate(async ({ systemId, recipeId }) => {
+    const clone = (value) => foundry.utils.deepClone(value);
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    const system = csm.getSystem(systemId);
+    const recipe = rm.getRecipe(recipeId);
+    const sourceTemplate = game.items.find((item) => item.name === 'Herbalist Sickle');
+    if (!system || !recipe || !sourceTemplate) {
+      throw new Error('Tool Studio fixture requires Arcane Forge, Brew Healing Potion, and Herbalist Sickle');
+    }
+    const pack = game.packs.get('dnd5e.items');
+    const index = await pack?.getIndex?.();
+    const uncached = Array.from(index || []).find((entry) => entry?._id && !pack.get(entry._id));
+    if (!uncached) throw new Error('Tool Studio fixture requires an uncached dnd5e.items entry');
+    const sourceSystem = clone(sourceTemplate.system);
+    const parityDescription = '<p>A well-balanced forge hammer. Durable, but the haft splinters when hard used.</p>';
+    if (typeof sourceSystem?.description === 'string') {
+      sourceSystem.description = parityDescription;
+    } else if (sourceSystem?.description && typeof sourceSystem.description === 'object') {
+      sourceSystem.description.value = parityDescription;
+    } else {
+      sourceSystem.description = { value: parityDescription };
+    }
+    const source = await Item.create({
+      name: "Smith's Hammer",
+      type: sourceTemplate.type,
+      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
+      system: sourceSystem,
+    });
+    if (!source) throw new Error("Tool Studio fixture could not create Smith's Hammer");
+    const replacementSource = await Item.create({
+      name: 'Smoke Tool Studio Replacement Item',
+      type: sourceTemplate.type,
+      img: sourceTemplate.img,
+      system: clone(sourceSystem),
+    });
+    if (!replacementSource) throw new Error('Tool Studio fixture could not create its replacement Item');
+
+    const restore = {
+      tools: clone(system.tools || []),
+      characterPrerequisites: clone(system.characterPrerequisites || []),
+      toolBreakage: clone(system.toolBreakage || { authority: 'toolSpecific' }),
+      recipeToolIds: clone(recipe.toolIds || []),
+      recipeToolBonusModes: clone(recipe.toolBonusModes || {}),
+      sourceRoles: clone(source.getFlag('fabricate', 'fabricate.roles') || null),
+      sourceCreated: true,
+      replacementSourceCreated: true,
+    };
+    const prerequisiteId = 'smoke-tool-studio-training';
+    const requestedToolId = 'smoke-tool-studio';
+    const components = (system.components || []).filter((component) => component.id !== source.id);
+    if (components.length < 2) throw new Error('Tool Studio repair fixture needs two managed Components');
+    const parityPrerequisites = [
+      ['smoke-tool-studio-expert', 'Expert Crafter', 'prof', 'gte', 4],
+      [prerequisiteId, "Proficient with Smith's Tools", 'prof', 'gte', 1],
+      ['smoke-tool-studio-weave', 'Attuned to the Weave', 'abilities.int.mod', 'gte', 2],
+      ['smoke-tool-studio-strong', 'Strength 13 or higher', 'abilities.str.value', 'gte', 13],
+      ['smoke-tool-studio-arena', 'Trained in Arcana', 'skills.arc.value', 'gte', 1],
+    ].map(([id, name, path, op, value]) => ({
+      id,
+      name,
+      icon: 'fa-solid fa-user-shield',
+      path,
+      op,
+      value,
+    }));
+    await csm.updateSystem(systemId, {
+      characterPrerequisites: parityPrerequisites,
+      // The parity frame owns an exact eight-row fixture. Clear the unrelated
+      // smoke tools first; restoration below reinstates the original array.
+      tools: [],
+      toolBreakage: { authority: 'toolSpecific' },
+    });
+    let { item: upsertedTool } = await csm.upsertTool(systemId, {
+      id: requestedToolId,
+      enabled: true,
+      label: "Smith's Hammer",
+      prerequisites: { enabled: true, ids: [prerequisiteId], gateMode: 'usability' },
+      bonus: { enabled: true, expression: '@prof' },
+      breakage: { mode: 'limitedUses', maxUses: 5 },
+      checkBreakable: true,
+      onBreak: { mode: 'destroy' },
+      repairRequirements: [{
+        id: 'smoke-tool-repair-group',
+        name: 'Restore the working edge',
+        options: components.slice(0, 2).map((component, index) => ({
+          id: `smoke-tool-repair-option-${index + 1}`,
+          quantity: 1,
+          extractEffects: false,
+          match: { type: 'component', componentId: component.id },
+        })),
+      }],
+    }, { itemUuid: source.uuid });
+    // dnd5e Item schemas vary in how they retain a cloned description. The parity
+    // fixture tests Tool Studio, not that system-specific schema edge, so pin the
+    // normalized Tool snapshot after the source-linked upsert has established its
+    // durable identity.
+    ({ item: upsertedTool } = await csm.upsertTool(systemId, {
+      ...upsertedTool,
+      description: 'A well-balanced forge hammer. Durable, but the haft splinters when hard used.',
+    }));
+    const toolId = upsertedTool.id;
+    const parityNames = [
+      'Arcane Forge',
+      "Alchemist's Supplies",
+      'Ley-Line Nexus',
+      "Master's Anvil",
+      'Moonwell',
+      'Volcanic Vent',
+      'Woodcarving Tools',
+    ];
+    for (const [index, label] of parityNames.entries()) {
+      await csm.upsertTool(systemId, {
+        id: `smoke-tool-studio-row-${index + 1}`,
+        enabled: true,
+        label,
+        componentId: components[index % components.length].id,
+        breakage: { mode: 'limitedUses', maxUses: 5 + index },
+        checkBreakable: true,
+        onBreak: { mode: index % 2 === 0 ? 'destroy' : 'flagBroken' },
+        prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+        bonus: { enabled: false, expression: '' },
+        repairRequirements: [],
+      });
+    }
+    await rm.updateRecipe(recipeId, {
+      toolIds: [...new Set([...(recipe.toolIds || []), toolId])],
+      toolBonusModes: { ...(recipe.toolBonusModes || {}), [toolId]: 'highestOnly' },
+    }, { allowIncomplete: true });
+    const registered = csm.getSystem(systemId).tools.find((tool) => tool.id === toolId);
+    const stampedToolId = source.getFlag('fabricate', 'fabricate.roles')?.[systemId]?.toolId;
+    if (!registered || stampedToolId !== toolId) {
+      throw new Error(`Tool Studio Item registration did not stamp roles.${systemId}.toolId`);
+    }
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+    return {
+      ...restore,
+      toolId,
+      sourceItemUuid: source.uuid,
+      replacementSourceItemId: replacementSource.id,
+      replacementSourceItemUuid: replacementSource.uuid,
+      uncachedReplacementUuid: `Compendium.dnd5e.items.Item.${uncached._id}`,
+    };
+  }, { systemId, recipeId });
+}
+
+async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
+  if (!fixture) return;
+  await page.evaluate(async ({ systemId, recipeId, fixture }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.discardToolDraft?.();
+    await csm.updateSystem(systemId, {
+      tools: fixture.tools,
+      characterPrerequisites: fixture.characterPrerequisites,
+      toolBreakage: fixture.toolBreakage,
+    });
+    await rm.updateRecipe(recipeId, {
+      toolIds: fixture.recipeToolIds,
+      toolBonusModes: fixture.recipeToolBonusModes,
+    }, { allowIncomplete: true });
+    const source = await fromUuid(fixture.sourceItemUuid);
+    if (source) {
+      await source.unsetFlag('fabricate', 'fabricate.roles');
+      if (fixture.sourceRoles) await source.setFlag('fabricate', 'fabricate.roles', fixture.sourceRoles);
+      if (fixture.sourceCreated) await source.delete();
+    }
+    const replacementSource = await fromUuid(fixture.replacementSourceItemUuid);
+    if (replacementSource && fixture.replacementSourceCreated) await replacementSource.delete();
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+  }, { systemId, recipeId, fixture });
+}
+
+async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actorId, fixture }) {
+  return page.evaluate(async ({ systemId, recipeId, actorId, fixture }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    const rm = game.fabricate.getRecipeManager();
+    const actor = game.actors.get(actorId);
+    const source = await fromUuid(fixture.sourceItemUuid);
+    const system = csm.getSystem(systemId);
+    const tool = system.tools.find((entry) => entry.id === fixture.toolId);
+    if (!actor || !source || !tool) throw new Error('Tool Studio replacement fixture did not resolve');
+    if (game.packs.get('dnd5e.items')?.get(fixture.uncachedReplacementUuid.split('.').at(-1))) {
+      throw new Error('Tool Studio direct replacement source was cached before awaited resolution');
+    }
+    await csm.upsertTool(systemId, {
+      ...tool,
+      breakage: { mode: 'breakageChance', breakageChance: 100 },
+      onBreak: { mode: 'replaceWith', replacementTarget: { type: 'item', itemUuid: fixture.uncachedReplacementUuid } },
+    });
+    const itemData = source.toObject();
+    delete itemData._id;
+    itemData.name = 'Smoke Tool Studio Owned Sickle';
+    foundry.utils.setProperty(itemData, `flags.fabricate.fabricate.roles.${systemId}.toolId`, fixture.toolId);
+    const [owned] = await actor.createEmbeddedDocuments('Item', [itemData]);
+    const order = [];
+    const createdItems = [];
+    const createdPayloads = [];
+    const originalCreate = actor.createEmbeddedDocuments;
+    const originalDelete = owned.delete;
+    actor.createEmbeddedDocuments = async function (type, data, options) {
+      order.push('create');
+      createdPayloads.push(foundry.utils.deepClone(data));
+      const created = await originalCreate.call(this, type, data, options);
+      createdItems.push(...created);
+      return created;
+    };
+    owned.delete = async function (options) {
+      order.push('delete');
+      return originalDelete.call(this, options);
+    };
+    let evidence;
+    try {
+      evidence = await game.fabricate.getCraftingEngine()._applyToolBreakage(
+        rm.getRecipe(recipeId),
+        [{ tool: csm.getSystem(systemId).tools.find((entry) => entry.id === fixture.toolId), item: owned, breakable: true }],
+        { forceBreak: true, authority: 'toolSpecific' }
+      );
+    } finally {
+      actor.createEmbeddedDocuments = originalCreate;
+      if (createdItems.length > 0) {
+        await actor.deleteEmbeddedDocuments('Item', createdItems.map((item) => item.id)).catch(() => {});
+      }
+    }
+    const created = createdItems[0];
+    const createdData = createdPayloads[0]?.[0];
+    const componentIdentity = foundry.utils.getProperty(createdData, `flags.fabricate.fabricate.roles.${systemId}.componentId`);
+    const sourceId = foundry.utils.getProperty(createdData, 'flags.core.sourceId');
+    if (order.join(',') !== 'create,delete') throw new Error(`Tool replacement order was ${order.join(',')}`);
+    if (createdData?.system?.quantity !== 1) throw new Error('Tool replacement did not create quantity one');
+    if (sourceId !== fixture.uncachedReplacementUuid) throw new Error('Tool replacement did not preserve direct Item source identity');
+    if (componentIdentity) throw new Error('Direct Item replacement fabricated Component identity');
+    if (actor.items.get(owned.id)) throw new Error('Original Tool remained after successful replacement');
+    if (evidence?.[0]?.broken !== true || created?.documentName !== 'Item') {
+      throw new Error('Tool replacement did not report a successful broken Item replacement');
+    }
+    return { order, sourceId, quantity: createdData.system.quantity };
+  }, { systemId, recipeId, actorId, fixture });
+}
+
+async function waitForToolBreakageAuthority(page, systemId) {
+  try {
+    await page.waitForFunction((systemId) => {
+      const persistedAuthority = game.fabricate.getCraftingSystemManager().getSystem(systemId)?.toolBreakage?.authority;
+      let projectedAuthority = null;
+      const unsubscribe = globalThis.__fabricateSmokeManagerApp?._adminStore?.viewState?.subscribe?.((state) => {
+        projectedAuthority = state?.selectedSystem?.toolBreakage?.authority ?? null;
+      });
+      if (typeof unsubscribe === 'function') unsubscribe();
+      globalThis.__fabricateToolAuthorityObservation = { persistedAuthority, projectedAuthority };
+      return persistedAuthority === 'checkDriven' && projectedAuthority === 'checkDriven';
+    }, systemId, { timeout: 10_000, polling: 'raf' });
+  } catch (error) {
+    const observed = await page.evaluate(() => globalThis.__fabricateToolAuthorityObservation ?? null);
+    throw new Error(`Tool breakage authority did not settle to checkDriven: ${JSON.stringify(observed)}`, { cause: error });
+  } finally {
+    await page.evaluate(() => { delete globalThis.__fabricateToolAuthorityObservation; }).catch(() => {});
+  }
+}
+
+async function readPersistedToolEnabled(page, systemId, toolId) {
+  return page.evaluate(({ systemId, toolId }) => (
+    game.fabricate
+      .getCraftingSystemManager()
+      .getSystem(systemId)
+      ?.tools?.find((tool) => tool.id === toolId)
+      ?.enabled
+  ), { systemId, toolId });
+}
+
+async function waitForToolEnabledState(page, systemId, toolId, expected) {
+  await page.waitForFunction(({ systemId, toolId, expected }) => {
+    const persisted = game.fabricate
+      .getCraftingSystemManager()
+      .getSystem(systemId)
+      ?.tools?.find((tool) => tool.id === toolId)
+      ?.enabled;
+    const rendered = document.querySelector(
+      `.fabricate-manager [data-manager-tool-id="${toolId}"] .manager-tools-enabled-toggle`
+    );
+    return persisted === expected && rendered?.getAttribute('aria-pressed') === String(expected);
+  }, { systemId, toolId, expected }, { timeout: 10_000, polling: 'raf' });
+}
+
+async function withSingleToolClipboardWrite(page, expectedUuid, action) {
+  await page.evaluate(() => {
+    const app = globalThis.__fabricateSmokeManagerApp;
+    const services = app?._services;
+    if (!services?.copyToClipboard) throw new Error('Tool source copy service is unavailable');
+    const notifications = globalThis.ui?.notifications;
+    globalThis.__fabricateToolClipboardProbe = {
+      calls: [],
+      info: [],
+      errors: [],
+      services,
+      notifications,
+      originalCopy: services.copyToClipboard,
+      originalInfo: notifications?.info,
+      originalError: notifications?.error,
+    };
+    services.copyToClipboard = async (text) => {
+      globalThis.__fabricateToolClipboardProbe.calls.push(text);
+    };
+    if (notifications) {
+      notifications.info = (message) => globalThis.__fabricateToolClipboardProbe.info.push(message);
+      notifications.error = (message) => globalThis.__fabricateToolClipboardProbe.errors.push(message);
+    }
+  });
+  let observed;
+  try {
+    await action();
+    await page.waitForFunction(() => globalThis.__fabricateToolClipboardProbe?.calls?.length === 1, null, {
+      timeout: 5_000,
+    });
+    observed = await page.evaluate(() => ({
+      calls: [...globalThis.__fabricateToolClipboardProbe.calls],
+      info: [...globalThis.__fabricateToolClipboardProbe.info],
+      errors: [...globalThis.__fabricateToolClipboardProbe.errors],
+    }));
+  } finally {
+    await page.evaluate(() => {
+      const probe = globalThis.__fabricateToolClipboardProbe;
+      if (!probe) return;
+      probe.services.copyToClipboard = probe.originalCopy;
+      if (probe.notifications) {
+        probe.notifications.info = probe.originalInfo;
+        probe.notifications.error = probe.originalError;
+      }
+      delete globalThis.__fabricateToolClipboardProbe;
+    }).catch(() => {});
+  }
+  if (JSON.stringify(observed?.calls) !== JSON.stringify([expectedUuid])) {
+    throw new Error(`Tool source Copy UUID wrote the wrong value or count: ${JSON.stringify(observed)}`);
+  }
+  if (observed.info.length !== 1 || observed.errors.length !== 0) {
+    throw new Error(`Tool source Copy UUID notification was not one honest success: ${JSON.stringify(observed)}`);
+  }
+}
+
+async function assertToolLibraryPagination(page, { expectedTotal, expectedPage = 1, expectScrollable }) {
+  const browser = page.locator('.fabricate-manager [data-tool-library]').first();
+  const list = browser.locator('[data-tool-library-scroll]');
+  const footer = browser.locator('[data-tool-browser-pagination]');
+  await list.waitFor({ state: 'visible', timeout: 5_000 });
+  await footer.waitFor({ state: 'visible', timeout: 5_000 });
+  const state = await browser.evaluate((element) => {
+    const scroll = element.querySelector('[data-tool-library-scroll]');
+    const pagination = element.querySelector('[data-tool-browser-pagination]');
+    const summary = pagination?.querySelector('[data-pagination-summary]');
+    const nav = pagination?.querySelector('.manager-pagination-nav');
+    const size = pagination?.querySelector('[data-pagination-size]');
+    const rect = (node) => {
+      const value = node?.getBoundingClientRect();
+      return value ? { left: value.left, right: value.right, top: value.top, bottom: value.bottom } : null;
+    };
+    return {
+      browser: rect(element),
+      scroll: rect(scroll),
+      footer: rect(pagination),
+      scrollable: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
+      selectedFirst: element.querySelector('.manager-tools-row:first-child')?.classList.contains('is-selected') === true,
+      ordered: Boolean(
+        summary &&
+        nav &&
+        size &&
+        (summary.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        (nav.compareDocumentPosition(size) & Node.DOCUMENT_POSITION_FOLLOWING)
+      ),
+    };
+  });
+  if (
+    !state.browser ||
+    !state.scroll ||
+    !state.footer ||
+    Math.abs(state.footer.left - state.browser.left) > 2 ||
+    Math.abs(state.footer.right - state.browser.right) > 2 ||
+    Math.abs(state.footer.bottom - state.browser.bottom) > 2 ||
+    state.scroll.bottom > state.footer.top + 2
+  ) {
+    throw new Error(`Tool pagination is not a full-width bottom-pinned footer: ${JSON.stringify(state)}`);
+  }
+  if (!state.ordered) throw new Error('Tool pagination does not match Recipe Studio control ordering');
+  if (expectedPage === 1 && !state.selectedFirst) {
+    throw new Error('Tool library did not preserve automatic first-row selection');
+  }
+  if (expectScrollable !== undefined && state.scrollable !== expectScrollable) {
+    throw new Error(`Tool list scrollability was ${state.scrollable}; expected ${expectScrollable}`);
+  }
+  const summary = await footer.locator('[data-pagination-summary]').textContent();
+  const pageText = await footer.locator('[data-pagination-page]').textContent();
+  if (!summary?.includes(`of ${expectedTotal}`) || !pageText?.includes(`Page ${expectedPage} of`)) {
+    throw new Error(`Tool pagination rendered the wrong dataset/page: ${summary}; ${pageText}`);
+  }
+  const before = await footer.boundingBox();
+  await list.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const after = await footer.boundingBox();
+  if (!before || !after || Math.abs(before.y - after.y) > 1 || Math.abs(before.height - after.height) > 1) {
+    throw new Error(`Tool footer moved when only the result list scrolled: ${JSON.stringify({ before, after })}`);
+  }
+  return after;
+}
+
+async function replaceToolStudioTools(page, systemId, tools) {
+  await page.evaluate(async ({ systemId, tools }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    await csm.updateSystem(systemId, { tools });
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+  }, { systemId, tools });
+}
+
+async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fixture }) {
+  // Request the prototype's outer geometry inside its exact source viewport.
+  // ApplicationV2 contributes its own frame and V13 truthfully clamps it to that
+  // viewport; capture the settled inner product rectangle rather than fabricating
+  // room outside the source. This path is shared by local and CI screenshot profiles.
+  let wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
+  await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  const liveManagerApp = await requireSingleLocator(page.locator('#fabricate-crafting-system-manager'), 'live Crafting System Manager app');
+  const manager = await requireSingleLocator(liveManagerApp.locator('.fabricate-manager'), 'live Fabricate manager');
+  const row = await requireSingleLocator(manager.locator(`[data-manager-tool-id="${fixture.toolId}"]`), 'Tool Studio fixture row');
+  await row.waitFor({ state: 'visible', timeout: 10_000 });
+  const visibleToolRows = manager.locator('.manager-tools-row');
+  const visibleToolRowCount = await visibleToolRows.count();
+  if (visibleToolRowCount !== 8) {
+    throw new Error(`Tool Studio parity library must render exactly 8 rows; found ${visibleToolRowCount}`);
+  }
+  const expectedToolNames = [
+    "Smith's Hammer",
+    'Arcane Forge',
+    "Alchemist's Supplies",
+    'Ley-Line Nexus',
+    "Master's Anvil",
+    'Moonwell',
+    'Volcanic Vent',
+    'Woodcarving Tools',
+  ];
+  const visibleToolNames = await visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
+  if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
+    throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
+  }
+  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
+    throw new Error("Tool Studio parity library did not automatically select Smith's Hammer in the first row");
+  }
+  const selectTarget = row.locator('.manager-tools-select-target');
+  const enabledToggle = row.locator('.manager-tools-enabled-toggle');
+  const editButton = row.locator('.manager-icon-button');
+  await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection');
+  await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
+  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit');
+  const otherSelectTarget = visibleToolRows.nth(1).locator('.manager-tools-select-target');
+  const otherToolId = await visibleToolRows.nth(1).getAttribute('data-manager-tool-id');
+  if (!otherToolId) throw new Error('Tool Studio alternate row has no Tool ID');
+  await withSingleToolDraftTransition(
+    page,
+    otherToolId,
+    'Tool alternate-row selection',
+    () => otherSelectTarget.click(),
+    async () => {
+      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool alternate-row selection did not expose selected state');
+      }
+    },
+  );
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool parity-row selection',
+    () => selectTarget.click(),
+    async () => {
+      if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool row selection did not expose selected state');
+      }
+    },
+  );
+  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
+    throw new Error("Tool Studio parity library must select Smith's Hammer in the first row");
+  }
+  const inspectorDescription = await manager.locator('[data-tool-inspector-description]').textContent();
+  if (!inspectorDescription?.includes('well-balanced forge hammer')) {
+    throw new Error(`Tool Studio parity inspector has the wrong source description: ${inspectorDescription}`);
+  }
+  const parityTools = await page.evaluate((systemId) => foundry.utils.deepClone(
+    game.fabricate.getCraftingSystemManager().getSystem(systemId)?.tools || []
+  ), systemId);
+  const paginationComponentId = parityTools.find((tool) => tool.componentId)?.componentId;
+  if (!paginationComponentId) throw new Error('Tool Studio pagination fixture has no managed Component identity');
+  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1 });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 524,
+    sourceViewport: { width: 1280, height: 520 },
+  });
+  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectScrollable: true });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await page.evaluate(async ({ systemId, tool }) => {
+    await game.fabricate.getCraftingSystemManager().upsertTool(systemId, tool);
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+  }, {
+    systemId,
+    tool: {
+      id: 'smoke-tool-studio-pagination-ninth',
+      enabled: true,
+      label: 'Zephyr Kiln',
+      componentId: paginationComponentId,
+      breakage: { mode: 'limitedUses', maxUses: 12 },
+      checkBreakable: true,
+      onBreak: { mode: 'destroy' },
+      prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+      bonus: { enabled: false, expression: '' },
+      repairRequirements: [],
+    },
+  });
+  await manager.locator('[data-tool-result-count]').filter({ hasText: '9 tools' })
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1 });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 524,
+    sourceViewport: { width: 1280, height: 520 },
+  });
+  const firstPageFooter = await assertToolLibraryPagination(
+    page,
+    { expectedTotal: 9, expectedPage: 1, expectScrollable: true },
+  );
+  await manager.locator('[data-tool-browser-pagination] [data-pagination-next]').click();
+  const secondPageFooter = await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 2 });
+  if (
+    Math.abs(firstPageFooter.y - secondPageFooter.y) > 1 ||
+    Math.abs(firstPageFooter.width - secondPageFooter.width) > 1 ||
+    Math.abs(firstPageFooter.height - secondPageFooter.height) > 1
+  ) {
+    throw new Error(`Tool footer moved when the page changed: ${JSON.stringify({
+      firstPageFooter,
+      secondPageFooter,
+    })}`);
+  }
+  await replaceToolStudioTools(page, systemId, parityTools);
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await row.waitFor({ state: 'visible', timeout: 5_000 });
+  await page.waitForFunction((toolId) => document
+    .querySelector(`[data-manager-tool-id="${toolId}"]`)
+    ?.classList.contains('is-selected'), fixture.toolId, { timeout: 5_000 });
+  const persistedEnabledBefore = await readPersistedToolEnabled(page, systemId, fixture.toolId);
+  if (await enabledToggle.getAttribute('aria-pressed') !== String(persistedEnabledBefore)) {
+    throw new Error('Tool enabled toggle did not initially match persisted state');
+  }
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle apply',
+    () => enabledToggle.click(),
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, !persistedEnabledBefore),
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle restore',
+    () => enabledToggle.click(),
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, persistedEnabledBefore),
+  );
+  if (await liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]').count() > 0) {
+    throw new Error('Tool toggle incorrectly opened the editor');
+  }
+  await resetToolStudioScroll(page);
+  await assertToolStudioLibraryLayout(page);
+  await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', wideGeometry);
+  try {
+    await replaceToolStudioTools(page, systemId, []);
+    await manager.locator('[data-tool-library-empty]').waitFor({ state: 'visible', timeout: 5_000 });
+    const emptyInspector = manager.locator('[data-tool-browser-inspector-empty]');
+    await emptyInspector.waitFor({ state: 'visible', timeout: 5_000 });
+    if (await manager.locator('.manager-tools-row').count() !== 0) {
+      throw new Error('Tool Studio empty-library capture still rendered Tool rows');
+    }
+    const [emptyInspectorBounds, emptyInspectorContentBounds] = await Promise.all([
+      emptyInspector.boundingBox(),
+      emptyInspector.locator(':scope > div').boundingBox(),
+    ]);
+    const inspectorCenterY = emptyInspectorBounds
+      ? emptyInspectorBounds.y + (emptyInspectorBounds.height / 2)
+      : Number.NaN;
+    const contentCenterY = emptyInspectorContentBounds
+      ? emptyInspectorContentBounds.y + (emptyInspectorContentBounds.height / 2)
+      : Number.NaN;
+    if (
+      !Number.isFinite(inspectorCenterY)
+      || !Number.isFinite(contentCenterY)
+      || Math.abs(inspectorCenterY - contentCenterY) > 2
+    ) {
+      throw new Error(`Tool Studio empty inspector is not vertically centered: ${JSON.stringify({
+        emptyInspectorBounds,
+        emptyInspectorContentBounds,
+      })}`);
+    }
+    await resetToolStudioScroll(page);
+    await captureToolStudioProduct(page, 'manager-tool-zero-state-empty-library-1280x720', wideGeometry);
+  } finally {
+    await replaceToolStudioTools(page, systemId, parityTools);
+    await row.waitFor({ state: 'visible', timeout: 5_000 });
+  }
+
+  await setManagerWindowSize(page, {
+    width: 614,
+    height: 704,
+    sourceViewport: { width: 680, height: 700 },
+  });
+  await resetToolStudioScroll(page);
+  await withSingleToolDraftTransition(
+    page,
+    otherToolId,
+    'Tool 680px alternate-row selection',
+    () => visibleToolRows.nth(1).locator('.manager-tools-select-target').click(),
+    async () => {
+      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool 680px alternate-row selection did not expose selected state');
+      }
+    },
+  );
+  await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection at 680px');
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool row selection at 680px',
+    () => selectTarget.click(),
+    async () => {
+      if (!(await row.evaluate((element) => element.classList.contains('is-selected')))) {
+        throw new Error('Tool row selection at 680px did not expose selected state');
+      }
+    },
+  );
+  const selectedToolIds = await visibleToolRows.evaluateAll((rows) => rows
+    .filter((candidate) => candidate.classList.contains('is-selected'))
+    .map((candidate) => candidate.dataset.managerToolId));
+  if (JSON.stringify(selectedToolIds) !== JSON.stringify([fixture.toolId])) {
+    throw new Error(`Tool row selection at 680px did not select exactly the intended Tool: ${JSON.stringify(selectedToolIds)}`);
+  }
+  const persistedEnabledBefore680 = await readPersistedToolEnabled(page, systemId, fixture.toolId);
+  await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle at 680px');
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle at 680px apply',
+    () => enabledToggle.click(),
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, !persistedEnabledBefore680),
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'toggleToolEnabled',
+    'Tool enabled toggle at 680px restore',
+    () => enabledToggle.click(),
+    () => waitForToolEnabledState(page, systemId, fixture.toolId, persistedEnabledBefore680),
+  );
+  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool Edit route at 680px',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"] [data-tool-editor-header] h2')
+      .filter({ hasText: "Smith's Hammer" }).waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  await liveManagerApp.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool Edit route at 1280px',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
+      .waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  const editorManager = liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]');
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  // The route transition asks ApplicationV2 to adopt the editor's default size;
+  // re-apply the requested window through the live instance and retain V13's
+  // truthful viewport-clamped product geometry.
+  wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
+  const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
+  const sourceCard = editor.locator('[data-tool-source-card]');
+  await assertPointerTarget(page, sourceCard, '[data-tool-source-card]', 'Tool Item drop target');
+  await page.locator('#sidebar [data-tab="items"]').first().click({ force: true });
+  // A user must be able to expose Foundry's Item directory before starting a
+  // native drag. Move the live ApplicationV2 window left for that interaction,
+  // then restore the exact 1280px evidence geometry immediately afterwards.
+  await page.evaluate(async () => {
+    await globalThis.__fabricateSmokeManagerApp.setPosition({
+      width: 900,
+      height: 700,
+      left: 0,
+      top: 0,
+    });
+  });
+  await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
+  const replacementSourceItem = page.locator([
+    `#sidebar .directory-item[data-entry-id="${fixture.replacementSourceItemId}"]`,
+    `#sidebar .directory-item[data-document-id="${fixture.replacementSourceItemId}"]`,
+  ].join(', ')).first();
+  await replacementSourceItem.waitFor({ state: 'visible', timeout: 10_000 });
+  const [managerBounds, replacementBounds] = await Promise.all([
+    liveManagerApp.boundingBox(),
+    replacementSourceItem.boundingBox(),
+  ]);
+  if (
+    !managerBounds
+    || !replacementBounds
+    || replacementBounds.x + (replacementBounds.width / 2) <= managerBounds.x + managerBounds.width
+  ) {
+    throw new Error(`Tool Item sidebar source remains occluded by the manager: ${JSON.stringify({
+      managerBounds,
+      replacementBounds,
+    })}`);
+  }
+  await withSingleToolStoreMutation(
+    page,
+    'stageToolDraftSource',
+    'Tool Item sidebar drag',
+    () => replacementSourceItem.dragTo(sourceCard),
+    () => sourceCard.filter({ hasText: 'Smoke Tool Studio Replacement Item' })
+      .waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  const copySourceUuid = editor.locator('[data-tool-source-copy-uuid]');
+  await assertPointerTarget(page, copySourceUuid, '[data-tool-source-copy-uuid]', 'Copy source UUID');
+  await withSingleToolClipboardWrite(
+    page,
+    fixture.replacementSourceItemUuid,
+    () => copySourceUuid.click(),
+  );
+  await editor.locator('[data-tool-editor-back]').click();
+  const discardDraft = page.locator(
+    '.dialog button[data-action="discard"], .dialog button:has-text("Discard")'
+  ).first();
+  await discardDraft.waitFor({ state: 'visible', timeout: 5_000 });
+  await discardDraft.click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]')
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'Tool Edit route after source discard',
+    () => editButton.click(),
+    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
+      .waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  wideGeometry = await setManagerWindowSize(page, {
+    width: 1214,
+    height: 724,
+    sourceViewport: { width: 1280, height: 720 },
+  });
+  await editor.locator('[data-tool-source-card]').filter({ hasText: "Smith's Hammer" })
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page);
+  await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, 'Overview parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', wideGeometry);
+  const displayLabel = editor.locator('[data-tool-label]');
+  await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-stress-long-name', wideGeometry);
+  await displayLabel.fill("Smith's Hammer");
+  await saveToolStudioDraftIfDirty(editor);
+
+  const tab = (name) => editor.locator(`#tool-tab-${name}`);
+  for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
+    await assertPointerTarget(page, tab(name), `#tool-tab-${name}`, `Tool ${name} tab`);
+  }
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 1280px');
+  await assertSavedToolStudioCapture(editor, 'Breakage parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', wideGeometry);
+  const flagBrokenChoice = editor.locator('input[name="tool-on-break"][value="flagBroken"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool flag-broken action',
+    () => flagBrokenChoice.check(),
+    async () => {
+      if (!(await flagBrokenChoice.isChecked())) throw new Error('Tool flag-broken action did not apply');
+    },
+  );
+  const repairGroups = editor.locator('[data-tool-repair-requirements] [data-recipe-group]');
+  const initialRepairGroupCount = await repairGroups.count();
+  const addRepairGroup = editor.locator('[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]');
+  await assertPointerTarget(page, addRepairGroup, '[data-recipe-add="tag-requirement"]', 'Tool repair AND control');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair AND add',
+    () => addRepairGroup.click(),
+    async () => {
+      if (await repairGroups.count() !== initialRepairGroupCount + 1) {
+        throw new Error('Tool repair AND control did not add exactly one group');
+      }
+    },
+  );
+  const addedRepairGroupRemove = repairGroups.last().locator('[data-recipe-remove="alternative"]');
+  await assertPointerTarget(page, addedRepairGroupRemove, '[data-recipe-remove="alternative"]', 'Tool repair AND restore');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair AND restore',
+    () => addedRepairGroupRemove.click(),
+    async () => {
+      if (await repairGroups.count() !== initialRepairGroupCount) {
+        throw new Error('Tool repair AND restore did not remove exactly one group');
+      }
+    },
+  );
+  const firstRepairGroup = repairGroups.first();
+  const initialRepairOptionCount = await firstRepairGroup.locator('[data-recipe-option]').count();
+  const addRepairAlternative = firstRepairGroup.locator('[data-recipe-add="alternative-component"]');
+  await assertPointerTarget(page, addRepairAlternative, '[data-recipe-add="alternative-component"]', 'Tool repair OR add-component control');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair OR add',
+    () => addRepairAlternative.click(),
+    async () => {
+      if (await firstRepairGroup.locator('[data-recipe-option]').count() !== initialRepairOptionCount + 1) {
+        throw new Error('Tool repair OR control did not add exactly one alternative');
+      }
+    },
+  );
+  const addedRepairAlternativeRemove = firstRepairGroup.locator('[data-recipe-option]').last()
+    .locator('[data-recipe-remove="alternative"]');
+  await assertPointerTarget(page, addedRepairAlternativeRemove, '[data-recipe-remove="alternative"]', 'Tool repair OR restore');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool repair OR restore',
+    () => addedRepairAlternativeRemove.click(),
+    async () => {
+      if (await firstRepairGroup.locator('[data-recipe-option]').count() !== initialRepairOptionCount) {
+        throw new Error('Tool repair OR restore did not remove exactly one alternative');
+      }
+    },
+  );
+  await assertNoScreenshotOverlays(page);
+  await scrollToolEditorPanelToReveal(
+    page,
+    editor,
+    '[data-tool-repair-requirements] [data-recipe-group] [data-recipe-add="alternative-component"]',
+    'Populated repair',
+  );
+  await captureToolStudioProduct(page, 'manager-tool-stress-repair', wideGeometry);
+
+  const replaceWithChoice = editor.locator('input[name="tool-on-break"][value="replaceWith"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool replace-with action',
+    () => replaceWithChoice.check(),
+    async () => {
+      if (!(await replaceWithChoice.isChecked())) throw new Error('Tool replace-with action did not apply');
+    },
+  );
+  const replacementGrid = editor.locator('[data-tool-replacement-target]');
+  await replacementGrid.waitFor({ state: 'visible', timeout: 5_000 });
+  const componentTarget = replacementGrid.locator('.manager-tool-replacement-component-trigger');
+  await assertPointerTarget(page, componentTarget, '.manager-tool-replacement-component-trigger', 'Component replacement picker');
+  await componentTarget.click();
+  const componentOption = page.locator('.manager-travel-popover .manager-travel-option').first();
+  await componentOption.waitFor({ state: 'visible', timeout: 5_000 });
+  const componentLabel = (await componentOption.textContent())?.trim();
+  if (!componentLabel) throw new Error('Tool Studio Component picker has no managed Component options');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Component replacement selection',
+    () => componentOption.click(),
+    async () => {
+      if (!((await componentTarget.textContent()) || '').includes(componentLabel)) {
+        throw new Error('Component replacement selection did not update the draft control');
+      }
+    },
+  );
+  await assertNoScreenshotOverlays(page);
+  await scrollToolEditorPanelToReveal(
+    page,
+    editor,
+    '[data-tool-replacement-target]',
+    'Component replacement',
+  );
+  await captureToolStudioProduct(page, 'manager-tool-stress-replacement', wideGeometry);
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+
+  const checkDriven = await requireSingleLocator(
+    manager.locator('[data-manager-tools-authority] label:has(input[value="checkDriven"])'),
+    'check-driven authority control',
+  );
+  await assertPointerTarget(page, checkDriven, '[data-manager-tools-authority] label', 'check-driven authority');
+  await withSingleToolStoreMutation(
+    page,
+    'setToolBreakageAuthority',
+    'check-driven authority',
+    () => checkDriven.click(),
+    () => waitForToolBreakageAuthority(page, systemId),
+  );
+  await requireSingleLocator(manager, 'live Fabricate manager before check-driven Edit');
+  const checkDrivenEditButton = await requireSingleLocator(
+    manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`),
+    'check-driven Tool Edit button',
+  );
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'check-driven Tool Edit route',
+    () => checkDrivenEditButton.click(),
+    () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
+  await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'check-driven Tool Breakage tab');
+  const immuneChoice = editor.locator('input[name="tool-check-breakable"][value="immune"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'check-driven Immune choice',
+    () => immuneChoice.check(),
+    async () => {
+      if (!(await immuneChoice.isChecked())) throw new Error('check-driven Immune choice did not apply');
+    },
+  );
+  const immuneOnBreakFieldset = editor.locator('[data-tool-breakage-tab]:has(input[name="tool-check-breakable"][value="immune"]:checked) [data-tool-on-break-controls]:disabled');
+  await immuneOnBreakFieldset.waitFor({ state: 'visible', timeout: 10_000 });
+  await requireSingleLocator(immuneOnBreakFieldset, 'check-driven immune on-break fieldset');
+  await assertDisabledToolOnBreakFieldset(immuneOnBreakFieldset);
+  await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-stress-immune', wideGeometry);
+  await editor.locator('[data-tool-editor-save]').click();
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  const toolSpecific = manager.locator('[data-manager-tools-authority] label:has(input[value="toolSpecific"])');
+  await withSingleToolStoreMutation(
+    page,
+    'setToolBreakageAuthority',
+    'tool-specific authority restore',
+    () => toolSpecific.click(),
+    () => page.waitForFunction((id) => (
+      game.fabricate.getCraftingSystemManager().getSystem(id)?.toolBreakage?.authority === 'toolSpecific'
+    ), systemId, { timeout: 10_000, polling: 'raf' }),
+  );
+  await withSingleToolDraftTransition(
+    page,
+    fixture.toolId,
+    'tool-specific Tool Edit route',
+    () => manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click(),
+    () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'tool-specific Tool Breakage tab');
+  const destroyChoice = editor.locator('input[name="tool-on-break"][value="destroy"]');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool destroy action restore',
+    () => destroyChoice.check(),
+    async () => {
+      if (!(await destroyChoice.isChecked())) throw new Error('Tool destroy action did not restore');
+    },
+  );
+  await saveToolStudioDraftIfDirty(editor);
+
+  await tab('requirements').click();
+  await editor.locator('[data-tool-requirements-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  if (await editor.locator('[data-tool-prerequisite-row]').count() !== 5) {
+    throw new Error('Tool Studio parity Requirements must render exactly 5 prerequisite rows');
+  }
+  const expectedPrerequisiteNames = [
+    'Expert Crafter',
+    "Proficient with Smith's Tools",
+    'Attuned to the Weave',
+    'Strength 13 or higher',
+    'Trained in Arcana',
+  ];
+  const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] strong').allTextContents();
+  if (JSON.stringify(visiblePrerequisiteNames) !== JSON.stringify(expectedPrerequisiteNames)) {
+    throw new Error(`Tool Studio parity prerequisite order drifted: ${JSON.stringify(visiblePrerequisiteNames)}`);
+  }
+  await assertPointerTarget(page, editor.locator('[data-tool-prerequisites-enabled]'), '[data-tool-prerequisites-enabled]', 'Tool prerequisite toggle');
+  await assertPointerTarget(page, editor.locator('[data-tool-bonus-enabled]'), '[data-tool-bonus-enabled]', 'Tool bonus toggle');
+  await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, 'Requirements parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-04-requirements-1280x720', wideGeometry);
+
+  await tab('validation').click();
+  await editor.locator('[data-tool-validation-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  await editor.locator('[data-editor-validation-summary="pass"]').waitFor({
+    state: 'visible',
+    timeout: 5_000,
+  });
+  if (await editor.locator('[data-tool-validation-check].is-invalid').count() !== 0) {
+    throw new Error('Tool Studio parity Validation must be the all-pass state');
+  }
+  await assertSavedToolStudioCapture(editor, 'Validation parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', wideGeometry);
+  await tab('requirements').click();
+  const selectedPrerequisite = editor.locator(
+    '[data-tool-prerequisite-row] input[type="checkbox"]:checked',
+  ).first();
+  const selectedPrerequisiteId = await selectedPrerequisite.getAttribute('value');
+  if (!selectedPrerequisiteId) throw new Error('Tool Studio invalid-state fixture has no selected prerequisite');
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool invalid prerequisite fixture',
+    () => selectedPrerequisite.click(),
+    async () => {
+      if (await editor.locator('[data-tool-prerequisite-row] input[type="checkbox"]:checked').count() !== 0) {
+        throw new Error('Tool invalid prerequisite fixture did not clear the selected prerequisite');
+      }
+    },
+  );
+  await tab('validation').click();
+  await editor.locator('[data-editor-validation-summary="block"]').waitFor({
+    state: 'visible',
+    timeout: 5_000,
+  });
+  await editor.locator('[data-tool-validation-check="prerequisites"].is-invalid').waitFor({
+    state: 'visible',
+    timeout: 5_000,
+  });
+  await assertNoScreenshotOverlays(page);
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', wideGeometry);
+  await tab('requirements').click();
+  const prerequisiteToRestore = editor.locator(
+    `[data-tool-prerequisite-row] input[type="checkbox"][value="${selectedPrerequisiteId}"]`,
+  );
+  await withSingleToolStoreMutation(
+    page,
+    'patchToolDraft',
+    'Tool prerequisite fixture restore',
+    () => prerequisiteToRestore.click(),
+    async () => {
+      if (!(await prerequisiteToRestore.isChecked())) {
+        throw new Error('Tool prerequisite fixture did not restore its selected prerequisite');
+      }
+    },
+  );
+  await saveToolStudioDraftIfDirty(editor);
+  await tab('breakage').click();
+  await editor.locator('[data-tool-breakage-tab]').waitFor({ state: 'visible', timeout: 5_000 });
+  const narrowGeometry = await setManagerWindowSize(page, {
+    width: 834,
+    height: 704,
+    sourceViewport: { width: 900, height: 700 },
+  });
+  await editor.locator('[data-tool-editor-header]').waitFor({ state: 'visible', timeout: 5_000 });
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page, { stacked: false });
+  await assertNoScreenshotOverlays(page);
+  await assertSavedToolStudioCapture(editor, '832px Breakage parity');
+  await resetToolStudioScroll(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry);
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 900px');
+  await toggleToolControlAndRestore(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 900px');
+  await saveToolStudioDraftIfDirty(editor);
+  await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 900px');
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click();
+  await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements restore at 900px');
+
+  await setManagerWindowSize(page, {
+    width: 614,
+    height: 704,
+    sourceViewport: { width: 680, height: 700 },
+  });
+  await resetToolStudioScroll(page);
+  await assertToolStudioEditorLayout(page, { stacked: true });
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 680px');
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 680px');
+  await toggleToolControlAndRestore(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 680px');
+  await saveToolStudioDraftIfDirty(editor);
+  await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage capture restore at 680px');
+  await resetToolStudioScroll(page);
+  await screenshot(page, 'manager-tool-stress-wrapping-680', {
+    clip: { x: 0, y: 0, width: 680, height: 700 },
+  });
+  await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 680px');
+  await editor.locator('[data-tool-editor-back]').click();
+  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
+  await openManagerRecipeEditor(page, recipeName);
+  await page.locator('[data-recipe-tab-button="tools"]').first().click();
+  const recipeToolRow = page.locator(`[data-recipe-tool-id="${fixture.toolId}"]`).first();
+  await recipeToolRow.waitFor({ state: 'visible', timeout: 5_000 });
+  if (await recipeToolRow.locator('select, [data-recipe-tool-bonus-mode]').count() > 0) {
+    throw new Error('Recipe Tools tab must not expose Tool breakage or check-bonus policy controls');
+  }
+  await assertPointerTarget(
+    page,
+    recipeToolRow.locator('[data-recipe-remove="tool"]'),
+    '[data-recipe-remove="tool"]',
+    'recipe Tool remove control',
+  );
+
+  if (await page.locator('.fabricate-manager[data-manager-view="recipe-edit"] .manager-chip:has-text("Unsaved")').count() > 0) {
+    throw new Error('Recipe Tools policy-removal check unexpectedly dirtied the Recipe draft');
+  }
+
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+  await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await page.locator('[data-checks-tab-button="crafting"]').first().click();
+  const natToggle = page.locator('[data-check-nat-stepping] input[type="checkbox"]').first();
+  await natToggle.waitFor({ state: 'visible', timeout: 5_000 });
+  await assertPointerTarget(page, natToggle, '[data-check-nat-stepping]', 'relative natural stepping');
+  const natBefore = await natToggle.isChecked();
+  await natToggle.click();
+  await natToggle.click();
+  if (await natToggle.isChecked() !== natBefore) throw new Error('Natural stepping toggle did not restore');
+  await page.evaluate(async (id) => {
+    await game.settings.set('fabricate', 'lastManagedCraftingSystem', id);
+  }, systemId);
+}
+
 /**
  * Close Foundry application windows across ApplicationV1 and ApplicationV2.
  * @param {import('playwright').Page} page
@@ -2976,7 +5395,12 @@ async function installNotificationHidingCss(page) {
  */
 async function waitForFabricateWindowsClosed(page, { timeout = 800, fallbackMs = 500 } = {}) {
   await waitForSettled(page, () => {
-    const windows = document.querySelectorAll('.fabricate-manager, .fabricate-app').length;
+    const windows = document.querySelectorAll([
+      '.fabricate-manager',
+      '.fabricate-app',
+      '.application[id^="fabricate-"]',
+      '.window-app[id^="fabricate-"]',
+    ].join(', ')).length;
     const hasDiscard = Array.from(document.querySelectorAll('button'))
       .some(button => /Discard Changes/.test(button.textContent || ''));
     return windows === 0 && !hasDiscard;
@@ -3010,7 +5434,6 @@ async function closeOpenApplications(page) {
     await discardDirtyDraft();
     await page.evaluate(async (selector) => {
       const closePromises = [];
-      let closedApplicationV2 = false;
 
       if (ui.windows) {
         for (const app of Object.values(ui.windows)) {
@@ -3027,19 +5450,19 @@ async function closeOpenApplications(page) {
         if (!element || element.id === 'sidebar') continue;
         if (element.querySelector?.('.fabricate-manager, .fabricate-app') || element.id?.startsWith?.('fabricate-')) {
           try {
-            closedApplicationV2 = true;
-            app.close({ force: true });
+            closePromises.push(Promise.resolve(app.close({ force: true })));
           } catch { /* ignore */ }
         }
       }
 
       await Promise.allSettled(closePromises);
 
-      if (!closedApplicationV2) {
-        document.querySelectorAll(selector).forEach(btn => {
-          try { btn.click(); } catch { /* ignore */ }
-        });
-      }
+      // ApplicationV2 registries can retain a stale instance after its close
+      // promise settles. Always sweep any close controls that remain in the DOM;
+      // when the registry close succeeded there is simply nothing left to click.
+      document.querySelectorAll(selector).forEach(btn => {
+        try { btn.click(); } catch { /* ignore */ }
+      });
     }, closeSelector);
     await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
@@ -3051,8 +5474,28 @@ async function closeOpenApplications(page) {
     await waitForFabricateWindowsClosed(page);
     await discardDirtyDraft();
 
-    const remaining = await page.locator('.fabricate-manager, .fabricate-app, button:has-text("Discard Changes")').count();
+    const remaining = await page.locator([
+      '.fabricate-manager',
+      '.fabricate-app',
+      '.application[id^="fabricate-"]',
+      '.window-app[id^="fabricate-"]',
+      'button:has-text("Discard Changes")',
+    ].join(', ')).count();
     if (remaining === 0) break;
+  }
+
+  const remaining = page.locator([
+    '.fabricate-manager',
+    '.fabricate-app',
+    '.application[id^="fabricate-"]',
+    '.window-app[id^="fabricate-"]',
+    'button:has-text("Discard Changes")',
+  ].join(', '));
+  if (await remaining.count() > 0) {
+    const ids = await remaining.evaluateAll(elements => elements.map(element => (
+      element.id || element.closest?.('[id]')?.id || element.tagName
+    )));
+    throw new Error(`Failed to close Fabricate application(s): ${ids.join(', ')}.`);
   }
 }
 
@@ -3268,6 +5711,12 @@ async function main() {
   // These in-source defaults stay in source, where their justification lives.
   const ignoredErrorPatternDefaults = [
     /favicon/i,
+    // The screenshot walk deliberately exercises the responsive Manager at
+    // these three evidence viewports. Foundry emits its own minimum-resolution
+    // warning even though the application remains usable and is the subject of
+    // the capture. Keep this waiver dimension-specific so an unexpected
+    // low-resolution run still fails the smoke.
+    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater\..*display has a resolution of (?:1280px by 720px|900px by 700px|680px by 700px)\./i,
     // Headless canvas-draw race: activating/redrawing a scene that gains new
     // placeables mid-capture (e.g. the issue-335 Manage-Interactables marker
     // fixtures) can momentarily read a canvas layer constant before the layer is
@@ -3294,6 +5743,17 @@ async function main() {
     errors: [],
     consoleErrors: []
   };
+
+  // Issue #807: page.isClosed() is causation-blind (true for an intentional
+  // close OR a renderer crash), so a tolerated post-captures teardown could hide
+  // a real product OOM as an untraceable "transient". page 'crash' is
+  // Playwright's causation-bearing renderer-crash signal (OOM canonical). Flag
+  // it so a crash-flagged tolerated run stays exit 0 but is visibly
+  // rendererCrashed in summary.json — a truthful signal, not a red run.
+  page.on('crash', () => {
+    results.rendererCrashed = true;
+    process.stderr.write('Renderer process crashed (page "crash" event).\n');
+  });
 
   try {
     startPhase('boot-and-join');
@@ -3477,7 +5937,17 @@ async function main() {
           try { await csm.deleteSystem(sys.id); } catch { /* ok */ }
         }
 
-        // 2. Clean stale smoke actors (tagged flags.fabricate.smokeSeed) so the
+        // 2. Clear stale smoke-world chat before any later phase opens the chat
+        //    sidebar. Old crafting cards retain image URLs from the product version
+        //    that created them; allowing them to render makes an otherwise clean run
+        //    fail the zero-console-error gate on obsolete asset 404s.
+        const staleMessages = game.messages?.contents ?? [];
+        if (staleMessages.length > 0) {
+          console.log(`Cleaning ${staleMessages.length} stale smoke chat messages`);
+          await ChatMessage.deleteDocuments(staleMessages.map(message => message.id));
+        }
+
+        // 3. Clean stale smoke actors (tagged flags.fabricate.smokeSeed) so the
         //    per-run re-import of the dnd5e Starter Heroes pack stays idempotent.
         const staleActors = game.actors.contents.filter(a => a.flags?.fabricate?.smokeSeed === true);
         if (staleActors.length > 0) {
@@ -3493,7 +5963,7 @@ async function main() {
           await User.deleteDocuments(staleUsers.map(u => u.id));
         }
 
-        // 3. Clean stale items (the fixed smoke set plus the issue #489
+        // 4. Clean stale items (the fixed smoke set plus the issue #489
         //    craft-execution world items, all uniquely 'Smoke '-prefixed).
         const staleItems = game.items.contents.filter(i =>
           ['Iron Ore', 'Mystic Herb', 'Dragon Scale', 'Empty Vial',
@@ -3657,10 +6127,13 @@ async function main() {
             flags: { core: { sourceId: item.uuid } }
           }));
 
-        // Crafter gets: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale
+        // Crafter gets: 3x Mystic Herb, 3x Empty Vial, 1x Dragon Scale.
+        // The UI evidence phases share this actor and may stage one vial in another
+        // workflow. Keep two concrete copies for the final potion attempt so one
+        // can be consumed while a distinct physical copy remains the reusable Tool.
         await crafter.createEmbeddedDocuments('Item', [
           ...copies(byName('Mystic Herb'), 3),
-          ...copies(byName('Empty Vial'), 2),
+          ...copies(byName('Empty Vial'), 3),
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
@@ -3799,7 +6272,7 @@ async function main() {
             await csm.deleteSystem(system.id);
           }
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -3885,15 +6358,33 @@ async function main() {
           // readiness warnings (issue 431 PR-2).
           craftingCheck: {
             enabled: true,
+            // Per-recipe check-modifier catalogue + default policy (issue 770). A
+            // crafting-owned aggregate feeding the `@craftingmod` formula placeholder,
+            // authored at the top level of the crafting check (sibling of `routed`), so
+            // the Checks → Crafting tab renders the populated CraftingModifierCatalogueCard
+            // beside the failure-consumption card (screenshot evidence). Each expression
+            // resolves against the crafter's dnd5e roll data; the `highest` default policy
+            // picks the single largest of the two default-eligible modifiers. The `alch`
+            // entry is the one the Brew Healing Potion recipe override selects below.
+            checkModifiers: [
+              { id: 'med', label: 'Medicine', icon: 'fas fa-staff-snake', expression: '@abilities.wis.mod' },
+              { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask', expression: '@abilities.int.mod' },
+              { id: 'herb', label: 'Herbalism', icon: 'fas fa-seedling', expression: '@abilities.dex.mod' }
+            ],
+            defaultModifierPolicy: 'highest',
+            defaultModifierIds: ['med', 'herb'],
             routed: {
               type: 'relative',
-              // `1d20 + 20` (total 21-40) always meets the Masterwork threshold, so the
-              // Phase-E Brew Healing Potion craft deterministically succeeds. Before #431
-              // the routed check was authored-only (never rolled); now that it is engine-
-              // evaluated a bare `1d20` vs dc 12 would fail the craft ~55% of the time
-              // (flaky smoke). The named tiers below are unchanged so the routed-check and
-              // validation-tab captures still render their authored outcomes.
-              rollFormula: '1d20 + 20',
+              // `1d20 + 20 + @craftingmod` (base total 21-40, plus a small ability mod) always
+              // meets the Masterwork threshold, so the Phase-E Brew Healing Potion craft
+              // deterministically succeeds. `@craftingmod` resolves to a scalar BEFORE the
+              // formula reaches Foundry's Roll (issue 770): the recipe's `byRecipe` override
+              // uses only the `alch` modifier (a starter-hero INT mod, roughly -1..+3), which
+              // the +20 base absorbs. Before #431 the routed check was authored-only (never
+              // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
+              // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
+              // the routed-check and validation-tab captures still render their authored outcomes.
+              rollFormula: '1d20 + 20 + @craftingmod',
               dc: 12,
               thresholdMode: 'meet',
               relativeOutcomes: [
@@ -3935,6 +6426,13 @@ async function main() {
               ]
             }
           },
+          // Two character prerequisites so the System Settings Character
+          // Prerequisites list renders populated for the issue-768 list-ergonomics
+          // evidence (section collapse, copy-to-modifiers).
+          characterPrerequisites: [
+            { id: 'smoke-pre-trained', name: 'Trained in Alchemy', icon: 'fa-solid fa-flask', path: 'skills.alchemy.rank', op: 'gte', value: 2 },
+            { id: 'smoke-pre-focused', name: 'Focused', icon: 'fa-solid fa-bullseye', path: 'flags.focused', op: 'isTrue', value: null }
+          ],
           essenceDefinitions: [
             {
               name: 'Verdant',
@@ -4037,9 +6535,15 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
+          // Per-recipe check-modifier override (issue 770): this recipe overrides the
+          // system's `highest` default policy with `byRecipe`, drawing only the `alch`
+          // catalogue modifier into `@craftingmod`. It renders the recipe editor's
+          // Overview modifier control in its OVERRIDE (not inherit) state — the
+          // screenshot evidence for the per-recipe override half of #770.
+          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
           // Single result group → produced on any non-failure outcome. The Phase-E
-          // craft rolls `1d20 + 20` (always Masterwork), so this craft deterministically
-          // succeeds and yields the single "Brewed Potion" group.
+          // craft rolls `1d20 + 20 + @craftingmod` (always Masterwork), so this craft
+          // deterministically succeeds and yields the single "Brewed Potion" group.
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -4066,6 +6570,31 @@ async function main() {
             }]
           }]
         });
+
+        // Books & Scrolls fixture (issue 796): seed FIVE resolvable book/scroll recipe
+        // items and link them all to "Brew Healing Potion" so its Books & Scrolls editor
+        // tab renders the POPULATED auto-fill grid — the tiling + specificity-cascade
+        // evidence the empty "Not in any book or scroll" panel cannot show. Five cards
+        // wrap past the editor's ~four-track row, proving the grid fills the panel and
+        // wraps rather than stretching one card. Real world Items back each definition so
+        // `fromUuid` resolves a live thumb/name instead of the missing-state row. These
+        // are created AFTER the component-registration loop above, so they never enter
+        // `componentMap`. The `-` covers the (0,3,0) grid rule vs the shared flex rule.
+        // Every img below is a Foundry-core raster confirmed to resolve (no 404s in the
+        // smoke console-error gate); `blueprint-recipe-alchemical` is the shared default
+        // recipe image every recipe frame already loads.
+        const bookItemType = worldItemByName['Mystic Herb']?.type || 'loot';
+        const bookItems = await Item.createDocuments([
+          { name: "Mythwright Crafter's Handbook", type: bookItemType, img: 'icons/sundries/books/book-tooled-eye-gold-red.webp' },
+          { name: "Alchemist's Field Notes", type: bookItemType, img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp' },
+          { name: 'Grimoire of the Verdant Path', type: bookItemType, img: 'icons/sundries/books/book-embossed-jewel-gold-green.webp' },
+          { name: 'Scroll of Restorative Draughts', type: bookItemType, img: 'icons/sundries/books/book-red-exclamation.webp' },
+          { name: "The Apothecary's Compendium", type: bookItemType, img: 'icons/sundries/books/book-embossed-jewel-gold-green.webp' }
+        ]);
+        for (const book of bookItems) {
+          const { item: bookDef } = await csm.addRecipeItemFromUuid(systemId, book.uuid);
+          await csm.updateRecipeItemDefinition(systemId, bookDef.id, { recipeIds: [recipe2.id] });
+        }
 
         const recipe3 = await rm.createRecipe({
           name: 'Craft Dragon Scale Armor',
@@ -4103,13 +6632,14 @@ async function main() {
 
         // Showcase recipe whose single ingredient set exercises every requirement row
         // type so the Ingredients tab renders: a plain component, an OR group (one
-        // group with two component options), a tag requirement, and a currency cost.
+        // group with two component options), a tag requirement, an essence requirement,
+        // and a currency cost.
         // complex:true forces the full set-card render; allowIncomplete persists it as a
         // structurally-valid editor shell. Single result group → produced on any
         // non-failure outcome (single-group exemption); routed modes ignore resultSelection.
         const showcaseRecipe = await rm.createRecipe({
           name: 'Showcase Requirements',
-          description: 'Demonstrates every ingredient requirement row: component, OR group, tag, and currency cost.',
+          description: 'Demonstrates every ingredient requirement row: component, OR group, tag, essence, and currency cost.',
           craftingSystemId: systemId,
           img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
           complex: true,
@@ -4141,6 +6671,19 @@ async function main() {
                 options: [{
                   quantity: 1,
                   match: { type: 'tags', tags: ['reagent', 'rare'], tagMatch: 'any' }
+                }]
+              },
+              // An essence requirement (issue 684): a first-class essence match (issue
+              // 649) with its own end-of-row Stepper. `verdant` is the derived id of the
+              // "Verdant" essence seeded on this system (the normalizer slugs the name via
+              // `_uniqueKey`). This row sits directly above the currency cost so the
+              // `manager-recipe-edit-ingredients-cost` capture — which scrolls the LAST
+              // (currency) row into view — shows BOTH the essence and currency rows.
+              {
+                name: 'Verdant essence',
+                options: [{
+                  quantity: 1,
+                  match: { type: 'essence', essenceId: 'verdant', amount: 2 }
                 }]
               },
               {
@@ -4311,6 +6854,41 @@ async function main() {
         await rm.updateRecipe(recipe2.id, { category: 'Alchemy' }, { allowIncomplete: true });
         await rm.updateRecipe(multiStepRecipe.id, { category: 'Smithing' }, { allowIncomplete: true });
 
+        // ── Books & Scrolls recipe items (issue 797) ─────────────────────────────
+        // Two recipe items so the recipe-item editor's Validation tab can be captured in
+        // BOTH an all-clear and a mixed pass/block state. Arcane Forge leaves
+        // `visibilityMode` at its 'knowledge' default, so the mode-specific check row is
+        // `learnsValid`. The two linked world items are created HERE, AFTER the
+        // component-registration loop above, so they are NOT registered as components and
+        // do not disturb the components-browser frames.
+        const bookType = worldItemByName['Iron Ore']?.type || 'loot';
+        const [tomeItem, scrollItem] = await Item.createDocuments([
+          {
+            name: 'Tome of Brewing',
+            type: bookType,
+            img: 'icons/sundries/books/book-worn-brown.webp',
+            system: { description: { value: '<p>A well-thumbed brewing manual that teaches its reader to brew a healing draught.</p>' } }
+          },
+          {
+            name: 'Torn Recipe Scroll',
+            type: bookType,
+            img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
+            system: { description: { value: '<p>A half-legible scroll whose recipe list has been torn away.</p>' } }
+          }
+        ]);
+
+        // All-clear recipe item: a world item is linked (originItemUuid), a recipe is
+        // linked, and learnsValid holds (learning limit off) → summary reads "All clear".
+        const clearRecipeItem = (await csm.addRecipeItemFromUuid(systemId, tomeItem.uuid)).item;
+        await csm.updateRecipeItemDefinition(systemId, clearRecipeItem.id, { recipeIds: [recipe2.id] });
+
+        // Mixed recipe item: the world item is linked, but NO recipe is linked, so
+        // `recipeLinked` BLOCKS while `itemLinked` and `learnsValid` pass. One frame then
+        // shows a PASS row AND a BLOCK row together with the blocked medallion and both
+        // non-zero count tiles (issue 797, decision 7). Left with its default empty
+        // `recipeIds`, so no update is needed.
+        const mixedRecipeItem = (await csm.addRecipeItemFromUuid(systemId, scrollItem.uuid)).item;
+
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
@@ -4389,6 +6967,13 @@ async function main() {
               vocabularies: {
                 regions: { values: ['northreach'] }
               },
+              // Two character modifiers so the System Settings Character Modifiers
+              // list renders populated for the issue-768 list-ergonomics evidence
+              // (icon picker, section collapse, copy-to-prerequisites).
+              characterModifiers: [
+                { id: 'smoke-mod-herbalism', label: 'Herbalism Training', icon: 'fa-solid fa-leaf', expression: '@skills.nature.value' },
+                { id: 'smoke-mod-survival', label: 'Wilderness Survival', icon: 'fa-solid fa-campground', expression: '@skills.survival.value' }
+              ],
               tasks: [{
                 id: 'smoke-forage-library',
                 name: 'Forage Wild Herbs',
@@ -4624,15 +7209,31 @@ async function main() {
             }]
           }]
         });
-        // The grant carries BOTH a player and characters, and the two characters
-        // reach their controllers by DIFFERENT routes — the crafter via Foundry
-        // OWNER ownership, the travel member via `User#character` assignment — so the
-        // rail's `controlledBy` union is exercised, not just one half of it.
+        // Access-grid evidence (issue 796): the recipe editor's Access tab tiles the
+        // granted characters into the SAME fixed three-column grid as Books & Scrolls.
+        // The two NAMED characters below reach their controllers by DIFFERENT routes —
+        // the crafter via Foundry OWNER ownership, the travel member via `User#character`
+        // assignment — so the `controlledBy` union is exercised; but two cards fill only
+        // part of one row. Seed four more resolvable grant-only characters so the list
+        // holds six, wrapping the three-column grid to two rows and proving it fills the
+        // panel. They are `smokeSeed`-flagged so cleanup removes them and are never
+        // referenced by the craft/gather steps (which key off the crafter/travel ids).
+        // They also carry `smokeSeedRole = 'access-grant'` (#816) so grant-only
+        // actors are distinguishable from the two hero fixtures; cleanup still keys
+        // solely on `smokeSeed === true`, so both cohorts are torn down.
+        const accessGrantType = game.actors.get(crafterId)?.type || 'character';
+        const accessGrantActors = await Actor.createDocuments(
+          ['Seraphine the Warded', 'Brother Alden', 'Initiate Kaelen', 'Mistweaver Vane'].map((name) => ({
+            name,
+            type: accessGrantType,
+            flags: { fabricate: { smokeSeed: true, smokeSeedRole: 'access-grant' } }
+          }))
+        );
         await rm.updateRecipe(
           wardedRecipe.id,
           {
             access: {
-              characterIds: [crafterId, travelMemberId].filter(Boolean),
+              characterIds: [crafterId, travelMemberId, ...accessGrantActors.map((a) => a.id)].filter(Boolean),
               playerIds: [gathererUserId].filter(Boolean)
             }
           },
@@ -4648,6 +7249,7 @@ async function main() {
           restrictedRecipeName: 'Warded Rite',
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id, showcaseRecipe.id, multiStepRecipe.id, routedReadinessRecipe.id, wardedRecipe.id],
+          recipeItemIds: { clear: clearRecipeItem.id, mixed: mixedRecipeItem.id },
           healingPotionRecipeId: recipe2.id,
           sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
@@ -4778,6 +7380,17 @@ async function main() {
         results.steps.push({ step: 'gathering-feature-gate-negative', passed: true, skipped: true });
       }
 
+      // Phase D0 renderer-teardown tolerance state (issue #807).
+      // `d0RequiredCapturesComplete` flips true only AFTER the last load-bearing
+      // D0 capture (manager-experimental-off), so a teardown BEFORE that milestone
+      // still fails loudly — those later frames were never captured and a PR
+      // relying on them must not go green. `d0TeardownTolerated` records that D0
+      // absorbed a post-milestone teardown so the Phase E entry guard can skip a
+      // dead page even when page.isClosed() reads false (a 'browser has been
+      // disconnected'-class teardown). Declared at this scope so both the D0 catch
+      // and the sibling Phase E block below can read them.
+      let d0RequiredCapturesComplete = false;
+      let d0TeardownTolerated = false;
       // ── Phase D0: Screenshot Crafting System Manager ─────────────────────
       // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
       // ~25 manager captures and pointer hit-tests; local `full` runs
@@ -4804,8 +7417,8 @@ async function main() {
         }, craftingSetup.systemId);
         await seedSmokeGatheringLibrary(page, craftingSetup);
 
-        await page.evaluate(() => {
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
 
@@ -4960,8 +7573,8 @@ async function main() {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, { features: { essences: true, gathering: false } });
         }, craftingSetup.systemId);
-        await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        await page.evaluate(async () => {
+          (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -5010,17 +7623,18 @@ async function main() {
         // instead of the empty setup-checklist state. Seeding must precede the
         // app .show() because entering the Travel tab does not itself re-read the
         // party store. Idempotent across reruns: clears any prior party first.
-        await page.evaluate(async (sysId) => {
+        await page.evaluate(async ({ sysId, crafterId, travelMemberId }) => {
           const realmStore = game.fabricate.getGatheringRealmStore?.();
           const partyStore = game.fabricate.getGatheringPartyStore?.();
           if (!realmStore || !partyStore) {
             throw new Error('Gathering realm/party stores unavailable for Travel seeding.');
           }
-          const smokeHeroes = game.actors.contents
-            .filter(a => a.type === 'character' && a.flags?.fabricate?.smokeSeed === true)
-            .sort((a, b) => a.name.localeCompare(b.name, 'en'));
-          const crafter = smokeHeroes[0];
-          const travelMember = smokeHeroes[1];
+          // Select the party actors by stable id (#816). The `smokeSeed` namespace
+          // is shared with grant-only Access-grid actors, so a name sort over that
+          // set could silently pick a grant actor; resolve the intended crafter and
+          // travel member from the ids the craft/gather steps already recorded.
+          const crafter = game.actors.get(crafterId);
+          const travelMember = travelMemberId ? game.actors.get(travelMemberId) : null;
           if (!crafter) {
             throw new Error('No smoke-seeded gathering actor found for Travel seeding.');
           }
@@ -5071,9 +7685,13 @@ async function main() {
               });
             }
           }
-        }, craftingSetup.systemId);
-        await page.evaluate(() => {
-          globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+        }, {
+          sysId: craftingSetup.systemId,
+          crafterId: cleanup.crafterId,
+          travelMemberId: cleanup.travelMemberId
+        });
+        await page.evaluate(async () => {
+          globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
         await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -5109,6 +7727,16 @@ async function main() {
         }
         await assertManagerLayoutStable(page, 'system edit normal');
         await assertNoScreenshotOverlays(page);
+        // The pointer-target pass typed a name without saving, so the identity form is
+        // dirty (issue 767 now lights an Unsaved chip). Persist it so the settled
+        // "normal"/"narrow" frames show the clean form; saveSystemDetails awaits a
+        // refresh internally.
+        const systemNameField = page.locator('.fabricate-manager #manager-system-name').first();
+        const saveDetailsButton = page
+          .locator('.fabricate-manager .manager-edit-card-heading button[type="submit"]')
+          .first();
+        await saveDetailsButton.click();
+        await page.waitForTimeout(400);
         // Scroll the optional-feature tiles fully into frame so the capture
         // shows the complete feature set (incl. the issue-714 time tile).
         const timeFeatureTile = page.locator('.fabricate-manager [data-feature-key="time"]').first();
@@ -5121,6 +7749,82 @@ async function main() {
         await assertManagerLayoutStable(page, 'system edit narrow');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-narrow');
+
+        // --- Dirty identity form (issue 767) ---
+        // Type an un-saved name change so the identity form is dirty, then frame the
+        // identity card so the lit "Unsaved" chip beside "Save details" is captured.
+        // Captured BEFORE any Save/blur that would persist, so the changed state
+        // itself (not the clean form) reaches the PR evidence.
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await systemNameField.fill('The Herbalist (unsaved edit)');
+        await page
+          .locator('.fabricate-manager [data-system-details-dirty]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        const identityHeading = page
+          .locator('.fabricate-manager .manager-edit-card-heading')
+          .first();
+        await identityHeading.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-system-edit-dirty');
+
+        // Restore the persisted name so the identity form is clean again before the
+        // walk navigates away — otherwise the new route-exit guard would raise a
+        // discard dialog and block the remaining captures. Re-typing the saved value
+        // clears the dirty flag with no further persistence (identity-gated seeding).
+        await systemNameField.fill('The Herbalist');
+        await page
+          .locator('.fabricate-manager [data-system-details-dirty]')
+          .first()
+          .waitFor({ state: 'detached', timeout: 5_000 })
+          .catch(() => {});
+
+        // --- Settings-list ergonomics (issue 768) ---
+        // The seeded system carries two Character Modifiers, two Character
+        // Prerequisites and two Currency Units. Capture the three lists together
+        // proving the three increment-1 features: (a) the shared IconPicker open on
+        // a modifier (icon-picker parity), (b) a whole-section collapse on the
+        // Currency Units card, and (c) the row-level copy buttons on the summary
+        // rows. Reset afterwards so the Currency captures below start expanded.
+        await setManagerWindowSize(page, { width: 1280, height: 980 });
+        const modifierCard = page.locator('.fabricate-manager [data-system-character-modifiers]').first();
+        await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+        await modifierCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+        await page.waitForTimeout(200);
+
+        // Collapse the Currency Units section to demonstrate whole-section collapse.
+        const currencyCollapseToggle = page.locator('.fabricate-manager [data-section-collapse="currency"]').first();
+        if (await currencyCollapseToggle.count() > 0) {
+          await currencyCollapseToggle.click();
+          await page.waitForTimeout(150);
+        }
+
+        // Open the first modifier in edit mode and open its IconPicker so the icon
+        // dropdown is visible (parity with Currency Units / Character Prerequisites).
+        const firstModifierRow = modifierCard.locator('[data-system-character-modifier]').first();
+        await firstModifierRow.locator('[data-toggle-character-modifier]').first().click();
+        await page.waitForTimeout(150);
+        const modifierIconTrigger = firstModifierRow.locator('.essence-icon-picker-trigger').first();
+        if (await modifierIconTrigger.count() > 0) {
+          await modifierIconTrigger.click();
+          await page.waitForTimeout(200);
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-system-edit-lists');
+
+        // Reset: close the editor (also dismisses the IconPicker popover) and
+        // re-expand the Currency Units section for the currency captures below.
+        const modifierDone = firstModifierRow
+          .locator('.manager-character-modifier-editor button:has-text("Done")')
+          .first();
+        if (await modifierDone.count() > 0) {
+          await modifierDone.click().catch(() => {});
+          await page.waitForTimeout(150);
+        }
+        if (await page.locator('.fabricate-manager [data-system-currency-units].is-section-collapsed').count() > 0) {
+          await page.locator('.fabricate-manager [data-section-collapse="currency"]').first().click();
+          await page.waitForTimeout(150);
+        }
 
         // --- Currency configuration (#393) ---
         // Enable currency via the optional-features toggle, seed the dnd5e (actorProperty)
@@ -5171,6 +7875,10 @@ async function main() {
         await currencyStrategy.selectOption('actorProperty');
         await page.waitForTimeout(300);
 
+        // ── D0 section: recipes / crafting (issue #826 scoped-skip guard) ──────
+        // Inert under rc/ci/full; skips the recipe + crafting captures on a scoped
+        // `screenshots` run whose target set touches none of them.
+        if (shouldRunScreenshotSection('recipes')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const recipeApiCount = await page.evaluate((sysId) => {
           const rm = game.fabricate?.getRecipeManager?.();
@@ -5225,6 +7933,61 @@ async function main() {
           await openManagerCraftingSection(page, 'recipes', 'recipes');
         }
 
+        // Issue 801 — the grouped-category CONTINUATION frame for the recipe library. With
+        // "Group by category" ON the list is ordered category-major BEFORE pagination, so a
+        // category larger than the page renders contiguously across the boundary rather than
+        // as an alphabetical slice on every page. Seed one category ("Aaa Continuation",
+        // which sorts FIRST as recipes order categories plain-alphabetically) with 14 rows so
+        // it alone spans pages 1→2, then capture the continuation page. See
+        // captureGroupedContinuationFrame for the shared scaffold and teardown.
+        await captureGroupedContinuationFrame(page, results, {
+          stepName: 'recipes-grouped-continuation',
+          failMessage: 'Recipes grouped continuation capture failed',
+          layout: 'recipes grouped continuation',
+          label: 'manager-recipes-grouped-continuation',
+          groupCountSelector: '.fabricate-manager .manager-recipe-group .fab-group-count',
+          openBrowser: () => openManagerCraftingSection(page, 'recipes', 'recipes'),
+          settle: () => settleManagerNav(page),
+          settleAfterReset: () => settleManagerNav(page),
+          seed: () => page.evaluate(async (sysId) => {
+            const rm = game.fabricate.getRecipeManager();
+            const ids = [];
+            for (let index = 1; index <= 14; index += 1) {
+              const recipe = await rm.createRecipe({
+                name: `Continuation Draught ${String(index).padStart(2, '0')}`,
+                description: 'Issue 801 grouped-pagination continuation fixture.',
+                craftingSystemId: sysId,
+                ingredientSets: [{
+                  ingredientGroups: [{
+                    name: 'Any reagent',
+                    options: [{ quantity: 1, match: { type: 'tags', tags: ['reagent'], tagMatch: 'any' } }]
+                  }]
+                }]
+              }, { allowIncomplete: true, notify: false });
+              await rm.updateRecipe(
+                recipe.id,
+                { category: 'Aaa Continuation' },
+                { allowIncomplete: true, notify: false }
+              );
+              ids.push(recipe.id);
+            }
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+            return ids;
+          }, craftingSetup.systemId),
+          hasSeed: (ids) => ids.length > 0,
+          cleanup: (ids) => page.evaluate(async (recipeIds) => {
+            const rm = game.fabricate.getRecipeManager();
+            for (const id of recipeIds) {
+              await rm.deleteRecipe(id, { notify: false }).catch(() => {});
+            }
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          }, ids),
+        });
+
+        // Issue 806 — prove the editor round-trip preserves the browser's view-state
+        // (category filter + collapsed group) rather than resetting it on the remount.
+        await captureRecipeEditorRoundtrip(page, results, craftingSetup);
+
         // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
         // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a
         // hiccup records a failed step rather than aborting the whole phase.
@@ -5234,10 +7997,12 @@ async function main() {
           await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
           await page.locator('.fabricate-manager [data-books-scrolls]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          // The Books & Scrolls surface is legitimately empty for a fixture system
-          // with no recipe items, so its zero-row state is not a layout failure —
-          // capture it without the row-count heuristic and never block the
-          // Crafting Settings capture that follows.
+          // The Books & Scrolls management surface now lists the book/scroll recipe items
+          // seeded for "Brew Healing Potion" (issue 796) PLUS the two recipe items seeded
+          // for the Validation-tab captures (issue 797) — the all-clear "Tome of Brewing"
+          // and the mixed "Torn Recipe Scroll" — so it is deliberately POPULATED. It is
+          // still captured without the row-count heuristic (a filtered/empty state would
+          // still be valid) and never blocks the Crafting Settings capture that follows.
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-books-scrolls-normal');
           await openManagerCraftingSection(page, 'settings', 'crafting-settings');
@@ -5251,6 +8016,37 @@ async function main() {
         } catch (err) {
           results.steps.push({ step: 'crafting-group-surfaces', passed: false, error: err.message });
           process.stderr.write(`Crafting group surface capture failed: ${err.message}\n`);
+        }
+
+        // Recipe-item editor → Validation tab (issue 797): brought to parity with the
+        // recipe editor's Validation tab (summary card + Passing/Blocking count tiles +
+        // grouped bordered rows with status pills). Captured in TWO states off the two
+        // recipe items seeded above: the all-clear "Tome of Brewing" and the mixed
+        // pass/block "Torn Recipe Scroll". Guarded so a hiccup records a failed step
+        // instead of aborting Phase D0.
+        try {
+          const openRecipeItemValidation = async (recipeItemId) => {
+            await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
+            await page.locator(`.fabricate-manager [data-books-scrolls-edit="${recipeItemId}"]`).first().click();
+            await page.locator('.fabricate-manager[data-manager-view="recipe-item-edit"]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            await page.locator('.fabricate-manager [data-recipe-item-tab-button="validation"]').first().click();
+            // Wait on the summary card marker (the recipe-item editor is an edit-form
+            // view with no table rows, so `assertManagerLayoutStable` — which requires
+            // them — does not apply; the recipe-editor tab captures likewise use only the
+            // overlay guard).
+            await page.locator('.fabricate-manager [data-recipe-item-tab="validation"] [data-recipe-item-validation-summary]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+            await assertNoScreenshotOverlays(page);
+          };
+          await openRecipeItemValidation(craftingSetup.recipeItemIds.clear);
+          await screenshot(page, 'manager-recipe-item-validation');
+          await openRecipeItemValidation(craftingSetup.recipeItemIds.mixed);
+          await screenshot(page, 'manager-recipe-item-validation-blocked');
+          results.steps.push({ step: 'recipe-item-validation', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'recipe-item-validation', passed: false, error: err.message });
+          process.stderr.write(`Recipe-item validation capture failed: ${err.message}\n`);
         }
 
         // Recipes → open the editor so the Overview tab's identity card is captured
@@ -5297,11 +8093,13 @@ async function main() {
           process.stderr.write(`Recipe tools capture failed: ${err.message}\n`);
         }
 
-        // Showcase Requirements → Ingredients tab: capture every requirement row type
-        // (component, OR group, tag, currency cost), the faint dividers, and the tag
-        // layout. The recipe has a SINGLE ingredient set, so it renders CHROMELESS
-        // (issue 643) — the requirement rows sit on the tab background with no "Set 1"
-        // box, above the full-width "Add ingredient set" promotion button.
+        // Showcase Requirements → Ingredients tab. The recipe has a SINGLE ingredient
+        // set, so it renders CHROMELESS (issue 643) — the requirement rows sit on the tab
+        // background with no "Set 1" box, above the full-width "Add ingredient set"
+        // promotion button. The tab is taller than the manager window, so ONE viewport
+        // frame cannot hold every row type (issue 684): this first frame, captured at the
+        // top of the tab, covers the component, OR-group and tag rows; the essence and
+        // currency-cost rows below the fold get their own scrolled frame immediately below.
         await openManagerRecipeEditor(page, 'Showcase Requirements');
         await page.locator('.fabricate-manager [data-recipe-tab-button="ingredients"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5309,6 +8107,20 @@ async function main() {
         await assertManagerLayoutStable(page, 'recipe edit ingredients');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-ingredients');
+
+        // Issue 684: the essence + currency-cost requirement rows sit BELOW the fold of
+        // the viewport-sized frame above, so they were cropped out of every published
+        // frame while the caption still claimed them. Split them into their own frame:
+        // scroll the currency-cost row (the LAST requirement, with the essence row
+        // directly above it) into view so both rows AND their shared end-of-row Steppers
+        // are on-screen, then capture. Inline like the first ingredients frame above — a
+        // hiccup fails the walk loudly rather than publishing a silently-cropped frame.
+        const ingredientsTab = page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first();
+        await ingredientsTab.locator('[data-recipe-option-currency]').first().scrollIntoViewIfNeeded();
+        await ingredientsTab.locator('[data-recipe-option-essence]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await ingredientsTab.locator('[data-recipe-currency-amount]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-recipe-edit-ingredients-cost');
 
         // Return to the recipes browser, then open the check-routed recipe whose
         // Validation tab carries both routed readiness warnings (issue 431 PR-2). The
@@ -5567,8 +8379,18 @@ async function main() {
 
         // Return to the recipes browser for the remaining navigation.
         await openManagerCraftingSection(page, 'recipes', 'recipes');
+        }
 
+        // ── D0 section: components + checks (issue #826 scoped-skip guard) ─────
+        // Re-enters via an absolute Components nav click, so it does not depend on
+        // the recipes section having run; net-zero (issue-800 restore + economy
+        // revert + system-switch re-selects all inline).
+        if (shouldRunScreenshotSection('components-checks')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+        // Required sections establish their own scope. Optional recipe captures
+        // above may have visited another system and intentionally own their cleanup.
+        await returnToSystemLibrary(page);
+        await selectSmokeSystemInManager(page, craftingSetup.systemId);
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
@@ -5578,8 +8400,244 @@ async function main() {
         await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
+        // ---------------------------------------------------------------------
+        // Issue 800 — write-time RESOLUTION of source descriptions, in three frames.
+        //
+        // Source items live in a world compendium that is then LOCKED, because the
+        // locked case is the reported one and the one an item-driven walk cannot reach:
+        // `repairItemData`'s identity leg skips locked packs (it writes flags INTO pack
+        // items) while its description leg resolves them through `fromUuid`. A
+        // world-item fixture would pass green while the reported bug stayed broken.
+        //
+        // TWO source documents, deliberately: `addItemFromUuid` is an UPSERT keyed on
+        // source uuid, so registering the uuid already bound to Mystic Herb would take
+        // the `existing` branch, overwrite that component's name/img/description, and
+        // `save()` it — silently renaming Mystic Herb for every downstream screenshot
+        // while the "ingestion" frame proved nothing (the new-id guard would never
+        // fire). The second, UNBOUND document makes the lookup miss so the create
+        // branch runs and the frame demonstrates the write path it exists for.
+        //
+        // Frames: BEFORE (raw stored text, as an un-repaired world renders it),
+        // AFTER-Repair (the same component after the GM action), and AFTER-ingestion
+        // (a component registered fresh through the write path).
+        // ---------------------------------------------------------------------
+        const enricher800 = await page.evaluate(async (sysId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          const system = csm.getSystem(sysId);
+          const component = system?.components?.find((c) => c.name === 'Mystic Herb');
+          if (!component) {
+            throw new Error('issue 800: Mystic Herb component not found for the enricher fixture');
+          }
+
+          // Two REAL dnd5e items to reference, so resolution produces genuine document
+          // names rather than anything this fixture could have supplied itself.
+          const referencePack = game.packs.get('dnd5e.items');
+          if (!referencePack) throw new Error('issue 800: dnd5e.items pack not found');
+          const index = await referencePack.getIndex();
+          const entries = [...index]
+            .filter((entry) => entry?._id && entry?.name)
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+          if (entries.length < 2) throw new Error('issue 800: dnd5e.items index too small');
+          const [first, second] = entries;
+
+          // The label-less reference is the headline case (it resolves to the document's
+          // real NAME). The unresolvable one lands immediately before a full stop, which
+          // is the shape that used to render a stranded separator. The GM-gated span is
+          // the privacy scrub's only live-Foundry exercise — its text must never reach
+          // the inspector.
+          const GATED_SECRET = 'GM-ONLY-SECRET-800';
+          const rawFor = (label) =>
+            `${label}: @UUID[Compendium.dnd5e.items.Item.${first._id}], `
+            + `@UUID[Compendium.dnd5e.items.Item.${second._id}]{${second.name}}, `
+            + '@UUID[Compendium.dnd5e.items.Item.doesnotexist0000]. '
+            + `<span data-visibility="gm">${GATED_SECRET}</span> `
+            + 'Burns for [[/r 1d4]]{1d4 rounds} dealing [[2d6]] fire damage.';
+
+          // A world compendium we own, holding both source items, LOCKED afterwards.
+          const CompendiumCollectionClass =
+            foundry.documents?.collections?.CompendiumCollection ?? globalThis.CompendiumCollection;
+          const packName = 'fabricate-smoke-800';
+          let sourcePack = game.packs.get(`world.${packName}`);
+          if (!sourcePack) {
+            sourcePack = await CompendiumCollectionClass.createCompendium({
+              label: 'Fabricate Smoke 800',
+              type: 'Item',
+              name: packName,
+            });
+          }
+          await sourcePack.configure({ locked: false });
+          const existingDocs = await sourcePack.getDocuments();
+          const ensureDoc = async (name, raw) => {
+            const found = existingDocs.find((doc) => doc.name === name);
+            if (found) {
+              await found.update({ 'system.description.value': raw });
+              return found;
+            }
+            const [created] = await Item.createDocuments(
+              [{ name, type: 'loot', system: { description: { value: raw } } }],
+              { pack: sourcePack.collection }
+            );
+            return created;
+          };
+          // Bound to Mystic Herb (frames 1 + 2).
+          const boundDoc = await ensureDoc('Smoke Supplies', rawFor('Craft'));
+          // Deliberately NOT bound to any component (frame 3).
+          const unboundDoc = await ensureDoc('Smoke Reagents', rawFor('Contains'));
+          await sourcePack.configure({ locked: true });
+          if (!game.packs.get(`world.${packName}`)?.locked) {
+            throw new Error('issue 800: the fixture pack must be LOCKED — that is the case under test');
+          }
+
+          // Snapshot what we are about to mutate so the fixture can be restored: every
+          // later manager/crafting/gathering frame shares this component.
+          const restore800 = {
+            componentId: component.id,
+            registeredItemUuid: component.registeredItemUuid,
+            originItemUuid: component.originItemUuid,
+            aliasItemUuids: [...(component.aliasItemUuids ?? [])],
+            name: component.name,
+            img: component.img,
+            description: component.description,
+          };
+          globalThis.__fabricateSmoke800Restore = restore800;
+
+          // Point the component at the locked source and seed the RAW stored text,
+          // which is exactly the state a world upgraded from an earlier version is in.
+          component.registeredItemUuid = boundDoc.uuid;
+          component.originItemUuid = boundDoc.uuid;
+          component.aliasItemUuids = [];
+          component.description = rawFor('Craft');
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          return {
+            componentId: component.id,
+            unboundSourceUuid: unboundDoc.uuid,
+            firstName: first.name,
+            secondName: second.name,
+            gatedSecret: GATED_SECRET,
+          };
+        }, craftingSetup.systemId);
+
+        const inspectorFlavour = () =>
+          page.locator('.fabricate-manager [data-component-inspector] .manager-component-browser-inspector-flavour').first();
+        const componentSearch = () =>
+          page.getByRole('searchbox', { name: 'Search components' }).first();
+        const selectComponent = async (componentId) => {
+          const componentName = await page.evaluate(
+            ({ systemId, id }) =>
+              game.fabricate
+                .getCraftingSystemManager()
+                .getSystem(systemId)
+                ?.components?.find((component) => component?.id === id)
+                ?.name ?? null,
+            { systemId: craftingSetup.systemId, id: componentId }
+          );
+          if (!componentName) {
+            throw new Error(`issue 800: component ${componentId} is absent from the owning system`);
+          }
+          // Components are paginated. Search by resolved identity before clicking
+          // so a newly ingested component cannot be hidden on another page.
+          await componentSearch().fill(componentName);
+          const identity = page
+            .locator(`.fabricate-manager .manager-component-row[data-component-id="${componentId}"] .manager-component-identity`)
+            .first();
+          await identity.waitFor({ state: 'visible', timeout: 5_000 });
+          await identity.click();
+          await inspectorFlavour().waitFor({ state: 'visible', timeout: 5_000 });
+          return (await inspectorFlavour().textContent() ?? '').trim();
+        };
+        const assertResolved = (text, frame) => {
+          if (/@[A-Za-z]+\[|&[A-Za-z]+\[/.test(text)) {
+            throw new Error(`issue 800 (${frame}): raw directive text survived: ${text}`);
+          }
+          for (const expected of [enricher800.firstName, enricher800.secondName, '1d4 rounds', '2d6']) {
+            if (!text.includes(expected)) {
+              throw new Error(`issue 800 (${frame}): expected "${expected}" in: ${text}`);
+            }
+          }
+          if (text.includes('Unknown')) {
+            throw new Error(`issue 800 (${frame}): the broken-reference placeholder leaked: ${text}`);
+          }
+          // The privacy scrub, exercised against a REAL Foundry render rather than only
+          // against happy-dom fixtures. This is the highest-consequence assertion here.
+          if (text.includes(enricher800.gatedSecret)) {
+            throw new Error(`issue 800 (${frame}): GM-gated content reached a stored, player-visible description: ${text}`);
+          }
+          if (/[,;:]\s*\./.test(text)) {
+            throw new Error(`issue 800 (${frame}): a separator was left stranded against a full stop: ${text}`);
+          }
+        };
+
+        // Frame 1 — BEFORE. The un-repaired world, raw directives visible.
+        const beforeText = await selectComponent(enricher800.componentId);
+        if (!beforeText.includes('@UUID[')) {
+          throw new Error(`issue 800 (before): expected the un-repaired raw text, got: ${beforeText}`);
+        }
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-before');
+        process.stdout.write('  D0: components description BEFORE screenshotted\n');
+
+        // Frame 2 — AFTER the GM Repair Item Data action, which reaches the locked pack.
+        await page.evaluate(async () => {
+          const summary = await game.fabricate.getCraftingSystemManager().repairItemData();
+          if (!(summary?.descriptions?.refreshed > 0)) {
+            throw new Error(`issue 800: repair refreshed no descriptions: ${JSON.stringify(summary?.descriptions)}`);
+          }
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        });
+        const repairedText = await selectComponent(enricher800.componentId);
+        assertResolved(repairedText, 'after repair');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-repaired');
+        process.stdout.write('  D0: components description AFTER-REPAIR screenshotted\n');
+
+        // Frame 3 — AFTER ingestion. Registering the UNBOUND locked-pack item drives the
+        // async write path (`_buildComponentSourceSnapshot`) and must create, not upsert.
+        const ingestedComponentId = await page.evaluate(async ({ sysId, sourceUuid }) => {
+          const result = await game.fabricate.getCraftingSystemManager().addItemFromUuid(sysId, sourceUuid);
+          if (result?.action !== 'added') {
+            throw new Error(`issue 800: expected ingestion to CREATE a component, got action="${result?.action}" — the fixture source must not already be bound to one`);
+          }
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          return result?.item?.id ?? null;
+        }, { sysId: craftingSetup.systemId, sourceUuid: enricher800.unboundSourceUuid });
+        if (!ingestedComponentId || ingestedComponentId === enricher800.componentId) {
+          throw new Error('issue 800: ingestion did not yield a distinct new component id');
+        }
+        const ingestedText = await selectComponent(ingestedComponentId);
+        assertResolved(ingestedText, 'after ingestion');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-components-description-ingested');
+        process.stdout.write('  D0: components description AFTER-INGESTION screenshotted\n');
+
+        // Restore the fixture. Every later frame in this run shares these components, so
+        // leaving Mystic Herb re-pointed at the smoke pack with a rewritten description —
+        // or leaving the ingested component in the browser — would silently corrupt them.
+        await page.evaluate(async ({ sysId, ingestedId }) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.deleteItem(sysId, ingestedId);
+          const restore = globalThis.__fabricateSmoke800Restore;
+          const component = csm.getSystem(sysId)?.components?.find((c) => c.id === restore?.componentId);
+          if (restore && component) {
+            Object.assign(component, {
+              registeredItemUuid: restore.registeredItemUuid,
+              originItemUuid: restore.originItemUuid,
+              aliasItemUuids: restore.aliasItemUuids,
+              name: restore.name,
+              img: restore.img,
+              description: restore.description,
+            });
+            await csm.save();
+          }
+          delete globalThis.__fabricateSmoke800Restore;
+          await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+        }, { sysId: craftingSetup.systemId, ingestedId: ingestedComponentId });
+        await componentSearch().fill('Mystic Herb');
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Mystic Herb")').first().waitFor({ state: 'visible', timeout: 5_000 });
+        process.stdout.write('  D0: components description fixture restored\n');
+
         // Components → open the editor so the identity card (central column) and the
         // linked-source inspector (right context panel) are captured (#398).
+        await componentSearch().fill('Iron Ore');
         await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Ore") button:has(i.fa-pen)').first().click();
         await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-component-edit-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5606,6 +8664,7 @@ async function main() {
         // Return to the components browser for the remaining navigation.
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await componentSearch().fill('Iron Sword');
 
         // The OFF salvage body (issue 676, AC4). Iron Sword has authored result groups
         // with `enabled` absent — the accurate state decision 6 guarantees every
@@ -5628,6 +8687,39 @@ async function main() {
         await screenshot(page, 'manager-component-edit-salvage-off');
         process.stdout.write('  D0: component edit salvage (off) screenshotted\n');
 
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        // Issue 764: the Simple-mode salvage editor at its one-success-group CAP. The two
+        // frames above are the ROUTED Arcane Forge salvage editor (multi-group + routing).
+        // Switch to the Simple Forge system and open Smoke Relic — a Simple-mode component
+        // with a single result group — so the frame shows the cap: the Add group control is
+        // HIDDEN and the required hint ("Simple mode uses a single result group") renders.
+        // Fails loudly by design (no guard): a missing hint means the cap regressed.
+        await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+        await selectSmokeSystemInManager(page, executionFixtures.simple.systemId);
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await componentSearch().fill('Smoke Relic');
+        await page.locator('.fabricate-manager .manager-component-row:has-text("Smoke Relic") button:has(i.fa-pen)')
+          .first().click();
+        await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        const simpleSalvageSection = page
+          .locator('.fabricate-manager [data-component-edit-section="salvage"]')
+          .first();
+        await simpleSalvageSection.waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager [data-salvage-simple-hint]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await simpleSalvageSection.scrollIntoViewIfNeeded();
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-component-edit-salvage-simple');
+        process.stdout.write('  D0: component edit salvage (simple cap) screenshotted\n');
+
+        // Return to the Arcane Forge system so the remaining Phase D0 captures run against
+        // the fully-seeded routed system they expect.
+        await softClick(page.locator('.fabricate-manager .manager-scope-return'));
+        await selectSmokeSystemInManager(page, craftingSetup.systemId);
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
@@ -5715,6 +8807,28 @@ async function main() {
           process.stderr.write(`Checks crafting consumption capture failed: ${err.message}\n`);
         }
 
+        // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
+        // 770). The seed authors a populated catalogue (Medicine / Alchemy / Herbalism)
+        // with a "Pick highest" default policy on the crafting check, so the frame shows
+        // the redesigned rows — IconPicker + label + the `@`-adorned expression field —
+        // plus the default-modifier pill multi-select. A DEDICATED frame (not the
+        // failure-consumption one above, which the same tab scrolls elsewhere for) so
+        // both cards get exact, un-cropped evidence.
+        try {
+          const modifierCard = page
+            .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
+            .first();
+          await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+          await modifierCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-checks-crafting-modifiers');
+          process.stdout.write('  D0: checks crafting modifiers screenshotted\n');
+          results.steps.push({ step: 'checks-crafting-modifiers', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'checks-crafting-modifiers', passed: false, error: err.message });
+          process.stderr.write(`Checks crafting modifiers capture failed: ${err.message}\n`);
+        }
+
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
@@ -5730,6 +8844,64 @@ async function main() {
         await screenshot(page, 'manager-components-stacked');
         process.stdout.write('  D0: components stacked screenshotted\n');
 
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+
+        // Issue 801 — the grouped-category CONTINUATION frame for the component library.
+        // Same shape as the recipe frame above (see captureGroupedContinuationFrame): seed
+        // one category ("Aaa Continuation", which sorts FIRST) with 14 rows so it alone spans
+        // pages 1→2 under a shrunk page, then capture the continuation page. Placed AFTER the
+        // stacked frame so the shrunk page size can never leak into an earlier capture.
+        const openComponentsBrowser = async () => {
+          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="components"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+        };
+        await captureGroupedContinuationFrame(page, results, {
+          stepName: 'components-grouped-continuation',
+          failMessage: 'Components grouped continuation capture failed',
+          layout: 'components grouped continuation',
+          label: 'manager-components-grouped-continuation',
+          groupCountSelector: '.fabricate-manager .manager-component-group .fab-group-count',
+          openBrowser: openComponentsBrowser,
+          settle: () => page.waitForTimeout(300),
+          settleAfterReset: () => page.waitForTimeout(200),
+          seed: () => page.evaluate(async (sysId) => {
+            const csm = game.fabricate.getCraftingSystemManager();
+            const rawItemTypes = game.documentTypes?.Item ?? game.system?.documentTypes?.Item ?? [];
+            const itemTypes = Array.from(rawItemTypes);
+            const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
+            const specs = Array.from({ length: 14 }, (_, index) => ({
+              name: `Continuation Reagent ${String(index + 1).padStart(2, '0')}`,
+              type: itemType,
+              img: 'icons/commodities/materials/bowl-powder-teal.webp',
+            }));
+            const items = await Item.createDocuments(specs);
+            const componentIds = [];
+            for (const item of items) {
+              const result = await csm.addItemFromUuid(sysId, item.uuid);
+              await csm.updateItem(sysId, result.item.id, { category: 'Aaa Continuation' });
+              componentIds.push(result.item.id);
+            }
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+            return { componentIds, itemIds: items.map((item) => item.id) };
+          }, craftingSetup.systemId),
+          hasSeed: (handle) => handle.componentIds.length > 0 || handle.itemIds.length > 0,
+          cleanup: (handle) => page.evaluate(async ({ sysId, componentIds, itemIds }) => {
+            const csm = game.fabricate.getCraftingSystemManager();
+            for (const id of componentIds) {
+              await csm.deleteItem(sysId, id).catch(() => {});
+            }
+            const items = itemIds.map((id) => game.items.get(id)).filter(Boolean);
+            if (items.length > 0) {
+              await Item.deleteDocuments(items.map((item) => item.id)).catch(() => {});
+            }
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+          }, { sysId: craftingSetup.systemId, componentIds: handle.componentIds, itemIds: handle.itemIds }),
+        });
+        }
+
+        // ── D0 section: tags & categories + essences (issue #826 skip guard) ──
+        if (shouldRunScreenshotSection('tags-essences')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Tags")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="tags"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -5811,7 +8983,13 @@ async function main() {
             }
           }
         }
+        }
 
+        // ── D0 section: environments + gathering (issue #826 skip guard) ──────
+        // Enters via exerciseManagerEnvironmentPointerTargets, which itself clicks
+        // the Gathering nav first (absolute), and only browses/edits — the
+        // phase-E gathering fixtures were seeded earlier in the always-run spine.
+        if (shouldRunScreenshotSection('gathering')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await exerciseManagerEnvironmentPointerTargets(page);
         if (await page.locator('.fabricate-manager .manager-environment-row').count() < 1) {
@@ -6006,14 +9184,47 @@ async function main() {
         // assertManagerLayoutStable (which requires table rows) does not apply here.
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-settings');
+        }
 
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Tools")').first().click();
-        await page.locator('.fabricate-manager[data-manager-view="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager .manager-tools-row:has-text("Herbalist Sickle")').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertManagerLayoutStable(page, 'tools normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-tools-normal');
+        // ── D0 section: Tool Studio (issue #784) ─────────────────────────────
+        // Screenshots-profile only scoping can run this section independently of all
+        // other D0 sections. Its setup snapshots every persisted writer it touches and
+        // the finally restore makes the section net-zero even when a capture fails.
+        if (shouldRunScreenshotSection('tools')) {
+          let toolStudioFixture = null;
+          try {
+            toolStudioFixture = await setupToolStudioFixture(page, {
+              systemId: craftingSetup.systemId,
+              recipeId: craftingSetup.healingPotionRecipeId,
+            });
+            await exerciseToolStudioPointerTargets(page, {
+              systemId: craftingSetup.systemId,
+              recipeName: 'Brew Healing Potion',
+              fixture: toolStudioFixture,
+            });
+            await verifyToolStudioLiveReplacement(page, {
+              systemId: craftingSetup.systemId,
+              recipeId: craftingSetup.healingPotionRecipeId,
+              actorId: cleanup.crafterId,
+              fixture: toolStudioFixture,
+            });
+            results.steps.push({ step: 'tool-studio-evidence', passed: true });
+          } catch (err) {
+            results.steps.push({ step: 'tool-studio-evidence', passed: false, error: err.message });
+            throw err;
+          } finally {
+            await restoreToolStudioFixture(page, {
+              systemId: craftingSetup.systemId,
+              recipeId: craftingSetup.healingPotionRecipeId,
+              fixture: toolStudioFixture,
+            });
+          }
+        }
+
+        // ── D0 section: system-overview + interactables (issue #826) ─────────
+        // The sub-blocks switch systems / open independent apps and restore the
+        // smoke-system selection + active scene inline.
+        if (shouldRunScreenshotSection('overview-interactables')) {
 
         // ── System Overview tabbed page + system-blocker banner (issue 429 PR-2) ─
         // Select the deliberately-broken "Broken Workshop" system (progressive
@@ -6266,6 +9477,8 @@ async function main() {
           // Sweep any window left over from the config block before opening +
           // capturing, so a still-fading ApplicationV2 cannot bleed through.
           await closeOpenApplications(page);
+          await page.locator('#fabricate-crafting-system-manager')
+            .waitFor({ state: 'detached', timeout: 10_000 });
 
           const interactableRef = craftingSetup.interactable;
           // Ensure the seeded interactable's scene is the active/viewed scene so the
@@ -6470,7 +9683,14 @@ async function main() {
           results.steps.push({ step: 'interactables-manager', passed: false, error: err.message });
           process.stderr.write(`Manage Interactables capture failed: ${err.message}\n`);
         }
+        }
 
+        // ── D0 section: import report + alchemy settings + experimental-off ───
+        // (issue #826 skip guard.) Each sub-block opens its own fresh manager /
+        // dialog session and self-restores (import "(Copy)" deletion; experimental
+        // features restored by the phase finally), so it is independent of prior
+        // sections and safe to skip as a unit.
+        if (shouldRunScreenshotSection('import-alchemy-experimental')) {
         // ── Post-import unresolved-reference report (#492) ─────────────────────
         // The GM-facing import report is a DialogV2 that only appears AFTER an
         // import, and only surfaces its "needs attention" list when the imported
@@ -6532,8 +9752,8 @@ async function main() {
             game.fabricate.getCraftingSystemManager().getSystems().map((s) => s.id)
           );
 
-          await page.evaluate(() => {
-            globalThis.__fabricateSmokeManagerApp = game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -6599,6 +9819,118 @@ async function main() {
           await closeOpenApplications(page).catch(() => {});
         }
 
+        // ── Folder-aware import categorization mapping step (#771) ─────────────
+        // The mapping modal exists only AFTER a folder / whole-pack component drop
+        // and is not representable in any world DB (Class B). Drive a WORLD-folder
+        // drop of a parent folder holding two Item subfolders — one named to match an
+        // existing component category (pre-filled by match-by-name), one matching
+        // nothing (then Skipped) — and capture the populated mapping step with >=2
+        // rows. Fully self-contained: the created folders/items and any temporary
+        // category are removed after the capture, and the modal is dismissed WITHOUT
+        // committing, so no component is imported into the smoke system.
+        try {
+          const mappingFixtures = await page.evaluate(async (sysId) => {
+            const csm = game.fabricate.getCraftingSystemManager();
+            const system = csm.getSystem(sysId);
+            const previousCategories = Array.isArray(system.componentCategories)
+              ? [...system.componentCategories]
+              : [];
+            const addedCategory = !previousCategories.some((c) => c.toLowerCase() === 'reagent');
+            if (addedCategory) {
+              await csm.updateSystem(sysId, {
+                componentCategories: [...previousCategories, 'Reagent'],
+              });
+            }
+            const itemType = Array.from(game.documentTypes.Item).find((t) => t !== 'base') || 'base';
+            const img = 'icons/commodities/metal/ingot-stack-steel.webp';
+            const parent = await Folder.create({ name: 'Smoke Bulk Import', type: 'Item' });
+            const reagentFolder = await Folder.create({
+              name: 'Reagent',
+              type: 'Item',
+              folder: parent.id,
+            });
+            const widgetsFolder = await Folder.create({
+              name: 'Widgets',
+              type: 'Item',
+              folder: parent.id,
+            });
+            await Item.create([
+              { name: 'Smoke Sage', type: itemType, img, folder: reagentFolder.id },
+              { name: 'Smoke Nightcap', type: itemType, img, folder: reagentFolder.id },
+              { name: 'Smoke Cog', type: itemType, img, folder: widgetsFolder.id },
+            ]);
+            return {
+              parentId: parent.id,
+              widgetsFolderId: widgetsFolder.id,
+              previousCategories,
+              addedCategory,
+            };
+          }, craftingSetup.systemId);
+
+          await page.evaluate(async () => {
+            (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
+          });
+          await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+          await setManagerWindowSize(page, { width: 1280, height: 820 });
+          await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
+          await settleManagerNav(page);
+          await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+          await page.locator('.fabricate-manager[data-manager-view="components"]').first()
+            .waitFor({ state: 'visible', timeout: 5_000 });
+
+          // Dispatch a real world-folder drop onto the component drop zone (the drop
+          // handler reads dataTransfer text/plain the same way Foundry drags do).
+          await page.evaluate((parentId) => {
+            const zone = document.querySelector('.fabricate-manager .manager-component-drop-zone');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData(
+              'text/plain',
+              JSON.stringify({ type: 'Folder', uuid: `Folder.${parentId}` })
+            );
+            zone.dispatchEvent(new DragEvent('drop', { dataTransfer, bubbles: true, cancelable: true }));
+          }, mappingFixtures.parentId);
+
+          const mappingDialog = page.locator('.fabricate-manager [data-import-mapping]').first();
+          await mappingDialog.waitFor({ state: 'visible', timeout: 10_000 });
+          // Prove >=2 rows rendered (Reagent + Widgets); parent holds no items so it is
+          // not its own row.
+          await page.locator('.fabricate-manager [data-import-mapping-row]').nth(1)
+            .waitFor({ state: 'visible', timeout: 5_000 });
+          // Skip the non-matching (Widgets) folder so the frame shows a skipped row.
+          await page.locator(
+            `.fabricate-manager [data-import-mapping-row="${mappingFixtures.widgetsFolderId}"] [data-import-mapping-skip]`
+          ).first().click();
+          // The modal IS the intended overlay here (like the import-report dialog), so
+          // clear bleed-over toasts but do NOT run assertNoScreenshotOverlays.
+          await dismissFoundryNotifications(page);
+          await screenshot(page, 'manager-import-folder-mapping');
+
+          // Dismiss without committing, then remove the fixtures + temporary category.
+          await page.locator('.fabricate-manager [data-import-mapping-cancel]').first().click().catch(() => {});
+          await mappingDialog.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+          await page.evaluate(async ({ parentId, previousCategories, addedCategory, sysId }) => {
+            const parent = game.folders.get(parentId);
+            if (parent) await parent.delete({ deleteSubfolders: true, deleteContents: true });
+            if (addedCategory) {
+              await game.fabricate
+                .getCraftingSystemManager()
+                .updateSystem(sysId, { componentCategories: previousCategories });
+            }
+          }, {
+            parentId: mappingFixtures.parentId,
+            previousCategories: mappingFixtures.previousCategories,
+            addedCategory: mappingFixtures.addedCategory,
+            sysId: craftingSetup.systemId,
+          });
+
+          await closeOpenApplications(page);
+          results.steps.push({ step: 'import-folder-mapping', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'import-folder-mapping', passed: false, error: err.message });
+          process.stderr.write(`Import folder mapping capture failed: ${err.message}\n`);
+          await closeOpenApplications(page).catch(() => {});
+        }
+
         // Manager alchemy-settings capture (issue #752 — evidence for #736's #713
         // half): the Crafting → Settings surface of an ALCHEMY-mode system (the
         // minimal "Smoke Alchemy Bench" seeded in Phase C). The Crafting nav group
@@ -6610,8 +9942,8 @@ async function main() {
         if (alchemyBenchSystemId) {
           try {
             await closeOpenApplications(page);
-            await page.evaluate(() => {
-              game.fabricate.api.getCraftingSystemManagerAppClass().show();
+            await page.evaluate(async () => {
+              (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
             });
             await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
             await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -6666,8 +9998,8 @@ async function main() {
           await page.evaluate(async () => {
             await game.settings.set('fabricate', 'experimentalFeatures', false);
           });
-          await page.evaluate(() => {
-            game.fabricate.api.getCraftingSystemManagerAppClass().show();
+          await page.evaluate(async () => {
+            (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
           });
           await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -6688,6 +10020,14 @@ async function main() {
           await assertManagerLayoutStable(page, 'experimental off');
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-experimental-off');
+          // Milestone (issue #807): the last load-bearing D0 capture has landed.
+          // A renderer teardown AFTER this point is tolerable infra flake; before
+          // it is not (later frames would be genuinely missing). Deliberately NOT
+          // hoisted earlier — the motivating essence-edit interaction is the
+          // `manager-essence-edit-first-state` capture several captures upstream of
+          // this milestone, so a teardown truly on that click is PRE-milestone and
+          // still fails loudly, which is correct.
+          d0RequiredCapturesComplete = true;
           process.stdout.write('  D0: experimental-off rail screenshotted\n');
           await closeOpenApplications(page);
           results.steps.push({ step: 'manager-experimental-off', passed: true });
@@ -6695,6 +10035,16 @@ async function main() {
           results.steps.push({ step: 'manager-experimental-off', passed: false, error: err.message });
           process.stderr.write(`Manager experimental-off capture failed: ${err.message}\n`);
           await closeOpenApplications(page).catch(() => {});
+        }
+        }
+
+        // On a scoped `screenshots` run the experimental-off milestone capture (which
+        // sets d0RequiredCapturesComplete) may be skipped, so mark the D0 required
+        // captures complete here: every targeted D0 section has run by this point, so
+        // a later transient renderer teardown is the tolerable post-milestone class.
+        // Inert under rc/ci/full (the milestone is set by the real capture there).
+        if (SCREENSHOT_SCOPING_ACTIVE) {
+          d0RequiredCapturesComplete = true;
         }
 
         await page.evaluate(async (sysId) => {
@@ -6709,8 +10059,37 @@ async function main() {
         results.steps.push({ step: 'screenshot-manager', passed: true });
         process.stdout.write('Phase D0 complete: Crafting System Manager screenshotted and hit-tested.\n');
       } catch (err) {
-        results.steps.push({ step: 'screenshot-manager', passed: false, error: err.message });
-        throw err;
+        // Issue #807: tolerate-or-fail. A real (non-teardown) failure, or ANY
+        // teardown BEFORE the manager-experimental-off milestone, records a hard
+        // screenshot-manager failure and fails via the terminal
+        // evaluateSmokeOutcome (D0 no longer rethrows, so this single record is the
+        // whole story — it is never double-recorded as create-crafting-system in
+        // the Phase C catch).
+        if (
+          !shouldTolerateSmokeTeardown({
+            message: err.message,
+            pageClosed: page.isClosed?.(),
+            requiredCapturesComplete: d0RequiredCapturesComplete
+          })
+        ) {
+          results.steps.push({ step: 'screenshot-manager', passed: false, error: err.message });
+        } else {
+          // Post-milestone transient renderer/page teardown: the same infra class
+          // the Phase E Journal step and the unhandledRejection guard already
+          // absorb. Record the step SKIPPED (not failed) and do NOT rethrow, so it
+          // neither reds the run nor propagates into Phase C. d0TeardownTolerated
+          // lets the Phase E guard skip the now-dead page.
+          d0TeardownTolerated = true;
+          results.steps.push({
+            step: 'screenshot-manager',
+            passed: true,
+            skipped: true,
+            error: TRANSIENT_TEARDOWN_SKIP_PREFIX + err.message
+          });
+          process.stderr.write(
+            `Phase D0 manager walk skipped after a transient page teardown: ${err.message}\n`
+          );
+        }
       } finally {
         await page.evaluate(async (previous) => {
           await game.settings.set('fabricate', 'experimentalFeatures', previous === true);
@@ -6720,6 +10099,23 @@ async function main() {
 
       // ── Phase E: Craft an item ──────────────────────────────────────────────
       startPhase('phase-E');
+      // Issue #807: with the D0 rethrow removed, Phase E is now reachable after a
+      // tolerated D0 teardown. The shared app Phase E drives cannot open on a
+      // dead/torn-down page, so skip it. Keyed on d0TeardownTolerated AND
+      // page.isClosed?.() — a 'browser has been disconnected'-class teardown is
+      // predicate-matched yet can leave page.isClosed() false, so isClosed alone
+      // would let Phase E proceed and throw into the Phase C catch.
+      if (!shouldRunScreenshotPhase('phase-E')) {
+        // Scoped `screenshots` run whose target set has no phase-E (player/craft/
+        // journal) label. Phase E is the last view-bearing phase and nothing earlier
+        // depends on its side effects, so skipping it is safe and drops the largest
+        // off-target cost for a manager-only PR. Inert for rc/ci/full.
+        process.stdout.write('Phase E: skipped (screenshots scope has no phase-E labels).\n');
+        results.steps.push({ step: 'craft-item-phase', passed: true, skipped: true });
+      } else if (page.isClosed?.() || d0TeardownTolerated) {
+        process.stdout.write('Phase E: skipped (renderer teardown tolerated in Phase D0).\n');
+        results.steps.push({ step: 'craft-item-phase', passed: true, skipped: true });
+      } else {
       process.stdout.write('Phase E: Crafting a Healing Potion...\n');
       try {
         // The "Craft Item" and "Gathering" sidebar actions both open ONE
@@ -6880,6 +10276,109 @@ async function main() {
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage-no-check');
+
+        // Issue 777: the pre-roll required-tools disclosure. Smoke Toolchest's salvage
+        // names two library tools — the Mallet the crafter holds (available, green) and the
+        // Anvil it does not (unavailable, red) — so this single frame proves the section is
+        // visible before any roll, the available/unavailable StatusPill treatment reads by
+        // icon+label (not colour alone), the human tool name shows (not a raw componentId),
+        // and the pre-roll action is disabled while a required tool is missing. Fails
+        // loudly on the `[data-inventory-salvage-tools]` waitFor, for the same reason as the
+        // frames above; does NOT commit a salvage.
+        await salvageSearch.fill('Smoke Toolchest');
+        await page.waitForTimeout(200);
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        const toolchestSalvageTab = appShell.locator('[data-inventory-detail-tab="salvage"]').first();
+        await toolchestSalvageTab.waitFor({ state: 'visible', timeout: 10_000 });
+        await toolchestSalvageTab.click();
+        await appShell.locator('[data-inventory-salvage-tools]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-salvage-tools');
+
+        // Issue 766: ONE physical stack registered as a salvageable component in TWO
+        // crafting systems (Smoke Air Shard, in the simple AND progressive forges) must
+        // render as a SINGLE inventory card, its quantity counted ONCE, carrying a
+        // System selector DROP-DOWN that re-scopes the whole detail body. This one frame
+        // proves both halves: (a) the collapsed single card with its union badges and a ×1
+        // pip (never ×2), and (b) the `<select>` selector with per-system affordance
+        // annotations, opened to a participation's detail. Fails loudly, by design (no
+        // guard, no try/catch), for the same reason as the salvage frames above — the
+        // evidence gate only scrapes the `screenshot(page, '<label>')` literal, so a
+        // silent no-op would publish no PNG yet still pass. Does NOT commit a salvage.
+        const collapseSearch = appShell.locator('[data-inventory-filters] input').first();
+        await collapseSearch.waitFor({ state: 'visible', timeout: 10_000 });
+        await collapseSearch.fill('Smoke Air Shard');
+        await page.waitForTimeout(200);
+        // Exactly ONE card for the multi-system stack — the collapse contract.
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        // The multi-system selector drop-down is the visual proof of the collapse.
+        await appShell.locator('[data-inventory-system-select]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-inventory-multi-system');
+
+        // Issue 764: the GM-facing Simple-mode MISCONFIGURED salvage cue. A stored Simple
+        // config with more than one success result group is invalid (the engine awards only
+        // the first). The normalizer now CLAMPS it on every save, and initialize()
+        // re-normalizes on load — so it is unreachable through updateSystem or a planted
+        // setting (both self-heal). Reproduce it the only faithful way: an IN-MEMORY
+        // post-init push of a second role-less group onto the live normalized system,
+        // bypassing the normalizer. Then remount InventoryView (a tab switch re-fetches the
+        // listing, which reads the live system) and capture the GM cue: SalvageMisconfigured
+        // Body with Simple-specific copy and the mode banner suppressed. Fails loudly.
+        await page.evaluate(({ systemId, componentId }) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          const system = csm.getSystem(systemId);
+          const component = system?.components?.find((c) => c.id === componentId);
+          if (!component?.salvage) {
+            throw new Error('issue 764 frame: Smoke Relic salvage not found for in-memory injection');
+          }
+          component.salvage.resultGroups.push({ id: 'smoke-relic-surplus-764', name: 'Surplus Parts', results: [] });
+        }, { systemId: executionFixtures.simple.systemId, componentId: executionFixtures.simple.relicComponentId });
+
+        // Tab out and back so InventoryView remounts and re-fetches the (now multi-group)
+        // listing — each tab body is behind an {#if}, so switching unmounts and remounts it.
+        await appShell.locator('.fabricate-app-nav-item:has-text("Gathering")').first().click();
+        await appShell.locator('.fabricate-app-nav-item.active:has-text("Gathering")').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('.fabricate-app-nav-item:has-text("Inventory")').first().click();
+        await appShell.locator('.fabricate-app-nav-item.active:has-text("Inventory")').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-state]:not([data-inventory-state="loading"])').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+
+        const misconfiguredSearch = appShell.locator('[data-inventory-filters] input').first();
+        await misconfiguredSearch.waitFor({ state: 'visible', timeout: 10_000 });
+        await misconfiguredSearch.fill('Smoke Relic');
+        await page.waitForTimeout(200);
+        await appShell.locator('[data-inventory-card]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await appShell.locator('[data-inventory-card]').first().click();
+        const misconfiguredTab = appShell.locator('[data-inventory-detail-tab="salvage"]').first();
+        await misconfiguredTab.waitFor({ state: 'visible', timeout: 10_000 });
+        await misconfiguredTab.click();
+        await appShell.locator('[data-inventory-salvage-body="misconfigured"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-salvage-misconfigured');
+
+        // Restore Smoke Relic's healthy single-group salvage so nothing downstream inherits
+        // the injected invalid config.
+        await page.evaluate(({ systemId, componentId }) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          const system = csm.getSystem(systemId);
+          const component = system?.components?.find((c) => c.id === componentId);
+          if (component?.salvage) {
+            component.salvage.resultGroups = component.salvage.resultGroups.filter(
+              (g) => g.id !== 'smoke-relic-surplus-764'
+            );
+          }
+        }, { systemId: executionFixtures.simple.systemId, componentId: executionFixtures.simple.relicComponentId });
 
         // Clear the search so the tab is left in its browsable state for any later
         // inventory work (and so a re-entry does not inherit this filter).
@@ -7109,6 +10608,16 @@ async function main() {
             }
           }
 
+          async function selectCraftingRecipeByName(name) {
+            const recipeSearch = appShell.locator('.crafting-browser-search input').first();
+            await recipeSearch.fill(name);
+            await page.waitForTimeout(350);
+            const row = appShell.locator(`[data-recipe-id]:has-text("${name}")`).first();
+            await row.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await row.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
+            return { recipeSearch, row };
+          }
+
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'player-crafting-simple');
 
@@ -7160,7 +10669,7 @@ async function main() {
 
           // Multi-option ingredient selector evidence (issue #552): select the
           // seeded 'Smoke Weave Filigree' recipe, whose single ingredient group
-          // offers two interchangeable coils the crafter holds, so the detail
+          // offers a held component or authored essence, so the detail
           // renders the IngredientOptionSelector "Alternatives" radiogroup with
           // two selectable rows. Defensive: a missing recipe/control records a
           // failed step rather than aborting the surrounding phase.
@@ -7181,6 +10690,7 @@ async function main() {
             await appShell.locator('.crafting-alt-option').first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-alternative');
             await screenshot(page, 'player-crafting-alternatives');
 
             // Nice-to-have "switched" variant: click the second alternative so the
@@ -7203,6 +10713,104 @@ async function main() {
               error: String(altError?.message ?? altError)
             });
             process.stdout.write(`  Player Crafting alternatives capture skipped: ${altError?.message ?? altError}\n`);
+          }
+
+          try {
+            const legacy = await selectCraftingRecipeByName('Smoke Legacy Essence Seal');
+            await appShell.locator('[data-io-group="essences"] .crafting-io-essence-icon').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-legacy');
+            await legacy.recipeSearch.fill('');
+
+            const firstClass = await selectCraftingRecipeByName(
+              'Smoke First-Class Essence Draught'
+            );
+            await appShell.locator('[data-io-group="ingredients"] .crafting-essence-thumb').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-ingredient');
+
+            await firstClass.row.locator('.crafting-recipe-row-add').click({ timeout: 5_000 });
+            await appShell.locator('[data-shopping-acquire-components] .crafting-essence-thumb').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-shopping');
+            await firstClass.recipeSearch.fill('');
+            results.steps.push({ step: 'player-crafting-essence-icons', passed: true });
+          } catch (essenceIconError) {
+            results.steps.push({
+              step: 'player-crafting-essence-icons',
+              passed: false,
+              error: String(essenceIconError?.message ?? essenceIconError)
+            });
+          }
+
+          // ── Explicit multi-step simple recipe (issue 765) ─────────────────
+          // Select the seeded 'Smoke Raise Tent' recipe (a simple-mode recipe whose
+          // sets live on steps[]). The step-aware projection must render an ordered
+          // per-step requirement list (data-recipe-section="steps") with the hint
+          // strip, one terminal PRODUCES row (the crate, not step 1's dowel), and no
+          // check card. Defensive: a missing recipe records a failed step rather than
+          // aborting the phase.
+          try {
+            const recipeSearch = appShell.locator('.crafting-browser-search input').first();
+            await recipeSearch.fill('Smoke Raise Tent');
+            await page.waitForTimeout(350);
+            const tentRow = appShell
+              .locator('[data-recipe-id]:has-text("Smoke Raise Tent")')
+              .first();
+            await tentRow.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            await tentRow.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
+            // Wait for the ordered step list (a stable section marker, not leaf content).
+            await appShell.locator('[data-recipe-section="steps"]').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            const stepBlocks = await appShell.locator('[data-recipe-section="steps"] [data-recipe-step]').count();
+            const hasHint = await appShell.locator('[data-recipe-section="steps-hint"]').count();
+            const hasCheck = await appShell.locator('[data-recipe-section="check"]').count();
+            const totalDuration = String(
+              await appShell.locator('[data-recipe-duration][data-recipe-duration-kind="total"]')
+                .first().textContent()
+            ).replace(/\s+/g, ' ').trim();
+            const stepDurationLabels = await appShell
+              .locator('[data-recipe-section="steps"] [data-recipe-step]')
+              .evaluateAll((steps) =>
+                steps.map((step) =>
+                  String(step.querySelector('[data-recipe-step-duration]')?.textContent ?? '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                )
+              );
+            if (
+              totalDuration !== 'Total duration: 1 hr 30 min' ||
+              stepDurationLabels[0] !== '30 min' ||
+              stepDurationLabels[1] !== '1 hr'
+            ) {
+              throw new Error(
+                `Unexpected multi-step durations: total="${totalDuration}", steps=${JSON.stringify(stepDurationLabels)}`
+              );
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-multistep');
+            // Restore the unfiltered recipe list for the subsequent frames.
+            await recipeSearch.fill('').catch(() => {});
+            await page.waitForTimeout(200);
+            results.steps.push({
+              step: 'player-crafting-multistep',
+              passed: stepBlocks >= 2 && hasHint > 0 && hasCheck === 0,
+              stepBlocks,
+              hasHint: hasHint > 0,
+              checkCardShown: hasCheck > 0,
+              totalDuration,
+              stepDurationLabels
+            });
+          } catch (multiStepError) {
+            results.steps.push({
+              step: 'player-crafting-multistep',
+              passed: false,
+              error: String(multiStepError?.message ?? multiStepError)
+            });
+            process.stdout.write(`  Player Crafting multi-step capture skipped: ${multiStepError?.message ?? multiStepError}\n`);
           }
 
           // ── Progressive player stage list (issue 651) ─────────────────────
@@ -7471,6 +11079,13 @@ async function main() {
           if (!crafter) throw new Error(`Actor ${crafterId} not found`);
 
           console.log(`Crafting with ${crafter.name} (${crafter.id}), ${crafter.items.size} items in inventory`);
+          const vialCopies = crafter.items.contents.filter((item) => item.name === 'Empty Vial');
+          if (vialCopies.length < 2) {
+            throw new Error(
+              `Brew Healing Potion fixture retained ${vialCopies.length} Empty Vial copies; `
+              + 'the attempt requires distinct ingredient and Tool documents'
+            );
+          }
 
           const rm = game.fabricate.getRecipeManager();
           const recipe = rm.getRecipe(recipeId);
@@ -7740,15 +11355,25 @@ async function main() {
         if (!journalErr) {
           results.steps.push({ step: 'player-journal', passed: true });
           process.stdout.write('  Screenshotted the player Journal screen.\n');
-        } else if (page.isClosed?.() || isTransientPageTeardown(journalErr.message)) {
+        } else if (
+          shouldTolerateSmokeTeardown({
+            message: journalErr.message,
+            pageClosed: page.isClosed?.(),
+            requiredCapturesComplete: true,
+          })
+        ) {
           // Infra teardown (renderer/page closed) — do not fail the whole smoke on
           // a known-flaky last step; mark it skipped with the reason so a
-          // persistent pattern is still visible in summary.json.
+          // persistent pattern is still visible in summary.json. The Journal step
+          // is the last step, so its required captures are complete by definition.
+          // Routes through the same shouldTolerateSmokeTeardown helper and stamps
+          // the same exported TRANSIENT_TEARDOWN_SKIP_PREFIX as the D0 skip site,
+          // so both writers and the degraded matcher can never drift.
           results.steps.push({
             step: 'player-journal',
             passed: true,
             skipped: true,
-            error: `transient page teardown (skipped): ${journalErr.message}`,
+            error: TRANSIENT_TEARDOWN_SKIP_PREFIX + journalErr.message,
           });
           process.stderr.write(
             `Player Journal capture skipped after a transient page teardown: ${journalErr.message}\n`
@@ -7768,8 +11393,16 @@ async function main() {
       } catch (err) {
         results.steps.push({ step: 'craft-item-phase', passed: false, error: err.message });
         process.stderr.write(`Phase E failed: ${err.message}\n`);
-        await screenshot(page, 'craft-failure');
+        // Issue #807: wrap the failure screenshot (mirroring journal-failure). A
+        // gone-page screenshot would otherwise throw out of this catch into the
+        // Phase C catch and REVIVE the deleted create-crafting-system record.
+        try {
+          await screenshot(page, 'craft-failure');
+        } catch {
+          /* page may already be gone — a gone-page screenshot must not throw */
+        }
       }
+      } // end Phase E (else branch of the D0-teardown guard)
 
     } catch (err) {
       results.steps.push({ step: 'create-crafting-system', passed: false, error: err.message });
@@ -7901,9 +11534,17 @@ async function main() {
     // or did we merely capture noise?". Computed HERE in the finally block —
     // beside results.consoleErrors — not in the try, so an early phase abort
     // still populates them and a gate never reads undefined.
-    const { stepFailures, consoleErrorCount } = computeSmokeSignal(results);
+    const { stepFailures, consoleErrorCount, degraded } = computeSmokeSignal(results);
     results.stepFailures = stepFailures;
     results.consoleErrorCount = consoleErrorCount;
+    // Issue #807: a tolerated transient D0/Journal teardown marks the run DEGRADED
+    // (still exit 0, but distinguishable in summary.json); rendererCrashed carries
+    // the causation-bearing page 'crash' signal (coerced to a boolean here even
+    // when the listener never fired). Both ride in summary.json beside the other
+    // signals — see AGENTS.md for how to read them.
+    results.degraded = degraded;
+    results.rendererCrashed = Boolean(results.rendererCrashed);
+    results.screenshotRun = screenshotRunIdentity;
     results.waivedConsoleErrors = waivedConsoleErrors;
     await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
     results.bootTimings = bootTimings;
@@ -7938,6 +11579,13 @@ async function main() {
     await writeFile(
       join(RESULTS_DIR, 'summary.json'),
       JSON.stringify(results, null, 2)
+    );
+    await writeFile(
+      join(RESULTS_DIR, 'screenshot-manifest.json'),
+      JSON.stringify({
+        ...screenshotRunIdentity,
+        captures: screenshotManifestEntries,
+      }, null, 2)
     );
 
     // Write console log

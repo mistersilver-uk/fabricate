@@ -77,6 +77,13 @@ export default defineConfig(({ command }) => {
         external: [],
         output: {
           assetFileNames: 'assets/[name].[ext]',
+          // Keep dynamic import()s as real sibling chunks instead of inlining
+          // them back into main.js. Lib builds default this to true, which would
+          // fold the deferred GM crafting-system-manager subtree (issue #150)
+          // back into the eager entry. A stable chunkFileNames keeps the emitted
+          // chunk paths predictable for the build-output gate.
+          inlineDynamicImports: false,
+          chunkFileNames: 'chunks/[name]-[hash].js',
           // Drop developer-only console.log/debug/info calls from production
           // output by marking them pure so dead-code elimination removes them.
           // console.error and console.warn are retained for user-visible messages.

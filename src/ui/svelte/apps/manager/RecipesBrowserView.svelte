@@ -62,20 +62,25 @@
   // are reactive AND, when bound, propagate back to the root so the state persists.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  let lastSystemId = $state('');
-
   // Switching system resets the CATEGORY filter and the group/page position — a
   // recipe category names a vocabulary the new system does not share, so carrying it
   // over filters the new library down to nothing. Mirrors ComponentsBrowserView. The
   // status/lock filters are NOT reset: enabled and locked mean the same thing in every
   // system, so they are preferences like sort/page-size, not a stale vocabulary. The
   // search term is cleared by the store on selectSystem (it is shared state).
+  //
+  // The sentinel is `ui.systemId`, PERSISTED on the lifted browser state — NOT a
+  // component-local `$state`. A local sentinel re-initialised to '' on every mount, so
+  // returning from an editor (a remount with the system unchanged) was misread as a
+  // system switch and wiped the page/filters/collapse this object otherwise preserves
+  // (issue 806). The equality early-return means writing `ui.systemId` back inside the
+  // same effect does not loop — it mirrors the `model.pageIndex` sync effect below.
   $effect(() => {
-    if (selectedSystemId === lastSystemId) return;
+    if (selectedSystemId === ui.systemId) return;
     ui.categoryFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
-    lastSystemId = selectedSystemId;
+    ui.systemId = selectedSystemId;
   });
 
   // The blocked-enable flash. Enabling is GATED (an incomplete recipe is refused),

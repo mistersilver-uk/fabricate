@@ -207,6 +207,7 @@
           {stageAnnouncement}
           {onReorderStage}
           {onReorderStageSettled}
+          steps={selectedRecipe?.steps ?? []}
         />
       </section>
 

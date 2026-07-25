@@ -30,6 +30,8 @@
   // the real entry point — tests that feed a body directly would miss the gap.
   let {
     item = null,
+    activeSystem = null,
+    onSelectSystem = () => {},
     onOpenRecipe = null,
     onLearn = null,
     onLearnAll = null,
@@ -59,6 +61,8 @@
 {:else}
   <InventoryComponentDetail
     {item}
+    {activeSystem}
+    {onSelectSystem}
     {onOpenRecipe}
     {salvaging}
     {salvageResult}

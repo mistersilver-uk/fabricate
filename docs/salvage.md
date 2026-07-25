@@ -34,7 +34,11 @@ It is set at the system level.
 The salvage resolution mode is set on the system's **Salvage resolution mode** card in the Crafting Admin panel.
 The card offers Simple, Progressive, and Routed by check, with Simple selected by default.
 A salvaged component has a single ingredient, so it cannot route by ingredient set, which is why ingredient-set routing (and Alchemy) is not offered here.
-Changing the mode is not destructive, but any component whose salvage setup is incompatible with the new mode has its salvage disabled until you reconfigure it.
+Changing the mode is not destructive to recipes or runs, but any component whose salvage setup is incompatible with the new mode has its salvage disabled until you reconfigure it.
+
+Simple mode awards a single result group.
+When you switch a system into Simple mode, any component that has more than one result group is trimmed back to its first.
+Fabricate warns you by name when this happens, listing every component it trimmed, so you always know which setups changed.
 
 You can also set the salvage resolution mode through the API.
 See the [CraftingSystemManager API]({% link api/system-manager.md %}).
@@ -73,6 +77,10 @@ Removing a component's last result group turns salvage back off for that compone
 This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
 
+When the system's salvage resolution mode is Simple, a component uses a single result group.
+In Simple mode the panel shows the hint **Simple mode uses a single result group**, so it is clear why only one is allowed; once you have added the one group, the **Add group** control is hidden.
+Routed and Progressive modes keep the full list, where each result group maps to an outcome or a stage.
+
 {: .note }
 > **Existing components show this toggle turned off, and that is correct.**
 > Before this toggle existed, per-component salvage was already stored and already enforced, but nothing in the interface could turn it on.
@@ -109,6 +117,27 @@ An item that cannot be salvaged shows no tab bar at all.
 Salvage happens inline in the inspector, so nothing opens in a separate window.
 Cards in the grid carry a recycle badge in their top-left corner when the component is salvageable, so players can see what can be broken down without opening each item.
 
+### Items in More Than One System
+
+A component can belong to more than one crafting system at once.
+When it does, the Inventory tab shows it as a single card rather than one card per system.
+Its quantity is counted once, so the grid reflects what the character actually holds.
+The card's recycle and tool markers cover every system the item takes part in, so a marker shows when the item can be salvaged or used as a tool in any of them.
+
+Selecting such an item adds a **System** drop-down to the top of the inspector, above the **Info** and **Salvage** tabs.
+The system in use is the selected option, and each option names the system followed by whether the item can be salvaged in that system and whether it acts as a tool there.
+A drop-down is used so the control stays compact however many systems the item belongs to.
+Picking a system re-scopes the whole inspector to that system's view of the item.
+The name, image, essences, tags, where it is used, and the Salvage tab all follow the selected system.
+This matters when two systems describe the same physical item differently, such as one giving it an essence and another a tag.
+
+Salvage always acts on the system you have selected, never a default one.
+When the item belongs to more than one system, the Salvage tab names the system it is about to act in.
+Breaking the item down acts only in the selected system, and the grid shows the true remaining quantity once the tab reloads.
+
+An item that belongs to only one system is unchanged.
+It shows no **System** drop-down and behaves exactly as before.
+
 ### What the Salvage Tab Shows
 
 The tab opens with a short banner naming the rule the component follows, then lists what the player stands to recover.
@@ -123,6 +152,7 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
 | Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
+| Simple, with a component left holding more than one result group | **Salvage isn't ready**, with a line saying the component has more than one result group and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single group and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra groups and clears the cue. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -132,6 +162,24 @@ Progressive salvage is different again.
 The progressive salvage check itself has no DC, because its roll is a budget spent down the stage list rather than a pass-or-fail against a target.
 Each component still carries its own progressive DC, and that DC is shown on its stage beside the reach value.
 See [Relative and fixed tiers]({% link crafting-checks.md %}#relative-and-fixed-tiers).
+
+### Required Tools
+
+Some components need a tool in hand before they can be broken down.
+When a component requires one, the Salvage tab lists it under a **Required tools** heading before any roll is made.
+Each required tool shows its name and image alongside a marker reading **Available** or **Unavailable**, so the player knows what they need before the attempt.
+
+Availability is judged against the character doing the salvaging, not the party as a whole.
+A tool that only another party member is carrying still reads **Unavailable**, because this character cannot reach it during the salvage.
+A tool the salvaging character holds but which is broken also reads **Unavailable**, because a broken tool cannot be used.
+
+While any required tool reads **Unavailable**, the **Salvage** button stays disabled.
+The footer then carries a note explaining that a required tool is missing, in place of the footer's usual one-shot reminder.
+Bringing the tool onto the salvaging character clears the block and makes the button usable.
+
+This is separate from salvaging a broken tool, covered in [Broken Tools](#broken-tools).
+There, the broken tool is itself the thing being recycled.
+Here, a working tool is a prerequisite for recycling something else.
 
 ### Making the Attempt
 

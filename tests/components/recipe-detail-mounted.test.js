@@ -8,7 +8,7 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { recipe, craftability } from '../helpers/crafting-fixtures.js';
+import { recipe, craftability, multiStepRecipe } from '../helpers/crafting-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -173,6 +173,61 @@ describe('RecipeDetail mounted behavior', () => {
     const shortPip = short.querySelector('.crafting-io-pip');
     assert.equal(shortPip.textContent.trim(), '1/3', 'short pip shows have/need');
     assert.ok(shortPip.classList.contains('is-insufficient'), 'short pip is red');
+  });
+
+  it('renders authored essence glyphs with fallback while preserving ordinary images', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ modeToken: 'simple', modeLabel: 'Simple' }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [
+          {
+            componentId: null,
+            name: 'Restorative essence',
+            img: null,
+            icon: 'fa-solid fa-heart',
+            isEssence: true,
+            description: '2x Restorative essence',
+            need: 2,
+            have: 1,
+            satisfied: false,
+          },
+          {
+            componentId: 'c1',
+            name: 'Iron',
+            img: 'icons/iron.webp',
+            description: '1x Iron',
+            need: 1,
+            have: 1,
+            satisfied: true,
+          },
+        ],
+        essenceStates: [
+          { type: 'aether', name: 'Aether', icon: 'fa-regular fa-star', need: 1, have: 1, satisfied: true },
+          { type: 'void', name: 'Void', icon: 'not-a-font-awesome-icon', need: 1, have: 0, satisfied: false },
+        ],
+      }),
+    });
+
+    const tiles = target.querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    const essenceThumb = tiles[0].querySelector('.crafting-essence-thumb');
+    assert.ok(essenceThumb, 'first-class essence uses a glyph thumb');
+    assert.match(essenceThumb.getAttribute('style'), /48px/, 'detail glyph keeps 48px geometry');
+    assert.equal(essenceThumb.getAttribute('aria-hidden'), 'true');
+    assert.ok(essenceThumb.querySelector('i').classList.contains('fa-heart'));
+    assert.equal(tiles[0].querySelector('img'), null, 'essence does not render an image');
+    assert.equal(tiles[0].querySelector('.crafting-io-pip').textContent.trim(), '1/2');
+    assert.equal(tiles[1].querySelector('.crafting-thumb img').getAttribute('src'), 'icons/iron.webp');
+
+    const legacyIcons = target.querySelectorAll(
+      '[data-io-group="essences"] .crafting-io-essence-icon'
+    );
+    assert.ok(legacyIcons[0].classList.contains('far'), 'legacy icon prefix is normalized');
+    assert.ok(legacyIcons[0].classList.contains('fa-star'), 'authored legacy glyph renders');
+    assert.ok(legacyIcons[1].classList.contains('fa-mortar-pestle'), 'unusable legacy icon falls back');
+    assert.match(target.querySelector('[data-io-group="essences"]').textContent, /Aether/);
+    assert.match(target.querySelector('[data-io-group="essences"]').textContent, /Void/);
   });
 
   it('shows the tool image to the left of the tool name', async () => {
@@ -495,6 +550,171 @@ describe('RecipeDetail mounted behavior', () => {
       target.querySelector('[data-crafting-craft]'),
       null,
       'no craft button on a teaser'
+    );
+  });
+
+  it('renders an explicit multi-step simple recipe as per-step blocks + one terminal produces', async () => {
+    const fixture = multiStepRecipe();
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: fixture.steps
+    });
+
+    // The multi-step hint strip renders at the top of the step list.
+    assert.ok(
+      target.querySelector('[data-recipe-section="steps-hint"]'),
+      'multi-step hint strip rendered'
+    );
+
+    // One ordered list item per step, each carrying its own materials (INPUTS only).
+    const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
+    assert.equal(steps.length, 2, 'both step blocks rendered as list items');
+    assert.equal(
+      steps[0].querySelector('[data-recipe-step-label]').textContent.replace(/\s+/g, ' ').trim(),
+      '1 Cut 30 min',
+      'first step shows its ordinal, label, and duration'
+    );
+    assert.equal(
+      steps[1].querySelector('[data-recipe-step-duration]').textContent.replace(/\s+/g, ' ').trim(),
+      '1 hr',
+      'second step shows its distinct authored duration'
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-duration]').textContent.replace(/\s+/g, ' ').trim(),
+      'Total duration: 1 hr 30 min',
+      'the header visibly identifies the aggregate duration once'
+    );
+
+    // Step 1 lists BOTH of its required materials.
+    const stepOneTiles = steps[0].querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    assert.equal(stepOneTiles.length, 2, 'step 1 shows both required materials');
+    // Step 2 lists its single material.
+    const stepTwoTiles = steps[1].querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    assert.equal(stepTwoTiles.length, 1, 'step 2 shows its material');
+
+    // No per-step Output group leaks into a step block (inputs only).
+    assert.equal(
+      steps[0].querySelector('[data-io-group="outputs"]'),
+      null,
+      'step blocks render no per-step output'
+    );
+
+    // Exactly ONE emphasized terminal PRODUCES row — the final product (Tent).
+    const outputs = target.querySelectorAll('[data-io-group="outputs"] [data-io-output]');
+    assert.equal(outputs.length, 1, 'a single terminal produces row');
+    assert.equal(
+      outputs[0].querySelector('.crafting-io-output-name').textContent.trim(),
+      'Tent',
+      'produces the final product, not a step intermediate'
+    );
+
+    // A disabled, formula-less check surfaces no check card.
+    assert.equal(
+      target.querySelector('[data-recipe-section="check"]'),
+      null,
+      'no crafting-check card when the check is off'
+    );
+  });
+
+  it('falls back to a single IoTable when steps is empty (single-step parity)', async () => {
+    // The multi-step body is gated on steps.length > 1. With an empty steps prop the
+    // model renders unchanged: one IoTable, no ordered step list. This documents the
+    // single-step parity path the multi-step branch must not regress.
+    const fixture = multiStepRecipe({ steps: [] });
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: []
+    });
+    assert.equal(
+      target.querySelector('[data-recipe-section="steps"]'),
+      null,
+      'no ordered step list when steps is empty'
+    );
+    assert.ok(target.querySelector('[data-recipe-section="io"]'), 'the single IoTable renders');
+  });
+
+  it('shows the authored craft duration chip before crafting for a timed recipe', async () => {
+    // Issue 846: a player choosing a timed recipe must see how long it takes BEFORE
+    // starting the craft, not only as a countdown once it is underway. The chip reads
+    // the recipe's dedicated authored duration and formats it with the shared
+    // compact formatter the manager uses.
+    const timed = recipe({
+      duration: { minutes: 30, hours: 2, days: 0, months: 0, years: 0 },
+    });
+    const target = await harness.mount({
+      recipe: timed,
+      selectedSetId: timed.defaultSetId,
+      craftability: timed.ingredientSets[0].craftability,
+    });
+
+    const chip = target.querySelector(
+      '.crafting-detail-header-meta [data-recipe-duration]'
+    );
+    assert.ok(chip, 'the pre-craft duration chip renders for a timed recipe');
+    // Largest-unit-first compact formatting (mirrors the manager Overview).
+    assert.equal(chip.textContent.replace(/\s+/g, ' ').trim(), 'Duration: 2 hr 30 min');
+  });
+
+  it('shows no duration chip for an instant (zero-duration) recipe', async () => {
+    // The default fixture has result.time === null (instant). An instant craft must not
+    // show a misleading "0 min" — the chip is omitted entirely.
+    const instant = recipe();
+    const target = await harness.mount({
+      recipe: instant,
+      selectedSetId: instant.defaultSetId,
+      craftability: instant.ingredientSets[0].craftability,
+    });
+
+    assert.equal(
+      target.querySelector('[data-recipe-duration]'),
+      null,
+      'no duration chip on an instant recipe'
+    );
+  });
+
+  it('does not leak the craft duration on a redacted (discovery) teaser', async () => {
+    // A timed recipe that is still undiscovered must not reveal its timing — the chip
+    // is suppressed alongside the mode chip on a teaser.
+    const teaser = recipe({
+      redaction: { redacted: true, hiddenFields: ['ingredients', 'results', 'description'] },
+      browseStatus: 'discovery',
+      duration: { minutes: 0, hours: 4, days: 0, months: 0, years: 0 },
+    });
+    const target = await harness.mount({
+      recipe: teaser,
+      selectedSetId: null,
+      craftability: null,
+    });
+
+    assert.ok(target.querySelector('[data-recipe-teaser]'), 'teaser hint rendered');
+    assert.equal(
+      target.querySelector('[data-recipe-duration]'),
+      null,
+      'no duration chip leaks on a discovery teaser'
+    );
+  });
+
+  it('omits a zero-duration step chip from a mixed timed and instant sequence', async () => {
+    const fixture = multiStepRecipe();
+    fixture.steps[1].duration = null;
+    fixture.duration = { minutes: 30, hours: 0, days: 0, months: 0, years: 0 };
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: fixture.steps,
+    });
+
+    const stepChips = target.querySelectorAll('[data-recipe-step-duration]');
+    assert.equal(stepChips.length, 1, 'only the timed step renders a duration chip');
+    assert.equal(stepChips[0].textContent.replace(/\s+/g, ' ').trim(), '30 min');
+    assert.equal(
+      target.querySelector('[data-recipe-duration]').textContent.replace(/\s+/g, ' ').trim(),
+      'Total duration: 30 min'
     );
   });
 

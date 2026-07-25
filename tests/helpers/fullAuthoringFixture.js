@@ -364,6 +364,12 @@ function slice(fixture) {
  * provenance fields that legitimately change between exports (`exportedAt`,
  * `fabricateVersion`) so two exports of the same authoring data compare equal.
  *
+ * Also strips per-recipe `importSource` (issue 775): import stamps durable
+ * provenance (a stable `systemId` + a volatile `importedAt`) onto every recipe it
+ * writes, so the second (post-import) export legitimately carries it while the
+ * first (authored) export does not. It is import-stamped provenance, not authoring
+ * data, so it is normalized out of the round-trip comparison.
+ *
  * @param {object} payload
  * @returns {object} a clone without volatile fields
  */
@@ -371,5 +377,8 @@ export function normalizeExportEnvelope(payload) {
   const clone = structuredClone(payload);
   delete clone.exportedAt;
   delete clone.fabricateVersion;
+  for (const recipe of Array.isArray(clone.recipes) ? clone.recipes : []) {
+    if (recipe && typeof recipe === 'object') delete recipe.importSource;
+  }
   return clone;
 }

@@ -77,7 +77,7 @@ A check is only "usable" when its resolution-mode sub-object carries an authored
 |:----------------|:-----------|:------------|
 | `simple` | `system.craftingCheck.simple` | `simple.rollFormula` is set |
 | `routedByCheck` | `system.craftingCheck.routed` | `routed.rollFormula` is set |
-| `routedByIngredients` | `system.craftingCheck.routed` | `routed.rollFormula` is set (the check is optional and does not select the result) |
+| `routedByIngredients` | `system.craftingCheck.simple` | `simple.rollFormula` is set (the check is optional and does not select the result) |
 | `progressive` | `system.craftingCheck.progressive` | `progressive.rollFormula` is set |
 | `alchemy`, `checkMode: 'none'` | — | never (a matched brew always succeeds) |
 | `alchemy`, `checkMode: 'simple'` | `system.craftingCheck.simple` | mandatory (`simple.rollFormula` must be set) |
@@ -103,6 +103,41 @@ When `simple.dcMode` is `"dynamic"`, the engine runs the macro at `system.crafti
 If the macro is absent or throws, the engine falls back to the static DC.
 This dynamic-DC macro is the only macro the crafting check still uses, and it only computes the DC.
 It never resolves the check outcome itself.
+
+Create a Script Macro and use its command as the following example.
+
+```javascript
+console.log('Fabricate Dynamic DC inputs', {
+  recipe: scope.recipe,
+  craftingSystem: scope.craftingSystem,
+  craftingActor: scope.craftingActor,
+  candidateIngredientSet: scope.candidateIngredientSet,
+});
+
+return scope.candidateIngredientSet ? 17 : 15;
+```
+
+Use `scope` as the recommended payload identifier.
+`scope.recipe` is serialized recipe data.
+`scope.craftingSystem` is the normalized crafting system object.
+`scope.craftingActor` is the crafting `Actor`.
+`scope.candidateIngredientSet` is the selected ingredient set, or `null` when no set is selected.
+
+Fabricate also provides `context` and `args` as aliases of the identical object.
+The aliases have object identity, so `scope === context && context === args` is `true`.
+This is not full native `Macro#execute` behavior.
+Native Foundry macro execution uses a rest copy for its `scope` and adds its own `speaker`, `actor`, `token`, and `character` locals.
+Fabricate provides none of those native locals.
+
+Fabricate evaluates `Number(result)` on the return value.
+When that number is finite, Fabricate truncates it to an integer and uses it as the DC.
+An absent Macro, a thrown error, or a non-finite result falls back to the configured static DC.
+
+Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available to the Macro.
+Fabricate directly evaluates the Script Macro command instead of calling native `Macro#execute`.
+This avoids the current player's Macro document permission gate for a GM-configured Macro during a player-initiated craft.
+The bypass adds no server or document authority.
+The script still runs as the current player.
 
 ### Effect Transfer Gating
 

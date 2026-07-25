@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 
 let idSeq = 0;
 const settingsStore = new Map();
+// Records the key of every game.settings.set call so a test can pin the number of
+// `recipes` world-setting writes a mutation issues (the #776 batch invariant).
+const settingsSetKeys = [];
 const notifications = [];
 
 globalThis.foundry = {
@@ -19,6 +22,7 @@ globalThis.game = {
   settings: {
     get: (_namespace, key) => settingsStore.get(key),
     set: async (_namespace, key, value) => {
+      settingsSetKeys.push(key);
       settingsStore.set(key, value);
       return value;
     }
@@ -68,6 +72,7 @@ describe('RecipeManager notification controls', () => {
   beforeEach(() => {
     notifications.length = 0;
     settingsStore.clear();
+    settingsSetKeys.length = 0;
   });
 
   it('notifies for direct recipe create, update, and delete by default', async () => {
@@ -155,6 +160,75 @@ describe('RecipeManager notification controls', () => {
     assert.equal(cleanupCalls, 1, 'default deleteRecipe still runs _cleanupFlagsAfterRecipeMutation');
   });
 
+  it('#775 Q3: updateRecipe retains a stored importSource when the GM edit omits it', async () => {
+    const manager = makeManager();
+    await manager.createRecipe(
+      makeRecipeData({ id: 'prov-recipe', name: 'Provenanced', importSource: { systemId: 'pack-A', importedAt: 111 } }),
+      { notify: false }
+    );
+    assert.deepEqual(
+      manager.getRecipe('prov-recipe').importSource,
+      { systemId: 'pack-A', importedAt: 111 },
+      'the stamped provenance persists through create'
+    );
+
+    // A GM edit that omits importSource must inherit the stored value via the
+    // `{ ...recipe.toJSON(), ...updates }` merge — so an edited imported recipe stays
+    // provenance-matched (and remains auto-prunable, the documented D1 semantics).
+    await manager.updateRecipe('prov-recipe', { name: 'GM Edited' }, { notify: false });
+    const edited = manager.getRecipe('prov-recipe');
+    assert.equal(edited.name, 'GM Edited');
+    assert.deepEqual(
+      edited.importSource,
+      { systemId: 'pack-A', importedAt: 111 },
+      'provenance survives a GM edit that never mentions importSource'
+    );
+  });
+
+  it('#775 Q7: deleteRecipe persist:false mutates the map without a recipes write; default persists once', async () => {
+    const manager = makeManager();
+    await manager.createRecipe(makeRecipeData({ id: 'del-defer', name: 'Deferred Delete' }), {
+      notify: false,
+      emitChange: false
+    });
+    await manager.createRecipe(makeRecipeData({ id: 'del-write', name: 'Written Delete' }), {
+      notify: false,
+      emitChange: false
+    });
+    settingsSetKeys.length = 0; // reset the write counter after the two seed creates
+
+    await manager.deleteRecipe('del-defer', {
+      notify: false,
+      emitChange: false,
+      persist: false,
+      cleanupFlags: false
+    });
+    assert.equal(manager.getRecipe('del-defer'), null, 'persist:false still removes the recipe from the map');
+    assert.equal(
+      settingsSetKeys.filter(key => key === 'recipes').length,
+      0,
+      'a persist:false delete issues no recipes write (folds into the batch save)'
+    );
+
+    await manager.deleteRecipe('del-write', { notify: false, emitChange: false });
+    assert.equal(manager.getRecipe('del-write'), null);
+    assert.equal(
+      settingsSetKeys.filter(key => key === 'recipes').length,
+      1,
+      'a default delete issues exactly one recipes write (persist defaults to true)'
+    );
+  });
+
+  it('#775: cleanupOrphanedRecipeFlags delegates to the single bulk _cleanupFlagsAfterRecipeMutation pass', async () => {
+    const manager = makeManager();
+    let calls = 0;
+    manager._cleanupFlagsAfterRecipeMutation = async () => {
+      calls += 1;
+    };
+    await manager.cleanupOrphanedRecipeFlags();
+    assert.equal(calls, 1, 'the public wrapper runs exactly one bulk cleanup pass');
+  });
+
   it('importRecipes emits one aggregate notification and returns counts', async () => {
     const manager = makeManager();
     manager.recipes.set('existing-recipe', new Recipe(makeRecipeData({ id: 'existing-recipe', name: 'Existing' })));
@@ -232,6 +306,67 @@ describe('RecipeManager notification controls', () => {
       notifications.filter(entry => entry.level === 'warn').length,
       0,
       'no aggregated conflict report when there are no conflicts'
+    );
+  });
+
+  it('persist:false mutates the in-memory map but issues no recipes world write', async () => {
+    const manager = makeManager();
+
+    await manager.createRecipe(
+      makeRecipeData({ id: 'no-write-create', name: 'Deferred Create' }),
+      { notify: false, emitChange: false, persist: false }
+    );
+    assert.equal(
+      manager.getRecipe('no-write-create')?.name,
+      'Deferred Create',
+      'the map holds the created recipe even though nothing was persisted'
+    );
+    assert.equal(
+      settingsSetKeys.filter(key => key === 'recipes').length,
+      0,
+      'a persist:false create issues no recipes write'
+    );
+
+    await manager.updateRecipe(
+      'no-write-create',
+      { name: 'Deferred Update' },
+      { notify: false, emitChange: false, persist: false }
+    );
+    assert.equal(
+      manager.getRecipe('no-write-create')?.name,
+      'Deferred Update',
+      'the map reflects the update'
+    );
+    assert.equal(
+      settingsSetKeys.filter(key => key === 'recipes').length,
+      0,
+      'a persist:false update still issues no recipes write'
+    );
+  });
+
+  it('persist defaults to true: a plain create and update each issue exactly one recipes write', async () => {
+    const manager = makeManager();
+
+    // Backward-compat pin: flipping the default to false would drop these writes.
+    await manager.createRecipe(makeRecipeData({ id: 'write-create', name: 'Written' }), {
+      notify: false,
+      emitChange: false
+    });
+    assert.equal(
+      settingsSetKeys.filter(key => key === 'recipes').length,
+      1,
+      'a default create issues exactly one recipes write'
+    );
+
+    await manager.updateRecipe(
+      'write-create',
+      { name: 'Rewritten' },
+      { notify: false, emitChange: false }
+    );
+    assert.equal(
+      settingsSetKeys.filter(key => key === 'recipes').length,
+      2,
+      'a default update issues one more recipes write'
     );
   });
 });

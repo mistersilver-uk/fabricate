@@ -17,6 +17,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import CraftingEssenceThumb from '../CraftingEssenceThumb.svelte';
   import CraftingThumb from '../CraftingThumb.svelte';
   import QuantityTag from '../QuantityTag.svelte';
 
@@ -92,7 +93,11 @@
               onkeydown={(event) =>
                 onRadioKeydown(event, (value) => commitOption(choice, value), values, choice.selectedOptionIndex)}
             >
-              <CraftingThumb src={option.img} alt="" size={40} />
+              {#if option.isEssence}
+                <CraftingEssenceThumb icon={option.icon} size={40} />
+              {:else}
+                <CraftingThumb src={option.img} alt="" size={40} />
+              {/if}
               <span class="crafting-alt-name">{option.name}</span>
               {#if option.isCurrency}
                 <QuantityTag

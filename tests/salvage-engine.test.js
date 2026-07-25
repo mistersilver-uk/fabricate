@@ -375,6 +375,55 @@ test('salvage() returns failure when required tool item is missing', async () =>
   assert.match(result.message, /tool/i);
 });
 
+test('salvage() cannot consume and use the same physical Item as a Tool', async () => {
+  const engine = makeEngine();
+  const sharedItem = makeItem('shared-component', 'Test Component', 1);
+  const actor = makeActor('actor-1', [sharedItem]);
+  const tool = makeFakeTool('shared-component');
+  const component = makeComponent({ name: 'Test Component', toolIds: [tool.id] });
+  const system = makeSystem({ components: [component], tools: [tool] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /tool/i);
+  assert.equal(sharedItem.deleteCalled, false, 'validation blocks before consuming the shared Item');
+  assert.equal(sharedItem.updateCalled, false, 'validation blocks before mutating the shared Item');
+});
+
+test('salvage() can consume one copy and use a distinct physical copy as a Tool', async () => {
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} }),
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+  engine._runSalvageCraftingCheck = async () => ({
+    success: true,
+    outcome: null,
+    value: null,
+    data: {},
+  });
+
+  const consumedCopy = makeItem('consumed-copy', 'Test Component', 1);
+  const toolCopy = makeItem('tool-copy', 'Test Component', 1);
+  const actor = makeActor('actor-1', [consumedCopy, toolCopy]);
+  const tool = makeFakeTool('tool-copy');
+  const component = makeComponent({
+    name: 'Test Component',
+    toolIds: [tool.id],
+    resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }],
+  });
+  const system = makeSystem({ components: [component], tools: [tool] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true);
+  assert.equal(consumedCopy.deleteCalled, true);
+  assert.equal(toolCopy.deleteCalled, false);
+});
+
 test('salvage() passes checks when actor has enough items and tools present', async () => {
   const fakeResolutionService = {
     validateSalvage: () => ({ valid: true, errors: [] }),

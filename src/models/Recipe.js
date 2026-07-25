@@ -1,3 +1,4 @@
+import { ingredientSetToolsAreActive } from '../systems/toolCheckBonus.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
@@ -93,6 +94,13 @@ export class Recipe {
       typeof data.minSuccessOutcomeId === 'string' && data.minSuccessOutcomeId.trim()
         ? data.minSuccessOutcomeId.trim()
         : null;
+    // Optional per-recipe crafting-check modifier override (issue 770). Absent → the
+    // recipe inherits the system's default policy + default eligible modifier ids.
+    // Present → overrides the policy and/or the eligible id subset resolved into the
+    // `@craftingmod` formula placeholder. Unknown catalogue ids are dropped at
+    // resolution time (the resolver validates against the system catalogue), so this
+    // normalizer only shape-guards; a malformed value becomes null (inherit).
+    this.craftingModifier = this._normalizeCraftingModifier(data.craftingModifier);
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
 
@@ -103,6 +111,65 @@ export class Recipe {
       author: game?.user?.name || 'Unknown',
       version: '1.0.0',
     };
+
+    // Durable settings-payload provenance stamped by the compendium importer (NOT a
+    // Foundry flag): identifies the source pack so a later reinstall can prune the
+    // recipes the pack dropped WITHOUT touching GM-authored recipes. Normalized to
+    // object-or-`null` — a malformed value (a string, or a partial object missing a
+    // `systemId`) becomes `null` — so a hand-authored recipe round-trips as `null` and
+    // the never-prune guard for GM-authored recipes is a structural absence enforced
+    // here at the normalizer, not at a UI control.
+    this.importSource = this._normalizeImportSource(data.importSource);
+  }
+
+  /**
+   * Normalize the optional per-recipe crafting-check modifier override (issue 770) to
+   * `{ policy?, modifierIds? } | null`. A non-object, or an object that carries neither
+   * a known policy nor a non-empty `modifierIds` array, normalizes to `null` (inherit
+   * the system default). `policy` keeps only the three known values (`addAll`,
+   * `highest`, `byRecipe`); an unknown/absent policy is dropped. `modifierIds` keeps
+   * only non-empty string ids, de-duplicated in order; catalogue membership is NOT
+   * checked here (the resolver drops unknown ids against the live system catalogue).
+   * @param {unknown} craftingModifier
+   * @returns {{ policy?: string, modifierIds?: string[] } | null}
+   * @private
+   */
+  _normalizeCraftingModifier(craftingModifier) {
+    if (!craftingModifier || typeof craftingModifier !== 'object') return null;
+    const validPolicies = ['addAll', 'highest', 'byRecipe'];
+    const policy = validPolicies.includes(craftingModifier.policy) ? craftingModifier.policy : null;
+    const seen = new Set();
+    const modifierIds = (
+      Array.isArray(craftingModifier.modifierIds) ? craftingModifier.modifierIds : []
+    ).filter((id) => {
+      if (typeof id !== 'string' || id.trim() === '' || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    // Neither a policy override nor an id subset → nothing to override, so inherit.
+    if (!policy && modifierIds.length === 0) return null;
+    const normalized = {};
+    if (policy) normalized.policy = policy;
+    if (modifierIds.length > 0) normalized.modifierIds = modifierIds;
+    return normalized;
+  }
+
+  /**
+   * Normalize durable import provenance to `{ systemId, importedAt } | null`. Any
+   * malformed value — a non-object, or an object missing a non-empty string
+   * `systemId` — normalizes to `null`, so the never-prune guard for a GM-authored
+   * recipe is the structural absence of provenance. `importedAt` coerces to a finite
+   * number (0 when absent/invalid).
+   * @param {unknown} importSource
+   * @returns {{ systemId: string, importedAt: number } | null}
+   * @private
+   */
+  _normalizeImportSource(importSource) {
+    if (!importSource || typeof importSource !== 'object') return null;
+    const systemId = typeof importSource.systemId === 'string' ? importSource.systemId.trim() : '';
+    if (!systemId) return null;
+    const importedAt = Number(importSource.importedAt);
+    return { systemId, importedAt: Number.isFinite(importedAt) ? importedAt : 0 };
   }
 
   /**
@@ -119,9 +186,10 @@ export class Recipe {
 
   /**
    * Check if this is a simple recipe (no advanced features)
+   * @param {object|null} [craftingSystem]
    * @returns {boolean}
    */
-  isSimpleRecipe() {
+  isSimpleRecipe(craftingSystem = null) {
     // Single ingredient set with exact item matching (no tags)
     const firstSet = this.ingredientSets[0];
     const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
@@ -145,7 +213,10 @@ export class Recipe {
 
     const hasNoTools =
       (this.toolIds?.length || 0) === 0 &&
-      this.ingredientSets.every((set) => (set.toolIds?.length || 0) === 0);
+      this.ingredientSets.every(
+        (set) =>
+          !ingredientSetToolsAreActive(craftingSystem, set) || (set.toolIds?.length || 0) === 0
+      );
     const hasNoVariableOutput = !this.isVariable;
     const hasNoEffectTransfer = !this.transferEffects;
 
@@ -489,9 +560,11 @@ export class Recipe {
       resultSelection: this.resultSelection,
       checkTierId: this.checkTierId,
       minSuccessOutcomeId: this.minSuccessOutcomeId,
+      craftingModifier: this.craftingModifier,
       currencyCost: this.currencyCost,
       teaser: this.teaser,
       metadata: this.metadata,
+      importSource: this.importSource,
     };
   }
 

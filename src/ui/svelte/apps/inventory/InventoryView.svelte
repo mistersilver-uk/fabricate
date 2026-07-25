@@ -56,8 +56,15 @@
   function onLearnAll(recipeIds) {
     return store?.learnAll?.(recipeIds);
   }
+  // The acting participation of the selected card (issue 766): the store resolves it from
+  // the selected system, defaulting to the primary. The whole detail body scopes to it.
+  const activeSystem = $derived(store?.selectedParticipation ?? null);
+  function onSelectSystem(systemId) {
+    store?.selectSystem?.(systemId);
+  }
   function onSalvage() {
-    return store?.salvage?.(store?.selectedItem?.componentId ?? null);
+    // Route salvage through the SELECTED participation's ids, never the primary default.
+    return store?.salvage?.(activeSystem?.systemId ?? null, activeSystem?.componentId ?? null);
   }
   function onResetSalvage() {
     store?.resetSalvage?.();
@@ -79,11 +86,13 @@
     // the run on a successful flush.
     return store?.flushSalvageOrder?.();
   }
-  // The salvage panel only ever sees the outcome of the component it belongs to: the
-  // store holds the salvaged row selected while its ribbon is up, but the row's own
-  // identity is still the gate.
+  // The salvage panel only ever sees the outcome of the participation it belongs to (issue
+  // 766): the result is keyed by the acting `(systemId, componentId)`, so the gate compares
+  // on the SELECTED participation — a system-B outcome must not surface under a system-A view.
   const salvageResult = $derived(
-    store?.salvageResult && store.salvageResult.componentId === store?.selectedItem?.componentId
+    store?.salvageResult &&
+      store.salvageResult.systemId === activeSystem?.systemId &&
+      store.salvageResult.componentId === activeSystem?.componentId
       ? store.salvageResult
       : null
   );
@@ -169,6 +178,8 @@
       <section class="inventory-view-column inventory-view-column-right" data-inventory-detail>
         <InventoryDetail
           item={store?.selectedItem ?? null}
+          {activeSystem}
+          {onSelectSystem}
           learningRecipeId={store?.learningRecipeId ?? null}
           salvaging={store?.salvagingKey != null}
           {salvageResult}

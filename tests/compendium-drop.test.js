@@ -1217,6 +1217,39 @@ test('refreshComponentMetadataForUpdatedItem — updates component description f
   assert.equal(saveCount, 1);
 });
 
+test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description, not just normalizes it (issue 800)', async () => {
+  // Item-sync is the second of exactly two triggers that refresh a stored description.
+  // Without resolution here, editing a source item would re-propagate raw directive
+  // text over a description the GM had already repaired — undoing the backfill one
+  // edit at a time. Placed beside the propagation assertion above deliberately.
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-supplies',
+      name: 'Supplies',
+      img: 'icons/supplies.webp',
+      description: 'Component Pouch',
+      registeredItemUuid: 'Item.supplies'
+    }]
+  }]);
+  mgr.save = async () => {};
+  mgr._enrichToHtml = async (raw) =>
+    raw.replaceAll('@UUID[Item.pouch]', '<a class="content-link">Component Pouch</a>');
+  const raw = 'Includes @UUID[Item.pouch] and a mortar.';
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    { uuid: 'Item.supplies', system: { description: { value: raw } } },
+    { 'system.description.value': raw }
+  );
+
+  assert.equal(result.updated, 1);
+  assert.equal(
+    mgr.getSystem('sys1').components[0].description,
+    'Includes Component Pouch and a mortar.'
+  );
+});
+
 test('refreshComponentMetadataForUpdatedItem — clears component description for canonical source UUID match', async () => {
   const mgr = buildManager([{
     id: 'sys1',

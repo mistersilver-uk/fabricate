@@ -19,6 +19,26 @@
  * total. Essences the player has access to (carried inside owned components) are
  * projected as their own synthetic rows in addition to being listed on each
  * component's detail.
+ *
+ * ONE CARD PER UNIFIED PHYSICAL STACK (issue 766). A physical document can back a
+ * component in several crafting systems at once; rather than render one card per system
+ * (double-counting the same stack), the component projection is AGGREGATE-THEN-COLLAPSE:
+ *
+ *   1. Each system contributes per-component PARTICIPATIONS — today's within-system
+ *      aggregation of every owned document/source actor for that component — each carrying
+ *      its own affordances (salvage/used-by/produced-by/essences/tool) and the SET of
+ *      contributing-document identities (`item.uuid` alone; never a compendium/duplicate
+ *      source union, which is shared across distinct documents and would undercount).
+ *   2. Participations whose document-identity sets INTERSECT collapse into one card (the
+ *      same physical stack participating in >1 system, or a divergent-roles join).
+ *   3. `totalQuantity`/`sources` are computed over the UNION of the card's contributing
+ *      documents deduped by identity (a document in two systems counts ONCE) and summed
+ *      per source actor.
+ *
+ * The card carries a per-system `systems[]` participation array so the inspector can scope
+ * its whole body to a selected participation; display name/img come from the primary
+ * participation's component; `broken` is a singular physical property of the document(s).
+ * Essence rows and recipe-item book rows are NOT collapsed — they remain per-system.
  */
 
 import { getFabricateFlag } from '../config/flags.js';
@@ -26,7 +46,11 @@ import { getFabricateFlag } from '../config/flags.js';
 // AUTHORITATIVE presence-gate disqualifier, and a second copy of its tolerant
 // flag-shape handling would drift from the gate this projection has to agree with.
 // The module is deliberately import-free, so this adds no transitive edge.
-import { isToolBroken } from '../gatheringToolRuntime.js';
+import {
+  isToolBroken,
+  matchGatheringTools,
+  classifyGatheringToolStates,
+} from '../gatheringToolRuntime.js';
 // Dispatch each ingredient option's `match` through the registry so tag matchers
 // (and any future matcher type) expand to the component ids they consume, instead
 // of the builder re-reading `match.componentId` and missing every non-direct type.
@@ -43,6 +67,7 @@ import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -85,6 +110,29 @@ function finiteOrNull(value) {
 function itemStackQuantity(item) {
   const raw = Number(item?.system?.quantity);
   return Number.isFinite(raw) && raw > 0 ? raw : 1;
+}
+
+/**
+ * The per-document identity token used to de-duplicate and cross-system-join owned
+ * documents (issue 766). It is `item.uuid` ALONE — never a `getItemSourceReferences`
+ * union: `_stats.compendiumSource` and the transitive `_stats.duplicateSource` are
+ * shared across DISTINCT physical documents (Foundry stamps a fresh `duplicateSource`
+ * on every drag-to-actor), so keying on them would merge two genuinely-owned stacks and
+ * UNDERcount real holdings. `getItemIdentityReferences` is the codebase's own precedent
+ * for excluding `duplicateSource` from identity; `uuid` is the only per-document-unique
+ * reference.
+ *
+ * When a fixture (or a legacy document) carries no `uuid`, the object reference itself is
+ * returned so each such document is treated as per-object-distinct — two uuid-less
+ * documents never collapse, preserving today's multi-document aggregation for objects
+ * that legitimately differ.
+ *
+ * @param {object|null} item
+ * @returns {string|object} the uuid string, or the item object itself when absent.
+ */
+function documentIdentity(item) {
+  const uuid = typeof item?.uuid === 'string' ? item.uuid.trim() : '';
+  return uuid.length > 0 ? uuid : item;
 }
 
 /**
@@ -194,19 +242,35 @@ export class InventoryListingBuilder {
       knowledgeSources,
     });
 
-    const rows = [];
+    // Stable, crafting-actor-first source ordering shared by every card's cross-system
+    // quantity union: participations span systems but always the same source actors.
+    const orderedSourceIds = sources.map(actorKey);
+
+    // Cross-system component projection is AGGREGATE-THEN-COLLAPSE (issue 766). Each
+    // system contributes per-component PARTICIPATIONS (today's within-system aggregation
+    // of multiple documents/actors), then participations whose contributing-document sets
+    // intersect collapse into ONE card per unified physical stack — quantity counted once.
+    // Essence rows (synthetic per-system aggregates) and recipe-item book rows are NOT
+    // collapsed and remain per-system.
+    const participations = [];
+    const essenceRows = [];
+    const recipeItemRows = [];
     const systems = this.craftingSystemManager?.getSystems?.() ?? [];
-    for (const system of Array.isArray(systems) ? systems : []) {
-      rows.push(
-        ...this._buildSystemRows(system, sources, allowedRecipeIds, isGM),
+    const systemList = Array.isArray(systems) ? systems : [];
+    for (const [order, system] of systemList.entries()) {
+      const built = this._buildSystemParticipations(system, sources, allowedRecipeIds, isGM, order);
+      participations.push(...built.participations);
+      essenceRows.push(...built.essenceRows);
+      recipeItemRows.push(
         ...this._buildRecipeItemRows(system, sources, craftingActor, allowedRecipeIds)
       );
     }
 
+    const componentRows = this._collapseParticipationsToCards(participations, orderedSourceIds);
+
+    const rows = [...componentRows, ...essenceRows, ...recipeItemRows];
     rows.sort((left, right) => stringOrEmpty(left?.name).localeCompare(stringOrEmpty(right?.name)));
 
-    const recipeItemCount = rows.filter((row) => row.isRecipeItem === true).length;
-    const essenceCount = rows.filter((row) => row.isEssenceSource === true).length;
     return {
       selectedActorId: actorKey(craftingActor),
       actor: craftingActor ?? null,
@@ -214,9 +278,9 @@ export class InventoryListingBuilder {
       worldTime: Number(this._nowWorldTime() || 0),
       rows,
       counts: {
-        components: rows.length - essenceCount - recipeItemCount,
-        essences: essenceCount,
-        recipeItems: recipeItemCount,
+        components: componentRows.length,
+        essences: essenceRows.length,
+        recipeItems: recipeItemRows.length,
         total: rows.length,
       },
     };
@@ -257,32 +321,47 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * Project one crafting system's owned components (+ essence rows) for the given
-   * source actors. Returns [] when nothing in this system is owned — the used-by
-   * index is only built for systems that produced at least one owned row.
+   * Project one crafting system's owned components into per-component PARTICIPATIONS
+   * (issue 766) plus its per-system essence rows. A participation is today's
+   * within-system aggregate of one component across every owned document and source
+   * actor, carrying the per-participation affordances (salvage/used-by/produced-by/
+   * essences/tool) AND the contributing-document set the cross-system collapse joins on.
+   * Returns empty arrays when nothing in this system is owned.
+   *
+   * @param {object} system The owning crafting system.
+   * @param {object[]} sources Source actors (crafting actor first).
+   * @param {Set<string>|null} allowedRecipeIds Teaser-redaction allowlist, or null.
+   * @param {boolean} isGM Whether the viewer is a GM.
+   * @param {number} order The system's index in `getSystems()` order (primary tie-break).
+   * @returns {{participations: object[], essenceRows: object[]}}
    * @private
    */
-  _buildSystemRows(system, sources, allowedRecipeIds = null, isGM = true) {
+  _buildSystemParticipations(system, sources, allowedRecipeIds = null, isGM = true, order = 0) {
     const components = Array.isArray(system?.components) ? system.components : [];
-    if (components.length === 0) return [];
+    if (components.length === 0) return { participations: [], essenceRows: [] };
 
     const owned = this._collectOwnedEntities(
       sources,
       (item) => findMatchingComponent(item, components, system?.id),
       'component'
     );
-    if (owned.size === 0) return [];
+    if (owned.size === 0) return { participations: [], essenceRows: [] };
 
     const context = this._systemRowContext({ system, sources, allowedRecipeIds, isGM, components });
 
-    const componentRows = [];
+    const participations = [];
     // essenceTotals: essenceId → Map<actorId, {name, img, qty}>
     const essenceTotals = new Map();
     // essenceContributors: essenceId → [{componentId, name, img, quantity}] — the
     // owned components that carry the essence and how much each contributes.
     const essenceContributors = new Map();
 
-    for (const { component, sources: sourceMap, item: representativeItem } of owned.values()) {
+    for (const {
+      component,
+      sources: sourceMap,
+      item: representativeItem,
+      documents,
+    } of owned.values()) {
       const rowSources = context.orderSources(sourceMap);
       const totalQuantity = rowSources.reduce((sum, source) => sum + source.quantity, 0);
       if (totalQuantity <= 0) continue;
@@ -290,14 +369,16 @@ export class InventoryListingBuilder {
       const rawEssences =
         component.essences && typeof component.essences === 'object' ? component.essences : {};
 
-      componentRows.push(
-        this._buildComponentRow({
+      participations.push(
+        this._buildComponentParticipation({
           component,
           representativeItem,
           rowSources,
           totalQuantity,
           rawEssences,
           context,
+          order,
+          documents,
         })
       );
 
@@ -318,7 +399,182 @@ export class InventoryListingBuilder {
     }
 
     const essenceRows = this._buildEssenceRows({ essenceTotals, essenceContributors, context });
-    return [...componentRows, ...essenceRows];
+    return { participations, essenceRows };
+  }
+
+  /**
+   * Collapse per-system component participations into one card per unified physical stack
+   * (issue 766): participations whose contributing-document identity sets intersect belong
+   * to one card. Distinct documents resolving to DIFFERENT components (disjoint sets) stay
+   * distinct cards; same-component documents across stacks/actors still aggregate.
+   * @private
+   */
+  _collapseParticipationsToCards(participations, orderedSourceIds) {
+    const groups = this._groupParticipationsByPhysicalStack(participations);
+    return groups.map((group) => this._buildCardFromParticipations(group, orderedSourceIds));
+  }
+
+  /**
+   * Union-find over participations, joining any two whose contributing-document sets share
+   * a document identity (`documentIdentity` — `item.uuid` alone, or a per-object token for
+   * uuid-less documents). The common case joins a single physical stack's participations in
+   * two systems; the divergent-roles case joins a system-A row of {doc1,doc2} with a
+   * system-B row of {doc1} because their sets intersect at doc1.
+   * @private
+   */
+  _groupParticipationsByPhysicalStack(participations) {
+    const parent = participations.map((_, index) => index);
+    const find = (start) => {
+      let root = start;
+      while (parent[root] !== root) root = parent[root];
+      return root;
+    };
+    const firstSeenAt = new Map();
+    for (const [index, participation] of participations.entries()) {
+      for (const docKey of participation.docKeys) {
+        const seen = firstSeenAt.get(docKey);
+        if (seen === undefined) {
+          firstSeenAt.set(docKey, index);
+        } else {
+          const rootA = find(index);
+          const rootB = find(seen);
+          if (rootA !== rootB) parent[rootA] = rootB;
+        }
+      }
+    }
+    const groups = new Map();
+    for (const [index, participation] of participations.entries()) {
+      const root = find(index);
+      const existing = groups.get(root);
+      if (existing) existing.push(participation);
+      else groups.set(root, [participation]);
+    }
+    return [...groups.values()];
+  }
+
+  /**
+   * Assemble one unified-stack card from its participations. `totalQuantity`/`sources` are
+   * computed over the UNION of contributing documents DEDUPED by identity (a document in
+   * two systems counts its stack quantity ONCE) and summed per source actor. Display
+   * name/img/description/tags/tier and the top-level salvage come from the PRIMARY
+   * participation; card at-a-glance badges are the deduped union across participations.
+   * `broken` is a singular physical property of the document(s).
+   * @private
+   */
+  _buildCardFromParticipations(group, orderedSourceIds) {
+    // Dedup contributing documents by identity, count each physical stack ONCE.
+    const cardDocs = new Map();
+    for (const participation of group) {
+      for (const doc of participation.documents) {
+        if (!cardDocs.has(doc.docKey)) cardDocs.set(doc.docKey, doc);
+      }
+    }
+    const byActor = new Map();
+    for (const doc of cardDocs.values()) {
+      this._addSourceQuantity(byActor, doc.actorId, doc.actorName, doc.actorImg, doc.quantity);
+    }
+    const sources = (Array.isArray(orderedSourceIds) ? orderedSourceIds : [])
+      .map((id) => byActor.get(id))
+      .filter((source) => source && source.qty > 0)
+      .map((source) => ({
+        actorId: source.actorId,
+        actorName: source.name,
+        actorImg: source.img,
+        quantity: source.qty,
+      }));
+    const totalQuantity = sources.reduce((sum, source) => sum + source.quantity, 0);
+
+    const primary = this._selectPrimaryParticipation(group);
+    return {
+      key: `${primary.systemId}:${primary.componentId}`,
+      componentId: primary.componentId,
+      systemId: primary.systemId,
+      systemName: primary.systemName,
+      name: primary.name,
+      img: primary.img,
+      icon: null,
+      description: primary.description,
+      tags: primary.tags,
+      tier: primary.tier,
+      isEssenceSource: false,
+      // Union at-a-glance signals: a tool anywhere reads as a tool; salvageable follows
+      // the (salvageable-biased) primary, so `salvage.enabled` is true iff any is.
+      isTool: group.some((participation) => participation.isTool === true),
+      // Singular physical property of the document(s), not per system.
+      broken: group.some((participation) => participation.broken === true),
+      salvage: primary.salvage,
+      totalQuantity,
+      sources,
+      // Essence pips are the union deduped by essence id (the card keys pips on `id`).
+      essences: this._unionParticipationEssences(group),
+      usedBy: primary.usedBy,
+      requiredFor: primary.requiredFor,
+      producedBy: primary.producedBy,
+      contributors: [],
+      // Per-system participations, each carrying its own affordances for the detail's
+      // system selector to scope the whole body to.
+      systems: group.map((participation) => this._participationEntry(participation)),
+    };
+  }
+
+  /**
+   * The deterministic primary participation: a SALVAGEABLE one first (so clicking the
+   * union recycle badge never opens a primary with no Salvage tab), then `getSystems()`
+   * order (stable Map insertion order — no flicker), then component name.
+   * @private
+   */
+  _selectPrimaryParticipation(group) {
+    return [...group].sort(
+      (left, right) =>
+        Number(right.isSalvageable === true) - Number(left.isSalvageable === true) ||
+        left.order - right.order ||
+        stringOrEmpty(left.name).localeCompare(stringOrEmpty(right.name))
+    )[0];
+  }
+
+  /**
+   * The card's essence pips: the union of every participation's essences, deduped by
+   * essence id (a raw union sharing an id would emit duplicate Svelte keys). Falls back to
+   * the single participation's list unchanged in the single-system case.
+   * @private
+   */
+  _unionParticipationEssences(group) {
+    const seen = new Set();
+    const out = [];
+    for (const participation of group) {
+      for (const essence of Array.isArray(participation.essences) ? participation.essences : []) {
+        if (essence?.id == null || seen.has(essence.id)) continue;
+        seen.add(essence.id);
+        out.push(essence);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Project a participation to its `systems[]` entry: the per-system facts the detail's
+   * system selector re-scopes the whole body to when the card participates in more than
+   * one system.
+   * @private
+   */
+  _participationEntry(participation) {
+    return {
+      systemId: participation.systemId,
+      systemName: participation.systemName,
+      componentId: participation.componentId,
+      name: participation.name,
+      img: participation.img,
+      description: participation.description,
+      tags: participation.tags,
+      tier: participation.tier,
+      isTool: participation.isTool,
+      salvage: participation.salvage,
+      ownedQuantity: participation.ownedQuantity,
+      essences: participation.essences,
+      usedBy: participation.usedBy,
+      requiredFor: participation.requiredFor,
+      producedBy: participation.producedBy,
+    };
   }
 
   /**
@@ -327,7 +583,10 @@ export class InventoryListingBuilder {
    * first. `match(item) => entity|null` adapts it to either the component matcher or the
    * recipe-item matcher; `entityKey` names the entity slot on each entry (`'component'`
    * or `'def'`). Each entry's `item` is the first matched document in source order — the
-   * representative document whose tool-usage / use-learn counters the row reports.
+   * representative document whose tool-usage / use-learn counters the row reports. Each
+   * entry also carries `documents[]` — every contributing document's identity token
+   * (`documentIdentity`), owning actor, and stack quantity — which the cross-system
+   * component collapse (issue 766) joins on and dedup-sums; recipe-item callers ignore it.
    * @private
    */
   _collectOwnedEntities(sources, match, entityKey) {
@@ -343,10 +602,19 @@ export class InventoryListingBuilder {
         const qty = itemStackQuantity(item);
         let entry = owned.get(entity.id);
         if (!entry) {
-          entry = { [entityKey]: entity, sources: new Map(), item };
+          entry = { [entityKey]: entity, sources: new Map(), item, documents: [] };
           owned.set(entity.id, entry);
         }
         this._addSourceQuantity(entry.sources, key, actorName, actorImg, qty);
+        // The contributing document, tracked for the cross-system collapse (issue 766):
+        // its identity token (uuid alone, else per-object), owning actor, and stack qty.
+        entry.documents.push({
+          docKey: documentIdentity(item),
+          actorId: key,
+          actorName,
+          actorImg,
+          quantity: qty,
+        });
       }
     }
     return owned;
@@ -420,6 +688,12 @@ export class InventoryListingBuilder {
     // which resolve each produced component id to a name/image/difficulty.
     const componentById = new Map(components.filter((entry) => entry?.id).map((c) => [c.id, c]));
 
+    // Source actor objects by id — the salvage projection scopes its required-tool
+    // availability to the TARGET salvage actor's items only (issue 777, the single actor
+    // the engine validates and the store salvages), NOT the party aggregate the crafting
+    // recipe surface uses.
+    const sourceActorsById = new Map(sources.map((actor) => [actorKey(actor), actor]));
+
     return {
       system,
       systemId,
@@ -434,23 +708,30 @@ export class InventoryListingBuilder {
       toolComponentIds,
       orderSources,
       componentById,
+      sourceActorsById,
     };
   }
 
   /**
-   * Build one owned-component inventory row. A component is "used by" a recipe when it
-   * is a direct ingredient/tool AND when the recipe requires an essence the component
-   * carries (e.g. Ham, which carries Bacon essence, is used by a recipe that needs
-   * Bacon essence) — deduped by recipe so a recipe that uses it both ways appears once.
+   * Build one owned-component PARTICIPATION (issue 766) — the per-system half of a card.
+   * A component is "used by" a recipe when it is a direct ingredient/tool AND when the
+   * recipe requires an essence the component carries (e.g. Ham, which carries Bacon
+   * essence, is used by a recipe that needs Bacon essence) — deduped by recipe so a
+   * recipe that uses it both ways appears once. Carries its own contributing-document set
+   * (for the collapse join and the per-participation salvage scoping) plus the `order`
+   * primary tie-break; `totalQuantity`/`sources`/`key`/`broken` are resolved at card level
+   * over the union of participations.
    * @private
    */
-  _buildComponentRow({
+  _buildComponentParticipation({
     component,
     representativeItem,
     rowSources,
     totalQuantity,
     rawEssences,
     context,
+    order,
+    documents,
   }) {
     const {
       system,
@@ -465,6 +746,7 @@ export class InventoryListingBuilder {
       componentProducedBy,
       componentById,
       hiddenEntityIds,
+      sourceActorsById,
     } = context;
 
     const directUsedBy = componentUsedBy.get(component.id) ?? [];
@@ -472,38 +754,48 @@ export class InventoryListingBuilder {
       ? this._mergeEssenceUsedBy(directUsedBy, rawEssences, essenceUsedBy)
       : directUsedBy;
 
+    // The player-facing salvage contract, or null when not salvageable. Scoped to THIS
+    // participation's own documents: `targetActorId` is the first owning actor among its
+    // `rowSources`, never the card union.
+    const salvage = this._buildSalvage({
+      system,
+      component,
+      componentById,
+      rowSources,
+      hiddenEntityIds,
+      sourceActorsById,
+    });
+
+    const docs = Array.isArray(documents) ? documents : [];
     return {
-      key: `${systemId}:${component.id}`,
-      componentId: stringOrNull(component.id),
+      order,
       systemId,
       systemName,
+      componentId: stringOrNull(component.id),
       name: stringOrEmpty(component.name),
       img: stringOrNull(component.img),
-      icon: null,
       description: stringOrEmpty(component.description),
       tags: Array.isArray(component.tags) ? component.tags.map(stringOrEmpty) : [],
       tier: component.tier ?? null,
-      isEssenceSource: false,
       isTool: toolComponentIds.has(component.id),
-      // A derived, read-only runtime verdict (issue 675). It drives the card overlay,
-      // the "Broken" pip and the inspector banner — and it does NOT gate salvage.
-      broken: this._isToolBroken(system, component.id, representativeItem),
-      // The player-facing salvage contract, or null when not salvageable. Component
-      // rows only: essence and recipe-item rows are never salvageable.
-      salvage: this._buildSalvage({
-        system,
-        component,
-        componentById,
-        rowSources,
-        hiddenEntityIds,
-      }),
-      totalQuantity,
-      sources: rowSources,
+      salvage,
+      isSalvageable: salvage?.enabled === true,
+      // The participation's OWN owned quantity (its documents only, not the card union) —
+      // the salvage surface's depleted/"None remaining"/disabled-action basis, since a
+      // divergent-roles participation cannot consume documents it does not back.
+      ownedQuantity: totalQuantity,
       essences: essencesEnabled ? this._componentEssences(rawEssences, essenceDefById) : [],
       usedBy,
       requiredFor: componentRequiredFor.get(component.id) ?? [],
       producedBy: componentProducedBy.get(component.id) ?? [],
-      contributors: [],
+      // A derived, read-only runtime verdict (issue 675) OR-ed at card level into the
+      // singular top-level `broken`. It drives the card overlay/pip/banner — and it does
+      // NOT gate salvage.
+      broken: this._isToolBroken(system, component.id, representativeItem),
+      // The contributing documents this participation aggregates (its own uuid set for the
+      // collapse join, and its per-actor stack quantities for the card's dedup union).
+      documents: docs,
+      docKeys: new Set(docs.map((doc) => doc.docKey)),
     };
   }
 
@@ -869,6 +1161,8 @@ export class InventoryListingBuilder {
    * @param {object} args.component  The component definition.
    * @param {Map<string, object>} args.componentById  System components by id.
    * @param {Array<{actorId: string|null}>} args.rowSources  Owned sources, crafting-actor first.
+   * @param {Map<string, object>} [args.sourceActorsById]  Source actor objects by id, for
+   *   scoping required-tool availability to the target salvage actor (issue 777).
    * @returns {object|null}
    * @private
    */
@@ -878,6 +1172,7 @@ export class InventoryListingBuilder {
     componentById,
     rowSources,
     hiddenEntityIds = NO_HIDDEN_ENTITIES,
+    sourceActorsById = null,
   }) {
     const salvage = component?.salvage ?? null;
     if (system?.features?.salvage !== true || salvage?.enabled !== true) return null;
@@ -899,18 +1194,54 @@ export class InventoryListingBuilder {
     // two usability states, and the body dispatches on the PAIR (mode, checkUsable).
     const rollFormula = typeof config?.rollFormula === 'string' ? config.rollFormula.trim() : '';
     const checkUsable = rollFormula.length > 0;
+    // Simple mode admits exactly one SUCCESS group (issue 764). A stored-but-not-yet-
+    // re-normalized legacy config with more than one success group is misconfigured: the
+    // engine awards `slice(0, 1)`, so the surplus is silently ignored. The GM sees this
+    // cue on the GM inventory path (the non-GM path hard-hides via `hiddenEntityIds`),
+    // and the config self-heals on the next system save.
+    const salvageGroups = Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : [];
+    const successGroupCount = salvageGroups.filter((group) => group?.role !== 'failure').length;
+    const simpleMultiGroup = mode === 'simple' && successGroupCount > 1;
     // Routed and progressive REQUIRE a formula to produce an outcome; without one the
     // engine aborts with `{ success: false, misconfigured: true }` and zero mutation. So
     // there are no tiers or stages to show — only a GM-config state.
-    const misconfigured = (mode === 'routed' || mode === 'progressive') && !checkUsable;
+    const routedNoFormula = mode === 'routed' && !checkUsable;
+    const progressiveNoFormula = mode === 'progressive' && !checkUsable;
+    const misconfigured = simpleMultiGroup || routedNoFormula || progressiveNoFormula;
+    // A DISCRIMINATOR, not a binary mode dispatch (issue 764): the body renders
+    // mode-specific copy, so a Simple misconfig must not fall through to the routed copy.
+    let misconfiguredReason = null;
+    if (simpleMultiGroup) misconfiguredReason = 'simpleMultiGroup';
+    else if (routedNoFormula) misconfiguredReason = 'routedNoFormula';
+    else if (progressiveNoFormula) misconfiguredReason = 'progressiveNoFormula';
     const routedType = mode === 'routed' ? (config?.type === 'fixed' ? 'fixed' : 'relative') : null;
+
+    // Required-tool disclosure (issue 777): resolve `salvage.toolIds` to library Tools and
+    // classify their availability against the TARGET salvage actor's items only — the same
+    // single actor `CraftingEngine.salvageComponent` validates and the store salvages
+    // (`rowSources[0]`), NOT the party aggregate the crafting recipe surface uses. When the
+    // target actor cannot be resolved, every tool reads unavailable (an empty item bag).
+    const targetActorId = rowSources[0]?.actorId ?? null;
+    const targetActor = sourceActorsById?.get?.(targetActorId) ?? null;
+    const toolStates = this._salvageToolStates({
+      system,
+      salvage,
+      componentById,
+      targetActor,
+    });
+    const toolsAvailable = toolStates.every((tool) => tool.available === true);
 
     return {
       enabled: true,
       mode,
       checkUsable,
       misconfigured,
+      misconfiguredReason,
       routedType,
+      // Required tools + a derived convenience so the panel disables its action without
+      // re-deriving tool matching (issue 777).
+      toolStates,
+      toolsAvailable,
       // simple / routed+relative: the base DC, per-component override applied.
       // routed+FIXED and progressive: null — there is no DC to show. A fixed outcome
       // matches on an absolute [start, end] segment of the roll range and `checkRoll`
@@ -943,8 +1274,82 @@ export class InventoryListingBuilder {
           : null,
       // Decision 8: the first OWNED actor holding it. Every listed source is already
       // owned (non-owned actors are filtered out before the listing is built).
-      targetActorId: rowSources[0]?.actorId ?? null,
+      targetActorId,
     };
+  }
+
+  /**
+   * Project a salvage component's required tools into per-tool availability states for
+   * the player salvage panel (issue 777), mirroring the crafting `toolStates` DATA shape
+   * (`RecipeManager._buildToolStates`) and additionally carrying an explicit `componentId`
+   * for stable keying. Resolution of `salvage.toolIds` mirrors
+   * `CraftingEngine._resolveSalvageTools` (dedupe, skip unknown ids), and availability is
+   * classified with the SAME shared matchers the crafting surface uses
+   * (`matchGatheringTools` + `classifyGatheringToolStates`), scoped to the target salvage
+   * actor's items only (Decision 3) with `presentTools: null` (the salvage path never
+   * injects canvas present-tools — parity with `salvageComponent`).
+   *
+   * A present-but-broken tool yields `{ available: false, needsRepair: true }`. The
+   * display name prefers the tool's user-authored `label`, then its display snapshot
+   * `name`, then the linked component's name, then the id (Decision 4); `img` prefers the
+   * tool's snapshot then the linked component's image.
+   *
+   * @param {object} args
+   * @param {object} args.system  The owning crafting system.
+   * @param {object} args.salvage  The component's salvage config.
+   * @param {Map<string, object>} args.componentById  System components by id.
+   * @param {object|null} args.targetActor  The actor whose items scope availability, or
+   *   null when unresolvable (every tool reads unavailable).
+   * @returns {Array<{componentId: string|null, name: string, img: string|null, available: boolean, needsRepair: boolean, virtual?: boolean}>}
+   * @private
+   */
+  _salvageToolStates({ system, salvage, componentById, targetActor }) {
+    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
+    if (ids.length === 0) return [];
+    const library = Array.isArray(system?.tools) ? system.tools : [];
+    const seen = new Set();
+    const tools = [];
+    for (const rawId of ids) {
+      const id = String(rawId ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const tool = library.find((entry) => entry?.id === id);
+      if (tool) tools.push(tool);
+    }
+    if (tools.length === 0) return [];
+
+    const systemId = stringOrNull(system?.id);
+    const matchArgs = {
+      // A null target actor yields an empty item bag, so every tool reads unavailable —
+      // the defensive "cannot resolve the salvage actor" case (Decision 3).
+      actor: { items: targetActor?.items ?? [] },
+      system: { id: systemId },
+      task: { id: null, craftingSystemId: systemId },
+      tools,
+      craftingSystemManager: { recipeManager: this.recipeManager },
+      presentTools: null,
+    };
+    const matchedByTool = new Map(
+      matchGatheringTools(matchArgs).items.map((entry) => [entry.tool, entry])
+    );
+    const stateByTool = new Map(
+      classifyGatheringToolStates(matchArgs).map((entry) => [entry.tool, entry.state])
+    );
+
+    return tools.map((tool) => {
+      const componentId = tool?.componentId ?? null;
+      const linked = componentId ? componentById.get(componentId) : null;
+      const entry = matchedByTool.get(tool) ?? null;
+      const state = {
+        componentId,
+        name: stringOrEmpty(tool?.label || tool?.name || linked?.name || componentId || tool?.id),
+        img: stringOrNull(tool?.img || linked?.img),
+        available: entry !== null,
+        needsRepair: stateByTool.get(tool) === 'damaged',
+      };
+      if (entry?.virtual === true) state.virtual = true;
+      return state;
+    });
   }
 
   /**
@@ -1483,17 +1888,30 @@ export class InventoryListingBuilder {
       addRequiredFor,
       seen,
     };
-    for (const set of Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []) {
-      this._indexIngredientSet(set, setCtx);
+    const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    const executionScopes = steps.length > 0 ? steps : [recipe];
+    for (const scope of executionScopes) {
+      for (const set of Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : []) {
+        this._indexIngredientSet(set, setCtx);
+      }
     }
-    for (const toolId of Array.isArray(recipe?.toolIds) ? recipe.toolIds : []) {
-      const componentId = toolComponentById.get(toolId);
-      if (componentId) addRequiredFor(componentId, recipeSourceKey, recipeSourceValue);
+    this._indexRecipeTools(recipe?.toolIds, setCtx);
+    for (const step of steps) {
+      this._indexRecipeTools(step?.toolIds, setCtx);
     }
 
     // Produced-by (recipe): every output result component id.
     for (const componentId of this._recipeResultComponentIds(recipe)) {
       addProduced(componentId, recipeSourceKey, recipeSourceValue);
+    }
+  }
+
+  _indexRecipeTools(toolIds, ctx) {
+    for (const toolId of Array.isArray(toolIds) ? toolIds : []) {
+      const componentId = ctx.toolComponentById.get(toolId);
+      if (componentId) {
+        ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+      }
     }
   }
 
@@ -1522,9 +1940,13 @@ export class InventoryListingBuilder {
     for (const group of Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []) {
       this._indexIngredientOptions(group, ctx);
     }
-    for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
-      const componentId = ctx.toolComponentById.get(toolId);
-      if (componentId) ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+    if (ingredientSetToolsAreActive(ctx.system, set)) {
+      for (const toolId of Array.isArray(set?.toolIds) ? set.toolIds : []) {
+        const componentId = ctx.toolComponentById.get(toolId);
+        if (componentId) {
+          ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
+        }
+      }
     }
     for (const [essenceId, quantity] of Object.entries(set?.essences ?? {})) {
       if (Number(quantity) > 0) {

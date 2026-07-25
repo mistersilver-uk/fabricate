@@ -12,6 +12,7 @@ import {
 import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { deflateSync } from 'node:zlib';
 
 import {
   buildScreenshotMarkdown,
@@ -22,13 +23,51 @@ import {
   hasScreenshotEvidence,
   hasUiChanges,
   isExemptByLabel,
+  loadChangedFiles,
+  main,
   mapChangedFilesToViews,
   publishScreenshotEvidence,
   readLabelList,
+  resolveDefaultBase,
+  sanitizeLabel,
+  smokeLabelsForChangedFiles,
   upsertScreenshotsBlock,
   VIEW_RECIPES,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
+
+// A `resolveDefaultBase`-shaped git runner: `rev-parse --verify --quiet <ref>` returns
+// status 0 only for a ref in `verifiable`, else status 1. Shared so the fallback-order
+// and no-base tests do not each re-spell a spawnSync-shaped stub (Sonar duplication).
+function gitVerifyStub(verifiable) {
+  const set = new Set(verifiable);
+  const calls = [];
+  const run = (args) => {
+    const ref = args[args.length - 1];
+    calls.push(ref);
+    return { status: set.has(ref) ? 0 : 1, stdout: '', stderr: '' };
+  };
+  run.calls = calls;
+  return run;
+}
+
+// Capture console.log output produced while `fn()` runs, restoring the real console
+// afterwards. Used to assert the plan path's "No UI changes detected." line without a
+// subprocess.
+async function captureLog(fn) {
+  const lines = [];
+  const realLog = console.log;
+  const realError = console.error;
+  console.log = (...args) => lines.push(args.join(' '));
+  console.error = () => {};
+  try {
+    await fn();
+  } finally {
+    console.log = realLog;
+    console.error = realError;
+  }
+  return lines;
+}
 
 // Run `runAssert(root)` against a temp dir seeded with `test-results/<name>`
 // fixtures, cleaning up afterwards. Module-scope so the per-test collect setup is
@@ -47,7 +86,129 @@ function withScreenshotFixtures(fixtures, runAssert) {
   }
 }
 
+const TOOL_STUDIO_VIEWS = [
+  ['01-library-1280x720', 'manager-tool-parity-01-library-1280x720', 1212, 682],
+  ['zero-state-empty-library-1280x720', 'manager-tool-zero-state-empty-library-1280x720', 1212, 682],
+  ['02-overview-1280x720', 'manager-tool-parity-02-overview-1280x720', 1212, 682],
+  ['03-breakage-1280x720', 'manager-tool-parity-03-breakage-1280x720', 1212, 682],
+  ['04-requirements-1280x720', 'manager-tool-parity-04-requirements-1280x720', 1212, 682],
+  ['05-validation-1280x720', 'manager-tool-parity-05-validation-1280x720', 1212, 682],
+  ['06-breakage-900x700', 'manager-tool-parity-06-breakage-900x700', 832, 662],
+  ['stress-long-name', 'manager-tool-stress-long-name', 1212, 682],
+  ['stress-repair', 'manager-tool-stress-repair', 1212, 682],
+  ['stress-replacement', 'manager-tool-stress-replacement', 1212, 682],
+  ['stress-immune', 'manager-tool-stress-immune', 1212, 682],
+  ['stress-invalid-validation', 'manager-tool-stress-invalid-validation', 1212, 682],
+  ['stress-wrapping-680', 'manager-tool-stress-wrapping-680', 680, 700],
+];
+
+const PNG_FIXTURES = new Map();
+
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const typeBytes = Buffer.from(type, 'ascii');
+  const chunk = Buffer.alloc(12 + data.length);
+  chunk.writeUInt32BE(data.length, 0);
+  typeBytes.copy(chunk, 4);
+  data.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])), 8 + data.length);
+  return chunk;
+}
+
+function minimalPng(width, height) {
+  const key = `${width}x${height}`;
+  if (PNG_FIXTURES.has(key)) return PNG_FIXTURES.get(key);
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  const image = Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(Buffer.alloc((width + 1) * height))),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+  PNG_FIXTURES.set(key, image);
+  return image;
+}
+
+function toolStudioEvidenceFixtures({
+  runId = 'tool-run-1',
+  headSha = 'abc1234',
+  targetLabels = TOOL_STUDIO_VIEWS.map(([, label]) => label),
+  summaryPatch = {},
+  capturePatch = () => ({}),
+} = {}) {
+  const captures = TOOL_STUDIO_VIEWS.map(([, label, width, height], index) => ({
+    label,
+    file: `screenshot-${String(index + 1).padStart(2, '0')}-${label}.png`,
+    width,
+    height,
+    ...capturePatch({ label, index }),
+  }));
+  return {
+    ...Object.fromEntries(captures.map(({ file, width, height }) => [file, minimalPng(width, height)])),
+    'summary.json': JSON.stringify({
+      passed: true,
+      stepFailures: 0,
+      consoleErrorCount: 0,
+      degraded: false,
+      rendererCrashed: false,
+      screenshotRun: { runId, headSha, targetLabels },
+      ...summaryPatch,
+    }),
+    'screenshot-manifest.json': JSON.stringify({ runId, headSha, targetLabels, captures }),
+  };
+}
+
 describe('UI PR screenshot evidence', () => {
+  const toolStudioFiles = [
+    'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
+    'src/ui/svelte/apps/manager/ToolEditView.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
+    'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
+  ];
+
+  it('maps every changed Tool Studio UI file to parity, zero-state, and separate stress evidence', () => {
+    for (const file of toolStudioFiles) {
+      const toolViews = mapChangedFilesToViews([file]).filter((view) =>
+        TOOL_STUDIO_VIEWS.some(([id]) => id === view.id)
+      );
+      assert.deepEqual(toolViews.map((view) => view.id), TOOL_STUDIO_VIEWS.map(([id]) => id), file);
+      assert.deepEqual(
+        toolViews.map((view) => view.smokeLabels),
+        TOOL_STUDIO_VIEWS.map(([, label]) => [label]),
+        file,
+      );
+    }
+  });
+
+  it('maps recipe Tool authoring files only to the existing Tools-tab frame', () => {
+    for (const file of [
+      'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
+    ]) {
+      const views = mapChangedFilesToViews([file]);
+      assert.deepEqual(views.map((view) => view.id), ['manager-recipe-edit-tools'], file);
+    }
+  });
   it('detects UI changes with the same path rules as CI', () => {
     assert.equal(hasUiChanges(['src/ui/svelte/apps/FabricateAppRoot.svelte']), true);
     assert.equal(hasUiChanges(['styles/fabricate.css']), true);
@@ -63,6 +224,102 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views.map(view => view.id), ['manager-environments']);
     assert.ok(views[0].smokeLabels.includes('manager-environments-browse-normal'));
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
+  });
+
+  it('maps the issue-767 system-details dirty frame to its own view id', () => {
+    // The SystemEditView (chip) republishes BOTH the clean settings frames and the
+    // dedicated dirty frame; CraftingSystemManagerRoot (the guard + lifted draft)
+    // republishes only the dirty frame.
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-system-edit-dirty'], ['manager-system-edit-dirty']);
+
+    const editViewIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/SystemEditView.svelte',
+    ]).map(view => view.id);
+    assert.ok(editViewIds.includes('manager-system-edit'));
+    assert.ok(editViewIds.includes('manager-system-edit-dirty'));
+    assert.ok(editViewIds.includes('manager-system-edit-lists'));
+
+    const rootIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    ]).map(view => view.id);
+    assert.ok(rootIds.includes('manager-system-edit-dirty'));
+    assert.ok(!rootIds.includes('manager-system-edit'));
+  });
+
+  it('maps a system/ settings-list child card to the system-edit frame (issue 768)', () => {
+    // The list-ergonomics work touches CharacterPrerequisitesCard, which renders
+    // INSIDE the system-edit frame. A change to any `system/` card must map to
+    // `manager-system-edit` rather than falling through to the generic UI frame.
+    const cardIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
+    ]).map(view => view.id);
+    assert.ok(cardIds.includes('manager-system-edit'));
+  });
+
+  it('maps the issue-800 description frames to their OWN view ids', () => {
+    // Three dedicated ids, each with exactly one smokeLabel. Appending them to
+    // `manager-components` would be silently useless: `collect` publishes only
+    // `candidates[0]` from a filename-sorted list, so the BEFORE/AFTER pair that
+    // constitutes the evidence would never both reach the PR.
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    for (const id of [
+      'manager-components-description-before',
+      'manager-components-description-repaired',
+      'manager-components-description-ingested',
+    ]) {
+      assert.deepEqual(byId[id], [id], `${id} must be its own single-frame view`);
+    }
+
+    // The normalizer republishes all three; the repair module republishes only the
+    // repaired frame.
+    const normalizerIds = mapChangedFilesToViews([
+      'src/utils/plainTextDescription.js',
+    ]).map(view => view.id);
+    assert.ok(normalizerIds.includes('manager-components-description-before'));
+    assert.ok(normalizerIds.includes('manager-components-description-repaired'));
+    assert.ok(normalizerIds.includes('manager-components-description-ingested'));
+
+    const repairIds = mapChangedFilesToViews([
+      'src/config/repairItemData.js',
+    ]).map(view => view.id);
+    assert.deepEqual(repairIds, ['manager-components-description-repaired']);
+  });
+
+  it('maps the issue-801 grouped-continuation frames to their OWN view ids', () => {
+    // Two dedicated ids, one published frame each (`collect` emits only `candidates[0]`).
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    for (const id of [
+      'manager-recipes-grouped-continuation',
+      'manager-components-grouped-continuation',
+      // Issue 806: the editor round-trip frame is also its own single-frame view.
+      'manager-recipes-editor-roundtrip',
+    ]) {
+      assert.deepEqual(byId[id], [id], `${id} must be its own single-frame view`);
+    }
+
+    // Phase 1 is model-only for recipes: recipeBrowserModel.js is the SOLE changed file
+    // that maps a frame to the recipes browser, so it MUST resolve to the continuation id.
+    const recipeModelIds = mapChangedFilesToViews([
+      'src/utils/recipeBrowserModel.js',
+    ]).map(view => view.id);
+    assert.ok(recipeModelIds.includes('manager-recipes-grouped-continuation'));
+    // Issue 806: the state factory now also maps to the editor round-trip frame.
+    assert.ok(recipeModelIds.includes('manager-recipes-editor-roundtrip'));
+
+    // The component model change maps to both the ordinary browser frame and the
+    // dedicated continuation frame.
+    const componentModelIds = mapChangedFilesToViews([
+      'src/utils/componentBrowserModel.js',
+    ]).map(view => view.id);
+    assert.ok(componentModelIds.includes('manager-components'));
+    assert.ok(componentModelIds.includes('manager-components-grouped-continuation'));
+
+    // The components view file also republishes the continuation frame.
+    const componentViewIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
+    ]).map(view => view.id);
+    assert.ok(componentViewIds.includes('manager-components-grouped-continuation'));
   });
 
   it('maps player gathering app files to the player-gathering recipes (incl. the realm-lock frame)', () => {
@@ -110,6 +367,9 @@ describe('UI PR screenshot evidence', () => {
         'player-crafting-progressive-reordered',
         'player-crafting-progressive-fixed',
         'player-crafting-progressive-stacked',
+        // The explicit multi-step simple recipe detail (issue 765) — its own view so the
+        // step-aware projection reaches the PR as a distinct frame.
+        'player-crafting-multistep',
       ]
     );
     assert.deepEqual(views[0].smokeLabels, [
@@ -131,6 +391,30 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[3].smokeLabels, ['player-crafting-progressive-reordered']);
     assert.deepEqual(views[4].smokeLabels, ['player-crafting-progressive-fixed']);
     assert.deepEqual(views[5].smokeLabels, ['player-crafting-progressive-stacked']);
+    assert.deepEqual(views[6].smokeLabels, ['player-crafting-multistep']);
+  });
+
+  it('maps all four player crafting essence icon states to dedicated evidence views', () => {
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
+    ]);
+    const ids = views.map((view) => view.id);
+    for (const id of [
+      'player-crafting-essence-legacy',
+      'player-crafting-essence-ingredient',
+      'player-crafting-essence-alternative',
+      'player-crafting-essence-shopping',
+    ]) {
+      assert.ok(ids.includes(id), `${id} is collected for the shared essence thumb`);
+      const view = views.find((candidate) => candidate.id === id);
+      assert.deepEqual(view.smokeLabels, [id]);
+      assert.match(harness, new RegExp(`screenshot\\(page, '${id}'\\)`));
+    }
+    assert.match(harness, /icon: 'fas fa-star-of-life'/);
+    assert.match(harness, /name: 'Smoke Legacy Essence Seal'/);
+    assert.match(harness, /name: 'Smoke First-Class Essence Draught'/);
+    assert.match(harness, /type: 'essence', essenceId: 'smoke-star-essence'/);
   });
 
   it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {
@@ -228,6 +512,80 @@ describe('UI PR screenshot evidence', () => {
     );
   });
 
+  // Issue 764: the two demonstration frames — the Simple-mode editor cap and the GM
+  // misconfigured inventory cue — each their own recipe (one file per id) so `collect`
+  // publishes both, mapped narrowly to a source THIS PR changed.
+  it('maps the issue-764 demonstration frames to their changed sources', () => {
+    const editorViews = mapChangedFilesToViews(['src/ui/svelte/apps/manager/ComponentEditView.svelte']).map(v => v.id);
+    assert.ok(editorViews.includes('manager-component-edit-salvage-simple'));
+
+    // The misconfigured body maps to its own frame PLUS the broader inventory/salvage
+    // frames — it lives under both globs — but must not disturb the player-salvage
+    // deep-equality above (which tests other salvage files).
+    const bodyViews = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    ]).map(v => v.id).sort();
+    assert.deepEqual(bodyViews, ['player-inventory', 'player-salvage', 'player-salvage-misconfigured']);
+
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-component-edit-salvage-simple'], ['manager-component-edit-salvage-simple']);
+    assert.deepEqual(byId['player-salvage-misconfigured'], ['player-salvage-misconfigured']);
+  });
+
+  // Issue 777: the required-tools disclosure frame is its own recipe (one file per id) so
+  // `collect` publishes it; appending its label to `player-salvage` would never publish it.
+  // Its narrow glob onto SalvageToolRequirements.svelte adds it alongside the broader
+  // inventory/salvage frames, without disturbing the player-salvage deep-equality above.
+  it('maps the issue-777 required-tools frame to its changed source', () => {
+    const ids = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
+    ]).map(v => v.id).sort();
+    assert.deepEqual(ids, ['player-inventory', 'player-salvage', 'player-salvage-tools']);
+
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['player-salvage-tools'], ['player-salvage-tools']);
+  });
+
+  // Issue 766: the multi-system collapse frame is its own recipe (one file per id) so
+  // `collect` publishes it; the existing player-inventory capture walk selects a
+  // single-system item and cannot reach the selector. Its narrow glob onto
+  // InventorySystemSelector.svelte adds it alongside the broad inventory frame, without
+  // disturbing the player-inventory deep-equality above.
+  it('maps the issue-766 multi-system frame to its changed source', () => {
+    const ids = mapChangedFilesToViews([
+      'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    ]).map(v => v.id).sort();
+    assert.deepEqual(ids, ['player-inventory', 'player-inventory-multi-system']);
+
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['player-inventory-multi-system'], ['player-inventory-multi-system']);
+  });
+
+  // Issue 797: the recipe-item Validation tab is brought to parity with the recipe
+  // Validation tab. TWO dedicated view ids (all-clear + mixed-failing), each its own
+  // single-frame view — `collect` publishes only `candidates[0]` from a filename-sorted
+  // list, so both frames must be separate views to reach the PR. Both map to the
+  // validation tab file AND the editor shell that hosts it.
+  it('maps the issue-797 recipe-item Validation frames to their own view ids', () => {
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-recipe-item-validation'], ['manager-recipe-item-validation']);
+    assert.deepEqual(byId['manager-recipe-item-validation-blocked'], ['manager-recipe-item-validation-blocked']);
+
+    // The validation tab file republishes BOTH frames.
+    const tabIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
+    ]).map(view => view.id);
+    assert.ok(tabIds.includes('manager-recipe-item-validation'));
+    assert.ok(tabIds.includes('manager-recipe-item-validation-blocked'));
+
+    // The editor shell that hosts the tab republishes BOTH frames too.
+    const editorIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
+    ]).map(view => view.id);
+    assert.ok(editorIds.includes('manager-recipe-item-validation'));
+    assert.ok(editorIds.includes('manager-recipe-item-validation-blocked'));
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
@@ -243,10 +601,12 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
   });
 
-  it('maps a recipe editor file to all eleven recipe-edit frame recipes', () => {
+  it('maps the recipe shell broadly while each focused recipe tab maps only its frames', () => {
     const expected = [
       'manager-recipe-edit-normal',
       'manager-recipe-edit-ingredients',
+      // Issue 684: the essence + currency-cost rows, split into their own scrolled frame.
+      'manager-recipe-edit-ingredients-cost',
       'manager-recipe-edit-validation',
       'manager-recipe-edit-multistep',
       // The four Results-tab modes (issue 643): routed-by-check outcome bands, the
@@ -265,19 +625,23 @@ describe('UI PR screenshot evidence', () => {
       // only frame captured against a restricted-visibility system; the others
       // run against a system whose mode drives the Books & Scrolls branch.
       'manager-recipe-edit-access-rail',
+      // The Books & Scrolls tab body (issue 796): its own frame so the linked-book grid
+      // fix reaches a PR (collect publishes only candidates[0] per view id).
+      'manager-recipe-edit-books-scrolls',
     ];
 
-    // The top-level editor view and any recipe sub-component all republish all eleven
-    // frames. Every editor tab lives under `recipe/` so the glob covers it; the BROWSER
-    // inspector deliberately lives under `recipes/`.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/ui/svelte/apps/manager/RecipeEditView.svelte']).map((view) => view.id),
+      expected,
+    );
+    const withoutTools = expected.filter((id) => id !== 'manager-recipe-edit-tools');
     for (const file of [
-      'src/ui/svelte/apps/manager/RecipeEditView.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
-      assert.deepEqual(views.map(view => view.id), expected, `${file} should map to all eleven recipe-edit frames`);
+      assert.deepEqual(views.map(view => view.id), withoutTools, `${file} should not republish the unrelated Tools tab`);
     }
 
     // Each frame carries exactly its own single smoke label.
@@ -285,6 +649,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views.map(view => view.smokeLabels), [
       ['manager-recipe-edit-normal'],
       ['manager-recipe-edit-ingredients'],
+      ['manager-recipe-edit-ingredients-cost'],
       ['manager-recipe-edit-validation'],
       ['manager-recipe-edit-multistep'],
       ['manager-recipe-edit-results'],
@@ -294,23 +659,48 @@ describe('UI PR screenshot evidence', () => {
       ['manager-recipe-edit-results-alchemy'],
       ['manager-recipe-edit-tools'],
       ['manager-recipe-edit-access-rail'],
+      ['manager-recipe-edit-books-scrolls'],
     ]);
   });
 
-  it('collects the eleven recipe-edit frames into eleven separate files', () => {
+  it('maps the issue-770 check-modifier UI to its Checks and recipe-edit frames', () => {
+    const idsFor = (file) => mapChangedFilesToViews([file]).map(view => view.id);
+    // The catalogue card has its OWN dedicated modifier frame (not the failure-
+    // consumption one, which the crafting tab scrolls elsewhere for).
+    assert.deepEqual(
+      idsFor('src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'),
+      ['manager-checks-crafting-modifiers'],
+    );
+    // The dedicated frame carries exactly its own single smoke label.
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    assert.deepEqual(byId['manager-checks-crafting-modifiers'], ['manager-checks-crafting-modifiers']);
+    // The shared pill multi-select renders in BOTH the Checks default set and the
+    // recipe Overview override, so it maps to the dedicated modifier frame and every
+    // recipe-edit frame.
+    const pillIds = idsFor('src/ui/svelte/components/ModifierPillSelect.svelte');
+    assert.ok(pillIds.includes('manager-checks-crafting-modifiers'));
+    assert.ok(pillIds.includes('manager-recipe-edit-normal'));
+  });
+
+  it('collects the thirteen recipe-edit frames into thirteen separate files', () => {
     withScreenshotFixtures(
       {
         'screenshot-01-manager-recipe-edit-normal.png': 'normal',
         'screenshot-02-manager-recipe-edit-ingredients.png': 'ingredients',
-        'screenshot-03-manager-recipe-edit-validation.png': 'validation',
-        'screenshot-04-manager-recipe-edit-multistep.png': 'multistep',
-        'screenshot-05-manager-recipe-edit-results.png': 'results',
-        'screenshot-06-manager-recipe-edit-results-multistep.png': 'results-multistep',
-        'screenshot-07-manager-recipe-edit-collapsed.png': 'collapsed',
-        'screenshot-08-manager-recipe-edit-results-progressive.png': 'results-progressive',
-        'screenshot-09-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
-        'screenshot-10-manager-recipe-edit-tools.png': 'tools',
-        'screenshot-11-manager-recipe-edit-access-rail.png': 'access-rail',
+        // Issue 684: the `-cost` label ENDS in `-cost.png`, so `matchesSmokeLabel`
+        // (anchored `…<label>\.png$`) keeps it distinct from the `-ingredients` frame
+        // even though `manager-recipe-edit-ingredients` is a string prefix of it.
+        'screenshot-03-manager-recipe-edit-ingredients-cost.png': 'ingredients-cost',
+        'screenshot-04-manager-recipe-edit-validation.png': 'validation',
+        'screenshot-05-manager-recipe-edit-multistep.png': 'multistep',
+        'screenshot-06-manager-recipe-edit-results.png': 'results',
+        'screenshot-07-manager-recipe-edit-results-multistep.png': 'results-multistep',
+        'screenshot-08-manager-recipe-edit-collapsed.png': 'collapsed',
+        'screenshot-09-manager-recipe-edit-results-progressive.png': 'results-progressive',
+        'screenshot-10-manager-recipe-edit-results-alchemy.png': 'results-alchemy',
+        'screenshot-11-manager-recipe-edit-tools.png': 'tools',
+        'screenshot-12-manager-recipe-edit-access-rail.png': 'access-rail',
+        'screenshot-13-manager-recipe-edit-books-scrolls.png': 'books-scrolls',
       },
       (root) => {
         const result = collectScreenshotEvidence({
@@ -318,7 +708,7 @@ describe('UI PR screenshot evidence', () => {
           prNumber: 654,
           root,
         });
-        assert.equal(result.copied.length, 11);
+        assert.equal(result.copied.length, 13);
         const byName = Object.fromEntries(
           result.copied.map(item => [
             item.destination.replaceAll('\\', '/').split('/').pop(),
@@ -328,6 +718,7 @@ describe('UI PR screenshot evidence', () => {
         assert.deepEqual(byName, {
           'manager-recipe-edit-normal.png': 'normal',
           'manager-recipe-edit-ingredients.png': 'ingredients',
+          'manager-recipe-edit-ingredients-cost.png': 'ingredients-cost',
           'manager-recipe-edit-validation.png': 'validation',
           'manager-recipe-edit-multistep.png': 'multistep',
           'manager-recipe-edit-results.png': 'results',
@@ -337,6 +728,7 @@ describe('UI PR screenshot evidence', () => {
           'manager-recipe-edit-results-alchemy.png': 'results-alchemy',
           'manager-recipe-edit-tools.png': 'tools',
           'manager-recipe-edit-access-rail.png': 'access-rail',
+          'manager-recipe-edit-books-scrolls.png': 'books-scrolls',
         });
       },
     );
@@ -385,7 +777,7 @@ describe('UI PR screenshot evidence', () => {
       { prNumber: 321 },
     );
 
-    assert.match(failure, /Manager gathering tools/);
+    assert.match(failure, /Tool Studio — library/);
     assert.match(failure, /## Screenshots/);
     assert.match(failure, /screenshots-exempt/);
   });
@@ -426,21 +818,146 @@ describe('UI PR screenshot evidence', () => {
     );
   });
 
-  it('reports missing collection screenshots and supports allowMissing', () => {
+  it('requires run metadata before collecting Tool Studio screenshots', () => {
     withScreenshotFixtures({}, (root) => {
       assert.throws(() => collectScreenshotEvidence({
         changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
         prNumber: 456,
         root,
-      }), /manager-tools/);
+        headSha: 'abc1234',
+      }), /Missing Tool Studio smoke summary/);
+    });
+  });
 
+  it('collects truthful r15-shaped Tool Studio parity and stress PNGs from one green current-head run', () => {
+    withScreenshotFixtures(toolStudioEvidenceFixtures(), (root) => {
       const result = collectScreenshotEvidence({
         changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
         prNumber: 456,
         root,
+        headSha: 'abc1234',
+      });
+      assert.deepEqual(result.copied.map(({ view }) => view.id), TOOL_STUDIO_VIEWS.map(([id]) => id));
+      assert.equal(result.missing.length, 0);
+    });
+  });
+
+  it('rejects Tool Studio images whose PNG dimensions disagree with a truthful-looking manifest', () => {
+    const fixtures = toolStudioEvidenceFixtures();
+    const [firstFile] = Object.keys(fixtures);
+    fixtures[firstFile] = minimalPng(1200, 682);
+    withScreenshotFixtures(fixtures, (root) => {
+      assert.throws(() => collectScreenshotEvidence({
+        changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
+        prNumber: 456,
+        root,
+        headSha: 'abc1234',
+      }), /Wrong Tool Studio PNG dimensions for 01-library-1280x720: 1200x682; expected 1212x682/);
+    });
+  });
+
+  it('rejects invalid bytes presented as a Tool Studio PNG', () => {
+    const fixtures = toolStudioEvidenceFixtures();
+    const [firstFile] = Object.keys(fixtures);
+    fixtures[firstFile] = Buffer.from('not a png');
+    withScreenshotFixtures(fixtures, (root) => {
+      assert.throws(() => collectScreenshotEvidence({
+        changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
+        prNumber: 456,
+        root,
+        headSha: 'abc1234',
+      }), /Invalid Tool Studio PNG for 01-library-1280x720/);
+    });
+  });
+
+  it('rejects failed, stale-head, and wrong-label-set Tool Studio runs', () => {
+    const cases = [
+      [
+        toolStudioEvidenceFixtures({ summaryPatch: { passed: false } }),
+        'abc1234',
+        /failed or degraded smoke summary/,
+      ],
+      [toolStudioEvidenceFixtures({ headSha: 'stale123' }), 'abc1234', /stale for the requested PR head SHA/],
+      [
+        toolStudioEvidenceFixtures({
+          targetLabels: TOOL_STUDIO_VIEWS
+            .filter(([id]) => id !== 'zero-state-empty-library-1280x720')
+            .map(([, label]) => label),
+        }),
+        'abc1234',
+        /another target-label set/,
+      ],
+    ];
+    for (const [fixtures, headSha, message] of cases) {
+      withScreenshotFixtures(fixtures, (root) => {
+        assert.throws(() => collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
+          prNumber: 456,
+          root,
+          headSha,
+        }), message);
+      });
+    }
+  });
+
+  it('rejects duplicate candidates, old or wrong parity dimensions, and stress-substituted evidence', () => {
+    const duplicateLabel = TOOL_STUDIO_VIEWS[0][1];
+    const cases = [
+      [
+        {
+          ...toolStudioEvidenceFixtures(),
+          [`duplicate-${duplicateLabel}.png`]: 'duplicate',
+        },
+        /Duplicate Tool Studio screenshot evidence/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ index }) => index === 0 ? { width: 1200 } : {},
+        }),
+        /Wrong Tool Studio dimensions/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ index }) => index === 0 ? { height: 686 } : {},
+        }),
+        /Wrong Tool Studio dimensions for 01-library-1280x720: 1212x686; expected 1212x682/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ label }) => label === 'manager-tool-parity-06-breakage-900x700'
+            ? { height: 666 }
+            : {},
+        }),
+        /Wrong Tool Studio dimensions for 06-breakage-900x700: 832x666; expected 832x662/,
+      ],
+      [
+        toolStudioEvidenceFixtures({
+          capturePatch: ({ index }) => index === 0 ? { label: 'manager-tool-stress-repair' } : {},
+        }),
+        /Stress evidence cannot substitute/,
+      ],
+    ];
+    for (const [fixtures, message] of cases) {
+      withScreenshotFixtures(fixtures, (root) => {
+        assert.throws(() => collectScreenshotEvidence({
+          changedFiles: ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'],
+          prNumber: 456,
+          root,
+          headSha: 'abc1234',
+        }), message);
+      });
+    }
+  });
+
+  it('reports missing non-Tool screenshots and supports allowMissing', () => {
+    withScreenshotFixtures({}, (root) => {
+      const result = collectScreenshotEvidence({
+        changedFiles: ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'],
+        prNumber: 456,
+        root,
         allowMissing: true,
       });
-      assert.deepEqual(result.missing.map(view => view.id), ['manager-tools']);
+      assert.deepEqual(result.missing.map(view => view.id), ['manager-environments']);
     });
   });
 
@@ -497,12 +1014,14 @@ describe('UI PR screenshot evidence', () => {
 
   it('treats a lang change alongside a render file as UI driven by that render file', () => {
     const view = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
-    const logicOnly = 'src/ui/svelte/stores/adminStore.js';
+    // A non-render `src/ui/**` file that matches NO recipe. `adminStore.js` used to
+    // serve here and no longer can: issue 800 gave it real description frames.
+    const logicOnly = 'src/ui/svelte/util/dropUtils.js';
     const ids = files => mapChangedFilesToViews(files).map(recipe => recipe.id);
 
     // A recipe-matching view drives the mapping; the lang file adds nothing.
     assert.equal(hasUiChanges(['lang/en.json', view]), true);
-    assert.deepEqual(ids(['lang/en.json', view]), ['manager-tools']);
+    assert.deepEqual(ids(['lang/en.json', view]), TOOL_STUDIO_VIEWS.map(([id]) => id));
 
     // A render file that matches no recipe still trips the generic fallback.
     assert.equal(hasUiChanges(['lang/en.json', logicOnly]), true);
@@ -527,7 +1046,17 @@ describe('UI PR screenshot evidence', () => {
     for (const match of harness.matchAll(/screenshot\(\s*page\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
+    for (const match of harness.matchAll(/captureToolStudioProduct\(\s*page\s*,\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
     for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
+      emitted.add(match[1]);
+    }
+    // Issue 801: the grouped-continuation frames route through the shared
+    // captureGroupedContinuationFrame(page, results, { … label: '…' … }) helper, which
+    // forwards `label` to captureStableManagerView as a variable — so the literal lives in
+    // the helper CALL's options object, not in the captureStableManagerView call itself.
+    for (const match of harness.matchAll(/captureGroupedContinuationFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     // The Results-tab captures (issue 643) route through captureRecipeResultsTab(page,
@@ -653,6 +1182,54 @@ describe('UI PR screenshot evidence', () => {
     assert.equal(hasScreenshotEvidence(upsertScreenshotsBlock('Body.', md)), true);
   });
 
+  it('scopes changed files to the exact smoke-label target set for the capture profile', () => {
+    // The `targets` command / `screenshots` profile consume this — it must equal the
+    // same mapping collect/publish use, never the full catalogue.
+    assert.deepEqual(smokeLabelsForChangedFiles(['styles/theme.css']), [
+      'manager-default-selection',
+      'manager-components-normal',
+      'manager-environments-browse-normal',
+      'manager-gathering-task-editor-normal',
+      'manager-gathering-events-normal',
+      'manager-essences-normal',
+    ]);
+    assert.deepEqual(smokeLabelsForChangedFiles(['docs/readme.md']), []);
+  });
+
+  it('publish threads a head SHA into revision-addressed S3 keys', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-publish-sha-'));
+    try {
+      const dir = join(root, 'tmp/pr-screenshots/251');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'manager-tools.png'), 'a');
+      const puts = [];
+      const runGh = (args) => {
+        if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
+        if (args[0] === 'pr' && args[1] === 'view') return { status: 0, stdout: 'Body.', stderr: '' };
+        if (args[0] === 'pr' && args[1] === 'edit') return { status: 0, stdout: '', stderr: '' };
+        return { status: 1, stdout: '', stderr: `unexpected ${args.join(' ')}` };
+      };
+      const result = await publishScreenshotEvidence({
+        prNumber: 251,
+        headSha: 'deadbee',
+        root,
+        runGh,
+        putObject: async (o) => puts.push(o),
+        config: { bucket: 'b', baseUrl: 'https://b.example', prefix: 'pr-screenshots' },
+      });
+      assert.equal(result.skipped, false);
+      assert.equal(puts[0].key, 'pr-screenshots/251/deadbee/manager-tools.png');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sanitizeLabel is a no-op on every current view label (no over-escaping)', () => {
+    for (const view of VIEW_RECIPES) {
+      assert.equal(sanitizeLabel(view.label), view.label, `${view.id} label should pass through unchanged`);
+    }
+  });
+
   it('upserts the screenshot block idempotently', () => {
     const md = '![pr-1 A](https://github.com/user-attachments/assets/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)';
     const first = upsertScreenshotsBlock('## Description\n\nBody text.', md);
@@ -711,7 +1288,7 @@ describe('UI PR screenshot evidence', () => {
       assert.match(written, /Original\./);
       assert.match(written, /##\s+Screenshots/);
       assert.match(written, /!\[pr-251 Manager gathering environments\]\(https:\/\/test-bucket\.s3\.eu-west-2\.amazonaws\.com\/pr-screenshots\/251\/manager-environments\.png\)/);
-      assert.match(written, /!\[pr-251 Manager gathering tools\]/);
+      assert.match(written, /!\[pr-251 manager-tools\]/);
       assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -734,6 +1311,133 @@ describe('UI PR screenshot evidence', () => {
           ? { status: 1, stdout: '', stderr: 'not logged in' }
           : { status: 0, stdout: '', stderr: '' }),
       }), /not authenticated/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves the first VERIFIABLE default base, skipping candidates git cannot verify', () => {
+    // origin/main fails rev-parse but origin/HEAD verifies → returns origin/HEAD. This
+    // kills a "return candidates[0] regardless of verify" mutant, which would wrongly
+    // return origin/main.
+    assert.equal(resolveDefaultBase({ runGit: gitVerifyStub(['origin/HEAD', 'main']) }), 'origin/HEAD');
+
+    // origin/main and origin/HEAD both fail → falls through to local main.
+    assert.equal(resolveDefaultBase({ runGit: gitVerifyStub(['main']) }), 'main');
+
+    // The happy path still prefers origin/main when it verifies.
+    assert.equal(resolveDefaultBase({ runGit: gitVerifyStub(['origin/main', 'origin/HEAD', 'main']) }), 'origin/main');
+  });
+
+  it('returns null when no default base candidate can be verified', () => {
+    const stub = gitVerifyStub([]);
+    assert.equal(resolveDefaultBase({ runGit: stub }), null);
+    // It actually probed every candidate rather than short-circuiting.
+    assert.deepEqual(stub.calls, ['origin/main', 'origin/HEAD', 'main']);
+  });
+
+  it('throws a base-resolution diagnostic that names the tried candidates and instructs --base', () => {
+    // The load-bearing distinction from a real "no UI changes" answer: an UNRESOLVABLE
+    // base throws a clear, actionable error rather than returning [].
+    let message = '';
+    try {
+      loadChangedFiles({}, { resolveBase: () => null });
+      assert.fail('expected loadChangedFiles to throw when no base resolves');
+    } catch (error) {
+      message = error.message;
+    }
+    assert.match(message, /origin\/main/);
+    assert.match(message, /origin\/HEAD/);
+    assert.match(message, /\bmain\b/);
+    assert.match(message, /--base <ref>/);
+  });
+
+  it('honours changed-files > base > default-base precedence via injected spies', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-changed-'));
+    try {
+      const changedFilesPath = join(root, 'changed-files.txt');
+      writeFileSync(changedFilesPath, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte\n');
+
+      // --changed-files wins: neither seam is consulted.
+      let resolveCalls = 0;
+      let readCalls = 0;
+      const resolveBase = () => { resolveCalls += 1; return 'origin/main'; };
+      const readChangedFiles = (base) => { readCalls += 1; return [`from:${base}`]; };
+
+      const both = loadChangedFiles(
+        { changedFiles: changedFilesPath, base: 'origin/dev' },
+        { resolveBase, readChangedFiles },
+      );
+      assert.deepEqual(both, ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte']);
+      assert.equal(resolveCalls, 0);
+      assert.equal(readCalls, 0);
+
+      // Explicit --base: readChangedFiles gets that base; resolveBase is NOT called.
+      const explicit = loadChangedFiles({ base: 'origin/dev' }, { resolveBase, readChangedFiles });
+      assert.deepEqual(explicit, ['from:origin/dev']);
+      assert.equal(resolveCalls, 0);
+      assert.equal(readCalls, 1);
+
+      // Neither flag: resolveBase decides the base, then readChangedFiles diffs it.
+      const defaulted = loadChangedFiles({}, { resolveBase, readChangedFiles });
+      assert.deepEqual(defaulted, ['from:origin/main']);
+      assert.equal(resolveCalls, 1);
+      assert.equal(readCalls, 2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does NOT throw when a resolved base legitimately yields no UI files (conflation guard)', async () => {
+    // The distinction the issue exists to protect: a resolved base whose diff genuinely
+    // contains no UI files is a REAL "no UI changes" answer — loadChangedFiles returns the
+    // non-UI list and never throws, and the plan path prints "No UI changes detected."
+    // This must stay distinct from the base-resolution failure that DOES throw.
+    const resolveBase = () => 'origin/main';
+    const readChangedFiles = () => ['docs/readme.md', 'openspec/specs/foo/spec.md'];
+
+    const files = loadChangedFiles({}, { resolveBase, readChangedFiles });
+    assert.deepEqual(files, ['docs/readme.md', 'openspec/specs/foo/spec.md']);
+    assert.equal(hasUiChanges(files), false);
+    assert.deepEqual(mapChangedFilesToViews(files), []);
+
+    const lines = await captureLog(() => main(['plan'], { resolveBase, readChangedFiles }));
+    assert.deepEqual(lines, ['No UI changes detected.']);
+  });
+
+  it('lists required views on the plan path when the resolved-base diff has UI files', async () => {
+    const resolveBase = () => 'origin/main';
+    const readChangedFiles = () => ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
+    const lines = await captureLog(() => main(['plan'], { resolveBase, readChangedFiles }));
+    assert.match(lines[0], /UI smoke screenshot artifacts required:/);
+    assert.ok(lines.some(line => /manager-tool-parity-01-library-1280x720/.test(line)));
+  });
+
+  it('never resolves a default base for publish or clean (command scoping)', async () => {
+    // publish derives files from tmp/pr-screenshots/<pr>/ and clean just removes a local
+    // dir — neither must spawn git or trip base resolution / its throw.
+    let resolveCalls = 0;
+    const resolveBase = () => { resolveCalls += 1; return 'origin/main'; };
+
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-scope-'));
+    try {
+      // clean: harmless local rm of a PR-scoped tmp dir under the real repo (a high PR
+      // number with no such dir), asserting only that the resolver is untouched.
+      await captureLog(() => main(['clean', '--pr', '999999'], { resolveBase }));
+      assert.equal(resolveCalls, 0);
+
+      // publish: an empty output dir → skipped before any PR read; gh/S3 seams stubbed so
+      // no real network/CLI, and the resolver still must not be called.
+      const emptyDir = join(root, 'empty');
+      mkdirSync(emptyDir, { recursive: true });
+      const runGh = (args) => (args[0] === 'auth'
+        ? { status: 0, stdout: 'ok', stderr: '' }
+        : { status: 1, stdout: '', stderr: 'should not be reached' });
+      await captureLog(() => main(
+        ['publish', '--pr', '251', '--output-dir', emptyDir],
+        { resolveBase, runGh, putObject: async () => {}, config: S3_CONFIG },
+      ));
+      assert.equal(resolveCalls, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

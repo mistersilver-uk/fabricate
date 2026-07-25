@@ -116,3 +116,51 @@ UI callers are expected to localize it at the presentation boundary, using `mess
 Removes learned records for recipes that no longer exist.
 
 **Returns:** `Promise<void>`
+
+### forgetLearnedRecipes(actor, recipeIds, options)
+
+Deletes learned recipes from one actor.
+This is the shared deletion primitive behind erasing a single recipe, resetting one crafting system, and resetting every system.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `actor` | `Actor` | The actor whose knowledge is cleared |
+| `recipeIds` | `string[]` | Recipe ids to forget |
+| `options.freeLearnBudget` | `boolean` | Free the consumed learn budget so a capped book permits re-learning (default `true`) |
+| `options.clearDiscovery` | `boolean` | Also clear each recipe's discovery progress (default `false`) |
+
+When `freeLearnBudget` is `true`, each cleared entry frees one consumed learn slot against a source book the actor still holds.
+An entry with no held source book, or whose recipe no longer exists, frees nothing.
+
+**Returns:** `Promise<{ success: boolean, count: number }>`
+
+### forgetSystemLearnedRecipes(actor, systemId, options)
+
+Resets one crafting system's learned recipes for one actor, along with their discovery progress.
+Learned records whose recipe no longer resolves to a system are left in place.
+
+**Returns:** `Promise<{ success: boolean, count: number }>`
+
+### forgetAllLearnedRecipes(actor, options)
+
+Resets every learned recipe for one actor across all crafting systems, along with every discovery-progress record.
+
+**Returns:** `Promise<{ success: boolean, count: number }>`
+
+### GM knowledge reset facade
+
+GMs usually reach the reset through the `game.fabricate.resetActorKnowledge` facade rather than calling the service directly.
+
+```javascript
+await game.fabricate.resetActorKnowledge({
+  actorId: someActor.id,
+  systemId: null, // one crafting system id, or null to reset every system
+  freeLearnBudget: true
+});
+```
+
+The facade is GM-only and takes an actor id, not an actor uuid.
+It never throws.
+It returns `{ success, message, messageData }` so a macro can branch on the outcome and localize `message` at the presentation boundary.
+This is the interim console and macro path.
+A Books and Scrolls Knowledge tab that surfaces the same reset in the UI is planned and not yet available.

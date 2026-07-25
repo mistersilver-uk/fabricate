@@ -447,3 +447,63 @@ test('D2: a world-time resume awards down the order stamped by run.userId, not t
 
   SALVAGE_SYSTEM.components.pop();
 });
+
+// ---------------------------------------------------------------------------
+// The capture KEY is scoped per (systemId, componentId) — issue 766.
+// ---------------------------------------------------------------------------
+
+test('salvage: the captured order key is scoped per (systemId, componentId), never componentId alone', async () => {
+  // Mutation this catches: REVERT the engine's capture key to `salvage:<componentId>`
+  // (drop the `${craftingSystemId}:` term). Component ids are NOT globally unique, so the
+  // systemId is load-bearing — the store's WRITE key and the engine's READ key must match
+  // exactly, or the captured order silently reads empty (and a same-componentId order in
+  // another system leaks in). Only the store's write key was pinned before this test; the
+  // engine's read key had none, so the exact one-sided desync the design warned about
+  // shipped green.
+  const actor = makeMergingActor();
+  const salvageRunManager = new SalvageRunManager();
+  setupSalvageGame({ userId: 'player-alice', worldTime: 100, salvageRunManager, actor });
+
+  // A REAL map lookup keyed by the composite id the engine passes, so the assertions bind
+  // the key FORMAT — not merely that the seam is called.
+  const orders = {
+    'sys-1:comp-1': ['s-c', 's-b', 's-a'],
+    // A same-componentId order under a DIFFERENT system — must NEVER leak into sys-1.
+    'other-sys:comp-1': ['s-a', 's-b', 's-c'],
+    // The bare componentId — what a reverted engine would read. Seeded so a revert picks
+    // THIS up (flipping the composite assertion red) rather than silently reading empty.
+    'comp-1': ['s-a', 's-b', 's-c'],
+  };
+  const engine = new CraftingEngine(
+    { canCraft: () => ({ canCraft: true }), getToolsForSet: () => [], toolMatchesItem: () => false },
+    null,
+    null,
+    null,
+    salvageRunManager,
+    null,
+    null,
+    { getPlayerResultOrder: (entry) => orders[entry?.id] ?? [] }
+  );
+
+  const component = salvageComponent({ timeRequirement: { hours: 1 } });
+  SALVAGE_SYSTEM.components.push(component);
+
+  const started = await engine.salvage(actor.uuid, 'sys-1', 'comp-1');
+  assert.equal(started.salvageRun.status, 'waitingTime');
+
+  const runId = started.salvageRun.id;
+  salvageRunManager.invalidateCache();
+  const persisted = salvageRunManager.getActiveRun(actor, runId);
+  assert.deepEqual(
+    persisted.resultOrder,
+    ['s-c', 's-b', 's-a'],
+    'the engine read key is `<systemId>:<componentId>`, matching the store write key'
+  );
+  assert.notDeepEqual(
+    persisted.resultOrder,
+    ['s-a', 's-b', 's-c'],
+    'neither the bare componentId nor another system sharing the componentId leaks in'
+  );
+
+  SALVAGE_SYSTEM.components.pop();
+});

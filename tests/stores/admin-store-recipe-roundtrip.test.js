@@ -16,12 +16,12 @@
  *     sets between recipe scope and step scope, so a lossy rewrite THERE would be
  *     invisible to a single-scope fixture and would ship green.
  *
- * Seven groups of fields are persisted and runtime-honoured but have **no UI
- * affordance at all**. They survive only by round-trip, and nothing on screen would
- * reveal their loss:
+ * The fixtures also preserve fields that are inactive or have no affordance in the
+ * configured mode. They survive by round-trip even when the current screen cannot
+ * author them:
  *
  *   - `Recipe.complex`                                  (a real authoring flag)
- *   - `IngredientSet.toolIds`                           (per-SET tools; the Tools tab is recipe-/step-scope only)
+ *   - `IngredientSet.toolIds`                           (inactive outside named routed-by-ingredients sets)
  *   - `Ingredient.match.tagMatch: 'all'`                (a control DOES exist — and it sits exactly where the "or..." popover lands)
  *   - a reserved `role: 'failure'` result group         (alchemy Simple)
  *   - `Ingredient.extractEffects` / `effectFilter`
@@ -61,7 +61,7 @@ const { Recipe } = await import('../../src/models/Recipe.js');
 const SILENT_RECIPE = Object.freeze({
   id: 'r-silent',
   name: 'Philtre of Silence',
-  description: 'A recipe carrying every field with no UI.',
+  description: 'A recipe carrying every field this round-trip protects.',
   img: 'icons/potion.webp',
   category: 'Potions',
   craftingSystemId: 'sys1',
@@ -88,13 +88,21 @@ const SILENT_RECIPE = Object.freeze({
   // 4. The legacy routing map: validated on save, not read by the live routing path.
   outcomeRouting: { success: 'grp-success' },
 
+  // 4b. Single-step duration (issue 845). UNLIKE the silent fields above this one HAS a
+  //     UI — the Overview Duration steppers — but the projection must still carry it or
+  //     the editor seeds the control from `undefined` and renders "Instant" on every
+  //     open. The persisted value is never lost (the shallow-merge floor restores it),
+  //     so its loss is DISPLAY-only and is guarded against the projected row, not the
+  //     byte-for-byte round trip.
+  timeRequirement: { minutes: 0, hours: 2, days: 3, months: 0, years: 0 },
+
   ingredientSets: [
     {
       id: 'set-1',
       name: 'Primary',
       essences: { fire: 2 },
-      // 5. Per-SET tools. The Tools tab is recipe-/step-scope only, so this has no
-      //    editor at all.
+      // 5. Per-set Tools are inactive and hidden outside named routed-by-ingredients
+      //    sets, but switching modes later must recover these stored references.
       toolIds: ['tool-mortar', 'tool-alembic'],
       // 6. resultMapping — meaningless without isVariable, and vice versa.
       resultMapping: ['grp-success'],
@@ -424,7 +432,11 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     );
     assert.equal(after.transferEffects, true, 'transferEffects has no UI');
     assert.equal(after.isVariable, true, 'isVariable has no UI');
-    assert.deepEqual(after.outcomeRouting, { success: 'grp-success' }, 'the legacy routing map survives');
+    assert.deepEqual(
+      after.outcomeRouting,
+      { success: 'grp-success' },
+      'the legacy routing map survives'
+    );
   });
 
   // The other half of that story: the merge floor holds even when the draft drops the
@@ -434,14 +446,18 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     delete draft.complex;
     delete draft.outcomeRouting;
 
-    await store.updateRecipe(draft.id, { ...draft, name: 'Merge floor' }, { allowIncomplete: true });
+    await store.updateRecipe(
+      draft.id,
+      { ...draft, name: 'Merge floor' },
+      { allowIncomplete: true }
+    );
 
     const after = persisted();
     assert.equal(after.complex, true, 'a missing top-level key falls back to the persisted value');
     assert.deepEqual(after.outcomeRouting, { success: 'grp-success' });
   });
 
-  it('preserves per-SET toolIds and resultMapping (neither has any editor)', async () => {
+  it('preserves inactive per-set toolIds and the unedited resultMapping', async () => {
     const draft = patchRecipeDraft(cloneRecipeDraft(projectedRow()), { img: 'icons/other.webp' });
     await store.updateRecipe(draft.id, draft, { allowIncomplete: true });
 
@@ -449,7 +465,7 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     assert.deepEqual(
       set.toolIds,
       ['tool-mortar', 'tool-alembic'],
-      'per-set tools survive — the Tools tab is recipe-/step-scope only, so nothing else guards them'
+      'inactive per-set Tool references survive a save so a later mode switch can restore them'
     );
     assert.deepEqual(set.resultMapping, ['grp-success'], 'the variable-output mapping survives');
     assert.deepEqual(set.essences, { fire: 2 }, 'the per-set essence requirement survives');
@@ -467,7 +483,7 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     assert.equal(
       tags.match.tagMatch,
       'all',
-      "tagMatch: 'all' survives — its control sits exactly where the new \"or...\" popover lands"
+      'tagMatch: \'all\' survives — its control sits exactly where the new "or..." popover lands'
     );
     assert.deepEqual(tags.match.tags, ['herbal', 'rare'], 'the tag list survives');
     assert.equal(component.extractEffects, true, 'extractEffects survives');
@@ -485,7 +501,10 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
 
     const groups = persisted().resultGroups;
     const failure = groups.find((group) => group.role === 'failure');
-    assert.ok(failure, "the reserved failure group survives — it is the ONLY failure group in the model");
+    assert.ok(
+      failure,
+      'the reserved failure group survives — it is the ONLY failure group in the model'
+    );
     assert.equal(failure.id, 'grp-failure');
     // (`Result.toJSON` also emits `itemUuid: null`; assert the authored fields.)
     assert.equal(failure.results.length, 1);
@@ -493,7 +512,11 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
     assert.equal(failure.results[0].quantity, 1);
     // And it is not confused with a success group: the success group has no role.
     const success = groups.find((group) => group.id === 'grp-success');
-    assert.equal(success.role, undefined, 'a success group carries no role — there is no tier vocabulary here');
+    assert.equal(
+      success.role,
+      undefined,
+      'a success group carries no role — there is no tier vocabulary here'
+    );
   });
 
   it('survives a SECOND round trip (an edit on top of an already round-tripped recipe)', async () => {
@@ -510,6 +533,22 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
       persisted(),
       { ...afterFirst, name: 'Pass two' },
       'the second pass moves nothing but the name either'
+    );
+  });
+
+  // The single-step DURATION display guard (issue 845). Unlike the silent fields above,
+  // this loss never reaches persistence (the shallow-merge floor restores a top-level
+  // key the draft omits), so the byte-for-byte round trip cannot see it — the craft time
+  // keeps applying. The defect is that `_buildRecipeList` dropped `timeRequirement` from
+  // the projected row, so the editor's draft seeded the Overview Duration steppers from
+  // `undefined` and rendered "Instant". This asserts the projection carries it.
+  it('projects the single-step recipe timeRequirement so the Overview Duration steppers seed (issue 845)', () => {
+    const row = projectedRow();
+    assert.ok(row, 'the recipe is projected into the browser list');
+    assert.deepEqual(
+      row.timeRequirement,
+      { minutes: 0, hours: 2, days: 3, months: 0, years: 0 },
+      'the projected row carries the persisted duration — without it the Duration control resets to Instant on every editor open'
     );
   });
 
@@ -555,7 +594,11 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
         'step ids and names survive in order (order is load-bearing: steps craft in sequence)'
       );
       assert.deepEqual(steps[0].toolIds, ['tool-mortar'], 'step-scope tools survive');
-      assert.deepEqual(steps[1].toolIds, [], 'a step with no tools stays empty rather than inheriting');
+      assert.deepEqual(
+        steps[1].toolIds,
+        [],
+        'a step with no tools stays empty rather than inheriting'
+      );
       assert.equal(steps[0].timeRequirement.minutes, 30, 'per-step duration survives');
       assert.equal(steps[1].timeRequirement.hours, 2);
     });
@@ -571,12 +614,16 @@ describe('the named-field round trip (issue 643 §2b F2)', () => {
       assert.deepEqual(
         firstSet.toolIds,
         ['tool-alembic'],
-        'per-SET tools inside a step have no editor at ANY scope — round-trip is their only guard'
+        'inactive per-set Tool references inside a step survive round-trip'
       );
       assert.deepEqual(secondSet.toolIds, ['tool-alembic', 'tool-mortar']);
       assert.deepEqual(firstSet.essences, { fire: 1 }, 'the per-set essence requirement survives');
       assert.deepEqual(secondSet.essences, { fire: 2 });
-      assert.deepEqual(firstSet.resultMapping, ['step-1-group'], 'the variable-output mapping survives');
+      assert.deepEqual(
+        firstSet.resultMapping,
+        ['step-1-group'],
+        'the variable-output mapping survives'
+      );
       assert.equal(firstSet.resultGroupId, 'step-1-group', 'set -> result-group routing survives');
       assert.equal(secondSet.resultGroupId, 'step-2-group');
     });

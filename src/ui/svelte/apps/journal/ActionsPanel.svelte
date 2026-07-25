@@ -28,9 +28,32 @@
   const busy = $derived(String(services?.journal?.busyRunId ?? '') === String(run?.id ?? '') && run?.id);
   const disabled = $derived(!ready || Boolean(busy));
 
+  // Player self-cancel (issue 848): owner-only, live crafting runs only. The
+  // projection sets `canCancel` (owned + non-terminal + discovered) and
+  // `refundOnCancel` (the system's default-ON refund policy) so the confirm copy
+  // tells the player whether their inputs come back before they commit.
+  const canCancel = $derived(run?.canCancel === true);
+  const refundOnCancel = $derived(run?.refundOnCancel !== false);
+  let confirmingCancel = $state(false);
+
   function trigger() {
     if (disabled || !run) return;
     services?.journal?.advance?.(run);
+  }
+
+  function startCancel() {
+    if (busy || !run) return;
+    confirmingCancel = true;
+  }
+
+  function keepCrafting() {
+    confirmingCancel = false;
+  }
+
+  function confirmCancel() {
+    if (busy || !run) return;
+    confirmingCancel = false;
+    services?.journal?.cancel?.(run);
   }
 </script>
 
@@ -60,6 +83,52 @@
       <p class="journal-actions-hint">
         {localize(isFinalStep ? 'FABRICATE.App.Journal.Actions.FinishHint' : 'FABRICATE.App.Journal.Actions.TriggerHint')}
       </p>
+    {/if}
+    {#if canCancel}
+      <div class="journal-actions-cancel" data-journal-cancel>
+        {#if confirmingCancel}
+          <p class="journal-actions-cancel-prompt" data-journal-cancel-prompt>
+            {localize('FABRICATE.App.Journal.Actions.CancelConfirm')}
+            {localize(
+              refundOnCancel
+                ? 'FABRICATE.App.Journal.Actions.CancelConfirmRefund'
+                : 'FABRICATE.App.Journal.Actions.CancelConfirmForfeit'
+            )}
+          </p>
+          <div class="journal-actions-cancel-row">
+            <button
+              type="button"
+              class="journal-actions-cancel-confirm"
+              data-journal-cancel-confirm
+              disabled={Boolean(busy)}
+              onclick={confirmCancel}
+            >
+              <i class="fas fa-trash-can" aria-hidden="true"></i>
+              <span>{localize('FABRICATE.App.Journal.Actions.CancelConfirmYes')}</span>
+            </button>
+            <button
+              type="button"
+              class="journal-actions-cancel-keep"
+              data-journal-cancel-keep
+              disabled={Boolean(busy)}
+              onclick={keepCrafting}
+            >
+              <span>{localize('FABRICATE.App.Journal.Actions.CancelKeep')}</span>
+            </button>
+          </div>
+        {:else}
+          <button
+            type="button"
+            class="journal-actions-cancel-start"
+            data-journal-cancel-start
+            disabled={Boolean(busy)}
+            onclick={startCancel}
+          >
+            <i class="fas fa-ban" aria-hidden="true"></i>
+            <span>{localize('FABRICATE.App.Journal.Actions.CancelCraft')}</span>
+          </button>
+        {/if}
+      </div>
     {/if}
   {:else}
     <p class="journal-actions-auto" data-journal-auto-resolve>
@@ -108,5 +177,72 @@
 
   .journal-actions-auto i {
     color: var(--fab-text-muted);
+  }
+
+  .journal-actions-cancel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-1);
+    padding-top: var(--fab-space-2);
+    border-top: 1px solid var(--fab-border);
+  }
+
+  .journal-actions-cancel-prompt {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fab-text-muted);
+  }
+
+  .journal-actions-cancel-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Foundry's global `button` sets a fixed height/line-height that crops these
+     compact text buttons, so reset appearance/height like the other Fabricate
+     card buttons (see the EnvironmentCard idiom). */
+  .journal-actions-cancel-start,
+  .journal-actions-cancel-confirm,
+  .journal-actions-cancel-keep {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: auto;
+    line-height: normal;
+    padding: 6px 10px;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+    background: var(--fab-surface-soft);
+    color: var(--fab-text);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .journal-actions-cancel-start:hover:not(:disabled),
+  .journal-actions-cancel-keep:hover:not(:disabled) {
+    background: var(--fab-surface-raised);
+  }
+
+  .journal-actions-cancel-confirm {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+    color: var(--fab-danger-text);
+  }
+
+  .journal-actions-cancel-confirm:hover:not(:disabled) {
+    background: var(--fab-danger);
+    color: var(--fab-danger-text);
+  }
+
+  .journal-actions-cancel-start:disabled,
+  .journal-actions-cancel-confirm:disabled,
+  .journal-actions-cancel-keep:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 </style>

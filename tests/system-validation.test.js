@@ -233,6 +233,26 @@ describe('evaluateSystemValidation — composition', () => {
     assert.equal(salvage.blocks, 'visibility');
   });
 
+  it('does NOT fault a normalized single-success Simple config with a reserved failure group (issue 764)', () => {
+    // The clamp emits `[success, reserved-failure]`; validation counts SUCCESS groups, so
+    // this valid shape must not raise the `invalidSalvage` visibility critical.
+    const component = {
+      id: 'comp-ok',
+      name: 'Cracked Gem',
+      salvage: {
+        resultGroups: [
+          { id: 'g1', results: [] },
+          { id: 'g-fail', role: 'failure', results: [] },
+        ],
+      },
+    };
+    const system = makeSystem({ salvageResolutionMode: 'simple' });
+    const report = evaluateSystemValidation(system, { components: [component] });
+
+    const salvage = report.issues.find((issue) => issue.kind === 'salvage');
+    assert.equal(salvage, undefined, 'a valid one-success-group config raises no salvage issue');
+  });
+
   it('never surfaces the internal component id as the salvage issue label (issue 611)', () => {
     // An UNNAMED component previously fell back to its internal id for both the
     // rendered entityName and the message string; the entityId (used only for

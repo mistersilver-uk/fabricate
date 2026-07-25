@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile, compileModule } from 'svelte/compiler';
-import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
+import { createClassComponent } from 'svelte/legacy';
+import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
 
 /**
@@ -27,9 +28,13 @@ export function rewriteClientImports(code) {
 export function installComponentTestGlobals() {
   globalThis.Text = document.createTextNode('').constructor;
   globalThis.Comment = document.createComment('').constructor;
+  const labels = {
+    'FABRICATE.App.Crafting.Detail.Duration': 'Duration',
+    'FABRICATE.App.Crafting.Detail.TotalDuration': 'Total duration'
+  };
   globalThis.game = {
     i18n: {
-      localize: (key) => key,
+      localize: (key) => labels[key] ?? key,
       format: (key, data) => `${key}:${JSON.stringify(data)}`
     }
   };
@@ -89,8 +94,15 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
+  'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
+  // RecipeDetailHeader surfaces the recipe's authored craft duration pre-craft (issue
+  // 846) via this formatter. RecipeDetailHeader is already in the compiled graph, so
+  // omitting this raw dep HANGS every mounted crafting test (# cancelled). It imports
+  // only foundryBridge.js (already listed above), so this single entry suffices.
+  'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
@@ -113,6 +125,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+  'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
   'src/ui/svelte/apps/crafting/QuantityTag.svelte',
   'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
@@ -127,6 +140,10 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
   'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
+  // SimpleRecipeBody renders this for an explicit multi-step recipe (issue 765).
+  // SimpleRecipeBody is already listed, so omitting this HANGS every mounted crafting
+  // test (# cancelled), not just the step-list one.
+  'src/ui/svelte/apps/crafting/detail/StepRequirementsList.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
   'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
@@ -145,7 +162,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  * Full lifecycle harness for a single mounted Svelte component test file. Wraps
  * the temp-dir + node_modules symlink + DOM/globals setup, writes the requested
  * raw `.js` modules and compiled `.svelte` modules, imports the component, and
- * exposes `mount`/`remount` + a `target` getter. This removes the per-file
+ * exposes `mount`/`setProps`/`remount` + a `target` getter. This removes the per-file
  * `before`/`after`/`mount`/`remount` boilerplate that was duplicated across the
  * component test suite.
  *
@@ -155,7 +172,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  * @param {string[]} [args.rawModules]  repo-relative `.js` modules copied verbatim
  * @param {string[]} [args.compiledModules] repo-relative `.svelte` modules to compile
  * @param {string} args.componentPath   repo-relative `.svelte` of the component under test
- * @returns {{ setup: () => Promise<void>, teardown: () => void, mount: (props?: object) => Promise<HTMLElement>, remount: () => void, readonly target: HTMLElement|null }}
+ * @returns {{ setup: () => Promise<void>, teardown: () => void, mount: (props?: object) => Promise<HTMLElement>, setProps: (props: object) => Promise<HTMLElement>, remount: () => void, readonly target: HTMLElement|null }}
  */
 export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath }) {
   let tempRoot = null;
@@ -183,7 +200,7 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       return import(pathToFileURL(join(tempRoot, `${modulePath}.js`)).href);
     },
     teardown() {
-      if (mounted) { unmount(mounted); mounted = null; }
+      if (mounted) { mounted.$destroy(); mounted = null; }
       if (target) { target.remove(); target = null; }
       teardownDOM();
       if (tempRoot) { rmSync(tempRoot, { recursive: true, force: true }); tempRoot = null; }
@@ -191,14 +208,22 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
     async mount(props = {}) {
       target = document.createElement('div');
       document.body.appendChild(target);
-      mounted = mount(Component, { target, props });
+      mounted = createClassComponent({ component: Component, target, props });
+      flushSync();
+      await tick();
+      flushSync();
+      return target;
+    },
+    async setProps(props) {
+      if (!mounted) throw new Error('Cannot update props before mounting a component');
+      mounted.$set(props);
       flushSync();
       await tick();
       flushSync();
       return target;
     },
     remount() {
-      if (mounted) { unmount(mounted); mounted = null; }
+      if (mounted) { mounted.$destroy(); mounted = null; }
       if (target) { target.remove(); target = null; }
     },
     get target() { return target; }

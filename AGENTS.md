@@ -12,6 +12,7 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 - Plans touching shared scripts (smoke test, build, lint, anything in `scripts/` invoked from `package.json`) must spell out the behavior in both CI and local dev explicitly — don't bury one as a parenthetical.
 - Capture the change delta in the work's GitHub issue (a managed `openspec-delta` block — proposal, design, tasks, spec deltas, roster, acceptance) before implementation starts; do not version planning files under `openspec/changes/` (that directory is gone).
 See `openspec/README.md` for the block format and rules.
+- Every `### Tasks` entry in the delta declares a literal `Lane surface: new-module | new-export | persisted-shape | none` field, because model-tier rule 2 reads it as a lookup at spawn time; see [Model tier routing](#model-tier-routing).
 - When the work originates from an existing issue, append the delta block and preserve the reporter's original text; when it originates from a prompt with no issue, create one from the `OpenSpec Change Delta` issue template.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
@@ -25,13 +26,34 @@ Stages auto-spawn role-specific subagents based on the change signals below — 
 Subagents not matched by the routing table only run when explicitly requested.
 
 The routing tokens below (`fabricate_orchestrator`, etc.) are provider-neutral role identifiers.
-Each resolves to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)) — so the auto-spawn workflow behaves the same regardless of which assistant is driving.
+A routing token names a role **family**, not a binding, so it does not always resolve directly to one.
+An untiered family resolves directly to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)).
+A model-tiered family resolves through per-spawn model-tier selection (see [Model tier routing](#model-tier-routing)) to exactly one model-tiered binding in each active provider, found through the `Family` table in [Agent Roles & Bindings](#agent-roles--bindings).
+Either way the auto-spawn workflow behaves the same regardless of which assistant is driving.
 The one exception is the read-only `fabricate_pr_explorer` mapping role: Claude uses its built-in `Explore` agent rather than a dedicated binding (see the table below).
 
 **Workflow driver.** The top-level loop — Codex's depth-0 prompt agent or Claude's main loop — is the *workflow driver*.
 It enacts the orchestrator role: it owns routing and the iteration loops and performs **all** agent spawning.
 The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec delta in the issue; it returns its plan to the driver.
 Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
+
+### Proportionality and momentum
+
+The workflow driver uses the shortest workflow that satisfies mandatory repository gates and the actual risk, prioritizing the earliest honestly reviewable PR while preserving mandatory safety, review, and exact-head delivery gates.
+One mechanically valid evidence run satisfies every gate it directly covers, so agents do not repeat equivalent checks or reviews ceremonially.
+A reviewer repeats only when its owned concern materially changed or an unresolved finding remains; issue or PR metadata edits and patch-equivalent rebases do not invalidate approval.
+The driver front-loads cheap checks for branch and base freshness, affected paths and roster, PR title and commitlint, existing CI state, and screenshot scope.
+The driver timeboxes delegated lanes: after about 60 seconds without observable progress it requests status once, and after another about 60 seconds it interrupts and reassigns the work or continues locally within driver authority.
+
+### Isolated worktree execution
+
+Every spawned role works in its own Git worktree by default so independent workstreams do not share a mutable checkout.
+The workflow driver owns the clean coordinator checkout and integration branch, GitHub and remote mutations, lane lifecycle, integration, authoritative gates, and guarded cleanup.
+Mutable lanes use unique `agent/<issue>-<stage>-<role>-r<revision>` branches and exclusive path ownership; read-only lanes use fresh detached worktrees pinned to the exact commit under review.
+Spawned agents verify their assigned path, branch or detached SHA, base, and clean state before acting, then return local commits, base-relative diffs, or verdicts without pushing or mutating issue or PR state.
+Parallel mutable lanes require disjoint owned paths and no dependency on unintegrated output.
+The driver serializes dependency installation and complete test, build, lint, Foundry/Docker, and screenshot gates from the fully integrated coordinator branch.
+Follow the canonical mechanics in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for assignment briefs, review artifacts, integration mapping, feedback revisions, conflicts, and cleanup.
 
 ### Auto-spawn routing
 
@@ -58,12 +80,200 @@ Worked examples:
 - A change touching `src/ui/svelte/apps/manager/EnvironmentEditView.svelte` and `lang/en.json` matches the always row, the UI row (`**/*.svelte`), and the domain row (`lang/**`): plan-review runs `fabricate_ux_designer` and `fabricate_domain_expert`, post-implementation review runs `fabricate_reviewer` and `fabricate_ux_designer`, and the docs loop runs `fabricate_docs_writer` with `fabricate_domain_expert`.
 - A change touching `src/systems/GatheringEngine.js` and `tests/gathering-engine-listing.test.js` matches the always row, the domain row (`src/systems/**`), and the tests row (`tests/**`); `foundry_integrator` joins only when the diff also adds or edits one of the Foundry identifiers above.
 
+### Model tier routing
+
+Every routing token above names a role **family**, not a binding.
+Six families — `fabricate_implementer`, `fabricate_reviewer`, `fabricate_domain_expert`, `fabricate_ux_designer`, `fabricate_quality_engineer`, and `foundry_integrator` — are bound at three **model tiers** ordered by capability, `small` < `medium` < `large`, so the driver routes each spawn to the cheapest model that can hold its scope.
+The other four roles are untiered and are pinned to a single model tier each.
+A model tier changes the model pin and nothing else: all three bindings of a family point at the same canonical `.agents/skills/<family>/SKILL.md`, and no per-model-tier skill directory exists.
+
+"Model tier" is written in full on first use in a section.
+A bare "tier" belongs to the crafting domain's existing success/outcome vocabulary and never to these three.
+
+| Model tier | Claude `model:` | Codex `model`   | Codex `model_reasoning_effort` |
+|------------|-----------------|-----------------|--------------------------------|
+| `small`    | `haiku`         | `gpt-5.6-luna`  | `low`                          |
+| `medium`   | `sonnet`        | `gpt-5.6-terra` | `medium`                       |
+| `large`    | `opus`          | `gpt-5.6-sol`   | `high`                         |
+
+These pins are declared once in `scripts/lib/agentModelTiers.js` and mirrored by this table; `npm run validate:agents` fails any binding that drifts from them.
+The model tier is an **underscore** suffix in token space (`fabricate_implementer_small`) and a **hyphen** suffix in file space (`.codex/agents/fabricate-implementer-small.toml`), because the two namespaces already differ that way.
+This is mechanical, not cosmetic: the bindings-table parser matches a token cell against a bare backticked `(fabricate|foundry)_\w+` pattern, and `\w` covers `_` but not `-`, so a hyphenated token cell would be silently skipped and that role would lose every binding check.
+
+The four untiered roles are pinned as follows.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Role                            | Model tier | Rationale                                                                       |
+|---------------------------------|------------|---------------------------------------------------------------------------------|
+| `fabricate_orchestrator`        | `large`    | Owns routing and the iteration loops.                                            |
+| `fabricate_docs_writer`         | `medium`   | Bounded JSDoc and Jekyll edits against an already-approved diff.                  |
+| `fabricate_competitive_analyst` | `large`    | Rare, research-heavy, judgement-dense; model-tiering it would save little.        |
+| `fabricate_pr_explorer`         | `small`    | Read-only codebase mapping. Codex binding only — Claude uses the built-in `Explore` agent, which has no repository binding and whose model this repository cannot set. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+#### Selecting a model tier
+
+Model-tier selection is the driver's, and it is literal.
+It is resolved **once per spawn**, keyed on the `(family token, stage, revision)` triple — not once per token.
+The routing table's Stage column already schedules one family at two stages, and those spawns see different facts, so they may legitimately resolve to different model tiers.
+
+The driver uses only facts it mechanically holds at that spawn point.
+
+| Stage                                 | Keyed path set                                                                                                                          | Size metric                                    | Rule 2 source                                                                                                                                           |
+|---------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| plan-review                           | the delta's proposed affected-files list, **intersected with the globs of the path-signal routing-table row that spawned this reviewer** | count of `### Tasks` items                     | the strongest `Lane surface` among the `### Tasks` entries whose declared paths intersect this reviewer's keyed path set, or `none` when none intersects |
+| implementation                        | the lane's owned-path set from the assignment brief                                                                                       | count of `### Tasks` items owned by the lane   | the lane's `Lane surface` field                                                                                                                         |
+| post-implementation review, docs loop | `git diff --name-only` against the assigned base, on the driver-generated immutable artifact, intersected with the spawning path-signal row's globs | added + deleted lines from `git diff --numstat` | the artifact: an added `export` line                                                                                                                    |
+
+`git diff` is an input for post-implementation stages only.
+The implementer is the agent that *creates* the diff, and plan-review runs before any implementation exists, so neither has one.
+
+Rule 2's review-stage source is the added-`export` line **only**, deliberately excluding added files.
+An added file is what makes the tests row fire in the first place, so keying on it would resolve `fabricate_quality_engineer` to `large` on every change that adds a test — the same always-`large` failure that row intersection fixes.
+Excluding added files also removes any dependence on ambient `diff.renames` configuration, which decides whether a rename reports as `R` or as `A` plus `D`.
+
+**Row intersection.**
+A reviewer spawned by a **path-signal** routing-table row is scored only on the paths that row's globs matched — the driver already computed that intersection to build the roster.
+Without it, one `package.json` touch would force every parallel plan reviewer to `large` at the workflow's highest-fan-out stage, which is precisely the outcome model tiers exist to avoid.
+Intersection applies to path-signal rows only.
+A **content-signal** row (Foundry identifiers, competitor questions, PR investigation) has no globs, so its reviewer scores on the **unintersected** set, exactly like the always-row roles.
+The Foundry row is mixed: intersect on its path globs when it matched on those, and score unintersected when it matched on content.
+The always-row roles `fabricate_implementer` and `fabricate_reviewer` own the whole change and always score unintersected.
+
+**`HIGH_RISK_PATHS`.**
+Any match forces `large`.
+The list lives here, once, next to the ladder.
+Its matching semantics and the list itself are inside one fenced block so that no illustrative path is read as a repository reference by the harness path-existence gate.
+
+```text
+Entries are root-anchored, repo-relative POSIX paths.
+`**` matches one or more path segments.
+An entry without `**` matches that exact path only, never a basename — so a nested
+src/ui/package.json would not match the root package.json entry.
+
+module.json
+package.json
+package-lock.json
+src/main.js
+src/migration/**
+scripts/**
+.github/workflows/**
+release.config.js
+release.s3.config.json
+AGENTS.md
+CLAUDE.md
+.agents/skills/**
+.claude/agents/**
+.codex/agents/**
+```
+
+The agent-harness paths are on the list because a mistake there mis-routes every future change.
+`openspec/specs/**` is deliberately **not** on the list — forcing it to `large` would make the `fabricate_domain_expert` lane permanently `large` and erase the saving for the role that touches specs most.
+It carries a `medium` floor instead (see the floors below), because the routing table schedules `fabricate_domain_expert` at plan-review and the docs loop but **never** at post-implementation review: a spec change that does not trip the docs row has its actual canonical-spec diff reviewed by `fabricate_reviewer` alone, and the cheapest model must not author or review canonical requirement text unaccompanied.
+
+**Base model tier — first match wins.**
+
+| # | Condition                                                                              | Model tier |
+|---|----------------------------------------------------------------------------------------|------------|
+| 1 | Any path in the keyed path set matches `HIGH_RISK_PATHS`                                 | `large`    |
+| 2 | The lane's rule 2 source is anything other than `none`                                   | `large`    |
+| 3 | The keyed path set holds 3 or more paths                                                 | `large`    |
+| 4 | The size metric exceeds `MEDIUM_MAX`                                                     | `large`    |
+| 5 | The keyed path set holds exactly 1 path and the size metric is at or below `SMALL_MAX`   | `small`    |
+| 6 | Otherwise, including whenever any input above is unavailable                             | `medium`   |
+
+| Stage                     | `SMALL_MAX`              | `MEDIUM_MAX`              |
+|---------------------------|--------------------------|---------------------------|
+| plan-review               | 3 delta tasks            | 8 delta tasks             |
+| implementation            | 1 owned delta task       | 4 owned delta tasks       |
+| post-implementation, docs | 50 added + deleted lines | 400 added + deleted lines |
+
+Rules 1 to 4 all yield `large`, so their overlap is harmless under first-match-wins; rules 5 and 6 are disjoint and rule 6 is total, so the ladder always returns exactly one model tier.
+Rule 6 is the default, and it defaults **up** to `medium`, never down to `small`.
+`small` requires a positive, narrow match on rule 5; nothing falls into `small` by omission.
+The 2-path case resolving to `medium` is a deliberate, stated relaxation of "single-file": a module plus its co-located test is one concern, not two, and treating it as `large` would make `large` the common case and erase the saving model tiers exist to produce.
+
+**Rule 2's input is authored at plan time, not judged at spawn time.**
+Each `### Tasks` entry in the issue delta carries a literal field:
+
+```text
+Lane surface: new-module | new-export | persisted-shape | none
+```
+
+Rule 2 then reads as a lookup, not a reading of prose.
+At post-implementation stages the field is ignored and rule 2 is derived from the artifact instead, per the keyed-input table above.
+
+**Worked examples.**
+
+- **A harness change whose implementation lane owns `AGENTS.md`, `.claude/agents/**`, `scripts/validate-agent-bindings.mjs`, and `package.json`.**
+Four `HIGH_RISK_PATHS` matches.
+Rule 1: `large`.
+- **Plan-review of a UI change that also touches `package.json`.**
+The `fabricate_ux_designer` spawn intersects the change with its row's globs (`src/ui/**`, `styles/**`, `**/*.svelte`), so `package.json` is not in its keyed set; 2 Svelte files, 5 delta tasks.
+Rules 1 to 4 miss, and rule 5 needs exactly 1 path.
+Rule 6: `medium`.
+The `fabricate_reviewer` spawn scores unintersected, hits `package.json`, and is `large`.
+- **A `lang/en.json` string correction, implementation lane.**
+One owned path, no high-risk match, `Lane surface: none`, 1 owned task.
+Rule 5: `small`.
+- **A Svelte component fix that adds an exported helper.**
+One owned path, but `Lane surface: new-export`.
+Rule 2: `large`.
+- **Post-implementation review of a 2-file, 180-line diff under `src/systems/`.**
+No high-risk match, no added file and no added `export`, 2 files, and 180 lines is above `SMALL_MAX` and below `MEDIUM_MAX`, while rule 5 needs exactly 1 path.
+Rule 6: `medium`.
+
+**Model-tier floors.**
+Applied after the base model tier; they only ever raise it, and every floor clamps at `large`.
+
+- A lane's model tier never decreases across revisions of the same `(family, stage)`.
+The floor is the **highest model tier at which the lane actually executed** in a previous revision — not the model tier it was originally resolved to.
+Without this, a lane that resolved `small`, escalated, and completed at `medium` would re-resolve to `small` from the same unchanged facts next revision and pay the identical wasted spawn again, since the ladder itself has no memory.
+- A revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier.
+- A lane whose keyed path set includes `openspec/specs/**` floors at `medium`.
+
+#### `ESCALATE_TIER`
+
+An agent of a model-tiered family that finds its assignment exceeds its model tier returns `ESCALATE_TIER: <reason>` on its first line rather than guessing.
+It is named `ESCALATE_TIER`, not `ESCALATE`, because this file and two canonical skills already use "escalating to the user" for the 3-revision cap, which is the opposite direction of travel.
+
+- **It is available only to the six model-tiered families.**
+An untiered role (`fabricate_orchestrator`, `fabricate_docs_writer`, `fabricate_competitive_analyst`, `fabricate_pr_explorer`) has no model tier above it to escalate into and returns `BLOCKED` with the reason instead.
+- **It is not a verdict.**
+It never satisfies a loop's acceptance condition, never counts as `APPROVED`, and is not a `BLOCKED` stop condition.
+It is defined for mutable roles too, whose first line is not a verdict at all.
+- **It is returned before the lane's first edit**, immediately after the lane identity checks in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
+The driver honours it only after mechanically confirming the lane has zero commits, `git status --short` is empty, and `HEAD` equals the assigned base; any other escalating lane is preserved and reported as `BLOCKED`.
+- **The driver disposes that clean lane** and creates a fresh lane at the same assigned base with the same owned paths, exactly one model tier up.
+- **An escalation does not consume a loop revision**, because a revision is defined by reviewer findings, not by model-tier capability.
+- **At most one escalation per `(family, stage, revision)`** — not per lane.
+The fresh lane inherits the spent budget, so `small` to `medium` to `large` in one revision is not permitted; a second escalation is `BLOCKED`.
+This is what bounds the worst case at two spawns per revision, since a per-lane budget would reset on every fresh lane.
+- **`ESCALATE_TIER` from a `large` lane is a protocol error.**
+The driver converts it to `BLOCKED` and surfaces it under the existing stop condition.
+- **Feedback rule.**
+When a `small` spawn escalates on a recurring assignment shape, move that shape up the ladder in this file.
+
+Because an escalation does not consume a revision, a family-named lane would collide with itself at the same revision, so the model-tiered token appears in the lane **branch** and the lane **directory** name alike — including for detached read-only lanes, which have no branch to disambiguate them.
+The assignment brief records the resolved model tier and the facts it was resolved from.
+See `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for the lane mechanics.
+
+An escalation is pure waste, not partial progress — the second spawn repeats the full orientation cost.
+The default-up rule, the executed-model-tier floor, the once-per-revision bound, and the requirement that the driver front-load selection from cheap facts it already holds are what keep the expected cost below the flat-`large` baseline.
+
 ### Iteration cycles
 
 Three loops run until acceptance, each capped at 3 revisions before escalating to the user:
 
 In every loop, reviewers return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
 Reviewers do not post verdicts (or other workflow notes) as GitHub issue or PR comments.
+
+The verdict vocabulary is `APPROVED / NEEDS_CHANGES / BLOCKED` (and `DOCS APPROVED / DOCS NEEDS_CHANGES` in the docs loop).
+`ESCALATE_TIER: <reason>` is **not** a verdict: it never satisfies a loop's acceptance condition, never counts as `APPROVED`, and is not a `BLOCKED` stop condition.
+Only the six model-tiered families may return it; an untiered role has no model tier above it and returns `BLOCKED` with the reason instead.
+See [Model tier routing](#model-tier-routing).
 
 1. **Plan review loop.** The driver drafts the OpenSpec delta in the issue's `openspec-delta` block (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table.
 Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the delta, returning its verdict to the driver rather than commenting on the issue.
@@ -76,10 +286,35 @@ The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and 
 Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`.
 Loop until both approve.
 
+### Final maintainer handoff
+
+Before asking the maintainer to review a PR, the workflow driver completes a final delivery loop from the coordinator checkout.
+Draft-head checks are preflight evidence only because some CI workflows may run only on the `ready_for_review` event.
+
+1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
+2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
+3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.
+4. Determine mechanically whether the rebase materially changed the implementation reviewer's owned concern or left an unresolved finding.
+Reuse the valid approval for a patch-equivalent rebase; when repeat review is required, create a fresh detached implementation-review lane pinned to the exact rebased commit and supply an immutable diff artifact.
+Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical spec, or documentation content.
+5. Update the remote branch only with `git push --force-with-lease=<branch>:<expected-sha>`.
+A rejected lease stops the loop for investigation; never retry with `--force` or an unqualified force push.
+6. Mark the PR ready for review, then wait for every required GitHub Actions and external check triggered for that exact head.
+Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
+Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
+7. On any failure, return the PR to draft before gathering evidence and routing fixes through the normal isolated implementation and review loops.
+After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks, repeating review only for a materially changed owned concern or unresolved finding.
+8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
+If main advanced, the head changed, or the PR returned to draft, repeat the mandatory delivery steps and apply step 4's material-change review rule.
+
+Only hand the PR to the maintainer after all final-delivery conditions are true on the same commit.
+
 ### Stop conditions
 
 - Any reviewer returning `BLOCKED` halts the loop and surfaces to the user.
 - Hitting the 3-revision cap on any loop halts and surfaces to the user with the outstanding findings.
+- An `ESCALATE_TIER` return is **not** a stop condition and does not consume a revision: the driver disposes the proven-clean lane and respawns it one model tier up.
+A second escalation within the same `(family, stage, revision)`, an escalation from a `large` lane, an escalation from an untiered role, or an escalating lane that is not provably clean at its assigned base all become `BLOCKED` and halt under the first bullet.
 - User intervention takes precedence; treat user guidance as the new entry condition for the next iteration.
 
 ### Confirming work and resolving findings
@@ -113,6 +348,7 @@ Its glob enumerates a fixed set of test directories (see the `test` script in `p
 A test placed in a directory the glob does not list is NOT gated, even though it passes when run directly with `node --test <file>`.
 When adding a test in a new directory, add that directory to the `test` script and confirm the total count rises under `npm test`.
 A mounted-component test that references a `.svelte` (or imported module) missing from its harness allowlist does not fail — it hangs and is reported as `# cancelled`, so after adding/rendering a component confirm `# cancelled 0`, not just `# fail 0` (see the implementer skill).
+The unit-test bar is `# cancelled 0` as well as `# fail 0`: a parallel run under machine load (a concurrent `npm ci` in another worktree, for instance) produces cancellations that read like failures, so on any cancellation re-run with `--test-concurrency=1` and account for the delta before diagnosing a real break.
 - **SonarCloud quality gate** — a separate CI job evaluated on the PR's *new code*, distinct from `npm run lint`.
 It fails on `new_duplicated_lines_density > 3%`, and SonarCloud Automatic Analysis **does not honor `sonar.cpd.exclusions`** from `sonar-project.properties`: duplication in `tests/**` and `scripts/**` fixtures counts against the gate exactly like `src/`.
 Keep new test/fixture/script code DRY (shared helpers like `createMountedComponentHarness`, hoisted constants); the only durable way to exempt a path is the maintainer-set **Duplication Exclusion** in the SonarCloud project UI.
@@ -121,9 +357,12 @@ The gate also fails on new bugs/code-smells that ESLint does not flag (e.g. `Arr
 The ones that bite in practice: `Math.random()` for an id or token (`S2245`, a MEDIUM vulnerability — use `crypto.randomUUID()` / `crypto.getRandomValues()` / `foundry.utils.randomID()`), and spawning a bare command name resolved through `PATH` such as `spawnSync('git', …)` (`S4036` — read the data from stdin, or pass a fixed executable path, rather than searching `PATH`).
 For GitHub Actions workflows the gate adds its own rules: no `${{ inputs.* }}` / `${{ github.* }}` interpolated into a `run:` block (`S7630` — pass them through `env:` and reference `$VAR`); declare `permissions:` at the **job** level on any new job (`S8264`); and SHA-pin third-party actions such as `aws-actions/*` (`S7637`; `actions/*` are allowlisted).
 A **composite action** (`.github/actions/release-setup/action.yml`) has **no `secrets`/`vars` context** — only `inputs`/`env`/`github`/`runner`/`steps`/`job` — so a `${{ vars.* }}` / `${{ secrets.* }}` moved into one resolves to an empty string silently; declare those as `inputs` the caller passes explicitly.
-- Reading a smoke result: `test-results/summary.json` reports `passed: false` if any phase step fails OR if an un-waived `consoleErrors[]` entry remains, and also carries the split counts `stepFailures` and `consoleErrorCount` (both written in the harness's `finally` block, so an early phase abort still populates them, never `undefined`).
+- Reading a smoke result: `test-results/summary.json` reports `passed: false` if any phase step fails OR if an un-waived `consoleErrors[]` entry remains, and also carries the split counts `stepFailures` and `consoleErrorCount` plus the flags `degraded` and `rendererCrashed` (all written in the harness's `finally` block, so an early phase abort still populates them, never `undefined`).
 Benign browser `404 (Not Found)` asset misses in the fixture world populate `consoleErrors` and flip `passed` to false even when every `steps[]` entry passed.
 A known-benign console or `pageerror` line can be admitted per run via `--allowed-console-error-patterns` (appended to the in-source defaults like `/reading 'OBJECTS'/`, never replacing them; waived lines are echoed to the step summary), but a failing `steps[]` entry is NEVER waivable and still throws first.
+`degraded: true` marks a run that tolerated a transient renderer/page teardown (a `screenshot-manager`/`player-journal` step recorded `skipped: true`) — the run stays exit 0 but is a flake, not a clean pass; `rendererCrashed: true` marks a Playwright page `crash` (canonically an OOM).
+A JS product bug surfaces via `consoleErrorCount` (the independent console-error gate), NOT the teardown-tolerance path — a tolerated teardown coincident with any non-waived console error still fails on the console gate; the tolerance can only mask a renderer PROCESS crash (OOM/target-destroyed) and only post-captures.
+A `rendererCrashed: true` exit-0 run warrants a confirming re-run, and a PERSISTENT `rendererCrashed` pattern is actionable (a systematic tail OOM), not cosmetic.
 Check `steps[]` for an actual failing step before treating a run as broken or discarding its screenshots — see the "Foundry integration (smoke) tests" section in `CONTRIBUTING.md`.
 - `npm run build` — required build gate for implementation changes.
 - `npm run lint` + `npm run lint:css` + `npm run format:check` + `npm run lint:md` — required ESLint + Stylelint + Prettier + markdownlint gate (the `lint` CI job).
@@ -136,8 +375,9 @@ Run `npm run lint:md:fix` to auto-split prose, re-running until the count stops 
 - For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
 - Fall back to `npm run test:foundry` when a change depends on real Foundry runtime behavior, when no Vite dev server is available, or when clean reproducible screenshots are needed.
 - UI-changing PRs (files under `src/ui/`, `styles/`, or any `*.svelte`/`*.css`) must include real smoke-run screenshot evidence for the relevant changed views before opening or updating the PR; a `lang/` change requires screenshots only when the same PR also changes one of those render files.
-Use `npm run screenshots:ui:plan -- --base origin/main` to identify expected views, run `npm run test:foundry` (local default `full` profile) to produce real Foundry screenshots under `test-results/`, `npm run screenshots:ui -- --base origin/main --pr <number>` to collect the relevant smoke artifacts into `tmp/pr-screenshots/<number>/`, then `npm run screenshots:ui:publish -- --pr <number>` to upload them to S3 (under `pr-screenshots/<number>/`) and embed the returned `![pr-<number> ...]` image markdown into a managed block in the PR body's `Screenshots (if applicable)` section, then `npm run screenshots:ui:clean -- --pr <number>` so PR-scoped screenshots are not committed as repository assets.
-Do NOT run the full smoke profile on a GitHub Actions runner — generation is local.
+Use `npm run screenshots:ui:plan -- --base origin/main` to identify expected views, run the scoped `screenshots` profile (`npm run test:foundry:screenshots -- --target-labels=$(npm run --silent screenshots:ui:targets -- --base origin/main)`) to produce real Foundry screenshots for only the changed-file-affected views under `test-results/`, `npm run screenshots:ui -- --base origin/main --pr <number>` to collect the relevant smoke artifacts into `tmp/pr-screenshots/<number>/`, then `npm run screenshots:ui:publish -- --pr <number>` to upload them to S3 (under `pr-screenshots/<number>/`) and embed the returned `![pr-<number> ...]` image markdown into a managed block in the PR body's `Screenshots (if applicable)` section, then `npm run screenshots:ui:clean -- --pr <number>` so PR-scoped screenshots are not committed as repository assets.
+The reduced `rc`/`ci` smoke stays the CI/release gate and `full` remains the occasional outer-loop suite; do NOT run the `full` (or `screenshots`) smoke profile on a GitHub Actions runner — generation is local.
+The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs`, the branch adds a capture state that reaches it rather than publishing an unrelated frame.
 The `check-screenshots` gate cannot be self-satisfied: there is no `SCREENSHOTS_NEEDED:` bypass.
 If capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label (agents must never apply it).
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster icon paths directly when previews need imagery; do not invent custom SVG preview art.
@@ -221,6 +461,24 @@ Two traps.
 (2) Use the **modern `ContextMenuEntry` shape** `{ label, icon, visible, onClick }`, NOT the deprecated `{ name, condition, callback }` (compat-warns per menu open, removed in v15): `visible(target)` returns a boolean, and `onClick(event, target)` takes the target **second** (the old `callback` passed `(target, event)` reversed).
 The entry element is a raw `HTMLElement`; read the pack id from `target.dataset.pack`.
 See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `main.js` wiring.
+- **V13 progress notifications** are `ui.notifications.info(msg, { progress: true, console: false })`, which returns a handle whose `handle.update({ pct, message })` advances the bar (`pct` on `[0, 1]`); this superseded `SceneNavigation.displayProgressBar` (a deprecated 13→15 shim the native scene loader no longer uses).
+Pass `console: false` for scene-loader parity, or every tick also writes a `console.info` line.
+This whole `{ progress: true }` + handle API is **identical across V13 and V14** (introduced in the V13 notifications refactor, confirmed against V14.361 source), so no version branch or `module.json` compatibility change is needed.
+A progress toast is **lifetime-exempt** — it ignores the normal 5 s dismissal and only self-dismisses when it reaches `pct: 1`, so a run that ends below `1` must tear its own bar down or it lingers until reload.
+The default reporter therefore owns an idempotent terminal `dismiss()` seam, and `importFromPackData` guarantees a terminal state on **every** exit path — success, an already-installed skip, AND a throw before the `pct:1` completion tick (its catch calls `dismiss()` to remove the still-open toast, then re-throws the original error unchanged) — so a failed import no longer leaves a frozen bar on screen.
+Tear the bar down with the handle's own `handle.remove()` (immediate and queue-safe): NOT `ui.notifications.remove(handle)`, whose class method throws on an undefined/stub handle, and NOT `update({ pct: 1 })`, which flashes the bar to a misleading SUCCESS state.
+Two guards are mandatory: `.update()` can **throw before the toast renders** when it is queued behind the visible-toast cap, and a test stub for `info` returns `undefined` (no `.update`) — so wrap the update in try/catch and no-op on a falsy handle (the same falsy-handle / missing-method / teardown-throw guards wrap `handle.remove()`).
+A stateful default reporter (opens one toast, then drives it) must be built **per run**, not once per long-lived importer, or a second run updates the first run's already-dismissed toast.
+See `createDefaultProgressReporter` (`src/systems/CompendiumImporter.js`).
+- **`CompendiumCollection#getIndex` already self-caches per pack**: a call whose `fields` are a subset of the pack's already-`#indexedFields` short-circuits to the cached index, and `clear()` does not reset it.
+So wrapping `getIndex` in a memo saves nothing — the residual cost of a per-item miss scan is the linear walk of the index, and the fix is a per-run `Map<nameLower, entry[]>` name→entry lookup, not memoizing the build.
+- **Item drop payloads onto a manager drop zone come in three item-bearing shapes**, all resolved by `services.collectImportFolderGroups` / `onDropItem` (`src/ui/SvelteCraftingSystemManagerApp.svelte.js`).
+A **world folder** is `{ type: 'Folder', uuid: 'Folder.<id>' }` (v13 drags carry the uuid, not a bare `id`) — resolve it with `fromUuidSync` and walk `folder.contents` + descendant folders.
+An **in-pack folder** is `{ type: 'Folder', uuid: 'Compendium.<pack>.Folder.<id>' }` (it carries a `folder.pack` packId).
+A **whole pack** is `{ type: 'Compendium', collection: '<packId>' }` (no folder in the payload).
+For BOTH compendium cases, read folder membership from `pack.index[].folder` — a **default-indexed** Item field, so grouping loads no documents — grouped by folder, with display names from `pack.folders`.
+Do **NOT** use `Folder#getSubfolders` for a packed folder: it filters `game.folders` (world-only) and returns `[]` for an in-pack folder, silently dropping nested items; derive the in-pack subtree from the `pack.folders` parent links instead (`descendantFolderIdSet` in `src/ui/svelte/util/importFolderGroups.js`).
+A compendium-**directory** world folder (resolved `folder.documentType === 'Compendium'`) groups packs, not items, and has no item-level grouping — skip it with a notice.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
 - `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
@@ -237,9 +495,13 @@ Do not add scoped focus CSS in components — it duplicates the area block and n
 New top-level app surfaces need their own focus block; a partial rule reads as "handled" but isn't.
 See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
 - Preserve `flags.core.sourceId` when embedded items must map back to a world item.
-- Fabricate runs configured macros through `MacroExecutor.run(uuid, context)` (`src/utils/MacroExecutor.js`), **not** `Macro#execute`.
-  It compiles `macro.command` into an `AsyncFunction` invoked with `(context, args, game, foundry, ui, fromUuid)` — so a Fabricate macro receives `context` (also aliased as `args`) and the explicit globals, and does **not** get Foundry's `Macro#execute` locals (`actor`/`token`/`speaker`/`character`/`scope`).
-  A thrown error propagates to the caller (no Foundry notification-swallow), which is why a currency payment-gate macro that throws aborts the craft loudly instead of silently passing.
+- Fabricate runs configured macros through `MacroExecutor.run(uuid, payload)` (`src/utils/MacroExecutor.js`), **not** `Macro#execute`.
+Foundry V13.351 `client/documents/macro.mjs` gates `Macro#execute(scope)` on the current user's Macro permission and requires LIMITED permission.
+Fabricate evaluates the configured command directly so player-initiated crafting can run GM-selected automation; this bypasses only that client-side Macro document gate and grants the current player no additional server or document authority.
+The generated `AsyncFunction` receives `(context, args, scope)`, with all three names referencing the identical Fabricate payload object.
+This is identifier-level compatibility, not full native execution semantics: Foundry constructs its native `scope` as a rest copy and also provides `actor` / `token` / `speaker` / `character` locals, while Fabricate provides neither the copy nor those additional locals.
+Foundry V13.351 `client/client.mjs` publishes `game`, `foundry`, `ui`, and `fromUuid` on `globalThis`, so Fabricate macros consume those runtime globals directly instead of receiving redundant function parameters.
+A thrown error propagates to the caller (no Foundry notification-swallow), which is why a currency payment-gate macro that throws aborts the craft loudly instead of silently passing.
 - `CraftingSystemManager` uses `getSystems()` and `getItems(systemId)`.
 - V13 `CalendarData#timeToComponents().day` is the day-*of-year* (0-based, and it resets every year), NOT a cumulative campaign day.
 Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).
@@ -262,17 +524,23 @@ It is per-user **within a world**, not per-account globally — the same player 
 Despite being async and replicated, the write is **locally coherent**: the awaited create/update populates the same local collection `ClientSettings#get` reads, so a `get` issued after the `await` returns the new value without waiting on any broadcast.
 That is what makes **flush-before-read an honest ordering guarantee** rather than a hopeful one — `await` the pending write, then start the operation that captures it (issue 675's salvage panel flushes its debounced order write before `salvage()` captures it onto the run record).
 It also means the failure mode to design for is **rejection, not staleness**.
+- **The player salvage order key is derived INDEPENDENTLY at two sites, and they must produce the identical string or the captured order silently reads empty.** The inventory store WRITES the order under `progressiveOrderKey({ scope: 'salvage', id })` (via `salvageOrderId` in `inventoryStore.svelte.js`), and `CraftingEngine.salvage` READS it back through the injected `getPlayerResultOrder` (wired to `_readPlayerResultOrder` in `src/main.js`) at capture time — two separate derivations of the same key.
+Issue 766 made the id composite (`salvage:<systemId>:<componentId>`, because component ids are NOT globally unique across systems), so any change to one derivation that misses the other yields a live key naming nothing: `applyPlayerResultOrder` finds no stored order and falls back to the authored one, with nothing thrown and every unit test that stubs only one side still green.
+Assert the write key equals the capture key in a store↔engine test (the #766 follow-up closed exactly this gap), never just that each side "uses `systemId`".
 - **Setting scope changes ORPHAN data; they never migrate it.** Foundry has no scope-migration facility (`ClientSettings#get` dispatches on scope at read time), so a pre-existing `localStorage` value is simply never read again — never deleted, never an error.
 When claiming "there is no data to migrate", prove it by showing **no writer has ever existed**, not that nothing reads it: "nothing reads it" does not imply absence.
 - **`BaseSetting.canUserCreate` is a UI helper, NOT authorization** — it requires `SETTINGS_MODIFY` (default ASSISTANT), which players lack, and reads like a blocker for user-scoped player writes.
 Real authz is `#canModify`, which passes any user writing their **own** user-scoped setting. `config: false` is orthogonal: only WORLD scope is GM-gated in the settings UI.
 - **A synced `updateWorldTime` handler runs on EVERY client**, so any per-user state read inside one reads the **executing** user, not the owner — and with no primary-GM gate or ownership filter, whichever client wins the race executes.
 Capture owner-scoped state onto the record at start instead of reading it at resume; that makes the invariant structural rather than documented.
-Issue 651's salvage `resultOrder` is the worked example (`SalvageRunManager.createRun` already stamps `userId`, so the capture is auditable); `SalvageRunManager.processWorldTime`'s unguarded actor loop is the open defect (#656).
+Issue 651's salvage `resultOrder` is the worked example (`SalvageRunManager.createRun` already stamps `userId`, so the capture is auditable).
+`SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` were the unguarded case (#656, fixed): both now take an injected `isPrimaryGM` collaborator, defaulting fail-open to `() => true` so unit fixtures still resume, with the real `activeGM` check wired at construction in `src/main.js`.
 Contrast `GatheringEngine`, which gates timed completions on `isPrimaryGM()` explicitly.
-- **`MigrationRunner` has no GM gate** (#657): `initialize()` calls `_runMigrations()` unconditionally and the runner contains zero `isGM`/`game.user` references.
-Safety is emergent and racy — `run()` early-returns once `MIGRATION_VERSION` is bumped, but a player connecting before or concurrently with the GM reaches a world-scoped write that `#canModify` denies and throws.
-Every new migration re-opens that window for one session per world upgrade.
+- **The migration GM gate lives in the CALLER, not `MigrationRunner`** (#657, fixed).
+`MigrationRunner` contains zero `isGM`/`game.user` references, so grepping the runner alone reads as an unguarded world-scoped write path — the wrong conclusion.
+The gate is `_runMigrations` in `src/main.js`, which early-returns unless `game.users?.activeGM?.id === game.user?.id`, so exactly one client runs the pass and no player or assistant races the setting writes.
+Use `activeGM`, not `isGM`: `User#isGM` is true for assistant GMs too, so an `isGM` gate would let the full GM and every assistant transform-and-write concurrently (last-writer-wins).
+When planning a new migration, confirm the gate at the call site rather than inferring its absence from the runner — this note previously asserted that absence and was wrong for every migration added after the fix.
 - **The adminStore view-state projections are a FAMILY of hand-built allowlists** — the `selectedSystem` projection and the recipe-list projection (both in `src/ui/svelte/stores/adminStore.js`), plus `salvageComponentOptions` in `CraftingSystemManagerRoot.svelte` — and a new field is invisible to the UI unless added to each one it must reach.
 For a **default-true** field the failure is worse than absent, it is **inverted**: the editor seeds from `undefined`, reads its default-true, renders ON for an entity the GM authored OFF, and saves that wrong value back.
 Pin such a projection with a `false` fixture — a `true` fixture round-trips green through a dropped field.
@@ -292,6 +560,13 @@ The consequence: **a string occupying a namespace slot silently shadows every ke
 Every child key of the shadowing string is affected at once.
 `tests/ui-lang-keys-resolve.test.js` (PR #674) gates only the **reference direction** (a key the code reads must exist); it does **not** detect a shadowed namespace, and **orphaned keys stay invisible to it entirely**.
 So when adding a key, check no ancestor path is itself a string, and prefer a distinct leaf (`…Salvage.Label`) over reusing a container path as a value.
+- **`setFlag` / `Document#update` OBJECT flags DEEP-MERGE, so removing a key needs an explicit `-=` deletion — whereas `game.settings.set` REPLACES the whole value and needs no deletion key.** This merge-vs-replace split is load-bearing across three subsystems: active-run containers, learned knowledge, and the party learn pool.
+An object flag written through `setFabricateFlag` is stored DOUBLY nested (`flags.fabricate.fabricate.<key>`) because the helper prefixes `fabricate.` and `expandObject` nests it again under the scope, so the deletion key is `flags.fabricate.fabricate.<map>.-=<id>` — a shallow `flags.fabricate.<map>.-=<id>` silently no-ops and the entry resurrects on reload.
+Never prune by rebuilding a filtered map and writing it back through `setFlag` as the sole write — that merge never removes keys.
+A same-`update` parent-delete + re-assert mix (`-=<map>` plus a fresh `<map>` in one payload) is ORDER-DEPENDENT in `mergeObject` (no delete-before-insert guarantee, so it can process the delete last and wipe the whole map); issue TWO sequential awaited updates instead — parent `-=<map>` first, then the retained-map write.
+See `forgetLearnedRecipes` (`src/systems/RecipeVisibilityService.js`) and `deleteRemovedActiveRunFlags` (`src/config/flags.js`) for the worked precedents; the party pool instead lives in a world setting, so its `decrement` re-`set`s the whole map with no `-=` key.
+- **The same merge-vs-replace split makes a dotted id SAFE as a settings-payload VALUE though it is a trap as a flag KEY.** `Recipe.importSource.systemId` (`importSource` in `src/models/Recipe.js`, stamped by `importFromPackData` in `src/systems/CompendiumImporter.js`) can hold a dotted pack id and round-trips intact because it rides inside the `recipes` world setting, which `game.settings.set` JSON-serializes whole — never through `mergeObject`/`expandObject` — so no dot is ever read as a path separator.
+That is why provenance-matched recipe pruning sidesteps the dotted-flag-key trap (where `setFlag`/`expandObject` split a dotted id on EVERY dot and nest it, so the reader silently misses the intended key): the identical dotted id that would degrade a flag key is inert-safe as a settings JSON value.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
@@ -325,6 +600,12 @@ Foundry layer — `src/ui/svelte/util/foundryBridge.js`.** `services.confirmDial
 In tests, `services.confirmDialog` is absent and the store helpers are stubbed directly on the test fixture — the Svelte layer never knows the difference.
 
 **Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/components/manager-mounted.test.js` (locate it with `grep -n confirmDiscardDirty`).
+
+**The `nextView === '<kind>-view'` same-view skip is NOT safe for a view with no `SCOPE_BROWSER_BY_VIEW` entry.** That map in `CraftingSystemManagerRoot.svelte` lists only `recipe-edit`, `recipe-item-edit`, `component-edit`, and `essence-edit`, and `browserViewForScopeChange` falls back to returning the view token unchanged for everything else.
+So a scope-select **system switch** from such a view calls `confirmRouteExit` with the view it is already on, the same-view skip returns `true`, and the guard silently never fires — even though the draft belongs to the outgoing system and is about to be abandoned.
+A view in that position needs a separate identity-change check invoked from `changeScopeSystem` before `confirmRouteExit`; `confirmSystemDetailsScopeChange` is the worked example (issue 767).
+`environment-edit` and `tools` also pair a same-view skip with no map entry, so check them against their own scope-change paths before assuming they are covered.
+Keep the same-view skip as well: a genuine same-view re-entry on the SAME system (the validation-blocker link) leaves the form mounted with its draft intact, so prompting there is a spurious dialog.
 
 **Anti-patterns:** adding `globalThis.confirm(message)` as a fallback (DialogV2 is always present in Foundry; missing-DialogV2 means a test environment that should stub the store helper); adding a `services?.confirmDiscard{Kind}Draft?.()` seam that nothing wires up in production; skipping the dirty check at the Svelte layer and relying solely on the store helper (the Svelte layer is the source of truth for which view is active and whether its draft is dirty; the store helper just asks the user).
 
@@ -480,13 +761,16 @@ Apply them to new content and to any section you are already editing.
 
 ## Git Conventions
 
-- All implementation, documentation, and workflow-file changes must happen on a non-`main` branch.
-- Before editing, verify the current branch (`git branch --show-current`).
-If it is `main`, create or switch to a task branch first.
-Re-check after any merge — merging a PR can move the local checkout to `main`, so a branch you were on earlier may no longer be current.
-- When the work is complete, commit to that branch, push it, and open a PR targeting `main`.
-- Respond to review feedback by updating the same branch and PR; do not open replacement PRs unless the user asks.
-- Review-only agents inspect the active branch and PR, and must not merge to `main`.
+- All implementation, documentation, and workflow-file changes must happen on a non-`main` integration or lane branch.
+- Before editing, the driver verifies the coordinator branch, and every mutable spawned agent verifies the branch and base in its assignment (`git branch --show-current` and `git rev-parse HEAD`).
+If the coordinator is on `main`, the driver creates or switches to a task branch before fan-out; a spawned agent treats any lane identity mismatch as blocked.
+Re-check after any integration or merge because the expected branch or SHA may have changed.
+- When a spawned agent completes work, it commits only owned paths locally and returns the commits to the driver without pushing or opening a PR.
+The driver verifies and integrates lane commits, then pushes the integration branch and opens or updates the PR targeting `main`.
+- Respond to review feedback through a valid retained lane or a fresh revision lane, then update the same integration branch and PR; do not open replacement PRs unless the user asks.
+- When review is required, review-only agents inspect fresh detached snapshots of the exact assigned integration commit against an immutable artifact and must not commit, push, merge, or mutate GitHub state.
+- Before maintainer handoff, complete the final delivery loop: rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across a patch-equivalent rebase or obtain fresh detached review when the owned concern materially changed or a finding remains unresolved, explicit-lease push, mark ready, require all exact-head checks including both SonarCloud checks, then re-fetch main and reverify ancestry, head identity, and ready state.
+- Treat draft checks as preflight only; a required workflow may be triggered by `ready_for_review` and must pass after the PR is undrafted.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 - PR descriptions must include a GitHub closing keyword for the issue the PR resolves: put `Closes #<issue>` (or `Fixes #<issue>` / `Resolves #<issue>`) on its own line in the `Description` section so merging the PR auto-closes the issue.
@@ -514,35 +798,65 @@ Bundling is acceptable when changes overlap on the same files such that hunk-spl
 
 ## Agent Roles & Bindings
 
-Each role is defined **once** in its shared `skills/<role>/SKILL.md` (the canonical persona).
+Each role is defined **once** in its shared `.agents/skills/<role>/SKILL.md` (the canonical persona and Codex repository-discovery location).
 Both provider agents are **thin bindings** that point at that skill — change behavior in the
 skill, not in the bindings.
 The default workflow above auto-spawns these roles based on change
 signals; explicit requests are only required for roles the routing table does not cover.
 
-| Routing token                  | Canonical skill (persona)                  | Codex binding                                | Claude `subagent_type`        |
-|---------------------------------|--------------------------------------------|----------------------------------------------|-------------------------------|
-| `fabricate_orchestrator`        | `skills/fabricate-orchestrator/SKILL.md`   | `.codex/agents/fabricate-orchestrator.toml`  | `fabricate-orchestrator`      |
-| `fabricate_implementer`         | `skills/fabricate-implementer/SKILL.md`    | `.codex/agents/fabricate-implementer.toml`   | `fabricate-implementer`       |
-| `fabricate_reviewer`            | `skills/fabricate-reviewer/SKILL.md`       | `.codex/agents/fabricate-reviewer.toml`      | `fabricate-reviewer`          |
-| `fabricate_domain_expert`       | `skills/fabricate-domain-expert/SKILL.md`  | `.codex/agents/fabricate-domain-expert.toml` | `fabricate-domain-expert`     |
-| `fabricate_docs_writer`         | `skills/fabricate-docs-writer/SKILL.md`    | `.codex/agents/fabricate-docs-writer.toml`   | `fabricate-docs-writer`       |
-| `fabricate_ux_designer`         | `skills/fabricate-ux-designer/SKILL.md`    | `.codex/agents/fabricate-ux-designer.toml`   | `fabricate-ux-designer`       |
-| `fabricate_quality_engineer`    | `skills/fabricate-quality-engineer/SKILL.md` | `.codex/agents/fabricate-quality-engineer.toml` | `fabricate-quality-engineer` |
-| `foundry_integrator`            | `skills/foundry-integrator/SKILL.md`       | `.codex/agents/foundry-integrator.toml`      | `foundry-integrator`          |
-| `fabricate_competitive_analyst` | `skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml` | `fabricate-competitive-analyst` |
-| `fabricate_pr_explorer`         | — (no shared skill; read-only mapping)     | `.codex/agents/fabricate-pr-explorer.toml`   | `Explore` (built-in)          |
+Each row below is one **binding**, so a model-tiered family occupies three rows that share one canonical skill and differ only by model pin.
+[Model tier routing](#model-tier-routing) explains how the driver picks which of the three a given spawn uses.
+
+| Routing token                     | Canonical skill (persona)                               | Codex binding                                          | Claude `subagent_type`           |
+|-----------------------------------|---------------------------------------------------------|--------------------------------------------------------|----------------------------------|
+| `fabricate_orchestrator`          | `.agents/skills/fabricate-orchestrator/SKILL.md`        | `.codex/agents/fabricate-orchestrator.toml`            | `fabricate-orchestrator`         |
+| `fabricate_implementer_small`     | `.agents/skills/fabricate-implementer/SKILL.md`         | `.codex/agents/fabricate-implementer-small.toml`       | `fabricate-implementer-small`    |
+| `fabricate_implementer_medium`    | `.agents/skills/fabricate-implementer/SKILL.md`         | `.codex/agents/fabricate-implementer-medium.toml`      | `fabricate-implementer-medium`   |
+| `fabricate_implementer_large`     | `.agents/skills/fabricate-implementer/SKILL.md`         | `.codex/agents/fabricate-implementer-large.toml`       | `fabricate-implementer-large`    |
+| `fabricate_reviewer_small`        | `.agents/skills/fabricate-reviewer/SKILL.md`            | `.codex/agents/fabricate-reviewer-small.toml`          | `fabricate-reviewer-small`       |
+| `fabricate_reviewer_medium`       | `.agents/skills/fabricate-reviewer/SKILL.md`            | `.codex/agents/fabricate-reviewer-medium.toml`         | `fabricate-reviewer-medium`      |
+| `fabricate_reviewer_large`        | `.agents/skills/fabricate-reviewer/SKILL.md`            | `.codex/agents/fabricate-reviewer-large.toml`          | `fabricate-reviewer-large`       |
+| `fabricate_domain_expert_small`   | `.agents/skills/fabricate-domain-expert/SKILL.md`       | `.codex/agents/fabricate-domain-expert-small.toml`     | `fabricate-domain-expert-small`  |
+| `fabricate_domain_expert_medium`  | `.agents/skills/fabricate-domain-expert/SKILL.md`       | `.codex/agents/fabricate-domain-expert-medium.toml`    | `fabricate-domain-expert-medium` |
+| `fabricate_domain_expert_large`   | `.agents/skills/fabricate-domain-expert/SKILL.md`       | `.codex/agents/fabricate-domain-expert-large.toml`     | `fabricate-domain-expert-large`  |
+| `fabricate_docs_writer`           | `.agents/skills/fabricate-docs-writer/SKILL.md`         | `.codex/agents/fabricate-docs-writer.toml`             | `fabricate-docs-writer`          |
+| `fabricate_ux_designer_small`     | `.agents/skills/fabricate-ux-designer/SKILL.md`         | `.codex/agents/fabricate-ux-designer-small.toml`       | `fabricate-ux-designer-small`    |
+| `fabricate_ux_designer_medium`    | `.agents/skills/fabricate-ux-designer/SKILL.md`         | `.codex/agents/fabricate-ux-designer-medium.toml`      | `fabricate-ux-designer-medium`   |
+| `fabricate_ux_designer_large`     | `.agents/skills/fabricate-ux-designer/SKILL.md`         | `.codex/agents/fabricate-ux-designer-large.toml`       | `fabricate-ux-designer-large`    |
+| `fabricate_quality_engineer_small`  | `.agents/skills/fabricate-quality-engineer/SKILL.md`  | `.codex/agents/fabricate-quality-engineer-small.toml`  | `fabricate-quality-engineer-small`  |
+| `fabricate_quality_engineer_medium` | `.agents/skills/fabricate-quality-engineer/SKILL.md`  | `.codex/agents/fabricate-quality-engineer-medium.toml` | `fabricate-quality-engineer-medium` |
+| `fabricate_quality_engineer_large`  | `.agents/skills/fabricate-quality-engineer/SKILL.md`  | `.codex/agents/fabricate-quality-engineer-large.toml`  | `fabricate-quality-engineer-large`  |
+| `foundry_integrator_small`        | `.agents/skills/foundry-integrator/SKILL.md`            | `.codex/agents/foundry-integrator-small.toml`          | `foundry-integrator-small`       |
+| `foundry_integrator_medium`       | `.agents/skills/foundry-integrator/SKILL.md`            | `.codex/agents/foundry-integrator-medium.toml`         | `foundry-integrator-medium`      |
+| `foundry_integrator_large`        | `.agents/skills/foundry-integrator/SKILL.md`            | `.codex/agents/foundry-integrator-large.toml`          | `foundry-integrator-large`       |
+| `fabricate_competitive_analyst`   | `.agents/skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml`     | `fabricate-competitive-analyst`  |
+| `fabricate_pr_explorer`           | — (no shared skill; read-only mapping)                  | `.codex/agents/fabricate-pr-explorer.toml`             | `Explore` (built-in)             |
 
 `fabricate_pr_explorer` is read-only codebase mapping; Claude uses its built-in `Explore` agent
 for the same role rather than a dedicated binding.
 
+### Family to model tiers
+
+The auto-spawn routing table keeps **family** tokens, while every row of the bindings table above is a binding token, so this table is the join between them.
+For a model-tiered family it is the sole path from a routing token to a `subagent_type`, so `npm run validate:agents` gates its family set against the base families derived from the bindings table and requires each row to name exactly that family's three model-tiered tokens.
+
+| Family                        | Model-tiered routing tokens                                                                                       |
+|-------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `fabricate_implementer`       | `fabricate_implementer_small`, `fabricate_implementer_medium`, `fabricate_implementer_large`                       |
+| `fabricate_reviewer`          | `fabricate_reviewer_small`, `fabricate_reviewer_medium`, `fabricate_reviewer_large`                                |
+| `fabricate_domain_expert`     | `fabricate_domain_expert_small`, `fabricate_domain_expert_medium`, `fabricate_domain_expert_large`                 |
+| `fabricate_ux_designer`       | `fabricate_ux_designer_small`, `fabricate_ux_designer_medium`, `fabricate_ux_designer_large`                       |
+| `fabricate_quality_engineer`  | `fabricate_quality_engineer_small`, `fabricate_quality_engineer_medium`, `fabricate_quality_engineer_large`        |
+| `foundry_integrator`          | `foundry_integrator_small`, `foundry_integrator_medium`, `foundry_integrator_large`                                |
+
+The four untiered roles — `fabricate_orchestrator`, `fabricate_docs_writer`, `fabricate_competitive_analyst`, and `fabricate_pr_explorer` — are absent from this table because their routing token is already their binding token.
+
 ### Shared skills with no persona binding
 
-These are loaded on demand (by path) from the role skills that reference them — not auto-spawned
-as agents:
+These are discoverable by Codex as repository skills and loaded on demand by roles that reference them; they are not auto-spawned as agents:
 
-- `skills/javascript-structural-design/SKILL.md`
-- `skills/review-implementing/SKILL.md`
+- `.agents/skills/javascript-structural-design/SKILL.md`
+- `.agents/skills/review-implementing/SKILL.md`
 
 ## What Agents Must Not Do
 

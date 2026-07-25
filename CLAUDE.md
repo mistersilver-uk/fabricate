@@ -7,18 +7,28 @@ Read `AGENTS.md` first for repo-wide rules.
 For non-trivial work, run the **Default Agentic Workflow** in `AGENTS.md` — the
 `plan → plan-review → implement → review → docs` state machine — without waiting to be asked.
 At each gate, spawn the roles matched by that file's auto-spawn routing table using the Agent
-tool: the `subagent_type` for each routing token is listed in the **Agent Roles & Bindings**
-table in `AGENTS.md` (e.g. `fabricate_orchestrator` → `fabricate-orchestrator`).
+tool: the `subagent_type` for each binding is listed in the **Agent Roles & Bindings**
+table in `AGENTS.md`.
+A routing token names a role family, so the join runs one of two ways.
+An untiered family resolves directly, as in `fabricate_orchestrator` → `fabricate-orchestrator`.
+A model-tiered family resolves through the **Model tier routing** ladder in `AGENTS.md` — which picks one of `small` / `medium` / `large` per spawn, from the `(family token, stage, revision)` triple — and then through the **Family to model tiers** table, as in `fabricate_implementer` at `small` → `fabricate_implementer_small` → `fabricate-implementer-small`.
+Record the resolved model tier and the facts it was resolved from in the lane's assignment brief.
+An agent of a model-tiered family may return `ESCALATE_TIER: <reason>` on its first line before its first edit; that is not a verdict, does not consume a revision, and is bounded at one escalation per family, stage, and revision.
 These
 subagents are registered in `.claude/agents/`; for the read-only `fabricate_pr_explorer` role,
 use the built-in `Explore` agent.
 Run plan-review reviewers in parallel, honor the 3-revision
 caps, and surface any `BLOCKED` verdict to the user.
+The main loop is the workflow driver and creates a unique isolated worktree for every spawned role by default; mutable roles use exclusive lane branches and read-only roles use fresh detached snapshots for each reviewed commit.
+The driver alone mutates the coordinator checkout, GitHub or remote state, integrates local lane commits, runs authoritative gates, and performs guarded cleanup.
+Use the provider-neutral lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; do not create a Claude-specific worktree convention.
+Before maintainer handoff, the driver finalizes PR metadata, rebases onto fetched `origin/main`, reruns authoritative gates and commitlint, preserves valid approval across a patch-equivalent rebase or obtains fresh detached exact-target review when the owned concern materially changed or a finding remains unresolved, pushes only with an explicit expected-head lease, marks the PR ready, and requires all post-undraft exact-head checks including both SonarCloud checks.
+Draft checks are preflight only; on failure or a moved main/head, return the PR to draft and repeat the delivery loop.
 
 ## Skills
 
-Shared project skills live in `skills/` (the canonical persona definition for each role lives in
-`skills/<role>/SKILL.md`).
+Shared project skills live in `.agents/skills/` (the canonical persona definition for each role lives in
+`.agents/skills/<role>/SKILL.md`).
 Each subagent reads its own skill by path on demand — they are not
 invocable as `/slash` commands in the main loop.
 Use those shared skills instead of creating
@@ -28,7 +38,7 @@ provider-local copies or provider-specific mirrors; see the bindings table in `A
 
 Before any multi-PR or git-history operation — stacking PRs, rebasing a branch after its base
 merges, force-pushing, or rewording commits — read the stacked-PR guidance in
-`skills/fabricate-orchestrator/SKILL.md` and the commit/PR-title rules in `AGENTS.md` first.
+`.agents/skills/fabricate-orchestrator/SKILL.md` and the commit/PR-title rules in `AGENTS.md` first.
 This
 applies in the main loop, not just to spawned sub-agents.
 Key traps they cover:
@@ -45,6 +55,13 @@ Restack
   branch, not just the tip.
 Use one valid type (`feat`/`fix`/`docs`/`refactor`/`test`/… — `i18n:`
   is not valid; use `feat(i18n):`), a lowercase subject, and remember to fix the PR title too.
+
+## Windows/MSYS gotchas
+
+- MSYS path conversion mangles a `git` argument that looks like a path with a colon: `git show origin/main:<path>` has its colon and slashes rewritten, so the ref fails to resolve.
+Prefix such commands with `MSYS2_ARG_CONV_EXCL='*'` to disable the rewrite.
+- Docker Compose in many worktrees exhausts Docker's address pool, and the failure surfaces as a generic compose-up error rather than a pool message.
+The Foundry smoke now uses a per-worktree-stable container identity (`scripts/lib/foundryRunIdentity.js`), so tear a disposed worktree down with `npm run test:foundry:down -- --clean` to reclaim its container and network at the source; `docker network prune -f` remains a safe fallback for accumulated worktree compose networks (it only frees networks with no attached container).
 
 ## OpenSpec
 

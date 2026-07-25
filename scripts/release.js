@@ -28,6 +28,7 @@ import { join, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 import { argv, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { verifyManagerChunkSplit } from './verify-manager-chunk-split.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -344,6 +345,18 @@ async function main() {
     console.error('Validation errors after build:');
     for (const f of result.missing) console.error(`  Missing: ${f}`);
     for (const e of result.errors) console.error(`  Error: ${e}`);
+    exit(1);
+  }
+
+  // Issue #150: prove the GM-only manager subtree stayed out of the eager entry
+  // and landed in a separate on-demand chunk. Reads the dist/ we just wrote.
+  console.log('\nVerifying deferred manager chunk split...');
+  const splitResult = verifyManagerChunkSplit(distDir);
+  if (splitResult.ok) {
+    console.log('Manager chunk split OK: dist/main.js is free of the manager subtree.');
+  } else {
+    console.error('Manager chunk split gate FAILED:');
+    for (const e of splitResult.errors) console.error(`  - ${e}`);
     exit(1);
   }
 }

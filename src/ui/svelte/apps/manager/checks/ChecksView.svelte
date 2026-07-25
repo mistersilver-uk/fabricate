@@ -22,6 +22,7 @@
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
   import SimpleCraftingCheckEditor from './SimpleCraftingCheckEditor.svelte';
   import ProgressiveCraftingCheckEditor from './ProgressiveCraftingCheckEditor.svelte';
+  import CraftingModifierCatalogueCard from './CraftingModifierCatalogueCard.svelte';
   import ChecksValidationTab from './ChecksValidationTab.svelte';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
@@ -46,6 +47,14 @@
     // crafting check (and mirrors it for salvage); alchemy resolves consumption through its
     // own `consumeOnFail` flag instead, so these toggles are hidden in alchemy mode.
     craftingConsumption = null,
+    // Per-recipe check-modifier catalogue + default policy (issue 770): the crafting-
+    // owned `craftingCheck.checkModifiers` catalogue, `defaultModifierPolicy`, and
+    // `defaultModifierIds`, edited in a card beside the failure-consumption card and
+    // persisted live via `onUpdateCraftingCheckModifiers`. Only shown when the active
+    // crafting check is usable (has an authored roll formula).
+    craftingCheckModifiers = [],
+    craftingDefaultModifierPolicy = 'addAll',
+    craftingDefaultModifierIds = [],
     // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
     // already honours. Restored as live-persisting toggles below the alchemy check-mode
     // selector. Defaults mirror the manager normalizer (learnOnCraft OFF; consumeOnFail and
@@ -78,6 +87,7 @@
     onUpdateGatheringCheckRouted = () => {},
     onSetAlchemyCheckMode = () => {},
     onUpdateCraftingConsumption = () => {},
+    onUpdateCraftingCheckModifiers = () => {},
     onUpdateAlchemyFlags = () => {},
     onTabChange = () => {},
     onToggleCheckActive = () => {}
@@ -148,6 +158,17 @@
       (craftingAlchemy && alchemyCheckMode === 'simple')
   );
   const craftingProgressive = $derived(resolutionMode === 'progressive');
+
+  // The active non-alchemy crafting check's authored roll formula: a check is usable
+  // iff it has an authored rollFormula (issue 770 gate for the modifier catalogue).
+  const craftingCheckUsable = $derived(
+    (craftingRouted
+      ? craftingCheck?.rollFormula
+      : craftingProgressive
+        ? craftingCheckProgressive?.rollFormula
+        : craftingCheckSimple?.rollFormula
+    )?.trim?.().length > 0
+  );
   const salvageRouted = $derived(salvageResolutionMode === 'routed');
   const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
   const salvageSimple = $derived(
@@ -345,7 +366,7 @@
           </section>
 
           {#if alchemyCheckMode === 'tiered'}
-            <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+            <CraftingCheckEditor value={craftingCheck} {resolutionMode} allowNatStepping breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
           {:else if alchemyCheckMode === 'simple'}
             <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
           {:else}
@@ -370,7 +391,7 @@
              which the routed test asserts is absent once the editor renders. -->
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if craftingRouted}
-            <CraftingCheckEditor value={craftingCheck} {resolutionMode} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+            <CraftingCheckEditor value={craftingCheck} {resolutionMode} allowNatStepping breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
           {:else if craftingSimple}
             <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
           {:else}
@@ -405,10 +426,19 @@
               />
             </div>
           </section>
+
+          {#if craftingCheckUsable}
+            <CraftingModifierCatalogueCard
+              checkModifiers={craftingCheckModifiers}
+              defaultModifierPolicy={craftingDefaultModifierPolicy}
+              defaultModifierIds={craftingDefaultModifierIds}
+              onChange={onUpdateCraftingCheckModifiers}
+            />
+          {/if}
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">
-          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckRouted} />
+          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} allowNatStepping breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckRouted} />
         </div>
       {:else if activeTab === 'salvage' && salvageProgressive}
         <div data-checks-panel="salvage">

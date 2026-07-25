@@ -399,14 +399,14 @@ test('555 R4 — one repair pass stamps a component source, a recipe-item source
     actors: [actor],
   });
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
   assert.equal(componentFlag(compSource), 'comp-ore');
   assert.equal(recipeItemFlag(bookSource), 'def-book');
   assert.equal(bookSource._stats.duplicateSource, null, 'clone source stripped');
   assert.equal(recipeItemFlag(ownedBook), 'def-book', 'the actor-owned copy is stamped via the four-tier matcher');
   assert.ok(summary.stamped >= 3);
 
-  const second = await mgr.repairComponentSourceFlags();
+  const second = await mgr.repairItemData();
   assert.equal(second.stamped, 0, 'idempotent second pass');
 });
 
@@ -433,7 +433,7 @@ test('555 R4 — a world SOURCE clone is NOT identity-matched onto the original 
     items: [cloneSource],
   });
 
-  await mgr.repairComponentSourceFlags();
+  await mgr.repairItemData();
   assert.equal(recipeItemFlag(cloneSource), undefined, 'the clone source is not mis-stamped with the original id');
 });
 
@@ -444,7 +444,7 @@ test('555 R4 name-assist — an owned copy whose unique name matches a different
   const ownedScroll = makeDoc({ uuid: 'Actor.a.Item.scroll', name: 'Scroll', duplicateSource: 'Item.book' });
   const mgr = ownedRepairManager(BOOK_SCROLL_DEFS, [ownedScroll]);
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
   assert.equal(recipeItemFlag(ownedScroll), 'def-scroll', 're-pointed by unique name to the scroll def');
   assert.equal(summary.repointed, 1);
   assert.deepEqual(summary.repointLog, [
@@ -467,7 +467,7 @@ test('555/567 R4 name-assist — a name matching TWO definitions WITHIN the syst
     [ownedCopy]
   );
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
   assert.equal(summary.skippedAmbiguous, 1);
   assert.equal(summary.repointed, 0);
   assert.equal(recipeItemFlag(ownedCopy), undefined, 'no re-point on an ambiguous name');
@@ -483,7 +483,7 @@ test('555 R4 name-assist — a flagged owned copy is authoritative and left unto
   });
   const mgr = ownedRepairManager(BOOK_SCROLL_DEFS, [ownedCopy]);
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
   assert.equal(recipeItemFlag(ownedCopy), 'def-book', 'a roles-flagged copy is authoritative');
   assert.equal(summary.repointed, 0);
 });
@@ -670,7 +670,7 @@ test('555 R4 — an actor-owned copy carrying BOTH compendiumSource and duplicat
     [ownedCopy]
   );
 
-  const summary = await mgr.repairComponentSourceFlags();
+  const summary = await mgr.repairItemData();
   assert.equal(recipeItemFlag(ownedCopy), 'def-book', 'resolved via tier 3 (compendium) despite the duplicateSource');
   assert.equal(summary.repointed, 0, 'a reliable tier-3 match is not a name-assist re-point');
   assert.equal(ownedCopy._stats.duplicateSource, null, 'the owned copy is stripped of its transitive duplicateSource');
@@ -771,7 +771,7 @@ test('567 #2 — the repair owner-null branch clears ONLY the recipe-item leaf, 
     items: [orphan],
   });
 
-  await mgr.repairComponentSourceFlags();
+  await mgr.repairItemData();
   assert.equal(roleLeaf(orphan, 'sys', 'recipeItemDefinitionId'), undefined, 'the stale recipe-item leaf is cleared');
   assert.equal(roleLeaf(orphan, 'sys', 'componentId'), 'comp-x', 'the sibling componentId leaf is preserved');
   assert.equal(roleLeaf(orphan, 'sys', 'toolId'), 'tool-x', 'the sibling toolId leaf is preserved');

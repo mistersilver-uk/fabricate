@@ -162,6 +162,82 @@ test('rolledDiceGroups fallback sums only active results: false excluded, absent
   assert.deepEqual(groups, [{ groupId: 0, group: '3d6', sum: 9, results: [3, 6] }]);
 });
 
+// ── @craftingmod: eval == display (issue 770) ────────────────────────────────
+
+// A Roll stub with BOTH an instance evaluate() (records the formula it rolled) and
+// the static replaceFormulaData the display path uses.
+function stubCraftingModRoll() {
+  const rolledFormulas = [];
+  const Roll = class {
+    constructor(formula) {
+      this.formula = formula;
+    }
+    async evaluate() {
+      rolledFormulas.push(this.formula);
+      return { total: 12, dice: [] };
+    }
+  };
+  Roll.replaceFormulaData = (formula, data, { missing } = {}) =>
+    String(formula).replace(/@([\w.]+)/g, (_m, path) => {
+      const value = path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
+      return value === undefined || value === null ? (missing ?? `@${path}`) : String(value);
+    });
+  Roll.validate = (formula) => !/NaN/.test(formula) && !/@/.test(formula);
+  globalThis.Roll = Roll;
+  return rolledFormulas;
+}
+
+const MOD_CONTEXT = {
+  catalogue: [
+    { id: 'med', expression: '@abilities.med.mod' },
+    { id: 'alch', expression: '@abilities.alch.mod' },
+  ],
+  systemPolicy: 'highest',
+  defaultModifierIds: ['med', 'alch'],
+};
+
+test('@craftingmod: evaluateCheckRoll rolls the substituted scalar and its display matches resolveCheckFormulaDisplay', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+
+  const rolled = await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    craftingModifier: MOD_CONTEXT,
+  });
+
+  // highest(3, 5) = 5 substituted BEFORE the roll: Foundry never sees @craftingmod.
+  assert.equal(rolledFormulas.at(-1), '1d20 + (5)', 'the scalar is substituted before Roll');
+  // The eval path's display equals the standalone display path (eval == display).
+  // `@craftingmod` substitutes to a parenthesized scalar so a negative modifier stays
+  // valid arithmetic; the parens are preserved in the display.
+  const display = resolveCheckFormulaDisplay('1d20 + @craftingmod', actor, MOD_CONTEXT);
+  assert.equal(rolled.resolvedFormula, display.display);
+  assert.equal(rolled.resolvedFormula, '1d20 + (5)');
+  delete globalThis.Roll;
+});
+
+test('@craftingmod: a formula without the token is unaffected (back-compat)', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 } } }) };
+  await evaluateCheckRoll('1d20 + @abilities.med.mod', actor, { craftingModifier: MOD_CONTEXT });
+  assert.equal(rolledFormulas.at(-1), '1d20 + @abilities.med.mod', 'no @craftingmod → untouched');
+  delete globalThis.Roll;
+});
+
+test('@craftingmod: runFormulaPassFail threads the modifier context through to the roll', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+  const r = await runFormulaPassFail({
+    formula: '1d20 + @craftingmod',
+    dc: 10,
+    thresholdMode: 'meet',
+    actor,
+    craftingModifier: MOD_CONTEXT,
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + (5)');
+  assert.equal(r.data.resolvedFormula, '1d20 + (5)');
+  delete globalThis.Roll;
+});
+
 // ── evaluateCheckRoll: non-interactive option (defect 3) ────────────────────
 
 test('evaluateCheckRoll evaluates with { allowInteractive: false } (no fulfilment dialog)', async () => {

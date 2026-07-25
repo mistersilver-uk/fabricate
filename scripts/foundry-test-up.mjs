@@ -17,12 +17,26 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const COMPOSE_FILE = join(ROOT, 'docker-compose.foundry.yml');
 const ENV_FILE = join(ROOT, '.env.foundry');
 const DEFAULT_FOUNDRY_IMAGE = 'felddy/foundryvtt:13';
-const CONTAINER_NAME = 'fabricate-foundry-test';
+
+// Per-worktree-stable container identity (issue #827). Derived deterministically from
+// the worktree root so it is unique across worktrees (no fixed-name collision) yet
+// stable within one (preserving the reuse cache + felddy's hostname-bound license).
+// Respect explicit overrides so the parent foundry-test.mjs (which also finds a free
+// port) can pin the values for the whole up/run/down pipeline.
+const identity = deriveRunIdentity(ROOT);
+process.env.FOUNDRY_CONTAINER_NAME ||= identity.containerName;
+process.env.FOUNDRY_CONTAINER_HOSTNAME ||= identity.hostname;
+process.env.COMPOSE_PROJECT_NAME ||= identity.project;
+process.env.FOUNDRY_HOST_PORT ||= String(identity.port);
+const CONTAINER_NAME = process.env.FOUNDRY_CONTAINER_NAME;
+
 const CACHE_DIR = join(ROOT, '.foundry-e2e', 'cache');
 const RESULTS_DIR = join(ROOT, 'test-results');
 

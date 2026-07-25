@@ -1,7 +1,7 @@
 {
   "id": "fabricate",
   "title": "Fabricate - Universal Gathering & Crafting System",
-  "description": "A system-agnostic, flexible gathering and crafting module that allows you to create any complete crafting systems you can imagine, and supports any tabletop RPG system.",
+  "description": "A system-agnostic gathering and crafting module for any tabletop RPG system: GMs author complete crafting systems with recipes, books, checks, and multi-step workflows, and players craft, gather, salvage, and brew from one unified window.",
   "version": "0.1.0",
   "authors": [
     {

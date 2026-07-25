@@ -62,6 +62,23 @@ const resultGroupCardSource = readFileSync(resultGroupCardPath, 'utf8');
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 
+// Extract a single scoped-`<style>` rule block by its selector and assert it (a) carries
+// each required fragment and (b) no longer sets `max-width` (the issue-796 cap on both the
+// grid list and the empty panel). The selector must be given VERBATIM — for the grid rule
+// pass the COMPOUND `.manager-recipe-books-tab .manager-recipe-item-links` rather than the
+// bare class, so the match stays pinned to the grid rule and is robust to future reordering
+// of the style blocks (the file also carries a bare `.manager-recipe-item-links { margin }`
+// rule that a bare-class regex could latch onto).
+function assertScopedRuleHasNoMaxWidth(source, selector, { mustContain = [] } = {}) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rule = source.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`));
+  assert.ok(rule, `scoped rule for "${selector}" exists`);
+  for (const fragment of mustContain) {
+    assert.ok(rule[0].includes(fragment), `"${selector}" declares ${fragment}`);
+  }
+  assert.equal(/max-width/.test(rule[0]), false, `"${selector}" no longer carries the cap`);
+}
+
 describe('RecipeEditView identity-only single column', () => {
   it('renders the identity card in the standard manager-main, with no bespoke workspace', () => {
     // The editor is fully controlled now: no <form> wrapper, the root's header Save
@@ -229,6 +246,29 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
       'missing state copy'
     );
   });
+
+  // Issue 796: the linked-book list tiles into a fixed three-column grid (widened from the
+  // earlier auto-fill 220px tracks, which truncated long titles), dropping the old
+  // `max-width: 520px` cap. The cascade win over the shared flex rule and the tiled fill
+  // are verified live in the smoke frame; this pins the rule SHAPE so a re-cap or a revert
+  // to narrow tracks regresses at test time. The COMPOUND selector is extracted so the
+  // match stays pinned to the grid rule (robust to future style-block reordering; the file
+  // also carries a bare `.manager-recipe-item-links { margin }` rule).
+  it('tiles the linked-book list into an uncapped three-column grid (Access-tab parity)', () => {
+    assertScopedRuleHasNoMaxWidth(
+      booksTabSource,
+      '.manager-recipe-books-tab .manager-recipe-item-links',
+      { mustContain: ['display: grid', 'repeat(3, minmax(0, 1fr)'] }
+    );
+  });
+
+  // The original bug capped BOTH the list and the empty state. Without this symmetric
+  // guard a re-cap of only the empty panel would ship green.
+  it('keeps the empty state a full-width uncapped panel', () => {
+    assertScopedRuleHasNoMaxWidth(booksTabSource, '.manager-recipe-section-empty', {
+      mustContain: ['width: 100%'],
+    });
+  });
 });
 
 describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', () => {
@@ -262,6 +302,16 @@ describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', (
       'the whole-table case has its OWN string, never "Played by <one name>"'
     );
     assert.equal(accessTabSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  });
+
+  // Issue 796: the access list widened from auto-fill 220px tracks (which truncated long
+  // names) to a fixed three-column grid, kept in visual parity with the Books & Scrolls
+  // grid. Access has no shared-rule collision, so no ancestor specificity guard is needed —
+  // pin the bare class rule.
+  it('tiles the access list into a three-column grid (Books & Scrolls parity)', () => {
+    assertScopedRuleHasNoMaxWidth(accessTabSource, '.manager-recipe-access-list', {
+      mustContain: ['display: grid', 'repeat(3, minmax(0, 1fr)'],
+    });
   });
 });
 

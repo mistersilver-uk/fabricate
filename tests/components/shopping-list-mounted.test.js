@@ -117,19 +117,58 @@ describe('ShoppingList mounted behavior', () => {
     assert.equal(summaryCount(target, 'components'), '0');
   });
 
-  it('folds a missing essence into the components list with an essence icon', async () => {
+  it('folds a missing essence into the components list with its authored icon', async () => {
     const target = await harness.mount({
       aggregate: aggregate({
         ingredients: [],
-        essences: [{ type: 'fire', name: 'Fire', totalNeed: 2, have: 0, missing: 2, satisfied: false }]
+        essences: [{ type: 'fire', name: 'Fire', icon: 'fa-solid fa-fire', totalNeed: 2, have: 0, missing: 2, satisfied: false }]
       }),
       entries: [ENTRY]
     });
     const card = target.querySelector('[data-shopping-acquire-components]');
     assert.ok(card, 'components card rendered for the essence');
     assert.match(card.textContent, /Fire/);
-    assert.ok(card.querySelector('.crafting-shopping-acquire-essence'), 'essence icon tile rendered');
+    const thumb = card.querySelector('.crafting-essence-thumb');
+    assert.ok(thumb, 'essence icon tile rendered');
+    assert.match(thumb.getAttribute('style'), /28px/, 'shopping glyph keeps 28px geometry');
+    assert.ok(thumb.querySelector('i').classList.contains('fa-fire'));
+    assert.match(card.textContent, /"have":0,"need":2/, 'have/need remains visible');
     assert.equal(summaryCount(target, 'components'), '1');
+  });
+
+  it('renders first-class essence shortages as glyphs and ordinary shortages as images', async () => {
+    const target = await harness.mount({
+      aggregate: aggregate({
+        ingredients: [
+          {
+            componentId: null,
+            name: 'Aether essence',
+            description: 'Aether essence',
+            icon: '',
+            isEssence: true,
+            totalNeed: 3,
+            have: 1,
+            missing: 2,
+            satisfied: false,
+          },
+          {
+            componentId: 'iron',
+            name: 'Iron',
+            description: 'Iron',
+            img: 'icons/iron.webp',
+            totalNeed: 1,
+            have: 0,
+            missing: 1,
+            satisfied: false,
+          },
+        ],
+      }),
+      entries: [ENTRY],
+    });
+    const rows = target.querySelectorAll('.crafting-shopping-acquire-row');
+    assert.ok(rows[0].querySelector('i').classList.contains('fa-mortar-pestle'));
+    assert.equal(rows[0].querySelector('img'), null);
+    assert.equal(rows[1].querySelector('img').getAttribute('src'), 'icons/iron.webp');
   });
 
   it('lists tools to acquire vs repair and hides available ones', async () => {

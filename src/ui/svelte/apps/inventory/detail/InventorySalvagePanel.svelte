@@ -29,9 +29,11 @@
   import SalvageRollSummary from './salvage/SalvageRollSummary.svelte';
   import SalvageRoutedBody from './salvage/SalvageRoutedBody.svelte';
   import SalvageSimpleBody from './salvage/SalvageSimpleBody.svelte';
+  import SalvageToolRequirements from './salvage/SalvageToolRequirements.svelte';
 
   let {
     salvage = null,
+    actingSystemName = '',
     busy = false,
     depleted = false,
     result = null,
@@ -48,6 +50,19 @@
   const mode = $derived(salvage?.mode ?? 'simple');
   const checkUsable = $derived(salvage?.checkUsable === true);
   const misconfigured = $derived(salvage?.misconfigured === true);
+  // Required-tool disclosure (issue 777). The states are decided builder-side (scoped to
+  // the target salvage actor); this component never re-derives tool matching. The section
+  // shows whenever any tool is required — independent of mode AND of `misconfigured`, a
+  // prerequisite is worth disclosing in every state.
+  const toolStates = $derived(Array.isArray(salvage?.toolStates) ? salvage.toolStates : []);
+  const hasToolRequirements = $derived(toolStates.length > 0);
+  // A missing required tool blocks the pre-roll action so the one-shot roll is never spent
+  // on an attempt the engine will reject. Threaded from the view-model, never re-derived.
+  const toolsAvailable = $derived(salvage?.toolsAvailable !== false);
+  const toolBlocked = $derived(hasToolRequirements && !toolsAvailable);
+  // The builder's discriminator (issue 764): the misconfigured body dispatches on it, so
+  // a Simple multi-group misconfig renders Simple-specific copy rather than routed copy.
+  const misconfiguredReason = $derived(salvage?.misconfiguredReason ?? null);
   // The ribbon is up: the attempt resolved and awarded. "Salvage again" resets.
   const committed = $derived(result?.state === 'success');
   // Salvaging the last copy leaves nothing to break down again. The ribbon still
@@ -58,6 +73,15 @@
   // A time-gated run has STARTED and awarded nothing. No ribbon, and no "Salvage
   // again" — that would only re-enter the time gate.
   const waiting = $derived(result?.state === 'waiting');
+
+  // Names the acting participation when the card spans more than one system (issue 766), so
+  // the player knows which system's salvage this panel drives. Empty for a single-system
+  // card, where there is no ambiguity.
+  const actingSystemLabel = $derived(
+    actingSystemName
+      ? localize('FABRICATE.App.Inventory.Salvage.ActingSystem', { system: actingSystemName })
+      : ''
+  );
 
   // Default TRUE — an absent key reads as permitted; only an explicit false pins the
   // GM's authored order. FROZEN once committed: the roll has already been spent down
@@ -133,23 +157,45 @@
   // both states: with a usable check the button is the roll — it commits, once, with no
   // reroll, which is the surprise worth warning about. Without one there is nothing to
   // roll and nothing to lose. One note for both said neither.
+  //
+  // A missing required tool SUPERSEDES the cost note (issue 777): the footer slot shows
+  // exactly one note, so when the action is blocked on a tool it explains WHY the button
+  // is off rather than what pressing it would cost — the block is the more actionable fact.
   const footerNote = $derived(
     localize(
-      checkUsable
-        ? 'FABRICATE.App.Inventory.Salvage.FooterNoteRoll'
-        : 'FABRICATE.App.Inventory.Salvage.FooterNote'
+      toolBlocked
+        ? 'FABRICATE.App.Inventory.Salvage.ToolBlockedNote'
+        : checkUsable
+          ? 'FABRICATE.App.Inventory.Salvage.FooterNoteRoll'
+          : 'FABRICATE.App.Inventory.Salvage.FooterNote'
     )
   );
 </script>
 
 <div class="salvage-panel" data-inventory-salvage-panel={mode}>
-  <p class="salvage-banner is-{banner.tone}" data-inventory-salvage-banner={mode}>
-    <i class={banner.icon} aria-hidden="true"></i>
-    <span class="salvage-banner-text">
-      <span class="salvage-banner-title">{bannerTitle}</span>
-      <span class="salvage-banner-rule">{bannerRule}</span>
-    </span>
-  </p>
+  {#if actingSystemLabel}
+    <p class="salvage-acting-system" data-inventory-salvage-acting-system>{actingSystemLabel}</p>
+  {/if}
+  <!-- SUPPRESSED when misconfigured (issue 764). The banner derives a mode/usability
+       tone — for a Simple no-check config that is the green "you'll recover this" ramp —
+       which contradicts the misconfigured body sitting directly beneath it. The
+       misconfigured body IS the banner in that state. -->
+  {#if !misconfigured}
+    <p class="salvage-banner is-{banner.tone}" data-inventory-salvage-banner={mode}>
+      <i class={banner.icon} aria-hidden="true"></i>
+      <span class="salvage-banner-text">
+        <span class="salvage-banner-title">{bannerTitle}</span>
+        <span class="salvage-banner-rule">{bannerRule}</span>
+      </span>
+    </p>
+  {/if}
+
+  <!-- Required-tool disclosure (issue 777), positioned after the banner and before the
+       roll summary. Rendered whenever a tool is required — independent of mode AND of
+       `misconfigured`: a prerequisite is worth disclosing in every state. -->
+  {#if hasToolRequirements}
+    <SalvageToolRequirements {toolStates} />
+  {/if}
 
   <!-- Read-only, and only AFTER resolution. There is no pre-roll dice box: the prompt
        is the roll step. -->
@@ -160,7 +206,7 @@
        chipped "Awaiting roll" directly beneath a success ribbon is a contradiction the
        player has to resolve for us. -->
   {#if misconfigured}
-    <SalvageMisconfiguredBody {mode} />
+    <SalvageMisconfiguredBody {mode} reason={misconfiguredReason} />
   {:else if mode === 'progressive'}
     <SalvageProgressiveBody
       {stages}
@@ -208,14 +254,19 @@
     <!-- A ruled row, not a full-width slab: the note explains the gesture's cost on the
          left and the action sits right, at its own width. -->
     <div class="salvage-footer">
-      <p class="salvage-footer-note" data-inventory-salvage-footer-note>
+      <p
+        class="salvage-footer-note"
+        id="salvage-footer-note"
+        data-inventory-salvage-footer-note
+      >
         {footerNote}
       </p>
       <button
         type="button"
         class="salvage-action"
         data-inventory-salvage-action
-        disabled={busy || misconfigured || waiting || depleted}
+        disabled={busy || misconfigured || waiting || depleted || !toolsAvailable}
+        aria-describedby={toolBlocked ? 'salvage-footer-note' : undefined}
         aria-busy={busy}
         onclick={() => onSalvage?.()}
       >
@@ -246,6 +297,16 @@
        honoured, restoring ~24px below the last control (measured). Scoped here, not on
        the shared `.inventory-detail`, which also serves the Info and book panels. */
     padding-bottom: var(--fab-space-6);
+  }
+
+  /* A quiet eyebrow naming the acting participation on a multi-system card. */
+  .salvage-acting-system {
+    margin: 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fab-text-muted);
   }
 
   .salvage-banner {

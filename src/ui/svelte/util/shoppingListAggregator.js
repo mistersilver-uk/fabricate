@@ -35,12 +35,20 @@ function _mergeIngredient(existing, incoming, recipeId, recipeName, recipeQuanti
   existing.totalNeed += contribution;
   // `have` is shared inventory — always reflect the latest evaluation value
   existing.have = incoming.have ?? 0;
+  if (incoming.isEssence === true) existing.isEssence = true;
+  if (!isNonblankIcon(existing.icon) && isNonblankIcon(incoming.icon)) {
+    existing.icon = incoming.icon;
+  }
   existing.recipeBreakdown.push({
     recipeId,
     recipeName,
     quantity: recipeQuantity,
     need: incoming.need ?? 0
   });
+}
+
+function isNonblankIcon(value) {
+  return typeof value === 'string' && value.trim() !== '';
 }
 
 /**
@@ -109,6 +117,8 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
           itemUuid: ing.itemUuid ?? null,
           name: ing.name ?? '',
           img: ing.img ?? null,
+          isEssence: ing.isEssence === true,
+          icon: isNonblankIcon(ing.icon) ? ing.icon : null,
           description: ing.description ?? '',
           totalNeed: 0,
           have: ing.have ?? 0,
@@ -125,11 +135,16 @@ export function aggregateShoppingList(entries, recipeManager, componentSourceAct
         essenceMap.set(type, {
           type,
           name: ess.name ?? type,
+          isEssence: true,
+          icon: isNonblankIcon(ess.icon) ? ess.icon : null,
           totalNeed: 0,
           have: ess.have ?? 0
         });
       }
       const existing = essenceMap.get(type);
+      if (!isNonblankIcon(existing.icon) && isNonblankIcon(ess.icon)) {
+        existing.icon = ess.icon;
+      }
       existing.totalNeed += (ess.need ?? 0) * quantity;
       existing.have = ess.have ?? 0;
     }

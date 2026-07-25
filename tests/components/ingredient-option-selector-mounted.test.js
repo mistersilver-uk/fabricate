@@ -12,9 +12,12 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+    'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
     'src/ui/svelte/apps/crafting/QuantityTag.svelte',
     'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   ],
@@ -58,6 +61,27 @@ describe('IngredientOptionSelector mounted behavior', () => {
     // Roving tabindex: exactly one tabbable radio per group.
     assert.equal(radios[0].getAttribute('tabindex'), '0');
     assert.equal(radios[1].getAttribute('tabindex'), '-1');
+  });
+
+  it('renders an authored essence glyph at 40px without changing radio semantics', async () => {
+    const choice = optionChoice();
+    choice.options[1] = {
+      ...choice.options[1],
+      name: 'Restorative essence',
+      img: null,
+      isEssence: true,
+      icon: 'fa-solid fa-heart',
+    };
+    const target = await harness.mount({ choices: [choice], onChoose: null });
+    const radio = target.querySelectorAll('[role="radio"]')[1];
+    const thumb = radio.querySelector('.crafting-essence-thumb');
+    assert.ok(thumb, 'essence alternative uses a glyph thumb');
+    assert.match(thumb.getAttribute('style'), /40px/, 'alternative glyph keeps 40px geometry');
+    assert.ok(thumb.querySelector('i').classList.contains('fa-heart'));
+    assert.equal(radio.querySelector('img'), null);
+    assert.equal(radio.getAttribute('aria-checked'), 'false');
+    assert.match(radio.getAttribute('aria-label'), /Restorative essence/);
+    assert.match(radio.textContent, /0\/1/, 'have/need remains visible');
   });
 
   it('flags an insufficient option as selectable-but-flagged', async () => {

@@ -15,6 +15,7 @@
  * is injected.
  */
 
+import { stampItemDataRoleIdentity } from './config/flags.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 
 export function flattenGatheringResults(resultGroups = []) {
@@ -104,6 +105,25 @@ export function createGatheringResultCreator(craftingSystemManager) {
         }
         if (source.uuid) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+        }
+
+        // Stamp the awarded component's durable per-system identity (issue 780) on the
+        // CREATED award item so a gathered part resolves to its OWN component through the
+        // identity tier once #601 removes the name fallback. The id is the one the RESULT
+        // authored (`result.componentId || result.systemItemId`) — NEVER `source.id`: in the
+        // `registeredItemUuid` case `source` is the registered source Item, whose id is a
+        // Foundry Item id, not the component id. `resolveGatheringResultSource` returns an
+        // `itemUuid` source BEFORE component resolution, so ANY itemUuid-resolved result
+        // (even one carrying a stray `result.componentId`) has no managed component and must
+        // stamp nothing — key off the resolved-component branch, not a raw `result.componentId`
+        // read. The stack branch below never touches `itemData`, so this stays create-only.
+        if (!result?.itemUuid) {
+          stampItemDataRoleIdentity(
+            itemData,
+            system?.id,
+            'componentId',
+            result?.componentId || result?.systemItemId
+          );
         }
 
         // Stack onto an existing matching item (same source UUID chain) that uses

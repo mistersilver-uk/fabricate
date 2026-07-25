@@ -2,6 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
+import {
+  REPORTER_ENRICHER_DESCRIPTION,
+  REPORTER_RESOLVED_EXPECTED,
+} from './helpers/enricherDescriptionFixtures.js';
 
 // Components are matched to actor items by name fallback (no source flags in these
 // fakes), so an item whose `name` equals a component's `name` is "owned".
@@ -42,6 +46,16 @@ function makeSystem(overrides = {}) {
 function makeBuilder({ systems, recipes = [] } = {}) {
   const systemList = systems ?? [makeSystem()];
   const getRecipesCalls = [];
+  // A tool matches an owned item when the item's name equals the tool's linked
+  // component name — the salvage tool-state projection (issue 777) resolves availability
+  // through this fake matcher, mirroring the name-fallback ownership matching these fakes
+  // already use for components.
+  const componentsById = new Map();
+  for (const system of systemList) {
+    for (const component of system?.components ?? []) {
+      if (component?.id) componentsById.set(component.id, component);
+    }
+  }
   const recipeManager = {
     getRecipes: (filters) => {
       getRecipesCalls.push(filters);
@@ -49,6 +63,10 @@ function makeBuilder({ systems, recipes = [] } = {}) {
         (r) =>
           filters?.craftingSystemId === undefined || r.craftingSystemId === filters.craftingSystemId
       );
+    },
+    toolMatchesItem: (_recipe, tool, candidate) => {
+      const component = componentsById.get(tool?.componentId);
+      return !!component && candidate?.name === component.name;
     },
   };
   const craftingSystemManager = { getSystems: () => systemList };
@@ -128,6 +146,32 @@ describe('InventoryListingBuilder — ownership aggregation', () => {
     assert.equal(listing.counts.essences, 1);
     assert.equal(listing.counts.total, 3);
   });
+
+  it('forwards the STORED component description unchanged, resolving nothing (issue 800)', () => {
+    // Inverted from the rejected read-side flatten. Descriptions are RESOLVED at write
+    // time, so a read surface that rewrote what it was handed would be a second,
+    // divergent implementation of the grammar. What it must do is forward the stored
+    // string byte-for-byte — including an un-repaired legacy one, which stays visibly
+    // raw until the GM runs Repair Item Data rather than being silently half-fixed here.
+    const system = makeSystem({
+      components: [
+        { id: 'c1', name: 'Iron', img: 'icons/iron.webp', description: REPORTER_RESOLVED_EXPECTED },
+        {
+          id: 'c2',
+          name: 'Coal',
+          img: 'icons/coal.webp',
+          description: REPORTER_ENRICHER_DESCRIPTION,
+        },
+      ],
+      tools: [],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Coal', 1)]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').description, REPORTER_RESOLVED_EXPECTED);
+    assert.equal(rowByComponent(listing, 'c2').description, REPORTER_ENRICHER_DESCRIPTION);
+  });
 });
 
 describe('InventoryListingBuilder — used-by index', () => {
@@ -140,6 +184,7 @@ describe('InventoryListingBuilder — used-by index', () => {
     ingredientSets: [
       {
         id: 's1',
+        name: 'Forge route',
         ingredientGroups: [
           { id: 'g1', options: [{ componentId: 'c1' }] },
           { id: 'g2', options: [{ match: { componentId: 'c2' } }] },
@@ -153,7 +198,10 @@ describe('InventoryListingBuilder — used-by index', () => {
   };
 
   function ownAll() {
-    const { builder, getRecipesCalls } = makeBuilder({ recipes: [recipe] });
+    const { builder, getRecipesCalls } = makeBuilder({
+      systems: [makeSystem({ resolutionMode: 'routedByIngredients' })],
+      recipes: [recipe],
+    });
     const listing = builder.buildListing({
       craftingActor: actor('a1', 'Akra', [item('Iron', 2), item('Coal', 1), item('Hammerhead', 1)]),
     });
@@ -180,6 +228,100 @@ describe('InventoryListingBuilder — used-by index', () => {
     ]);
     // A tool is never "used by" (consumed) — that list stays empty for a pure tool.
     assert.deepEqual(rowByComponent(listing, 'c3').usedBy, []);
+  });
+
+  it('indexes recipe, explicit-step, and active routed-set Tools under requiredFor', () => {
+    const explicitRecipe = {
+      id: 'r-steps',
+      name: 'Layered Forge',
+      img: 'icons/layered.webp',
+      craftingSystemId: 'sys-1',
+      toolIds: ['t-recipe'],
+      steps: [
+        {
+          id: 'step-1',
+          toolIds: ['t-step'],
+          ingredientSets: [
+            {
+              id: 'step-set',
+              name: 'Forging route',
+              ingredientGroups: [],
+              toolIds: ['t-set'],
+            },
+          ],
+        },
+      ],
+    };
+    const build = (resolutionMode, setName = 'Forging route') => {
+      const recipeForMode = {
+        ...explicitRecipe,
+        steps: [
+          {
+            ...explicitRecipe.steps[0],
+            ingredientSets: [{ ...explicitRecipe.steps[0].ingredientSets[0], name: setName }],
+          },
+        ],
+      };
+      const system = makeSystem({
+        resolutionMode,
+        tools: [
+          { id: 't-recipe', componentId: 'c1' },
+          { id: 't-step', componentId: 'c2' },
+          { id: 't-set', componentId: 'c3' },
+        ],
+      });
+      const { builder } = makeBuilder({ systems: [system], recipes: [recipeForMode] });
+      return builder.buildListing({
+        craftingActor: actor('a1', 'Akra', [
+          item('Iron', 1),
+          item('Coal', 1),
+          item('Hammerhead', 1),
+        ]),
+      });
+    };
+    const expected = [
+      {
+        kind: 'recipe',
+        recipeId: 'r-steps',
+        name: 'Layered Forge',
+        img: 'icons/layered.webp',
+      },
+    ];
+
+    const routed = build('routedByIngredients');
+    assert.deepEqual(rowByComponent(routed, 'c1').requiredFor, expected);
+    assert.deepEqual(rowByComponent(routed, 'c2').requiredFor, expected);
+    assert.deepEqual(rowByComponent(routed, 'c3').requiredFor, expected);
+
+    for (const inactive of [build('simple'), build('routedByIngredients', '  ')]) {
+      assert.deepEqual(rowByComponent(inactive, 'c1').requiredFor, expected);
+      assert.deepEqual(rowByComponent(inactive, 'c2').requiredFor, expected);
+      assert.deepEqual(rowByComponent(inactive, 'c3').requiredFor, []);
+    }
+  });
+
+  it('does not index stale per-set Tools outside named routed-by-ingredients sets', () => {
+    for (const system of [
+      makeSystem({ resolutionMode: 'simple' }),
+      makeSystem({ resolutionMode: 'routedByIngredients' }),
+    ]) {
+      const staleRecipe = {
+        ...recipe,
+        ingredientSets: recipe.ingredientSets.map((set, index) =>
+          index === 0
+            ? {
+                ...set,
+                name: system.resolutionMode === 'routedByIngredients' ? '  ' : set.name,
+              }
+            : set
+        ),
+      };
+      const { builder } = makeBuilder({ systems: [system], recipes: [staleRecipe] });
+      const listing = builder.buildListing({
+        craftingActor: actor('a1', 'Akra', [item('Hammerhead', 1)]),
+      });
+      assert.deepEqual(rowByComponent(listing, 'c3').requiredFor, []);
+    }
   });
 
   it('records essence usage on the essence row', () => {
@@ -812,6 +954,30 @@ describe('InventoryListingBuilder — recipe-item books', () => {
     return listing.rows.find((row) => row.isRecipeItem === true) ?? null;
   }
 
+  it('forwards the STORED recipe-item description and the recipe flavor unchanged (issue 800)', () => {
+    const system = bookSystem();
+    system.recipeItemDefinitions[0].description = REPORTER_RESOLVED_EXPECTED;
+    // Recipe flavor is Fabricate-authored free text and is explicitly out of scope —
+    // it is never resolved and never rewritten.
+    const recipes = [
+      {
+        id: 'r1',
+        name: 'Fireball',
+        description: 'Deals @Damage[8d6]{8d6 fire} damage.',
+        img: 'icons/fb.webp',
+        craftingSystemId: 'sys-b',
+        recipeItemId: 'def-1',
+      },
+    ];
+    const listing = bookBuilder({ system, recipes }).buildListing({
+      craftingActor: bookActor('a1', 'Akra', [bookItem('Item.book1', 1)]),
+      viewer: { isGM: true },
+    });
+    const row = bookRow(listing);
+    assert.equal(row.description, REPORTER_RESOLVED_EXPECTED);
+    assert.equal(row.recipes[0].description, 'Deals @Damage[8d6]{8d6 fire} damage.');
+  });
+
   it('flags a book’s recipes learnBlocked when the reader fails its character prerequisites (issue 544)', () => {
     const EXPERT = {
       id: 'p-expert',
@@ -1354,6 +1520,75 @@ describe('InventoryListingBuilder - salvage view-model', () => {
     );
   });
 
+  it('flags a Simple multi-success-group config as misconfigured for the GM (issue 764)', () => {
+    // A stored-but-not-yet-re-normalized legacy config: two SUCCESS groups in Simple mode.
+    // The GM path (salvageOf uses a GM viewer) surfaces the misconfigured cue with the
+    // `simpleMultiGroup` discriminator so the body renders Simple-specific copy.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        salvage: {
+          resultGroups: [
+            { id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] },
+            { id: 'g2', results: [{ id: 'r2', componentId: 'c3', quantity: 1 }] },
+          ],
+        },
+      })
+    );
+    assert.equal(salvage.enabled, true);
+    assert.equal(salvage.misconfigured, true);
+    assert.equal(salvage.misconfiguredReason, 'simpleMultiGroup');
+  });
+
+  it('a Simple config with ONE success + reserved failure group is not misconfigured (issue 764)', () => {
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        check: { simple: { rollFormula: '1d20', dc: 12 } },
+        salvage: {
+          resultGroups: [
+            { id: 'g1', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] },
+            {
+              id: 'g-fail',
+              role: 'failure',
+              results: [{ id: 'r2', componentId: 'c3', quantity: 1 }],
+            },
+          ],
+        },
+      })
+    );
+    assert.equal(salvage.misconfigured, false);
+    assert.equal(salvage.misconfiguredReason, null);
+  });
+
+  it('routed/progressive no-formula misconfig carries its own discriminator (issue 764)', () => {
+    const routed = salvageOf(salvageSystem({ mode: 'routed', check: {} }));
+    assert.equal(routed.misconfigured, true);
+    assert.equal(routed.misconfiguredReason, 'routedNoFormula');
+
+    const progressive = salvageOf(salvageSystem({ mode: 'progressive', check: {} }));
+    assert.equal(progressive.misconfigured, true);
+    assert.equal(progressive.misconfiguredReason, 'progressiveNoFormula');
+  });
+
+  it('a normalized failure-only Simple config (enabled:false) yields no panel (issue 764)', () => {
+    // Option a: a failure-only Simple config normalizes to `enabled: false`, so the
+    // builder returns null (no panel). The GM is cued by the manager invalidSalvage
+    // critical instead — asserted here so the outcome is pinned end-to-end.
+    const salvage = salvageOf(
+      salvageSystem({
+        mode: 'simple',
+        salvage: {
+          enabled: false,
+          resultGroups: [
+            { id: 'g-fail', role: 'failure', results: [{ id: 'r1', componentId: 'c2' }] },
+          ],
+        },
+      })
+    );
+    assert.equal(salvage, null);
+  });
+
   it('routed + RELATIVE renders effective, dcOverride-shifted thresholds', () => {
     const check = {
       routed: {
@@ -1583,6 +1818,80 @@ describe('InventoryListingBuilder - salvage view-model', () => {
     });
     assert.equal(rowByComponent(listing, 'c1').salvage.targetActorId, 'a2');
   });
+
+  // Required-tool disclosure (issue 777). The tool `tool-lw` links component `c3` (Slag),
+  // so an actor is deemed to hold it when it owns an item named "Slag".
+  const toolSystem = (extra = {}) =>
+    salvageSystem({
+      tools: [
+        { id: 'tool-lw', componentId: 'c3', label: "Leatherworker's Tools", img: 'icons/lw.webp' },
+      ],
+      salvage: { toolIds: ['tool-lw'] },
+      ...extra,
+    });
+
+  it('projects a required tool that the target actor holds as available', () => {
+    const salvage = salvageOf(toolSystem(), { items: [item('Iron', 1), item('Slag', 1)] });
+    assert.deepEqual(
+      salvage.toolStates.map((t) => [t.componentId, t.name, t.available, t.needsRepair]),
+      [['c3', "Leatherworker's Tools", true, false]]
+    );
+    assert.equal(salvage.toolStates[0].img, 'icons/lw.webp');
+    assert.equal(salvage.toolsAvailable, true);
+  });
+
+  it('projects a required tool the target actor lacks as unavailable and blocks the action', () => {
+    const salvage = salvageOf(toolSystem(), { items: [item('Iron', 1)] });
+    assert.deepEqual(
+      salvage.toolStates.map((t) => [t.name, t.available, t.needsRepair]),
+      [["Leatherworker's Tools", false, false]]
+    );
+    assert.equal(salvage.toolsAvailable, false);
+  });
+
+  it('projects a present-but-broken required tool as unavailable with needsRepair true', () => {
+    const broken = {
+      name: 'Slag',
+      system: {},
+      getFlag: (scope, key) => scope === 'fabricate' && key === 'toolBroken',
+    };
+    const salvage = salvageOf(toolSystem(), { items: [item('Iron', 1), broken] });
+    assert.deepEqual(
+      salvage.toolStates.map((t) => [t.available, t.needsRepair]),
+      [[false, true]]
+    );
+    assert.equal(salvage.toolsAvailable, false);
+  });
+
+  it('skips an unknown/disabled tool id when resolving required tools', () => {
+    const salvage = salvageOf(toolSystem({ salvage: { toolIds: ['tool-lw', 'no-such-tool'] } }), {
+      items: [item('Iron', 1), item('Slag', 1)],
+    });
+    assert.equal(salvage.toolStates.length, 1, 'the unresolvable id is skipped');
+    assert.equal(salvage.toolStates[0].componentId, 'c3');
+  });
+
+  it('has an empty toolStates and toolsAvailable true when no tools are required', () => {
+    const salvage = salvageOf(salvageSystem({}));
+    assert.deepEqual(salvage.toolStates, []);
+    assert.equal(salvage.toolsAvailable, true);
+  });
+
+  it('scopes tool availability to the target actor, not a non-target party member', () => {
+    // The target actor (crafting-actor-first) holds Iron but NOT the tool; only a
+    // non-target source actor holds it. The engine validates the target actor alone, so
+    // the panel must read the tool as UNAVAILABLE despite the party holding it.
+    const system = toolSystem();
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
+      componentSourceActors: [actor('a2', 'Camp Chest', [item('Slag', 1)])],
+    });
+    const salvage = rowByComponent(listing, 'c1').salvage;
+    assert.equal(salvage.targetActorId, 'a1');
+    assert.equal(salvage.toolStates[0].available, false);
+    assert.equal(salvage.toolsAvailable, false);
+  });
 });
 
 describe('InventoryListingBuilder - derived broken verdict', () => {
@@ -1760,7 +2069,11 @@ describe('InventoryListingBuilder - salvage entity-tier visibility gate (#703)',
       craftingActor: actor('a1', 'Akra', [item('Iron', 1)]),
       viewer: { isGM: true, id: 'gm' },
     });
-    assert.notEqual(rowByComponent(listing, 'c1').salvage, null);
+    const salvage = rowByComponent(listing, 'c1').salvage;
+    assert.notEqual(salvage, null);
+    // Issue 764: the GM cue is the misconfigured body with the Simple discriminator.
+    assert.equal(salvage.misconfigured, true);
+    assert.equal(salvage.misconfiguredReason, 'simpleMultiGroup');
     assert.equal(system.components[0].salvage.enabled, true);
   });
 });

@@ -9,7 +9,7 @@ has_children: true
 
 A recipe defines what ingredients are needed and what results are produced.
 Recipes belong to a crafting system and follow that system's resolution mode.
-They can currently only be authored through the API.
+GMs author them in the Crafting Admin panel, and the public API can create them too.
 
 ---
 
@@ -21,7 +21,7 @@ Every recipe brings together a few things.
 - An optional category that helps you organise recipes, when your crafting system groups recipes by category.
 - The ingredients it needs, made up of one or more sets of required materials.
 - The results it produces, made up of one or more groups of items.
-- Any tools it requires, such as a forge or a cauldron, which are needed but not consumed.
+- Any reusable tools it requires, such as a forge or a cauldron.
 - Whether active effects carried by the ingredients are copied onto the results.
 - Whether the recipe is enabled, which controls if it can be crafted.
 - Whether the recipe is locked, which lets players see it exists but stops anyone other than the GM from crafting it.
@@ -108,23 +108,34 @@ See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
 ## Tools
 
-Tools are items required for crafting but not consumed, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
-A recipe can require tools for the whole recipe, for a single step, or for a particular ingredient set.
+Tools are reusable items required for crafting, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
+A recipe can require Tools for the whole recipe or for a single step.
+In **Routed by ingredients**, each named ingredient set can also require its own Tools.
 
-See [Tools]({% link tools.md %}) for configuration, requirement gates, breakage modes, and usage tracking. (Tools replaced the retired Catalyst concept in version 0.6.0.)
+See [Tools]({% link tools.md %}) for source linking, prerequisites, breakage, and usage tracking.
 
-## Current Crafting Surface
+### Tool behavior
 
-Recipes are authored mainly through the API today.
-An early GM recipe editor is also available in the Crafting Admin panel.
-It can edit a recipe's identity (name, description, image, and whether it is on or off) and link a recipe item to it.
-When the system is in player mode, the editor's Overview tab can also restrict a recipe to specific players.
+The recipe **Tools** tab selects required Tools; it does not configure how they behave.
+Tool Studio owns each Tool's prerequisites, bonus, wear, breakage, and on-break action.
+Crafting System check settings own check-driven breakage.
+
+Fabricate adds every distinct eligible Tool bonus to crafting and salvage checks.
+A Tool whose prerequisites use **Bonus is withheld** contributes nothing when those prerequisites fail, but it still satisfies the Tool requirement.
+A Tool whose prerequisites use **Tool is unusable** blocks crafting when those prerequisites fail.
+Gathering applies no numeric Tool bonus.
+
+## Authoring and Crafting Surfaces
+
+GMs author recipes in the Crafting Admin panel.
+The recipe editor has dedicated tabs for the recipe's overview, ingredients, results, tools, access, and validation.
+The Overview tab edits identity (name, description, image, and whether it is on or off) and links a recipe item.
+When the system is in player mode, the Overview tab can also restrict a recipe to specific players.
 When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
 See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
-Full recipe authoring through the editor, including ingredients, steps, and results, is still in progress.
-Runtime crafting is available through the public API.
-See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.
 
-{: .note }
-> A player-facing Crafting tab is planned and not yet available.
-Recipe crafting works through the API today.
+Players craft in the **Crafting** tab of the unified Fabricate window.
+They browse the recipes their character can see, choose which owned actors supply the materials, roll any crafting check, and craft.
+
+Recipe authoring and runtime crafting are also available through the public API.
+See the [Crafting Engine API reference]({% link api/crafting-engine.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create recipes, check craftability, and run a craft.

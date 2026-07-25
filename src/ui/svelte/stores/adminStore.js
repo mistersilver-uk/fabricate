@@ -47,6 +47,10 @@ import {
 } from '../../../utils/componentCategories.js';
 import { withCategoryIcon } from '../../../utils/categoryIcons.js';
 import {
+  plainTextDescription,
+  descriptionTextCandidate,
+} from '../../../utils/plainTextDescription.js';
+import {
   planRecipeCategoryReassignments,
   planComponentCategoryReassignments,
   planTagRemovals,
@@ -87,6 +91,7 @@ import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js'
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
 import { SignatureValidator } from '../../../systems/SignatureValidator.js';
+import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js';
 import {
   localizeRecipeActivationError,
   localizeRecipePersistenceError,
@@ -110,6 +115,7 @@ const FEATURE_MAP = {
   gathering: 'gathering',
   chatOutput: 'chatOutput',
   salvage: 'salvage',
+  refundOnPlayerCancel: 'refundOnPlayerCancel',
 };
 
 const RESOLUTION_MODE_LABEL_KEYS = {
@@ -237,6 +243,27 @@ function _deleteCurrencyUnitFromList(units, unitId) {
   return nextUnits.length === units.length ? null : nextUnits;
 }
 
+/**
+ * Reorder a list by moving the element at `fromIndex` to `toIndex`, returning a
+ * new array. Returns null for an invalid or no-op move so callers can skip the
+ * save. Array order is the persisted order for the System Overview settings lists
+ * (issue 768) — a reorder just rewrites the array through each list's existing
+ * whole-payload save path, no new persisted field.
+ */
+function _reorderListByIndex(list, fromIndex, toIndex) {
+  const source = Array.isArray(list) ? list : [];
+  const from = Number(fromIndex);
+  const to = Number(toIndex);
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  if (from < 0 || from >= source.length) return null;
+  if (to < 0 || to >= source.length) return null;
+  if (from === to) return null;
+  const next = [...source];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 function _setSubUnitAmount(entry, subUnitId, numericAmount) {
   if (entry.unitId !== subUnitId) return entry;
   return { ...entry, amount: numericAmount };
@@ -316,13 +343,21 @@ function _usesExplicitRecipeSteps(recipe, executionSteps) {
   return (Array.isArray(recipe?.steps) && recipe.steps.length > 0) || executionSteps.length > 1;
 }
 
-function _buildRequirementPreviewStep(step, index, sharedRecipeToolIds = []) {
+function _buildRequirementPreviewStep(
+  step,
+  index,
+  sharedRecipeToolIds = [],
+  craftingSystem = null
+) {
   const ingredientSets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
   const ingredientSetSummaries = ingredientSets.map((set, setIndex) => ({
     id: set?.id || `set-${setIndex + 1}`,
     name: set?.name || `Set ${setIndex + 1}`,
     ingredientCount: _ingredientCountForSet(set),
-    toolCount: Array.isArray(set?.toolIds) ? set.toolIds.length : 0,
+    toolCount:
+      ingredientSetToolsAreActive(craftingSystem, set) && Array.isArray(set?.toolIds)
+        ? set.toolIds.length
+        : 0,
   }));
   const stepToolCount = Array.isArray(step?.toolIds) ? step.toolIds.length : 0;
   const previewIngredientCount =
@@ -410,15 +445,16 @@ function _isRecipeIncomplete(recipe) {
   return _isRecipeIncompleteByCounts(recipe);
 }
 
-function _buildRecipeBrowserDisplay(recipe) {
+function _buildRecipeBrowserDisplay(recipe, craftingSystem = null) {
   const executionSteps = _getRecipeExecutionSteps(recipe);
-  const isSimple = typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe() : true;
+  const isSimple =
+    typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe(craftingSystem) : true;
   const sharedRecipeToolIds =
     _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.toolIds)
       ? recipe.toolIds
       : [];
   const requirementsPreview = executionSteps.map((step, index) =>
-    _buildRequirementPreviewStep(step, index, sharedRecipeToolIds)
+    _buildRequirementPreviewStep(step, index, sharedRecipeToolIds, craftingSystem)
   );
   const structure = _recipeStructure(isSimple, requirementsPreview.length);
 
@@ -947,56 +983,30 @@ function _normalizeToolOnBreak(input) {
 }
 
 function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID) {
-  const id = String(tool.id || randomID());
-  // `label` is the user-authored display override — distinct from the `name`/`img` display
-  // snapshot and never written by snapshot capture/migration (issue 561, R2-2).
-  const rawLabel = typeof tool.label === 'string' ? tool.label.trim() : '';
-  const componentId =
-    typeof tool.componentId === 'string' && tool.componentId.trim()
-      ? tool.componentId.trim()
-      : null;
-  // First-class tool source references + display snapshot (issue 561). This is the DRAFT-PATH
-  // twin of `CraftingSystemManager._normalizeTool`; the fields MUST be retained here or the
-  // draft strips them (the normalizer-strips-unknown-fields trap).
-  // New-name-first, legacy-name-tolerant (issue 560): accept the renamed
-  // `registeredItemUuid`/`originItemUuid`/`aliasItemUuids` and the pre-rename (issue 560)
-  // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`, emitting the new names.
   const originItemUuid =
-    tool.originItemUuid || tool.registeredItemUuid || tool.sourceItemUuid || tool.sourceUuid || null;
+    tool.originItemUuid ||
+    tool.registeredItemUuid ||
+    tool.sourceItemUuid ||
+    tool.sourceUuid ||
+    null;
   const registeredItemUuid =
-    tool.registeredItemUuid || tool.originItemUuid || tool.sourceUuid || tool.sourceItemUuid || null;
-  const primaryRefs = new Set(
-    [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
-  );
+    tool.registeredItemUuid ||
+    tool.originItemUuid ||
+    tool.sourceUuid ||
+    tool.sourceItemUuid ||
+    null;
   const rawAliasItemUuids = Array.isArray(tool.aliasItemUuids)
     ? tool.aliasItemUuids
     : Array.isArray(tool.fallbackItemIds)
       ? tool.fallbackItemIds
-      : null;
-  const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-    ? [
-        ...new Set(
-          rawAliasItemUuids
-            .filter((ref) => typeof ref === 'string')
-            .map((ref) => ref.trim())
-            .filter((ref) => ref && !primaryRefs.has(ref))
-        ),
-      ]
-    : [];
-  return {
-    id,
-    label: rawLabel,
-    enabled: tool.enabled !== false,
-    componentId,
-    name: typeof tool.name === 'string' && tool.name ? tool.name : null,
-    img: typeof tool.img === 'string' && tool.img ? tool.img : null,
+      : [];
+  return Tool.fromJSON({
+    ...tool,
+    id: String(tool.id || randomID()),
     registeredItemUuid,
     originItemUuid,
-    aliasItemUuids,
-    requirement: _normalizeToolRequirement(tool.requirement),
-    breakage: _normalizeToolBreakage(tool.breakage),
-    onBreak: _normalizeToolOnBreak(tool.onBreak),
-  };
+    aliasItemUuids: rawAliasItemUuids,
+  }).toJSON();
 }
 
 function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
@@ -1617,7 +1627,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const prepared = recipes.map((recipe) => {
-    const display = _buildRecipeBrowserDisplay(recipe);
+    const display = _buildRecipeBrowserDisplay(recipe, selectedSystem);
     // Book membership (many-to-many): the books that contain this recipe. The
     // legacy scalar `recipeItemId`/name/img reflect the FIRST containing book.
     const containingDefinitions = _recipeItemDefinitionsContaining(
@@ -1650,6 +1660,20 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       outcomeRouting: raw.outcomeRouting || null,
       checkTierId: raw.checkTierId ?? null,
       minSuccessOutcomeId: raw.minSuccessOutcomeId ?? null,
+      // Per-recipe crafting-check modifier override (issue 770). This projection is a
+      // hand-built ALLOWLIST: omitting it makes the Overview override control seed from
+      // `undefined`, render "Inherit system default", and silently write the override
+      // back to null on the next save (data loss). `raw` is `recipe.toJSON()`, which
+      // carries `craftingModifier` per the model.
+      craftingModifier: raw.craftingModifier ?? null,
+      // Single-step recipe duration (issue 845). This projection is a hand-built
+      // ALLOWLIST: omitting it makes the Overview Duration steppers seed from
+      // `undefined` and render "Instant" on every editor open — the persisted value
+      // is NOT lost (RecipeManager.updateRecipe shallow-merges it back from the stored
+      // record when the draft omits the key), so craft time still applies, but the GM
+      // sees their authored duration reset to zero. Multi-step recipes carry their
+      // per-step duration inside the `steps` array projected wholesale below.
+      timeRequirement: raw.timeRequirement ?? null,
       complex: raw.complex === true,
       toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
       visibilitySummary: _visibilitySummary(recipe),
@@ -1666,7 +1690,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
         playerIds: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds : [],
       },
       accessSummary: {
-        characterCount: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds.length : 0,
+        characterCount: Array.isArray(raw.access?.characterIds)
+          ? raw.access.characterIds.length
+          : 0,
         playerCount: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds.length : 0,
       },
       locked: recipe.locked === true,
@@ -1788,9 +1814,20 @@ async function _resolveSourceDocumentState(uuid) {
  * @param {object|null} doc
  * @returns {string}
  */
-function _documentDescriptionCandidate(doc) {
+async function _documentDescriptionCandidate(doc, enrichToHtml) {
   if (!doc) return '';
-  return _plainTextDescription(doc.system?.description ?? doc.description ?? '');
+  const raw = _descriptionTextCandidate(doc.system?.description ?? doc.description ?? '');
+  if (!raw) return '';
+  // The live fallback RESOLVES too (issue 800). It has to: the population this
+  // fallback exists for — a compendium-linked component whose stored description is
+  // empty (issue 676) — is precisely the population whose live description carries
+  // the raw directives the reporter saw. A non-enriching fallback would leave the
+  // reported bug visible for exactly those components until a GM ran Repair.
+  // `relativeTo` is passed here as well as at ingestion, or the same description can
+  // resolve at registration and go broken on this path.
+  const enriched =
+    typeof enrichToHtml === 'function' ? await enrichToHtml(raw, { relativeTo: doc }) : raw;
+  return _plainTextDescription(enriched);
 }
 
 // ---------------------------------------------------------------------------
@@ -1937,7 +1974,10 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
     const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
     const linkedRecipes =
       memberIds.length > 0
-        ? memberIds.map((id) => recipeById.get(String(id))).filter(Boolean).map(toRecipeRef)
+        ? memberIds
+            .map((id) => recipeById.get(String(id)))
+            .filter(Boolean)
+            .map(toRecipeRef)
         : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
     const learnedActors = new Set();
     for (const recipe of linkedRecipes) {
@@ -1956,36 +1996,105 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
   });
 }
 
+// Deterministic structural serialization with recursively sorted object keys.
+// JSON.stringify alone follows insertion order, so two structurally-identical
+// items built by different code paths could serialize differently; sorting keys
+// makes the signature depend on structure/values only.
+function _stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(_stableStringify).join(',')}]`;
+  const keys = Object.keys(value).sort((a, b) => a.localeCompare(b));
+  const entries = keys.map((k) => `${JSON.stringify(k)}:${_stableStringify(value[k])}`);
+  return `{${entries.join(',')}}`;
+}
+
+// Per-item memo signature. The card is `{ ...item, ...overrides }`, so it ships
+// EVERY stored `item` field — the signature therefore serializes the WHOLE item
+// (not a hand-enumerated subset, which would miss e.g. `category`/`difficulty`
+// and serve a stale card). It is combined with the EXTERNAL inputs the card also
+// reads: the `showTags`/`showEssences`/`showSalvage` flags (a `features.salvage`
+// toggle is a system-level change that is neither an item field nor a system-id
+// change, so it MUST live in the signature to invalidate) and the resolved
+// essence name/icon per essence id (an essence-catalog edit is system-level).
+function _itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
+  const essenceResolution = Object.keys(item?.essences || {})
+    .sort((a, b) => a.localeCompare(b))
+    .map((id) => [
+      id,
+      essenceDefinitionById.get(id)?.name || id,
+      essenceDefinitionById.get(id)?.icon,
+    ]);
+  return _stableStringify({
+    item,
+    showTags,
+    showEssences,
+    showSalvage,
+    essenceResolution,
+  });
+}
+
+// The per-store item-card memo (a Map keyed `${systemId}:${itemId}` → `{signature, card}`)
+// lets an unchanged component skip its per-item `fromUuid` (`_resolveSourceDocumentState`)
+// and conditional `enrichHTML` on refresh, so a single-component edit no longer pays
+// O(all-components) resolution cost.
+//
+// FRESHNESS TRADE (disclosed, NOT "unchanged"): on a cache hit the memo reuses the
+// last-resolved source-document state, so `sourceMissing`/`sourceOrigin` (the "Missing"
+// badge) reflects an EXTERNAL source-document delete/restore only on system re-select
+// (the whole cache clears on a system-id change) or on Repair Item Data / item-sync of
+// that component (its stored fields change → signature miss) — NOT on an unrelated
+// same-system refresh. This matches the existing best-effort, opportunistic behavior:
+// there is no world-item-delete refresh hook (foundryBridge ignores non-actor items), so
+// today such a change is already reflected only on the next unrelated refresh. No
+// USER-edited field goes stale — a user edit mutates the stored item → signature miss.
 async function _buildItemCards(
   systemManager,
   selectedSystem,
   itemSearchTerm,
-  showTags,
-  showEssences,
-  essenceDefinitionById
+  { showTags, showEssences, essenceDefinitionById, enrichToHtml, cache }
 ) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
   const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
   return Promise.all(
     items.map(async (item) => {
+      const cacheKey = `${selectedSystem.id}:${item.id}`;
+      const signature = _itemCardSignature(
+        item,
+        showTags,
+        showEssences,
+        showSalvage,
+        essenceDefinitionById
+      );
+      const cached = cache?.get(cacheKey);
+      // Hit: reuse the prior card verbatim, skipping `fromUuid` + `enrichHTML`.
+      if (cached && cached.signature === signature) return cached.card;
       const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
-      // Resolve the LINKED DOCUMENT, not just its existence (issue 676). The editor's
-      // identity strip promises "name, image & description follow the linked item and
-      // can't be edited here" — and for description that promise was FALSE: this read
-      // `item.description` off the stored component record, which holds whatever was
-      // captured at registration. For a compendium-linked component that is routinely
-      // empty, so the strip rendered a bare "—" while the item's sheet showed prose.
+      // Precedence: STORED FIRST, enriched live document as the fallback (issue 800,
+      // flipping the live-first order issue 676 introduced).
       //
-      // The stored value remains the FALLBACK, so an unresolvable source (and every
-      // environment without `fromUuid`) renders exactly what it rendered before.
-      // A genuinely description-less item still yields '' -> the strip's own "—".
+      // Issue 676 preferred the live document because the stored description was
+      // routinely empty for a compendium-linked component, so the identity strip's
+      // promise that "name, image & description follow the linked item" rendered a bare
+      // "—". Since descriptions are now RESOLVED and stored at ingestion and by the GM
+      // repair, the stored value is the authoritative one and reading the live document
+      // on every render is pure cost.
+      //
+      // The trade is honest and is read FRESHNESS: a pack-content change (a game system
+      // or module shipping new prose) now reaches the component when a GM runs Repair
+      // Item Data, where previously it landed on the next render. Item-sync covers
+      // in-world edits only.
+      //
+      // Statement form, deliberately: `(await enrichedLive) || stored` would re-introduce
+      // the per-component `enrichHTML` call this flip exists to avoid.
       const { doc: sourceDoc, missing: sourceMissing } =
         await _resolveSourceDocumentState(registeredItemUuidDisplay);
-      const description =
-        _documentDescriptionCandidate(sourceDoc) || _plainTextDescription(item.description);
+      let description = _plainTextDescription(item.description);
+      if (!description) {
+        description = await _documentDescriptionCandidate(sourceDoc, enrichToHtml);
+      }
       const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
-      return {
+      const card = {
         ...item,
         img: item.img || 'icons/svg/item-bag.svg',
         description,
@@ -2007,6 +2116,8 @@ async function _buildItemCards(
         showTags,
         showEssences,
       };
+      cache?.set(cacheKey, { signature, card });
+      return card;
     })
   );
 }
@@ -2113,70 +2224,18 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
   });
 }
 
+// Thin delegators to the shared Foundry-free plain-texter (src/utils/
+// plainTextDescription.js). Kept as named module functions because
+// `_documentDescriptionCandidate`, `_buildManagedItemOptions`, and the Books &
+// Scrolls projection call them, and source-contract tests may pin the names.
+// The shared helper flattens Foundry enricher directives (issue 800) before the
+// HTML strip, so every description surface renders human-readable labels.
 function _plainTextDescription(value) {
-  const raw = _descriptionTextCandidate(value);
-  if (!raw) return '';
-
-  if (globalThis.document?.createElement) {
-    const template = globalThis.document.createElement('template');
-    template.innerHTML = raw;
-    return String(template.content?.textContent || '')
-      .replace(/\s+/g, ' ')
-      .replace(/\s+([,.;:!?])/g, '$1')
-      .trim();
-  }
-
-  return raw
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([,.;:!?])/g, '$1')
-    .trim();
+  return plainTextDescription(value);
 }
 
 function _descriptionTextCandidate(value, seen = new Set()) {
-  if (value == null) return '';
-
-  const valueType = typeof value;
-  if (valueType === 'string') return value.trim();
-  if (valueType === 'number' || valueType === 'boolean' || valueType === 'bigint') {
-    return String(value).trim();
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((entry) => _descriptionTextCandidate(entry, seen))
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-  }
-  if (valueType !== 'object') return '';
-  if (seen.has(value)) return '';
-  seen.add(value);
-
-  for (const key of [
-    'value',
-    'enriched',
-    'html',
-    'text',
-    'content',
-    'short',
-    'long',
-    'unidentified',
-    'chat',
-  ]) {
-    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-    const candidate = _descriptionTextCandidate(value[key], seen);
-    if (candidate) return candidate;
-  }
-
-  return '';
+  return descriptionTextCandidate(value, seen);
 }
 
 /**
@@ -2225,6 +2284,9 @@ function _buildSelectedSystemViewData(
       effectTransfer: selectedSystem.features?.effectTransfer === true,
       gathering: selectedSystem.features?.gathering === true,
       salvage: selectedSystem.features?.salvage === true,
+      // Default-ON policy flag (issue 848): an explicit false forfeits inputs on a
+      // player cancel; anything else (incl. a legacy system missing the key) refunds.
+      refundOnPlayerCancel: selectedSystem.features?.refundOnPlayerCancel !== false,
     },
 
     categories: selectedSystem.categories || [],
@@ -2257,7 +2319,9 @@ function _buildSelectedSystemViewData(
     // System-owned character prerequisite library (issue 544). Surfaced through
     // the allowlist projection (like `tools`) so the System Settings accordion
     // and the recipe-item learning-gate picker read them.
-    characterPrerequisites: normalizeCharacterPrerequisiteList(selectedSystem.characterPrerequisites),
+    characterPrerequisites: normalizeCharacterPrerequisiteList(
+      selectedSystem.characterPrerequisites
+    ),
 
     requirements: selectedSystem.requirements || {
       time: { enabled: true },
@@ -2298,6 +2362,20 @@ function _buildSelectedSystemViewData(
           (selectedSystem.craftingCheck?.consumption?.breakToolsOnFail ??
             selectedSystem.craftingCheck?.consumption?.consumeCatalystsOnFail) === true,
       },
+      // Per-recipe check-modifier catalogue + default policy (issue 770). This
+      // hand-built projection is an allowlist: a field omitted here is INVISIBLE to
+      // the UI, so the catalogue editor + recipe override control would read empty.
+      checkModifiers: Array.isArray(selectedSystem.craftingCheck?.checkModifiers)
+        ? selectedSystem.craftingCheck.checkModifiers.map((modifier) => _clonePlain(modifier))
+        : [],
+      defaultModifierPolicy: ['addAll', 'highest', 'byRecipe'].includes(
+        selectedSystem.craftingCheck?.defaultModifierPolicy
+      )
+        ? selectedSystem.craftingCheck.defaultModifierPolicy
+        : 'addAll',
+      defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
+        ? [...selectedSystem.craftingCheck.defaultModifierIds]
+        : [],
     },
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -2400,15 +2478,14 @@ export function createAdminStore(services) {
   const environmentValidationState = writable(null);
   let environmentValidationAttempt = 0;
   let dirtyEnvironmentDiscardConfirmation = null;
-  const toolsDraft = writable(null);
-  const toolsDraftBaseline = writable(null);
-  const toolsDraftSystemId = writable('');
-  const toolsDraftDirty = writable(false);
-  const toolsDraftDirtyToolIds = writable([]);
-  const toolsDraftSaving = writable(false);
-  const toolsDraftSaveError = writable(null);
-  const toolsDraftSelectedToolId = writable('');
-  const toolsDraftExpandedToolId = writable('');
+  const toolDraft = writable(null);
+  const toolDraftBaseline = writable(null);
+  const toolDraftSystemId = writable('');
+  const toolDraftSourceItemUuid = writable('');
+  const toolDraftDirty = writable(false);
+  const toolDraftSaving = writable(false);
+  const toolDraftSaveError = writable(null);
+  const toolDraftValidation = writable({ valid: false, errors: ['missing'] });
   let dirtyToolsDraftDiscardConfirmation = null;
   const travelSelectedPartyId = writable('');
   const travelSaving = writable(false);
@@ -2421,6 +2498,14 @@ export function createAdminStore(services) {
   let readyRefreshScheduled = false;
   let externalRefreshScheduled = false;
   let destroyed = false;
+
+  // Per-store item-card memo (store-instance scope, NEVER module-global — avoids
+  // cross-app/test bleed). See `_buildItemCards` for the signature shape and the
+  // disclosed source-document freshness trade. Cleared in `refresh()` on a
+  // resolved-system-id change (the single invalidation chokepoint); item-search
+  // changes deliberately do NOT invalidate.
+  const itemCardCache = new Map();
+  let itemCardCacheSystemId = '';
 
   // --- Computed state ---
   const viewState = writable({
@@ -2511,16 +2596,37 @@ export function createAdminStore(services) {
   }
 
   function _currentToolsDraftViewPatch() {
+    const draft = get(toolDraft);
+    const baseline = get(toolDraftBaseline);
+    const systemId = get(toolDraftSystemId);
+    const library = systemId ? _systemTools(systemId) : [];
+    const overlay = (entries, entry) => {
+      if (!entry) return entries.map(_clonePlain);
+      const index = entries.findIndex((tool) => String(tool.id) === String(entry.id));
+      if (index < 0) return [...entries.map(_clonePlain), _clonePlain(entry)];
+      return entries.map((tool, toolIndex) =>
+        toolIndex === index ? _clonePlain(entry) : _clonePlain(tool)
+      );
+    };
     return {
-      toolsDraft: _clonePlain(get(toolsDraft)),
-      toolsDraftBaseline: _clonePlain(get(toolsDraftBaseline)),
-      toolsDraftSystemId: get(toolsDraftSystemId),
-      toolsDraftDirty: get(toolsDraftDirty),
-      toolsDraftDirtyToolIds: _clonePlain(get(toolsDraftDirtyToolIds)),
-      toolsDraftSaving: get(toolsDraftSaving),
-      toolsDraftSaveError: get(toolsDraftSaveError),
-      toolsDraftSelectedToolId: get(toolsDraftSelectedToolId),
-      toolsDraftExpandedToolId: get(toolsDraftExpandedToolId),
+      toolDraft: _clonePlain(draft),
+      toolDraftBaseline: _clonePlain(baseline),
+      toolDraftSystemId: systemId,
+      toolDraftSourceItemUuid: get(toolDraftSourceItemUuid),
+      toolDraftDirty: get(toolDraftDirty),
+      toolDraftSaving: get(toolDraftSaving),
+      toolDraftSaveError: get(toolDraftSaveError),
+      toolDraftValidation: _clonePlain(get(toolDraftValidation)),
+      // Temporary shell aliases: these are projections, never mutable editor state.
+      toolsDraft: systemId ? overlay(library, draft) : null,
+      toolsDraftBaseline: systemId ? overlay(library, baseline) : null,
+      toolsDraftSystemId: systemId,
+      toolsDraftDirty: get(toolDraftDirty),
+      toolsDraftDirtyToolIds: get(toolDraftDirty) && draft?.id ? [draft.id] : [],
+      toolsDraftSaving: get(toolDraftSaving),
+      toolsDraftSaveError: get(toolDraftSaveError),
+      toolsDraftSelectedToolId: draft?.id || '',
+      toolsDraftExpandedToolId: draft?.id || '',
     };
   }
 
@@ -2532,57 +2638,80 @@ export function createAdminStore(services) {
   }
 
   function _recomputeToolsDraftDirty() {
-    const current = get(toolsDraft) || [];
-    const baseline = get(toolsDraftBaseline) || [];
-    const baselineById = new Map(baseline.map((tool) => [String(tool.id), tool]));
-    const dirtyIds = [];
-    for (const tool of current) {
-      const id = String(tool?.id || '');
-      if (!id) continue;
-      const baselineTool = baselineById.get(id);
-      if (!baselineTool || JSON.stringify(tool) !== JSON.stringify(baselineTool)) dirtyIds.push(id);
-    }
-    toolsDraftDirtyToolIds.set(dirtyIds);
-    toolsDraftDirty.set(dirtyIds.length > 0);
+    const current = get(toolDraft);
+    const baseline = get(toolDraftBaseline);
+    toolDraftDirty.set(current !== null && JSON.stringify(current) !== JSON.stringify(baseline));
   }
 
   function enterToolsDraft(systemId = get(selectedSystemId)) {
     if (!systemId) return false;
-    const snapshot = _systemTools(systemId);
-    toolsDraft.set(_clonePlain(snapshot));
-    toolsDraftBaseline.set(_clonePlain(snapshot));
-    toolsDraftSystemId.set(String(systemId));
-    toolsDraftDirty.set(false);
-    toolsDraftDirtyToolIds.set([]);
-    toolsDraftSaveError.set(null);
-    toolsDraftSelectedToolId.set(snapshot[0]?.id || '');
-    toolsDraftExpandedToolId.set('');
+    toolDraft.set(null);
+    toolDraftBaseline.set(null);
+    toolDraftSystemId.set(String(systemId));
+    toolDraftSourceItemUuid.set('');
+    toolDraftDirty.set(false);
+    toolDraftSaveError.set(null);
+    toolDraftValidation.set({ valid: false, errors: ['missing'] });
+    _patchToolsDraftViewState();
+    return true;
+  }
+
+  function _setFocusedToolDraft(draft, baseline, systemId) {
+    toolDraft.set(_clonePlain(draft));
+    toolDraftBaseline.set(_clonePlain(baseline));
+    toolDraftSystemId.set(String(systemId || ''));
+    toolDraftSourceItemUuid.set('');
+    toolDraftSaveError.set(null);
+    _recomputeToolsDraftDirty();
+    toolDraftValidation.set(validateToolDraft());
+    _patchToolsDraftViewState();
+    return true;
+  }
+
+  function createToolDraft(initialPatch = {}, systemId = get(selectedSystemId)) {
+    if (!systemId) return null;
+    const patch = initialPatch && typeof initialPatch === 'object' ? initialPatch : {};
+    const created = _normalizeGatheringLibraryTool({ ...patch, id: _randomID() }, _randomID);
+    _setFocusedToolDraft(created, null, systemId);
+    return _clonePlain(created);
+  }
+
+  function openToolDraft(toolId, systemId = get(selectedSystemId)) {
+    const id = String(toolId || '');
+    if (!id || !systemId) return false;
+    const existing = _systemTools(systemId).find((tool) => String(tool.id) === id);
+    if (!existing) return false;
+    return _setFocusedToolDraft(existing, existing, systemId);
+  }
+
+  function patchToolDraft(patch = {}) {
+    const current = get(toolDraft);
+    if (!current || !patch || typeof patch !== 'object') return false;
+    const nested = ['requirement', 'prerequisites', 'bonus', 'breakage', 'onBreak'];
+    const merged = { ...current, ...patch };
+    for (const key of nested) {
+      if (patch[key] && typeof patch[key] === 'object') {
+        merged[key] = { ...(current[key] || {}), ...patch[key] };
+      }
+    }
+    toolDraft.set(_normalizeGatheringLibraryTool(merged, _randomID));
+    toolDraftSaveError.set(null);
+    _recomputeToolsDraftDirty();
+    toolDraftValidation.set(validateToolDraft());
     _patchToolsDraftViewState();
     return true;
   }
 
   function updateToolsDraft(mutator) {
     if (typeof mutator !== 'function') return false;
-    const current = get(toolsDraft);
-    if (!Array.isArray(current)) return false;
-    const next = mutator(current.map((tool) => _clonePlain(tool)));
-    if (!Array.isArray(next)) return false;
-    toolsDraft.set(next);
-    _recomputeToolsDraftDirty();
-    _patchToolsDraftViewState();
-    return true;
+    const current = get(toolDraft);
+    if (!current) return false;
+    const next = mutator([_clonePlain(current)]);
+    return Array.isArray(next) && next[0] ? patchToolDraft(next[0]) : false;
   }
 
   function addToolToDraft(initialPatch = {}) {
-    const patch = initialPatch && typeof initialPatch === 'object' ? initialPatch : {};
-    const created = _normalizeGatheringLibraryTool({ ...patch, id: _randomID() }, _randomID);
-    const success = updateToolsDraft((list) => [...list, created]);
-    if (success) {
-      toolsDraftSelectedToolId.set(created.id);
-      toolsDraftExpandedToolId.set(created.id);
-      _patchToolsDraftViewState();
-    }
-    return success ? created : null;
+    return createToolDraft(initialPatch);
   }
 
   /**
@@ -2597,258 +2726,212 @@ export function createAdminStore(services) {
    * @returns {Promise<boolean>}
    */
   async function addToolFromUuidToDraft(itemUuid) {
-    const uuid = String(itemUuid || '');
-    if (!uuid) return false;
-    const systemId = String(get(toolsDraftSystemId) || get(selectedSystemId) || '');
-    if (!systemId) return false;
-    const systemManager = services.getCraftingSystemManager?.();
-    if (typeof systemManager?.addToolFromUuid !== 'function') return false;
-    try {
-      const result = await systemManager.addToolFromUuid(systemId, uuid);
-      const created = result?.item
-        ? _normalizeGatheringLibraryTool(result.item, _randomID)
-        : null;
-      if (!created) return false;
-      const current = Array.isArray(get(toolsDraft)) ? get(toolsDraft) : [];
-      const baseline = Array.isArray(get(toolsDraftBaseline)) ? get(toolsDraftBaseline) : [];
-      toolsDraft.set([...current, _clonePlain(created)]);
-      toolsDraftBaseline.set([...baseline, _clonePlain(created)]);
-      toolsDraftSelectedToolId.set(created.id);
-      toolsDraftExpandedToolId.set(created.id);
-      _recomputeToolsDraftDirty();
-      _patchToolsDraftViewState();
-      await refresh();
-      return true;
-    } catch (err) {
-      console.error('Fabricate | Failed to add tool from item:', err);
-      services.notify?.error?.(err?.message || 'Failed to add tool from item');
-      return false;
-    }
+    if (!get(toolDraft) && !createToolDraft()) return false;
+    return stageToolDraftSource(itemUuid);
+  }
+
+  function stageToolDraftSource(itemUuid, snapshot = {}) {
+    const uuid = String(itemUuid || '').trim();
+    if (!uuid || !get(toolDraft)) return false;
+    toolDraftSourceItemUuid.set(uuid);
+    return patchToolDraft({
+      ...snapshot,
+      componentId: null,
+      registeredItemUuid: uuid,
+      originItemUuid: uuid,
+      aliasItemUuids: [],
+    });
+  }
+
+  function unlinkToolDraftSource() {
+    if (!get(toolDraft)) return false;
+    toolDraftSourceItemUuid.set('');
+    return patchToolDraft({
+      componentId: null,
+      registeredItemUuid: null,
+      originItemUuid: null,
+      aliasItemUuids: [],
+      name: null,
+      img: null,
+      description: '',
+    });
   }
 
   function updateToolInDraft(toolId, patch = {}) {
     if (!toolId || typeof patch !== 'object' || patch === null) return false;
-    return updateToolsDraft((list) =>
-      list.map((tool) =>
-        tool.id === toolId ? _normalizeGatheringLibraryTool({ ...tool, ...patch }, _randomID) : tool
-      )
-    );
+    if (String(get(toolDraft)?.id || '') !== String(toolId) && !openToolDraft(toolId)) return false;
+    return patchToolDraft(patch);
   }
 
   async function deleteToolFromDraft(toolId) {
-    if (!toolId) return false;
-    const id = String(toolId);
-    const current = get(toolsDraft);
-    if (!Array.isArray(current)) return false;
-    const baseline = get(toolsDraftBaseline) || [];
-    const wasPersisted = baseline.some((tool) => String(tool.id) === id);
-    if (wasPersisted) {
-      const systemId = get(toolsDraftSystemId);
-      if (!systemId) return false;
-      toolsDraftSaving.set(true);
-      _patchToolsDraftViewState();
-      try {
-        // Prefer the manager's `deleteTool` so a first-class tool's durable
-        // `roles[systemId].toolId` leaf is cleared from its source Item (issue 561, D7) —
-        // a whetstone's sibling `componentId` leaf survives. Fall back to a whole-list
-        // persist for a manager that predates it (e.g. legacy test fixtures).
-        const systemManager = services.getCraftingSystemManager?.();
-        if (typeof systemManager?.deleteTool === 'function') {
-          await systemManager.deleteTool(systemId, id);
-        } else {
-          const live = _systemTools(systemId);
-          const next = live.filter((tool) => String(tool.id) !== id);
-          const persisted = await _persistSystemTools(systemId, next);
-          if (persisted === null) return false;
-        }
-        toolsDraftBaseline.set(baseline.filter((tool) => String(tool.id) !== id));
-      } finally {
-        toolsDraftSaving.set(false);
-      }
-    }
-    toolsDraft.set(current.filter((tool) => String(tool.id) !== id));
-    _recomputeToolsDraftDirty();
-    if (String(get(toolsDraftSelectedToolId)) === id) {
-      const remaining = get(toolsDraft) || [];
-      toolsDraftSelectedToolId.set(remaining[0]?.id || '');
-    }
-    if (String(get(toolsDraftExpandedToolId)) === id) {
-      toolsDraftExpandedToolId.set('');
-    }
-    _patchToolsDraftViewState();
-    return true;
+    const id = String(toolId || get(toolDraft)?.id || '');
+    if (!id) return false;
+    if (String(get(toolDraft)?.id || '') !== id && !openToolDraft(id)) return false;
+    return deleteToolDraft();
   }
 
   function selectDraftTool(toolId) {
-    toolsDraftSelectedToolId.set(toolId || '');
-    if (toolId) toolsDraftExpandedToolId.set(toolId);
-    _patchToolsDraftViewState();
+    return toolId ? openToolDraft(toolId) : false;
   }
 
   function setExpandedDraftTool(toolId) {
-    toolsDraftExpandedToolId.set(toolId || '');
-    _patchToolsDraftViewState();
+    return toolId ? openToolDraft(toolId) : false;
   }
 
   function validateToolsDraft() {
-    const tools = get(toolsDraft) || [];
-    const errors = [];
-    for (const raw of tools) {
-      const result = Tool.fromJSON(raw).validate();
-      if (!result.valid) errors.push({ id: raw.id, errors: result.errors });
-    }
-    return { valid: errors.length === 0, errors };
+    const result = validateToolDraft();
+    return result.valid
+      ? { valid: true, errors: [] }
+      : { valid: false, errors: [{ id: get(toolDraft)?.id || '', errors: result.errors }] };
   }
 
-  function validateToolDraft(toolId) {
+  function validateToolDraft(toolId = get(toolDraft)?.id) {
     const id = String(toolId || '');
-    const tool = (get(toolsDraft) || []).find((entry) => String(entry.id) === id);
+    const tool = get(toolDraft);
+    if (String(tool?.id || '') !== id) return { valid: false, errors: ['missing'] };
     if (!tool) return { valid: false, errors: ['missing'] };
     const result = Tool.fromJSON(tool).validate();
     return { valid: result.valid, errors: result.errors };
   }
 
-  function isToolDraftDirty(toolId) {
-    const id = String(toolId || '');
-    return id !== '' && get(toolsDraftDirtyToolIds).includes(id);
+  function isToolDraftDirty(toolId = get(toolDraft)?.id) {
+    return String(toolId || '') === String(get(toolDraft)?.id || '') && get(toolDraftDirty);
   }
 
-  async function saveToolDraft(toolId) {
-    const systemId = get(toolsDraftSystemId);
-    if (!systemId) return false;
-    const id = String(toolId || '');
-    if (!id) return false;
-    if (!isToolDraftDirty(id)) return true;
-    const draft = get(toolsDraft) || [];
-    const tool = draft.find((entry) => String(entry.id) === id);
-    if (!tool) return false;
-    const validation = validateToolDraft(id);
+  async function saveToolDraft() {
+    const systemId = get(toolDraftSystemId);
+    const draft = get(toolDraft);
+    if (!systemId || !draft) return false;
+    if (!get(toolDraftDirty)) return true;
+    const validation = validateToolDraft();
+    toolDraftValidation.set(validation);
     if (!validation.valid) {
-      toolsDraftSaveError.set('invalid');
+      toolDraftSaveError.set('invalid');
       _patchToolsDraftViewState();
       return false;
     }
-    toolsDraftSaving.set(true);
+    const systemManager = services.getCraftingSystemManager?.();
+    if (typeof systemManager?.upsertTool !== 'function') return false;
+    toolDraftSaving.set(true);
+    toolDraftSaveError.set(null);
     _patchToolsDraftViewState();
     try {
-      const baseline = get(toolsDraftBaseline) || [];
-      const baselineTool = baseline.find((entry) => String(entry.id) === id) || null;
-      const live = _systemTools(systemId);
-      const liveIndex = live.findIndex((entry) => String(entry.id) === id);
-      const liveTool =
-        liveIndex >= 0 ? _normalizeGatheringLibraryTool(live[liveIndex], _randomID) : null;
-      const hasConflict = baselineTool
-        ? JSON.stringify(baselineTool) !== JSON.stringify(liveTool)
-        : liveTool !== null;
-      if (hasConflict) {
-        const overwrite = await services.confirmDialog?.({
-          title:
-            services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Title') ||
-            'Tools were modified elsewhere',
-          content:
-            services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Content') ||
-            'The library has been modified outside this editor. Overwrite with your changes?',
-          yes: {
-            label:
-              services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Confirm') ||
-              'Overwrite',
-            callback: () => true,
-          },
-          no: {
-            label:
-              services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Cancel') ||
-              'Cancel',
-            callback: () => false,
-          },
-        });
-        if (overwrite !== true) {
-          toolsDraftSaving.set(false);
-          _patchToolsDraftViewState();
-          return false;
-        }
-      }
-      const normalizedTool = _normalizeGatheringLibraryTool(tool, _randomID);
-      const next = live.map((entry) => _normalizeGatheringLibraryTool(entry, _randomID));
-      if (liveIndex >= 0) {
-        next[liveIndex] = normalizedTool;
-      } else {
-        const draftIndex = draft.findIndex((entry) => String(entry.id) === id);
-        next.splice(Math.max(0, Math.min(draftIndex, next.length)), 0, normalizedTool);
-      }
-      const persisted = await _persistSystemTools(systemId, next);
-      if (persisted === null) return false;
-      toolsDraft.set(
-        draft.map((entry) => (String(entry.id) === id ? _clonePlain(normalizedTool) : entry))
+      const itemUuid = get(toolDraftSourceItemUuid);
+      const result = await systemManager.upsertTool(
+        systemId,
+        _clonePlain(draft),
+        itemUuid ? { itemUuid } : {}
       );
-      const baselineById = new Map(baseline.map((entry) => [String(entry.id), entry]));
-      baselineById.set(id, normalizedTool);
-      toolsDraftBaseline.set(
-        draft
-          .filter((entry) => String(entry.id) === id || baselineById.has(String(entry.id)))
-          .map((entry) =>
-            String(entry.id) === id
-              ? _clonePlain(normalizedTool)
-              : _clonePlain(baselineById.get(String(entry.id)))
-          )
-      );
-      _recomputeToolsDraftDirty();
-      toolsDraftSaveError.set(null);
-      _patchToolsDraftViewState();
+      if (!result?.item) throw new Error('Tool save returned no item');
+      const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
+      toolDraft.set(_clonePlain(saved));
+      toolDraftBaseline.set(_clonePlain(saved));
+      toolDraftSourceItemUuid.set('');
+      toolDraftDirty.set(false);
+      toolDraftValidation.set(validateToolDraft(saved.id));
       await refresh();
       return true;
+    } catch (error) {
+      toolDraftSaveError.set(error?.message || 'save');
+      services.notify?.error?.(
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.SaveFailed') ||
+          'The Tool could not be saved. Try again.'
+      );
+      return false;
     } finally {
-      toolsDraftSaving.set(false);
+      toolDraftSaving.set(false);
       _patchToolsDraftViewState();
     }
   }
 
-  // A brand-new tool draft (id absent from the persisted baseline) that the user
-  // added but never filled in matches the canonical empty-tool shape for its id.
-  // Such a draft has nothing to save and must not block a "Save all".
-  function _isBlankNewToolDraft(tool, baselineIds) {
-    if (!tool || baselineIds.has(String(tool.id))) return false;
-    const normalized = _normalizeGatheringLibraryTool({ ...tool }, _randomID);
-    const blank = _normalizeGatheringLibraryTool({ id: tool.id }, _randomID);
-    return JSON.stringify(normalized) === JSON.stringify(blank);
+  function discardToolDraft() {
+    const baseline = get(toolDraftBaseline);
+    if (baseline) {
+      toolDraft.set(_clonePlain(baseline));
+      toolDraftDirty.set(false);
+      toolDraftSaveError.set(null);
+      toolDraftSourceItemUuid.set('');
+      toolDraftValidation.set(validateToolDraft(baseline.id));
+      _patchToolsDraftViewState();
+      return true;
+    }
+    return cancelToolsDraft();
   }
 
-  // Drop blank, unmodified, brand-new tool drafts (e.g. the user clicked "Add
-  // tool" then tried to save/navigate away without assigning a component).
-  // Discarding them lets a "Save all" complete cleanly instead of silently
-  // blocking on an empty, invalid row (issue 297). Repairs selection/expansion
-  // when they pointed at a discarded draft.
-  function _discardBlankNewToolDrafts() {
-    const current = get(toolsDraft);
-    if (!Array.isArray(current)) return;
-    const baselineIds = new Set((get(toolsDraftBaseline) || []).map((entry) => String(entry.id)));
-    const kept = current.filter((tool) => !_isBlankNewToolDraft(tool, baselineIds));
-    if (kept.length === current.length) return;
-    toolsDraft.set(kept);
-    const keptIds = new Set(kept.map((entry) => String(entry.id)));
-    if (!keptIds.has(String(get(toolsDraftSelectedToolId)))) {
-      toolsDraftSelectedToolId.set(kept[0]?.id || '');
-    }
-    if (!keptIds.has(String(get(toolsDraftExpandedToolId)))) {
-      toolsDraftExpandedToolId.set('');
-    }
-    _recomputeToolsDraftDirty();
+  async function deleteToolDraft() {
+    const draft = get(toolDraft);
+    const systemId = get(toolDraftSystemId);
+    if (!draft || !systemId) return false;
+    const persisted = get(toolDraftBaseline) !== null;
+    toolDraftSaving.set(true);
     _patchToolsDraftViewState();
+    try {
+      if (persisted) {
+        const systemManager = services.getCraftingSystemManager?.();
+        if (typeof systemManager?.deleteTool !== 'function') return false;
+        const result = await systemManager.deleteTool(systemId, draft.id);
+        if (result?.deleted !== true) return false;
+      }
+      toolDraft.set(null);
+      toolDraftBaseline.set(null);
+      toolDraftSourceItemUuid.set('');
+      toolDraftDirty.set(false);
+      toolDraftSaveError.set(null);
+      toolDraftValidation.set({ valid: false, errors: ['missing'] });
+      await refresh();
+      _patchToolsDraftViewState();
+      return true;
+    } catch (error) {
+      toolDraftSaveError.set(error?.message || 'delete');
+      services.notify?.error?.(
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.DeleteFailed') ||
+          'The Tool could not be deleted. Try again.'
+      );
+      return false;
+    } finally {
+      toolDraftSaving.set(false);
+      _patchToolsDraftViewState();
+    }
+  }
+
+  async function toggleToolEnabled(toolId, enabled, systemId = get(selectedSystemId)) {
+    const systemManager = services.getCraftingSystemManager?.();
+    const live = _systemTools(systemId).find((tool) => String(tool.id) === String(toolId));
+    if (!live || typeof systemManager?.upsertTool !== 'function') return false;
+    try {
+      const result = await systemManager.upsertTool(systemId, {
+        ...live,
+        enabled: enabled === true,
+      });
+      if (!result?.item) return false;
+      const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
+      if (String(get(toolDraft)?.id || '') === String(saved.id)) {
+        const draftWasDirty = get(toolDraftDirty);
+        if (draftWasDirty) {
+          toolDraft.update((draft) => ({ ...draft, enabled: saved.enabled }));
+          toolDraftBaseline.update((baseline) =>
+            baseline ? { ...baseline, enabled: saved.enabled } : baseline
+          );
+        } else {
+          toolDraft.set(_clonePlain(saved));
+          toolDraftBaseline.set(_clonePlain(saved));
+        }
+        _recomputeToolsDraftDirty();
+      }
+      await refresh();
+      _patchToolsDraftViewState();
+      return true;
+    } catch {
+      services.notify?.error?.(
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed') ||
+          'The Tool status could not be changed. Try again.'
+      );
+      return false;
+    }
   }
 
   async function saveAllDirtyToolDrafts() {
-    // A "Save all" should not be blocked by an empty new-tool row the user never
-    // filled in: discard blank, unmodified, brand-new drafts first so they don't
-    // fail validation and silently abort the save (issue 297). A partially-edited
-    // invalid tool (e.g. a named tool with no component) still returns false so
-    // the caller can surface why.
-    _discardBlankNewToolDrafts();
-    const dirtyIds = [...get(toolsDraftDirtyToolIds)];
-    for (const toolId of dirtyIds) {
-      if (!isToolDraftDirty(toolId)) continue;
-      const saved = await saveToolDraft(toolId);
-      if (saved !== true) return false;
-    }
-    return true;
+    return saveToolDraft();
   }
 
   async function saveToolsDraft() {
@@ -2856,20 +2939,19 @@ export function createAdminStore(services) {
   }
 
   function cancelToolsDraft() {
-    toolsDraft.set(null);
-    toolsDraftBaseline.set(null);
-    toolsDraftSystemId.set('');
-    toolsDraftDirty.set(false);
-    toolsDraftDirtyToolIds.set([]);
-    toolsDraftSaveError.set(null);
-    toolsDraftSelectedToolId.set('');
-    toolsDraftExpandedToolId.set('');
+    toolDraft.set(null);
+    toolDraftBaseline.set(null);
+    toolDraftSystemId.set('');
+    toolDraftSourceItemUuid.set('');
+    toolDraftDirty.set(false);
+    toolDraftSaveError.set(null);
+    toolDraftValidation.set({ valid: false, errors: ['missing'] });
     _patchToolsDraftViewState();
     return true;
   }
 
   function isToolsDraftDirty() {
-    return get(toolsDraftDirtyToolIds).length > 0 && Array.isArray(get(toolsDraft));
+    return get(toolDraftDirty) && get(toolDraft) !== null;
   }
 
   async function confirmDiscardDirtyToolsDraft() {
@@ -2952,6 +3034,22 @@ export function createAdminStore(services) {
     return _confirmDiscardDirtyDraft(
       'FABRICATE.Admin.Manager.Essence.DiscardDirtyContent',
       'The current essence has unsaved changes. Discard them and continue?'
+    );
+  }
+
+  /**
+   * Route-exit prompt for the System Overview → Settings identity sub-form (Name +
+   * Description only — the optional-feature toggles and the modifier/prerequisite/currency
+   * cards on the same tab live-apply and stage no draft, so they never reach this prompt).
+   * Like the other Svelte-layer-dirty kinds it does NOT check dirtiness itself: the root
+   * gates on its lifted `systemDetailsDirty` before calling.
+   *
+   * @returns {Promise<'save'|'discard'|'cancel'>} the chosen action, never a boolean
+   */
+  function confirmDiscardDirtySystemDetailsDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.SystemEdit.DiscardDirtyContent',
+      'The system details have unsaved changes. Save them and continue, or discard them?'
     );
   }
 
@@ -3793,6 +3891,32 @@ export function createAdminStore(services) {
     const current = _systemCharacterPrerequisites(id);
     const next = current.filter((entry) => entry.id !== prerequisiteId);
     if (next.length === current.length) return false; // unknown id — nothing removed
+    const persisted = await _persistSystemCharacterPrerequisites(id, next);
+    if (persisted === null) return false;
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Move one character prerequisite from `fromIndex` to `toIndex` (issue 768).
+   * Array order IS the persisted order, so the reorder rewrites the system's
+   * characterPrerequisites array and persists through updateSystem. Returns false
+   * on an invalid/no-op move.
+   *
+   * @param {number} fromIndex Source position.
+   * @param {number} toIndex Destination position.
+   * @param {string} [systemId] Target crafting system id.
+   * @returns {Promise<boolean>}
+   */
+  async function reorderCharacterPrerequisite(
+    fromIndex,
+    toIndex,
+    systemId = get(selectedSystemId)
+  ) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return false;
+    const next = _reorderListByIndex(_systemCharacterPrerequisites(id), fromIndex, toIndex);
+    if (!next) return false;
     const persisted = await _persistSystemCharacterPrerequisites(id, next);
     if (persisted === null) return false;
     await refresh();
@@ -4824,6 +4948,15 @@ export function createAdminStore(services) {
       if (resolvedSystemId !== currentSystemId) selectedSystemId.set(resolvedSystemId);
     }
 
+    // Item-card memo invalidation chokepoint: a system-id change (selectSystem,
+    // fallback resolution, createSystem) drops every cached card. `features.salvage`
+    // and essence-catalog toggles are captured IN the per-item signature, so they
+    // miss without a clear; item-search changes deliberately do not invalidate.
+    if (resolvedSystemId !== itemCardCacheSystemId) {
+      itemCardCache.clear();
+      itemCardCacheSystemId = resolvedSystemId;
+    }
+
     // Build system list after resolving selection so the library row highlight matches view state.
     const systemList = allSystems.map((s) => ({
       id: s.id,
@@ -4932,14 +5065,13 @@ export function createAdminStore(services) {
         (selectedSystemData?.essenceDefinitions || []).map((def) => [def.id, def])
       );
 
-      itemCards = await _buildItemCards(
-        systemManager,
-        selectedSystem,
-        get(itemSearch),
+      itemCards = await _buildItemCards(systemManager, selectedSystem, get(itemSearch), {
         showTags,
         showEssences,
-        essenceDefinitionById
-      );
+        essenceDefinitionById,
+        enrichToHtml: services?.enrichToHtml,
+        cache: itemCardCache,
+      });
     }
 
     const environmentState = await _buildEnvironmentState(selectedSystem);
@@ -5086,12 +5218,27 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  /**
+   * Persist the crafting system's name and description, then refresh so the `selectedSystem`
+   * projection republishes the saved values (which is what clears the editor's `Unsaved` chip,
+   * since the chip compares the typed inputs against that projection rather than a baseline).
+   *
+   * The boolean return is a navigation contract, not decoration: the manager's `system-details`
+   * route-exit guard runs this on Save-and-navigate and proceeds only on a non-`false` result,
+   * so the no-selected-system no-op MUST report `false` and keep the GM on the form rather than
+   * letting navigation continue as if the edit had been stored.
+   *
+   * @param {string} name
+   * @param {string} description
+   * @returns {Promise<boolean>} `false` when there is no selected system to write to
+   */
   async function saveSystemDetails(name, description) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
-    if (!sysId) return;
+    if (!sysId) return false;
     await systemManager.updateSystem(sysId, { name, description });
     await refresh();
+    return true;
   }
 
   async function setResolutionMode(resolutionMode) {
@@ -5882,8 +6029,7 @@ export function createAdminStore(services) {
         'Existing multi-step recipes will run as one combined action and show only their final results for editing. Their steps are kept and restored if you turn multi-step recipes back on. No recipe data is deleted.'
       }</p>`,
       yes: {
-        label:
-          services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
+        label: services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
         callback: () => true,
       },
       no: () => false,
@@ -6102,8 +6248,8 @@ export function createAdminStore(services) {
     for (const { id, tags: nextTags } of planTagRemovals(_getManagedItems(system), tag)) {
       await systemManager.updateItem(sysId, id, { tags: nextTags });
     }
-    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map((recipe) =>
-      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
+    const recipes = (recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || []).map(
+      (recipe) => (typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe)
     );
     for (const { id, updates } of planRecipeTagRemovals(recipes, tag)) {
       await recipeManager.updateRecipe(id, updates, { allowIncomplete: true, notify: false });
@@ -6904,6 +7050,33 @@ export function createAdminStore(services) {
   }
 
   /**
+   * Move one library character modifier from `fromIndex` to `toIndex` (issue
+   * 768). The array order IS the persisted order, so the reorder rewrites the
+   * gathering config's characterModifiers array in place and saves through the
+   * existing gathering-config path. Returns false on an invalid/no-op move.
+   *
+   * @param {number} fromIndex Source position.
+   * @param {number} toIndex Destination position.
+   * @param {string} [systemId] Target crafting system id.
+   * @returns {Promise<boolean>}
+   */
+  async function reorderGatheringCharacterModifier(
+    fromIndex,
+    toIndex,
+    systemId = get(selectedSystemId)
+  ) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    const next = _reorderListByIndex(systemConfig.characterModifiers, fromIndex, toIndex);
+    if (!next) return false;
+    systemConfig.characterModifiers = next;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  /**
    * Idempotently seed the active Foundry game system's preset bundle into the
    * selected crafting system's character modifier library. Existing ids are
    * preserved; the return value identifies added vs. skipped presets and
@@ -7377,6 +7550,27 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // Persist the crafting check-modifier catalogue + default policy (issue 770). MUST
+  // spread the existing craftingCheck block: `updateSystem` shallow-merges only the
+  // top level, so a naive `{ craftingCheck: { checkModifiers } }` would drop every
+  // sibling check field (simple/routed/progressive/consumption) which the normalizer
+  // then re-defaults (silent data loss). The whole `checkModifiers`/`defaultModifierIds`
+  // arrays are REPLACED by `game.settings.set` (array replace, not merge), so removing a
+  // catalogue entry persists without any `-=` deletion. Callers pass a partial patch of
+  // { checkModifiers?, defaultModifierPolicy?, defaultModifierIds? }.
+  async function saveCraftingCheckModifiers(patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.craftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      craftingCheck: { ...existing, ...patch },
+    });
+    await refresh();
+  }
+
   // Shallow-merge a patch into the selected system's salvageCraftingCheck and
   // persist (the manager normalizes the whole check on write). Shared by every
   // salvage check saver below so the boilerplate lives in one place.
@@ -7416,7 +7610,8 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  const saveGatheringCheckActive = (enabled) => _saveGatheringCheckPatch({ enabled: enabled === true });
+  const saveGatheringCheckActive = (enabled) =>
+    _saveGatheringCheckPatch({ enabled: enabled === true });
   const saveGatheringCheckProgressive = (progressive) => _saveGatheringCheckPatch({ progressive });
   const saveGatheringCheckRouted = (routed) => _saveGatheringCheckPatch({ routed });
 
@@ -7486,6 +7681,25 @@ export function createAdminStore(services) {
       const nextUnits = _deleteCurrencyUnitFromList(currency.units, unitId);
       if (!nextUnits) return false;
       currency.units = nextUnits;
+      return true;
+    });
+  }
+
+  /**
+   * Move one currency unit from `fromIndex` to `toIndex` (issue 768). Array order
+   * IS the persisted order, so the reorder rewrites the currency units array and
+   * persists through updateSystem. Returns false on an invalid/no-op move.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {number} fromIndex Source position.
+   * @param {number} toIndex Destination position.
+   * @returns {Promise<boolean>}
+   */
+  async function reorderCurrencyUnit(fromIndex, toIndex, systemId = get(selectedSystemId)) {
+    return await _updateCurrencyConfig(systemId, (currency) => {
+      const next = _reorderListByIndex(currency.units, fromIndex, toIndex);
+      if (!next) return false;
+      currency.units = next;
       return true;
     });
   }
@@ -7704,11 +7918,15 @@ export function createAdminStore(services) {
       : [];
     let changed = false;
     for (const def of definitions) {
-      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) => String(id));
+      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map((id) =>
+        String(id)
+      );
       const has = currentIds.includes(rid);
       const want = wanted.has(String(def.id));
       if (has === want) continue;
-      const next = want ? [...new Set([...currentIds, rid])] : currentIds.filter((id) => id !== rid);
+      const next = want
+        ? [...new Set([...currentIds, rid])]
+        : currentIds.filter((id) => id !== rid);
       await systemManager.updateRecipeItemDefinition(sysId, def.id, { recipeIds: next });
       changed = true;
     }
@@ -7722,7 +7940,9 @@ export function createAdminStore(services) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId || !recipeItemId) return;
-    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, { enabled: enabled !== false });
+    await systemManager.updateRecipeItemDefinition(sysId, recipeItemId, {
+      enabled: enabled !== false,
+    });
     await refresh();
   }
 
@@ -7752,7 +7972,9 @@ export function createAdminStore(services) {
     const sysId = get(selectedSystemId);
     if (!sysId || !recipeItemId) return false;
     const confirmed = await services.confirmDialog?.({
-      title: services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') || 'Delete recipe item?',
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') ||
+        'Delete recipe item?',
       content: `<p>${services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteContent') || 'Delete this recipe item? Recipes linked to it will be unlinked.'}</p>`,
       yes: () => true,
       no: () => false,
@@ -7881,7 +8103,11 @@ export function createAdminStore(services) {
     try {
       // notify:false — the toggle is the GM's own explicit editor action with immediate
       // visual feedback, so the "Recipe updated" toast is noise.
-      await recipeManager.updateRecipe(recipeId, { enabled }, { allowIncomplete: true, notify: false });
+      await recipeManager.updateRecipe(
+        recipeId,
+        { enabled },
+        { allowIncomplete: true, notify: false }
+      );
       await refresh();
       return true;
     } catch (err) {
@@ -7921,7 +8147,11 @@ export function createAdminStore(services) {
     try {
       // notify:false — same as the enabled toggle: an explicit editor action with
       // immediate visual feedback needs no "Recipe updated" toast.
-      await recipeManager.updateRecipe(recipeId, { locked: locked === true }, { allowIncomplete: true, notify: false });
+      await recipeManager.updateRecipe(
+        recipeId,
+        { locked: locked === true },
+        { allowIncomplete: true, notify: false }
+      );
       await refresh();
       return true;
     } catch (err) {
@@ -8216,6 +8446,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtySystemDetailsDraft,
     confirmDiscardDirtyRecipeDraft,
     confirmRecipeAction,
     confirmDiscardDirtyGatheringTaskDraft,
@@ -8264,6 +8495,14 @@ export function createAdminStore(services) {
     updateGatheringLibraryTool,
     deleteGatheringLibraryTool,
     validateGatheringLibraryTool,
+    createToolDraft,
+    openToolDraft,
+    patchToolDraft,
+    stageToolDraftSource,
+    unlinkToolDraftSource,
+    discardToolDraft,
+    deleteToolDraft,
+    toggleToolEnabled,
     enterToolsDraft,
     updateToolsDraft,
     addToolToDraft,
@@ -8289,10 +8528,12 @@ export function createAdminStore(services) {
     addGatheringCharacterModifier,
     updateGatheringCharacterModifier,
     deleteGatheringCharacterModifier,
+    reorderGatheringCharacterModifier,
     seedGatheringCharacterModifierPresets,
     addCharacterPrerequisite,
     updateCharacterPrerequisite,
     deleteCharacterPrerequisite,
+    reorderCharacterPrerequisite,
     seedCharacterPrerequisitePresetsForSystem,
     addGatheringDropRowCharacterModifier,
     updateGatheringDropRowCharacterModifier,
@@ -8305,6 +8546,7 @@ export function createAdminStore(services) {
     saveCraftingCheckProgressive,
     saveCraftingCheckActive,
     saveCraftingCheckConsumption,
+    saveCraftingCheckModifiers,
     saveSalvageCheckActive,
     saveSalvageCheckProgressive,
     saveSalvageCheckSimple,
@@ -8315,6 +8557,7 @@ export function createAdminStore(services) {
     addCurrencyUnit,
     updateCurrencyUnit,
     deleteCurrencyUnit,
+    reorderCurrencyUnit,
     addCurrencySubUnit,
     updateCurrencySubUnit,
     deleteCurrencySubUnit,

@@ -26,7 +26,7 @@ import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
-import { renderDialog, viewScene, localize as bridgeLocalize } from './ui/svelte/util/foundryBridge.js';
+import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
@@ -71,6 +71,7 @@ import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
@@ -116,13 +117,32 @@ import {
 } from './canvas/regions/interactableConfigSheet.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteFabricateApp.svelte.js';
-import './ui/SvelteCraftingSystemManagerApp.svelte.js';
 import './ui/InteractableBrowserApp.svelte.js';
 import './ui/InteractionPromptApp.svelte.js';
 import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
 
 let gatheringEngine = null;
+
+// The GM-only crafting system manager app is deferred to a lazy chunk so
+// non-GM players never download/parse its subtree at module init. The dynamic
+// import runs the module's bottom-of-file registerCraftingSystemManagerApp(...)
+// side effect exactly once; subsequent opens reuse the memoized promise.
+let _craftingSystemManagerAppLoad = null;
+
+/**
+ * Lazily load and register the GM crafting system manager app class.
+ * Memoizes the dynamic import so repeated opens do not re-enter import().
+ * @returns {Promise<Function>} the registered app class
+ */
+function loadCraftingSystemManagerAppClass() {
+  if (!_craftingSystemManagerAppLoad) {
+    _craftingSystemManagerAppLoad = import('./ui/SvelteCraftingSystemManagerApp.svelte.js').then(
+      () => getCraftingSystemManagerAppClass()
+    );
+  }
+  return _craftingSystemManagerAppLoad;
+}
 
 /**
  * Resolve a stored gathering actor preference against Foundry's actor collection.
@@ -219,6 +239,7 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
     buildItemRef: (actor, item) => gatheringRunItemRef(actor, item),
     resolveReplacementSource: ({ componentId, system }) =>
       resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),
+    resolveItemUuid: (uuid) => fromUuid(uuid),
     evaluateExpression
   });
 }
@@ -422,8 +443,18 @@ class Fabricate {
     // Run data migrations before managers load persisted data
     await this._runMigrations();
     // Create managers
-    this.recipeManager = new RecipeManager();
-    this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
+    this.recipeManager = new RecipeManager({
+      getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+    });
+    // Issue 800: the manager RESOLVES source descriptions through Foundry's own
+    // enricher at its async ingestion boundaries, so a content link is stored as the
+    // referenced document's name rather than raw `@UUID[…]` text. Both seams default
+    // to pass-throughs (`enrichHTML` cannot run under happy-dom), so wiring the real
+    // implementations here is what makes the production path resolve at all.
+    this.craftingSystemManager = new CraftingSystemManager(this.recipeManager, {
+      enrichToHtml: (raw, options) => enrichToHtml(raw, options),
+      primeEnricherCache: (rawTexts) => primeEnricherCache(rawTexts)
+    });
     // Wire the real primary-GM check into the timed world-time resume paths (issue
     // 656). Both managers default `isPrimaryGM` to `() => true` (fail-open, so unit
     // fixtures resume), so passing the real `activeGM` check here is load-bearing —
@@ -473,7 +504,11 @@ class Fabricate {
       this.salvageRunManager,
       this.actorInventoryCoinSpender,
       this.actorPropertyCoinSpender,
-      { getPlayerResultOrder: entry => this._readPlayerResultOrder(entry) }
+      {
+        getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
+        getCraftingSystem: systemId => this.craftingSystemManager.getSystem(systemId),
+        resolveItemUuid: uuid => fromUuid(uuid)
+      }
     );
 
     // Initialize recipe manager
@@ -1186,7 +1221,8 @@ class Fabricate {
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
       nowWorldTime: () => game.time?.worldTime ?? 0,
-      resolveCheckFormula: (formula, actor) => resolveCheckFormulaDisplay(formula, actor),
+      resolveCheckFormula: (formula, actor, craftingModifier) =>
+        resolveCheckFormulaDisplay(formula, actor, craftingModifier),
     });
     return this._craftingListingBuilder;
   }
@@ -1343,6 +1379,44 @@ class Fabricate {
       craftingActor,
       componentSourceActors,
     });
+  }
+
+  /**
+   * GM-only crafting-knowledge reset (issue 773) — the interim macro/console access
+   * path until #785 ships the Books & Scrolls Knowledge tab. Clears one actor's
+   * learned recipes (and their scoped discovery progress) for one crafting system
+   * (`systemId`) or, when `systemId` is null, across every system, delegating to the
+   * shared {@link RecipeVisibilityService#forgetLearnedRecipes} deletion primitive.
+   *
+   * Explicitly GM-gated even though it is GM-only: it mutates player-owned actor
+   * state and, for `total`-scope books, a world setting. Takes an `actorId` (never an
+   * actor uuid), resolves it via `game.actors.get`, and never throws — it returns the
+   * `{ success, message }` facade convention so a macro can branch on the outcome.
+   *
+   * @param {object} options
+   * @param {string} options.actorId The actor whose knowledge is reset.
+   * @param {string|null} [options.systemId] Limit to one crafting system, or null for all.
+   * @param {boolean} [options.freeLearnBudget=true] Free the consumed learn budget so
+   *   capped books permit re-learning.
+   * @returns {Promise<{ success: boolean, message: string, messageData?: object }>}
+   */
+  async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
+    if (game.user?.isGM !== true) {
+      return { success: false, message: 'FABRICATE.Knowledge.Reset.GMOnly' };
+    }
+    const actor = game.actors?.get?.(actorId);
+    if (!actor) {
+      return { success: false, message: 'FABRICATE.Knowledge.Reset.NoActor' };
+    }
+    const service = this.recipeVisibilityService;
+    const result = systemId
+      ? await service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })
+      : await service.forgetAllLearnedRecipes(actor, { freeLearnBudget });
+    return {
+      success: result.success === true,
+      message: 'FABRICATE.Knowledge.Reset.Success',
+      messageData: { actor: actor.name, count: result.count || 0, systemId },
+    };
   }
 
   /**
@@ -2214,6 +2288,50 @@ class Fabricate {
   }
 
   /**
+   * Cancel a player's in-progress craft (issue 848) — the owner-scoped counterpart of
+   * {@link advanceCraftingRun}. Reuses the SAME ownership guard: because `cancelCraft`
+   * restores items to the source actors and reads/updates the crafting actor, a
+   * non-owner of any of them is blocked gracefully with a "needs owner" message rather
+   * than an ungraceful Foundry permission throw. On success the engine removes the run
+   * and — when the system's `features.refundOnPlayerCancel` flag is on (default) —
+   * restores the consumed ingredients and refunds the spent currency.
+   *
+   * @param {object} options
+   * @param {string} options.actorId World-actor id the run is keyed to.
+   * @param {string} options.runId Active run id to cancel.
+   * @returns {Promise<object>} The cancel result, or a `{ success: false, message }`.
+   */
+  async cancelCraftingRun({ actorId, runId } = {}) {
+    this._requireReady();
+    const actor = game.actors?.get(actorId);
+    const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
+    const resolved = resolveAdvanceSources({ actor, run, fromUuid: globalThis.fromUuidSync });
+    if (resolved.blocked) {
+      return {
+        success: false,
+        message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner'),
+      };
+    }
+    const result = await this.craftingEngine.cancelCraft(
+      actor,
+      resolved.componentSourceActors,
+      runId
+    );
+    if (result?.success && result.cancelled) {
+      let key = 'FABRICATE.App.Journal.Actions.Cancelled';
+      if (result.refunded) {
+        key = 'FABRICATE.App.Journal.Actions.CancelledRefunded';
+      } else if (result.partialRefund) {
+        // A partial reversal must not claim a full return: some inputs came back but
+        // others (or the currency refund) could not be restored.
+        key = 'FABRICATE.App.Journal.Actions.CancelledPartial';
+      }
+      return { ...result, message: localizeGathering(key) };
+    }
+    return result;
+  }
+
+  /**
    * Quick craft helper - craft a recipe for an actor
    * @param {Actor} actor - The actor performing the craft
    * @param {string|Recipe} recipe - Recipe ID or Recipe object
@@ -2348,6 +2466,7 @@ function bindFabricateGlobal() {
     RecipeManager,
     CraftingEngine,
     getFabricateAppClass,
+    loadCraftingSystemManagerAppClass,
     getCraftingSystemManagerAppClass,
     getInteractableConfigAppClass,
     getInteractablesManagerAppClass,
@@ -2544,6 +2663,12 @@ Hooks.once('ready', async () => {
   // inventories that predate it.
   await runOwnedItemComponentIdentityRestamp();
 
+  // Issue 800: GM-only cue for a world whose stored descriptions predate write-time
+  // resolution and still show raw `@UUID[…]` text. A DETECTOR only — it scans
+  // already-loaded descriptions synchronously, resolves nothing, rewrites nothing,
+  // and self-clears once the GM has run Repair Item Data.
+  notifyUnresolvedItemDescriptions();
+
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
   // marker, the region-enter presence prompt, the controlToken re-trigger, and
@@ -2564,7 +2689,7 @@ Hooks.once('ready', async () => {
     try {
       routeEventSceneSocketMessage(payload, {
         currentUserId: () => game.user?.id,
-        isActiveGM: () => game.user === game.users?.activeGM,
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
         showPrompt: showEventScenePrompt,
         viewSceneForSelf: (uuid) => viewScene(uuid)
       });
@@ -2765,7 +2890,7 @@ async function runInteractableMarkerSync() {
     const environmentStore = fabricate?.getGatheringEnvironmentStore?.() ?? null;
     await syncInteractableMarkers({
       scenes: game.scenes,
-      isActiveGM: () => game.user === game.users?.activeGM,
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
       resolveEnvironment: (environmentId) => environmentStore?.get?.(environmentId) ?? null,
       resolveTask: (systemId, taskId) => {
         const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
@@ -3034,7 +3159,9 @@ function addModuleButtonsToItemsDirectory() {
         'Manage Crafting Systems',
         'fas fa-book',
         'manage',
-        () => getCraftingSystemManagerAppClass().show()
+        () => {
+          void loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
+        }
       );
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
     }
@@ -3168,7 +3295,7 @@ globalThis.fabricate = {
    * Open the GM crafting system manager
    */
   openRecipeManager: () => {
-    return getCraftingSystemManagerAppClass().show();
+    return loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
   },
 
   /**

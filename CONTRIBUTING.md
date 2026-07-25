@@ -546,6 +546,7 @@ npm run build
 - `npm run test:foundry:run` — run the Playwright smoke test against an already-running container.
 - `npm run test:foundry:down` — stop and remove the container (preserve the image).
 - `npm run test:foundry:rc` — release-candidate profile.
+- `npm run test:foundry:screenshots` — scoped PR screenshot evidence (issue 826): full real-Foundry frames for only the views a PR affects (pass `-- --target-labels=<csv>` from `npm run screenshots:ui:targets` to scope it; empty captures the full catalogue).
 
 To run the release-candidate CI profile locally:
 
@@ -601,7 +602,7 @@ After any run (success or failure), results are written to `test-results/`:
 
 | File | Description |
 |------|-------------|
-| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], phaseTimings[], viewTimings[] }` — pass/fail result, smoke profile, timings, and list of errors |
+| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], stepFailures, consoleErrorCount, degraded, rendererCrashed, phaseTimings[], viewTimings[] }` — pass/fail result, the split `stepFailures`/`consoleErrorCount` signals, the `degraded`/`rendererCrashed` flags, smoke profile, timings, and list of errors |
 | `console.log` | Full browser console output captured during the test |
 | `screenshot-*.png` | Per-step screenshots captured by the selected profile |
 | `screenshot-failure.png` | Captured only when a step throws (last DOM state) |
@@ -628,9 +629,9 @@ Every profile boots a real Foundry instance, joins the `fabricate-smoke-ci` worl
 
 The `full` profile additionally captures Crafting System Manager v2 screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, asserts the seeded 0%-drop and scene-blocked gathers plus the hazardous "Bramble Snare" event firing, and runs document cleanup.
 
-### Smoke profiles (`rc` vs `full`)
+### Smoke profiles (`rc`, `full`, `screenshots`)
 
-A single orchestrator (`scripts/foundry-test.mjs`) and run script (`scripts/foundry-test-run.mjs`) handle both profiles.
+A single orchestrator (`scripts/foundry-test.mjs`) and run script (`scripts/foundry-test-run.mjs`) handle every profile.
 The profile is selected by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>` on `node scripts/foundry-test.mjs`).
 
 | Profile | When | Phases | Target |
@@ -638,13 +639,20 @@ The profile is selected by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>` on `n
 | `rc` | Release-candidate CI | Phase B → C → E (unified shell, one Gathering success, Healing Potion craft) → console-error check | < 25 min including cold setup |
 | `ci` | Deprecated alias for `rc` (removed after one release) | same as `rc` | same |
 | `full` (default) | Local and visual-regression runs | + Phase D0 (manager screenshots), extended Gathering states, non-GM redaction, no-selectable actors, Phase F (cleanup) | ~10–15 min locally |
+| `screenshots` | Scoped PR screenshot evidence (issue 826) | Same rendering path and budget as `full`, but captures ONLY the labels a PR's changed files affect and skips a view-bearing phase whose labels are all off-target; the full-only behavioral assert phases do NOT run | Modestly faster for a manager-only PR (phase E skipped, ~25% off) but ≈no win yet for player PRs since phase D0 still fully navigates — the per-view within-D0 scoping that yields the larger win is a follow-on |
 
 The `rc` profile captures a pinned screenshot budget (`world-loaded`, `fabricate-app-shell`, `post-craft`, `alara-post-craft-inventory`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run.
 
-The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`, default 18 minutes).
-The default keeps headroom over the observed rc run duration (~870-930s across all phases) so ordinary hosted-runner variance no longer trips the watchdog on an otherwise-passing smoke.
+The `screenshots` profile is the PR-evidence producer: it renders the same real-Foundry app windows as `full` but scopes the captured set to the views a PR touches.
+Its target label set comes from `mapChangedFilesToViews` — derive it with `npm run screenshots:ui:targets -- --base origin/main` (or `--changed-files <file>`) and pass it via `--target-labels=<csv>` / `FOUNDRY_SCREENSHOT_TARGET_LABELS`; an empty set (no UI change) means capture the full catalogue.
+Phase E (the player/craft/journal frames) is skipped when no target label maps to it, so a manager-only PR drops that whole phase.
+The label → phase registration lives in `scripts/lib/screenshotCaptureMap.js` (a pure, playwright-free module the harness and the unit tests share).
+
+The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`).
+When unset, the default is **profile-derived**: the expected walk duration for the resolved profile plus a fixed finalization grace (`scripts/lib/foundryRunBudget.js`), so the budget always clears a legitimately-passing walk *plus* its post-verdict `summary.json` write rather than SIGTERM-killing finalization on a green run.
+`rc`/`ci` keep today's 18-minute budget (headroom over the observed ~870-930s rc walk), while `full`/`screenshots` derive ~26 minutes — so the `full` walk no longer needs a manual `FOUNDRY_RUN_TIMEOUT_MS` override to finish teardown and write `summary.json`.
 On overrun, the run process is sent `SIGTERM` and the orchestrator proceeds to Docker teardown + artifact upload, so the 25-minute Actions budget can never preempt cleanup.
-Override locally if you need a longer or shorter cap:
+An explicit `FOUNDRY_RUN_TIMEOUT_MS` (for example CI's pinned value) always wins; override locally if you need a longer or shorter cap:
 
 ```bash
 FOUNDRY_RUN_TIMEOUT_MS=600000 npm run test:foundry:rc          # POSIX (10 minutes)
@@ -666,6 +674,23 @@ These are very different signals:
 So before treating a run as broken — or discarding its captured screenshots — confirm whether `steps[]` contains an actual failing step.
 A `passed: false` driven purely by `404` console noise with zero failed steps means the walk succeeded and the `screenshot-*.png` artifacts are valid evidence.
 (Example seen in practice: all phases B–F passed and `fabricate-app-shell` captured correctly, but `passed: false` came solely from 12 generic `404` console errors.)
+
+### Tolerated transient renderer teardown (`degraded` / `rendererCrashed`)
+
+A long `full` run can hit a transient Chromium renderer/page teardown at the tail — the message class `Target page, context or browser has been closed` (or `disconnected`/`crashed`).
+This is the same infra flake the Phase E Journal step and the process-level `unhandledRejection` guard already absorb.
+The Phase D0 manager walk now absorbs it too, but only after its last load-bearing capture (the `manager-experimental-off` milestone).
+
+`d0RequiredCapturesComplete` flips true immediately after the `manager-experimental-off` screenshot — the last genuine D0 capture.
+A teardown after that milestone records the `screenshot-manager` step skipped (not failed) and the run continues.
+A teardown before it still records `screenshot-manager: false` and fails the run, because the later frames were genuinely never captured and a PR relying on them must not go green.
+The tolerated window is deliberately minimal, so any earlier teardown fails loudly.
+
+`degraded: true` means a transient teardown was tolerated (a `screenshot-manager` or `player-journal` step is `skipped: true` with a `transient page teardown (skipped): …` error), so the run still exits 0 but is distinguishable from a clean pass.
+`rendererCrashed: true` means Playwright fired a page `crash` event (canonically an OOM) — the causation-bearing renderer-crash signal that `page.isClosed()` cannot distinguish from an intentional close — so a crash-flagged tolerated run stays exit 0 but warrants a confirming re-run.
+A real Fabricate JS error surfaces as a `pageerror`/`console.error` in the independent `consoleErrors[]` gate, not through the teardown path, so a tolerated teardown coincident with any non-waived console error still fails the run.
+The tolerance can therefore only ever mask a post-captures renderer process crash, never a JS regression.
+A persistent `rendererCrashed`/`degraded` pattern across runs is actionable (a systematic tail OOM), not cosmetic.
 
 ### Known drift pattern: Phase D0 selectors
 
@@ -693,6 +718,12 @@ Don't assume green PR CI means the full smoke walk passes.
 
 - Needs Docker Desktop running and `.env.foundry` with `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` (the `up` script loads it; CI sets the vars directly).
 The container is cached between runs, so re-runs boot in ~5s.
+- Running smoke from a disposable worktree needs a few extras the main checkout has already.
+Copy `.env.foundry` from the main checkout (a fresh worktree does not carry it).
+The container identity (name, hostname, compose project, host port) is now derived deterministically from the worktree root by `scripts/lib/foundryRunIdentity.js`, so it is unique per worktree and no longer collides — the old pre-run/post-run `docker rm -f fabricate-foundry-test` dance is superseded and unnecessary.
+Tear a disposed worktree down with `npm run test:foundry:down -- --clean` so its per-worktree container and compose network are removed; that is a cleaner reclaim than the periodic `docker network prune -f` guard (which stays safe, since it only frees networks with no attached container — preserved stopped containers keep theirs in use).
+The default run budget is now profile-derived, so a local `full` walk (`npm run test:foundry`, no `FOUNDRY_RUN_TIMEOUT_MS`) already gets ~26 minutes and no longer needs a manual headroom override to finish teardown and write `summary.json`.
+On a branch that predates this profile-derived default, still give the run `FOUNDRY_RUN_TIMEOUT_MS` headroom so the older flat 18-minute default does not trip the watchdog on an otherwise-passing full walk.
 - The `run` phase **wipes `test-results/`** at startup.
 Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`.
 Tee to a path outside `test-results/` if you need a copy.
@@ -783,6 +814,18 @@ PR-scoped screenshots are temporary handoff files only.
    **Removing the S3 objects** (e.g. when the PR closes): `npm run screenshots:ui:clean -- --pr <number> --s3` deletes them best-effort (a missing-credentials/permission failure only warns).
 
    **Orphan prevention:** the S3 bucket has a lifecycle rule expiring the `pr-screenshots/` prefix after N days as a backstop, so PR screenshots never accumulate even if `--s3` cleanup is skipped.
+
+### Evidence and CI recovery runbook
+
+A few sharp edges recur when collecting, publishing, and reading back CI:
+
+- `screenshots:ui` and `screenshots:ui:plan` need `--base origin/main`.
+Without it, zero views are planned **silently** — the command exits 0 as if there were nothing to capture, and a later `publish` then reports nothing to upload.
+Pass `--base origin/main` every time rather than trusting an empty plan.
+- Publishing patches the PR body, which fires an `edited` workflow run whose payload SHAs are frozen at that moment.
+That `edited` run's `lint-commits` can fail with "Invalid revision range", and its skipped jobs pollute the status contexts.
+Never rerun the `edited` run: let it settle, then fully rerun the original PUSH run so a fresh green result lands **last** in every context.
+- Judge PR state by the newest result per context (`gh pr view --json statusCheckRollup`), not the flat `gh pr checks` listing, which mixes the stale `edited`-run rows in with the fresh push-run rows.
 
 ### Screenshot source
 

@@ -9,6 +9,12 @@ import {
   DEFAULT_GATHERING_EVENT_IMG,
   DEFAULT_GATHERING_TASK_IMG,
 } from '../../src/gatheringImageDefaults.js';
+import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
+import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
+import {
+  REPORTER_ENRICHER_DESCRIPTION,
+  REPORTER_RESOLVED_EXPECTED,
+} from '../helpers/enricherDescriptionFixtures.js';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -82,7 +88,7 @@ function createMockServices(overrides = {}) {
     lastManagedCraftingSystem: '',
   };
 
-  let systems = [makeSystem({ id: 'sys1', name: 'System One' })];
+  let systems = overrides.systems || [makeSystem({ id: 'sys1', name: 'System One' })];
   let recipes = [makeRecipe({ id: 'r1', name: 'Recipe One', craftingSystemId: 'sys1' })];
 
   const mockSystemManager = {
@@ -260,6 +266,38 @@ describe('createAdminStore', () => {
       assert.equal(vs.systems[0].selected, true);
     });
 
+    it('projects features.refundOnPlayerCancel (default ON) into the selected system', async () => {
+      // The projection is a hand-built allowlist: without the projected field the
+      // player-cancel refund toggle (issue 848) would be invisible to the manager UI.
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.refresh();
+      await store.selectSystem('sys1');
+      const selected = get(store.viewState).selectedSystem;
+      assert.equal(
+        selected.features.refundOnPlayerCancel,
+        true,
+        'a system with no explicit flag defaults to refunding on cancel'
+      );
+    });
+
+    it('projects an explicit features.refundOnPlayerCancel:false as forfeit-on-cancel', async () => {
+      const services = createMockServices({
+        systems: [
+          makeSystem({ id: 'sys1', name: 'System One', features: { refundOnPlayerCancel: false } }),
+        ],
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+      await store.selectSystem('sys1');
+      const selected = get(store.viewState).selectedSystem;
+      assert.equal(
+        selected.features.refundOnPlayerCancel,
+        false,
+        'an explicit false projects through as forfeit-on-cancel'
+      );
+    });
+
     it('restores selected system from lastManagedCraftingSystem setting', () => {
       const services = createMockServices({
         getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
@@ -320,7 +358,13 @@ describe('createAdminStore', () => {
           {
             id: 'trg1',
             label: 'Natural 1',
-            condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
+            condition: {
+              type: 'diceGroup',
+              groupId: 0,
+              aggregate: 'anyDie',
+              operator: '==',
+              value: 1,
+            },
           },
         ],
       };
@@ -356,6 +400,97 @@ describe('createAdminStore', () => {
           `craftingCheck.${mode}.checkBreakage is cloned, not shared`
         );
       }
+    });
+
+    it('projects the crafting check-modifier catalogue, policy, and default ids (issue 770 allowlist)', async () => {
+      // The projection is a hand-built allowlist: a field dropped from it is invisible
+      // to the UI. The ChecksView mount test feeds these as direct props, bypassing the
+      // projection, so this reads the ACTUAL projection to catch a silently-dropped field.
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.craftingCheck = {
+        mode: 'passFail',
+        simple: { rollFormula: '1d20 + @craftingmod' },
+        checkModifiers: [
+          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+          { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+        ],
+        defaultModifierPolicy: 'highest',
+        defaultModifierIds: ['med'],
+      };
+      const store = createAdminStore(services);
+      await store.refresh();
+      const check = get(store.viewState).selectedSystem.craftingCheck;
+
+      assert.deepEqual(
+        check.checkModifiers.map((modifier) => modifier.id),
+        ['med', 'alch'],
+        'the catalogue surfaces through the projection allowlist'
+      );
+      assert.notEqual(
+        check.checkModifiers[0],
+        sys.craftingCheck.checkModifiers[0],
+        'catalogue entries are cloned, not shared with the live system'
+      );
+      assert.equal(check.defaultModifierPolicy, 'highest');
+      assert.deepEqual(check.defaultModifierIds, ['med']);
+    });
+
+    it('saveCraftingCheckModifiers preserves sibling check fields and replaces the catalogue array (issue 770 persistence trap)', async () => {
+      // updateSystem shallow-merges only the top level, so a checkModifiers-only patch
+      // that failed to spread `...existing` would drop every sibling check field. Capture
+      // the persisted payload and assert the siblings survive AND that a dropped catalogue
+      // entry does not resurrect (whole-array replace, not merge).
+      let updateArgs = null;
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.craftingCheck = {
+        mode: 'passFail',
+        simple: { rollFormula: '1d20 + @craftingmod', dc: 12 },
+        routed: { type: 'relative', rollFormula: '1d20' },
+        progressive: { rollFormula: '2d6' },
+        consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
+        checkModifiers: [
+          { id: 'med', label: 'Medicine', expression: '@med' },
+          { id: 'alch', label: 'Alchemy', expression: '@alch' },
+        ],
+        defaultModifierPolicy: 'addAll',
+        defaultModifierIds: ['med', 'alch'],
+      };
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // A checkModifiers-only patch (the shallow-spread footgun surface): drop 'alch'.
+      await store.saveCraftingCheckModifiers({
+        checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+      });
+
+      const persisted = updateArgs.updates.craftingCheck;
+      // Every sibling check field survives the nested write (would vanish without ...existing).
+      assert.equal(persisted.simple.rollFormula, '1d20 + @craftingmod');
+      assert.equal(persisted.simple.dc, 12);
+      assert.equal(persisted.routed.type, 'relative');
+      assert.equal(persisted.progressive.rollFormula, '2d6');
+      assert.deepEqual(persisted.consumption, {
+        consumeIngredientsOnFail: false,
+        breakToolsOnFail: true,
+      });
+      // The catalogue array is REPLACED whole — 'alch' does not resurrect.
+      assert.deepEqual(
+        persisted.checkModifiers.map((modifier) => modifier.id),
+        ['med'],
+        'the whole checkModifiers array is replaced, not merged'
+      );
+      // A sibling modifier field not in the patch is preserved from existing.
+      assert.deepEqual(persisted.defaultModifierIds, ['med', 'alch']);
     });
 
     it('projects toolBreakage.authority as toolSpecific when the system has none (issue 419)', async () => {
@@ -1931,6 +2066,88 @@ describe('createAdminStore', () => {
       assert.equal(projected.resultGroups.length, 1, 'top-level resultGroups projected');
     });
 
+    it('viewState.recipes projects the per-recipe craftingModifier override for the editor (issue 770 allowlist)', async () => {
+      // The recipe list projection is a hand-built ALLOWLIST. Omitting craftingModifier
+      // makes the Overview override control seed from `undefined` → render "Inherit
+      // system default" → and (since the editor saves the whole draft) silently write the
+      // override back to null. Read the ACTUAL projection, not a prop-fed tab.
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipe = makeRecipe({
+        id: 'r-mod',
+        name: 'Brew Healing Potion',
+        craftingSystemId: 'sys1',
+        toJSON: () => ({
+          id: 'r-mod',
+          name: 'Brew Healing Potion',
+          craftingSystemId: 'sys1',
+          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
+        }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [recipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-mod');
+      assert.ok(projected, 'recipe should be projected');
+      assert.deepEqual(
+        projected.craftingModifier,
+        { policy: 'byRecipe', modifierIds: ['alch'] },
+        'the override surfaces so the editor renders OVERRIDE, not inherit'
+      );
+    });
+
+    it('viewState.recipes projects a null craftingModifier when the recipe inherits (issue 770)', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipe = makeRecipe({
+        id: 'r-inherit',
+        craftingSystemId: 'sys1',
+        toJSON: () => ({ id: 'r-inherit', name: 'Inheritor', craftingSystemId: 'sys1' }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: () => [recipe],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-inherit');
+      assert.equal(projected.craftingModifier, null, 'no override projects as null (inherit)');
+    });
+
+    it('updateRecipe threads a craftingModifier override through the save path (issue 770 round-trip)', async () => {
+      // The editor saves the whole draft (seeded from the projection above). Assert the
+      // store save path forwards craftingModifier to the recipe manager so an authored
+      // override survives save → reload rather than being dropped en route.
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateArgs = { id, updates, options };
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const ok = await store.updateRecipe('r1', {
+        name: 'Renamed',
+        craftingModifier: { policy: 'highest', modifierIds: ['med'] },
+      });
+      assert.equal(ok, true);
+      assert.deepEqual(
+        updateArgs.updates.craftingModifier,
+        { policy: 'highest', modifierIds: ['med'] },
+        'the override is threaded to recipeManager.updateRecipe, not stripped'
+      );
+    });
+
     it('addRecipeItemFromUuid passes through the manager result', async () => {
       const passthrough = { item: { id: 'item-x' }, action: 'created' };
       const services = createMockServices();
@@ -2367,9 +2584,7 @@ describe('createAdminStore', () => {
         resultGroups: [{ id: 'g-good', name: 'Good', checkOutcomeIds: ['t-good'] }],
         steps: [],
       };
-      services._getRecipesMutable().push(
-        makeRecipe({ ...recipeData, toJSON: () => recipeData })
-      );
+      services._getRecipesMutable().push(makeRecipe({ ...recipeData, toJSON: () => recipeData }));
       let updateCount = 0;
       const origUpdateRecipe = recipeManager.updateRecipe;
       recipeManager.updateRecipe = async (id, updates, options) => {
@@ -2615,7 +2830,10 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
       const gathering = vs.selectedSystem?.gatheringCraftingCheck;
-      assert.ok(gathering?.progressive, 'progressive gathering config should be surfaced, not dropped');
+      assert.ok(
+        gathering?.progressive,
+        'progressive gathering config should be surfaced, not dropped'
+      );
       assert.equal(gathering.progressive.awardMode, 'equal');
       assert.ok(gathering?.routed, 'routed gathering config should be surfaced, not dropped');
       assert.equal(gathering.routed.relativeOutcomes?.[0]?.name, 'Rich Vein');
@@ -2627,7 +2845,10 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.gatheringCraftingCheck = { enabled: true, routed: { type: 'fixed', fixedOutcomes: [] } };
+        sys.gatheringCraftingCheck = {
+          enabled: true,
+          routed: { type: 'fixed', fixedOutcomes: [] },
+        };
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -2648,7 +2869,10 @@ describe('createAdminStore', () => {
       assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.progressive, progressive);
       // existing fields are preserved by the shallow merge
       assert.equal(updateArgs.updates.gatheringCraftingCheck.enabled, true);
-      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.routed, { type: 'fixed', fixedOutcomes: [] });
+      assert.deepEqual(updateArgs.updates.gatheringCraftingCheck.routed, {
+        type: 'fixed',
+        fixedOutcomes: [],
+      });
     });
 
     it('addCurrencyUnit and updateCurrencyUnit persist editable unit fields', async () => {
@@ -2981,7 +3205,9 @@ describe('createAdminStore', () => {
       assert.ok(updateCall !== null);
       assert.equal(updateCall.systemId, 'sys1');
       assert.equal(updateCall.recipeItemId, 'book-1');
-      assert.deepEqual(updateCall.patch, { caps: { learn: { limitRecipes: true, maxRecipes: 4 } } });
+      assert.deepEqual(updateCall.patch, {
+        caps: { learn: { limitRecipes: true, maxRecipes: 4 } },
+      });
     });
 
     it('updateRecipeItemCaps is a no-op without a recipe item id', async () => {
@@ -5702,6 +5928,7 @@ describe('createAdminStore', () => {
 
     it('viewState.recipes derives browser display counts from execution steps', async () => {
       const services = createMockServices();
+      services._getSystemsMutable()[0].resolutionMode = 'routedByIngredients';
       const origManager = services.getRecipeManager();
       const multiStepRecipe = makeRecipe({
         id: 'r-multi',
@@ -5719,6 +5946,7 @@ describe('createAdminStore', () => {
             ingredientSets: [
               {
                 id: 'set-herbs',
+                name: 'Herb route',
                 ingredientGroups: [
                   { id: 'group-herb', options: [{ componentId: 'mint' }, { componentId: 'sage' }] },
                   { id: 'group-water', options: [{ componentId: 'water' }] },
@@ -5734,6 +5962,7 @@ describe('createAdminStore', () => {
             ingredientSets: [
               {
                 id: 'set-finish',
+                name: 'Finish route',
                 ingredients: [{ componentId: 'ash' }, { componentId: 'salt' }],
                 toolIds: ['filter', 'vial'],
               },
@@ -5786,7 +6015,7 @@ describe('createAdminStore', () => {
           ingredientSetSummaries: [
             {
               id: 'set-herbs',
-              name: 'Set 1',
+              name: 'Herb route',
               ingredientCount: 3,
               toolCount: 1,
             },
@@ -5804,7 +6033,7 @@ describe('createAdminStore', () => {
           ingredientSetSummaries: [
             {
               id: 'set-finish',
-              name: 'Set 1',
+              name: 'Finish route',
               ingredientCount: 2,
               toolCount: 2,
             },
@@ -5815,6 +6044,7 @@ describe('createAdminStore', () => {
 
     it('viewState.recipes falls back to recipe-level ingredientSets and preserves alternatives for requirementsPreview', async () => {
       const services = createMockServices();
+      services._getSystemsMutable()[0].resolutionMode = 'routedByIngredients';
       const origManager = services.getRecipeManager();
       const fallbackRecipe = makeRecipe({
         id: 'r-single',
@@ -5823,6 +6053,7 @@ describe('createAdminStore', () => {
         ingredientSets: [
           {
             id: 'set-main',
+            name: 'Main route',
             ingredientGroups: [
               { id: 'group-main', options: [{ componentId: 'root' }, { componentId: 'mushroom' }] },
             ],
@@ -5830,6 +6061,7 @@ describe('createAdminStore', () => {
           },
           {
             id: 'set-alt',
+            name: 'Alternative route',
             ingredients: [
               { componentId: 'fish' },
               { componentId: 'salt' },
@@ -5873,19 +6105,55 @@ describe('createAdminStore', () => {
           ingredientSetSummaries: [
             {
               id: 'set-main',
-              name: 'Set 1',
+              name: 'Main route',
               ingredientCount: 2,
               toolCount: 1,
             },
             {
               id: 'set-alt',
-              name: 'Set 2',
+              name: 'Alternative route',
               ingredientCount: 3,
               toolCount: 0,
             },
           ],
         },
       ]);
+    });
+
+    it('viewState.recipes omits inactive per-set Tools from browser Tool counts', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipeWithStaleSetTools = makeRecipe({
+        id: 'r-stale-set-tools',
+        name: 'Simple Recipe',
+        craftingSystemId: 'sys1',
+        toolIds: ['global-tool'],
+        ingredientSets: [
+          {
+            id: 'set-main',
+            name: 'Named but not routed',
+            ingredientGroups: [{ id: 'group-main', options: [{ componentId: 'root' }] }],
+            toolIds: ['stale-set-tool'],
+          },
+        ],
+        resultGroups: [{ id: 'success' }],
+      });
+
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [recipeWithStaleSetTools].filter(
+            (recipe) =>
+              !filter?.craftingSystemId || recipe.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const recipe = get(store.viewState).recipes.find((entry) => entry.id === 'r-stale-set-tools');
+      assert.equal(recipe.toolCount, 1);
+      assert.equal(recipe.requirementsPreview[0].ingredientSetSummaries[0].toolCount, 0);
     });
 
     it('surfaces recipe routing fields (resultSelection, checkTierId, checkOutcomeIds) in the view state', async () => {
@@ -6176,6 +6444,340 @@ describe('createAdminStore', () => {
       assert.equal(vs.itemCards[1].description, '');
       assert.equal(vs.itemCards[1].hasDescription, false);
       assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
+    });
+
+    // -----------------------------------------------------------------------
+    // Issue 800 — read-side precedence. Descriptions are RESOLVED at write time,
+    // so the store reads the STORED value first and only falls back to the live
+    // document (enriching it) when the stored value is empty.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Seed `sys1` with a single component and drive a refresh, with `fromUuid` and the
+     * `enrichToHtml` seam stubbed. Returns the projected card plus the enrich calls.
+     */
+    async function itemCardFor(component, { liveDoc = null } = {}) {
+      const services = createMockServices();
+      const enrichCalls = [];
+      services.enrichToHtml = async (raw, options) => {
+        enrichCalls.push({ raw, options });
+        return `<a class="content-link">Component Pouch</a>`;
+      };
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = [makeItem(component)];
+      delete sys.items;
+
+      const originalFromUuid = globalThis.fromUuid;
+      globalThis.fromUuid = async () => liveDoc;
+      try {
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        return { card: get(store.viewState).itemCards[0], enrichCalls };
+      } finally {
+        globalThis.fromUuid = originalFromUuid;
+      }
+    }
+
+    it('itemCards prefer a NON-EMPTY stored description over a differing live document (issue 800)', async () => {
+      const { card, enrichCalls } = await itemCardFor(
+        {
+          id: 'comp-stored',
+          name: 'Alchemist’s Supplies',
+          registeredItemUuid: 'Compendium.dnd5e.equipment24.Item.supplies',
+          description: REPORTER_RESOLVED_EXPECTED,
+        },
+        { liveDoc: { system: { description: { value: 'Something else entirely.' } } } }
+      );
+
+      assert.equal(card.description, REPORTER_RESOLVED_EXPECTED);
+      assert.equal(
+        enrichCalls.length,
+        0,
+        'statement form is load-bearing: `(await enriched) || stored` would re-introduce ' +
+          'the per-component enrichHTML call this flip exists to avoid'
+      );
+    });
+
+    it('itemCards fall back to the ENRICHED live document when the stored description is empty (issue 800)', async () => {
+      // The issue 676 population — a compendium-linked component with no stored
+      // description — is exactly the population whose live text carries raw
+      // directives, so a non-enriching fallback would leave the reported bug visible
+      // here until a GM ran Repair.
+      const { card, enrichCalls } = await itemCardFor(
+        {
+          id: 'comp-empty',
+          name: 'Alchemist’s Supplies',
+          registeredItemUuid: 'Compendium.dnd5e.equipment24.Item.supplies',
+          description: '',
+        },
+        { liveDoc: { system: { description: { value: REPORTER_ENRICHER_DESCRIPTION } } } }
+      );
+
+      assert.equal(card.description, 'Component Pouch');
+      // A refresh publishes view state in two phases, so the projection may be built
+      // more than once; what matters is that the fallback resolves at all (the
+      // stored-first test above pins the ZERO-call case).
+      assert.ok(enrichCalls.length >= 1, 'the live fallback resolves');
+      assert.equal(enrichCalls[0].raw, REPORTER_ENRICHER_DESCRIPTION);
+      assert.ok(
+        enrichCalls[0].options?.relativeTo,
+        'relativeTo must be passed on the live path too, or a description that resolved ' +
+          'at ingestion goes broken on this fallback'
+      );
+    });
+
+    it('every read surface forwards the STORED string unchanged (issue 800 cross-caller invariant)', async () => {
+      // The cross-caller invariant in its new form. Its old form asserted that three
+      // surfaces produced identical FLATTENED output; the flatten is gone, so what must
+      // now hold across surfaces is that a STORED (already-resolved) description is
+      // forwarded byte-for-byte, with no surface resolving or rewriting it.
+      const stored = REPORTER_RESOLVED_EXPECTED;
+      const { card } = await itemCardFor({
+        id: 'comp-forward',
+        name: 'Alchemist’s Supplies',
+        description: stored,
+      });
+      assert.equal(card.description, stored, 'adminStore projection');
+
+      const manager = new CraftingSystemManager({ getRecipes: () => [] });
+      assert.equal(
+        manager._normalizeComponentDescription(stored),
+        stored,
+        'CraftingSystemManager sync normalizer'
+      );
+
+      const builder = new InventoryListingBuilder({
+        recipeManager: { getRecipes: () => [], toolMatchesItem: () => false },
+        craftingSystemManager: {
+          getSystems: () => [
+            {
+              id: 'sys-x',
+              name: 'Alchemy',
+              components: [{ id: 'cx', name: 'Supplies', description: stored }],
+            },
+          ],
+        },
+        localize: (key) => key,
+        nowWorldTime: () => 0,
+      });
+      const listing = builder.buildListing({
+        craftingActor: {
+          id: 'a1',
+          name: 'Akra',
+          img: 'icons/a1.webp',
+          items: [{ name: 'Supplies', system: { quantity: 1 } }],
+        },
+      });
+      assert.equal(
+        listing.rows.find((row) => row.componentId === 'cx' && !row.isEssenceSource)?.description,
+        stored,
+        'InventoryListingBuilder buildListing row'
+      );
+    });
+
+    it('read surfaces DIVERGE on an un-repaired labelled directive, and that is the real contract (issue 800)', async () => {
+      // The test above passes for a resolved string, but a resolved string is already
+      // plain text — so normalization is a no-op there and it would pass identically if
+      // the surfaces diverged wildly. This case uses a LABELLED directive, where they
+      // genuinely differ, so the contract is pinned rather than merely asserted.
+      //
+      // `adminStore` and the manager's sync normalizer both run `plainTextDescription`,
+      // whose retained mop-up renders the label; `InventoryListingBuilder` forwards the
+      // stored string untouched. The consequence is real and worth seeing: until a GM
+      // runs Repair Item Data, the SAME component reads "Acid" in the manager and
+      // "@UUID[…]{Acid}" in a player's inventory. Repair converges them, which is why
+      // it — not a wider read-side rewrite — is the fix.
+      const labelled = '@UUID[Compendium.dnd5e.items.Item.acid00]{Acid}';
+
+      const { card } = await itemCardFor({
+        id: 'comp-labelled',
+        name: 'Alchemist’s Supplies',
+        description: labelled,
+      });
+      assert.equal(card.description, 'Acid', 'adminStore normalizes: the mop-up renders the label');
+
+      const manager = new CraftingSystemManager({ getRecipes: () => [] });
+      assert.equal(
+        manager._normalizeComponentDescription(labelled),
+        'Acid',
+        'the manager normalizer agrees with adminStore'
+      );
+
+      const builder = new InventoryListingBuilder({
+        recipeManager: { getRecipes: () => [], toolMatchesItem: () => false },
+        craftingSystemManager: {
+          getSystems: () => [
+            {
+              id: 'sys-x',
+              name: 'Alchemy',
+              components: [{ id: 'cx', name: 'Supplies', description: labelled }],
+            },
+          ],
+        },
+        localize: (key) => key,
+        nowWorldTime: () => 0,
+      });
+      const listing = builder.buildListing({
+        craftingActor: {
+          id: 'a1',
+          name: 'Akra',
+          img: 'icons/a1.webp',
+          items: [{ name: 'Supplies', system: { quantity: 1 } }],
+        },
+      });
+      assert.equal(
+        listing.rows.find((row) => row.componentId === 'cx' && !row.isEssenceSource)?.description,
+        labelled,
+        'the inventory listing forwards the stored string VERBATIM and resolves nothing'
+      );
+    });
+
+    // -----------------------------------------------------------------------
+    // Issue 148 — per-store item-card memo. Unchanged components skip their
+    // per-item `fromUuid`/`enrichHTML` on refresh; a signature over the WHOLE
+    // stored item plus the external flags (`showTags`/`showEssences`/`showSalvage`)
+    // and resolved essence catalog invalidates only what actually changed.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Seed `sys1` with `components`, instrument `globalThis.fromUuid` with a call
+     * counter, create the store, and run `body` with a `count()` reader and a
+     * `reset()`. Restores `fromUuid` afterwards. Shared by the memo tests so the
+     * seam swap is written once (Sonar new-code duplication).
+     */
+    async function withMemoStore(components, servicesOverrides, body) {
+      const services = createMockServices(servicesOverrides);
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.components = components;
+      delete sys.items;
+      let calls = 0;
+      const originalFromUuid = globalThis.fromUuid;
+      globalThis.fromUuid = async () => {
+        calls += 1;
+        return {};
+      };
+      try {
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        return await body({
+          store,
+          sys,
+          count: () => calls,
+          reset: () => {
+            calls = 0;
+          },
+        });
+      } finally {
+        globalThis.fromUuid = originalFromUuid;
+      }
+    }
+
+    it('memoizes item cards: a single-component edit re-resolves 1, a no-op refresh re-resolves 0 (issue 148)', async () => {
+      const components = Array.from({ length: 75 }, (_, i) =>
+        makeItem({
+          id: `comp-${i}`,
+          name: `Component ${i}`,
+          registeredItemUuid: `Item.live-${i}`,
+          description: '',
+        })
+      );
+      await withMemoStore(components, undefined, async ({ store, sys, count, reset }) => {
+        // Baseline: every one of the 75 components forces a source resolution.
+        assert.ok(count() >= 75, `initial selectSystem resolves all components (got ${count()})`);
+
+        // Mutate exactly ONE component (new object, same id, changed name).
+        reset();
+        sys.components = sys.components.map((item, i) =>
+          i === 0 ? makeItem({ ...item, name: 'Component 0 EDITED' }) : item
+        );
+        await store.refresh();
+        assert.equal(count(), 1, 'only the edited component re-resolves — not O(all)');
+
+        // A no-op refresh (nothing changed) hits the cache for every card.
+        reset();
+        await store.refresh();
+        assert.equal(count(), 0, 'an unchanged same-system refresh resolves nothing');
+      });
+    });
+
+    it('stale-card guard: editing ONLY a component category yields a fresh card with the new category (issue 148)', async () => {
+      // `category` is not read by `fromUuid`, so a hand-enumerated signature subset
+      // (name/description/tags/essences) would leave the signature unchanged and serve
+      // a STALE card. The whole-item serialization catches it.
+      const components = [makeItem({ id: 'comp-cat', name: 'Herb', category: 'herbs' })];
+      await withMemoStore(components, undefined, async ({ store, sys }) => {
+        assert.equal(get(store.viewState).itemCards[0].category, 'herbs');
+
+        sys.components = [makeItem({ id: 'comp-cat', name: 'Herb', category: 'potions' })];
+        await store.refresh();
+        assert.equal(
+          get(store.viewState).itemCards[0].category,
+          'potions',
+          'the whole-item signature invalidates on a category-only edit'
+        );
+      });
+    });
+
+    it('salvage toggle refreshes every card salvageSummary (issue 148)', async () => {
+      // `showSalvage = features.salvage` is neither an item field nor a system-id
+      // change, so it lives IN the signature: flipping it must miss every card.
+      const salvage = {
+        enabled: true,
+        ingredientQuantity: 2,
+        toolIds: ['hammer'],
+        resultGroups: [],
+        outcomeRouting: {},
+      };
+      const components = [
+        makeItem({ id: 'ore-a', name: 'Ore A', salvage }),
+        makeItem({ id: 'ore-b', name: 'Ore B', salvage }),
+      ];
+      await withMemoStore(components, undefined, async ({ store, sys }) => {
+        sys.features = { salvage: false };
+        await store.refresh();
+        for (const card of get(store.viewState).itemCards) {
+          assert.equal(card.salvageSummary, null, 'salvage off → no summary');
+        }
+
+        sys.features = { salvage: true };
+        await store.refresh();
+        for (const card of get(store.viewState).itemCards) {
+          assert.ok(card.salvageSummary, 'salvage on → every card gains a summary');
+          assert.equal(card.salvageSummary.quantityRequired, 2);
+        }
+      });
+    });
+
+    it('two-phase publish: the settled selectedSystem is a NEW reference carrying enriched recipeItemDefinitions (issue 148 invariant)', async () => {
+      // The memo must not touch `selectedSystem`: phase-2 still builds a NEW
+      // selectedSystemData object, or Svelte's `$derived` never re-propagates the
+      // enriched Books & Scrolls projection.
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.recipeItemDefinitions = [
+        { id: 'def-1', name: 'Tome', originItemUuid: '', recipeIds: [] },
+      ];
+
+      const store = createAdminStore(services);
+      const captured = [];
+      const unsub = store.viewState.subscribe((vs) => {
+        if (vs.selectedSystem) captured.push(vs.selectedSystem);
+      });
+      await store.selectSystem('sys1');
+      unsub();
+
+      const phase1 = captured[0];
+      const settled = get(store.viewState).selectedSystem;
+      assert.ok(phase1, 'phase-1 publishes a selectedSystem');
+      assert.notEqual(
+        phase1,
+        settled,
+        'phase-2 selectedSystem must be a different reference for $derived to re-propagate'
+      );
+      assert.ok(
+        Array.isArray(settled.recipeItemDefinitions),
+        'the settled reference carries the enriched recipeItemDefinitions'
+      );
     });
 
     it('viewState.selectedSystem projects componentCategories, independently of categories (issue 676)', async () => {

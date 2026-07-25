@@ -9,6 +9,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 
@@ -49,7 +50,7 @@ const harness = createMountedComponentHarness({
 });
 
 function makeJournal(overrides = {}) {
-  const calls = { select: [] };
+  const calls = { select: [], cancel: [] };
   const store = {
     loading: false,
     error: false,
@@ -76,6 +77,7 @@ function makeJournal(overrides = {}) {
     setHistoryPage() {},
     setHistoryPageSize() {},
     advance() {},
+    cancel(run) { calls.cancel.push(run?.id ?? run); },
     tickWorldTime() {},
     ...overrides
   };
@@ -208,6 +210,55 @@ describe('JournalView mounted behavior', () => {
     assert.ok(target.querySelector('[data-journal-empty="active"]'), 'no-active-runs empty state shown');
     assert.ok(target.querySelector('[data-journal-empty="history"]'), 'no-history empty state shown');
     assert.ok(target.querySelector('[data-journal-empty="detail"]'), 'no-run-selected empty state shown');
+  });
+
+  it('shows an owner-only cancel affordance that confirms then routes to store.cancel', async () => {
+    // A discovered, owned, in-progress crafting run offers the player cancel (issue 848).
+    const run = makeCraftingRun({ canCancel: true, refundOnCancel: true });
+    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const startBtn = target.querySelector('[data-journal-cancel-start]');
+    assert.ok(startBtn, 'the cancel-craft button renders for an owned in-progress run');
+    // No cancel is issued until the player confirms.
+    startBtn.click();
+    flushSync();
+    assert.equal(calls.cancel.length, 0, 'the first click only reveals the confirm step');
+    const prompt = target.querySelector('[data-journal-cancel-prompt]');
+    assert.ok(prompt, 'the confirm prompt appears');
+    assert.match(prompt.textContent, /CancelConfirmRefund/, 'refund-on run explains inputs return');
+
+    target.querySelector('[data-journal-cancel-confirm]').click();
+    flushSync();
+    assert.deepEqual(calls.cancel, [run.id], 'confirming routes to store.cancel with the run');
+  });
+
+  it('lets the player back out of a cancel with "keep crafting" (no cancel issued)', async () => {
+    const run = makeCraftingRun({ canCancel: true, refundOnCancel: false });
+    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    target.querySelector('[data-journal-cancel-start]').click();
+    flushSync();
+    // A forfeit system warns that inputs will NOT return.
+    assert.match(
+      target.querySelector('[data-journal-cancel-prompt]').textContent,
+      /CancelConfirmForfeit/,
+      'refund-off run warns inputs are forfeit'
+    );
+    target.querySelector('[data-journal-cancel-keep]').click();
+    flushSync();
+    assert.equal(calls.cancel.length, 0, 'backing out issues no cancel');
+    assert.ok(!target.querySelector('[data-journal-cancel-prompt]'), 'the confirm step is dismissed');
+  });
+
+  it('hides the cancel affordance for a run the player does not own', async () => {
+    const run = makeCraftingRun({ canCancel: false });
+    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.ok(!target.querySelector('[data-journal-cancel]'), 'no cancel affordance for a not-owned run');
+    // The advance button still renders — only the cancel affordance is gated.
+    assert.ok(target.querySelector('[data-journal-trigger]'), 'the advance button is unaffected');
   });
 
   it('routes a run-card click to the store select action', async () => {

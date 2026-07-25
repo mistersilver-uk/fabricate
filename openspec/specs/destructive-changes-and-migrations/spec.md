@@ -157,6 +157,16 @@ For systems in `alchemy` mode:
 - Remove stale `fabricate.lastManagedCraftingSystem` references.
 - Remove stale progressive-order preferences for missing recipes.
 
+### GM Item-Data Repair
+
+- The GM maintenance action is named **Repair Item Data**, and its code, module, localization namespace, and registered menu entry carry that name.
+- Its remit is reconciling every projection of a definition's resolved source document — durable identity and derived display snapshots (name, image, description) alike; it is not limited to repairing identity flags.
+It resolves each definition's own source reference, including sources in locked compendium packs, and reports description outcomes in a summary bucket distinct from the identity-repair counts.
+Descriptions are refreshed for components and recipe-item definitions; tools are excluded, as they carry no description.
+- Worlds created before this behaviour carry stored descriptions captured under the previous rules; bringing them forward is the GM's explicit action.
+There is no silent load-time rewrite and no automatic migration.
+The action's stated purpose and its confirmation prompt must name description refresh so the GM's consent covers it.
+
 ## Migration Policy
 
 ### Migration State Storage

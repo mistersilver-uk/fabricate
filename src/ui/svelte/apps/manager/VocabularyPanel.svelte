@@ -18,6 +18,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
 
   let {
     label = '',
@@ -64,15 +65,10 @@
     onSetIcon = () => {},
   } = $props();
 
-  let inputValue = $state('');
-  let iconValue = $state('');
-  let feedback = $state('');
-  let submitting = $state(false);
   let searchTerm = $state('');
   let pendingRemovalId = $state('');
   let editingIconId = $state('');
   let editingIconValue = $state('');
-  let inputElement;
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -95,7 +91,6 @@
   // (no custom rows and no query) is the onboarding state. They render differently.
   const showNoResults = $derived(hasQuery && filteredRows.length === 0);
   const showEmpty = $derived(!hasQuery && (rows || []).length === 0);
-  const liveHint = $derived(describeInput(inputValue));
 
   function matchesSearch(row) {
     if (!normalizedSearchTerm) return true;
@@ -103,45 +98,6 @@
       .join(' ')
       .toLowerCase()
       .includes(normalizedSearchTerm);
-  }
-
-  // Focus on the next microtask rather than `await tick()`: tick waits for Svelte's
-  // full reactive flush, landing focus() one microtask after the surrounding state
-  // mutations — later than the two ticks tests (and Foundry's app lifecycle) await
-  // after a form submit. queueMicrotask runs after this batch's effect schedule, so
-  // bind:this is current without adding await depth.
-  function focusAfterUpdate(element) {
-    queueMicrotask(() => element?.focus?.());
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    if (submitting) return;
-    const rawValue = inputValue.trim();
-    const value = normalize(inputValue);
-    if (!rawValue || liveHint.blocked) {
-      focusAfterUpdate(inputElement);
-      return;
-    }
-    submitting = true;
-    try {
-      const icon = showIcon ? iconValue.trim() : undefined;
-      const result = await onAdd(value, icon);
-      if (result === false) {
-        feedback = addFailedFeedback;
-        focusAfterUpdate(inputElement);
-        return;
-      }
-      inputValue = '';
-      iconValue = '';
-      feedback = successFeedback(value, rawValue);
-      focusAfterUpdate(inputElement);
-    } catch (_err) {
-      feedback = addFailedFeedback;
-      focusAfterUpdate(inputElement);
-    } finally {
-      submitting = false;
-    }
   }
 
   function refText(row) {
@@ -190,63 +146,26 @@
     editingIconId = '';
     editingIconValue = '';
   }
-
-  function toneIcon(tone) {
-    if (tone === 'success') return 'fas fa-circle-check';
-    if (tone === 'danger') return 'fas fa-circle-exclamation';
-    return 'fas fa-circle-info';
-  }
 </script>
 
 <section class="manager-vocabulary-panel" aria-label={label}>
   <p class="manager-vocabulary-desc manager-muted">{hint}</p>
 
-  <form class="manager-vocabulary-form" onsubmit={submit}>
-    <div class="manager-vocabulary-form-fields">
-      <label class="manager-field" for={inputId}>
-        <span>{inputLabel}</span>
-        <input
-          id={inputId}
-          type="text"
-          bind:value={inputValue}
-          bind:this={inputElement}
-          oninput={() => (feedback = '')}
-          placeholder={inputPlaceholder}
-        />
-      </label>
-      {#if showIcon}
-        <label class="manager-field manager-vocabulary-icon-field" for={`${inputId}-icon`}>
-          <span>{iconLabel}</span>
-          <span class="manager-vocabulary-icon-input">
-            <i class={iconValue.trim() || defaultIcon} aria-hidden="true"></i>
-            <input
-              id={`${inputId}-icon`}
-              type="text"
-              bind:value={iconValue}
-              placeholder={iconPlaceholder}
-            />
-          </span>
-        </label>
-      {/if}
-      <button
-        type="submit"
-        class="manager-button is-primary"
-        disabled={!inputValue.trim() || liveHint.blocked || submitting}
-      >
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{addLabel}</span>
-      </button>
-    </div>
-
-    {#if feedback}
-      <p class="manager-form-warning" role="status">{feedback}</p>
-    {:else if inputValue.trim() && liveHint.message}
-      <p class={`manager-vocabulary-hint is-${liveHint.tone || 'info'}`} role="status">
-        <i class={toneIcon(liveHint.tone)} aria-hidden="true"></i>
-        <span>{liveHint.message}</span>
-      </p>
-    {/if}
-  </form>
+  <InlineVocabularyAdd
+    {inputId}
+    {inputLabel}
+    {inputPlaceholder}
+    {addLabel}
+    {describeInput}
+    {normalize}
+    {successFeedback}
+    {addFailedFeedback}
+    {showIcon}
+    {iconLabel}
+    {iconPlaceholder}
+    {defaultIcon}
+    {onAdd}
+  />
 
   <div class="manager-vocabulary-search-row">
     <label class="manager-search manager-vocabulary-search">

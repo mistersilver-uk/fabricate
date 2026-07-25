@@ -42,16 +42,36 @@ export function createGatheringToolAvailability({ craftingSystemManager, evaluat
     async check({ actor, viewer, system, environment, task, tools = [], presentTools = null } = {}) {
       const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager, presentTools });
       const failedRequirements = [];
-      for (const { tool } of matched.items) {
-        if (!tool?.requirement) continue;
-        const result = await evaluator?.evaluateRequirement?.({
-          requirement: tool.requirement,
-          actor,
-          environment,
-          task
+      for (const { tool, item, virtual } of matched.items) {
+        const boundActor = virtual === true ? actor : (item?.parent ?? actor);
+        const gate = await evaluateToolPrerequisiteGate({
+          tool,
+          actor: boundActor,
+          prerequisiteDefinitions: system?.characterPrerequisites,
+          evaluatePrerequisite: ({ actor: gateActor, prerequisite }) =>
+            evaluatePrerequisite(gateActor?.getRollData?.() ?? gateActor?.system ?? {}, prerequisite),
         });
-        if (result && result.allowed !== true) {
-          failedRequirements.push({ tool, diagnostic: result.diagnostic, reasonCode: result.reasonCode });
+        if (!gate.usable) {
+          failedRequirements.push({
+            tool,
+            diagnostic: null,
+            reasonCode: 'TOOL_PREREQUISITE_FAILED',
+          });
+        }
+        if (tool?.requirement) {
+          const result = await evaluator?.evaluateRequirement?.({
+            requirement: tool.requirement,
+            actor,
+            environment,
+            task
+          });
+          if (result && result.allowed !== true) {
+            failedRequirements.push({
+              tool,
+              diagnostic: result.diagnostic,
+              reasonCode: result.reasonCode,
+            });
+          }
         }
       }
       return {
@@ -131,14 +151,14 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
  * yields `present`):
  *   1. The matched item(s) for the tool's OWN component all carry the
  *      `flags.fabricate.toolBroken` flag (the `flagBroken` breakage form).
- *   2. The tool's `onBreak.mode === 'replaceWith'` with a non-empty
- *      `replacementComponentId`, and the actor holds an item matching that
- *      separate replacement component (the `replaceWith` repair-stock broken
- *      variant). This recognition is display-only and does NOT change attempt
- *      validation in {@link matchGatheringTools}.
+ *   2. The tool's `onBreak.mode === 'replaceWith'`, and the actor holds an item
+ *      matching its discriminated replacement target. A Component target matches
+ *      that managed Component. A direct-Item target matches its source reference.
+ *      This recognition is display-only and does NOT change attempt validation in
+ *      {@link matchGatheringTools}.
  *
- * Tolerant of a null/empty actor (all `missing`); never throws. A null/empty/
- * missing `replacementComponentId` never produces a synthetic probe.
+ * Tolerant of a null/empty actor (all `missing`); never throws. An absent or
+ * malformed replacement target never produces a replacement probe.
  *
  * @returns {Array<{ tool: object, state: 'present'|'damaged'|'missing' }>}
  */
@@ -166,10 +186,19 @@ export function classifyGatheringToolStates({ actor, system, task, tools = [], c
     // component above. When no working item matched, probe for it via the same
     // matcher and surface it as `damaged` (display-only).
     if (state === 'missing' && tool?.onBreak?.mode === 'replaceWith') {
-      const replacementComponentId = tool.onBreak.replacementComponentId;
-      if (typeof replacementComponentId === 'string' && replacementComponentId.trim()) {
-        const replacementTool = { componentId: replacementComponentId };
+      const target = tool.onBreak.replacementTarget || (
+        typeof tool.onBreak.replacementComponentId === 'string'
+          ? { type: 'component', componentId: tool.onBreak.replacementComponentId }
+          : null
+      );
+      if (target?.type === 'component' && target.componentId?.trim()) {
+        const replacementTool = { componentId: target.componentId.trim() };
         if (items.some(candidate => matcher(syntheticRecipe, replacementTool, candidate))) {
+          state = 'damaged';
+        }
+      } else if (target?.type === 'item' && target.itemUuid?.trim()) {
+        const itemUuid = target.itemUuid.trim();
+        if (items.some((candidate) => getItemSourceReferences(candidate).includes(itemUuid))) {
           state = 'damaged';
         }
       }
@@ -244,3 +273,6 @@ function normalizeFoundryCollection(collection) {
   if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
   return [];
 }
+import { getItemSourceReferences } from './utils/sourceUuid.js';
+import { evaluatePrerequisite } from './systems/characterPrerequisites.js';
+import { evaluateToolPrerequisiteGate } from './systems/toolCheckBonus.js';

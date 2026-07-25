@@ -1,4 +1,111 @@
+import { stampItemDataRoleIdentity } from './config/flags.js';
 import { Tool } from './models/Tool.js';
+
+/**
+ * Stamp a broken-tool REPLACEMENT grant's durable identity onto its item-data payload
+ * BEFORE creation (issue 780). ALWAYS stamps the replacement component id at
+ * `flags.fabricate.roles[system.id].componentId` — the replacement IS that component — so
+ * every downstream component consumer (inventory display, salvage, crafting ingredient
+ * matching, the gathering stack-guard) resolves it by durable identity once #601 removes
+ * the name-fallback tier.
+ *
+ * ADDITIONALLY co-stamps `roles[system.id].toolId` with the linking tool's id ONLY when
+ * EXACTLY ONE first-class tool in `system.tools` links the replacement component
+ * (`tool.componentId === componentId`) — the componentId-linked "whetstone" case the `Tool`
+ * model documents. The tool matcher (`resolveToolForItem` / `itemIsToolByDurableIdentity`)
+ * reads `roles[systemId].toolId`, NOT `componentId`, so a componentId-only stamp would not
+ * keep a replacement that is itself a working tool matchable once the name tier is gone. On
+ * ZERO or MULTIPLE linking tools the `toolId` co-stamp is skipped (ambiguous); when the
+ * component does not resolve `componentId` is nullish and the shared writer stamps nothing.
+ *
+ * Shared by BOTH replacement creators — `CraftingEngine._makeToolReplacementCreator` and
+ * {@link makeCreateReplacement} below — so their stamping logic cannot drift.
+ *
+ * @param {object} itemData - the plain replacement item-data about to be created
+ * @param {{ id?: string, tools?: Array<object> }|null|undefined} system
+ * @param {string|null|undefined} componentId - the resolved replacement component id
+ */
+export function stampReplacementComponentIdentity(itemData, system, componentId) {
+  const systemId = system?.id;
+  stampItemDataRoleIdentity(itemData, systemId, 'componentId', componentId);
+  const linkingTools = (Array.isArray(system?.tools) ? system.tools : []).filter(
+    (tool) => tool?.componentId === componentId
+  );
+  if (linkingTools.length === 1) {
+    stampItemDataRoleIdentity(itemData, systemId, 'toolId', linkingTools[0].id);
+  }
+}
+
+function replacementItemData(source) {
+  if (!source || typeof source !== 'object') return null;
+  const fromDocument = source.toObject?.();
+  const itemData =
+    fromDocument && typeof fromDocument === 'object'
+      ? fromDocument
+      : {
+          name: source.name ?? 'Replacement Item',
+          img: source.img ?? 'icons/svg/item-bag.svg',
+          type: source.type ?? 'loot',
+          system: source.system
+            ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
+            : {},
+        };
+  itemData.system ??= {};
+  itemData.system.quantity = 1;
+  if (source.uuid) {
+    globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+  }
+  return itemData;
+}
+
+/**
+ * Build the single lossless Tool replacement creator used by crafting, salvage,
+ * and gathering breakage consumers.
+ *
+ * @param {object} dependencies
+ * @param {object|null} dependencies.system
+ * @param {(args: {componentId: string, system: object}) => object|Promise<object|null>}
+ *   [dependencies.resolveComponentSource]
+ * @param {(uuid: string) => Promise<object|null>} [dependencies.resolveItemUuid]
+ * @returns {(args: {actor: object, target: object}) => Promise<object|null>}
+ */
+export function createToolReplacementCreator({
+  system = null,
+  resolveComponentSource,
+  resolveItemUuid,
+} = {}) {
+  return async ({ actor, target } = {}) => {
+    if (typeof actor?.createEmbeddedDocuments !== 'function') return null;
+
+    let source;
+    let componentId = null;
+    try {
+      if (target?.type === 'component') {
+        componentId = typeof target.componentId === 'string' ? target.componentId.trim() : '';
+        if (!componentId || typeof resolveComponentSource !== 'function') return null;
+        source = await resolveComponentSource({ componentId, system });
+      } else if (target?.type === 'item') {
+        const itemUuid = typeof target.itemUuid === 'string' ? target.itemUuid.trim() : '';
+        if (!itemUuid || typeof resolveItemUuid !== 'function') return null;
+        source = await resolveItemUuid(itemUuid);
+        if (source?.documentName !== 'Item') return null;
+      } else {
+        return null;
+      }
+
+      if (!source) return null;
+      const itemData = replacementItemData(source);
+      if (!itemData) return null;
+      if (componentId) stampReplacementComponentIdentity(itemData, system, componentId);
+
+      const created = await actor.createEmbeddedDocuments('Item', [itemData]);
+      const createdItem = Array.isArray(created) ? created[0] : null;
+      return createdItem?.documentName === 'Item' ? createdItem : null;
+    } catch {
+      return null;
+    }
+  };
+}
 
 /**
  * Shared Tool breakage PLAN/APPLY runtime.
@@ -11,8 +118,10 @@ import { Tool } from './models/Tool.js';
  * The runtime is deliberately matcher-agnostic: callers inject
  *   - `matchTools`      — resolves required tools to owned `{ tool, item }` pairs
  *   - `buildItemRef`    — builds a run-record `{ actorUuid, itemUuid, quantity }`
- *   - `resolveReplacementSource` — resolves a `replaceWith` componentId to a
- *     source item/component (optional; only needed for the `replaceWith` mode)
+ *   - `resolveReplacementSource` — resolves a Component replacement target to a
+ *     source item/component (optional; only needed for component replacement)
+ *   - `resolveItemUuid` — resolves a direct Item replacement target (optional;
+ *     only needed for direct-Item replacement)
  *   - `evaluateExpression` — async dice/expression evaluator (optional)
  *
  * Usage (`limitedUses`) semantics are preserved exactly: only `limitedUses`
@@ -80,7 +189,9 @@ export function plannedToolBreakageOutcome(tool) {
   if (tool.onBreak?.mode === 'replaceWith') {
     return {
       action: 'replaced',
-      replacementComponentId: tool.onBreak.replacementComponentId,
+      replacementTarget: tool.onBreak.replacementTarget
+        ? { ...tool.onBreak.replacementTarget }
+        : null,
     };
   }
   return { action: 'none' };
@@ -272,9 +383,10 @@ export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
  * @param {object} params.actor
  * @param {object} params.item
  * @param {object} [params.planned]                - prior plan entry for this item, if any
+ * @param {string} [params.authority=toolSpecific] - active system breakage authority
  * @param {Function} [params.evaluateExpression]
  * @param {Function} [params.buildItemRef]         - (actor, item) => itemRef
- * @param {Function} [params.createReplacement]    - async ({ actor, componentId }) => void
+ * @param {Function} [params.createReplacement]    - async ({ actor, target }) => Item|{success: true}|true|null
  * @returns {Promise<object>} evidence entry
  */
 export async function applyToolUsageAndBreakage({
@@ -282,17 +394,19 @@ export async function applyToolUsageAndBreakage({
   actor,
   item,
   planned,
+  authority = 'toolSpecific',
   evaluateExpression,
   buildItemRef,
   createReplacement,
 } = {}) {
-  await tool.applyUsage(item);
+  if (authority !== 'checkDriven') {
+    await tool.applyUsage(item);
+  }
   const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-  // `applyUsage` has already incremented the persisted `timesUsed`, so the
-  // breakage decision must read the POST-increment count via `Tool#evaluateBreakage`
-  // (its documented contract). Using the plan-phase projector `evaluateToolBreakagePlan`
-  // here would add a second +1 on top of the applied increment and break `limitedUses`
-  // tools one use early (e.g. maxUses:2 breaking on the first craft).
+  // Under tool-specific authority, `applyUsage` has already incremented the
+  // persisted `timesUsed`, so an unplanned decision must read the POST-increment
+  // count via `Tool#evaluateBreakage` (its documented contract). Check-driven
+  // callers provide a planned forced decision and disable retained usage tracking.
   const breakageResult = planned
     ? { mode: planned.mode, broken: planned.broken, evidence: planned.evidence }
     : await tool.evaluateBreakage({ actor, item, evaluateExpression });
@@ -320,6 +434,7 @@ export async function applyToolUsageAndBreakage({
  * @param {Function} deps.matchTools                  - ({ actor, system, task, tools }) => { items: [{ tool, item }], missing }
  * @param {Function} deps.buildItemRef                - (actor, item) => itemRef
  * @param {Function} [deps.resolveReplacementSource]  - ({ componentId, system }) => source|null
+ * @param {Function} [deps.resolveItemUuid]            - async (uuid) => Item|null
  * @param {Function} [deps.evaluateExpression]
  * @param {Function} [deps.planKey]                   - ({ actor, task }) => string (defaults to actor:task)
  * @returns {{ plan: Function, apply: Function }}
@@ -328,6 +443,7 @@ export function createToolBreakageRuntime({
   matchTools,
   buildItemRef,
   resolveReplacementSource,
+  resolveItemUuid,
   evaluateExpression,
   planKey,
 } = {}) {
@@ -337,26 +453,12 @@ export function createToolBreakageRuntime({
       ? planKey
       : ({ actor, task } = {}) => `${actor?.uuid ?? actor?.id ?? 'actor'}:${task?.id ?? 'task'}`;
 
-  function makeCreateReplacement(actor, system) {
-    if (typeof resolveReplacementSource !== 'function') return;
-    return async ({ actor: replacementActor, componentId }) => {
-      const source = resolveReplacementSource({ componentId, system });
-      if (!source || typeof replacementActor?.createEmbeddedDocuments !== 'function') return;
-      const itemData = source.toObject?.() ?? {
-        name: source.name ?? 'Replacement Item',
-        img: source.img ?? 'icons/svg/item-bag.svg',
-        type: source.type ?? 'loot',
-        system: source.system
-          ? (globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system })
-          : {},
-      };
-      itemData.system ??= {};
-      if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
-      if (source.uuid) {
-        globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
-      }
-      await replacementActor.createEmbeddedDocuments('Item', [itemData]);
-    };
+  function makeCreateReplacement(system) {
+    return createToolReplacementCreator({
+      system,
+      resolveComponentSource: resolveReplacementSource,
+      resolveItemUuid,
+    });
   }
 
   // Resolve the system's breakage authority (issue 419). Unknown / missing →
@@ -377,8 +479,9 @@ export function createToolBreakageRuntime({
     } = {}) {
       const matched = matchTools({ actor, system, task, tools, presentTools });
       const authority = resolveAuthority(system);
-      // Under checkDriven authority, the active check decides whether ALL required
-      // tools break for this attempt; per-tool modes are ignored except `immune`.
+      // Under checkDriven authority, the active check decides whether required tools
+      // break. `checkBreakable === false` excludes a Tool. Legacy `breakage.mode:
+      // 'immune'` is read forward as that exclusion and is never written canonically.
       const decision =
         authority === 'checkDriven'
           ? evaluateCheckBreakage({ checkBreakage, checkResult })
@@ -407,12 +510,12 @@ export function createToolBreakageRuntime({
           continue;
         }
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-        const isImmune = model.breakage?.mode === 'immune';
+        const isImmune = model.checkBreakable === false || model.breakage?.mode === 'immune';
         let breakageResult;
         let extra = {};
         if (authority === 'checkDriven') {
           if (isImmune) {
-            // Immune tools never break and are recorded as skipped-immune.
+            // Excluded tools never break and are recorded as skipped-immune.
             breakageResult = { mode: 'immune', broken: false, evidence: { authority } };
             extra = { authority, skippedImmune: true };
           } else if (decision.forceBreak) {
@@ -498,11 +601,14 @@ export function createToolBreakageRuntime({
           continue;
         }
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-        const isImmune = tool.breakage?.mode === 'immune';
+        // `checkBreakable === false` is the canonical exclusion. The legacy `immune`
+        // mode remains a read-forward compatibility input for unnormalized callers.
+        const isImmune = tool.checkBreakable === false || tool.breakage?.mode === 'immune';
         let planned = plannedByItem.get(stringOrEmpty(itemRef?.itemUuid));
         let extra = {};
         if (authority === 'checkDriven') {
           if (isImmune) {
+            // Excluded tools never break and are recorded as skipped-immune.
             planned = { mode: 'immune', broken: false, evidence: { authority } };
             extra = { authority, skippedImmune: true };
           } else if (decision.forceBreak) {
@@ -523,9 +629,10 @@ export function createToolBreakageRuntime({
           actor,
           item,
           planned,
+          authority,
           evaluateExpression,
           buildItemRef,
-          createReplacement: makeCreateReplacement(actor, system),
+          createReplacement: makeCreateReplacement(system),
         });
         evidence.push({ ...entry, ...extra });
       }

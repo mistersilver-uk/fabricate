@@ -5,6 +5,15 @@ function defaultRandomID() {
   );
 }
 
+// A generated unit id has the shape produced by `defaultRandomID`: `foundry.utils.randomID()`
+// returns 16 alphanumeric chars and the crypto fallback returns 10 hex chars, so any id of 10+
+// alphanumeric characters is treated as machine-generated. Short, semantic ids (e.g. the preset
+// coin keys `cp`/`sp`/`ep`/`gp`/`pp`) deliberately fail this guard so a hand-authored abbreviation
+// that intentionally equals such an id is preserved.
+function isGeneratedUnitId(value) {
+  return /^[A-Za-z0-9]{10,}$/.test(value);
+}
+
 /**
  * Normalize one raw currency-unit entry into the canonical
  * `{ id, label, abbreviation, icon, actorPath, denomination?, contains[] }` shape.
@@ -15,6 +24,12 @@ function defaultRandomID() {
  * deduplicated by child id and drops any entry without a positive integer amount. Returns `null`
  * for a non-object entry or one that resolves to an empty id.
  *
+ * `abbreviation` is optional and defaults to the empty string when unauthored — it is never
+ * defaulted to, or persisted as, the unit `id`. A stored `abbreviation` that strictly equals the
+ * unit `id` is self-healed back to `''` when the id has the generated shape (see
+ * {@link isGeneratedUnitId}); a hand-authored abbreviation that equals a short semantic id (e.g. a
+ * preset coin key) is left intact.
+ *
  * @param {object} [entry]
  * @param {() => string} [randomID] - id factory used when the entry has no id.
  * @returns {object|null}
@@ -24,7 +39,9 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
   const id = String(entry.id || randomID()).trim();
   if (!id) return null;
   const label = String(entry.label || entry.name || id).trim() || id;
-  const abbreviation = String(entry.abbreviation || entry.abbr || id).trim() || id;
+  const rawAbbreviation = String(entry.abbreviation || entry.abbr || '').trim();
+  const abbreviation =
+    rawAbbreviation && !(rawAbbreviation === id && isGeneratedUnitId(id)) ? rawAbbreviation : '';
   const actorPath = String(entry.actorPath || entry.path || '').trim();
   const denomination = String(entry.denomination || '').trim();
   const contains = Array.isArray(entry.contains)
@@ -72,8 +89,8 @@ const PF2E_DENOMINATIONS = new Set(['pp', 'gp', 'sp', 'cp']);
 
 /**
  * Ordered keys of the custom currency macro set (`requirements.currency.macros`). `canAfford` gates
- * the craft and `decrement` performs the spend; `increment` is reserved for a future refund flow
- * and is never invoked. Used by the normalizer and the macro spender to iterate the macro slots.
+ * the craft, `decrement` performs the spend, and `increment` performs the refund on a player-cancel
+ * reversal (issue 848). Used by the normalizer and the macro spender to iterate the macro slots.
  *
  * @type {string[]}
  */
@@ -330,8 +347,9 @@ function buildUnitResolver(byId, errors) {
 }
 
 // Macro spending drives the craft through GM macros, so the engine must be able to gate
-// (canAfford) and deduct (decrement); both are required. `increment` is reserved for a future
-// refund flow and stays optional.
+// (canAfford) and deduct (decrement); both are required. `increment` performs the player-cancel
+// refund (issue 848) and stays OPTIONAL — a system with no increment macro simply cannot refund a
+// macro-mode cancel (the reversal reports the failure rather than aborting).
 function collectMacroConfigErrors(macros, errors) {
   const safeMacros = macros && typeof macros === 'object' ? macros : {};
   if (!String(safeMacros.canAfford || '').trim()) {
@@ -397,6 +415,19 @@ export function validateCurrencyProfile(units = [], options = {}) {
   };
 }
 
+/**
+ * Format a currency requirement as `<amount> <label>` for display.
+ *
+ * Resolves the requirement's unit id to a human label through the chain `abbreviation` (when
+ * authored), then `label`, so a well-formed requirement never surfaces the raw unit id (a resolved
+ * unit always carries a non-empty label). The one exception is a degenerate orphaned reference: when
+ * `requirement.unit` names an id no longer present in `units`, the raw id is rendered verbatim as a
+ * last resort, because a stale id reads better than a blank cost.
+ *
+ * @param {{ unit?: string, amount?: number }} requirement
+ * @param {object[]} [units]
+ * @returns {string}
+ */
 export function formatCurrencyRequirement(requirement, units = []) {
   const unit = findCurrencyUnit(units, requirement?.unit);
   const label = unit?.abbreviation || unit?.label || requirement?.unit || '';
@@ -584,6 +615,48 @@ export function buildCurrencySpendUpdates(actor, requirement, units = []) {
 }
 
 /**
+ * Compute the batched `actor.update(...)` payload that REFUNDS a currency requirement under the
+ * `actorProperty` strategy — the exact inverse of {@link buildCurrencySpendUpdates}. A refund makes
+ * no change: it simply adds `amount` of the requirement's own denomination back to the actor's
+ * held balance, so a `5 gp` spend refunds `5 gp` (net base-value neutral even if the original spend
+ * had to break higher coins for change). Used by the player-cancel reversal (issue 848) and shared
+ * with the GM cancel/reverse (issue 847).
+ *
+ * @param {object} actor
+ * @param {{ unit: string, amount: number }} requirement
+ * @param {object[]} [units]
+ * @returns {{ valid: boolean, message?: string, updates?: object, formatted?: string }}
+ */
+export function buildCurrencyRefundUpdates(actor, requirement, units = []) {
+  const profile = validateCurrencyProfile(units);
+  if (!profile.valid) {
+    return {
+      valid: false,
+      message: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
+    };
+  }
+  const unit = findCurrencyUnit(profile.units, requirement?.unit);
+  if (!unit) {
+    return {
+      valid: false,
+      message: `Currency unit "${requirement?.unit || ''}" is not configured.`,
+    };
+  }
+  const amount = Math.max(0, Math.trunc(Number(requirement?.amount || 0)));
+  if (amount <= 0) return { valid: true, updates: {} };
+
+  const balanceResult = readCurrencyBalances(actor, profile.units);
+  if (!balanceResult.valid) return { valid: false, message: balanceResult.message };
+
+  const current = balanceResult.balances.get(unit.id) || 0;
+  return {
+    valid: true,
+    updates: { [unit.actorPath]: current + amount },
+    formatted: formatCurrencyRequirement(requirement, profile.units),
+  };
+}
+
+/**
  * Decide whether sub-unit `subUnitId` may be added as a direct child of `parentUnitId`.
  *
  * Eligibility rule: `reachable(parent) ∩ reachable(child) = ∅`, where `reachable(X)` is `X` plus
@@ -616,13 +689,23 @@ export function canAddCurrencySubUnit(units = [], parentUnitId = '', subUnitId =
   return true;
 }
 
+/**
+ * List the units eligible to become a direct sub-unit of `parentUnitId` (see
+ * {@link canAddCurrencySubUnit}), each projected to `{ id, label, abbreviation }` for the picker.
+ * Both display fields resolve through a fallback so neither renders empty: `label` falls back to the
+ * id, and `abbreviation` resolves through `abbreviation`, then `label`, then `id`.
+ *
+ * @param {object[]} [units]
+ * @param {string} [parentUnitId]
+ * @returns {{ id: string, label: string, abbreviation: string }[]}
+ */
 export function currencySubUnitOptions(units = [], parentUnitId = '') {
   return (Array.isArray(units) ? units : [])
     .filter((unit) => canAddCurrencySubUnit(units, parentUnitId, unit?.id))
     .map((unit) => ({
       id: unit.id,
       label: unit.label || unit.id,
-      abbreviation: unit.abbreviation || unit.id,
+      abbreviation: unit.abbreviation || unit.label || unit.id,
     }));
 }
 

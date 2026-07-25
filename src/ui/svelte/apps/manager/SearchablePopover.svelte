@@ -112,16 +112,24 @@
   });
   const isGrouped = $derived(groupedOptions.length > 0);
 
-  function close() {
+  function close({ restoreFocus = true } = {}) {
     open = false;
     search = '';
+    if (restoreFocus) {
+      queueMicrotask(() => {
+        if (triggerButton?.isConnected !== false) triggerButton?.focus?.();
+      });
+    }
   }
 
   function toggle(event) {
     event.stopPropagation();
     if (disabled) return;
-    open = !open;
-    if (!open) search = '';
+    if (open) {
+      close({ restoreFocus: false });
+      return;
+    }
+    open = true;
   }
 
   function choose(id) {
@@ -140,10 +148,25 @@
 
   function getHorizontalBounds(hostRect) {
     if (!pickerRoot) return {};
-    const mainPanel = pickerRoot.closest('.admin-main, .manager-main, .manager-table-scroll');
-    const rect = mainPanel?.getBoundingClientRect?.();
-    if (!rect) return {};
-    return { minLeft: rect.left - hostRect.left + 16, maxRight: rect.right - hostRect.left - 16 };
+    const selector = '.admin-main, .manager-main, .manager-table-scroll';
+    let candidate = pickerRoot.parentElement;
+    while (candidate) {
+      if (candidate.matches?.(selector)) {
+        const rect = candidate.getBoundingClientRect?.();
+        const display = globalThis.getComputedStyle?.(candidate)?.display;
+        if (rect && rect.width > 0 && rect.height > 0 && display !== 'contents') {
+          return {
+            minLeft: rect.left - hostRect.left + 16,
+            maxRight: rect.right - hostRect.left - 16,
+          };
+        }
+      }
+      candidate = candidate.parentElement;
+    }
+    return {
+      minLeft: 16,
+      maxRight: Math.max(16, hostRect.width - 16),
+    };
   }
 
   function updatePosition() {
@@ -199,7 +222,7 @@
 <div
   class={`manager-travel-picker ${pickerClass}`}
   bind:this={pickerRoot}
-  use:dismissOnOutsideClick={{ enabled: open, onDismiss: close, additionalNodes: () => [popoverRoot] }}
+  use:dismissOnOutsideClick={{ enabled: open, onDismiss: () => close(), additionalNodes: () => [popoverRoot] }}
 >
   <button
     type="button"

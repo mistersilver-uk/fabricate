@@ -73,6 +73,7 @@ game.fabricate.hideGatheringRealmForActor({ actor, systemId, realmId }) // GM-on
 game.fabricate.getGatheringEconomy({ systemId }) // Gathering economy block
 game.fabricate.setGatheringEconomy({ systemId, economy }) // GM-only economy update
 game.fabricate.getRecipeVisibilityService() // Visibility and knowledge
+game.fabricate.resetActorKnowledge({ actorId, systemId, freeLearnBudget }) // GM-only reset of one actor's learned recipes (one system, or all systems when systemId is null)
 game.fabricate.getResolutionModeService()   // Mode validation and resolution
 ```
 
@@ -94,7 +95,8 @@ fabricate.listCraftingSystems()
 const {
   Recipe, Ingredient, IngredientGroup,
   RecipeManager, CraftingEngine,
-  getFabricateAppClass, getCraftingSystemManagerAppClass,
+  getFabricateAppClass,
+  loadCraftingSystemManagerAppClass, getCraftingSystemManagerAppClass,
   CraftingSystemManager,
   CraftingRunManager, SalvageRunManager,
   GatheringEnvironmentStore, GatheringRunManager,
@@ -106,6 +108,22 @@ const {
   CompendiumImporter, CraftingSystemExporter
 } = game.fabricate.api;
 ```
+
+The GM crafting-system-manager app is loaded from a separate on-demand chunk so
+non-GM players never download it.
+Open it programmatically through the async accessor, which loads (and registers)
+the class the first time it is called, then caches it:
+
+```javascript
+const AppClass = await game.fabricate.api.loadCraftingSystemManagerAppClass();
+AppClass.show();
+```
+
+The synchronous `getCraftingSystemManagerAppClass()` still exists for
+backward compatibility, but it now throws until the manager has been opened at
+least once (i.e. until `loadCraftingSystemManagerAppClass()`, the header button,
+or `fabricate.openRecipeManager()` has loaded the chunk).
+Prefer the async accessor.
 
 ### Gathering Runtime Facade
 

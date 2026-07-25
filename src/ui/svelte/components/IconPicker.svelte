@@ -5,7 +5,7 @@
   import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
-    ESSENCE_ICON_OPTIONS,
+    getEssenceIconOptions,
     filterEssenceIconOptions,
     getEssenceIconOption,
     normalizeEssenceIcon
@@ -32,7 +32,7 @@
   let searchInput = $state(null);
   let popoverStyle = $state('');
 
-  const iconOptions = ESSENCE_ICON_OPTIONS;
+  const iconOptions = getEssenceIconOptions();
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
   const selectedOption = $derived(getEssenceIconOption(selectedIconClass, iconOptions));
   const filteredOptions = $derived(filterEssenceIconOptions(iconOptions, searchTerm));

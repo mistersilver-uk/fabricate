@@ -25,6 +25,7 @@
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
+  import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
 
   let {
     recipe = null,
@@ -53,6 +54,14 @@
     // only for a routed+fixed system, so the "Minimum success tier" control below
     // auto-hides everywhere else.
     minSuccessTierOptions = [],
+    // Per-recipe crafting-check modifier override (issue 770). `craftingModifierOptions`
+    // is the system's `checkModifiers` catalogue ({id,label}); non-empty only when the
+    // system's crafting check is usable and a catalogue is authored, so the control
+    // auto-hides everywhere else. `craftingModifierPolicyDefault` is the system default
+    // policy, surfaced in the "Inherit" option label. The control writes
+    // `recipe.craftingModifier` ({ policy?, modifierIds? } | null): null inherits.
+    craftingModifierOptions = [],
+    craftingModifierPolicyDefault = 'addAll',
     // `recipe.locked` — persisted, engine-honoured (`guardCraftStart` refuses a
     // locked craft) and, until issue 643, written by NOTHING in the UI. Its write
     // path is never gated, unlike enable: a GM locks a recipe precisely while it is
@@ -88,6 +97,43 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // Per-recipe crafting-modifier override state (issue 770). `overridePolicy` drives the
+  // select ('' = inherit the system default); `hasModifierOverride` decides whether the
+  // per-modifier picker shows. Writing null clears the override entirely (inherit).
+  const MODIFIER_POLICY_LABELS = {
+    addAll: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll', 'Add all'),
+    highest: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Pick highest'),
+    byRecipe: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe', 'By recipe')
+  };
+  const overridePolicy = $derived(recipe?.craftingModifier?.policy || '');
+  const overrideModifierIds = $derived(recipe?.craftingModifier?.modifierIds || []);
+  const hasModifierOverride = $derived(!!recipe?.craftingModifier);
+  const defaultPolicyLabel = $derived(
+    (MODIFIER_POLICY_LABELS[craftingModifierPolicyDefault] || MODIFIER_POLICY_LABELS.addAll)()
+  );
+
+  function changeModifierPolicy(value) {
+    if (!value) {
+      onUpdateRecipe({ craftingModifier: null });
+      return;
+    }
+    const modifierIds = recipe?.craftingModifier?.modifierIds || [];
+    onUpdateRecipe({
+      craftingModifier: { policy: value, ...(modifierIds.length ? { modifierIds } : {}) }
+    });
+  }
+
+  function toggleModifierId(id, checked) {
+    const current = recipe?.craftingModifier?.modifierIds || [];
+    const modifierIds = checked
+      ? [...new Set([...current, id])]
+      : current.filter((existing) => existing !== id);
+    const next = {};
+    if (recipe?.craftingModifier?.policy) next.policy = recipe.craftingModifier.policy;
+    if (modifierIds.length) next.modifierIds = modifierIds;
+    onUpdateRecipe({ craftingModifier: Object.keys(next).length ? next : null });
   }
 
   const STEP_MODE_OPTIONS = [
@@ -226,6 +272,37 @@
         </select>
       </label>
     {/if}
+    {#if craftingModifierOptions.length > 0}
+      <label class="manager-recipe-field" data-recipe-crafting-modifier>
+        <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}</span>
+        <select
+          data-recipe-field="craftingModifierPolicy"
+          value={overridePolicy}
+          onchange={(event) => changeModifierPolicy(event.currentTarget.value || null)}
+          disabled={saving}
+        >
+          <option value="">{text('FABRICATE.Admin.Manager.Recipe.CraftingModifierInherit', 'Inherit system default') + ` (${defaultPolicyLabel})`}</option>
+          <option value="addAll">{MODIFIER_POLICY_LABELS.addAll()}</option>
+          <option value="highest">{MODIFIER_POLICY_LABELS.highest()}</option>
+          <option value="byRecipe">{MODIFIER_POLICY_LABELS.byRecipe()}</option>
+        </select>
+      </label>
+      {#if hasModifierOverride}
+        <div class="manager-recipe-field" data-recipe-crafting-modifier-picker>
+          <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.CraftingModifierPick', 'Eligible modifiers')}</span>
+          <ModifierPillSelect
+            options={craftingModifierOptions}
+            selectedIds={overrideModifierIds}
+            disabled={saving}
+            testId="recipe-crafting-modifier"
+            menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
+            allSelectedLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected', 'All modifiers selected.')}
+            noneSelectedLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierInheritDefaults', 'Inheriting the system default modifiers.')}
+            onToggle={toggleModifierId}
+          />
+        </div>
+      {/if}
+    {/if}
   </div>
 
   <!-- Two side-by-side status cards. "Locked" here means the recipe stays visible to
@@ -333,3 +410,9 @@
     </section>
   {/if}
 </section>
+
+<style>
+  [data-recipe-crafting-modifier-picker] {
+    margin-top: 0.25rem;
+  }
+</style>

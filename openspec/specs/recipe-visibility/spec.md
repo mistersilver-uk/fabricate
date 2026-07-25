@@ -565,6 +565,34 @@ The batch "Read & learn all" affordance (see Player-Selected Learning From The I
 - Manual-learning eligibility is evaluated per matched recipe using that recipe's own knowledge configuration.
 In mixed-system worlds, the manual path only includes recipes from systems where `dragDropEnabled === false`.
 
+### Knowledge Reset / Erase
+
+A single knowledge-deletion primitive (`RecipeVisibilityService.forgetLearnedRecipes`) serves three grains from one code path: **erase one** learned recipe, **reset one system**, and **reset all systems** for one actor.
+It is the shared mutation behind the GM reset API and #785's per-recipe "Erase memory" action.
+
+- Deletion is an explicit, reload-safe `-=` flag-key removal at the **full doubly-nested** path `Actor.flags.fabricate.fabricate.learnedRecipes.-=<recipeId>` (and, when clearing discovery, `Actor.flags.fabricate.fabricate.discoveryProgress.-=<recipeId>`), batched into a single `Actor#update`.
+It must NOT prune by rebuilding a filtered map through `setFlag` as the sole write — that merge never removes keys, so the entry resurrects on reload (the `deleteRemovedActiveRunFlags` doctrine); a shallow `flags.fabricate.learnedRecipes.-=<id>` silently no-ops.
+- Dotted (imported) recipe ids that `expandObject` would mis-split on `.` (`isSafeFlagKeySegment` is false) route to a **two-step delete-then-write fallback**: the parent key is dropped first (`await actor.update({ 'flags.fabricate.fabricate.-=learnedRecipes': null })`), then the retained map is re-written (`await _setLearnedMap(actor, retainedMap)`).
+These are two sequential awaited operations, never one order-dependent update — `mergeObject`/`_migrateDeletionKey` may process the deletion after the insertion and wipe the whole map.
+The same two-step applies to `discoveryProgress` when clearing discovery and any scoped id is dotted.
+A retained entry whose own id contains a dot re-splits on the step-2 rewrite exactly as the original learn write did — a known fidelity limit of dotted retained ids, not an expandObject-safe guarantee.
+- `freeLearnBudget` defaults ON for the reset/erase grains (respec/amnesia must let the actor re-learn) and is passed OFF for the recipe-deletion cleanup path.
+When on, each cleared learned entry frees one consumed learn slot against a **still-held** source copy, reading its **current** `learnScope`: `perInstance` decrements the held item's `Item.flags.fabricate.recipeItemLearning.learnedCount`; `total` decrements the `recipeItemPartyLearnPool` key (a new GM-authoritative `decrement`, symmetric with `increment`, floored at 0, non-GM degrades safely).
+- **Unresolvable / orphan entries free nothing.** An entry with no `sourceItemUuid` (auto-learn), a source book the actor no longer holds, or a recipe id that no longer resolves gets no budget math at all — in particular a `total` pool key is unreconstructable once the recipe/definition is gone, so it is deliberately left as-is (no decrement, never a wrong-key decrement).
+- **Grain composition.** Erase-one clears only the learned entry and leaves `discoveryProgress` untouched by default (an off-by-default `clearDiscovery` option, which GM-gated #785 consumers may opt into, also clears the recipe's discovery key).
+Reset-one-system clears every learned entry whose recipe belongs to the system (via `getRecipe(id).craftingSystemId`) plus its scoped `discoveryProgress`, and **leaves orphan learned keys (unresolvable recipe) in place** — they cannot be attributed to a system.
+Reset-all-systems clears every learned key **including orphans**, plus every `discoveryProgress` entry.
+
+### GM-Only Knowledge Reset API
+
+`game.fabricate.resetActorKnowledge({ actorId, systemId, freeLearnBudget })` is the interim GM macro/console access path until #785's Knowledge tab ships.
+It is explicitly GM-gated (a non-GM returns the `FABRICATE.Knowledge.Reset.GMOnly` outcome and never mutates), takes an `actorId` (never an actor uuid, resolved via `game.actors.get`; a missing actor returns `FABRICATE.Knowledge.Reset.NoActor`), delegates the scoped id set to `forgetLearnedRecipes` with `clearDiscovery: true`, and returns `{ success, message, messageData }` without throwing.
+
+### Auto-Relearn Semantics
+
+A reset does not spontaneously re-learn on refresh or reopen: auto-learn fires only from the `createItem` hook, so a still-held auto-learn book re-grants the recipe only on a fresh `createItem` (remove and re-add) or an explicit learn affordance — never from a render or reload.
+Separately, in `item` / `knowledge` visibility modes, *holding* a matching book makes a recipe visible/craftable via `evaluateKnowledgeAccess().hasMatchedItem` independent of the learned map, so clearing learned knowledge does not hide a recipe reachable purely by possessing the book; the reset clears the durable **learned** grant while item-possession access persists while the book is held.
+
 ## Edge Cases
 
 ### Recipe Item Definition Missing
@@ -586,6 +614,8 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 ### Recipe Deletion
 
 - Remove corresponding learned entries from all actors.
+- The removal uses the explicit `-=` deletion primitive (`forgetLearnedRecipes`) called with `freeLearnBudget: false` — recipe deletion is content management, not an in-fiction un-learn, so it must not refund any consumed learn budget.
+`cleanupLearnedRecipes` is rerouted onto that primitive, fixing the prior filtered-map `setFlag` rebuild that MERGED and therefore never actually deleted the stale keys (they resurrected on reload).
 
 ### Visibility Mode Change
 

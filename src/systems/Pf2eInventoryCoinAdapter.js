@@ -66,4 +66,29 @@ export class Pf2eInventoryCoinAdapter {
     }
     return { valid: true };
   }
+
+  /**
+   * Refund a single denomination's worth of coins through the pf2e inventory API — the
+   * inverse of {@link spend}. `actor.inventory.addCoins({ [denomination]: count })` adds
+   * the coins back (returns void, no change-making, never fails on sufficiency). Maps the
+   * requirement shape exactly as `spend` does so a refund gives back the same denomination
+   * that was spent. Used by the player-cancel reversal (issue 848).
+   *
+   * @param {object} actor
+   * @param {{ unit: object, amount: number }} requirement
+   * @returns {Promise<{ valid: boolean, message?: string }>}
+   */
+  async addCoins(actor, { unit, amount } = {}) {
+    const denomination = String(unit?.denomination || unit?.id || '').trim();
+    if (!denomination) {
+      return { valid: false, message: 'Currency unit has no pf2e denomination.' };
+    }
+    const count = Math.trunc(Number(amount) || 0);
+    if (count <= 0) return { valid: true };
+    if (typeof actor?.inventory?.addCoins !== 'function') {
+      return { valid: false, message: 'Currency is not available on this actor.' };
+    }
+    await actor.inventory.addCoins({ [denomination]: count });
+    return { valid: true };
+  }
 }

@@ -80,12 +80,12 @@ function makeActor(items) {
   return { items: arr };
 }
 
-function makeSystemManager(systemId, components) {
+function makeSystemManager(systemId, components, essenceDefinitions = []) {
   return {
     user: { isGM: true },
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: (id) => (id === systemId ? { id: systemId, features: {}, components, managedItems: components, essenceDefinitions: [] } : null),
+        getSystem: (id) => (id === systemId ? { id: systemId, features: {}, components, managedItems: components, essenceDefinitions } : null),
       }),
       getResolutionModeService: () => null,
     },
@@ -282,6 +282,40 @@ test('an insufficient overridden option is selectable-but-flagged (not craftable
   assert.equal(overridden.canCraft, false, 'the short chosen option blocks the craft');
   assert.equal(overridden.ingredientStates[0].satisfied, false);
   assert.equal(overridden.ingredientStates[0].componentId, 'cmp-b', 'still shows the chosen option');
+});
+
+test('mixed OR choices carry authored essence icon metadata without an aura image', () => {
+  const systemId = 'sys-essence-choice';
+  const components = [
+    { id: 'cmp-a', name: 'Red Herb', registeredItemUuid: 'reg-a', img: 'a.webp' },
+  ];
+  globalThis.game = makeSystemManager(systemId, components, [
+    { id: 'restorative', name: 'Restorative', icon: 'fas fa-heart' },
+  ]);
+  const manager = new RecipeManager();
+  const g = group(
+    [
+      { match: { type: 'component', componentId: 'cmp-a' }, quantity: 1 },
+      { match: { type: 'essence', essenceId: 'restorative', amount: 2 }, quantity: 1 },
+    ],
+    'g-essence-choice'
+  );
+  const recipe = new Recipe({
+    name: 'Restorative Potion',
+    craftingSystemId: systemId,
+    ingredientSets: [makeSet([g]).toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability(
+    [makeActor([makeComponentItem('i-a', 'reg-a', 2)])],
+    recipe
+  );
+  const essence = result.ingredientChoices[0].options[1];
+  assert.equal(essence.isEssence, true);
+  assert.equal(essence.icon, 'fas fa-heart');
+  assert.equal(essence.img, null);
+  assert.notEqual(essence.img, 'icons/svg/aura.svg');
 });
 
 test('a tag option matching multiple held stacks emits a stack choice', () => {

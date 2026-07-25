@@ -37,10 +37,11 @@ test seams where JavaScript structure is part of the task.
 ### Tasks
 
 Plain-markdown checklist (do **not** use GitHub sub-issues — keep tasks inside this
-block as text so `gh issue view` round-trips cleanly):
+block as text so `gh issue view` round-trips cleanly).
+Every entry ends with a literal `Lane surface:` field, which the driver reads as a lookup when it selects a model tier for that lane's spawn (rule 2 of the ladder in `AGENTS.md`):
 
-- [ ] Phase 1 — …
-- [ ] Phase 2 — …
+- [ ] Phase 1 — … `Lane surface: new-module | new-export | persisted-shape | none`
+- [ ] Phase 2 — … `Lane surface: none`
 
 ### Spec Deltas
 

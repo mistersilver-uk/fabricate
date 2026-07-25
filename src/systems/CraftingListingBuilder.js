@@ -65,6 +65,7 @@ const BLOCKING_REASON_KEYS = {
 
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
+const TIME_REQUIREMENT_FIELDS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 /**
  * Non-alchemy modes whose crafting check is mandatory (the attempt fails without an
@@ -261,30 +262,56 @@ export class CraftingListingBuilder {
       return this._buildTeaserModel({ base, recipe, system, mode, hidden });
     }
 
+    // An explicit multi-step recipe stores its sets on `steps[]` and leaves the raw
+    // top-level `ingredientSets` empty; the listing therefore reads from the FIRST
+    // execution step (`getExecutionSteps()[0]`). For a single-step recipe that step's
+    // `ingredientSets` is the same array as `recipe.ingredientSets`, so this is a
+    // generalization, not a special case. See the Multi-Step Recipe Presentation spec.
+    const firstStep = this._firstStep(recipe);
+    const firstStepSets = Array.isArray(firstStep?.ingredientSets) ? firstStep.ingredientSets : [];
+
     // Per-set craftability (essences + per-set tools + actor-bound currency probe
     // all folded in by evaluateCraftability's per-set pass).
-    const ingredientSets = recipe.ingredientSets.map((set, idx) => ({
+    const ingredientSets = firstStepSets.map((set, idx) => ({
       id: stringOrNull(set.id),
       label:
         stringOrEmpty(set.name) ||
         this.localize('FABRICATE.App.Crafting.IngredientSetFallback', {
           index: idx + 1,
         }),
-      craftability: this._evaluateSet({ recipe, set, craftSources, craftingActor }),
+      craftability: this._evaluateSet({
+        recipe,
+        set,
+        step: firstStep,
+        craftSources,
+        craftingActor,
+      }),
       // The products this set routes to (routed-by-ingredients). Empty for
       // routedByCheck, whose output is per outcome tier, not per set.
-      products: mode === 'routedByCheck' ? [] : this._productsForSet({ recipe, system, set }),
+      products:
+        mode === 'routedByCheck'
+          ? []
+          : this._productsForSet({ recipe, system, set, step: firstStep }),
     }));
 
+    // Craft-button craftability evaluates the first step's sets over the UNION of
+    // recipe-level and step-level tool ids (the same view the engine crafts against),
+    // bypassing RecipeManager's `ingredientSets.length === 0` early return for a
+    // stepped recipe.
     const fullCraftability =
-      this.recipeManager?.evaluateCraftability?.(craftSources, recipe, { craftingActor }) ?? null;
+      this.recipeManager?.evaluateCraftability?.(
+        craftSources,
+        this._stepRecipeView(recipe, firstStep),
+        {
+          craftingActor,
+        }
+      ) ?? null;
     const canCraftMaterials = fullCraftability?.canCraft === true;
     const defaultSetId =
-      stringOrNull(fullCraftability?.satisfiableSet?.id) ??
-      stringOrNull(recipe.ingredientSets?.[0]?.id);
+      stringOrNull(fullCraftability?.satisfiableSet?.id) ?? stringOrNull(firstStepSets?.[0]?.id);
     const defaultSet =
-      recipe.ingredientSets.find((set) => stringOrNull(set.id) === defaultSetId) ??
-      recipe.ingredientSets?.[0] ??
+      firstStepSets.find((set) => stringOrNull(set.id) === defaultSetId) ??
+      firstStepSets?.[0] ??
       null;
 
     const exhausted =
@@ -305,9 +332,14 @@ export class CraftingListingBuilder {
       blockingReasons,
       ingredientSets,
       defaultSetId,
-      check: this._buildCheck(system, mode, craftingActor),
+      check: this._buildCheck(system, mode, recipe, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
+      duration: this._buildDuration({ recipe, system, mode }),
       result: this._buildResult({ recipe, system, mode, defaultSet }),
+      // Per-step requirement projection (`simple` multi-step only; [] otherwise). Each
+      // entry carries the step's label, its per-set craftability (tool union applied)
+      // and the components it produces. See Multi-Step Recipe Presentation.
+      steps: this._buildSteps({ recipe, system, mode, craftSources, craftingActor }),
       // The ordered stage list (progressive only; [] otherwise) — the F1 fix.
       progressiveStages: this._buildProgressiveStages({ recipe, system, mode }),
       // GM policy: may this player reorder the stages? Default true (issue 651).
@@ -330,13 +362,18 @@ export class CraftingListingBuilder {
     const showIngredients = !hidden.has('ingredients');
     const showResults = !hidden.has('results');
     const showDescription = !hidden.has('description');
+    // Source the (non-redacted) set list from the first execution step, matching the
+    // full projection above; step-level requirement detail is never computed for a
+    // teaser (`steps: []`), redacted exactly as `result`/`outcomeTiers`.
+    const firstStep = this._firstStep(recipe);
+    const firstStepSets = Array.isArray(firstStep?.ingredientSets) ? firstStep.ingredientSets : [];
     return {
       ...base,
       flavor: showDescription ? stringOrEmpty(recipe.description) : '',
       browseStatus: CRAFTING_BROWSE_STATUS.DISCOVERY,
       blockingReasons: this._blockingReasons(CRAFTING_BROWSE_STATUS.DISCOVERY),
       ingredientSets: showIngredients
-        ? recipe.ingredientSets.map((set, idx) => ({
+        ? firstStepSets.map((set, idx) => ({
             id: stringOrNull(set.id),
             label:
               stringOrEmpty(set.name) ||
@@ -345,14 +382,19 @@ export class CraftingListingBuilder {
           }))
         : [],
       defaultSetId: null,
-      check: showResults ? this._buildCheck(system, mode) : null,
+      // Timing is always spoiler detail for a Discovery-Mode teaser, independent
+      // of the configurable result-field redaction list.
+      duration: null,
+      // A teaser surfaces no step data, redacted exactly as `result`/`outcomeTiers`.
+      steps: [],
+      check: showResults ? this._buildCheck(system, mode, recipe) : null,
       outcomeTiers: showResults ? this._buildOutcomeTiers({ recipe, system, mode }) : null,
       result: showResults
         ? this._buildResult({
             recipe,
             system,
             mode,
-            defaultSet: recipe.ingredientSets?.[0] ?? null,
+            defaultSet: firstStepSets?.[0] ?? null,
           })
         : { items: [], timeLabel: null, xp: null },
       // Redacted exactly as `result`/`outcomeTiers` above. A teaser is shown to a player
@@ -375,16 +417,127 @@ export class CraftingListingBuilder {
    * recipe-wide satisfiable set.
    * @private
    */
-  _evaluateSet({ recipe, set, craftSources, craftingActor }) {
+  _evaluateSet({ recipe, set, step = null, craftSources, craftingActor }) {
     if (typeof this.recipeManager?.evaluateCraftability !== 'function') return null;
     // A shallow copy preserves the recipe's data fields (craftingSystemId,
-    // toolIds, currencyCost, …) and the IngredientSet instance methods, while
-    // narrowing the evaluation to this one set. evaluateCraftability reads recipe
-    // data only (never recipe prototype methods), so the copy is sufficient.
-    const singleSetRecipe = { ...recipe, ingredientSets: [set] };
+    // currencyCost, …) and the IngredientSet instance methods, while narrowing the
+    // evaluation to this one set and applying the owning step's tool union (D1) —
+    // evaluateCraftability reads recipe data only (never recipe prototype methods),
+    // so the copy is sufficient. When no step is supplied (single-step callers) it
+    // defaults to the first execution step, preserving current behaviour.
+    const owningStep = step ?? this._firstStep(recipe);
+    const singleSetRecipe = { ...this._stepRecipeView(recipe, owningStep), ingredientSets: [set] };
     return this.recipeManager.evaluateCraftability(craftSources, singleSetRecipe, {
       craftingActor,
     });
+  }
+
+  /**
+   * A read-side mirror of `CraftingEngine._buildStepRecipeView`: a shallow copy of
+   * the recipe narrowed to one execution step's sets/result groups, with the tool
+   * ids as the UNION of recipe-level and step-level ids (deduped downstream by
+   * `RecipeManager.getToolsForSet`). The union — NOT a step-else-recipe fallback —
+   * is what the engine consumes at craft time, so the projection must evaluate
+   * against the same tool set or the tile would disagree with the craft (D1).
+   * @private
+   */
+  _stepRecipeView(recipe, step) {
+    return {
+      ...recipe,
+      ingredientSets: Array.isArray(step?.ingredientSets)
+        ? step.ingredientSets
+        : recipe.ingredientSets,
+      resultGroups: Array.isArray(step?.resultGroups) ? step.resultGroups : recipe.resultGroups,
+      toolIds: [
+        ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
+        ...(Array.isArray(step?.toolIds) ? step.toolIds : []),
+      ],
+    };
+  }
+
+  /**
+   * Project a positive authored duration into the listing's canonical five-field
+   * shape. Zero-only and absent requirements are instant and surface as null.
+   * @private
+   */
+  _durationOrNull(timeRequirement) {
+    if (!timeRequirement || typeof timeRequirement !== 'object') return null;
+    const duration = Object.fromEntries(
+      TIME_REQUIREMENT_FIELDS.map((field) => [
+        field,
+        Math.max(0, Number(timeRequirement[field] || 0) || 0),
+      ])
+    );
+    return TIME_REQUIREMENT_FIELDS.some((field) => duration[field] > 0) ? duration : null;
+  }
+
+  /**
+   * The effective recipe-level duration shown before crafting. Authored shape is
+   * authoritative: an implicit recipe uses its recipe-level requirement, while an
+   * explicit simple-mode sequence sums authored step units field-wise. Other
+   * explicit shapes have no safe recipe-level projection. Calendar-dependent unit
+   * conversion is left to the execution layer.
+   * @private
+   */
+  _buildDuration({ recipe, system, mode }) {
+    if (system?.requirements?.time?.enabled === false) return null;
+    const authoredSteps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    if (authoredSteps.length === 0) return this._durationOrNull(recipe?.timeRequirement);
+    if (mode !== 'simple' || authoredSteps.length <= 1) return null;
+
+    const aggregate = Object.fromEntries(TIME_REQUIREMENT_FIELDS.map((field) => [field, 0]));
+    for (const step of authoredSteps) {
+      const duration = this._durationOrNull(step?.timeRequirement);
+      if (!duration) continue;
+      for (const field of TIME_REQUIREMENT_FIELDS) aggregate[field] += duration[field];
+    }
+    return this._durationOrNull(aggregate);
+  }
+
+  /**
+   * The per-step requirement projection surfaced to the `simple`-mode detail body.
+   * Empty for single-step recipes and for every non-`simple` mode. `simple` enforces
+   * exactly one ingredient set per step, so each entry carries exactly one set.
+   * @private
+   */
+  _buildSteps({ recipe, system, mode, craftSources, craftingActor }) {
+    if (mode !== 'simple') return [];
+    const steps = this._executionSteps(recipe);
+    if (steps.length <= 1) return [];
+    return steps.map((step, index) => {
+      const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
+      return {
+        id: stringOrNull(step?.id),
+        label: this._stepLabel(step, index),
+        duration:
+          system?.requirements?.time?.enabled === false
+            ? null
+            : this._durationOrNull(step?.timeRequirement),
+        ingredientSets: sets.map((set, setIdx) => ({
+          id: stringOrNull(set.id),
+          label:
+            stringOrEmpty(set.name) ||
+            this.localize('FABRICATE.App.Crafting.IngredientSetFallback', { index: setIdx + 1 }),
+          craftability: this._evaluateSet({ recipe, set, step, craftSources, craftingActor }),
+          products: this._productsForSet({ recipe, system, set, step }),
+        })),
+        // Retained deliberately as groundwork for a future non-`simple` step renderer
+        // (intermediate yields are meaningful there) and to keep the entry shape
+        // symmetric with `ingredientSets[]`; not rendered under the inputs-only body.
+        products: this._productsForSet({ recipe, system, set: sets[0] ?? null, step }),
+      };
+    });
+  }
+
+  /**
+   * A step's display label: the author-given name, else its 1-based position (never
+   * the internal id), mirroring `ResolutionModeService._entityLabel`.
+   * @private
+   */
+  _stepLabel(step, index) {
+    const name = typeof step?.name === 'string' ? step.name.trim() : '';
+    if (name) return name;
+    return this.localize('FABRICATE.App.Crafting.Detail.StepFallback', { index: index + 1 });
   }
 
   /**
@@ -414,9 +567,29 @@ export class CraftingListingBuilder {
    * The crafting-check descriptor for the recipe's resolution mode, or null when
    * the system configures no check block for that mode. `usable` is true iff an
    * authored, non-empty roll formula exists — NOT the legacy `enabled` flag.
+   *
+   * The displayed `dc` is resolved per-recipe (not per-system) with the same
+   * precedence the engine (`CraftingEngine._resolveSimpleCheckDc`) and the GM
+   * manager (`_buildRecipeCheckSummary`) use: the recipe's selected difficulty tier
+   * (`recipe.checkTierId` → the matching `config.tiers[].dc`) wins, falling back to
+   * the slot's static `config.dc`; both the tier DC and a finite static DC are
+   * truncated to an integer. A routed-fixed check and a dynamic (macro-resolved) DC
+   * both report `dc: null` (no chip): a fixed check matches by value range, and a
+   * dynamic DC is resolved at craft time — this read-only builder never runs the
+   * macro. Unlike the engine/GM row, a slot with a `rollFormula` but no finite
+   * static `dc` reports `null` rather than the hardcoded `15` fallback — a
+   * deliberate display-only divergence so the listing never surfaces a DC chip
+   * where none is authored.
+   *
+   * @param {object} system - The resolved crafting system.
+   * @param {string} mode - The system's resolution mode.
+   * @param {object} recipe - The recipe being projected (drives tier-DC selection).
+   * @param {object|null} [craftingActor] - The acting character, for @-placeholder
+   *   resolution of the display formula. Omitted (null) for a teaser projection so
+   *   formula resolution stays suppressed.
    * @private
    */
-  _buildCheck(system, mode, craftingActor = null) {
+  _buildCheck(system, mode, recipe, craftingActor = null) {
     const checks = system?.craftingCheck ?? {};
     // Alchemy selects its check slot from the SYSTEM-level `alchemy.checkMode`:
     // none → no check card, simple → the pass/fail slot, tiered → the routed slot.
@@ -468,6 +641,12 @@ export class CraftingListingBuilder {
       (mode === 'alchemy' && (alchemyCheckMode === 'simple' || alchemyCheckMode === 'tiered'));
     const checksEnabled =
       system?.features?.craftingChecks === true || system?.craftingCheck?.enabled === true;
+    // Suppress the empty DC-only card for a disabled, formula-less optional check (the
+    // Tent case): nothing renders when the mode does not require a check, no roll
+    // formula is authored, and checks are not enabled. A mandatory-by-mode check, an
+    // authored formula (`usable`), or `checksEnabled === true` (which keeps the "no
+    // roll formula configured" GM note) all still surface.
+    if (!requiredByMode && !usable && !checksEnabled) return null;
     const mandatory = requiredByMode
       ? true
       : mode === 'routedByIngredients'
@@ -479,7 +658,14 @@ export class CraftingListingBuilder {
     // false when the formula does not reduce to a number for this actor (error state).
     const resolution =
       rollFormula.length > 0 && craftingActor
-        ? this._resolveCheckFormula(rollFormula, craftingActor)
+        ? this._resolveCheckFormula(rollFormula, craftingActor, {
+            // The `@craftingmod` context (issue 770): resolve the same scalar the
+            // engine rolls, so the displayed formula matches what evaluates.
+            catalogue: checks.checkModifiers,
+            systemPolicy: checks.defaultModifierPolicy,
+            defaultModifierIds: checks.defaultModifierIds,
+            recipeModifier: recipe?.craftingModifier ?? null,
+          })
         : null;
     // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
     // range, not DC, so it has no meaningful DC — null it so the player card hides
@@ -487,8 +673,14 @@ export class CraftingListingBuilder {
     const routedFixed =
       (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
       config.type === 'fixed';
+    // Resolve the displayed DC AFTER the #765 suppression guard above (never
+    // reorder it there): routed-fixed and dynamic-DC checks surface no chip
+    // (`null`); otherwise the recipe's tier DC wins over the static fallback. See
+    // the method JSDoc and `_resolveDisplayDc`.
+    const dc =
+      routedFixed || config.dcMode === 'dynamic' ? null : this._resolveDisplayDc(config, recipe);
     return {
-      dc: routedFixed ? null : (config.dc ?? null),
+      dc,
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
       resolvedFormula: resolution?.display ?? null,
       formulaResolved: resolution ? resolution.resolved === true : null,
@@ -497,6 +689,33 @@ export class CraftingListingBuilder {
       mandatory,
       usable,
     };
+  }
+
+  /**
+   * The DC to display for a resolved check `config`, mirroring the engine's
+   * `_resolveSimpleCheckDc` tier/static precedence for the tier and integer-static
+   * cases: the recipe's selected difficulty tier (`recipe.checkTierId` → matching
+   * `config.tiers[].dc`, truncated) wins, else the finite static `config.dc`
+   * (truncated). Unlike the engine/GM row, a slot with no finite static `dc`
+   * returns `null` (no chip) rather than the hardcoded `15` — a deliberate
+   * display-only divergence. The absent-`dc` cases are asymmetric: a `null`
+   * static `dc` coerces to `0` (finite) and shows a DC 0 chip, while `undefined`
+   * reaches the `?? null` tail and yields `null`. A non-finite yet PRESENT
+   * `config.dc` (e.g. a stray authored string) surfaces verbatim through that
+   * same tail rather than becoming `15` — the accepted residual, since the
+   * builder never invents a DC the recipe never declared. Callers resolve the
+   * routed-fixed and dynamic-DC `null` cases before this.
+   * @private
+   */
+  _resolveDisplayDc(config, recipe) {
+    const tierId = recipe?.checkTierId;
+    if (tierId) {
+      const tiers = Array.isArray(config.tiers) ? config.tiers : [];
+      const tier = tiers.find((entry) => entry?.id === tierId);
+      const tierDc = Number(tier?.dc);
+      if (tier && Number.isFinite(tierDc)) return Math.trunc(tierDc);
+    }
+    return Number.isFinite(Number(config.dc)) ? Math.trunc(Number(config.dc)) : (config.dc ?? null);
   }
 
   /**
@@ -573,13 +792,33 @@ export class CraftingListingBuilder {
    * @private
    */
   _buildResult({ recipe, system, mode, defaultSet }) {
-    // routedByCheck output is per outcome tier (see outcomeTiers), so the top-level
-    // item list is empty.
-    const items =
-      mode === 'routedByCheck' ? [] : this._productsForSet({ recipe, system, set: defaultSet });
-    // timeLabel is calendar-aware and deferred to the UI slice; the raw duration
-    // requirement is surfaced for that formatting step.
-    return { items, time: recipe.timeRequirement ?? null, timeLabel: null, xp: null };
+    return {
+      items: this._resultItems({ recipe, system, mode, defaultSet }),
+      timeLabel: null,
+      xp: null,
+    };
+  }
+
+  /**
+   * The recipe's top-level expected output rows. `routedByCheck` is per outcome tier
+   * (empty top-level list). In `simple` mode the output is the recipe's FINAL product,
+   * so it resolves against the terminal execution step and that step's own set (simple
+   * resolution ignores the set, yielding the terminal step's success group). Every
+   * other mode resolves the first step against `defaultSet`, unchanged.
+   * @private
+   */
+  _resultItems({ recipe, system, mode, defaultSet }) {
+    if (mode === 'routedByCheck') return [];
+    if (mode === 'simple') {
+      const terminalStep = this._terminalStep(recipe);
+      return this._productsForSet({
+        recipe,
+        system,
+        set: terminalStep?.ingredientSets?.[0] ?? null,
+        step: terminalStep,
+      });
+    }
+    return this._productsForSet({ recipe, system, set: defaultSet });
   }
 
   /**
@@ -589,20 +828,41 @@ export class CraftingListingBuilder {
    * per-option product grid and the default set's expected output.
    * @private
    */
-  _productsForSet({ recipe, system, set }) {
-    const step = this._firstStep(recipe);
+  _productsForSet({ recipe, system, set, step = null }) {
+    const resolvedStep = step ?? this._firstStep(recipe);
     const resolved = this.resolutionModeService?.resolveResultGroups?.({
       recipe,
-      step,
+      step: resolvedStep,
       ingredientSet: set,
       checkResult: null,
     });
     return this._resultItemsFromGroups(resolved?.groups, system);
   }
 
-  _firstStep(recipe) {
+  /**
+   * The recipe's execution steps (real per-step `IngredientSet`/`ResultGroup`
+   * instances). A single-step recipe returns one synthesized implicit step whose
+   * arrays are the recipe's own top-level arrays.
+   * @private
+   */
+  _executionSteps(recipe) {
     const steps = this.resolutionModeService?.getExecutionSteps?.(recipe);
-    return Array.isArray(steps) && steps.length > 0 ? steps[0] : null;
+    return Array.isArray(steps) ? steps : [];
+  }
+
+  _firstStep(recipe) {
+    const steps = this._executionSteps(recipe);
+    return steps.length > 0 ? steps[0] : null;
+  }
+
+  /**
+   * The terminal (final) execution step — the recipe's product-bearing step. For a
+   * single-step recipe this is the same synthesized implicit step as `_firstStep`.
+   * @private
+   */
+  _terminalStep(recipe) {
+    const steps = this._executionSteps(recipe);
+    return steps.length > 0 ? steps.at(-1) : null;
   }
 
   /**

@@ -455,15 +455,18 @@ test('shared-base multi-group recipes sharing one base component → no conflict
 });
 
 // ---------------------------------------------------------------------------
-// 18. Subset group requirements ARE a collision (issue 547)
+// 18. Strict subset group requirements are ALLOWED (issue 774 — INVERTS 547)
 //
-// A set whose group requirements are a subset of another set's is genuine
-// ambiguity: every submission satisfying the larger set also satisfies the
-// smaller one (runtime matching is superset-tolerant), so the smaller recipe
-// can never be reached distinctly. Must still be rejected.
+// A set whose group requirements are a STRICT subset of another's is now
+// distinguishable at runtime: the overlap is one-directional (only the larger
+// set's transversal satisfies the smaller, never the reverse), so the
+// most-specific matcher brews the larger set when its extra ingredient is present
+// and the smaller when it is not. The enable-time guard rejects only the SYMMETRIC
+// (inseparable) case, so this pair must ENABLE. (Previously issue 547 rejected it
+// under the superset-tolerant first-match runtime.)
 // ---------------------------------------------------------------------------
 
-test('subset group requirements → conflict (issue 547)', () => {
+test('strict subset group requirements → ALLOWED (issue 774, inverts 547)', () => {
   const components = [makeComponent('comp-water'), makeComponent('comp-herb')];
 
   // Set X: single group {Water}
@@ -471,7 +474,7 @@ test('subset group requirements → conflict (issue 547)', () => {
     makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-water' })])]),
   ]);
 
-  // Set Y: groups {Water}, {Herb} — X's requirement is a subset of Y's
+  // Set Y: groups {Water}, {Herb} — X's requirement is a STRICT subset of Y's.
   const recipeY = makeRecipe('r-y', 'Herbal Water Brew', [
     makeIngredientSet([
       makeGroup([makeIngredient('component', { componentId: 'comp-water' })]),
@@ -483,19 +486,29 @@ test('subset group requirements → conflict (issue 547)', () => {
   const validator = buildValidator(system, [recipeX, recipeY], components);
 
   const result = validator.validateSystem('sys-1');
-  assert.equal(result.valid, false, 'Subset group requirements must be rejected');
-  assert.ok(result.conflicts.length > 0);
+  assert.equal(
+    result.valid,
+    true,
+    `Strict subset/superset is one-directional and disambiguated by the runtime; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
 });
 
 // ---------------------------------------------------------------------------
-// 19. Multi-group joint satisfiability across option-alternatives (issue 547)
+// 19. OR-option shadowing stays INSEPARABLE (issue 774 — NOT inverted)
 //
-// When one set's group is a subset (in component-id terms) of the covering
-// set's corresponding group for EVERY covering group, every submission that
-// satisfies the dependent set also satisfies the covering set → collision.
+// dependent={Water},{Herb} vs covering={Water},{Herb OR Mineral}. This is NOT a
+// clean strict subset: the OR option makes the overlap SYMMETRIC. covering's own
+// natural craft can be Water+Herb (it may pick the Herb arm), which satisfies
+// dependent; and dependent's Water+Herb satisfies covering. Neither dominates, so
+// under the runtime's most-specific pick a Water+Herb submission would FIZZLE and
+// dependent could NEVER be brewed distinctly (every dependent submission also
+// matches covering). The `&&` guard therefore still REJECTS this pair — it is the
+// inseparable case an added ingredient cannot resolve. (Contrast test 18: a strict
+// subset with no OR is one-directional and allowed.)
 // ---------------------------------------------------------------------------
 
-test('multi-group joint satisfiability: dependent groups subset covering groups → conflict', () => {
+test('OR-option covering shadows a narrower set → conflict (issue 774, symmetric inseparable)', () => {
   const components = [
     makeComponent('comp-water'),
     makeComponent('comp-herb'),
@@ -527,7 +540,11 @@ test('multi-group joint satisfiability: dependent groups subset covering groups 
   const validator = buildValidator(system, [dependent, covering], components);
 
   const result = validator.validateSystem('sys-1');
-  assert.equal(result.valid, false, 'Dependent-subsumed-by-covering must be rejected');
+  assert.equal(
+    result.valid,
+    false,
+    'Symmetric (OR-option) shadowing is inseparable and must be rejected'
+  );
   assert.ok(result.conflicts.length > 0);
 });
 
@@ -582,17 +599,17 @@ test('shared base with disjoint option-alternative second groups → no conflict
 });
 
 // ---------------------------------------------------------------------------
-// 21. quantity>=2 multi-component group joint satisfiability (issue 547 follow-up)
+// 21. quantity>=2 multi-component group is ALLOWED (issue 774 — INVERTS 547)
 //
-// A `quantity: 2` "metal"-tag group is naturally crafted with TWO DISTINCT metal
-// components (iron + gold). That single craft also fully satisfies a second
-// recipe whose two single-component groups are {iron} and {gold}, so the runtime
-// (first-match) would silently brew the wrong recipe. The transversal test must
-// let a quantity>=2 group contribute multiple distinct components, or it
-// under-rejects this genuine ambiguity.
+// A `quantity: 2` "metal"-tag group naturally crafted iron+gold plus {salt},{pepper}
+// (recipe A) fully satisfies recipe B={iron},{gold}. But the overlap is
+// one-directional: B's iron+gold cannot supply A's salt+pepper, so A strictly
+// DOMINATES B. The most-specific runtime brews A for the iron+gold+salt+pepper
+// craft and B for a bare iron+gold craft — both are reachable — so the enable-time
+// guard now ALLOWS the pair. (Previously issue 547 rejected it under first-match.)
 // ---------------------------------------------------------------------------
 
-test('quantity>=2 multi-component group vs its distinct components → conflict (issue 547)', () => {
+test('quantity>=2 multi-component group vs its distinct components → ALLOWED (issue 774, inverts 547)', () => {
   const components = [
     makeComponent('comp-iron', ['metal']),
     makeComponent('comp-gold', ['metal']),
@@ -609,7 +626,7 @@ test('quantity>=2 multi-component group vs its distinct components → conflict 
     ]),
   ]);
 
-  // Recipe B: {iron}, {gold} — satisfied by iron+gold, which A's natural craft supplies.
+  // Recipe B: {iron}, {gold} — a strict subset of A's satisfiable craft.
   const recipeB = makeRecipe('r-b', 'Iron & Gold Brew', [
     makeIngredientSet([
       makeGroup([makeIngredient('component', { componentId: 'comp-iron' })]),
@@ -623,10 +640,10 @@ test('quantity>=2 multi-component group vs its distinct components → conflict 
   const result = validator.validateSystem('sys-1');
   assert.equal(
     result.valid,
-    false,
-    'A quantity>=2 multi-component craft that also fully matches another set must be rejected'
+    true,
+    `A strictly dominates B (one-directional), so the pair is separable and allowed; got: ${JSON.stringify(result.conflicts)}`
   );
-  assert.ok(result.conflicts.length > 0);
+  assert.equal(result.conflicts.length, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -668,6 +685,77 @@ test('quantity 1 multi-component group vs its distinct components → no conflic
     result.valid,
     true,
     `A quantity 1 metal group supplies only one unit and cannot satisfy {iron},{gold}; got: ${JSON.stringify(result.conflicts)}`
+  );
+  assert.equal(result.conflicts.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 23. tag/OR inseparable pair stays a conflict (issue 774 regression)
+//
+// A single `mithril` tagged BOTH `rare` and `metal` satisfies A={rare} and
+// B={metal} via the SAME one-item submission, in BOTH directions — the symmetric
+// inseparable case no ingredient can resolve. Must still be REJECTED.
+// ---------------------------------------------------------------------------
+
+test('tag/OR inseparable (mithril tagged rare AND metal) → conflict (issue 774)', () => {
+  const components = [makeComponent('comp-mithril', ['rare', 'metal'])];
+
+  const recipeA = makeRecipe('r-a', 'Rare Brew', [
+    makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['rare'], tagMatch: 'any' })])]),
+  ]);
+  const recipeB = makeRecipe('r-b', 'Metal Brew', [
+    makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['metal'], tagMatch: 'any' })])]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [recipeA, recipeB], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(result.valid, false, 'a single item satisfying both tags is inseparable → reject');
+  assert.ok(result.conflicts.length > 0);
+});
+
+// ---------------------------------------------------------------------------
+// 24. Incomparable siblings are ALLOWED (issue 774)
+//
+// B={S,V,E} and C={S,V,R} share a base {S,V} but their third groups are disjoint.
+// Neither transversal satisfies the other (E ≠ R), so neither dominates and the
+// pair is separable: adding E brews B, adding R brews C. An ambiguous
+// over-submission {S,V,E,R} fizzles at runtime (covered by the engine tests), not
+// a wrong brew. The enable-time guard must ALLOW the pair.
+// ---------------------------------------------------------------------------
+
+test('incomparable siblings {S,V,E} / {S,V,R} → ALLOWED (issue 774)', () => {
+  const components = [
+    makeComponent('comp-s'),
+    makeComponent('comp-v'),
+    makeComponent('comp-e'),
+    makeComponent('comp-r'),
+  ];
+
+  const brewB = makeRecipe('r-b', 'Brew B', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-s' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-v' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-e' })]),
+    ]),
+  ]);
+  const brewC = makeRecipe('r-c', 'Brew C', [
+    makeIngredientSet([
+      makeGroup([makeIngredient('component', { componentId: 'comp-s' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-v' })]),
+      makeGroup([makeIngredient('component', { componentId: 'comp-r' })]),
+    ]),
+  ]);
+
+  const system = { id: 'sys-1', resolutionMode: 'alchemy' };
+  const validator = buildValidator(system, [brewB, brewC], components);
+
+  const result = validator.validateSystem('sys-1');
+  assert.equal(
+    result.valid,
+    true,
+    `Incomparable siblings are distinguishable and must both enable; got: ${JSON.stringify(result.conflicts)}`
   );
   assert.equal(result.conflicts.length, 0);
 });

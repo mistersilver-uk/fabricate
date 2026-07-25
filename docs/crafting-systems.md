@@ -27,10 +27,25 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 |:-----------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Name**                     | Display name shown in the UI                                                                                                                       |
 | **Description**              | Optional flavour text                                                                                                                              |
-| **Recipe resolution mode**   | How recipes produce results: Simple, Routed by ingredients, Routed by check, Progressive, or Alchemy. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
-| **Salvage resolution mode**  | How salvaging a component awards results: Simple (default), Progressive, or Routed by check. See [Salvage]({% link salvage.md %}#salvage-resolution-mode) |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The recipe and salvage resolution modes are not set on this screen.
+They live on the **Settings** page of the **Crafting** menu.
+See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) and [Salvage]({% link salvage.md %}#salvage-resolution-mode).
+
+The **Name** and **Description** you type are held until you click **Save details**.
+An **Unsaved** chip appears beside that button while either field differs from what is stored, and it clears once the save goes through.
+
+If you navigate away, or switch to another crafting system, while the **Unsaved** chip is showing, Fabricate asks what to do first.
+**Save** stores the pending name and description and then continues.
+**Discard Changes** puts both fields back to their stored values and then continues.
+**Keep Editing** cancels the move and leaves your typing intact.
+Moving between the tabs of the same system keeps what you typed and does not ask, because you have not left the form.
+
+While you have unsaved details open, a change made to the same system somewhere else is not merged into the fields you are editing.
+Saving replaces it with your values, so finish or discard your edit before picking up someone else's.
+The other cards on this screen, such as the feature toggles and the currency editor, apply as soon as you change them and are never part of this prompt.
 
 ### Tags And Categories
 
@@ -137,10 +152,14 @@ Fabricate also re-checks recipe ingredient signatures so any overlap that would 
 
 After the change, Fabricate shows a summary of how many recipes were migrated, and a separate warning listing any recipes it had to delete.
 
-Changing the **salvage resolution mode** is not destructive.
+Changing the **salvage resolution mode** is not destructive to recipes or runs.
 No recipes or runs are deleted.
 Any component whose salvage setup is incompatible with the new mode simply has its salvage disabled, and can be re-enabled once it is reconfigured.
 You will be asked to confirm.
+
+Switching a system **into** Simple mode is the one case that changes component setups.
+Simple mode awards a single result group, so any component that has more than one is trimmed back to its first when you switch.
+Fabricate warns you by name when this happens, listing every component it trimmed, so nothing is dropped silently.
 
 The **Salvage resolution mode** card offers Simple (the default), Progressive, and Routed by check.
 A salvaged component has a single ingredient, so ingredient-set routing (and Alchemy) does not apply and is not offered.
@@ -189,7 +208,7 @@ See [Effect Transfer]({% link effect-transfer.md %}) for how the feature is enab
 
 ### Recipe Visibility
 
-Recipe visibility controls which players can see and access recipes through the visibility service and planned player Crafting UI.
+Recipe visibility controls which players can see and access recipes in the player Crafting tab, backed by the visibility service.
 You configure this per crafting system in the **Recipe Visibility** card on the **Settings** page of the **Crafting** menu.
 The Crafting menu is always available for every crafting system.
 See [The Crafting Menu](#the-crafting-menu).
@@ -503,13 +522,15 @@ You turn them on or off with the **Time requirements** toggle in the **Optional 
 {: .note }
 > Fabricate shows the duration editors on a recipe only while time requirements are enabled for the system.
 > Turning them off later does not delete the durations you have already authored.
-> Each one stays visible as a read-only value, and a step no longer waits on time until you re-enable time requirements.
+> The authored values stay visible as read-only values in GM authoring summaries, and a step no longer waits on time until you re-enable time requirements.
 
 ### Currency Requirements
 
-When you enable currency requirements, a recipe step can cost an amount of a currency unit you define.
-Fabricate checks whether the crafting actor can afford the step before the craft begins, then spends the cost when the step is taken.
-If the actor cannot pay, the step is blocked and the craft is stopped before any ingredients are consumed.
+When you enable currency requirements, a recipe ingredient can offer a currency cost as an alternative to its items.
+A crafter who does not have the items can pay the cost from their own coins instead.
+Fabricate tries each ingredient's item options first, and falls back to a currency cost only when no item option is satisfied.
+Before the craft begins, Fabricate checks whether the crafting actor can afford every currency cost the craft will use, then spends those costs after the item ingredients are consumed.
+If the actor cannot pay, the craft is stopped before anything is consumed and Fabricate reports that there is not enough currency.
 
 You configure currency in the system settings editor, in the **Currency units** card.
 
@@ -526,7 +547,7 @@ It offers three strategies, and you can pick any of them in any world, regardles
 A short hint under the selector describes the strategy you have chosen.
 
 - **Actor data path** reads each currency unit from a numeric field on the actor sheet, such as a Dungeons & Dragons 5e character's gold.
-  Fabricate makes its own change across the denominations you define, so a step priced in silver can be paid from gold and the difference returned in smaller coins.
+  Fabricate makes its own change across the denominations you define, so a cost priced in silver can be paid from gold and the difference returned in smaller coins.
 - **Actor inventory** treats coins as items the actor carries, read and spent through a preconfigured provider.
   This is the right choice for game systems such as Pathfinder 2e, where coins live in the inventory rather than in a single sheet field.
 - **Macro** drives currency with macros you write, for any game system.
@@ -539,7 +560,7 @@ When you choose **Actor inventory**, a **Provider** selector appears.
 A provider is a built-in adapter that already knows how to read and spend coins from your game system's inventory.
 Pathfinder 2e ships with one.
 When a provider is selected, it manages the denominations for you, so the unit list becomes a read-only **Provider-managed denominations** list.
-You can still reference those denominations by their abbreviation in a step's currency cost, but you cannot edit them here.
+You can still reference those denominations by their abbreviation in a currency cost, but you cannot edit them here.
 In a world whose game system has no provider, Fabricate shows a note steering you to the **Macro** strategy instead, and leaves your own units untouched.
 
 #### The currency macros (Macro)
@@ -553,17 +574,20 @@ You link each macro by dragging it from the Foundry macro directory onto a drop 
 - **Increment macro** is reserved for a future refund flow.
   You can link it now, but Fabricate does not run it yet.
 
-Each macro receives the step's cost, keyed by the abbreviation you gave each currency unit, so your macro can match coins by the same abbreviation you configured.
-If a macro reports failure or stops with an error, Fabricate blocks the step and the craft is stopped before any ingredients are consumed.
+Each macro receives the currency cost, keyed by the abbreviation you gave each currency unit, so your macro can match coins by the same abbreviation you configured.
+If a macro reports failure or stops with an error, Fabricate stops the craft before any ingredients are consumed.
 
 #### Defining currency units
 
 When you use the **Actor data path** or **Macro** strategy, you define your own currency units.
-Each unit has a label, an abbreviation, and an icon.
+Each unit has a label, an optional abbreviation, and an icon.
+The abbreviation is the short form shown on a currency cost.
+When you leave it blank, the cost shows the unit's full label instead.
 
 - Under **Actor data path**, each unit also names the field on the actor sheet that holds its balance.
 - Under **Macro**, units have no path or denomination.
-  Your macros match coins by abbreviation, so a note reminds you that conversion between units is handled by your macros.
+  Your macros match coins by abbreviation, so every unit must have one.
+  Fabricate reports a configuration error if a unit is missing its abbreviation, and a note reminds you that conversion between units is handled by your macros.
 
 You can also describe how units break down into smaller ones, such as one gold breaking down into ten silver.
 A unit with no breakdown is treated as a base denomination.

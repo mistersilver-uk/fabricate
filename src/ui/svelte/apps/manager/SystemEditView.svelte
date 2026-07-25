@@ -9,6 +9,7 @@
   the whole crafting manager admin is GM-scoped.
 -->
 <script>
+  import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
@@ -16,6 +17,11 @@
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import CharacterPrerequisitesCard from './system/CharacterPrerequisitesCard.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
+  import {
+    mapModifierToPrerequisite,
+    mapPrerequisiteToModifier,
+    stripExpressionSigil
+  } from '../../../../systems/characterModifierPrerequisiteCopy.js';
 
   let {
     selectedSystem = null,
@@ -37,18 +43,34 @@
     onSelectIssue = () => {},
     onShowSystemOverview = () => {},
     onSaveDetails = () => {},
+    // Lift the identity draft (Name + Description) up to the root so the Manager
+    // route-exit guard can persist it on a Save-and-navigate. Emitted on every
+    // input, mirroring the essence/component `onDraftChange` → root draft pattern.
+    onDetailsChange = () => {},
+    // Report the local dirty state up so the root can gate the route-exit guard. This
+    // is the root's ONLY dirtiness signal: the comparison is against the live
+    // `selectedSystem` projection and only this view holds the typed inputs, so the
+    // root cannot re-derive it from the lifted draft alone.
+    onDirtyChange = () => {},
+    // Bumped by the root (discard branch of the guard) to force the local inputs to
+    // re-seed from the persisted system even when the system id is unchanged. A
+    // counter rather than a flag, so a second discard on the SAME system still
+    // registers as a change (the `requestedTabNonce` idiom above).
+    reseedNonce = 0,
     onToggleFeature = async () => true,
     characterModifierLibrary = [],
     characterModifierPresetsSupported = false,
     onAddCharacterModifier = async () => null,
     onUpdateCharacterModifier = async () => {},
     onDeleteCharacterModifier = async () => {},
+    onReorderCharacterModifier = async () => {},
     onSeedCharacterModifierPresets = async () => {},
     characterPrerequisiteLibrary = [],
     characterPrerequisitePresetsSupported = false,
     onAddCharacterPrerequisite = async () => null,
     onUpdateCharacterPrerequisite = async () => {},
     onDeleteCharacterPrerequisite = async () => {},
+    onReorderCharacterPrerequisite = async () => {},
     onSeedCharacterPrerequisitePresets = async () => {},
     currencyUnits = [],
     currencyPresetsSupported = false,
@@ -59,6 +81,7 @@
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
     onDeleteCurrencyUnit = async () => {},
+    onReorderCurrencyUnit = async () => {},
     onAddCurrencySubUnit = async () => {},
     onUpdateCurrencySubUnit = async () => {},
     onDeleteCurrencySubUnit = async () => {},
@@ -177,6 +200,121 @@
   let currencySubUnitSelections = $state({});
   const ROLL_EXPRESSION_PATTERN_UI = /\bd\d|[*/()]/;
 
+  // Whole-section collapse (issue 768) — a session-local Set keyed by section name
+  // ('modifiers' | 'prerequisites' | 'currency'), mirroring ComponentsBrowserView's
+  // `collapsedCategories`. In-memory only: preserved across store refresh, reset on
+  // system switch, NEVER persisted. Distinct from the prerequisites card's per-item
+  // accordion (`openId`) — this is a section-level wrapper. Collapse is opt-IN: a
+  // section absent from the set is expanded.
+  let collapsedSections = $state(new Set());
+  let lastCollapseSystemId = $state(null);
+  $effect(() => {
+    const currentId = selectedSystem?.id ?? null;
+    if (currentId !== lastCollapseSystemId) {
+      lastCollapseSystemId = currentId;
+      collapsedSections = new Set();
+    }
+  });
+  function toggleSectionCollapsed(section) {
+    const next = new Set(collapsedSections);
+    if (next.has(section)) next.delete(section);
+    else next.add(section);
+    collapsedSections = next;
+  }
+  function isSectionCollapsed(section) {
+    return collapsedSections.has(section);
+  }
+  function expandSection(section) {
+    if (!collapsedSections.has(section)) return;
+    const next = new Set(collapsedSections);
+    next.delete(section);
+    collapsedSections = next;
+  }
+
+  // Cross-list copy (issue 768). A copy is an ADD into the destination store via
+  // its existing (normalizing, id-generating) add op, then the new entry is opened
+  // in edit mode in the target card so the dropped pass/fail-or-roll logic is an
+  // honest, visible gap rather than a silent loss. `copyAnnouncement` drives a
+  // shared aria-live region; a nonce forces the prerequisites card to open the
+  // freshly-added entry even when its id-run is unchanged.
+  let copyAnnouncement = $state('');
+  let prereqRequestOpenId = $state('');
+  let prereqRequestOpenNonce = $state(0);
+
+  function announceCopy(name) {
+    copyAnnouncement = localize('FABRICATE.Admin.Manager.ListErgonomics.CopiedAnnouncement', {
+      name: String(name || '').trim()
+    });
+    if (
+      !copyAnnouncement ||
+      copyAnnouncement === 'FABRICATE.Admin.Manager.ListErgonomics.CopiedAnnouncement'
+    ) {
+      copyAnnouncement = `Copied ${String(name || '').trim()} and icon — set the condition.`;
+    }
+  }
+
+  // Manual reorder (issue 768) — Move-up/down chevron buttons on each settings-list
+  // row call the list's index-based store op (array order IS the persisted order),
+  // mirroring the accessible CompositionList pattern. One shared aria-live region
+  // announces the new position so the move is observable without sight of the
+  // reflowed list. `reorderList` is shared by all three lists so the announce +
+  // persist pattern lives in one place (no per-list duplication).
+  let reorderAnnouncement = $state('');
+  function announceReorder(name, position, total) {
+    reorderAnnouncement = localize('FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement', {
+      name: String(name || '').trim(),
+      position: String(position),
+      total: String(total)
+    });
+    if (
+      !reorderAnnouncement ||
+      reorderAnnouncement === 'FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement'
+    ) {
+      reorderAnnouncement = `Moved ${String(name || '').trim()} to position ${position} of ${total}.`;
+    }
+  }
+  async function reorderList(reorderOp, index, delta, name, total) {
+    const toIndex = index + delta;
+    await reorderOp(index, toIndex);
+    announceReorder(name, toIndex + 1, total);
+  }
+
+  // The copied entry opens in edit mode in the OTHER section (Prereqs sit below
+  // Modifiers, Modifiers above Prereqs), so for the long-list case this feature
+  // targets it can land off-screen — the aria-live confirmation would then be the
+  // ONLY signal (invisible to a sighted GM). After the target editor renders, scroll
+  // the new row into view and move focus to its first editable field so the visible
+  // confirmation matches the announced one. Scoped to this page's root (bound below)
+  // so a query never crosses into another mounted manager instance.
+  let pageRoot = $state(null);
+  async function revealCopiedEntry(selector) {
+    await tick();
+    const node = pageRoot?.querySelector?.(selector);
+    if (!node) return;
+    node.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    const focusTarget = node.querySelector?.('input, select, textarea');
+    focusTarget?.focus?.();
+  }
+
+  async function handleCopyModifierToPrerequisite(entry) {
+    const created = await onAddCharacterPrerequisite(mapModifierToPrerequisite(entry));
+    if (!created?.id) return;
+    expandSection('prerequisites');
+    prereqRequestOpenId = created.id;
+    prereqRequestOpenNonce += 1;
+    announceCopy(entry?.label);
+    await revealCopiedEntry(`[data-system-character-prerequisite="${created.id}"]`);
+  }
+
+  async function handleCopyPrerequisiteToModifier(entry) {
+    const created = await onAddCharacterModifier(mapPrerequisiteToModifier(entry));
+    if (!created?.id) return;
+    expandSection('modifiers');
+    characterModifierEditingId = created.id;
+    announceCopy(entry?.name);
+    await revealCopiedEntry(`[data-system-character-modifier="${created.id}"]`);
+  }
+
   const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
   const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true);
   // Time requirements default ON (issue 714): an absent flag reads as enabled, so only
@@ -238,6 +376,13 @@
 
   function characterModifierIsRoll(entry) {
     return Boolean(entry?.expression) && ROLL_EXPRESSION_PATTERN_UI.test(entry.expression);
+  }
+
+  // The collapsed summary row shows the expression with its leading `@` sigil
+  // stripped for a cleaner inline read (the raw `@`-prefixed value stays in the
+  // editor's Expression field — only the DISPLAY strips it).
+  function characterModifierExpressionDisplay(entry) {
+    return stripExpressionSigil(entry?.expression);
   }
 
   async function handleAddCharacterModifier() {
@@ -304,7 +449,7 @@
   function currencyUnitSubUnitOptions(unitId) {
     return currencyUnits
       .filter(entry => currencyCanAddSubUnit(unitId, entry.id))
-      .map(entry => ({ id: entry.id, label: entry.label || entry.id, abbreviation: entry.abbreviation || entry.id }));
+      .map(entry => ({ id: entry.id, label: entry.label || entry.id, abbreviation: entry.abbreviation || '' }));
   }
 
   function currencySelectedSubUnit(unitId) {
@@ -333,9 +478,38 @@
   let systemNameValue = $state('');
   let systemDescriptionValue = $state('');
 
+  // Seed the local inputs from the persisted system on IDENTITY change only (or a
+  // root-driven `reseedNonce` bump on discard), never on every `selectedSystem`
+  // reference change. The admin store publishes `viewState` twice on refresh (a
+  // sync publish then an async-enriched publish with a NEW `selectedSystem` object
+  // of the same id); a reference-triggered reseed would overwrite the GM's
+  // un-saved keystrokes on that second publish (and on any unrelated mid-edit
+  // refresh, e.g. a feature toggle). Gating on id/nonce keeps the typed value and
+  // lets `detailsDirty` clear naturally after Save re-publishes the projection.
+  let lastSeededSystemId = $state(null);
+  let appliedReseedNonce = $state(0);
   $effect(() => {
-    systemNameValue = selectedSystem?.name ?? '';
-    systemDescriptionValue = selectedSystem?.description ?? '';
+    const currentId = selectedSystem?.id ?? null;
+    if (currentId !== lastSeededSystemId || reseedNonce !== appliedReseedNonce) {
+      lastSeededSystemId = currentId;
+      appliedReseedNonce = reseedNonce;
+      systemNameValue = selectedSystem?.name ?? '';
+      systemDescriptionValue = selectedSystem?.description ?? '';
+    }
+  });
+
+  const detailsDirty = $derived(
+    (systemNameValue ?? '') !== (selectedSystem?.name ?? '') ||
+      (systemDescriptionValue ?? '') !== (selectedSystem?.description ?? '')
+  );
+
+  // One-way up: mirror the typed values into the root draft and report dirtiness so
+  // the route-exit guard can Save (from the lifted draft) or Discard on navigate.
+  $effect(() => {
+    onDetailsChange(systemNameValue, systemDescriptionValue);
+  });
+  $effect(() => {
+    onDirtyChange(detailsDirty);
   });
 
   const featureDefinitions = [
@@ -347,6 +521,18 @@
     { systemKey: 'effectTransfer', storeKey: 'effectTransfer', icon: 'fas fa-wand-sparkles', labelKey: 'FABRICATE.Admin.Manager.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' },
     { systemKey: 'chatOutput', storeKey: 'chatOutput', icon: 'fas fa-comment', labelKey: 'FABRICATE.Admin.Manager.Feature.ChatOutput', fallback: 'Chat output', hintKey: 'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.ChatOutput', hintFallback: 'Posts a summary chat card after crafting and gathering attempts.' }
   ];
+
+  // Refund-on-player-cancel is authored NEXT TO Time requirements (rendered after it)
+  // and only applies to a TIMED craft — a player can only cancel an in-progress timed
+  // run — so its toggle is disabled while Time requirements is off (issue 848 follow-up).
+  const refundOnCancelFeature = {
+    systemKey: 'refundOnPlayerCancel',
+    storeKey: 'refundOnPlayerCancel',
+    labelKey: 'FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel',
+    fallback: 'Refund on player cancel',
+  };
+  const refundOnCancelVisible = $derived(hasFeatureKey(selectedSystem, 'refundOnPlayerCancel'));
+  const refundOnCancelEnabled = $derived(selectedSystem?.features?.refundOnPlayerCancel === true);
 
   const visibleFeatures = $derived(featureDefinitions.filter(feature => hasFeatureKey(selectedSystem, feature.systemKey)));
 
@@ -371,7 +557,7 @@
 </script>
 
 {#if selectedSystem}
-  <div class="manager-environment-edit-view manager-system-edit-view" data-system-editor>
+  <div class="manager-environment-edit-view manager-system-edit-view" data-system-editor bind:this={pageRoot}>
     <SystemEditorTabs {activeTab} badges={tabBadges} onSelect={(tab) => { activeTab = tab; }} />
 
     <div class="manager-environment-workspace manager-system-workspace is-inspector-hidden">
@@ -392,6 +578,8 @@
     </section>
 
     <form class="manager-system-edit-form" onsubmit={handleSubmit}>
+      <div class="visually-hidden" role="status" aria-live="polite" data-list-copy-announcement>{copyAnnouncement}</div>
+      <div class="visually-hidden" role="status" aria-live="polite" data-list-reorder-announcement>{reorderAnnouncement}</div>
       {#if systemBlocked}
         <div class="manager-environment-comp-callout manager-system-edit-blocker" role="note" data-system-edit-blocker>
           <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
@@ -407,10 +595,20 @@
       <section class="manager-edit-card">
         <div class="manager-edit-card-heading">
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.SystemEdit.Identity', 'Identity')}</h3>
-          <button type="submit" class="manager-button is-primary">
-            <i class="fas fa-save" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.SystemEdit.SaveDetails', 'Save details')}</span>
-          </button>
+          <!--
+            The heading is `justify-content: space-between`, so the chip must share a
+            flex-end action group with the Save button to hug it (the house idiom every
+            other dirty chip uses); a bare third child would float mid-heading.
+          -->
+          <div class="manager-action-group">
+            {#if detailsDirty}
+              <span class="manager-chip is-warning" data-system-details-dirty>{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</span>
+            {/if}
+            <button type="submit" class="manager-button is-primary">
+              <i class="fas fa-save" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.SystemEdit.SaveDetails', 'Save details')}</span>
+            </button>
+          </div>
         </div>
         <div class="manager-edit-grid">
           <label class="manager-field" for="manager-system-name">
@@ -475,6 +673,33 @@
               <small>{text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Time', 'Enables recipe and step duration (time requirement) authoring, and applies those durations when crafting.')}</small>
             </div>
           </div>
+          {#if refundOnCancelVisible}
+            <div class="manager-feature-tile" class:is-feature-disabled={!timeRequirementsEnabled} data-feature-key="refundOnPlayerCancel">
+              <span class={`manager-feature-tile-icon ${refundOnCancelEnabled ? 'is-on' : 'is-off'}`} aria-hidden="true"><i class="fas fa-rotate-left"></i></span>
+              <div class="manager-feature-tile-body">
+                <div class="manager-feature-tile-head">
+                  <strong>{text('FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel', 'Refund on player cancel')}</strong>
+                  <button
+                    type="button"
+                    class={`manager-status-toggle ${refundOnCancelEnabled ? 'is-on' : 'is-off'}`}
+                    aria-pressed={refundOnCancelEnabled}
+                    aria-label={text('FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel', 'Refund on player cancel')}
+                    data-system-refund-toggle
+                    disabled={!timeRequirementsEnabled}
+                    onclick={() => { if (timeRequirementsEnabled) handleToggleFeature(refundOnCancelFeature); }}
+                  >
+                    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                    <span class="manager-status-toggle-label">{refundOnCancelEnabled
+                      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+                  </button>
+                </div>
+                <small>{timeRequirementsEnabled
+                  ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.RefundOnPlayerCancel', 'Returns consumed ingredients and spent currency when a player cancels their in-progress craft. Turn off to forfeit inputs on cancel.')
+                  : text('FABRICATE.Admin.Manager.SystemEdit.FeatureHint.RefundOnPlayerCancelDisabled', 'Enable Time requirements to configure this — a player can only cancel a timed craft in progress.')}</small>
+              </div>
+            </div>
+          {/if}
           <div class="manager-feature-tile" data-feature-key="currency">
             <span class={`manager-feature-tile-icon ${currencyEnabled ? 'is-on' : 'is-off'}`} aria-hidden="true"><i class="fas fa-coins"></i></span>
             <div class="manager-feature-tile-body">
@@ -501,8 +726,20 @@
       </section>
 
       {#if gatheringEnabled}
-        <section class="manager-edit-card manager-character-modifier-card" data-system-character-modifiers aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title', 'Character modifiers')}>
+        {@const modifiersCollapsed = isSectionCollapsed('modifiers')}
+        <section class="manager-edit-card manager-character-modifier-card" class:is-section-collapsed={modifiersCollapsed} data-system-character-modifiers aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title', 'Character modifiers')}>
           <header class="manager-character-modifier-card-header">
+            <button
+              type="button"
+              class="manager-section-collapse-toggle"
+              aria-expanded={!modifiersCollapsed}
+              aria-controls="manager-section-body-modifiers"
+              aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.ToggleSection', 'Collapse or expand this section')}
+              data-section-collapse="modifiers"
+              onclick={() => toggleSectionCollapsed('modifiers')}
+            >
+              <i class={`fa-solid ${modifiersCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+            </button>
             <div class="manager-character-modifier-card-header-copy">
               <h3 class="manager-card-title">
                 <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
@@ -525,22 +762,68 @@
               </button>
             </div>
           </header>
+          {#if !modifiersCollapsed}
+          <div id="manager-section-body-modifiers" class="manager-section-body">
           {#if characterModifierLibrary.length === 0}
             <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Empty', 'No character modifiers yet.')}</p>
           {:else}
             <ul class="manager-character-modifier-list">
-              {#each characterModifierLibrary as entry (entry.id)}
-                <li class="manager-character-modifier-row" data-system-character-modifier={entry.id}>
-                  {#if characterModifierEditingId === entry.id}
-                    <div class="manager-character-modifier-editor">
-                      <label class="manager-field">
-                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Label', 'Label')}</span>
-                        <input type="text" value={entry.label} oninput={(event) => onUpdateCharacterModifier(entry.id, { label: event.currentTarget.value })} />
-                      </label>
-                      <label class="manager-field">
-                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Icon', 'Icon')}</span>
-                        <input type="text" value={entry.icon} oninput={(event) => onUpdateCharacterModifier(entry.id, { icon: event.currentTarget.value })} />
-                      </label>
+              {#each characterModifierLibrary as entry, index (entry.id)}
+                {@const modifierOpen = characterModifierEditingId === entry.id}
+                {@const modifierExpression = characterModifierExpressionDisplay(entry)}
+                <li class="manager-modifier-item" class:is-open={modifierOpen} data-system-character-modifier={entry.id}>
+                  <div class="manager-modifier-header">
+                    <button
+                      type="button"
+                      class="manager-modifier-summary"
+                      aria-expanded={modifierOpen}
+                      aria-controls={`character-modifier-body-${entry.id}`}
+                      data-toggle-character-modifier
+                      onclick={() => characterModifierEditingId = modifierOpen ? '' : entry.id}
+                    >
+                      <i class={`fa-solid ${modifierOpen ? 'fa-chevron-down' : 'fa-chevron-right'} manager-modifier-chevron`} aria-hidden="true"></i>
+                      <span class="manager-modifier-icon"><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i></span>
+                      <span class="manager-modifier-label">{entry.label}</span>
+                      {#if characterModifierIsRoll(entry)}
+                        <span class="manager-chip manager-character-modifier-roll-tag">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag', 'Roll')}</span>
+                      {/if}
+                      {#if modifierExpression}
+                        <span class="manager-modifier-expression" data-character-modifier-expression>
+                          <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
+                          {modifierExpression}
+                        </span>
+                      {/if}
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-move-modifier-up={entry.id} disabled={index === 0} onclick={() => reorderList(onReorderCharacterModifier, index, -1, entry.label, characterModifierLibrary.length)}>
+                      <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-move-modifier-down={entry.id} disabled={index === characterModifierLibrary.length - 1} onclick={() => reorderList(onReorderCharacterModifier, index, 1, entry.label, characterModifierLibrary.length)}>
+                      <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites', 'Copy to prerequisites')} data-copy-to-prerequisite={entry.id} onclick={() => handleCopyModifierToPrerequisite(entry)}>
+                      <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    </button>
+                  </div>
+
+                  {#if modifierOpen}
+                    <div class="manager-modifier-body manager-character-modifier-editor" id={`character-modifier-body-${entry.id}`}>
+                      <div class="manager-modifier-name-row">
+                        <div class="manager-field manager-modifier-icon-field">
+                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Icon', 'Icon')}</span>
+                          <IconPicker
+                            value={entry.icon || 'fa-solid fa-user'}
+                            buttonTitle={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ChangeIcon', 'Change icon')}
+                            onChange={(iconClass) => onUpdateCharacterModifier(entry.id, { icon: iconClass })}
+                          />
+                        </div>
+                        <label class="manager-field manager-modifier-label-field">
+                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Label', 'Label')}</span>
+                          <input type="text" value={entry.label} oninput={(event) => onUpdateCharacterModifier(entry.id, { label: event.currentTarget.value })} />
+                        </label>
+                      </div>
                       <label class="manager-field">
                         <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
                         <input type="text" value={entry.expression} oninput={(event) => onUpdateCharacterModifier(entry.id, { expression: event.currentTarget.value })} />
@@ -550,24 +833,12 @@
                         <button type="button" class="manager-button is-danger" onclick={() => handleDeleteCharacterModifier(entry.id)}>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')}</button>
                       </div>
                     </div>
-                  {:else}
-                    <div class="manager-character-modifier-summary">
-                      <span class="manager-character-modifier-icon"><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i></span>
-                      <span class="manager-character-modifier-label">{entry.label}</span>
-                      {#if characterModifierIsRoll(entry)}
-                        <span class="manager-chip manager-character-modifier-roll-tag">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag', 'Roll')}</span>
-                      {/if}
-                      <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Edit', 'Edit character modifier')} onclick={() => characterModifierEditingId = entry.id}>
-                        <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                      </button>
-                      <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
-                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                      </button>
-                    </div>
                   {/if}
                 </li>
               {/each}
             </ul>
+          {/if}
+          </div>
           {/if}
         </section>
       {/if}
@@ -578,12 +849,33 @@
         onAdd={onAddCharacterPrerequisite}
         onUpdate={onUpdateCharacterPrerequisite}
         onDelete={onDeleteCharacterPrerequisite}
+        onReorder={async (fromIndex, toIndex, name) => {
+          await onReorderCharacterPrerequisite(fromIndex, toIndex);
+          announceReorder(name, toIndex + 1, characterPrerequisiteLibrary.length);
+        }}
         onSeedPresets={onSeedCharacterPrerequisitePresets}
+        collapsed={isSectionCollapsed('prerequisites')}
+        onToggleCollapsed={() => toggleSectionCollapsed('prerequisites')}
+        onCopyToModifier={gatheringEnabled ? handleCopyPrerequisiteToModifier : null}
+        requestOpenId={prereqRequestOpenId}
+        requestOpenNonce={prereqRequestOpenNonce}
       />
 
       {#if currencyEnabled}
-      <section class="manager-edit-card manager-currency-unit-card" data-system-currency-units aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Title', 'Currency units')}>
+      {@const currencyCollapsed = isSectionCollapsed('currency')}
+      <section class="manager-edit-card manager-currency-unit-card" class:is-section-collapsed={currencyCollapsed} data-system-currency-units aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Title', 'Currency units')}>
         <header class="manager-character-modifier-card-header">
+          <button
+            type="button"
+            class="manager-section-collapse-toggle"
+            aria-expanded={!currencyCollapsed}
+            aria-controls="manager-section-body-currency"
+            aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.ToggleSection', 'Collapse or expand this section')}
+            data-section-collapse="currency"
+            onclick={() => toggleSectionCollapsed('currency')}
+          >
+            <i class={`fa-solid ${currencyCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+          </button>
           <div class="manager-character-modifier-card-header-copy">
             <h3 class="manager-card-title">
               <i class="fa-solid fa-coins" aria-hidden="true"></i>
@@ -609,6 +901,8 @@
           {/if}
         </header>
 
+        {#if !currencyCollapsed}
+        <div id="manager-section-body-currency" class="manager-section-body">
         <div class="manager-currency-strategy" data-system-currency-strategy>
           <label class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategy', 'Spend strategy')}</span>
@@ -740,7 +1034,7 @@
           <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
         {:else}
           <ul class="manager-character-modifier-list">
-            {#each currencyUnits as unit (unit.id)}
+            {#each currencyUnits as unit, index (unit.id)}
               {@const expanded = currencyExpandedUnitId === unit.id}
               {@const subUnitOptions = currencyUnitSubUnitOptions(unit.id)}
               <li class="manager-character-modifier-row" data-system-currency-unit={unit.id}>
@@ -782,7 +1076,7 @@
                                 onchange={(event) => updateCurrencySubUnitSelection(unit.id, event.currentTarget.value)}
                               >
                                 {#each subUnitOptions as option (option.id)}
-                                  <option value={option.id}>{option.label} ({option.abbreviation})</option>
+                                  <option value={option.id}>{option.label}{option.abbreviation ? ` (${option.abbreviation})` : ''}</option>
                                 {/each}
                               </select>
                             </label>
@@ -844,6 +1138,12 @@
                     <span class="manager-character-modifier-icon"><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"></i></span>
                     <span class="manager-character-modifier-label">{unit.label || unit.id}</span>
                     <span class="manager-chip">{(unit.contains || []).length} {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</span>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-move-currency-up={unit.id} disabled={index === 0} onclick={() => reorderList(onReorderCurrencyUnit, index, -1, unit.label || unit.id, currencyUnits.length)}>
+                      <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')} data-move-currency-down={unit.id} disabled={index === currencyUnits.length - 1} onclick={() => reorderList(onReorderCurrencyUnit, index, 1, unit.label || unit.id, currencyUnits.length)}>
+                      <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                    </button>
                     <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.Edit', 'Edit currency unit')} onclick={() => currencyExpandedUnitId = unit.id}>
                       <i class="fa-solid fa-pen" aria-hidden="true"></i>
                     </button>
@@ -855,6 +1155,8 @@
               </li>
             {/each}
           </ul>
+        {/if}
+        </div>
         {/if}
       </section>
       {/if}

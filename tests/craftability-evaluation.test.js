@@ -56,7 +56,8 @@ globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
-const { deriveToolSourceFromComponents } = await import('../src/migration/migrateToolsToFirstClass.js');
+const { deriveToolSourceFromComponents } =
+  await import('../src/migration/migrateToolsToFirstClass.js');
 
 // ---------------------------------------------------------------------------
 // Helper builders
@@ -355,7 +356,11 @@ test('TC6: evaluateCraftability matches managed-component ingredients by registe
   const actor = makeActor([actorItem]);
   const result = manager.evaluateCraftability([actor], recipe);
 
-  assert.equal(result.canCraft, true, 'managed-component ingredient should match by registeredItemUuid');
+  assert.equal(
+    result.canCraft,
+    true,
+    'managed-component ingredient should match by registeredItemUuid'
+  );
   assert.equal(result.ingredientStates.length, 1);
   const state = result.ingredientStates[0];
   assert.equal(state.satisfied, true);
@@ -664,6 +669,83 @@ test('TC8c: evaluateCraftability supports iterable actor.items without Array.fil
   );
 });
 
+test('TC8e: one physical item cannot satisfy both ingredient consumption and a Tool requirement', () => {
+  const systemId = 'sys-tc8e';
+  const compId = 'comp-vial';
+  const registeredItemUuid = 'Item.vial-source';
+  const consumedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-consumed',
+    registeredItemUuid,
+    1
+  );
+  const set = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData(compId, 1)]),
+  ]);
+  const manager = makeRecipeManagerWithSystem(
+    systemId,
+    [{ id: compId, registeredItemUuid, name: 'Empty Vial' }],
+    [{ id: 'tool-vial', componentId: compId, enabled: true }]
+  );
+  const recipe = new Recipe({
+    name: 'Vial Tool Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    toolIds: ['tool-vial'],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability([makeActor([consumedVial])], recipe);
+
+  assert.equal(result.canCraft, false);
+  assert.equal(result.ingredientStates[0].satisfied, true, 'the ingredient itself is present');
+  assert.equal(result.toolStates[0].available, false, 'the consumed document is reserved');
+  assert.equal(result.missing.tools.length, 1);
+});
+
+test('TC8f: a second physical copy remains available as the Tool', () => {
+  const systemId = 'sys-tc8f';
+  const compId = 'comp-vial';
+  const registeredItemUuid = 'Item.vial-source';
+  const consumedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-consumed',
+    registeredItemUuid,
+    1
+  );
+  const retainedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-retained',
+    registeredItemUuid,
+    1
+  );
+  const set = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData(compId, 1)]),
+  ]);
+  const manager = makeRecipeManagerWithSystem(
+    systemId,
+    [{ id: compId, registeredItemUuid, name: 'Empty Vial' }],
+    [{ id: 'tool-vial', componentId: compId, enabled: true }]
+  );
+  const recipe = new Recipe({
+    name: 'Vial Tool Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    toolIds: ['tool-vial'],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability(
+    [makeActor([consumedVial, retainedVial])],
+    recipe
+  );
+
+  assert.equal(result.canCraft, true);
+  assert.equal(result.toolStates[0].available, true);
+  assert.equal(
+    result.toolStates[0].contributionInput.matchedItem,
+    retainedVial,
+    'Tool matching skips the concrete Item reserved by the ingredient plan'
+  );
+});
+
 // ---------------------------------------------------------------------------
 // TC9: Essence requirements
 // ---------------------------------------------------------------------------
@@ -702,6 +784,7 @@ test('TC9: evaluateCraftability essenceStates show satisfied when essences avail
   assert.equal(result.essenceStates[0].have, 3);
   assert.equal(result.essenceStates[0].need, 2);
   assert.equal(result.essenceStates[0].satisfied, true);
+  assert.equal(result.essenceStates[0].isEssence, true);
 });
 
 test('TC9a: evaluateCraftability counts essences from matched component definitions', () => {
@@ -754,9 +837,38 @@ test('TC9a: evaluateCraftability counts essences from matched component definiti
   // player crafting detail can show them instead of the essence id.
   assert.equal(result.essenceStates[0].name, 'Restorative');
   assert.equal(result.essenceStates[0].icon, 'fas fa-heart');
+  assert.equal(result.essenceStates[0].isEssence, true);
   assert.equal(result.essenceStates[0].have, 2);
   assert.equal(result.essenceStates[0].need, 2);
   assert.equal(result.essenceStates[0].satisfied, true);
+});
+
+test('TC9a: missing legacy essence states retain authored presentation metadata', () => {
+  const systemId = 'sys-tc9a-missing';
+  const essenceId = 'restorative';
+  const set = makeIngredientSet([], { [essenceId]: 2 });
+  const manager = makeRecipeManagerWithEssences(systemId, [
+    { id: essenceId, name: 'Restorative', icon: 'fas fa-heart' },
+  ]);
+  const recipe = new Recipe({
+    name: 'Missing Essence Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const result = manager.evaluateCraftability([makeActor([])], recipe);
+
+  assert.equal(result.canCraft, false);
+  assert.deepEqual(result.essenceStates[0], {
+    type: essenceId,
+    name: 'Restorative',
+    icon: 'fas fa-heart',
+    isEssence: true,
+    need: 2,
+    have: 0,
+    satisfied: false,
+  });
 });
 
 test('TC9b: evaluateCraftability multiplies component-defined essences by stack quantity', () => {
@@ -1302,6 +1414,8 @@ test('essence group tile resolves the essence NAME + icon (never the raw id) and
   assert.equal(state.description, '2x Restorative essence', 'tile shows the resolved essence name');
   assert.ok(!state.description.includes(essenceId), 'the raw essence id never leaks into the tile');
   assert.equal(state.icon, 'fas fa-heart', 'the essence definition icon is carried on the tile');
+  assert.equal(state.isEssence, true, 'the tile is marked for essence glyph rendering');
+  assert.equal(state.img, null, 'the tile does not expose the synthetic aura image');
   // Finding 2: a SATISFIED essence tile shows amount-based need + accumulated have.
   assert.equal(state.need, 2, 'need is the essence amount, not the option quantity');
   assert.equal(state.have, 3, 'have is the accumulated essence (3 herbs x 1 each)');
@@ -1319,7 +1433,9 @@ test('a MISSING essence group tile shows the accumulated have and the essence am
       scope === 'fabricate' && key === 'fabricate.essences' ? { fire: 1 } : undefined,
   };
   const set = makeIngredientSet([makeEssenceOptionGroup(essenceId, 4, 'g-ess')]);
-  const manager = makeRecipeManagerWithEssences(systemId, [{ id: 'fire', name: 'Fire' }]);
+  const manager = makeRecipeManagerWithEssences(systemId, [
+    { id: 'fire', name: 'Fire', icon: 'fas fa-fire-flame-curved' },
+  ]);
   const recipe = new Recipe({
     name: 'Fire Brew',
     craftingSystemId: systemId,
@@ -1333,6 +1449,9 @@ test('a MISSING essence group tile shows the accumulated have and the essence am
   assert.equal(state.need, 4);
   assert.equal(state.have, 1, 'have reflects the accumulated fire essence');
   assert.equal(state.satisfied, false);
+  assert.equal(state.isEssence, true);
+  assert.equal(state.icon, 'fas fa-fire-flame-curved');
+  assert.equal(state.img, null, 'missing essence tiles do not expose the aura image');
 });
 
 test('consumption threads the component-aware resolver: a component-defined essence draws down via canCraft', () => {
@@ -1352,7 +1471,11 @@ test('consumption threads the component-aware resolver: a component-defined esse
   ];
   const crystal = makeComponentItem('crystal-item', 'Compendium.test.crystal', 5);
   const set = makeIngredientSet([makeEssenceOptionGroup(essenceId, 3, 'g-ess')]);
-  const manager = makeRecipeManagerWithEssences(systemId, [{ id: essenceId, name: 'Aether' }], components);
+  const manager = makeRecipeManagerWithEssences(
+    systemId,
+    [{ id: essenceId, name: 'Aether' }],
+    components
+  );
   const recipe = new Recipe({
     name: 'Aether Draught',
     craftingSystemId: systemId,
@@ -1363,6 +1486,117 @@ test('consumption threads the component-aware resolver: a component-defined esse
   const { canCraft, satisfiableSet } = manager.canCraft([makeActor([crystal])], recipe);
   assert.equal(canCraft, true, 'the essence group resolves against the component-defined essence');
   assert.ok(satisfiableSet, 'a satisfiable set is reported');
+});
+
+// ---------------------------------------------------------------------------
+// Issue 857: a by-TAG ingredient must match owned items whose MANAGED COMPONENT
+// carries the tag. Authored tags live on the component definition (the same source
+// the recipe editor links tag ingredients from), and Fabricate never stamps a
+// `flags.fabricate.tags` onto inventory items — so an owned item that resolves to a
+// tagged component (by source uuid) but carries no tag flag of its own must still be
+// offered as available. Before the fix the tag matcher read only the item's own
+// (never-populated) tag flag, so a by-tag ingredient reported "no components
+// available" while an identical by-component ingredient worked.
+// ---------------------------------------------------------------------------
+
+test('issue 857: a by-tag ingredient matches an owned item via its managed component tags', () => {
+  const systemId = 'sys-857-tag-component';
+  const compHerb = 'comp-857-herb';
+  const srcHerb = 'Item.857-herb-source';
+
+  // Recipe requires 3x anything tagged `plant`.
+  const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['plant'], 3)])]);
+  const recipe = new Recipe({
+    name: 'Herbal Poultice',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  // The managed component carries the `plant` tag on its DEFINITION; the owned item
+  // resolves to it by source uuid and has NO tag flag of its own.
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compHerb, registeredItemUuid: srcHerb, name: 'Dried Herb', tags: ['plant'] },
+  ]);
+  const heldHerb = makeComponentItem('held-herb', srcHerb, 3);
+
+  const result = manager.evaluateCraftability([makeActor([heldHerb])], recipe);
+
+  assert.equal(
+    result.canCraft,
+    true,
+    'a by-tag ingredient is satisfied by an owned component carrying the tag on its definition'
+  );
+  assert.equal(result.ingredientStates.length, 1);
+  assert.equal(
+    result.ingredientStates[0].satisfied,
+    true,
+    'the tag group resolves to the held herb'
+  );
+  assert.equal(
+    result.ingredientStates[0].have,
+    3,
+    'all three tagged units are counted as available'
+  );
+  assert.equal(result.ingredientStates[0].need, 3);
+});
+
+test('issue 857: a tagMatch=all ingredient needs the resolved component to carry EVERY required tag', () => {
+  const systemId = 'sys-857-tag-all';
+  const srcBoth = 'Item.857-both-source';
+  const srcPartial = 'Item.857-partial-source';
+
+  // Require ALL of {plant, fresh}.
+  const set = makeIngredientSet([
+    makeGroupData([{ match: { type: 'tags', tags: ['plant', 'fresh'], tagMatch: 'all' }, quantity: 1 }]),
+  ]);
+  const recipe = new Recipe({
+    name: 'Fresh Poultice',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  // A component carrying BOTH tags satisfies; one carrying only `plant` does not.
+  const both = makeRecipeManagerWithSystem(systemId, [
+    { id: 'c-both', registeredItemUuid: srcBoth, name: 'Fresh Herb', tags: ['plant', 'fresh'] },
+  ]);
+  const satisfied = both.evaluateCraftability([makeActor([makeComponentItem('held-both', srcBoth, 1)])], recipe);
+  assert.equal(satisfied.canCraft, true, 'all required tags present on the component → satisfied');
+
+  const partial = makeRecipeManagerWithSystem(systemId, [
+    { id: 'c-partial', registeredItemUuid: srcPartial, name: 'Dried Herb', tags: ['plant'] },
+  ]);
+  const unsatisfied = partial.evaluateCraftability([makeActor([makeComponentItem('held-partial', srcPartial, 1)])], recipe);
+  assert.equal(unsatisfied.canCraft, false, 'a component missing one required tag does NOT satisfy an all-rule');
+});
+
+test('issue 857: a by-tag ingredient stays unsatisfied when no owned component carries the tag', () => {
+  const systemId = 'sys-857-tag-mismatch';
+  const compStone = 'comp-857-stone';
+  const srcStone = 'Item.857-stone-source';
+
+  const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['plant'], 1)])]);
+  const recipe = new Recipe({
+    name: 'Herbal Poultice',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  // The owned component is tagged `mineral`, not `plant`: it must not satisfy the
+  // `plant` tag group (the fix widens matching to component tags, it does not match
+  // every owned item).
+  const manager = makeRecipeManagerWithSystem(systemId, [
+    { id: compStone, registeredItemUuid: srcStone, name: 'River Stone', tags: ['mineral'] },
+  ]);
+  const heldStone = makeComponentItem('held-stone', srcStone, 5);
+
+  const result = manager.evaluateCraftability([makeActor([heldStone])], recipe);
+
+  assert.equal(result.canCraft, false, 'a component without the required tag does not satisfy it');
+  assert.equal(result.ingredientStates[0].satisfied, false);
+  assert.equal(result.ingredientStates[0].have, 0, 'no tagged units are available');
 });
 
 test('_validateEssenceReferences flags an essence OPTION referencing a deleted essence id on enable', () => {

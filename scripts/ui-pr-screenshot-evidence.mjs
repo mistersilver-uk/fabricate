@@ -23,7 +23,29 @@ const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 // manager-recipes recipe).
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/.*\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/(?!RecipeTools(?:Tab|Section)\.svelte$).*\.svelte$/,
+  // The Overview tab's eligible-modifier override renders the shared pill multi-select
+  // (issue 770); a change to it republishes the recipe-editor frames it appears in.
+  /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
+];
+
+// Every recipe-editor frame maps one same-named smoke label to the shared
+// RECIPE_EDIT_MATCHES glob. The factory collapses the twelve otherwise-identical view
+// literals into one call each so the block does not read as a large duplicated span —
+// Sonar's Automatic Analysis counts repeated object literals (`cpd.exclusions` is ignored)
+// and a fresh sibling entry would otherwise trip the new-code duplication gate.
+const recipeEditFrame = (id, label) => ({ id, label, smokeLabels: [id], matches: RECIPE_EDIT_MATCHES });
+const toolStudioFrame = (id, label, smokeLabel, matches) => ({
+  id,
+  label,
+  smokeLabels: [smokeLabel],
+  matches,
+});
+const TOOL_STUDIO_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/(?:CraftingSystemManagerRoot|ToolsBrowserView|ToolEditView)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+  /^styles\/fabricate\.css$/,
 ];
 
 export const VIEW_RECIPES = Object.freeze([
@@ -49,7 +71,43 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-system-edit',
     label: 'Manager system settings',
     smokeLabels: ['manager-system-edit-normal', 'manager-system-edit-narrow'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    // Issue 768: the settings-list child cards (CharacterPrerequisitesCard and any
+    // future `system/` card) render inside this frame, so a change to one maps to a
+    // system-edit screenshot rather than the generic fallback.
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/system\/.+\.svelte$/,
+    ],
+  },
+  {
+    // Issue 767: the unsaved-changes chip + dirty-draft guard for the identity
+    // form. This needs its OWN view id (not an appended smokeLabel on
+    // `manager-system-edit`): `collect` publishes only `candidates[0]` from a
+    // filename-sorted list, so appending the dirty label there would publish the
+    // clean `-narrow` frame forever and the changed state would never reach the PR.
+    id: 'manager-system-edit-dirty',
+    label: 'Manager system settings — unsaved-changes chip',
+    smokeLabels: ['manager-system-edit-dirty'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+    ],
+  },
+  {
+    // Issue 768: the settings-list ergonomics proof frame — Character Modifiers,
+    // Character Prerequisites and Currency Units seeded with ≥2 entries, with the
+    // shared IconPicker open on a modifier, the Currency section collapsed, and the
+    // row-level copy buttons visible. Its OWN view id + single smokeLabel because
+    // `collect` publishes only candidates[0]; appending this label to
+    // `manager-system-edit` would keep publishing the clean settled frame instead.
+    id: 'manager-system-edit-lists',
+    label: 'Manager system settings — settings-list ergonomics (icon picker, collapse, copy)',
+    smokeLabels: ['manager-system-edit-lists'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/system\/.+\.svelte$/,
+      /^src\/systems\/characterModifierPrerequisiteCopy\.js$/,
+    ],
   },
   {
     id: 'manager-currency',
@@ -83,6 +141,57 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
     ],
   },
+  // Issue 801: the grouped-category CONTINUATION frame — a category split across a page
+  // boundary, its continuation slice ("N of M") at the head of the next page. Its OWN view
+  // id (one file per published frame; `collect` emits only `candidates[0]`) so the
+  // continuation state itself reaches the PR rather than an unrelated components frame.
+  {
+    id: 'manager-components-grouped-continuation',
+    label: 'Manager components browser — grouped category continued across a page boundary',
+    smokeLabels: ['manager-components-grouped-continuation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      /^src\/utils\/componentBrowserModel\.js$/,
+    ],
+  },
+  // Issue 800: write-time RESOLUTION of source descriptions. Three DEDICATED view ids,
+  // not extra smokeLabels on `manager-components`: `collect` publishes only
+  // `candidates[0]` from a filename-sorted list, so appending them there would publish
+  // one arbitrary frame and the BEFORE/AFTER pair — the whole point of the evidence —
+  // would never reach the PR.
+  {
+    id: 'manager-components-description-before',
+    label: 'Component description — BEFORE (un-repaired world, raw directive text)',
+    smokeLabels: ['manager-components-description-before'],
+    matches: [
+      /^src\/utils\/plainTextDescription\.js$/,
+      /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+    ],
+  },
+  {
+    id: 'manager-components-description-repaired',
+    label: 'Component description — AFTER Repair Item Data (locked-pack source resolved)',
+    smokeLabels: ['manager-components-description-repaired'],
+    matches: [
+      /^src\/utils\/plainTextDescription\.js$/,
+      /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+      /^src\/systems\/CraftingSystemManager\.js$/,
+      /^src\/config\/repairItemData\.js$/,
+    ],
+  },
+  {
+    id: 'manager-components-description-ingested',
+    label: 'Component description — AFTER ingestion (resolved on the write path)',
+    smokeLabels: ['manager-components-description-ingested'],
+    matches: [
+      /^src\/utils\/plainTextDescription\.js$/,
+      /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+      /^src\/systems\/CraftingSystemManager\.js$/,
+    ],
+  },
   {
     id: 'manager-component-edit',
     label: 'Manager component editor (single column: identity strip + category, no rail)',
@@ -114,6 +223,16 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add
+    // group control HIDDEN and the required hint shown. Its own recipe (one file per id,
+    // per the issue-752 demonstration pattern) so `collect` publishes it as its own frame
+    // rather than collapsing it into the routed authoring frame above.
+    id: 'manager-component-edit-salvage-simple',
+    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add group, required hint)',
+    smokeLabels: ['manager-component-edit-salvage-simple'],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  },
+  {
     id: 'manager-checks-gathering',
     label: 'Manager Checks tab — gathering check editor (routed)',
     smokeLabels: ['manager-checks-gathering'],
@@ -143,6 +262,21 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
+    ],
+  },
+  {
+    // Issue 770: the check-modifier catalogue card — its OWN frame (the crafting tab
+    // scrolls to the failure-consumption card for the frame above, so the modifier card
+    // needs a dedicated capture to show its IconPicker + label + `@`-expression rows and
+    // the default-modifier pill multi-select un-cropped). One published frame; the card
+    // and the shared pill control both republish it.
+    id: 'manager-checks-crafting-modifiers',
+    label: 'Manager Checks tab — crafting check-modifier catalogue',
+    smokeLabels: ['manager-checks-crafting-modifiers'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingModifierCatalogueCard\.svelte$/,
+      /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
     ],
   },
   {
@@ -189,12 +323,19 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-gathering-events-normal', 'manager-gathering-event-editor-normal'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEventEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringEventsBrowserView\.svelte$/],
   },
-  {
-    id: 'manager-tools',
-    label: 'Manager gathering tools',
-    smokeLabels: ['manager-tools-normal'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/],
-  },
+  toolStudioFrame('01-library-1280x720', 'Tool Studio — library parity', 'manager-tool-parity-01-library-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('zero-state-empty-library-1280x720', 'Tool Studio — empty library zero state', 'manager-tool-zero-state-empty-library-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('02-overview-1280x720', 'Tool Studio — Overview parity', 'manager-tool-parity-02-overview-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('03-breakage-1280x720', 'Tool Studio — Breakage parity', 'manager-tool-parity-03-breakage-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('04-requirements-1280x720', 'Tool Studio — Requirements parity', 'manager-tool-parity-04-requirements-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('05-validation-1280x720', 'Tool Studio — all-pass Validation parity', 'manager-tool-parity-05-validation-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('06-breakage-900x700', 'Tool Studio — 900px Breakage parity', 'manager-tool-parity-06-breakage-900x700', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-long-name', 'Tool Studio stress — long display name', 'manager-tool-stress-long-name', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-repair', 'Tool Studio stress — populated repair', 'manager-tool-stress-repair', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-replacement', 'Tool Studio stress — replacement target', 'manager-tool-stress-replacement', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-immune', 'Tool Studio stress — check-driven Immune', 'manager-tool-stress-immune', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-invalid-validation', 'Tool Studio stress — failing Validation', 'manager-tool-stress-invalid-validation', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('stress-wrapping-680', 'Tool Studio stress — 680px wrapping', 'manager-tool-stress-wrapping-680', TOOL_STUDIO_MATCHES),
   {
     id: 'manager-travel',
     label: 'Manager travel and parties',
@@ -221,6 +362,32 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
     ],
   },
+  // Issue 801: the grouped-category CONTINUATION frame for the recipe library. Phase 1 is
+  // MODEL-ONLY — RecipesBrowserView.svelte is untouched — so `recipeBrowserModel.js` is the
+  // SOLE changed file that maps a frame to this browser; its `matches` MUST name it or the
+  // frame is silently stranded. Its own view id (one published frame per view id).
+  {
+    id: 'manager-recipes-grouped-continuation',
+    label: 'Manager recipes browser — grouped category continued across a page boundary',
+    smokeLabels: ['manager-recipes-grouped-continuation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/utils\/recipeBrowserModel\.js$/,
+    ],
+  },
+  // Issue 806: the editor round-trip preservation frame. The fix persists the reset
+  // sentinel (a `systemId` field) on the lifted browser state, so both the view file and
+  // the state factory in `recipeBrowserModel.js` are load-bearing changed files that must
+  // map a frame to this browser or it is silently stranded. Its own view id (one frame).
+  {
+    id: 'manager-recipes-editor-roundtrip',
+    label: 'Manager recipes browser — category filter + collapsed group preserved across an editor round-trip (#806)',
+    smokeLabels: ['manager-recipes-editor-roundtrip'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/utils\/recipeBrowserModel\.js$/,
+    ],
+  },
   {
     id: 'manager-import-report',
     label: 'Manager import — post-import unresolved-reference report (#492)',
@@ -228,6 +395,19 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/systems\/importReportContent\.js$/,
+    ],
+  },
+  // Issue 771: folder-aware categorization mapping modal, shown before a folder /
+  // whole-pack component drop commits. Its own single-frame view (collect publishes only
+  // candidates[0] per id). Mapped to the mapping component AND the drop-path service file
+  // that opens it, so a change to either republishes the frame.
+  {
+    id: 'manager-import-folder-mapping',
+    label: 'Manager import — folder-aware categorization mapping step (#771)',
+    smokeLabels: ['manager-import-folder-mapping'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
+      /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
     ],
   },
   // The gated Crafting nav group (issue 511) publishes three distinct frames — the
@@ -244,6 +424,31 @@ export const VIEW_RECIPES = Object.freeze([
     label: 'Manager Books & Scrolls recipe-item surface',
     smokeLabels: ['manager-books-scrolls-normal'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/],
+  },
+  // Issue 797: the recipe-item editor's Validation tab, brought to parity with the
+  // recipe editor's Validation tab (summary card + count tiles + grouped bordered rows
+  // with status pills). TWO dedicated view ids — one all-clear, one mixed-failing — each
+  // its own single-frame view: `collect` publishes only `candidates[0]` from a
+  // filename-sorted list, so appending both labels to one view would drop one of the
+  // evidence frames. Both match the validation tab file AND the editor shell that hosts
+  // it, so a change to either republishes the pair.
+  {
+    id: 'manager-recipe-item-validation',
+    label: 'Manager recipe-item editor — Validation tab (all clear)',
+    smokeLabels: ['manager-recipe-item-validation'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\/RecipeItemValidationTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemEditor\.svelte$/,
+    ],
+  },
+  {
+    id: 'manager-recipe-item-validation-blocked',
+    label: 'Manager recipe-item editor — Validation tab (mixed pass/block, cannot be used)',
+    smokeLabels: ['manager-recipe-item-validation-blocked'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\/RecipeItemValidationTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RecipeItemEditor\.svelte$/,
+    ],
   },
   {
     id: 'manager-crafting-settings',
@@ -269,50 +474,26 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-experimental-off'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
-  // The recipe editor publishes TEN distinct frames (overview/identity, ingredients,
+  // The recipe editor publishes twelve distinct frames (overview/identity, ingredients,
   // validation tab, multi-step durations, the four Results-tab modes — routed-by-check,
-  // multi-step, progressive, alchemy — tools, and the restricted-visibility context
-  // rail). `collect` emits ONE file per recipe id (it takes the first matching smoke
-  // label), so each frame needs its own recipe — a single recipe with ten smoke labels
-  // would only ever publish the first (overview) frame and silently drop the rest. All
-  // ten share the same `matches`, so any change to a recipe editor/inspector or recipe
-  // sub-component republishes them together.
-  {
-    id: 'manager-recipe-edit-normal',
-    label: 'Manager recipe editor — overview / identity',
-    smokeLabels: ['manager-recipe-edit-normal'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-ingredients',
-    label: 'Manager recipe editor — ingredients (components, OR groups, tags, currency cost)',
-    smokeLabels: ['manager-recipe-edit-ingredients'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-validation',
-    label: 'Manager recipe editor — validation tab',
-    smokeLabels: ['manager-recipe-edit-validation'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-multistep',
-    label: 'Manager recipe editor — multi-step durations',
-    smokeLabels: ['manager-recipe-edit-multistep'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results',
-    label: 'Manager recipe editor — results (routed-by-check outcome sets)',
-    smokeLabels: ['manager-recipe-edit-results'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results-multistep',
-    label: 'Manager recipe editor — results (per-step content, multi-step)',
-    smokeLabels: ['manager-recipe-edit-results-multistep'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
+  // multi-step, progressive, alchemy — tools, the restricted-visibility Access tab, and
+  // the Books & Scrolls tab body). `collect` emits ONE file per recipe id (it takes the
+  // first matching smoke label), so each frame needs its own recipe — a single recipe
+  // with twelve smoke labels would only ever publish the first (overview) frame and
+  // silently drop the rest. All twelve share the same `matches`, so any change to a recipe
+  // editor/inspector or recipe sub-component republishes them together.
+  recipeEditFrame('manager-recipe-edit-normal', 'Manager recipe editor — overview / identity'),
+  recipeEditFrame('manager-recipe-edit-ingredients', 'Manager recipe editor — ingredients (components, OR groups, tags)'),
+  // Issue 684: the essence + currency-cost rows sit below the fold of the ingredients
+  // frame above, so they get their OWN scrolled frame (the harness scrolls the last
+  // currency-cost row into view before capturing). Its own recipe-edit view id so
+  // `collect` publishes it as a distinct frame; the caption owns ONLY the two rows the
+  // frame actually shows.
+  recipeEditFrame('manager-recipe-edit-ingredients-cost', 'Manager recipe editor — ingredients scrolled to essence + currency-cost rows (with steppers)'),
+  recipeEditFrame('manager-recipe-edit-validation', 'Manager recipe editor — validation tab'),
+  recipeEditFrame('manager-recipe-edit-multistep', 'Manager recipe editor — multi-step durations'),
+  recipeEditFrame('manager-recipe-edit-results', 'Manager recipe editor — results (routed-by-check outcome sets)'),
+  recipeEditFrame('manager-recipe-edit-results-multistep', 'Manager recipe editor — results (per-step content, multi-step)'),
   // Multi-step visibility gating (issue 710). The disable-confirm frame is the system
   // settings view whose multi-step feature tile opens the confirm dialog (SystemEditView
   // renders the tile; the adminStore toggle/confirm gate drives it — but adminStore is
@@ -325,42 +506,26 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-multistep-disable-confirm'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   },
-  {
-    id: 'manager-recipe-edit-collapsed',
-    label: 'Manager recipe editor — collapsed multi-step (feature off)',
-    smokeLabels: ['manager-recipe-edit-collapsed'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results-progressive',
-    label: 'Manager recipe editor — results (progressive ordered stages)',
-    smokeLabels: ['manager-recipe-edit-results-progressive'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-results-alchemy',
-    label: 'Manager recipe editor — results (alchemy two-slot success/reserved-failure)',
-    smokeLabels: ['manager-recipe-edit-results-alchemy'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    id: 'manager-recipe-edit-tools',
-    label: 'Manager recipe editor — tools (component-name fallback for unlabelled tools)',
-    smokeLabels: ['manager-recipe-edit-tools'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
-  {
-    // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
-    // rail). Every other recipe frame is captured against a system whose visibility mode
-    // drives the Books & Scrolls branch, so without this frame the restricted (access)
-    // branch would ship with no screenshot evidence at all. The frame ID keeps its
-    // `-access-rail` suffix: it is a stable identifier the published S3 keys and the
-    // smoke labels share, and renaming it would orphan existing evidence for no gain.
-    id: 'manager-recipe-edit-access-rail',
-    label: 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)',
-    smokeLabels: ['manager-recipe-edit-access-rail'],
-    matches: RECIPE_EDIT_MATCHES,
-  },
+  recipeEditFrame('manager-recipe-edit-collapsed', 'Manager recipe editor — collapsed multi-step (feature off)'),
+  recipeEditFrame('manager-recipe-edit-results-progressive', 'Manager recipe editor — results (progressive ordered stages)'),
+  recipeEditFrame('manager-recipe-edit-results-alchemy', 'Manager recipe editor — results (alchemy two-slot success/reserved-failure)'),
+  toolStudioFrame('manager-recipe-edit-tools', 'Manager recipe editor — tools and bonus modes', 'manager-recipe-edit-tools', [
+    /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+    /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeTools(?:Tab|Section)\.svelte$/,
+  ]),
+  // The Access tab is MODE-CONDITIONAL (issue 676 rehomed it from the deleted context
+  // rail). Every other recipe frame is captured against a system whose visibility mode
+  // drives the Books & Scrolls branch, so without this frame the restricted (access)
+  // branch would ship with no screenshot evidence at all. The frame ID keeps its
+  // `-access-rail` suffix: it is a stable identifier the published S3 keys and the
+  // smoke labels share, and renaming it would orphan existing evidence for no gain.
+  recipeEditFrame('manager-recipe-edit-access-rail', 'Manager recipe editor — restricted-visibility Access tab (players and characters with access)'),
+  // The Books & Scrolls tab body (issue 796). Its own dedicated frame because `collect`
+  // publishes only `candidates[0]` per view id, so without a view mapped to this smoke
+  // label the linked-book grid fix would never reach a PR — the sibling recipe-edit frames
+  // capture other tabs. This frame proves the tab body tiles into an auto-fill grid filling
+  // the panel rather than the old ~half-width capped column.
+  recipeEditFrame('manager-recipe-edit-books-scrolls', 'Manager recipe editor — Books & Scrolls tab (linked-book grid fills the panel)'),
   {
     id: 'player-gathering',
     label: 'Player gathering tab',
@@ -404,6 +569,42 @@ export const VIEW_RECIPES = Object.freeze([
       'player-crafting-run-summary',
     ],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+  },
+  {
+    id: 'player-crafting-essence-legacy',
+    label: 'Player crafting — legacy set-level essence authored icon',
+    smokeLabels: ['player-crafting-essence-legacy'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+    ],
+  },
+  {
+    id: 'player-crafting-essence-ingredient',
+    label: 'Player crafting — first-class essence ingredient authored icon',
+    smokeLabels: ['player-crafting-essence-ingredient'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+    ],
+  },
+  {
+    id: 'player-crafting-essence-alternative',
+    label: 'Player crafting — essence OR-alternative authored icon',
+    smokeLabels: ['player-crafting-essence-alternative'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IngredientOptionSelector\.svelte$/,
+    ],
+  },
+  {
+    id: 'player-crafting-essence-shopping',
+    label: 'Player crafting — Shopping List essence shortage authored icon',
+    smokeLabels: ['player-crafting-essence-shopping'],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/ShoppingList\.svelte$/,
+    ],
   },
   {
     id: 'player-crafting-stacked',
@@ -459,6 +660,17 @@ export const VIEW_RECIPES = Object.freeze([
     label: 'Player crafting — progressive stage list, narrow window',
     smokeLabels: ['player-crafting-progressive-stacked'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//, /^src\/ui\/SvelteFabricateApp\.svelte\.js$/],
+  },
+  // The explicit multi-step simple recipe detail (issue 765): per-step material blocks,
+  // the multi-step hint strip, one terminal PRODUCES row, and no check card. Its OWN
+  // view — `collect` emits one file per view id, so this reaches the PR as a distinct
+  // frame proving the step-aware projection rather than folding into the resting simple
+  // frame (which shows a single-step recipe).
+  {
+    id: 'player-crafting-multistep',
+    label: 'Player crafting — explicit multi-step simple recipe detail',
+    smokeLabels: ['player-crafting-multistep'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
   },
   // The player Alchemy workbench (issue 543) publishes three distinct frames — the
   // discipline chooser, the three-column workbench, and the narrow stacked layout.
@@ -522,6 +734,43 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\//,
       /^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySalvagePanel\.svelte$/,
     ],
+  },
+  {
+    // Issue 764: the GM-facing Simple-mode MISCONFIGURED salvage cue — the
+    // `SalvageMisconfiguredBody` with Simple-specific copy and the mode banner suppressed,
+    // for a stored multi-success-group Simple config. Narrowly matched to the misconfigured
+    // body ONLY, so the two `player-salvage` deep-equality assertions (which test
+    // `SalvageSimpleBody`/`InventorySalvagePanel`) are unaffected.
+    id: 'player-salvage-misconfigured',
+    label: 'Player salvage panel — Simple misconfigured cue (GM inventory)',
+    smokeLabels: ['player-salvage-misconfigured'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageMisconfiguredBody\.svelte$/],
+  },
+  {
+    // Issue 777: the pre-roll required-tools disclosure — the `SalvageToolRequirements`
+    // section with one AVAILABLE (green) and one UNAVAILABLE (red) StatusPill row, the
+    // state the existing player-salvage capture walk cannot reach. Its OWN view (one file
+    // per view id) so `collect` publishes the dedicated frame; appending its label to the
+    // existing `player-salvage` view would never publish it. Narrowly matched to the tool
+    // requirements section ONLY, so the two `player-salvage` deep-equality assertions are
+    // unaffected.
+    id: 'player-salvage-tools',
+    label: 'Player salvage panel — required-tools disclosure',
+    smokeLabels: ['player-salvage-tools'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageToolRequirements\.svelte$/],
+  },
+  {
+    // Issue 766: the one-card-per-unified-physical-stack collapse — a single card for a
+    // stack registered in two crafting systems, carrying the role=radiogroup System
+    // selector that re-scopes the whole detail body. Its OWN view (one file per view id)
+    // so `collect` publishes the dedicated frame; the frame the existing player-inventory
+    // capture walk (a single-system selection) cannot reach. Narrowly matched to the new
+    // selector component ONLY, so the `player-inventory` deep-equality assertions above are
+    // unaffected (it still ALSO maps to player-inventory via the broad inventory glob).
+    id: 'player-inventory-multi-system',
+    label: 'Player Inventory tab — multi-system collapsed card + system selector',
+    smokeLabels: ['player-inventory-multi-system'],
+    matches: [/^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySystemSelector\.svelte$/],
   },
   {
     id: 'fabricate-app-shell',
@@ -664,6 +913,21 @@ export function mapChangedFilesToViews(files = []) {
   return matched.filter(Boolean);
 }
 
+// The flat, de-duplicated list of smoke labels the views a PR's changed files affect
+// map to — the EXACT target set the scoped `screenshots` capture profile
+// (`scripts/foundry-test-run.mjs`, issue #826) should capture. This is the same
+// `mapChangedFilesToViews` lookup `collect`/`publish` consume, so the captured set and
+// the collected set stay in lockstep.
+export function smokeLabelsForChangedFiles(files = []) {
+  const labels = [];
+  for (const view of mapChangedFilesToViews(files)) {
+    for (const label of view.smokeLabels) {
+      if (!labels.includes(label)) labels.push(label);
+    }
+  }
+  return labels;
+}
+
 // A UI PR satisfies the screenshot check when its body has a "Screenshots"
 // heading (any ATX level — typically `##`) whose section contains at least one
 // image. Images may be markdown (`![alt](url)`) or HTML (`<img ... src=...>`);
@@ -712,6 +976,7 @@ export function collectScreenshotEvidence({
   sourceDir = 'test-results',
   outputDir,
   allowMissing = false,
+  headSha,
   root = ROOT,
 } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'collect');
@@ -721,6 +986,10 @@ export function collectScreenshotEvidence({
   const copied = [];
   const missing = [];
   const allImages = existsSync(sourceRoot) ? listImages(sourceRoot).sort((a, b) => a.localeCompare(b)) : [];
+  const toolViews = views.filter(isToolStudioView);
+  const toolEvidence = toolViews.length > 0
+    ? validateToolStudioRunEvidence({ sourceRoot, views, headSha })
+    : null;
 
   mkdirSync(destinationRoot, { recursive: true });
   for (const view of views) {
@@ -729,7 +998,13 @@ export function collectScreenshotEvidence({
       missing.push(view);
       continue;
     }
+    if (toolEvidence && isToolStudioView(view) && candidates.length !== 1) {
+      throw new Error(`Duplicate Tool Studio screenshot evidence for ${view.id}: ${candidates.length} candidates`);
+    }
     const source = candidates[0];
+    if (toolEvidence && isToolStudioView(view)) {
+      validateToolStudioCapture(view, source, toolEvidence);
+    }
     const destination = join(destinationRoot, `${view.id}${extensionOf(source)}`);
     copyFileSync(source, destination);
     copied.push({ view, source, destination });
@@ -741,6 +1016,121 @@ export function collectScreenshotEvidence({
   }
 
   return { views, copied, missing, destinationRoot };
+}
+
+function isToolStudioView(view) {
+  return view.matches === TOOL_STUDIO_MATCHES;
+}
+
+const TOOL_PARITY_DIMENSIONS = new Map([
+  ['01-library-1280x720', [1212, 682]],
+  ['zero-state-empty-library-1280x720', [1212, 682]],
+  ['02-overview-1280x720', [1212, 682]],
+  ['03-breakage-1280x720', [1212, 682]],
+  ['04-requirements-1280x720', [1212, 682]],
+  ['05-validation-1280x720', [1212, 682]],
+  ['06-breakage-900x700', [832, 662]],
+]);
+const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
+
+function readJsonEvidence(path, label) {
+  if (!existsSync(path)) throw new Error(`Missing ${label}: ${relative(ROOT, path)}`);
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(`Invalid ${label}: ${error.message}`);
+  }
+}
+
+function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
+  const summary = readJsonEvidence(join(sourceRoot, 'summary.json'), 'Tool Studio smoke summary');
+  const manifest = readJsonEvidence(
+    join(sourceRoot, 'screenshot-manifest.json'),
+    'Tool Studio screenshot manifest'
+  );
+  if (
+    summary.passed !== true ||
+    summary.stepFailures !== 0 ||
+    summary.consoleErrorCount !== 0 ||
+    summary.degraded !== false ||
+    summary.rendererCrashed !== false
+  ) {
+    throw new Error('Tool Studio screenshot evidence comes from a failed or degraded smoke summary');
+  }
+  const summaryRun = summary.screenshotRun || {};
+  if (!summaryRun.runId || summaryRun.runId !== manifest.runId) {
+    throw new Error('Tool Studio summary and manifest do not share one run identity');
+  }
+  const expectedHead = normalizeHeadShaSegment(headSha);
+  if (!expectedHead || summaryRun.headSha !== expectedHead || manifest.headSha !== expectedHead) {
+    throw new Error('Tool Studio screenshot evidence is stale for the requested PR head SHA');
+  }
+  const expectedLabels = views
+    .flatMap((view) => view.smokeLabels)
+    .sort((a, b) => a.localeCompare(b));
+  const summaryLabels = [...(summaryRun.targetLabels || [])].sort((a, b) => a.localeCompare(b));
+  const manifestLabels = [...(manifest.targetLabels || [])].sort((a, b) => a.localeCompare(b));
+  if (
+    JSON.stringify(summaryLabels) !== JSON.stringify(expectedLabels) ||
+    JSON.stringify(manifestLabels) !== JSON.stringify(expectedLabels)
+  ) {
+    throw new Error('Tool Studio screenshot evidence belongs to another target-label set');
+  }
+  return { manifest, capturesByFile: new Map((manifest.captures || []).map((entry) => [entry.file, entry])) };
+}
+
+function validateToolStudioCapture(view, source, evidence) {
+  const file = basename(source);
+  const capture = evidence.capturesByFile.get(file);
+  if (TOOL_PARITY_DIMENSIONS.has(view.id) && capture?.label?.includes('stress')) {
+    throw new Error(`Stress evidence cannot substitute for Tool Studio parity frame ${view.id}`);
+  }
+  if (!capture || !view.smokeLabels.includes(capture.label)) {
+    throw new Error(`Tool Studio manifest does not bind ${file} to ${view.id}`);
+  }
+  if (TOOL_PARITY_DIMENSIONS.has(view.id)) {
+    const [width, height] = TOOL_PARITY_DIMENSIONS.get(view.id);
+    if (capture.width !== width || capture.height !== height) {
+      throw new Error(
+        `Wrong Tool Studio dimensions for ${view.id}: ${capture.width}x${capture.height}; expected ${width}x${height}`
+      );
+    }
+    const actual = readToolStudioPngDimensions(view, source);
+    if (actual.width !== width || actual.height !== height) {
+      throw new Error(
+        `Wrong Tool Studio PNG dimensions for ${view.id}: ${actual.width}x${actual.height}; expected ${width}x${height}`
+      );
+    }
+    return;
+  }
+  const actual = readToolStudioPngDimensions(view, source);
+  if (actual.width !== capture.width || actual.height !== capture.height) {
+    throw new Error(
+      `Tool Studio PNG dimensions do not match its manifest for ${view.id}: ` +
+      `${actual.width}x${actual.height} actual; ${capture.width}x${capture.height} declared`
+    );
+  }
+}
+
+function readToolStudioPngDimensions(view, source) {
+  if (extensionOf(source) !== '.png') {
+    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} is not a .png file`);
+  }
+  const bytes = readFileSync(source);
+  const hasPngHeader =
+    bytes.length >= 33 &&
+    bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) &&
+    bytes.readUInt32BE(8) === 13 &&
+    bytes.toString('ascii', 12, 16) === 'IHDR';
+  if (!hasPngHeader) {
+    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has no valid PNG header`);
+  }
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  if (width === 0 || height === 0) {
+    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has zero dimensions`);
+  }
+  return { width, height };
 }
 
 export function cleanPrScreenshotEvidence({ prNumber, root = ROOT } = {}) {
@@ -761,10 +1151,32 @@ export function isExemptByLabel(labels = [], exemptLabel = DEFAULT_EXEMPT_LABEL)
   return labels.some(label => String(label).trim().toLowerCase() === target);
 }
 
+// CONSERVATIVE label sanitization (salvaged from #823, Design H hardening #1). A view
+// label flows unescaped into `![label](url)` alt-text + the managed PR-body block, an
+// injection/block-breakout vector. Reject/escape ONLY what actually breaks the
+// `![...](...)` structure or the managed block: control chars, newlines, the block
+// sentinels, and the `[`/`]` that terminate alt-text. Parens are LEGAL in markdown
+// alt-text and appear in real labels (e.g. "Manager currency configuration (spend
+// strategy, units, macros)"), so they are deliberately preserved — do NOT over-escape.
+export function sanitizeLabel(label = '') {
+  return (
+    String(label)
+      // Strip control characters (incl. newlines/DEL) that could break the block/line.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+      // Neutralize the managed-block sentinels so a label can't forge/break the block.
+      .replace(/<!--\s*fabricate:screenshots:(?:start|end)\s*-->/gi, '')
+      // Escape the alt-text terminators; parens are intentionally left intact.
+      .replace(/([[\]])/g, '\\$1')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
 export function buildScreenshotMarkdown(prNumber, uploaded = []) {
   const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   const prefix = normalizedPrNumber ? `pr-${normalizedPrNumber} ` : '';
-  return uploaded.map(({ label, url }) => `![${prefix}${label}](${url})`).join('\n\n');
+  return uploaded.map(({ label, url }) => `![${prefix}${sanitizeLabel(label)}](${url})`).join('\n\n');
 }
 
 export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
@@ -831,11 +1243,30 @@ async function defaultS3ListAndDelete(region) {
   };
 }
 
-// Upload collected screenshots to S3 under <prefix>/<pr>/<view>.png. Headless,
-// no GitHub Releases/branches; the public-read object URL is embedded in the PR
-// body. `putObject` is injectable so tests never touch AWS.
-export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject } = {}) {
+// A normalized, filesystem-safe S3 key path segment: reject `..`, path separators,
+// and anything but a revision-shaped token so a supplied headSha cannot escape the
+// PR-scoped prefix (parity with the PR-number validation). Salvaged from #823.
+function normalizeHeadShaSegment(headSha) {
+  if (headSha === undefined || headSha === null || headSha === '') return '';
+  const value = String(headSha).trim();
+  if (!/^[0-9a-zA-Z._-]+$/.test(value) || value.includes('..')) {
+    throw new Error(`Invalid head SHA segment: ${headSha}`);
+  }
+  return value;
+}
+
+// Upload collected screenshots to S3. Publish adopts REVISION-ADDRESSED keys
+// `<prefix>/<pr>/<head-sha>/<view>.png` when a headSha is supplied (cache-busting so a
+// re-pushed revision does not serve a stale cached frame; the existing prefix-delete
+// cleanup still works with nested keys), else the legacy `<prefix>/<pr>/<view>.png`.
+// Headless, no GitHub Releases/branches; the public-read object URL is embedded in the
+// PR body. `putObject` is injectable so tests never touch AWS. `labelForId` lets a
+// caller supply labels from its own registry; otherwise labels resolve from
+// `VIEW_RECIPES` and fall back to the id (the id is DERIVED from the filename here, so
+// the pairing is unambiguous by construction).
+export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
+  const shaSegment = normalizeHeadShaSegment(headSha);
   const cfg = config || loadS3Config(root);
   if (!cfg.bucket || !cfg.baseUrl) {
     throw new Error('S3 is not configured. Set bucket/baseUrl in release.s3.config.json (or S3_RELEASE_BUCKET/RELEASE_BASE_URL).');
@@ -845,10 +1276,14 @@ export async function uploadScreenshotObjects({ prNumber, files = [], root = ROO
   for (const file of files) {
     const name = basename(file);
     const viewId = name.slice(0, name.length - extensionOf(file).length);
-    const key = `${cfg.prefix}/${normalizedPrNumber}/${name}`;
+    const prScope = shaSegment
+      ? `${cfg.prefix}/${normalizedPrNumber}/${shaSegment}`
+      : `${cfg.prefix}/${normalizedPrNumber}`;
+    const key = `${prScope}/${name}`;
     await put({ bucket: cfg.bucket, key, body: readFileSync(file), contentType: contentTypeFor(file) });
     const recipe = VIEW_RECIPES.find(item => item.id === viewId);
-    uploaded.push({ viewId, label: recipe ? recipe.label : viewId, url: `${cfg.baseUrl}/${key}`, key, file });
+    const label = (labelForId && labelForId(viewId)) || (recipe ? recipe.label : viewId);
+    uploaded.push({ viewId, label, url: `${cfg.baseUrl}/${key}`, key, file });
   }
   return uploaded;
 }
@@ -880,6 +1315,8 @@ export async function publishScreenshotEvidence({
   runGh = defaultGhRunner,
   putObject,
   config,
+  headSha,
+  labelForId,
 } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const destinationRoot = resolve(root, dir || `tmp/pr-screenshots/${normalizedPrNumber}`);
@@ -900,7 +1337,7 @@ export async function publishScreenshotEvidence({
     };
   }
 
-  const uploaded = await uploadScreenshotObjects({ prNumber: normalizedPrNumber, files, root, config, putObject });
+  const uploaded = await uploadScreenshotObjects({ prNumber: normalizedPrNumber, files, root, config, putObject, headSha, labelForId });
 
   const repoArgs = repo ? ['--repo', repo] : [];
   const view = runGh(['pr', 'view', String(normalizedPrNumber), ...repoArgs, '--json', 'body', '--jq', '.body']);
@@ -972,10 +1409,44 @@ function readLines(path) {
     .filter(Boolean);
 }
 
-function readChangedFilesFromGit(base) {
-  const result = spawnSync('git', ['diff', '--name-only', `${base}..HEAD`], { cwd: ROOT, encoding: 'utf8' });
+// Ordered default-base candidates. The first ref git can verify wins when neither
+// --base nor --changed-files is supplied. Named in the failure diagnostic so a
+// contributor knows exactly what was tried.
+const DEFAULT_BASE_CANDIDATES = Object.freeze(['origin/main', 'origin/HEAD', 'main']);
+
+// Single spawn path for every git call so `readChangedFilesFromGit` and
+// `resolveDefaultBase` share one implementation. `scripts/**` is NOT excluded from
+// SonarCloud's new-code duplication under Automatic Analysis, so two near-identical
+// inline `spawnSync('git', …)` blocks would risk the duplication gate.
+// `git` is resolved from PATH by design: this is a local maintainer/CI dev tool that
+// assumes git on PATH (like the sibling `gh`/`git` spawns in this file), the command
+// name is a fixed literal, args are an array with no shell, so there is no injection
+// vector. S4036 (PATH must be fixed/unwriteable) is not applicable here.
+function runGit(args, { root = ROOT } = {}) {
+  return spawnSync('git', args, { cwd: root, encoding: 'utf8' }); // NOSONAR S4036 — git-from-PATH is the intended dev-tool contract (see note above)
+}
+
+function readChangedFilesFromGit(base, { root = ROOT } = {}) {
+  // Three-dot `<base>...HEAD` is merge-base semantics: "what did THIS branch change
+  // since it forked from <base>", applied to BOTH the resolved-default and explicit
+  // --base paths so bare `plan` never disagrees with `plan --base <ref>`. On the
+  // integration path the driver rebases onto origin/main first, so the merge base is
+  // origin/main's tip and three-dot collapses to two-dot.
+  const result = runGit(['diff', '--name-only', `${base}...HEAD`], { root });
   if (result.status !== 0) throw new Error(result.stderr || `git diff failed with status ${result.status}`);
   return result.stdout.split(/\r?\n/).filter(Boolean);
+}
+
+// Resolve a default base ref when the caller supplies neither --base nor
+// --changed-files. Returns the first candidate git can verify, or null when none
+// resolve (e.g. a checkout with no `origin` remote and no local `main`). The git
+// runner and candidate list are injectable so tests never touch a real repository.
+export function resolveDefaultBase({ root = ROOT, runGit: gitRunner = runGit, candidates = DEFAULT_BASE_CANDIDATES } = {}) {
+  for (const ref of candidates) {
+    const result = gitRunner(['rev-parse', '--verify', '--quiet', ref], { root });
+    if (result && result.status === 0) return ref;
+  }
+  return null;
 }
 
 function parseArgs(argv) {
@@ -1010,18 +1481,39 @@ function toCamelCase(value) {
   return value.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
 }
 
-function loadChangedFiles(args) {
+// Resolve the changed-file set from, in precedence order: --changed-files (read
+// line-by-line), --base (diff against that ref), else a resolved default base. On a
+// resolved default it prints a one-line stderr note (stdout stays a clean artifact
+// listing) and diffs; when no base ref can be resolved it throws a clear, actionable
+// error rather than returning [] — so a bare invocation never reports a confident
+// "no UI changes" from an empty input set. The seams default to the real
+// implementations so `main()`'s existing call site is unchanged.
+export function loadChangedFiles(args, { resolveBase = resolveDefaultBase, readChangedFiles = readChangedFilesFromGit } = {}) {
   if (args.changedFiles) return readLines(args.changedFiles);
-  if (args.base) return readChangedFilesFromGit(args.base);
-  return [];
+  if (args.base) return readChangedFiles(args.base);
+  const base = resolveBase();
+  if (!base) {
+    throw new Error(
+      `Could not resolve a default base ref (tried ${DEFAULT_BASE_CANDIDATES.join(', ')}). `
+      + 'Pass --base <ref> (e.g. --base origin/main) or --changed-files <file>.',
+    );
+  }
+  console.error(`Using default base ${base} (no --base given).`);
+  return readChangedFiles(base);
 }
 
-async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0] || 'plan';
-  const changedFiles = loadChangedFiles(args);
+  const { resolveBase, readChangedFiles, runGh, putObject, config } = deps;
+  // Base resolution is scoped to the commands that CONSUME the changed-file set.
+  // `publish` derives its files from tmp/pr-screenshots/<pr>/ and `clean` just removes
+  // a local dir — neither must spawn git, print the default-base note, or throw when no
+  // base ref resolves (that would turn `clean` into a spurious exit 1).
+  const loadChanged = () => loadChangedFiles(args, { resolveBase, readChangedFiles });
 
   if (command === 'plan') {
+    const changedFiles = loadChanged();
     if (!hasUiChanges(changedFiles)) {
       console.log('No UI changes detected.');
       return;
@@ -1033,7 +1525,17 @@ async function main(argv = process.argv.slice(2)) {
     return;
   }
 
+  if (command === 'targets') {
+    // Print the scoped `screenshots`-profile target label set (CSV) for the changed
+    // files, for `FOUNDRY_SCREENSHOT_TARGET_LABELS` / `--target-labels`. Empty output
+    // (no UI change) tells the caller to skip the capture run entirely.
+    const changedFiles = loadChanged();
+    console.log(smokeLabelsForChangedFiles(changedFiles).join(','));
+    return;
+  }
+
   if (command === 'check') {
+    const changedFiles = loadChanged();
     const body = args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '';
     const exemptLabel = args.exemptLabel || DEFAULT_EXEMPT_LABEL;
     const labels = readLabelList(args.labels);
@@ -1067,12 +1569,14 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'collect') {
+    const changedFiles = loadChanged();
     const result = collectScreenshotEvidence({
       changedFiles,
       prNumber: args.pr,
       sourceDir: args.sourceDir || 'test-results',
       outputDir: args.outputDir,
       allowMissing: args.allowMissing === true,
+      headSha: args.headSha,
     });
     for (const item of result.copied) {
       console.log(`${relative(ROOT, item.destination).replaceAll(sep, '/')} <= ${relative(ROOT, item.source).replaceAll(sep, '/')}`);
@@ -1109,6 +1613,12 @@ async function main(argv = process.argv.slice(2)) {
       prNumber: args.pr,
       repo: args.repo,
       dir: args.outputDir,
+      runGh,
+      putObject,
+      config,
+      // Revision-addressed keys (`<prefix>/<pr>/<head-sha>/<view>.png`) when the head
+      // SHA is supplied; without it the keys fall back to the legacy PR-scoped path.
+      headSha: args.headSha,
     });
     if (result.skipped) {
       console.log(result.reason);

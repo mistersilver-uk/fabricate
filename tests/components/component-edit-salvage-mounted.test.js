@@ -460,4 +460,78 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     assert.equal(target.querySelector('[data-salvage-result-difficulty]'), null);
     harness.remount();
   });
+
+  // ── issue 764: the Simple-mode single-success-group cap ───────────────────
+
+  it('Simple mode HIDES Add group at the one-success-group cap and shows the required hint', async () => {
+    // RESULT_GROUPS carries one success group, so Simple mode is at its cap: the only
+    // add-group affordance is gone and the required hint explains why. The invariant is
+    // the normalizer clamp; this is UX only.
+    const target = await harness.mount(props({ salvageResolutionMode: 'simple' }));
+    assert.equal(
+      target.querySelector('[data-add-salvage-group]'),
+      null,
+      'no Add group control at the Simple one-success-group cap'
+    );
+    const hint = target.querySelector('[data-salvage-simple-hint]');
+    assert.ok(hint, 'the required visible hint is present (not a tooltip)');
+    assert.match(hint.textContent, /single result group/i);
+    harness.remount();
+  });
+
+  it('Simple mode with NO success group still exposes Add group so the GM can author one', async () => {
+    const target = await harness.mount(
+      props({
+        salvageResolutionMode: 'simple',
+        component: { salvage: { enabled: false, resultGroups: [] } },
+      })
+    );
+    assert.ok(
+      target.querySelector('[data-add-salvage-group]'),
+      'the GM can still add the first success group in Simple mode'
+    );
+    assert.ok(target.querySelector('[data-salvage-simple-hint]'), 'and the hint is shown');
+    harness.remount();
+  });
+
+  it('Routed mode keeps the multi-group Add group control and no Simple hint', async () => {
+    const target = await harness.mount(props({ salvageResolutionMode: 'routed' }));
+    assert.ok(
+      target.querySelector('[data-add-salvage-group]'),
+      'Routed still exposes Add group'
+    );
+    assert.equal(
+      target.querySelector('[data-salvage-simple-hint]'),
+      null,
+      'the Simple hint is Simple-only'
+    );
+    harness.remount();
+  });
+
+  it('Simple cap counts SUCCESS groups — a legacy reserved failure row is preserved, not blanked', async () => {
+    // One success group + one reserved `role: 'failure'` group: the cap counts success
+    // groups (1 → capped) but the failure row's stored data must survive and render.
+    const target = await harness.mount(
+      props({
+        salvageResolutionMode: 'simple',
+        component: {
+          salvage: {
+            enabled: true,
+            resultGroups: [
+              { id: 'grp-win', name: 'Scraps', results: [{ id: 'r1', componentId: 'cmp-scrap', quantity: 1 }] },
+              { id: 'grp-fail', name: 'Nothing', role: 'failure', results: [{ id: 'r2', componentId: 'cmp-dust', quantity: 1 }] },
+            ],
+          },
+        },
+      })
+    );
+    assert.equal(
+      target.querySelector('[data-add-salvage-group]'),
+      null,
+      'capped at one success group even with a legacy failure group present'
+    );
+    const groups = target.querySelectorAll('[data-salvage-group]');
+    assert.equal(groups.length, 2, 'both the success and the reserved failure rows render (data not blanked)');
+    harness.remount();
+  });
 });

@@ -161,7 +161,7 @@ test('unknown tier id falls back to the default DC', async () => {
 // ── Dynamic DC (macro) ──────────────────────────────────────────────────────
 
 test('dynamic DC: the macro return value is used as the DC', async () => {
-  const { engine } = makeEngine({
+  const { engine, system } = makeEngine({
     simple: defaultSimple({ dc: 99, dcMode: 'dynamic', macroUuid: 'Macro.dc' }),
   });
   stubRoll(13, [{ number: 1, faces: 20, total: 13 }]);
@@ -182,6 +182,7 @@ test('dynamic DC: the macro return value is used as the DC', async () => {
       'macro gets the ingredient set'
     );
     assert.ok(received.context.craftingActor && received.context.recipe);
+    assert.strictEqual(received.context.craftingSystem, system);
   } finally {
     MacroExecutor.run = orig;
   }

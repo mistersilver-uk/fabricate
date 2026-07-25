@@ -115,6 +115,43 @@ export function isTransientPageTeardown(message) {
 }
 
 /**
+ * The prefix stamped onto a smoke step's `error` when a transient renderer/page
+ * teardown is TOLERATED (the step is recorded skipped rather than failed). Both
+ * harness writer sites — the Phase E Journal step and the Phase D0 manager walk —
+ * stamp this exact prefix, and `computeSmokeSignal` matches on it to derive
+ * `degraded`. Single-sourcing the constant means writer spelling and matcher
+ * cannot silently drift apart and leave a tolerated run un-flagged.
+ *
+ * @type {string}
+ */
+export const TRANSIENT_TEARDOWN_SKIP_PREFIX = 'transient page teardown (skipped): ';
+
+/**
+ * Decide whether a smoke step's error is a TOLERABLE transient teardown.
+ *
+ * True only when the teardown class is present — the page/target is already gone
+ * (`pageClosed`) OR the message is teardown-shaped (`isTransientPageTeardown`) —
+ * AND every required capture already completed (`requiredCapturesComplete`). A
+ * real (non-teardown) assertion failure returns false EVEN with
+ * `requiredCapturesComplete: true`, so a genuine post-milestone failure is never
+ * swallowed. Both the Phase E Journal step and the Phase D0 manager walk route
+ * their tolerate-or-fail decision through this single predicate, so the two sites
+ * cannot diverge on what counts as tolerable.
+ *
+ * @param {{ message?: unknown, pageClosed?: boolean, requiredCapturesComplete?: boolean }} [params]
+ * @returns {boolean}
+ */
+export function shouldTolerateSmokeTeardown({
+  message,
+  pageClosed,
+  requiredCapturesComplete,
+} = {}) {
+  return (
+    (Boolean(pageClosed) || isTransientPageTeardown(message)) && Boolean(requiredCapturesComplete)
+  );
+}
+
+/**
  * The split smoke signal, computed from the accumulated results.
  *
  * `stepFailures` counts failed steps; `consoleErrorCount` counts the NON-waived
@@ -122,8 +159,14 @@ export function isTransientPageTeardown(message) {
  * capture time and never appear here). A failing step with zero console errors
  * is therefore distinguishable from the inverse.
  *
- * @param {{ steps?: Array<{ passed?: boolean }>, consoleErrors?: string[] }} results
- * @returns {{ stepFailures: number, consoleErrorCount: number }}
+ * `degraded` is true when any skipped step's `error` starts with
+ * `TRANSIENT_TEARDOWN_SKIP_PREFIX` — i.e. a transient renderer/page teardown was
+ * TOLERATED (recorded skipped, not failed). A degraded run still exits 0 but is
+ * distinguishable in `summary.json`. Matching on the exported prefix constant
+ * keeps this matcher in lockstep with the harness writer sites that stamp it.
+ *
+ * @param {{ steps?: Array<{ passed?: boolean, skipped?: boolean, error?: string }>, consoleErrors?: string[] }} results
+ * @returns {{ stepFailures: number, consoleErrorCount: number, degraded: boolean }}
  */
 export function computeSmokeSignal(results) {
   const steps = Array.isArray(results?.steps) ? results.steps : [];
@@ -131,6 +174,12 @@ export function computeSmokeSignal(results) {
   return {
     stepFailures: steps.filter((step) => step?.passed === false).length,
     consoleErrorCount: consoleErrors.length,
+    degraded: steps.some(
+      (step) =>
+        step?.skipped === true &&
+        typeof step?.error === 'string' &&
+        step.error.startsWith(TRANSIENT_TEARDOWN_SKIP_PREFIX)
+    ),
   };
 }
 
@@ -144,6 +193,12 @@ export function computeSmokeSignal(results) {
  * every captured console error matched a pattern, `consoleErrors` is empty and
  * the console-error throw is suppressed.
  *
+ * Steps-first ordering is kept, but when a step fails AND runtime console errors
+ * were also captured, the console-error COUNT is appended to the `reason:'steps'`
+ * message. The steps-short-circuit would otherwise leave a nonzero
+ * `consoleErrorCount` invisible behind the step failure; the independent
+ * console-error gate below is unchanged.
+ *
  * @param {{ steps?: Array<{ passed?: boolean, step?: string, error?: string }>, consoleErrors?: string[] }} results
  * @returns {{ throws: boolean, reason?: 'steps' | 'console-errors', message?: string }}
  */
@@ -154,10 +209,14 @@ export function evaluateSmokeOutcome(results) {
   const failedSteps = steps.filter((step) => step?.passed === false);
   if (failedSteps.length > 0) {
     const summary = failedSteps.map((step) => `${step.step}: ${step.error || 'failed'}`).join('; ');
+    const consoleNote =
+      consoleErrors.length > 0
+        ? ` (+${consoleErrors.length} runtime console error(s) captured)`
+        : '';
     return {
       throws: true,
       reason: 'steps',
-      message: `${failedSteps.length} step(s) failed: ${summary}`,
+      message: `${failedSteps.length} step(s) failed: ${summary}${consoleNote}`,
     };
   }
 

@@ -5,6 +5,12 @@ import { readFileSync } from 'node:fs';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SYS_A,
+  SYS_B,
+  multiSystemCardRow,
+  multiSystemProgressiveCardRow,
+} from '../helpers/inventoryCollapseFixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -48,7 +54,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
+    // The <select> system selector InventoryComponentDetail renders for a multi-system
+    // card (issue 766). A `.svelte` leaf, so it lives in compiledModules — NOT
+    // CRAFTING_APP_RAW_MODULES; an omission HANGS this suite (# cancelled), never fails.
+    'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
@@ -60,6 +71,7 @@ function makeItem() {
   return {
     key: 'sys:c1',
     componentId: 'c1',
+    systemId: 'sys',
     name: 'Mordant Gland',
     img: 'icons/gland.webp',
     icon: null,
@@ -125,7 +137,27 @@ function makeServices(item) {
     visibleItems: [item],
     pageItems: [item],
     selectedItem: item,
+    selectedSystemId: null,
+    // Mirrors the real store's derivation: the top-level identity for a single-system /
+    // legacy card, else the selected (or first) participation.
+    get selectedParticipation() {
+      const it = this.selectedItem;
+      if (!it) return null;
+      const systems = Array.isArray(it.systems) ? it.systems : [];
+      if (systems.length === 0) {
+        return {
+          systemId: it.systemId ?? null,
+          componentId: it.componentId ?? null,
+          salvage: it.salvage ?? null,
+          ownedQuantity: Number(it.totalQuantity ?? 0),
+        };
+      }
+      return systems.find((entry) => entry.systemId === this.selectedSystemId) ?? systems[0];
+    },
     select() {},
+    selectSystem(systemId) {
+      this.selectedSystemId = systemId ?? null;
+    },
     setSearch() {},
     setFilter() {},
     setSort() {},
@@ -903,6 +935,7 @@ function salvageItem(salvage = {}, overrides = {}) {
       mode: 'simple',
       checkUsable: false,
       misconfigured: false,
+      misconfiguredReason: null,
       routedType: null,
       dc: null,
       allowPlayerResultReorder: true,
@@ -911,6 +944,8 @@ function salvageItem(salvage = {}, overrides = {}) {
       stages: [],
       awardMode: null,
       targetActorId: 'a1',
+      toolStates: [],
+      toolsAvailable: true,
       ...salvage,
     },
     ...overrides,
@@ -928,7 +963,8 @@ function salvageServices(item, storeOverrides = {}) {
   store.orderedSalvageStages = item.salvage?.stages ?? [];
   store.salvageOrderAnnouncement = '';
   store.salvageOrderIsCustom = false;
-  store.salvage = (componentId) => calls.salvage.push(componentId);
+  // The view now routes through the selected participation's (systemId, componentId).
+  store.salvage = (_systemId, componentId) => calls.salvage.push(componentId);
   store.resetSalvage = () => calls.reset.push(true);
   store.reorderSalvageStage = (...args) => calls.reorder.push(args);
   store.resetSalvageOrder = (...args) => calls.resetOrder.push(args);
@@ -1133,6 +1169,115 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
   });
 
+  it('issue 764: a Simple multi-group misconfig renders Simple-specific copy and suppresses the banner', async () => {
+    // Threaded end-to-end THROUGH InventoryComponentDetail (prop-threading doctrine): the
+    // `misconfiguredReason` discriminator must reach SalvageMisconfiguredBody so it renders
+    // the Simple copy, NOT the routed "needs a check formula" copy. The green recycle
+    // banner that a Simple no-check config would otherwise show is suppressed.
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'simple',
+        checkUsable: false,
+        misconfigured: true,
+        misconfiguredReason: 'simpleMultiGroup',
+      })
+    );
+    const target = await openSalvage(services);
+
+    const body = target.querySelector('[data-inventory-salvage-body="misconfigured"]');
+    assert.ok(body, 'the misconfigured body renders on the GM path');
+    // The harness localizer echoes keys, so the Simple discriminator selects the Simple key.
+    assert.match(body.textContent, /MisconfiguredSimple/, 'Simple-specific copy, not routed');
+    assert.ok(
+      !body.textContent.includes('MisconfiguredRouted'),
+      'the routed copy is not rendered for a Simple misconfig'
+    );
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-banner]'),
+      null,
+      'the mode banner is suppressed when misconfigured'
+    );
+    assert.equal(target.querySelector('[data-inventory-salvage-action]').disabled, true);
+  });
+
+  // issue 777: required-tool disclosure.
+  it('renders the Required tools section with a row per required tool', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        toolStates: [
+          { componentId: 'c9', name: "Leatherworker's Tools", img: null, available: true, needsRepair: false },
+          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+        ],
+        toolsAvailable: false,
+      })
+    );
+    const target = await openSalvage(services);
+
+    const section = target.querySelector('[data-inventory-salvage-tools]');
+    assert.ok(section, 'the required-tools section renders');
+    const rows = section.querySelectorAll('[data-inventory-salvage-tool]');
+    assert.equal(rows.length, 2, 'a row per required tool');
+    assert.match(section.textContent, /Leatherworker's Tools/, 'the human tool name, not a raw id');
+    assert.equal(rows[0].dataset.ioSatisfied, 'true', 'the held tool reads available');
+    assert.equal(rows[1].dataset.ioSatisfied, 'false', 'the missing tool reads unavailable');
+  });
+
+  it('disables the pre-roll action when a required tool is unavailable', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        checkUsable: true,
+        dc: 12,
+        toolStates: [
+          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+        ],
+        toolsAvailable: false,
+      })
+    );
+    const target = await openSalvage(services);
+
+    const action = target.querySelector('[data-inventory-salvage-action]');
+    assert.equal(action.disabled, true, 'a missing tool blocks the one-shot roll');
+    assert.equal(
+      action.getAttribute('aria-describedby'),
+      'salvage-footer-note',
+      'the disabled action points at the block note'
+    );
+  });
+
+  it('renders no tools section when no tool is required', async () => {
+    const { services } = salvageServices(salvageItem({ toolStates: [], toolsAvailable: true }));
+    const target = await openSalvage(services);
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-tools]'),
+      null,
+      'no requirement, no section'
+    );
+  });
+
+  // Guards a later move of the section inside a non-misconfigured branch: a prerequisite is
+  // worth disclosing even when the salvage config is misconfigured.
+  it('renders the Required tools section even when the salvage is misconfigured', async () => {
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: false,
+        misconfigured: true,
+        routedType: 'relative',
+        toolStates: [
+          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+        ],
+        toolsAvailable: false,
+      })
+    );
+    const target = await openSalvage(services);
+
+    assert.ok(target.querySelector('[data-inventory-salvage-body="misconfigured"]'));
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-tools]'),
+      'the tools section renders independent of the misconfigured state'
+    );
+  });
+
   it('the footer is one-shot: pressing it asks the store to salvage this component', async () => {
     const { services, calls } = salvageServices(salvageItem({ checkUsable: true, dc: 12 }));
     const target = await openSalvage(services);
@@ -1154,6 +1299,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     harness.remount();
     store.salvageResult = {
+      systemId: 'sys',
       componentId: 'c1',
       state: 'success',
       message: 'Salvaged Mordant Gland',
@@ -1173,6 +1319,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('the summary prints the roll total when a roll happened, and omits it for a no-check salvage', async () => {
     const { services, store } = salvageServices(salvageItem({ checkUsable: true, dc: 12 }));
     store.salvageResult = {
+      systemId: 'sys',
       componentId: 'c1',
       state: 'success',
       message: 'Successfully salvaged Mordant Gland',
@@ -1193,6 +1340,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     harness.remount();
     const guaranteed = salvageServices(salvageItem({ checkUsable: false }));
     guaranteed.store.salvageResult = {
+      systemId: 'sys',
       componentId: 'c1',
       state: 'success',
       message: 'Successfully salvaged Mordant Gland',
@@ -1215,7 +1363,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('a committed salvage with stock remaining swaps the footer for the ribbon plus a Salvage again reset', async () => {
     // makeItem() carries totalQuantity 7, so stock remains: "Salvage again" is offered.
     const { services, calls, store } = salvageServices(salvageItem());
-    store.salvageResult = { componentId: 'c1', state: 'success', message: '', awarded: [] };
+    store.salvageResult = { systemId: 'sys', componentId: 'c1', state: 'success', message: '', awarded: [] };
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'));
@@ -1235,7 +1383,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   // the header must read honestly rather than a stale count.
   it('a committed salvage of the LAST copy shows the ribbon but withholds "Salvage again" and reads depleted', async () => {
     const { services, store } = salvageServices(salvageItem({}, { totalQuantity: 0 }));
-    store.salvageResult = { componentId: 'c1', state: 'success', message: '', awarded: [] };
+    store.salvageResult = { systemId: 'sys', componentId: 'c1', state: 'success', message: '', awarded: [] };
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'), 'the result ribbon still shows');
@@ -1256,6 +1404,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('AC9: a time-gated salvage shows a waiting state with the engine message, no ribbon', async () => {
     const { services, store } = salvageServices(salvageItem());
     store.salvageResult = {
+      systemId: 'sys',
       componentId: 'c1',
       state: 'waiting',
       message: 'Salvage started for Mordant Gland (60s remaining)',
@@ -1609,6 +1758,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('post-roll: chips reconcile against the run record — and NOTHING still awaits a roll', async () => {
     const { services } = progressiveServices({
       salvageResult: {
+        systemId: 'sys',
         componentId: 'c1',
         state: 'success',
         message: 'Salvaged Mordant Gland',
@@ -1647,6 +1797,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     // the count must decline to answer.
     const { services } = progressiveServices({
       salvageResult: {
+        systemId: 'sys',
         componentId: 'c1',
         state: 'success',
         message: '',
@@ -1664,6 +1815,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('post-roll: reorder is FROZEN — the roll has already been spent down the list', async () => {
     const { services } = progressiveServices({
       salvageResult: {
+        systemId: 'sys',
         componentId: 'c1',
         state: 'success',
         message: '',
@@ -1707,6 +1859,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       }),
       {
         salvageResult: {
+          systemId: 'sys',
           componentId: 'c1',
           state: 'success',
           message: '',
@@ -1730,6 +1883,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     // lie; claiming they still await a roll would be the contradiction above.
     const { services } = progressiveServices({
       salvageResult: {
+        systemId: 'sys',
         componentId: 'c1',
         state: 'success',
         message: '',
@@ -1766,6 +1920,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     harness.remount();
     const after = salvageServices(salvageItem(routed), {
       salvageResult: {
+        systemId: 'sys',
         componentId: 'c1',
         state: 'success',
         message: '',
@@ -1780,6 +1935,144 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(marked.length, 1, 'exactly one tier is marked');
     assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
     assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
+  });
+});
+
+describe('InventoryView (mounted) — one card per unified physical stack (issue 766)', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  it('single-system row: renders NO system selector and identical name/total/badges + Info leaves', async () => {
+    // The WIDENED single-system guardrail: not badges alone — the whole Info surface.
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.equal(
+      target.querySelector('[data-inventory-system-selector]'),
+      null,
+      'no selector node with a single participation'
+    );
+    const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
+    assert.match(detail.textContent, /Mordant Gland/, 'the component name');
+    assert.match(detail.textContent, /"count":7/, 'the card total counted once');
+    assert.match(detail.textContent, /Akra/, 'a source actor (Info leaf)');
+    assert.match(detail.textContent, /Alchemist's Crucible/, 'used-by (Info leaf)');
+    assert.match(detail.textContent, /Distil Gland/, 'produced-by (Info leaf)');
+    assert.match(detail.textContent, /Carve Bone Idol/, 'required-for (Info leaf)');
+    assert.match(detail.textContent, /Fire/, 'essence content (Info leaf)');
+  });
+
+  it('multi-system card: renders a <select> drop-down with one option per participation', async () => {
+    const { services } = makeServices(multiSystemCardRow());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const select = target.querySelector('[data-inventory-system-select]');
+    assert.ok(select, 'the selector is a native <select> drop-down');
+    assert.equal(select.tagName, 'SELECT', 'a value choice, not a radiogroup toggle');
+    const opts = select.querySelectorAll('option');
+    assert.equal(opts.length, 2, 'one option per participation');
+    // The label is associated with the select (a11y).
+    assert.ok(
+      target.querySelector('label[for="inventory-system-selector-select"]'),
+      'a <label for> is associated with the select'
+    );
+    // The primary (System A) is the selected value, and options read as the system NAME.
+    const optionByValue = (id) =>
+      [...opts].find((option) => (option.value || option.getAttribute('value')) === id);
+    assert.ok(optionByValue(SYS_A)?.selected, 'the salvageable-biased primary is selected');
+    assert.match(optionByValue(SYS_A).textContent, new RegExp(SYS_A), 'option reads as the system name');
+    // The primary participation's name/essence scope the body.
+    const detail = target.querySelector(`[data-inventory-detail="${SYS_A}:cA"]`);
+    assert.match(detail.textContent, /Air Shard/, 'header name is the primary participation');
+    assert.match(detail.textContent, /Fire/, 'essence section scopes to System A');
+    assert.doesNotMatch(detail.textContent, /Water/, 'System B essence is not shown for System A');
+  });
+
+  it('changing the system drop-down routes the selection to store.selectSystem', async () => {
+    const { services, store } = makeServices(multiSystemCardRow());
+    const picks = [];
+    store.selectSystem = (systemId) => picks.push(systemId);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const select = target.querySelector('[data-inventory-system-select]');
+    select.value = SYS_B;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+    assert.deepEqual(picks, [SYS_B], 'the drop-down drives the store selection');
+  });
+
+  it('with System B selected, the whole body scopes to System B (name + essence + salvage)', async () => {
+    const { services, store } = makeServices(multiSystemCardRow());
+    // Preset the participation the store resolves to, then mount (the POJO store getter is
+    // not reactive; this proves the scoping without a live signal round-trip).
+    store.selectedSystemId = SYS_B;
+    const target = await harness.mount({ services });
+    await settle();
+
+    const detail = target.querySelector(`[data-inventory-detail="${SYS_A}:cA"]`);
+    assert.match(detail.textContent, /Crystallized Air/, 'header name is System B');
+    assert.match(detail.textContent, /Water/, 'essence section is System B');
+    assert.doesNotMatch(detail.textContent, /Fire/, 'System A essence is not shown for System B');
+    // The acting-system eyebrow names System B on the salvage surface.
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-acting-system]'),
+      'the salvage panel names the acting system'
+    );
+  });
+
+  it('pressing Salvage routes the SELECTED participation ids, explicitly not the primary', async () => {
+    // Binds InventoryView.onSalvage (a routing site the earlier tests left unpressed):
+    // mutating it to forward the PRIMARY `selectedItem` ids instead of `activeSystem`
+    // would send System A's cA here, flipping this test.
+    const { services, store } = makeServices(multiSystemCardRow());
+    const salvageCalls = [];
+    store.salvage = (systemId, componentId) => {
+      salvageCalls.push([systemId, componentId]);
+      return Promise.resolve({ success: true });
+    };
+    store.selectedSystemId = SYS_B;
+    const target = await harness.mount({ services });
+    await settle();
+
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    target.querySelector('[data-inventory-salvage-action]').click();
+    await settle();
+
+    assert.deepEqual(salvageCalls, [[SYS_B, 'cB']], 'System B (selected), never System A (primary)');
+  });
+
+  it('withholds the ribbon for a result belonging to a DIFFERENT participation of the same component id', async () => {
+    // Binds the success-ribbon gate's systemId term (a routing site left untested).
+    // Both participations share the component id `shared`, so the gate MUST compare on
+    // systemId too: a result stamped for System A must not surface while System B is
+    // selected. Dropping the systemId term from the gate makes `shared === shared` true
+    // and shows the ribbon — flipping this test.
+    const { services, store } = makeServices(multiSystemProgressiveCardRow());
+    store.selectedSystemId = SYS_B;
+    store.salvageResult = {
+      systemId: SYS_A,
+      componentId: 'shared',
+      state: 'success',
+      message: '',
+      awarded: [],
+    };
+    const target = await harness.mount({ services });
+    await settle();
+
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-ribbon]'),
+      null,
+      "System A's result must not surface a ribbon while System B is selected"
+    );
   });
 });
 

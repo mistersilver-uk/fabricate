@@ -10,6 +10,7 @@ Gathering environments let a GM define places where actors can gather materials 
 They are managed from the **Environments** tab in the Crafting Admin panel.
 
 {: .gm }
+
 > Only GMs can create and edit gathering environments.
 
 ## Enable Gathering
@@ -39,9 +40,9 @@ Each crafting system decides how often its gathering tasks can be attempted thro
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Limitation | Toggle | What it caps |
-|:-----------|:-------|:-------------|
-| **Stamina** | **Stamina** pill | A per-character stamina pool. Each attempt spends the task's stamina cost. A character can keep going only while they have stamina, which regenerates as world time passes. |
+| Limitation         | Toggle                  | What it caps                                                                                                                                                                |
+| :----------------- | :---------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stamina**        | **Stamina** pill        | A per-character stamina pool. Each attempt spends the task's stamina cost. A character can keep going only while they have stamina, which regenerates as world time passes. |
 | **Resource nodes** | **Resource nodes** pill | A finite per-task node pool in each environment. Each accepted attempt depletes one node. Once a pool is empty the task is blocked until its nodes respawn over world time. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -55,17 +56,18 @@ Each can be on or off on its own:
 - **Both on** means both limits apply at once.
   A single accepted attempt both depletes the node pool **and** spends the character's stamina.
   This is the **anti-dogpiling** combination.
-  Finite resource nodes cap the *total* pulls until they respawn, so a large, high-stamina party cannot strip a task in a single visit no matter how much collective stamina it has.
+  Finite resource nodes cap the _total_ pulls until they respawn, so a large, high-stamina party cannot strip a task in a single visit no matter how much collective stamina it has.
 
 Stamina enforcement only kicks in once a character actually has a pool (a non-blank **Maximum stamina** rolled for them).
 A task with no stamina cost is never gated by stamina.
 Resource-node enforcement applies per task only where you author a node pool on that task.
 Per-task node counts/respawn and per-character stamina pools/regen are unchanged by the toggles.
-The toggles only decide whether each limitation is *active* for the system.
+The toggles only decide whether each limitation is _active_ for the system.
 
 ![Fabricate gathering settings](img/screenshots/fabricate-gathering-settings.webp)
 
 {: .note }
+
 > Older worlds used a single limitation choice that could only be none, stamina, or resource nodes at a time.
 > When you upgrade, Fabricate converts that choice into the two independent toggles automatically (stamina becomes Stamina on, nodes becomes Resource nodes on, otherwise both off).
 > To run both limits at once, turn on both toggles.
@@ -74,17 +76,18 @@ The toggles only decide whether each limitation is *active* for the system.
 
 Each environment belongs to one crafting system and stores:
 
-| Field | Description |
-|:------|:------------|
-| **Name** | The environment name players and GMs see |
-| **Description** | Optional notes shown while authoring |
-| **Enabled** | Disabled environments are hidden from normal player listing |
+| Field              | Description                                                                                                               |
+| :----------------- | :------------------------------------------------------------------------------------------------------------------------ |
+| **Name**           | The environment name players and GMs see                                                                                  |
+| **Description**    | Optional notes shown while authoring                                                                                      |
+| **Enabled**        | Disabled environments are hidden from normal player listing                                                               |
 | **Selection Mode** | **Targeted** shows visible task rows, or **Blind** shows one generic opaque action resolved from one or more hidden tasks |
-| **Biomes** | Optional biome tags used to match Gathering Tasks and events |
-| **Danger Level** | Optional single danger ceiling used to match reusable events |
-| **Scene** | Optional scene gate for environments tied to a specific scene |
+| **Biomes**         | Optional biome tags used to match Gathering Tasks and events                                                              |
+| **Danger Level**   | Optional single danger ceiling used to match reusable events                                                              |
+| **Scene**          | Optional scene gate for environments tied to a specific scene                                                             |
 
 {: .note }
+
 > **Biomes** and **Danger Level** above are the composition match tags.
 > They decide which reusable tasks and events belong to the environment, not where players can gather.
 > Geography is no longer a composition tag.
@@ -120,16 +123,16 @@ Once authored, they apply to every gathering environment in that system.
 
 ![Fabricate gathering rules](img/screenshots/fabricate-gathering-settings.webp)
 
-| Rule | Values |
-|:-----|:-------|
-| **Rewards** | Highest ranked successful drop, all drops, or a limited number of drops |
-| **Reward limit** | A positive number used when Rewards is set to a limited number of drops |
-| **Events** | Highest ranked successful event, all events, or a limited number of events |
-| **Event limit** | A positive number used when Events is set to a limited number of events |
-| **Event outcome** | Whether a triggered event still lets the attempt succeed, or makes it fail |
+| Rule                     | Values                                                                                                                                       |
+| :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Rewards**              | Highest ranked successful drop, all drops, or a limited number of drops                                                                      |
+| **Reward limit**         | A positive number used when Rewards is set to a limited number of drops                                                                      |
+| **Events**               | Highest ranked successful event, all events, or a limited number of events                                                                   |
+| **Event limit**          | A positive number used when Events is set to a limited number of events                                                                      |
+| **Event outcome**        | Whether a triggered event still lets the attempt succeed, or makes it fail                                                                   |
 | **Blind candidate gate** | Whether a blind action only draws from tasks the character can attempt right now (the default), or from every matching task (see Blind Mode) |
-| **Blind reveal** | When a blind task is revealed to the player: never (the default), on success, or on any attempt |
-| **Reveal scope** | Who learns a revealed task: the character, the player, the party, or everyone |
+| **Blind reveal**         | When a blind task is revealed to the player: never (the default), on success, or on any attempt                                              |
+| **Reveal scope**         | Who learns a revealed task: the character, the player, the party, or everyone                                                                |
 
 ## Blind Mode
 
@@ -188,13 +191,14 @@ Each library tool carries:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Field | Description |
-|:------|:------------|
-| **Source** | The item the tool is. Either its own source item (an item-sourced tool) or a managed component (a component-linked tool). See [Tools]({% link tools.md %}) |
-| **Display label** | Optional. Falls back to the tool's item or component name |
-| **Tool requirement** | Optional formula checked against the character's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
-| **Breakage mechanic** | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), **Dice expression** (a formula compared against a threshold), or **Immune** (never breaks) |
-| **On-break action** | One of **Destroy item**, **Mark as broken**, or **Replace with item** (the replacement must differ from the original) |
+| Field                        | Description                                                                                                                                                |
+| :--------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source**                   | The item the tool is. Either its own source item (an item-sourced tool) or a managed component (a component-linked tool). See [Tools]({% link tools.md %}) |
+| **Display label**            | Optional. Falls back to the tool's item or component name                                                                                                  |
+| **Tool requirement**         | Optional formula checked against the character's roll data. See [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples   |
+| **Breakage mechanic**        | One of **Limited uses** (a use counter), **Breakage chance** (a flat percent), or **Dice expression** (a formula compared against a threshold)             |
+| **Check-driven eligibility** | **Immune** excludes the tool from breakage triggered by a check. It does not remove its retained tool-specific breakage mechanic.                          |
+| **On-break action**          | One of **Destroy item**, **Mark as broken**, or **Replace with component**. A replacement is selected from the crafting system's managed Components.       |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -223,18 +227,19 @@ Gathering Task records support:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Field | Description |
-|:------|:------------|
-| **Name, description, image, enabled** | GM-authored task identity and availability |
-| **Biomes** | Optional environment composition match tags. Empty means any |
-| **Weather, time of day** | Optional runtime availability gates. Empty means any |
-| **Drop rows** | Ordered item/component rows with a quantity, a drop rate from 0 to 100, and optional per-drop time/weather modifiers. The order you author them in is the rank used by the system's Gathering Rules. |
-| **Stamina and modifiers** | Optional stamina cost and a gathering roll modifier formula |
-| **Required tools** | Optional references to the system's Gathering Tools library. All referenced tools are required. |
+| Field                                 | Description                                                                                                                                                                                          |
+| :------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name, description, image, enabled** | GM-authored task identity and availability                                                                                                                                                           |
+| **Biomes**                            | Optional environment composition match tags. Empty means any                                                                                                                                         |
+| **Weather, time of day**              | Optional runtime availability gates. Empty means any                                                                                                                                                 |
+| **Drop rows**                         | Ordered item/component rows with a quantity, a drop rate from 0 to 100, and optional per-drop time/weather modifiers. The order you author them in is the rank used by the system's Gathering Rules. |
+| **Stamina and modifiers**             | Optional stamina cost and a gathering roll modifier formula                                                                                                                                          |
+| **Required tools**                    | Optional references to the system's Gathering Tools library. All referenced tools are required.                                                                                                      |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 {: .note }
+
 > Stamina maximums, starting stamina, regeneration amounts, costs, and character modifiers all accept **formulas** (a number, an ability modifier, dice, and more).
 > See [Gathering Formulas]({% link gathering-expressions.md %}) for ready-to-use examples.
 
@@ -242,13 +247,13 @@ Reusable event records support:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Field | Description |
-|:------|:------------|
-| **Name, description, image, enabled** | GM-authored event identity and availability |
-| **Danger, biomes** | Optional environment composition match tags. Empty means any. The environment matches events up to its single danger ceiling. |
-| **Weather, time of day** | Optional runtime availability gates. Empty means any |
-| **Trigger rate** | The event trigger rate from 1 to 100 |
-| **Modifier** | Optional event roll modifier formula |
+| Field                                 | Description                                                                                                                   |
+| :------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------- |
+| **Name, description, image, enabled** | GM-authored event identity and availability                                                                                   |
+| **Danger, biomes**                    | Optional environment composition match tags. Empty means any. The environment matches events up to its single danger ceiling. |
+| **Weather, time of day**              | Optional runtime availability gates. Empty means any                                                                          |
+| **Trigger rate**                      | The event trigger rate from 1 to 100                                                                                          |
+| **Modifier**                          | Optional event roll modifier formula                                                                                          |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -288,16 +293,16 @@ The task editor lets you set:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Area | What you set |
-|:-----|:-------------|
-| Task basics | Name, description, image, whether it is enabled, and how it is resolved |
-| Visibility gate | Turn task visibility on or off, then set its formula and required threshold |
-| Progressive checks | Choose the award mode plus the check formula and an optional threshold |
-| Time requirement | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years |
-| Failure outcome | Leave clear for Fabricate's default failure feedback, or set custom text or a macro |
-| Result groups | Add, rename, delete, and reorder groups |
-| Results | Add, edit, delete, and reorder component results, each with a component and a quantity |
-| Required tools | Reference the system's Tools library. The tools themselves (their source item or component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
+| Area               | What you set                                                                                                                                                                                                                               |
+| :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Task basics        | Name, description, image, whether it is enabled, and how it is resolved                                                                                                                                                                    |
+| Visibility gate    | Turn task visibility on or off, then set its formula and required threshold                                                                                                                                                                |
+| Progressive checks | Choose the award mode plus the check formula and an optional threshold                                                                                                                                                                     |
+| Time requirement   | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years                                                                                                                                             |
+| Failure outcome    | Leave clear for Fabricate's default failure feedback, or set custom text or a macro                                                                                                                                                        |
+| Result groups      | Add, rename, delete, and reorder groups                                                                                                                                                                                                    |
+| Results            | Add, edit, delete, and reorder component results, each with a component and a quantity                                                                                                                                                     |
+| Required tools     | Reference the system's Tools library. The tools themselves (their source item or component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -317,10 +322,10 @@ Cancelling the picker leaves the current path unchanged.
 A visibility gate controls whether a gathering task is visible to a particular character before an attempt starts.
 It has just two parts:
 
-| Field | Notes |
-|:------|:------|
-| Formula | A roll expression evaluated against the viewing character's roll data. |
-| Threshold | The value the formula must meet for the task to be visible. |
+| Field     | Notes                                                                  |
+| :-------- | :--------------------------------------------------------------------- |
+| Formula   | A roll expression evaluated against the viewing character's roll data. |
+| Threshold | The value the formula must meet for the task to be visible.            |
 
 The editor keeps incomplete input aside until both the formula and the threshold are present.
 For example, entering a formula without a threshold does not change the saved task yet.
@@ -346,11 +351,11 @@ Progressive gathering tasks need an award mode and a check formula.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Field | Description |
-|:------|:------------|
-| Award mode | One of equal, partial, or exceed |
-| Check formula | Required. A roll expression evaluated against the acting character's roll data |
-| Check threshold | Optional. When left blank the check just produces a value |
+| Field           | Description                                                                    |
+| :-------------- | :----------------------------------------------------------------------------- |
+| Award mode      | One of equal, partial, or exceed                                               |
+| Check formula   | Required. A roll expression evaluated against the acting character's roll data |
+| Check threshold | Optional. When left blank the check just produces a value                      |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -364,13 +369,13 @@ To keep a task immediate, leave its time requirement clear.
 
 To make a task take time, enter a positive duration across any of these fields:
 
-| Field | Description |
-|:------|:------------|
+| Field   | Description     |
+| :------ | :-------------- |
 | Minutes | Minutes to wait |
-| Hours | Hours to wait |
-| Days | Days to wait |
-| Months | Months to wait |
-| Years | Years to wait |
+| Hours   | Hours to wait   |
+| Days    | Days to wait    |
+| Months  | Months to wait  |
+| Years   | Years to wait   |
 
 You cannot save a negative, non-numeric, or all-zero time requirement.
 Clearing the time requirement makes the task immediate again.
@@ -380,9 +385,9 @@ Clearing the time requirement makes the task immediate again.
 If a task has no custom failure outcome, Fabricate shows its default failure message.
 GMs can set a custom failure outcome when a task should explain failure differently or run its own automation.
 
-| Mode | What you set | Notes |
-|:-----|:-------------|:------|
-| Text | Custom text | Shows your custom failure text. |
+| Mode  | What you set           | Notes                                           |
+| :---- | :--------------------- | :---------------------------------------------- |
+| Text  | Custom text            | Shows your custom failure text.                 |
 | Macro | A Foundry script macro | Runs the selected macro when the attempt fails. |
 
 Switching between text and macro keeps only the one you are currently using.
@@ -495,16 +500,17 @@ A library tool carries:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Field | Description |
-|:------|:------------|
-| Source | The item the tool is. Either its own source item or a managed component from the system's component library. See [Tools]({% link tools.md %}) |
-| Requirement | Optional. A roll expression that must hold true for the character to use the tool |
-| Breakage mechanic | One of limited uses, breakage chance, a dice expression, or immune (never breaks) |
-| Maximum uses | For limited uses: a positive number, or blank for unlimited |
-| Breakage chance | For breakage chance: a whole percent from 0 to 100 |
-| Dice expression and threshold | For a dice expression: a roll formula and a number it must reach to avoid breaking |
-| On-break action | One of destroy the item, mark it as broken, or replace it with another component |
-| Replacement | For replace: a different managed component given to the character when the tool breaks |
+| Field                         | Description                                                                                                                                   |
+| :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source                        | The item the tool is. Either its own source item or a managed component from the system's component library. See [Tools]({% link tools.md %}) |
+| Requirement                   | Optional. A roll expression that must hold true for the character to use the tool                                                             |
+| Breakage mechanic             | One of limited uses, breakage chance, or a dice expression                                                                                    |
+| Check-driven eligibility      | Immune excludes the tool from check-driven breakage. It does not remove its retained tool-specific breakage mechanic.                         |
+| Maximum uses                  | For limited uses: a positive number, or blank for unlimited                                                                                   |
+| Breakage chance               | For breakage chance: a whole percent from 0 to 100                                                                                            |
+| Dice expression and threshold | For a dice expression: a roll formula and a number it must reach to avoid breaking                                                            |
+| On-break action               | One of destroy the item, mark it as broken, or replace it with another item                                                                   |
+| Replacement                   | For replace: a different managed Component given to the character when the Tool breaks                                                        |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -515,7 +521,9 @@ Either way, the on-break action always happens.
 
 Whether a tool breaks in the first place follows the system's **Tool breakage source** setting on the [Tools]({% link tools.md %}#tool-breakage-source) page.
 With the default **Tool-specific** source, each tool's own breakage mechanic decides.
-With the **Check-driven** source, the gathering check decides whether all required tools break, the same way it does for crafting and salvage, and per-tool mechanics are ignored except for immune tools.
+With the **Check-driven** source, the gathering check decides whether every required tool that is not **Immune** breaks, the same way it does for crafting and salvage.
+Each Tool retains its own mechanic, but that mechanic is not evaluated while this source is active.
+Retained limited-use counters also remain unchanged while check-driven authority is active.
 This takes effect once the Progressive and Routed by check gathering modes ship.
 The only gathering mode available today, d100, has no check for triggers to read, so check-driven breakage cannot fire for a d100 attempt.
 Until then, gathering tool breakage uses the Tool-specific source regardless of this setting.
@@ -556,7 +564,7 @@ Enabled tasks must be fully configured:
 
 - A routed task needs the system to have a gathering check formula configured.
 - A progressive task needs an award mode and a check formula.
-The threshold is optional.
+  The threshold is optional.
 
 A custom failure outcome is validated whether or not the task is enabled.
 

@@ -3,6 +3,7 @@
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
+  import ChanceSlider from '../../components/ChanceSlider.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
@@ -561,38 +562,6 @@
 
   function quantityValue(row) {
     return normalizeQuantity(row?.quantity ?? 1);
-  }
-
-  function onDropRateInput(rowId, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    input.value = normalized;
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      onUpdateDrop(rowId, { dropRate });
-    }
-  }
-
-  function onDropRateBlur(row, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      input.value = String(dropRate);
-      onUpdateDrop(row.id, { dropRate });
-      return;
-    }
-    input.value = String(dropRateValue(row));
-  }
-
-  function onDropRateKeydown(row, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const currentValue = event.currentTarget.value === '' ? dropRateValue(row) : Number(event.currentTarget.value);
-    const dropRate = normalizeDropRate((Number.isFinite(currentValue) ? currentValue : dropRateValue(row)) + (event.key === 'ArrowUp' ? 1 : -1));
-    event.currentTarget.value = String(dropRate);
-    onUpdateDrop(row.id, { dropRate });
   }
 
   function onQuantityInput(rowId, event) {
@@ -1339,18 +1308,15 @@
                   {/if}
                 </span>
                 <span role="cell" class="manager-drop-cell manager-drop-rate-cell" data-gathering-task-drop-chance-cell>
-                  <span class="manager-drop-rate-value">
-                    <span class="manager-drop-rate-percent">
-                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={dropRateValue(row)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onDropRateInput(row.id, event)} onblur={(event) => onDropRateBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => onDropRateKeydown(row, event)} />
-                      <span aria-hidden="true">%</span>
-                    </span>
-                    <span class={`manager-drop-rate-control ${dropRateTierClass(row.dropRate)}`} style={`--fab-drop-rate-value: ${dropRateValue(row)}%; --fab-drop-rate-color: ${dropRateTierColor(row.dropRate)};`}>
-                      <span class="manager-drop-rate-track" aria-hidden="true">
-                        <span class="manager-drop-rate-fill"></span>
-                      </span>
-                      <input type="range" min="0" max="100" step="1" value={dropRateValue(row)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => onUpdateDrop(row.id, { dropRate: Number(event.currentTarget.value) })} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
-                    </span>
-                  </span>
+                  <ChanceSlider
+                    value={dropRateValue(row)}
+                    numberLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent', 'Drop chance percent')}
+                    rangeLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')}
+                    resolveColor={dropRateTierColor}
+                    controlClass={dropRateTierClass(row.dropRate)}
+                    stopPropagation={true}
+                    onChange={(dropRate) => onUpdateDrop(row.id, { dropRate })}
+                  />
                 </span>
                 <span role="cell" class="manager-drop-cell manager-drop-quantity-cell">
                   <input type="text" inputmode="numeric" pattern={'[1-9][0-9]{0,2}'} value={quantityValue(row)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.Quantity', 'Quantity')} oninput={(event) => onQuantityInput(row.id, event)} onblur={(event) => onQuantityBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => onQuantityKeydown(row, event)} />

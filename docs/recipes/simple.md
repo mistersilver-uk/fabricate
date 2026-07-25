@@ -30,8 +30,9 @@ A basic alchemy recipe:
 ### Creating the recipe
 
 This recipe has one ingredient set with two groups, a "Herbs" group (2x Moonpetal Herb) and a "Container" group (1x Empty Vial), and one result group producing 1x Healing Potion.
-Recipes can be authored through the API only.
-See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
+You author it on the Ingredients and Results tabs of the recipe editor in the Crafting Admin panel.
+The public API can create and configure recipes too.
+See the [API reference]({% link api/recipe-manager.md %}) for those methods.
 
 ## With an Optional Check
 

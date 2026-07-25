@@ -20,13 +20,16 @@ The repository MUST treat files under `openspec/specs/*/spec.md` as the canonica
 
 Non-trivial changes MUST be planned as an OpenSpec change delta in the work's GitHub issue before implementation starts.
 The delta is NOT versioned as files in the repository; it lives in a managed block (`openspec-delta:start` … `openspec-delta:end`) in the issue body and consolidates the proposal, design, tasks, any per-domain spec deltas, the resolved roster, and acceptance/verification.
+Each task entry MUST declare its lane surface as a literal field so model-tier selection has a mechanically available input rather than a reading of prose.
 
 #### Scenario: planning issue work
 
 - **WHEN** work is non-trivial or spans multiple files, validations, or decisions
-- **THEN** the orchestrator captures the change delta in the issue's managed `openspec-delta` block before code changes begin
+- **THEN** the workflow driver captures the change delta in the issue's managed `openspec-delta` block before code changes begin
 - **AND** when the work originates from an existing issue it appends the block, preserving the reporter's original text, and when the work originates from a prompt with no issue it creates an issue from the `OpenSpec Change Delta` template
 - **AND** it rewrites the block in place across plan-review iterations rather than appending duplicate blocks, and never edits outside the markers
+- **AND** every `### Tasks` entry carries a literal `Lane surface` field naming one of the declared values, which the driver reads as a lookup when it selects that lane's model tier
+- **AND** a spawned orchestrator helper remains read-only and returns draft or replacement managed-block text for the driver to apply
 
 #### Scenario: implementing the delta into canonical specs
 
@@ -39,38 +42,68 @@ The delta is NOT versioned as files in the repository; it lives in a managed blo
 - **THEN** post-implementation review and the documentation loop compare the actual `openspec/specs/` diff against the proposed delta in the issue
 - **AND** they confirm the implementation faithfully realizes the delta, or — when implementation justifiably deviated — the issue's delta and its `Deviations` note are updated so the delta accurately describes what shipped
 
+### Requirement: Proportional workflow and momentum
+
+The workflow driver MUST use the shortest workflow that satisfies mandatory repository gates and the actual risk, and MUST prioritize the earliest honestly reviewable PR while preserving mandatory safety, review, and exact-head delivery gates.
+One mechanically valid evidence run MUST satisfy every gate it directly covers without ceremonial repetition.
+
+#### Scenario: front-loading cheap checks
+
+- **WHEN** the driver begins or resumes a workflow
+- **THEN** it checks branch and base freshness, affected paths and roster, PR title and commitlint compliance, existing CI and external-check state, and screenshot scope before starting more expensive or delegated work
+
+#### Scenario: reusing valid evidence and approvals
+
+- **WHEN** a mechanically valid check or review already covers an unchanged target and concern
+- **THEN** the driver reuses that evidence instead of repeating an equivalent check or review ceremonially
+- **AND** a reviewer repeats only when its owned concern materially changed or an unresolved finding remains
+- **AND** issue or PR metadata edits and patch-equivalent rebases do not invalidate approval
+- **AND** when repeat review is required, the driver uses a fresh detached lane pinned to the exact target and supplies an immutable artifact
+
+#### Scenario: timeboxing a delegated lane
+
+- **WHEN** a delegated lane shows no observable progress for about 60 seconds
+- **THEN** the driver requests status once
+- **AND** after about another 60 seconds without progress it interrupts and reassigns the work or continues locally within driver authority
+
+#### Scenario: preserving mandatory gates
+
+- **WHEN** check evidence is stale or ambiguous, its target changed, repository policy requires an exact-head result, or a reviewer's owned concern materially changed or retains an unresolved finding
+- **THEN** the driver reruns the applicable check or review before maintainer handoff
+
 ### Requirement: Branch and PR workflow
 
-All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and be delivered through a PR targeting `main`.
+All mutating agent work MUST happen on a branch that is not `main`, `release`, or a hotfix line, and the workflow driver MUST deliver the integrated result through a PR targeting `main`.
 A PR targets `release` or a hotfix line only for a hotfix to the current public release.
 The release automation's forward-port merge from `release` into `main` is not agent work and is exempt from this requirement.
 
 #### Scenario: starting mutable work
 
-- **WHEN** an agent will edit implementation, documentation, specs, prompts, skills, or workflow files
-- **THEN** it verifies the current branch first
-- **AND** if the branch is `main`, `release`, or a hotfix line, it creates or switches to a task branch before editing
+- **WHEN** the workflow driver will coordinate mutable work
+- **THEN** it verifies that the clean coordinator checkout is on a non-protected integration branch
+- **AND** every spawned mutable agent verifies its assigned worktree, lane branch, base SHA, and clean status before editing
 
 #### Scenario: finishing mutable work
 
-- **WHEN** an agent completes a scoped change
-- **THEN** it commits the change to the task branch
-- **AND** pushes the branch
-- **AND** opens or updates a PR targeting `main`, or `release` or a hotfix line when the change is a hotfix to the current public release
+- **WHEN** a spawned mutable agent completes a scoped change
+- **THEN** it commits only owned paths to its local lane branch and returns the commits to the workflow driver without pushing or mutating GitHub state
+- **AND** the driver verifies and integrates the returned commits on the coordinator branch
+- **AND** the driver pushes the integrated branch and opens or updates a PR targeting `main`, or `release` or a hotfix line when the change is a hotfix to the current public release
 - **AND** the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf`
 - **AND** the PR description uses H2 sections for `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`
 
 #### Scenario: responding to review feedback
 
-- **WHEN** a reviewer requests changes on a PR
-- **THEN** the implementing agent updates the same branch and PR
-- **AND** it does not open a replacement PR unless the user explicitly asks
+- **WHEN** a reviewer requests changes
+- **THEN** the driver reuses the retained mutable lane when ownership and dependency context remain valid, or creates a fresh revision lane from current integration `HEAD`
+- **AND** the driver integrates accepted follow-up commits and updates the same PR unless the user explicitly asks for a replacement
 
 #### Scenario: read-only review work
 
 - **WHEN** a review-only agent evaluates work
-- **THEN** it reviews the active branch and PR against the PR's base branch
-- **AND** it must not commit, push, or merge
+- **THEN** it reviews a fresh detached worktree pinned to the exact assigned integration commit against the supplied base and immutable diff artifact
+- **AND** it must not commit, push, merge, or mutate GitHub state
+- **AND** if repeat review is later required at another commit, the driver creates another fresh detached lane instead of reusing that checkout
 
 #### Scenario: working near the release branch
 
@@ -79,30 +112,182 @@ The release automation's forward-port merge from `release` into `main` is not ag
 - **AND** it MUST NOT squash-merge a prerelease line into `release`, because squashing collapses Conventional Commit types and mis-computes the stable version
 - **AND** it MUST NOT merge `release` or `main` into a hotfix line; a fix leaves a hotfix line by cherry-pick
 
+### Requirement: Ready-for-review delivery gate
+
+Before maintainer handoff, the workflow driver MUST deliver a PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and required implementation review, is ready for review, and has every required post-undraft GitHub and external check successful.
+Draft-head checks MUST be treated only as preflight evidence because required workflows may use the `ready_for_review` trigger.
+
+#### Scenario: preparing the final remote head
+
+- **WHEN** implementation, review, and documentation loops have accepted the integrated change
+- **THEN** the driver finalizes PR title, body, issue linkage, screenshots, and other metadata before the final run
+- **AND** it fetches `origin/main`, captures the expected remote PR-head SHA, and requires a clean coordinator with no active mutable lane
+- **AND** it rebases the integration branch onto current `origin/main`
+- **AND** it reruns every required authoritative local gate plus `npx commitlint --from origin/main --to HEAD`
+- **AND** it preserves valid implementation approval when the rebase is patch-equivalent for the reviewer's owned concern and no finding remains unresolved
+- **AND** when repeat review is required, it obtains that review from a fresh detached lane pinned to the exact rebased commit with an immutable diff artifact
+- **AND** it repeats domain and documentation reconciliation if conflict resolution or later fixes change workflow, canonical specification, or documentation content
+
+#### Scenario: publishing rewritten history
+
+- **WHEN** the rebased head has passed its required local gates and has valid required implementation-review evidence
+- **THEN** the driver updates the remote only with `--force-with-lease=<branch>:<expected-sha>` using the previously captured remote SHA
+- **AND** a rejected lease stops for investigation
+- **AND** the driver MUST NOT retry with `--force` or an unqualified force push
+
+#### Scenario: validating the ready head
+
+- **WHEN** the explicit-lease push succeeds
+- **THEN** the driver marks the PR ready for review before the final check rollup
+- **AND** it waits for every required GitHub Actions and external check on that exact remote head
+- **AND** both SonarCloud checks, Automatic Analysis and Quality Gate, report success
+- **AND** pending, skipped when required, cancelled, stale-head, or failing checks do not satisfy the gate
+
+#### Scenario: restarting failed or stale delivery
+
+- **WHEN** a required check fails, current `origin/main` advances, the remote PR head changes, or the PR is draft
+- **THEN** the driver returns the PR to draft before evidence gathering, issue reconciliation, or isolated fix work
+- **AND** it repeats rebase, authoritative validation, explicit-lease push, ready transition, and exact-head checks
+- **AND** it repeats review only when the resulting target materially changes the reviewer's owned concern or an unresolved finding remains
+- **AND** after a successful rollup it fetches `origin/main` again and verifies current-main ancestry, unchanged remote-head identity, and ready state before maintainer handoff
+
+### Requirement: Isolated agent worktrees
+
+Every spawned agent MUST work from a unique repository-local Git worktree by default.
+Mutable lanes MUST use exclusive branches, and read-only lanes MUST use detached snapshots pinned to the exact commit being evaluated.
+A lane of a model-tiered family MUST carry its model-tiered token in both its branch name and its lane directory name, and an escalated lane MUST be a fresh lane at the same assigned base with the same owned paths rather than a reused feedback-revision lane.
+
+#### Scenario: preparing planning and plan-review lanes
+
+- **WHEN** the workflow driver needs a delta drafted or reviewed before approval
+- **THEN** it requires a clean coordinator checkout and a committed shared baseline
+- **AND** it derives a preliminary roster mechanically from the current request and proposed affected paths
+- **AND** it creates fresh detached planner or plan-review worktrees beneath `.worktrees/<issue>/`, pinned to that baseline without requiring an approved delta
+- **AND** it keeps immutable review artifacts in the driver-owned sibling directory `.worktrees/<issue>/artifacts/` rather than inside a detached checkout
+- **AND** it recomputes the preliminary roster when proposed paths or content signals change
+
+#### Scenario: preparing mutable implementation lanes
+
+- **WHEN** the workflow driver is ready to fan out approved work
+- **THEN** it requires the approved issue delta, final resolved roster, dependency order, exclusive path ownership, and a clean committed coordinator baseline
+- **AND** it creates each lane beneath `.worktrees/<issue>/` with a unique directory that carries the same role component as the branch, including for detached read-only lanes
+- **AND** it assigns mutable branches named `agent/<issue>-<stage>-<role>-r<revision>`, where the role component is the model-tiered token in hyphenated file form for a model-tiered family
+
+#### Scenario: briefing a spawned agent
+
+- **WHEN** the driver assigns a mutable or read-only lane
+- **THEN** the brief supplies the absolute worktree path, issue, role, stage, revision, base SHA, expected branch or detached SHA, owned paths, dependency state, expected commit range, allowed focused checks, handoff format, and — for a model-tiered family — the resolved model tier and the facts it was resolved from
+- **AND** the agent verifies its top-level path, branch or detached state, assigned SHA, and clean status before acting
+- **AND** an identity mismatch or unexpected existing change blocks the lane before edits begin
+
+#### Scenario: running mutable lanes concurrently
+
+- **WHEN** multiple mutable agents can work at the same time
+- **THEN** their owned paths are disjoint and every lockfile or shared configuration file has exactly one owner
+- **AND** no parallel lane depends on output that has not integrated
+- **AND** dependent work starts from the integration commit containing its prerequisites
+
+### Requirement: Driver-owned coordination and integration
+
+The workflow driver MUST exclusively own the coordinator checkout, integration branch, GitHub and remote mutations, worktree lifecycle, integration ordering, authoritative gates, and cleanup.
+Spawned agents MUST return local work products to the driver and MUST NOT exercise those shared authorities.
+
+#### Scenario: handing off mutable work
+
+- **WHEN** a mutable agent finishes a revision
+- **THEN** it commits only owned paths locally
+- **AND** it returns the verified base, ordered new commit SHAs, base-relative changed paths and diff, focused check results, lane status, and any caveats or recommended managed-block text
+- **AND** it leaves the lane available for driver verification or a valid retained-lane feedback round
+
+#### Scenario: integrating lane commits
+
+- **WHEN** the driver receives a mutable lane handoff
+- **THEN** it verifies the coordinator and lane state, exact commit range, owned changed paths, integrated dependencies, and absence of a prior integration record
+- **AND** it cherry-picks commits in declared dependency order
+- **AND** it records a source-to-integrated SHA mapping for every commit
+- **AND** if a cherry-pick conflicts it aborts the cherry-pick and routes resolution through a fresh revision lane based on current integration `HEAD` without editing another lane
+
+#### Scenario: iterating after feedback
+
+- **WHEN** a mutable lane remains available with unchanged ownership and current dependency context
+- **THEN** the driver reuses it and accepts only the new ordered commits for the revision
+- **AND** when ownership changes, the prior lane is unavailable, or conflict or stale dependency invalidates its context, the driver creates a fresh revision lane from current integration `HEAD`
+
+#### Scenario: reviewing a changed integration target
+
+- **WHEN** implementation, plan, or documentation integration materially changes a reviewer's owned concern or leaves a finding unresolved
+- **THEN** the driver creates a fresh detached reviewer lane pinned to that exact target and supplies the immutable base-relative artifact
+- **AND** metadata-only edits and patch-equivalent rebases preserve the prior approval without another review
+- **AND** domain or canonical-spec reconciliation integrates before dependent documentation authoring
+- **AND** domain and documentation cross-review may run concurrently only after both outputs integrate
+
+### Requirement: Serialized validation and guarded cleanup
+
+The workflow driver MUST serialize resource-heavy validation and MUST treat only gates run from the fully integrated coordinator branch as authoritative acceptance evidence.
+Cleanup MUST preserve any lane whose integration or meaningful state has not been mechanically resolved.
+An escalated lane proven clean at its assigned base with zero commits MAY be disposed; any other escalating lane MUST be preserved and reported as `BLOCKED`.
+
+#### Scenario: running local and CI gates
+
+- **WHEN** lane work is in progress
+- **THEN** agents may run focused checks allowed by their briefs
+- **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, Foundry or Docker smoke, and screenshot generation
+- **AND** the driver runs required final gates from the fully integrated coordinator branch
+- **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
+
+#### Scenario: per-worktree-isolated real-Foundry capture
+
+- **WHEN** the driver runs the real-Foundry screenshot capture from a worktree
+- **THEN** the container identity (name, hostname, compose project, host port) is derived deterministically from the worktree root, so it is stable within a worktree yet distinct across worktrees and concurrent worktrees do not collide on the fixed name
+- **AND** the derivation preserves the container-reuse cache and the hostname-bound cached license within a worktree
+- **AND** — CONDITIONAL on the licensing probe passing and the prebaked world existing — the capture may be sharded across containers within a run, with the merged frame set required to equal the single-container scoped set
+- **AND** the evidence producer is unchanged: still real-Foundry scoped capture, never a Foundry-free render
+
+#### Scenario: cleaning integrated lanes
+
+- **WHEN** the workflow has accepted a lane's integrated output
+- **THEN** the driver verifies its source-to-integrated mappings, stable patch equivalence, tracked state, and meaningful untracked state before removal
+- **AND** known generated content is discarded only after confirming it contains no meaningful work
+- **AND** forced worktree removal is allowed only after integration equivalence and meaningful-state checks succeed
+- **AND** `git branch -D` is allowed for a cherry-picked lane only after every source commit is mapped and patch-equivalent to its integrated commit
+- **AND** an escalated lane, which has nothing to integrate because it escalated before its first edit, is disposed only after the driver proves it has zero commits, a clean status, and `HEAD` at the assigned base
+- **AND** dirty, unintegrated, blocked, interrupted, ambiguous, or otherwise unverified lanes and branches are preserved and reported
+- **AND** the driver prunes worktree metadata only after eligible lanes are removed
+
 ### Requirement: Shared skill source
 
-Shared reusable skills MUST live under the repository `skills/` directory.
+Shared reusable skills MUST live under the repository `.agents/skills/` directory so Codex discovers them from the repository root.
 
 #### Scenario: provider-specific skill discovery
 
-- **WHEN** a provider-specific skill root is needed
-- **THEN** it points back to the canonical `skills/` directory instead of carrying a divergent copy
+- **WHEN** a provider-specific agent binding needs a shared skill
+- **THEN** it points back to the canonical `.agents/skills/` directory instead of carrying a divergent copy
+- **AND** no second repository skill tree is maintained outside the Codex discovery root
 
 ### Requirement: Role persona bindings
 
-Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`.
+Each agent role MUST be defined once in its canonical `.agents/skills/<role>/SKILL.md`.
 Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.md` for Claude) MUST be thin bindings that point at the canonical skill and MUST NOT carry divergent persona behavior.
 
 #### Scenario: resolving a routing token
 
 - **WHEN** the auto-spawn routing table in `AGENTS.md` names a role token such as `fabricate_orchestrator`
-- **THEN** it resolves to a registered agent in each active provider — `.codex/agents/<role>.toml` for Codex and the `.claude/agents/<role>.md` `subagent_type` for Claude
+- **THEN** an untiered role resolves directly to a registered agent in each active provider — `.codex/agents/<role>.toml` for Codex and the `.claude/agents/<role>.md` `subagent_type` for Claude
+- **AND** a model-tiered family resolves through per-spawn model-tier selection, and then through the `AGENTS.md` family table, to exactly one model-tiered binding in each active provider
 - **AND** the read-only mapping role `fabricate_pr_explorer`, which has no shared skill, resolves to `.codex/agents/fabricate-pr-explorer.toml` for Codex and to Claude's built-in `Explore` agent (no dedicated Claude binding)
+
+#### Scenario: resolving a model-tiered role to its persona
+
+- **WHEN** the validator or the driver resolves a model-tiered role name
+- **THEN** it first splits any model-tier suffix unconditionally into a candidate base family and model tier, so the family map is built even for an incomplete family
+- **AND** it then checks completeness over those candidates, reporting a family and its missing model tiers by name
+- **AND** it only then resolves the skill path, using the base family when that skill exists and the family declared all three model tiers, and otherwise treating the role name literally
+- **AND** all model tiers of one family share a single canonical `.agents/skills/<role>/SKILL.md` and differ only by model pin, with no per-model-tier skill directory
 
 #### Scenario: changing role behavior
 
 - **WHEN** a role's behavior must change
-- **THEN** the edit is made in `skills/<role>/SKILL.md`
+- **THEN** the edit is made in `.agents/skills/<role>/SKILL.md`
 - **AND** the provider bindings remain thin pointers without divergent persona behavior
 - **AND** provider-local metadata, tool allowlists, and sandbox guardrails may live in bindings when needed
 
@@ -110,11 +295,46 @@ Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.
 
 - **WHEN** role agents are spawned for a change
 - **THEN** the workflow driver (the provider's top-level loop — Codex's depth-0 prompt agent or Claude's main loop) owns routing and the plan, implementation, and docs iteration loops
+- **AND** the workflow driver alone mutates issue, PR, or workflow state
+- **AND** a spawned orchestrator helper performs read-only planning and returns draft managed-block text rather than applying it
 - **AND** scoped role agents execute their role and return without spawning or routing further agents
+
+### Requirement: Model tier routing
+
+Executing roles MUST be bound at three model tiers ordered by capability, and the workflow driver MUST resolve exactly one model tier per spawn, keyed on the family token, stage, and revision, from a literal first-match-wins ladder whose default raises rather than lowers and whose reviewer inputs are scoped to the routing row that spawned it.
+An agent of a model-tiered family whose assignment exceeds its model tier MUST return a non-verdict escalation before its first edit rather than proceed, while an untiered role MUST return `BLOCKED` instead.
+An escalation MUST NOT consume a loop revision, MUST be bounded at one per family, stage, and revision, and MUST become `BLOCKED` when returned from the most capable model tier.
+A lane's model tier MUST NOT decrease across revisions, flooring on the model tier at which it actually executed, and the orchestrator MUST stay on the most capable model tier.
+Each model tier's provider model pins MUST be declared in exactly one place, and the agent-binding validator MUST fail any binding that drifts from them.
+
+#### Scenario: selecting a model tier for a spawn
+
+- **WHEN** the workflow driver spawns a role of a model-tiered family
+- **THEN** it resolves exactly one model tier from the ladder in `AGENTS.md`, keyed on that spawn's family token, stage, and revision, using only facts it mechanically holds at that point
+- **AND** it scores a reviewer spawned by a path-signal routing row only on the paths that row's globs matched, while a content-signal or always-row role scores on the unintersected set
+- **AND** any keyed path matching the high-risk path list resolves to the most capable model tier
+- **AND** an unavailable or otherwise unmatched input resolves to the middle model tier, so no spawn reaches the cheapest model tier by omission
+- **AND** it records the resolved model tier and the facts it was resolved from in the lane's assignment brief
+
+#### Scenario: escalating from a model tier
+
+- **WHEN** an agent of a model-tiered family determines that its assignment exceeds its assigned model tier
+- **THEN** it returns the non-verdict escalation on its first line before making any edit, immediately after its lane identity checks
+- **AND** the driver honours it only after mechanically confirming that lane has zero commits, a clean status, and `HEAD` at the assigned base, and otherwise preserves and reports the lane as `BLOCKED`
+- **AND** it disposes that proven-clean lane and creates a fresh lane at the same assigned base with the same owned paths, exactly one model tier up, without consuming a loop revision
+- **AND** a second escalation within the same family, stage, and revision, an escalation from the most capable model tier, or an escalation from an untiered role is `BLOCKED`
+
+#### Scenario: flooring a model tier across revisions
+
+- **WHEN** the driver re-resolves a model tier for a later revision of the same family and stage
+- **THEN** the result is never below the highest model tier at which that lane actually executed in a previous revision, rather than the model tier it was originally resolved to
+- **AND** a revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier
+- **AND** a lane whose keyed path set includes `openspec/specs/**` is floored at the middle model tier
+- **AND** every floor only ever raises the base model tier and clamps at the most capable one
 
 ### Requirement: Harness reference integrity
 
-Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `skills/README.md`, `skills/*/SKILL.md`, `skills/*/references/*.md`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
+Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/README.md`, `.agents/skills/README.md`, `.agents/skills/*/SKILL.md`, every Markdown file recursively beneath `.agents/skills/*/references/`, `.claude/agents/*.md`, and `.codex/agents/*.toml` — MUST cite repository files by paths that exist and by symbol names rather than line numbers, and the agent-binding validator MUST enforce this mechanically.
 
 #### Scenario: validating harness references
 
@@ -122,8 +342,22 @@ Harness documents — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `openspec/REA
 - **THEN** it verifies every conservatively path-shaped backtick reference in the harness documents resolves to an existing file or directory, allowing only entries in an explicit, commented allow-missing set
 - **AND** it rejects line-number-based code citations (such as `file.js:NNN` or approximate line references) in the harness documents
 - **AND** it verifies every skill-backed role's Claude binding declares a `model:` and its Codex binding declares a `model =`
-- **AND** it verifies the AGENTS.md shared-skills list equals the set of `skills/` subdirectories containing a `SKILL.md` minus the role directories derived from the bindings table
+- **AND** it resolves a model-tiered binding to its base family skill, derives the shared-skills list from base families rather than from model-tiered role names, and resolves read-only tool exemptions against the base family token
+- **AND** it requires a model-tiered family to declare all three model tiers, reporting the family and its missing model tiers by name
+- **AND** it gates every skill-backed role's pin, model-tiered or not, against its declared model tier by exact comparison, covering the Codex reasoning-effort field as well as the model
+- **AND** it gates the `AGENTS.md` family table against the base families derived from the bindings table, treating failure to locate that table as an error rather than a skip
+- **AND** it requires each model-tiered binding's `description`, in both providers, to name its own model tier and neither of the other two
+- **AND** it verifies every `.agents/skills/<name>/SKILL.md` has only single-line string `name` and `description` frontmatter fields
+- **AND** the `name` matches its directory, contains at most 64 lowercase letters, digits, and hyphens, and the `description` contains 1-1024 characters without angle brackets
+- **AND** it recursively enumerates every Markdown file beneath a skill's `references/` directory, validates paths cited by those nested documents, and requires the owning `SKILL.md` to cite each one directly by its full relative `references/...` path
+- **AND** it verifies the AGENTS.md shared-skills list equals the set of `.agents/skills/` subdirectories containing a `SKILL.md` minus the role directories derived from the bindings table
 - **AND** it exits non-zero on any violation
+
+#### Scenario: consistent local and CI validation
+
+- **WHEN** a developer runs `npm run validate:agents` locally or the `validate-agents` CI job runs it on Ubuntu
+- **THEN** the identical dependency-free Node validator behavior enforces the same discovery, metadata, recursive-reference, and binding requirements in both environments
+- **AND** neither path requires network access or a provider-specific fallback
 
 #### Scenario: citing code from harness documents
 
@@ -175,8 +409,8 @@ Pull requests that change UI files MUST include smoke-run screenshot evidence fo
 #### Scenario: UI files changed
 
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
-- **THEN** the agent runs the Foundry smoke harness locally (the `full` profile via `npm run test:foundry`) and collects the relevant smoke screenshots for the changed views
-- **AND** the full smoke profile is not run on a GitHub Actions runner
+- **THEN** the agent runs the Foundry smoke harness locally with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which captures the changed-file-affected views as full real-Foundry app windows, and collects the relevant smoke screenshots for the changed views
+- **AND** the reduced `rc`/`ci` smoke stays the CI/release gate and the `full` profile remains the occasional outer-loop visual-regression suite; the `full` profile is not run on a GitHub Actions runner
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence
 - **AND** `npm run screenshots:ui:publish -- --pr <number>` uploads the collected screenshots to S3 (`pr-screenshots/<number>/`) and embeds the returned `![pr-<number> ...]` markdown into a managed block in the PR body
 - **AND** the agent cleans `tmp/pr-screenshots/<number>/` immediately after the evidence is added to the PR
