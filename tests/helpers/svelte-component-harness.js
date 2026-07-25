@@ -36,14 +36,23 @@ function declarationListFor(modulePath) {
   return 'rawModules';
 }
 
+function formatImporterChain(importerChain) {
+  return importerChain.join(' -> ');
+}
+
 function validateMountedComponentDependencies({ repoRoot, rawModules, runeModules, compiledModules, componentPath }) {
   const declaredModules = new Set([...rawModules, ...runeModules, ...compiledModules, componentPath]);
-  const pending = [...declaredModules];
+  const pending = [
+    ...[...declaredModules]
+      .filter((modulePath) => modulePath !== componentPath)
+      .map((modulePath) => ({ modulePath, importerChain: [modulePath] })),
+    { modulePath: componentPath, importerChain: [componentPath] }
+  ];
   const visited = new Set();
   const missing = [];
 
   while (pending.length > 0) {
-    const importerPath = pending.pop();
+    const { modulePath: importerPath, importerChain } = pending.pop();
     if (visited.has(importerPath)) continue;
     visited.add(importerPath);
 
@@ -65,11 +74,11 @@ function validateMountedComponentDependencies({ repoRoot, rawModules, runeModule
       }
       if (!declaredModules.has(importedPath)) {
         missing.push(
-          `${importerPath} imports ${specifier} (${importedPath}); add it to ${declarationListFor(importedPath)}`
+          `${formatImporterChain([...importerChain, importedPath])}; ${importerPath} imports ${specifier} (${importedPath}); add it to ${declarationListFor(importedPath)}`
         );
         continue;
       }
-      pending.push(importedPath);
+      pending.push({ modulePath: importedPath, importerChain: [...importerChain, importedPath] });
     }
   }
 

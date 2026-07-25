@@ -21,17 +21,18 @@ function createRecipeBrowserHarness({ rawModules = CRAFTING_APP_RAW_MODULES, com
 }
 
 describe('createMountedComponentHarness dependency validation', () => {
-  it('rejects an omitted raw transitive import before component import', async () => {
+  it('reports the full importer chain for an omitted indirect raw import before component import', async () => {
     const harness = createRecipeBrowserHarness({
-      rawModules: CRAFTING_APP_RAW_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/util/foundryBridge.js')
+      rawModules: CRAFTING_APP_RAW_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/util/craftingImageDefaults.js')
     });
 
     await assert.rejects(
       harness.setup(),
       (error) => {
-        assert.match(error.message, /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte/);
-        assert.match(error.message, /\.\.\/\.\.\/util\/foundryBridge\.js/);
-        assert.match(error.message, /src\/ui\/svelte\/util\/foundryBridge\.js/);
+        assert.match(
+          error.message,
+          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte -> src\/ui\/svelte\/util\/craftingImageDefaults\.js/
+        );
         assert.match(error.message, /rawModules/);
         return true;
       }
@@ -40,17 +41,18 @@ describe('createMountedComponentHarness dependency validation', () => {
     harness.teardown();
   });
 
-  it('rejects an omitted compiled transitive component before component import', async () => {
+  it('reports the full importer chain for an omitted indirect compiled component before component import', async () => {
     const harness = createRecipeBrowserHarness({
-      compiledModules: CRAFTING_APP_COMPILED_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/components/Pagination.svelte')
+      compiledModules: CRAFTING_APP_COMPILED_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/apps/crafting/CraftingThumb.svelte')
     });
 
     await assert.rejects(
       harness.setup(),
       (error) => {
-        assert.match(error.message, /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte/);
-        assert.match(error.message, /\.\.\/\.\.\/components\/Pagination\.svelte/);
-        assert.match(error.message, /src\/ui\/svelte\/components\/Pagination\.svelte/);
+        assert.match(
+          error.message,
+          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte/
+        );
         assert.match(error.message, /compiledModules/);
         return true;
       }
