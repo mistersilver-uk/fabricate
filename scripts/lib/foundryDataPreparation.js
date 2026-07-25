@@ -1,11 +1,17 @@
 /**
- * Stop a running cached container before replacing its bound data.
+ * Container states that prove no container process can hold the bound data.
+ */
+const INACTIVE_CONTAINER_STATUSES = new Set(['created', 'dead', 'exited']);
+
+/**
+ * Stop an active or ambiguous cached container and prove it is inactive before
+ * replacing its bound data.
  *
  * The stop collaborator is deliberately synchronous: a successful return is
- * the boundary that makes destructive setup safe to begin.
+ * followed by a fresh inspection before destructive setup can begin.
  *
  * @param {object} collaborators
- * @param {{ inspectStatus: () => string | null, stop: () => void }} collaborators.cachedContainer
+ * @param {{ inspectStatus: () => string | null, stop: (status: string) => void }} collaborators.cachedContainer
  * @param {() => void | Promise<void>} collaborators.replaceBoundData
  * @returns {Promise<string | null>} The reusable container's post-preparation status.
  */
@@ -13,14 +19,26 @@ export async function prepareFoundryData({
   cachedContainer,
   replaceBoundData,
 }) {
-  const cachedContainerStatus = cachedContainer.inspectStatus();
+  const initialStatus = cachedContainer.inspectStatus();
 
-  if (cachedContainerStatus === 'running') {
-    cachedContainer.stop();
+  if (initialStatus === null) {
+    await replaceBoundData();
+    return null;
+  }
+
+  if (!INACTIVE_CONTAINER_STATUSES.has(initialStatus)) {
+    cachedContainer.stop(initialStatus);
+  }
+
+  const verifiedStatus = cachedContainer.inspectStatus();
+  if (verifiedStatus !== null && !INACTIVE_CONTAINER_STATUSES.has(verifiedStatus)) {
+    throw new Error(
+      `Foundry container remained in unsafe state "${verifiedStatus}" after recovery; refusing to replace bound data.`
+    );
   }
 
   await replaceBoundData();
-  return cachedContainerStatus === 'running' ? 'stopped' : cachedContainerStatus;
+  return verifiedStatus;
 }
 
 /**

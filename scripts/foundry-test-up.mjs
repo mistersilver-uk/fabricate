@@ -14,7 +14,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -122,25 +122,60 @@ function compose(args) {
   });
 }
 
-function getContainerStatus() {
-  const result = spawnSync('docker', [
+/**
+ * Inspect the exact per-worktree container without treating Docker failures as
+ * proof that the container is absent.
+ *
+ * @param {object} [options]
+ * @param {string} [options.containerName]
+ * @param {typeof spawnSync} [options.runInspect]
+ * @returns {string | null}
+ */
+export function inspectCachedContainerStatus({
+  containerName = CONTAINER_NAME,
+  runInspect = spawnSync,
+} = {}) {
+  const result = runInspect('docker', [
     'inspect',
     '--format',
     '{{.State.Status}}',
-    CONTAINER_NAME
+    containerName
   ], {
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore']
+    stdio: ['ignore', 'pipe', 'pipe']
   });
 
-  if (result.status !== 0) return null;
-  return (result.stdout ?? '').trim() || null;
+  if (result.error) {
+    throw new Error(
+      `Unable to inspect Foundry container ${containerName}: ${result.error.message}`,
+      { cause: result.error }
+    );
+  }
+
+  const stdout = (result.stdout ?? '').trim();
+  const stderr = (result.stderr ?? '').trim();
+  if (result.status !== 0) {
+    if (/No such object:/i.test(stderr)) return null;
+    const detail = stderr || `docker inspect exited with status ${result.status ?? 'unknown'}`;
+    throw new Error(`Unable to inspect Foundry container ${containerName}: ${detail}`);
+  }
+  if (!stdout) {
+    throw new Error(
+      `Unable to inspect Foundry container ${containerName}: docker inspect returned an empty status.`
+    );
+  }
+  return stdout;
 }
 
 const cachedContainer = {
-  inspectStatus: getContainerStatus,
-  stop() {
-    process.stdout.write(`Stopping running Foundry container ${CONTAINER_NAME} before data setup...\n`);
+  inspectStatus: inspectCachedContainerStatus,
+  stop(status) {
+    process.stdout.write(
+      `Stopping ${status} Foundry container ${CONTAINER_NAME} before data setup...\n`
+    );
+    if (status === 'paused') {
+      compose('unpause');
+    }
     compose('stop');
   },
   restart(status) {
@@ -219,7 +254,9 @@ function configureCachedReleaseUrl() {
   process.stdout.write(`Using cached Foundry archive ${archiveName}.\n`);
 }
 
-async function main() {
+export async function runFoundryLauncher({
+  prepareData = prepareFoundryData,
+} = {}) {
   // Load .env.foundry if present (local dev; CI sets vars directly)
   if (existsSync(ENV_FILE)) {
     await loadEnvFile(ENV_FILE);
@@ -241,7 +278,7 @@ async function main() {
   // Both local and CI runs use this same per-worktree identity and recovery
   // boundary. A live container must release its bind mount before setup replaces
   // smoke data; a failed synchronous stop aborts before either preparation step.
-  let existingStatus = await prepareFoundryData({
+  let existingStatus = await prepareData({
     cachedContainer,
     async replaceBoundData() {
       // Ensure game systems are downloaded
@@ -369,16 +406,18 @@ async function main() {
   });
 }
 
-main()
-  .then(async () => {
-    const table = formatBootTimingsTable();
-    if (table) process.stdout.write(`\n${table}\n\n`);
-    await writeBootTimings();
-  })
-  .catch(async err => {
-    const table = formatBootTimingsTable();
-    if (table) process.stderr.write(`\n${table}\n\n`);
-    await writeBootTimings();
-    process.stderr.write(`foundry-test-up failed: ${err.message}\n`);
-    process.exit(1);
-  });
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
+  runFoundryLauncher()
+    .then(async () => {
+      const table = formatBootTimingsTable();
+      if (table) process.stdout.write(`\n${table}\n\n`);
+      await writeBootTimings();
+    })
+    .catch(async err => {
+      const table = formatBootTimingsTable();
+      if (table) process.stderr.write(`\n${table}\n\n`);
+      await writeBootTimings();
+      process.stderr.write(`foundry-test-up failed: ${err.message}\n`);
+      process.exit(1);
+    });
+}
