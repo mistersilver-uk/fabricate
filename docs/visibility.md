@@ -403,7 +403,7 @@ Each row has two actions.
   The button is disabled once the copy is spent, and disabled for a copy with unlimited uses, because there is nothing to spend.
 - **Delete** removes the copy entirely.
   It asks you to confirm first: click once to arm the button, then click again to confirm, or click elsewhere to back out.
-  For a stacked copy, deleting removes the whole stack, not one unit at a time, and asks for confirmation in a full dialog naming the quantity instead of the quick arm-and-click.
+  For a stacked copy, deleting removes the whole stack, not one unit at a time, and the arm-and-click is followed by a full dialog naming the quantity before anything is removed.
   Deleting a copy never touches anything the character has already learned from it.
   When deleting this copy would strand a shared learning budget, the tab shows a warning explaining why, so you know to erase memory first.
   See [Erase Memory Before Delete](#erase-memory-before-delete) below.
