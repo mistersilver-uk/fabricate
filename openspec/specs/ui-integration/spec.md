@@ -798,13 +798,15 @@ Two consequences follow and are stated rather than discovered: under `global` + 
 The entry carries **no count badge** — the count would require the tab-gated projection, which is a no-op precisely while the rail is rendered, and the sibling Access entry is count-less for the same reason.
 
 **Layout and roster.** Three panes: rail, searchable character roster, detail pane.
-The roster is **player characters only** (the same roster the Access Surface uses) with no show-NPCs toggle; an NPC's knowledge state stays reachable through the GM Knowledge Reset API.
+The roster is **player characters only** — the same player-character predicate the Access Surface roster applies — with no show-NPCs toggle; an NPC's knowledge state stays reachable through the GM Knowledge Reset API.
+The two rosters share the predicate, not the accessor: Access projects each actor into a display record, while this surface enumerates the LIVE actor documents, because the projection reads each actor's owned items and flags.
 Each roster row carries the actor's portrait, name and an "N item(s) · M learned" meta line, with a dimmed "Nothing tracked" row for a character carrying neither.
 
 **Default tab.** The surface opens on Recipe items, except when the selected system has **zero recipe item definitions**, in which case it opens on Learned recipes.
 The rule keys on the definition count, never on the selected character's row counts, so the tab does not shift as the GM moves down the roster; and it is resolved **once on surface entry**, never as a live derivation over that count — a GM authoring the system's first recipe item elsewhere would otherwise flip the count and yank the open tab.
 
-**Projected owned-copy row fields.** Identity (image, name, quantity), the Book / Scroll / Incomplete type derived from the recipe count, the contained-recipe count, `timesUsed` and `maxUses`, the derived remaining charges, `spent`, `inert`, `canExpend`, the resolved `learnScope`, and `matchTier` — the GM diagnostic tier from recipe-item matching, whose `duplicate` value is the low-confidence tier the bulk auto-learn gate already refuses.
+**Projected owned-copy row fields.** Identity (image, name, quantity), the Book / Scroll / Incomplete type derived from the recipe count, the contained-recipe count, `timesUsed` and `maxUses`, the derived remaining charges, `spent`, `inert`, `canExpend`, the resolved `learnScope`, and `matchTier` — the GM diagnostic tier from recipe-item matching.
+`matchTier` is a **provenance** label, not an ambiguity report: its `duplicate` value names the weakest link (the copy reached its definition only through `_stats.duplicateSource`, the tier the bulk auto-learn gate refuses) and is reachable from a single definition, so the surface MUST NOT present it as a duplicate, conflicting, or ambiguous match.
 
 **Rendering rules.**
 

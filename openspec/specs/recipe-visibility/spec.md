@@ -77,6 +77,11 @@ The tier-4 `_stats.duplicateSource` condition was matched at runtime before issu
 There is no clone-gate in this matcher: tier 3 is always trusted at match time, because an actor-owned copy legitimately carries both an inherited `_stats.compendiumSource` (provenance) and a `_stats.duplicateSource` (Foundry stamps it on every non-compendium drag-drop).
 The clone-gate is a REGISTRATION and source-repair rule only (see the data-models spec) and must never reach this matcher.
 
+**A tier is a provenance label, never an ambiguity signal.**
+The matcher returns exactly one definition and one tier, never a set and never a count, so no tier value can report that an owned copy matched more than one definition.
+In particular `duplicate` says only that the copy reached its definition through `_stats.duplicateSource`; a candidate set holding a single definition can produce it, and a copy that would satisfy two definitions is resolved silently by tier precedence and then candidate order without any distinguishing output.
+Any consumer surfacing `duplicate` MUST describe it as the weakest provenance link (the tier the bulk auto-learn confidence gate below refuses), and MUST NOT describe it as a duplicate, conflicting, or ambiguous match.
+
 ### Bulk auto-learn confidence gate (tier 4)
 
 The `createItem` bulk on-drop auto-learn path (`mode: 'auto'`) must NOT auto-grant a recipe whose owned item matches a **registered** definition (one that carries an `id`) ONLY via tier 4 (the un-migrated `_stats.duplicateSource` fallback).
@@ -376,10 +381,13 @@ A surface offering the action MUST therefore render it disabled rather than as a
 - An **already-spent** copy performs zero writes too, and the guard is the exact complement of `_filterNonExhausted`: a capped book whose `maxUses` is a finite number greater than zero and whose current `timesUsed` is at or above it is refused inside the core.
 This is behaviour-preserving on the craft path, which only ever reaches the core with a candidate that predicate already kept.
 It is load-bearing on the GM path, which has no such pre-filter: without it a stale row — an asynchronous re-projection, a second GM window, a macro spending the last charge — would drive one further increment and, under `whenSpent: "destroyed"`, silently delete the copy while reporting success.
-The refusal MUST be reported distinctly from the uncapped refusal, because the two are different facts about the copy.
+The guard MUST be evaluated against the count the core itself re-reads from the document, never against a caller-supplied snapshot, because the stale row is exactly the case it exists to refuse.
+The refusal MUST be reported distinctly from the uncapped refusal, because the two are different facts about the copy: one says the book has no charges to spend at all, the other says this copy has none left.
 - Caps MUST come from `_getRecipeItemCaps` (via `_capsForDefinition` when only a definition is in hand), never a raw `definition.caps` read, so the legacy `destroyWhenExhausted` / `limitRecipes` / `learningMode` derivations stay applied.
 - The current count is re-read from the document inside the core rather than taken from a caller-supplied candidate snapshot.
 On the craft path the two are provably equal today (nothing awaits between candidate collection and the write), so the re-read is strictly safer and never behaviour-changing: it closes a staleness window that would open the moment an `await` is inserted between the two.
+That equality is conditional on one coercion rule, and the rule is normative rather than incidental: the shared read MUST collapse a non-numeric `timesUsed` to `0`, exactly as the craft path's historical outer `Number(<snapshot> || 0)` did over an already-coerced value.
+A truthy but unparseable stored count (`"abc"`) otherwise reads as `NaN`, which forces the exhaustion test false, writes `null` as the new count, and leaves a copy that can never reach any `whenSpent` disposal branch.
 
 ### Deterministic Item Selection
 
