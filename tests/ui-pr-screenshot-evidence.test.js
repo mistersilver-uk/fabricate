@@ -243,6 +243,33 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
+  it('maps every changed Knowledge surface file to BOTH the surface view and its armed-Delete view (issue 785)', () => {
+    // The armed frame needs its OWN view id because `collect` publishes only
+    // `candidates[0]`: appended to the surface view, the lower-numbered un-armed
+    // owned-copies frame would win forever and the armed state would never ship.
+    for (const file of [
+      'src/ui/svelte/apps/manager/KnowledgeView.svelte',
+      'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
+      'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+    ]) {
+      const ids = mapChangedFilesToViews([file]).map((view) => view.id);
+      assert.ok(ids.includes('manager-knowledge'), file);
+      assert.ok(ids.includes('manager-knowledge-delete-armed'), file);
+    }
+    const surface = VIEW_RECIPES.find((view) => view.id === 'manager-knowledge');
+    assert.deepEqual(surface.smokeLabels, [
+      'manager-knowledge-owned-copies',
+      'manager-knowledge-empty-tab',
+      'manager-knowledge-learned-lost-copy',
+      'manager-knowledge-party-pool-warning',
+      'manager-knowledge-narrow',
+    ]);
+  });
+
   it('maps recipe Tool authoring files only to the existing Tools-tab frame', () => {
     for (const file of [
       'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',

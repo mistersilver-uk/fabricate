@@ -157,6 +157,12 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-tool-stress-invalid-validation',
   'manager-tool-parity-06-breakage-900x700',
   'manager-tool-stress-wrapping-680',
+  'manager-knowledge-owned-copies',
+  'manager-knowledge-empty-tab',
+  'manager-knowledge-learned-lost-copy',
+  'manager-knowledge-party-pool-warning',
+  'manager-knowledge-delete-armed',
+  'manager-knowledge-narrow',
   'manager-components-progressive',
   'manager-component-edit-difficulty',
   'interactable-config-linked',
@@ -376,6 +382,15 @@ const D0_SECTION_SPANS = [
     name: 'tools',
     from: 'manager-tool-parity-01-library-1280x720',
     to: 'manager-tool-stress-wrapping-680',
+  },
+  {
+    // The GM Knowledge surface (issue 785). Its fixture writes real actor flags,
+    // creates world Items + recipe-item definitions and grants owned copies, and its
+    // `finally` restore undoes all of it — so skipping the section skips the mutation
+    // AND its restore together, exactly like the Tool Studio section above.
+    name: 'knowledge',
+    from: 'manager-knowledge-owned-copies',
+    to: 'manager-knowledge-narrow',
   },
   {
     name: 'overview-interactables',

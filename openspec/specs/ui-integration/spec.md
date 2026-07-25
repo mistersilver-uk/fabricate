@@ -785,6 +785,60 @@ The inspector authors the grant through **two independent rosters** — Characte
 
 Grant state is read from `recipe.access`, and the surface stages no dirty draft, so it is not part of the Manager confirm-discard route-exit chain.
 
+### Knowledge Surface
+
+`Knowledge` is the `Crafting` group's per-character **runtime** knowledge audit: which owned copies of the selected system's recipe items each character carries, and which recipes each character has learned.
+It is the play-state counterpart to the Books & Scrolls Surface (which authors recipe items) and the Access Surface (which grants visibility), and it operates on per-character **owned copies**, never on definitions.
+It audits **world actors only**; the knowledge state of an unlinked-token synthetic actor is out of scope.
+"Surface" rather than "Tab" is deliberate: `Tab` in this spec names top-level manager tabs, which Knowledge is not.
+
+**Membership gate.** The rail entry is shown when `craftingEffect(visibilityMode).showBooksScrolls` is true **OR** the selected system's `resolutionMode === "alchemy"`, and is absent otherwise.
+That gate is deliberately wider than Books & Scrolls': `learnRecipeOnCraft` writes `learnedRecipes` under **every** visibility mode, and under `global` + alchemy those entries are the sole reveal source, so a `showBooksScrolls`-only gate would leave the GM no lever at all in that documented discovery-only configuration.
+Two consequences follow and are stated rather than discovered: under `global` + alchemy the Recipe items tab is legitimately empty and the Learned recipes tab carries everything; under `restricted` + alchemy the rail shows Access **and** Knowledge but **not** Books & Scrolls.
+The entry carries **no count badge** — the count would require the tab-gated projection, which is a no-op precisely while the rail is rendered, and the sibling Access entry is count-less for the same reason.
+
+**Layout and roster.** Three panes: rail, searchable character roster, detail pane.
+The roster is **player characters only** (the same roster the Access Surface uses) with no show-NPCs toggle; an NPC's knowledge state stays reachable through the GM Knowledge Reset API.
+Each roster row carries the actor's portrait, name and an "N item(s) · M learned" meta line, with a dimmed "Nothing tracked" row for a character carrying neither.
+
+**Default tab.** The surface opens on Recipe items, except when the selected system has **zero recipe item definitions**, in which case it opens on Learned recipes.
+The rule keys on the definition count, never on the selected character's row counts, so the tab does not shift as the GM moves down the roster; and it is resolved **once on surface entry**, never as a live derivation over that count — a GM authoring the system's first recipe item elsewhere would otherwise flip the count and yank the open tab.
+
+**Projected owned-copy row fields.** Identity (image, name, quantity), the Book / Scroll / Incomplete type derived from the recipe count, the contained-recipe count, `timesUsed` and `maxUses`, the derived remaining charges, `spent`, `inert`, `canExpend`, the resolved `learnScope`, and `matchTier` — the GM diagnostic tier from recipe-item matching, whose `duplicate` value is the low-confidence tier the bulk auto-learn gate already refuses.
+
+**Rendering rules.**
+
+- The uses chip has exactly three states: unlimited (info tone, "Unlimited"), remaining, and spent.
+`remaining === null` means UNLIMITED and MUST render as "Unlimited", never "0 left".
+`timesUsed` is shown before `maxUses` so a post-hoc cap change stays legible.
+- `inert` renders as a **second, independent** chip whenever the flag is set, and is never folded into the uses chip.
+That yields five renderable combinations, including **inert-but-not-spent** — the visible form of the "nothing ever clears `inert`" gap.
+- Expend is **disabled** for a spent copy and for an uncapped copy (which would write nothing), and is **not** gated on `inert`: an inert-but-not-spent copy still has charges the runtime will spend, so disabling it there would apply a gate the engine does not.
+- Delete deletes the **whole document** even for a stacked copy, behind a `services.confirmDialog` naming the quantity when `quantity > 1`.
+- The spent-row dim is scoped to the row's identity and meta and MUST NOT reach the action cluster, whose disabled button already carries its own reduced opacity.
+- A learned row whose source copy is gone states that fact in its source line, and any learned row whose erase will free no budget carries a per-row "Frees no slot" sub-label rather than a banner promise the erase cannot keep.
+
+**Confirmation affordance.** The two high-frequency row actions (Delete a copy, Erase a memory) use an inline two-step arm rather than a modal: the first click arms the control, the second executes.
+It is a real focusable `button`, its icon swaps as well as its label so the state survives greyscale, its `aria-label` carries the full consequence sentence, and `data-armed` is the test hook.
+The armed token is keyed on the **target document id**, never a row index, because the projection re-publishes asynchronously from actor and item hooks.
+Exactly one armed token exists at a time, and it is dropped on: character selection change, tab switch, roster search-query change, any executed action (including Expend), `Escape`, `blur`, arming a different row, and any projection publish that no longer contains the armed id.
+There is no auto-disarm timer.
+`services.confirmDialog` is retained for the heavyweight cases: a stacked delete and both reset grains.
+
+**Per-character reset.** The detail header offers **both** grains — "this system" and "all systems" — routed through the GM Knowledge Reset API with and without a `systemId`, each behind a `confirmDialog`.
+Both are required: reset-one-system deliberately leaves orphan learned keys in place, so only the all-systems grain can clear them and give the surfaced orphan roll-up a reachable lever.
+The dialog body is where the erase-versus-reset discovery-progress asymmetry is disclosed.
+
+**Disclosure placement — one idea per strip, never a banner stack.**
+The Recipe items tab carries one persistent info banner stating that the surface edits play state and never definitions.
+The party-pool ordering hazard renders as a **conditional** warning band, raised only when the selected character owns a `learnScope: "total"` copy that is the source of a still-learned entry; a permanent band for a conditional hazard is noise.
+The Learned recipes tab's band states the general rule without promising slot recovery, and the per-row "Frees no slot" sub-label carries the per-row truth.
+
+**Refresh and reference contract.** The projection MUST NOT join the shared admin-store `refresh()`, which ~40 mutation paths invoke and which has no cheap invalidation signature for a whole-world actors-by-items scan.
+It is computed by a separate refresh gated on a `knowledgeActive` flag, so it is a total no-op while the surface is closed, and while the surface is open the externally-driven actor/item hooks coalesce into one refresh through the existing microtask scheduler.
+Each store action awaits its seam call and then re-runs the knowledge refresh, never the shared `refresh()`.
+The result is published as a top-level `viewState.knowledge` and is **always a new object**; it MUST NOT hang off `selectedSystem`, which would force a `selectedSystem` reference rebuild on every knowledge publish and let a late second-phase publish clobber freshly projected rows.
+
 ### Environments Tab
 
 Only shown when `features.gathering === true` for the selected crafting system.

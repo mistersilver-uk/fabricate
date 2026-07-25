@@ -41,6 +41,16 @@ const toolStudioFrame = (id, label, smokeLabel, matches) => ({
   smokeLabels: [smokeLabel],
   matches,
 });
+// The GM Knowledge surface (issue 785). Shared by the two Knowledge view ids below
+// (the surface itself and its armed-Delete frame) so the pair is one trigger set
+// expressed once. `ArmedDangerButton` is included because it renders inside every
+// owned-copy and learned row; `styles/` is deliberately NOT, so a broad stylesheet
+// change keeps routing to the existing theme-or-global-ui fallback.
+const KNOWLEDGE_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/(?:KnowledgeView|ArmedDangerButton)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/knowledge\/knowledgeStudio\.js$/,
+];
 const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:CraftingSystemManagerRoot|ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
@@ -449,6 +459,30 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\/RecipeItemValidationTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/RecipeItemEditor\.svelte$/,
     ],
+  },
+  // Issue 785: the GM Knowledge surface. TWO view ids sharing one `matches` list —
+  // `collect` publishes only `candidates[0]` from a filename-sorted list, so the armed
+  // Delete frame cannot be an extra `smokeLabels` entry on the main view (the un-armed
+  // owned-copies frame has the lower capture counter and would win forever). The shared
+  // `KNOWLEDGE_MATCHES` const is what keeps the pair from reading as two near-identical
+  // literals to SonarCloud's duplication gate.
+  {
+    id: 'manager-knowledge',
+    label: 'Manager Knowledge surface (roster, owned copies, learned recipes, narrow)',
+    smokeLabels: [
+      'manager-knowledge-owned-copies',
+      'manager-knowledge-empty-tab',
+      'manager-knowledge-learned-lost-copy',
+      'manager-knowledge-party-pool-warning',
+      'manager-knowledge-narrow',
+    ],
+    matches: KNOWLEDGE_MATCHES,
+  },
+  {
+    id: 'manager-knowledge-delete-armed',
+    label: 'Manager Knowledge surface — Delete armed to "Confirm?" beside un-armed rows',
+    smokeLabels: ['manager-knowledge-delete-armed'],
+    matches: KNOWLEDGE_MATCHES,
   },
   {
     id: 'manager-crafting-settings',

@@ -49,6 +49,7 @@ import {
   expectedSelectorsForManagerSurface
 } from './lib/managerLayoutGuards.js';
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
+import { runFixturedScreenshotSection } from './lib/smokeSectionFixture.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
@@ -1558,6 +1559,12 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-gathering-task-row',
       '.manager-gathering-event-row',
       '.manager-tools-row',
+      // GM Knowledge surface (issue 785). Both row classes are measured so the narrow
+      // (~880px) band — where three columns still hold and the detail pane is at its
+      // narrowest — is covered for horizontal overflow, and the owned-copy row is what
+      // `MANAGER_SURFACE_EXPECTED_SELECTORS` pins for `knowledge normal` / `narrow`.
+      '.manager-knowledge-copy-row',
+      '.manager-knowledge-learned-row',
       '[data-manager-tool-id]',
       '[data-tool-edit-view]',
       '.manager-inspector-card',
@@ -1616,6 +1623,8 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-gathering-task-row'
       || metric.selector === '.manager-gathering-event-row'
       || metric.selector === '[data-manager-tool-id]'
+      || metric.selector === '.manager-knowledge-copy-row'
+      || metric.selector === '.manager-knowledge-learned-row'
       || metric.selector === '.manager-travel-parties-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
@@ -4401,6 +4410,412 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
     if (replacementSource && fixture.replacementSourceCreated) await replacementSource.delete();
     await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
   }, { systemId, recipeId, fixture });
+}
+
+/**
+ * Seed the GM Knowledge surface's runtime fixture (issue 785).
+ *
+ * The surface audits per-character RUNTIME knowledge, so the fixture is entirely
+ * additive persisted world state: five NEW world Items registered as five NEW recipe
+ * item definitions (one per cap profile), owned copies of each granted to real player
+ * characters, and two seeded `learnedRecipes` entries. Nothing existing is mutated, so
+ * `restoreKnowledgeFixture` is a pure teardown and the section is persisted-net-zero.
+ *
+ * The seeded copy states are the five renderable chip combinations plus the party-pool
+ * hazard:
+ *  - limited-use (3 uses, one spent)  → remaining-tone uses chip
+ *  - uncapped                         → info "Unlimited" chip, Expend DISABLED
+ *  - inert-but-not-spent (1 of 5, `inert: true`) → remaining chip PLUS the Inert chip.
+ *    This is the state the `inert` merge-survival proof needs and the only one that
+ *    can produce it (see `assertKnowledgeInertSurvivesExpend`).
+ *  - spent (2 of 2, `inert: true`)    → danger "Spent" chip PLUS the Inert chip
+ *  - `learnScope: 'total'` party-pool copy that is the SOURCE of a still-learned
+ *    entry → raises the D8 ordering-hazard warning band.
+ *
+ * A grant-only access fixture actor carries a learned entry whose `sourceItemUuid`
+ * dangles (its copy is gone) and NO owned copies, which gives both the "copy no longer
+ * owned" source rung with its "Frees no slot" sub-label and a dashed empty tab state.
+ * Its untouched siblings stay empty-inventory, which is what puts the dimmed "Nothing
+ * tracked" row in the roster.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{systemId: string, recipeId: string, chipStatesActorId: string, partyPoolActorId: string}} options
+ */
+async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActorId, partyPoolActorId }) {
+  return page.evaluate(async ({ systemId, recipeId, chipStatesActorId, partyPoolActorId }) => {
+    const clone = (value) => foundry.utils.deepClone(value);
+    const csm = game.fabricate.getCraftingSystemManager();
+    const system = csm.getSystem(systemId);
+    const recipe = game.fabricate.getRecipeManager().getRecipe(recipeId);
+    const chipStatesActor = game.actors.get(chipStatesActorId);
+    const partyPoolActor = game.actors.get(partyPoolActorId);
+    // The grant-only access fixtures (issue 796) are the empty-inventory player
+    // characters this surface needs. Sorted by name so the choice is deterministic.
+    const grantOnlyActors = game.actors.contents
+      .filter((actor) => actor.getFlag('fabricate', 'smokeSeedRole') === 'access-grant')
+      .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+    const learnedOnlyActor = grantOnlyActors[0] || null;
+    const untrackedActor = grantOnlyActors[1] || null;
+    if (!system || !recipe || !chipStatesActor || !partyPoolActor || !learnedOnlyActor || !untrackedActor) {
+      throw new Error('Knowledge fixture requires the smoke system, its healing-potion recipe, both hero actors and two grant-only actors');
+    }
+
+    const sourceType = game.items.find((item) => item.name === 'Tome of Brewing')?.type || 'loot';
+    // Every img is a Foundry-core raster this harness already loads elsewhere, so the
+    // console-error gate cannot trip on a missing asset.
+    const plan = [
+      {
+        key: 'limited',
+        name: 'Smoke Knowledge Primer',
+        img: 'icons/sundries/books/book-tooled-eye-gold-red.webp',
+        caps: { item: { limitUses: true, maxUses: 3, whenSpent: 'inert' } },
+        usage: { timesUsed: 1 },
+        holder: chipStatesActor,
+      },
+      {
+        key: 'uncapped',
+        name: 'Smoke Knowledge Endless Codex',
+        img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp',
+        caps: { item: { limitUses: false } },
+        usage: null,
+        holder: chipStatesActor,
+      },
+      {
+        key: 'inert',
+        name: 'Smoke Knowledge Faded Grimoire',
+        img: 'icons/sundries/books/book-worn-brown.webp',
+        caps: { item: { limitUses: true, maxUses: 5, whenSpent: 'inert' } },
+        usage: { timesUsed: 1, inert: true },
+        holder: chipStatesActor,
+      },
+      {
+        key: 'spent',
+        name: 'Smoke Knowledge Spent Scroll',
+        img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
+        caps: { item: { limitUses: true, maxUses: 2, whenSpent: 'inert' } },
+        usage: { timesUsed: 2, inert: true },
+        holder: chipStatesActor,
+      },
+      {
+        key: 'partyPool',
+        name: 'Smoke Knowledge Party Tome',
+        img: 'icons/sundries/books/book-embossed-jewel-gold-green.webp',
+        caps: {
+          item: { limitUses: true, maxUses: 4, whenSpent: 'inert' },
+          learn: { limitLearning: true, learnsAllowed: 2, learnScope: 'total' },
+        },
+        usage: { timesUsed: 1 },
+        holder: partyPoolActor,
+      },
+    ];
+
+    const sources = await Item.createDocuments(
+      plan.map((entry) => ({ name: entry.name, type: sourceType, img: entry.img }))
+    );
+    const definitionIds = [];
+    const ownedByKey = {};
+    const createdItems = new Map();
+    for (const [index, entry] of plan.entries()) {
+      const { item: definition } = await csm.addRecipeItemFromUuid(systemId, sources[index].uuid);
+      await csm.updateRecipeItemDefinition(systemId, definition.id, {
+        recipeIds: [recipeId],
+        caps: entry.caps,
+      });
+      definitionIds.push(definition.id);
+      // The owned copy claims its definition through the durable per-system roles map
+      // (`flags.fabricate.fabricate.roles.<systemId>.recipeItemDefinitionId`), which is
+      // tier 1 of `matchRecipeItemDefinition` — the same identity a real drag-to-actor
+      // copy resolves through. Built as an object literal rather than a dotted update
+      // path so nothing can mis-split on a key segment.
+      const nested = { roles: { [systemId]: { recipeItemDefinitionId: definition.id } } };
+      if (entry.usage) nested.recipeItemUsage = { ...entry.usage };
+      const [owned] = await entry.holder.createEmbeddedDocuments('Item', [{
+        name: entry.name,
+        type: sourceType,
+        img: entry.img,
+        flags: { fabricate: { fabricate: nested } },
+      }]);
+      if (!owned) throw new Error(`Knowledge fixture could not grant ${entry.name}`);
+      ownedByKey[entry.key] = { actorId: entry.holder.id, itemId: owned.id, itemUuid: owned.uuid };
+      createdItems.set(entry.holder.id, [...(createdItems.get(entry.holder.id) || []), owned.id]);
+    }
+
+    const learnedTargets = [
+      // Still-owned party-pool source → the D8 hazard band's precondition.
+      { actor: partyPoolActor, sourceItemUuid: ownedByKey.partyPool.itemUuid },
+      // A dangling source uuid: the copy this was learned from is gone, so the row
+      // resolves rung 2 of the source ladder and frees no learn budget on erase.
+      { actor: learnedOnlyActor, sourceItemUuid: `Actor.${learnedOnlyActor.id}.Item.${foundry.utils.randomID()}` },
+    ];
+    const learnedRestores = [];
+    for (const target of learnedTargets) {
+      const current = target.actor.getFlag('fabricate', 'fabricate.learnedRecipes') || null;
+      learnedRestores.push({ actorId: target.actor.id, learnedRecipes: clone(current) });
+      await target.actor.update({
+        'flags.fabricate.fabricate.learnedRecipes': {
+          ...(current || {}),
+          [recipeId]: { learnedAt: Date.now(), sourceItemUuid: target.sourceItemUuid },
+        },
+      });
+    }
+
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+    return {
+      definitionIds,
+      recipeId,
+      // `deleteRecipeItemDefinition` NULLS `recipeItemId` / `linkedRecipeItemUuid` on
+      // every recipe the deleted definition claimed membership over. The fixture links
+      // its definitions to a real recipe (so the Type pill and "N recipes inside" read
+      // truthfully), so restore must not let that null-out land on the smoke world's
+      // recipe. Snapshot both link fields and repair them if it ever does.
+      recipeLinks: {
+        recipeItemId: recipe.recipeItemId ?? null,
+        linkedRecipeItemUuid: recipe.linkedRecipeItemUuid ?? null,
+      },
+      sourceItemIds: sources.map((source) => source.id),
+      createdItems: [...createdItems].map(([actorId, itemIds]) => ({ actorId, itemIds })),
+      learnedRestores,
+      ownedByKey,
+      chipStatesActorId: chipStatesActor.id,
+      partyPoolActorId: partyPoolActor.id,
+      learnedOnlyActorId: learnedOnlyActor.id,
+      untrackedActorId: untrackedActor.id,
+    };
+  }, { systemId, recipeId, chipStatesActorId, partyPoolActorId });
+}
+
+/**
+ * Undo everything `setupKnowledgeFixture` created (issue 785).
+ *
+ * The seeded learned entries are removed with a real key DELETION via `unsetFlag`
+ * (`flags.fabricate.fabricate.-=learnedRecipes`), NEVER a filtered `setFlag` map
+ * rewrite: `Document#update`'s recursive merge never removes a key, so a rewritten map
+ * leaves the seeded entry to resurrect on reload — leaving the section not net-zero and
+ * poisoning every later smoke run's world, including unrelated PRs. Any pre-existing
+ * map is written back only AFTER that deletion has landed.
+ *
+ * The owned copies are deleted BEFORE the learned entries so no budget-freeing path can
+ * resolve a still-held source copy and decrement a party-pool key this fixture never
+ * incremented.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{systemId: string, fixture: object|null}} options
+ */
+async function restoreKnowledgeFixture(page, { systemId, fixture }) {
+  if (!fixture) return;
+  await page.evaluate(async ({ systemId, fixture }) => {
+    const csm = game.fabricate.getCraftingSystemManager();
+    for (const { actorId, itemIds } of fixture.createdItems || []) {
+      const actor = game.actors.get(actorId);
+      if (actor) await actor.deleteEmbeddedDocuments('Item', itemIds).catch(() => {});
+    }
+    for (const { actorId, learnedRecipes } of fixture.learnedRestores || []) {
+      const actor = game.actors.get(actorId);
+      if (!actor) continue;
+      await actor.unsetFlag('fabricate', 'fabricate.learnedRecipes').catch(() => {});
+      if (learnedRecipes && Object.keys(learnedRecipes).length > 0) {
+        await actor.update({ 'flags.fabricate.fabricate.learnedRecipes': learnedRecipes });
+      }
+    }
+    // Drop each fixture definition's membership BEFORE deleting it: with no
+    // `recipeIds`, the delete finds no referencing recipe and never nulls the smoke
+    // world's `recipeItemId` / `linkedRecipeItemUuid`.
+    for (const definitionId of fixture.definitionIds || []) {
+      await csm.updateRecipeItemDefinition(systemId, definitionId, { recipeIds: [] }).catch(() => {});
+      await csm.deleteRecipeItemDefinition(systemId, definitionId).catch(() => {});
+    }
+    // Belt-and-braces repair on the exact fields that delete path would have nulled.
+    const rm = game.fabricate.getRecipeManager();
+    const recipe = rm?.getRecipe?.(fixture.recipeId);
+    const links = fixture.recipeLinks || {};
+    if (
+      recipe &&
+      ((recipe.recipeItemId ?? null) !== (links.recipeItemId ?? null) ||
+        (recipe.linkedRecipeItemUuid ?? null) !== (links.linkedRecipeItemUuid ?? null))
+    ) {
+      recipe.recipeItemId = links.recipeItemId ?? null;
+      recipe.linkedRecipeItemUuid = links.linkedRecipeItemUuid ?? null;
+      await rm.save?.();
+    }
+    for (const itemId of fixture.sourceItemIds || []) {
+      await game.items.get(itemId)?.delete().catch(() => {});
+    }
+    await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
+  }, { systemId, fixture });
+}
+
+/**
+ * The single place the REAL Foundry `ObjectField` flag merge is exercised (issue 785).
+ *
+ * `_setRecipeItemUsage` writes `{ timesUsed }` ALONE, so only a usage-only write landing
+ * on an already-`inert` document can prove that Foundry's recursive merge preserves the
+ * sibling key. `_markRecipeItemInert` writes both keys in one payload and proves
+ * nothing, and the unit suite's payload-level assertion cannot exercise the merge at all
+ * (its `FakeDocument` is deliberately merge-blind).
+ *
+ * The copy MUST therefore be the inert-but-NOT-spent fifth state: a spent copy cannot be
+ * expended and a still-capped copy carries no `inert`, so either would resolve to
+ * `undefined === undefined` and pass unconditionally. That state is reachable from the
+ * surface only because `canExpend` deliberately does not test `inert`, which this also
+ * asserts.
+ *
+ * @param {import('playwright').Page} page
+ * @param {object} fixture
+ */
+async function assertKnowledgeInertSurvivesExpend(page, fixture) {
+  const { actorId, itemId } = fixture.ownedByKey.inert;
+  const expend = page.locator(`.fabricate-manager [data-knowledge-expend="${itemId}"]`).first();
+  if (await expend.isDisabled()) {
+    throw new Error('The inert-but-not-spent copy must stay expendable — `canExpend` must not test `inert`');
+  }
+  await expend.click();
+  const readUsage = ({ actorId, itemId }) => (
+    game.actors.get(actorId)?.items?.get(itemId)?.getFlag('fabricate', 'fabricate.recipeItemUsage') ?? null
+  );
+  await page.waitForFunction(
+    ({ actorId, itemId }) => {
+      const usage = game.actors.get(actorId)?.items?.get(itemId)?.getFlag('fabricate', 'fabricate.recipeItemUsage');
+      return Number(usage?.timesUsed) === 2;
+    },
+    { actorId, itemId },
+    { timeout: 10_000, polling: 'raf' }
+  );
+  const usage = await page.evaluate(readUsage, { actorId, itemId });
+  if (usage?.inert !== true) {
+    throw new Error(`The usage-only expend write dropped the sibling inert flag: ${JSON.stringify(usage)}`);
+  }
+}
+
+/**
+ * Drive the GM Knowledge surface and capture its evidence frames (issue 785).
+ *
+ * Every frame is a genuinely distinct app state — a different roster selection, inner
+ * tab, armed row, or manager width — because `collect` publishes one frame per view id
+ * and a duplicate state would publish no new information.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{fixture: object}} options
+ */
+async function exerciseKnowledgeSurface(page, { fixture }) {
+  const selectKnowledgeCharacter = async (actorId) => {
+    await page.locator(`.fabricate-manager [data-knowledge-actor="${actorId}"]`).first().click();
+    await page.locator(`.fabricate-manager [data-knowledge-actor="${actorId}"][aria-pressed="true"]`).first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+  };
+  const openKnowledgeTab = async (tabId) => {
+    await page.locator(`.fabricate-manager [data-knowledge-tab="${tabId}"]`).first().click();
+    await page.locator(`.fabricate-manager [data-knowledge-panel="${tabId}"]`).first()
+      .waitFor({ state: 'visible', timeout: 5_000 });
+  };
+
+  await setManagerWindowSize(page, { width: 1280, height: 900 });
+  await openManagerCraftingSection(page, 'knowledge', 'knowledge');
+  await page.locator('.fabricate-manager[data-manager-view="knowledge"]').first()
+    .waitFor({ state: 'visible', timeout: 10_000 });
+  await page.locator('.fabricate-manager [data-knowledge-view]').first()
+    .waitFor({ state: 'visible', timeout: 10_000 });
+  // The dimmed "Nothing tracked" roster row proves the roster spans every player
+  // character, not only the ones carrying state. It is in the roster column, so it
+  // rides along in every frame below.
+  await page.locator(`.fabricate-manager [data-knowledge-actor="${fixture.untrackedActorId}"] [data-knowledge-untracked]`)
+    .first().waitFor({ state: 'visible', timeout: 5_000 });
+
+  // (1) Owned copies — the whole chip vocabulary in one list, beside the detail
+  // header's two reset grains.
+  await selectKnowledgeCharacter(fixture.chipStatesActorId);
+  await openKnowledgeTab('recipeItems');
+  await page.locator('.fabricate-manager .manager-knowledge-copy-row').first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  const copyRowCount = await page.locator('.fabricate-manager .manager-knowledge-copy-row').count();
+  if (copyRowCount !== 4) {
+    throw new Error(`Knowledge chip-state character must hold exactly 4 owned copies; found ${copyRowCount}`);
+  }
+  for (const [key, usesChip, expectInert] of [
+    ['limited', 'remaining', false],
+    ['uncapped', 'unlimited', false],
+    ['inert', 'remaining', true],
+    ['spent', 'spent', true],
+  ]) {
+    const row = page.locator(`.fabricate-manager [data-knowledge-copy="${fixture.ownedByKey[key].itemId}"]`).first();
+    await row.locator(`[data-knowledge-uses-chip="${usesChip}"]`).waitFor({ state: 'visible', timeout: 5_000 });
+    const inertChips = await row.locator('[data-knowledge-inert]').count();
+    if ((inertChips > 0) !== expectInert) {
+      throw new Error(`Knowledge ${key} copy rendered ${inertChips} Inert chip(s); expected ${expectInert ? 'one' : 'none'}`);
+    }
+  }
+  // An uncapped book writes nothing and a spent one has no charge left, so both
+  // disable Expend — a disabled control, never a silent no-op.
+  for (const key of ['uncapped', 'spent']) {
+    const expend = page.locator(`.fabricate-manager [data-knowledge-expend="${fixture.ownedByKey[key].itemId}"]`).first();
+    if (!(await expend.isDisabled())) {
+      throw new Error(`Expend must be disabled on the ${key} recipe item copy`);
+    }
+  }
+  await assertManagerLayoutStable(page, 'knowledge normal');
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, 'manager-knowledge-owned-copies');
+
+  await assertKnowledgeInertSurvivesExpend(page, fixture);
+
+  // (2) A tab's dashed empty state: the learned-only character carries knowledge but
+  // no owned copies at all.
+  await selectKnowledgeCharacter(fixture.learnedOnlyActorId);
+  await openKnowledgeTab('recipeItems');
+  await page.locator('.fabricate-manager [data-knowledge-items-empty]').first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, 'manager-knowledge-empty-tab');
+
+  // (3) Learned recipes — the "copy no longer owned" source rung and the per-row
+  // "Frees no slot" sub-label that states D7's prohibition positively.
+  await openKnowledgeTab('learnedRecipes');
+  await page.locator('.fabricate-manager [data-knowledge-source="lostCopy"]').first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await page.locator('.fabricate-manager [data-knowledge-frees-no-slot]').first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, 'manager-knowledge-learned-lost-copy');
+
+  // (4) The D8 ordering-hazard band, raised only for a character holding a
+  // `total`-scope copy that is the source of a still-learned entry.
+  await selectKnowledgeCharacter(fixture.partyPoolActorId);
+  await openKnowledgeTab('recipeItems');
+  await page.locator('.fabricate-manager [data-knowledge-party-pool-warning]').first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await assertManagerLayoutStable(page, 'knowledge normal');
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, 'manager-knowledge-party-pool-warning');
+
+  // (5) Delete armed to "Confirm?" WITH un-armed sibling rows in the same frame —
+  // the contrast is the evidence, since only one armed token exists at a time.
+  await selectKnowledgeCharacter(fixture.chipStatesActorId);
+  await openKnowledgeTab('recipeItems');
+  const armToken = `delete:${fixture.ownedByKey.limited.itemId}`;
+  await page.locator(`.fabricate-manager [data-arm-token="${armToken}"]`).first().click();
+  await page.locator(`.fabricate-manager [data-arm-token="${armToken}"][data-armed="true"]`).first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  const unarmedSiblings = await page
+    .locator('.fabricate-manager .manager-knowledge-copy-row [data-armed="false"]').count();
+  if (unarmedSiblings < 1) {
+    throw new Error('The armed Delete frame must show at least one un-armed sibling row');
+  }
+  await assertManagerLayoutStable(page, 'knowledge normal');
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, 'manager-knowledge-delete-armed');
+
+  // (6) ~880px — deliberately ABOVE the 831px single-column collapse. That band is
+  // where three columns still hold and the detail pane is at its narrowest, so it is
+  // where the row action cluster actually risks clipping. Re-selecting the character
+  // first disarms the row, so the narrow frame shows the resting layout.
+  await selectKnowledgeCharacter(fixture.chipStatesActorId);
+  await page.locator(`.fabricate-manager [data-arm-token="${armToken}"][data-armed="false"]`).first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await setManagerWindowSize(page, { width: 880, height: 900 });
+  await page.waitForTimeout(300);
+  await assertManagerLayoutStable(page, 'knowledge narrow');
+  await assertNoScreenshotOverlays(page);
+  await screenshot(page, 'manager-knowledge-narrow');
+  await setManagerWindowSize(page, { width: 1280, height: 900 });
 }
 
 async function verifyToolStudioLiveReplacement(page, { systemId, recipeId, actorId, fixture }) {
@@ -9196,33 +9611,65 @@ async function main() {
         // other D0 sections. Its setup snapshots every persisted writer it touches and
         // the finally restore makes the section net-zero even when a capture fails.
         if (shouldRunScreenshotSection('tools')) {
-          let toolStudioFixture = null;
-          try {
-            toolStudioFixture = await setupToolStudioFixture(page, {
+          // `runFixturedScreenshotSection` owns the setup → exercise → finally-restore
+          // scaffold this section and the Knowledge section below both need; only the
+          // callbacks differ. `rethrow` keeps this section's long-standing fail-loud
+          // behaviour: its walk carries behavioural assertions, not just captures.
+          await runFixturedScreenshotSection({
+            results,
+            step: 'tool-studio-evidence',
+            rethrow: true,
+            setup: () => setupToolStudioFixture(page, {
               systemId: craftingSetup.systemId,
               recipeId: craftingSetup.healingPotionRecipeId,
-            });
-            await exerciseToolStudioPointerTargets(page, {
-              systemId: craftingSetup.systemId,
-              recipeName: 'Brew Healing Potion',
-              fixture: toolStudioFixture,
-            });
-            await verifyToolStudioLiveReplacement(page, {
-              systemId: craftingSetup.systemId,
-              recipeId: craftingSetup.healingPotionRecipeId,
-              actorId: cleanup.crafterId,
-              fixture: toolStudioFixture,
-            });
-            results.steps.push({ step: 'tool-studio-evidence', passed: true });
-          } catch (err) {
-            results.steps.push({ step: 'tool-studio-evidence', passed: false, error: err.message });
-            throw err;
-          } finally {
-            await restoreToolStudioFixture(page, {
+            }),
+            exercise: async (fixture) => {
+              await exerciseToolStudioPointerTargets(page, {
+                systemId: craftingSetup.systemId,
+                recipeName: 'Brew Healing Potion',
+                fixture,
+              });
+              await verifyToolStudioLiveReplacement(page, {
+                systemId: craftingSetup.systemId,
+                recipeId: craftingSetup.healingPotionRecipeId,
+                actorId: cleanup.crafterId,
+                fixture,
+              });
+            },
+            restore: (fixture) => restoreToolStudioFixture(page, {
               systemId: craftingSetup.systemId,
               recipeId: craftingSetup.healingPotionRecipeId,
-              fixture: toolStudioFixture,
-            });
+              fixture,
+            }),
+          });
+        }
+
+        // ── D0 section: GM Knowledge surface (issue 785) ─────────────────────
+        // Screenshots-profile scoping can run this section on its own. Its fixture is
+        // purely ADDITIVE persisted world state (new world Items, new recipe-item
+        // definitions, granted owned copies, two seeded learned entries) and the
+        // `finally` restore tears all of it down, so the section is net-zero even when
+        // a capture fails. `rethrow: false` because the section is evidential: losing
+        // its frames must not also cost every later D0 section's frames.
+        if (shouldRunScreenshotSection('knowledge')) {
+          const knowledgeResult = await runFixturedScreenshotSection({
+            results,
+            step: 'knowledge-surface-evidence',
+            rethrow: false,
+            setup: () => setupKnowledgeFixture(page, {
+              systemId: craftingSetup.systemId,
+              recipeId: craftingSetup.healingPotionRecipeId,
+              chipStatesActorId: cleanup.crafterId,
+              partyPoolActorId: cleanup.travelMemberId,
+            }),
+            exercise: (fixture) => exerciseKnowledgeSurface(page, { fixture }),
+            restore: (fixture) => restoreKnowledgeFixture(page, {
+              systemId: craftingSetup.systemId,
+              fixture,
+            }),
+          });
+          if (!knowledgeResult.passed) {
+            process.stderr.write(`Knowledge surface evidence failed: ${knowledgeResult.error?.message}\n`);
           }
         }
 
