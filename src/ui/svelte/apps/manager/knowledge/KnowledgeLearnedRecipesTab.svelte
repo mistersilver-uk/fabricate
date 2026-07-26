@@ -31,8 +31,8 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <p class="manager-component-info-banner" data-knowledge-learned-banner>
-    <i class="fas fa-circle-info" aria-hidden="true"></i>
+  <p class="manager-warning-band manager-knowledge-learned-band" data-knowledge-learned-banner>
+    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
     <span>{text(
       'FABRICATE.Admin.Manager.Knowledge.LearnedBanner',
       'Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.'

@@ -4484,8 +4484,25 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
       1,
     ],
     [
-      '.fabricate-manager .manager-tools-library-chips .manager-chip,\n.fabricate-manager .manager-knowledge-copy-chips .manager-chip {',
-      '.manager-knowledge-copy-chips .manager-chip {',
+      // The Tools library row is canonical for row chip scale. `-copy-heading` joined it
+      // because the type/quantity/category chips sit in the heading beside the name and
+      // otherwise inherited the ambient size, out-sizing the Tools rows alongside them.
+      '.fabricate-manager .manager-tools-library-chips .manager-chip,\n' +
+        '.fabricate-manager .manager-knowledge-copy-chips .manager-chip,\n' +
+        '.fabricate-manager .manager-knowledge-copy-heading .manager-chip {',
+      // Anchored on the LAST selector in the list: a mid-list selector is followed by a
+      // comma, so its `{` form never appears and counting it would prove nothing.
+      '.manager-knowledge-copy-heading .manager-chip {',
+      1,
+    ],
+    [
+      // The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button
+      // scale; the Knowledge row actions and reset cluster join it rather than restating
+      // min-height/padding/font-size.
+      '.fabricate-manager .manager-tool-edit-actions .manager-button,\n' +
+        '.fabricate-manager .manager-knowledge-row-actions .manager-button,\n' +
+        '.fabricate-manager .manager-knowledge-reset-actions .manager-button {',
+      '.manager-knowledge-reset-actions .manager-button {',
       1,
     ],
     [

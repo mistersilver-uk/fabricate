@@ -13152,12 +13152,15 @@
   text-align: center;
 }
 
+/* The dashed panel is rounded, matching the reference prototype's empty state. It was
+   square-cornered while every other panel, card and chip in the manager is rounded. */
 .fabricate-manager .manager-empty {
   display: grid;
   place-items: center;
   min-height: 220px;
   padding: var(--fab-space-4);
   border: 1px dashed var(--fab-mv2-border);
+  border-radius: 12px;
   color: var(--fab-mv2-text-muted);
   text-align: center;
   background: var(--fab-overlay-light-03);
@@ -13192,6 +13195,8 @@
   font-size: 0.8rem;
 }
 
+/* The glyph sits on a rounded tile, as in the reference prototype. The 46px box already
+   existed; it was transparent, so the icon floated with nothing anchoring it. */
 .fabricate-manager .manager-empty > div > i {
   display: inline-flex;
   align-items: center;
@@ -13199,7 +13204,9 @@
   width: 46px;
   height: 46px;
   margin-bottom: var(--fab-space-3);
+  border-radius: 12px;
   color: var(--fab-mv2-text);
+  background: var(--fab-surface-soft);
   font-size: 1.55rem;
 }
 
@@ -13767,7 +13774,14 @@
   justify-content: flex-end;
 }
 
-.fabricate-manager .manager-tool-edit-actions .manager-button {
+/* The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button
+   scale, so the GM Knowledge surface's row actions (Expend/Delete/Erase memory) and its
+   per-character reset cluster join it rather than restating the values. Without this
+   they inherited the ambient ~1rem and read as heavier and larger than every other
+   action button in the same window. */
+.fabricate-manager .manager-tool-edit-actions .manager-button,
+.fabricate-manager .manager-knowledge-row-actions .manager-button,
+.fabricate-manager .manager-knowledge-reset-actions .manager-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   font-size: 0.72rem;
@@ -20096,10 +20110,16 @@
 }
 
 /* The compact chip scale, shared by the Tools library rows and the GM Knowledge
-   surface's owned-copy rows (issue 785). One rule with two consumers rather than two
-   byte-identical blocks. */
+   surface's rows (issue 785). One rule with several consumers rather than byte-identical
+   blocks. The Tools library row is canonical for row chip scale.
+
+   `-copy-heading` is here as well as `-copy-chips`: the type/quantity pills on the
+   owned-copy row and the category chip on the learned row live in the HEADING beside
+   the name, so without this they inherited the ambient chip size and out-sized the
+   Tools rows they sit alongside in the same manager. */
 .fabricate-manager .manager-tools-library-chips .manager-chip,
-.fabricate-manager .manager-knowledge-copy-chips .manager-chip {
+.fabricate-manager .manager-knowledge-copy-chips .manager-chip,
+.fabricate-manager .manager-knowledge-copy-heading .manager-chip {
   min-height: 20px;
   padding: 0 var(--fab-space-chip);
   font-size: 0.62rem;
@@ -20709,6 +20729,18 @@
   margin-inline-start: var(--fab-space-1);
   min-width: 0;
   color: var(--fab-warning-text);
+}
+
+/* The erase caveat is a WARNING band, not an info banner: it is the standing statement
+   that the action is destructive and may not refund a slot. The prototype renders it
+   taller than a one-line info strip, so it takes the roomier vertical padding and the
+   readable body scale rather than the info banner's compact 0.66rem. */
+.fabricate-manager .manager-knowledge-learned-band {
+  margin: 0;
+  padding: var(--fab-space-3);
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .fabricate-manager .manager-knowledge-row-actions {
