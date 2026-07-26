@@ -23,6 +23,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
+    // The shared modal chrome (issue 877): portal, centring, title/subtitle, close and
+    // footer rail. This modal renders THROUGH it, so omitting it breaks the mount.
+    'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
@@ -131,10 +134,22 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(commitButton().disabled, true);
   });
 
-  it('calls onClose from the close button', async () => {
+  // The close control now belongs to the shared ManagerModal chrome (issue 877), so it
+  // is located by the primitive's hook rather than a mapping-specific one.
+  it('calls onClose from the shared modal close button', async () => {
     let closed = 0;
     await harness.mount({ open: true, folders: FOLDERS, ...VOCAB, onClose: () => (closed += 1) });
-    document.querySelector('[data-import-mapping-close]').click();
+    document.querySelector('[data-manager-modal-close]').click();
     assert.equal(closed, 1);
+  });
+
+  // The smoke harness pins `[data-import-mapping]` on the dialog ROOT; the root is now
+  // rendered by ManagerModal, so the hook survives only via its `rootAttributes` prop.
+  it('keeps the mapping automation hook on the shared modal root', async () => {
+    await harness.mount({ open: true, folders: FOLDERS, ...VOCAB });
+    const root = dialog();
+    assert.ok(root, 'expected the dialog root');
+    assert.ok(root.hasAttribute('data-manager-modal'), 'renders through the shared chrome');
+    assert.equal(root.getAttribute('role'), 'dialog');
   });
 });

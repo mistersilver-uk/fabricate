@@ -26,6 +26,10 @@ const repoRoot = resolve(__dirname, '../..');
 const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
+  // The manager's ONE modal-dialog chrome (issue 877). Both import-flow modals render
+  // through it, so adding it to a third screen would silently pull it into every suite
+  // that mounts a tree containing that screen.
+  'src/ui/svelte/apps/manager/ManagerModal.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
