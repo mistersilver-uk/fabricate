@@ -5697,7 +5697,6 @@
     {:else if currentView === 'books-scrolls' && selectedSystem}
       <BooksScrollsView
         recipeItems={recipeItemDefinitions}
-        selectedSystemName={selectedSystem?.name || ''}
         visibilityMode={craftingVisibilityMode}
         {selectedRecipeItemId}
         onSelectRecipeItem={(id) => selectRecipeItem(id)}

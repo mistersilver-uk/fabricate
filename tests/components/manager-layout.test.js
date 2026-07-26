@@ -4988,18 +4988,24 @@ test('recipe tag list spans the full row width on its own line below the control
   }
 });
 
-// The Books & Scrolls surface is the only manager view with FOUR unconditional grid
-// children (its own section header, the drop zone, the filter toolbar, the table). The
-// shared `.manager-main` template names three tracks, so before issue 785 the `1fr`
-// landed on the TOOLBAR — it swallowed every pixel of slack and floated mid-panel while
-// the table fell into an implicit `auto` row pinned to the bottom of the view. This
-// guard ties the template to the markup: adding a fifth section without widening the
-// template reintroduces exactly that defect, and no test covered this route before.
+// Until issue 785 the Books & Scrolls surface carried its own duplicate page header, so it
+// had FOUR unconditional grid children against the shared three-track `auto auto 1fr`: the
+// `1fr` landed on the TOOLBAR — it swallowed every pixel of slack and floated mid-panel —
+// while the table fell into an implicit `auto` row pinned to the bottom of the view. The
+// header is gone (the shell renders one already) and the route names its own tracks. This
+// guard ties the template to the markup rather than to a literal value: adding a section
+// without widening the template reintroduces exactly that defect, and before this test no
+// coverage existed for this route at all.
 test('the Books & Scrolls route names one grid track per section and grows the table', () => {
   const source = readFileSync(resolve(managerComponentDir, 'BooksScrollsView.svelte'), 'utf8');
   const main = source.slice(source.indexOf('<main class="manager-main'));
   const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
-  assert.equal(children.length, 4, 'expected four unconditional top-level grid children');
+  assert.equal(children.length, 3, 'expected three unconditional top-level grid children');
+  assert.equal(
+    main.includes('manager-section-header'),
+    false,
+    'the view must not render a second page header (issue 676/785)'
+  );
 
   const block = blockFor('.fabricate-manager[data-manager-view="books-scrolls"] .manager-main');
   const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();

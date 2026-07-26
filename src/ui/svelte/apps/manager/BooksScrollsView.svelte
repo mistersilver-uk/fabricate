@@ -20,7 +20,6 @@
   Props:
    - recipeItems: projected recipe items ({ id, resolvedName, resolvedImg,
      derivedType, enabled, caps, recipes, learnedByCount, linkMissing }).
-   - selectedSystemName: the system's display name (kicker).
    - visibilityMode: 'item' | 'knowledge' — chooses the use vs learning chip.
    - selectedRecipeItemId: the row currently open in the inspector.
    - onSelectRecipeItem(id): select a row (opens the inspector).
@@ -46,7 +45,6 @@
 
   let {
     recipeItems = [],
-    selectedSystemName = '',
     visibilityMode = 'knowledge',
     selectedRecipeItemId = '',
     onSelectRecipeItem = () => {},
@@ -214,14 +212,10 @@
 </script>
 
 <main class="manager-main manager-books-scrolls-main" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls')} data-books-scrolls>
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.BooksScrolls.Library', 'Books & Scrolls')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.BooksScrolls.LibraryHint', 'Recipe items that grant recipes when read. Set their contents, uses and learning limits.')}</p>
-    </div>
-  </section>
-
+  <!-- No per-view page header: the shell's `.manager-header` already renders the system
+       kicker, the "Books & Scrolls" title and a subtitle, so a second one restated the
+       title inside the panel. Removed for the same reason as the components and recipes
+       libraries (issue 676). -->
   <section
     class={`manager-books-scrolls-drop-zone ${dropError ? 'is-error' : ''}`}
     data-books-scrolls-drop-zone

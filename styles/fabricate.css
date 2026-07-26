@@ -1746,14 +1746,15 @@
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
-/* Books & Scrolls is the only manager surface with FOUR unconditional grid children: its
-   own section header, the drop zone, the filter toolbar and the table. The shared
-   `auto auto 1fr` template only names three, so the `1fr` landed on the TOOLBAR — which
-   absorbed every pixel of slack and floated mid-panel — while the table fell into an
-   implicit `auto` row pinned to the bottom of the view. Same failure family as the
-   components pager above: the growing track must be the scrolling table. */
+/* Drop zone, filter toolbar, then the TABLE which takes the slack. Named explicitly
+   rather than left to the shared `auto auto 1fr`: this view carried its own duplicate
+   page header until issue 785, so it had four children against a three-track template —
+   the `1fr` landed on the TOOLBAR, which absorbed every pixel of slack and floated
+   mid-panel, while the table fell into an implicit `auto` row pinned to the bottom. With
+   the duplicate header gone the child count is three, and the growing track must stay on
+   the scrolling table (same failure family as the components pager above). */
 .fabricate-manager[data-manager-view="books-scrolls"] .manager-main {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 /*
