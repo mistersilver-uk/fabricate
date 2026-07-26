@@ -58,7 +58,9 @@
       id: 'recipe',
       icon: 'fas fa-scroll',
       label: text('FABRICATE.Admin.Manager.TagsCategories.Categories', 'Recipe categories'),
-      count: counts.customCategories || 0,
+      // Whole-vocabulary counts, General included — the same total the panel's own entry
+      // chip and the inspector's at-a-glance tile report (issue 878).
+      count: counts.recipeCategories || 0,
     },
     {
       id: 'component',
@@ -67,7 +69,7 @@
         'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
         'Component categories'
       ),
-      count: counts.customComponentCategories || 0,
+      count: counts.componentCategories || 0,
     },
     {
       id: 'tag',

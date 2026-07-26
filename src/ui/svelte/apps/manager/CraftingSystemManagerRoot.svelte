@@ -798,10 +798,18 @@
     selectedSystem?.componentCategoryIcons || {}
   ));
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
+  // Every category counter on the Tags & Categories screen reports the WHOLE vocabulary
+  // — the GM's own entries plus the reserved General bucket — because General is a real,
+  // referenceable category that recipes and components genuinely fall under (issue 878).
+  // `buildCategoryRows` / `buildComponentCategoryRows` both emit General first, so a row
+  // array's length already IS that total. The previous `custom*` fields subtracted
+  // General here and fed the tab badge and the at-a-glance tile, while `VocabularyPanel`
+  // counted it independently for its own entry chip — one screen, three numbers, two
+  // meanings. The `baseCategories: 1` companion field was read by nothing and is gone
+  // rather than left to invite a double count against these now-inclusive totals.
   const tagCategoryCounts = $derived({
-    baseCategories: 1,
-    customCategories: categoryRows.filter(row => row.id !== 'general').length,
-    customComponentCategories: componentCategoryRows.filter(row => row.id !== 'general').length,
+    recipeCategories: categoryRows.length,
+    componentCategories: componentCategoryRows.length,
     itemTags: tagRows.length,
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
     componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
@@ -5844,10 +5852,10 @@
           <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}</h3>
           <div class="manager-fact-grid">
             <div class="manager-fact" data-tags-category-fact="recipe-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.RecipeCategories', 'Recipe categories')}</span></span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.recipeCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.RecipeCategories', 'Recipe categories')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="component-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.customComponentCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ComponentCategories', 'Component categories')}</span></span>
+              <span class="manager-fact-line"><strong>{tagCategoryCounts.componentCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ComponentCategories', 'Component categories')}</span></span>
             </div>
             <div class="manager-fact" data-tags-category-fact="item-tags">
               <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags')}</span></span>

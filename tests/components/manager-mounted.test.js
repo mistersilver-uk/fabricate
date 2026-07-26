@@ -511,6 +511,41 @@ async function openRecipeEditor(calls, storeOptions = {}) {
   return target;
 }
 
+// Mount the manager and route to the Tags & Categories screen. Assigns the module-level
+// `mounted`/`target` (so afterEach can clean up) and returns the mounted target.
+async function openTagsScreen(calls = [], storeOptions = {}) {
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  mounted = mount(Component, {
+    target,
+    props: {
+      store: createStore(calls, storeOptions),
+      services: { openCurrentAdmin: () => {} },
+    },
+  });
+  flushSync();
+  navButton('Tags & Categories').click();
+  await tick();
+  flushSync();
+  return target;
+}
+
+// The three numbers that disagreed on one screen before issue 878: the tab badge, the
+// inspector's at-a-glance tile, and the active panel's own entry chip. Reading all three
+// through one helper is what lets a test assert they AGREE as well as what they agree on.
+// The entry chip belongs to whichever panel is mounted, so `tab` must be the active tab.
+function vocabularyCounters(tab, fact) {
+  return {
+    tabBadge: target
+      .querySelector(`[data-vocabulary-tab="${tab}"] .manager-editor-tab-badge`)
+      .textContent.trim(),
+    glanceTile: target
+      .querySelector(`[data-tags-category-fact="${fact}"] strong`)
+      .textContent.trim(),
+    entryChip: target.querySelector('[data-vocabulary-shown-count] span').textContent.trim(),
+  };
+}
+
 function headerSaveButton(target) {
   return Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(
     (button) => button.textContent.includes('Save')
@@ -6771,6 +6806,50 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('[data-vocabulary-confirm="reagent"]'), null);
     assert.ok(!calls.some((call) => call[0] === 'removeComponentCategory'));
+  });
+
+  it('counts the reserved General bucket in the tab badge, the glance tile and the entry chip alike (issue 878)', async () => {
+    // Three counters used to disagree on one screen: the tab badge and the at-a-glance
+    // tile subtracted General while the panel's entry chip included it, so the same
+    // vocabulary read 0, 0 and 1. All three now report the whole vocabulary — the GM's
+    // own entries PLUS the reserved bucket recipes and components genuinely fall under.
+    await openTagsScreen();
+
+    // The fixture seeds exactly one custom recipe category (`potions`) and one custom
+    // component category (`Reagent`), so a correct category counter reads 2. A counter
+    // still subtracting General reads 1 and one double-counting it reads 3.
+    assert.deepEqual(
+      vocabularyCounters('recipe', 'recipe-categories'),
+      { tabBadge: '2', glanceTile: '2', entryChip: '2 entries' },
+      'one custom recipe category plus General is two, on all three surfaces'
+    );
+    // With a custom entry present General has something to be distinguished FROM, so it
+    // takes its row — and the row is what the second of the two numbers accounts for.
+    assert.ok(
+      target.querySelector('[data-category-id="general"]'),
+      'the reserved row is listed once a custom category exists'
+    );
+
+    target.querySelector('[data-vocabulary-tab="component"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      vocabularyCounters('component', 'component-categories'),
+      { tabBadge: '2', glanceTile: '2', entryChip: '2 entries' },
+      'the sibling component vocabulary counts its own General the same way'
+    );
+    assert.ok(target.querySelector('[data-component-category-id="general"]'));
+
+    // Tags are the control: they pass `lockedRow={null}` and have no reserved bucket at
+    // all, so their three counters must equal the raw tag count with nothing added.
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      vocabularyCounters('tag', 'item-tags'),
+      { tabBadge: '3', glanceTile: '3', entryChip: '3 entries' },
+      'the tag vocabulary has no reserved bucket, so nothing is added to its count'
+    );
   });
 
   it('picks a per-category icon from the searchable popover and delegates it to the store (issue 878)', async () => {
