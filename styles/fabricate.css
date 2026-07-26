@@ -5955,14 +5955,6 @@
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-vocabulary-locked-hint {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Empty (onboarding) and no-results states span the whole grid. Both now render through
    the shared `EmptyState` primitive, so only the grid-span survives here — a scoped block
    cannot reach a track defined by the ancestor grid. */

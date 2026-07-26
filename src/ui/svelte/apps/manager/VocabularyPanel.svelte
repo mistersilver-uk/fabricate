@@ -208,17 +208,17 @@
             ><i class="fas fa-lock"></i></span
           >
           <!--
-            The reserved row's explanatory sentence sits INLINE beside the name and
-            truncates rather than stacking under it (issue 878). Stacked, it was the one
-            card in the grid with two lines of copy, so it outgrew every sibling row —
-            the grid is `align-items: start`, so the taller card simply stuck out. One
-            line keeps the row's height governed by the same 34px icon tile as the rest.
+            The reserved row carries its name ALONE, so it sits at the same height as every
+            custom row (the grid is `align-items: start`, so a second line of copy would
+            make this the one card that sticks out). The explanatory sentence was inlined
+            and ellipsised to buy that height, but at real column widths it truncated to
+            "Built…" — one word, beside untruncated custom rows, reading as breakage rather
+            than as brevity. The `Locked` chip already states the row cannot be edited, the
+            inspector's help panel explains the fallback in full, and the sentence survives
+            as the row's tooltip (issue 878).
           -->
-          <div class="manager-vocabulary-main is-inline">
+          <div class="manager-vocabulary-main is-inline" title={lockedFallbackHint}>
             <strong>{lockedRow.name}</strong>
-            <span class="manager-muted manager-vocabulary-locked-hint" title={lockedFallbackHint}
-              >{lockedFallbackHint}</span
-            >
           </div>
           {#if (lockedRow.totalUsage || 0) > 0}
             <span class="manager-chip is-warning"

@@ -4709,6 +4709,9 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     // The Knowledge page-header roll-up pill: every other browser surface reports its
     // count in the nav-rail badge, so a header pill was a one-screen divergence.
     'manager-knowledge-header-pills',
+    // The reserved row's inline explanatory sentence: ellipsised to fit one line it
+    // truncated to "Built…", so it became the row's tooltip instead (issue 878).
+    'manager-vocabulary-locked-hint',
   ]) {
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
   }
@@ -5086,7 +5089,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
   try {
     const lockedRow = `<div class="manager-vocabulary-row">
       <span class="manager-vocabulary-icon is-locked-icon"><i class="fas fa-lock"></i></span>
-      <div class="manager-vocabulary-main is-inline"><strong>General</strong><span class="manager-muted manager-vocabulary-locked-hint">Built-in fallback &mdash; cannot be renamed or removed.</span></div>
+      <div class="manager-vocabulary-main is-inline" title="Built-in fallback &mdash; cannot be renamed or removed."><strong>General</strong></div>
       <span class="manager-chip manager-vocabulary-chip-locked"><i class="fas fa-lock"></i>Locked</span>
     </div>`;
     const customRow = `<div class="manager-vocabulary-row">
@@ -5101,13 +5104,12 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
     const geometry = await page.evaluate(() => {
       const locked = document.querySelector('[data-vocabulary-locked-card]');
       const custom = document.querySelector('[data-vocabulary-custom-card]');
-      const hint = locked.querySelector('.manager-vocabulary-locked-hint');
       const trigger = custom.querySelector('.manager-vocabulary-icon-trigger');
       const triggerRect = trigger.getBoundingClientRect();
       return {
         lockedHeight: Math.round(locked.getBoundingClientRect().height),
         customHeight: Math.round(custom.getBoundingClientRect().height),
-        hintClipped: hint.scrollWidth > hint.clientWidth,
+        hintRendered: Boolean(locked.querySelector('.manager-vocabulary-locked-hint')),
         triggerWidth: Math.round(triggerRect.width),
         triggerHeight: Math.round(triggerRect.height),
       };
@@ -5125,9 +5127,13 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       geometry.customHeight,
       `the reserved row must match its siblings exactly (locked ${geometry.lockedHeight}px vs custom ${geometry.customHeight}px)`
     );
-    assert.ok(
-      geometry.hintClipped,
-      'the reserved row keeps its sentence on one clipped line rather than growing the card'
+    // The sentence itself is gone: ellipsised at real column widths it truncated to
+    // "Built…", which read as breakage beside untruncated custom rows. It survives as the
+    // row's tooltip, so the card carries the name alone and the height follows for free.
+    assert.equal(
+      geometry.hintRendered,
+      false,
+      'the reserved row must not render an inline explanatory sentence'
     );
   } finally {
     await browser.close();

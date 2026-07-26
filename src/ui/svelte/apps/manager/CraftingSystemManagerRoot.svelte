@@ -5234,7 +5234,14 @@
           <button type="button" class={`manager-nav-button ${currentView === 'tags' ? 'is-active' : ''}`} aria-current={currentView === 'tags' ? 'page' : undefined} onclick={() => setView('tags')}>
             <i class="fas fa-tags" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
-            <span class="manager-nav-count">{selectedCounts.itemTags + selectedCounts.recipeCategories}</span>
+            <!--
+              The rail badge is the whole screen's vocabulary, so it sums the SAME
+              inclusive projection the tab badges and at-a-glance tiles read (issue 878).
+              It previously summed `selectedCounts`, which counts raw persisted arrays:
+              General was absent and component categories were omitted entirely, so the
+              rail read 5 beside tab badges of 3 / 1 / 3.
+            -->
+            <span class="manager-nav-count">{tagCategoryCounts.recipeCategories + tagCategoryCounts.componentCategories + tagCategoryCounts.itemTags}</span>
           </button>
           {#if canShowEssences}
             <button type="button" class={`manager-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`} aria-current={currentView === 'essences' || currentView === 'essence-edit' ? 'page' : undefined} onclick={() => setView('essences')}>
