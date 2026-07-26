@@ -2164,24 +2164,27 @@
   padding: var(--fab-space-4);
 }
 
+/*
+  ONE right-hand-panel surface for the whole manager (issue 881).
+
+  This rail used to sit on `--fab-mv2-surface-2`, with the Recipe Studio views carved out
+  onto `--fab-mv2-surface-1` (issue 643) and the Tool Studio's own preview column written
+  as a third, bespoke `--fab-bg-2` aside. Two of those three were already the same shade —
+  `--fab-mv2-surface-1` IS `--fab-bg-2` — so the odd one out was the shared rule, which is
+  why the Tags & Categories rail read visibly lighter than the Tool Studio panel it is
+  supposed to match. Unifying on the darker shade removes the per-view exception rather
+  than adding a `[data-manager-view="tags"]` one.
+*/
 .fabricate-manager .manager-inspector {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border-left: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-mv2-surface-1);
   overflow-y: auto;
   max-height: 100%;
   min-height: 0;
-}
-
-/* Recipe Studio only: the context rail sits on the SAME surface as the main
-   editor panel (`--fab-mv2-surface-1`), one step darker than the shared inspector
-   shade used on every other manager screen. The border-left is kept (issue 643). */
-.fabricate-manager[data-manager-view="recipe-edit"] .manager-inspector,
-.fabricate-manager[data-manager-view="recipes"] .manager-inspector {
-  background: var(--fab-mv2-surface-1);
 }
 
 .fabricate-manager .manager-character-modifier-card {
@@ -13683,13 +13686,16 @@
   grid-row: 3;
 }
 
+/* The Tool Studio's right-hand panel is the shared inspector surface written through the
+   shared token, not a bespoke `--fab-bg-2` aside that happened to resolve to the same
+   colour (issue 881). Only its grid placement and its roomier padding are its own. */
 .fabricate-manager .manager-tool-preview {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-4);
   border-left: 1px solid var(--fab-mv2-border);
-  background: var(--fab-bg-2);
+  background: var(--fab-mv2-surface-1);
   grid-column: 3;
   grid-row: 2 / 4;
 }
