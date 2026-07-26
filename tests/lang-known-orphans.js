@@ -265,6 +265,11 @@ export const KNOWN_ORPHANS = [
   'FABRICATE.Admin.Manager.BooksScrolls.LearnCapNone',
   'FABRICATE.Admin.Manager.BooksScrolls.LearnOnce',
   'FABRICATE.Admin.Manager.BooksScrolls.LearnTimes',
+  // The view's duplicate page header was removed in issue 785 (the shell already renders
+  // one), exactly as issue 676 did for the components library — whose `Component.Library`
+  // and `Component.LibraryHint` sit in this list for the same reason.
+  'FABRICATE.Admin.Manager.BooksScrolls.Library',
+  'FABRICATE.Admin.Manager.BooksScrolls.LibraryHint',
   'FABRICATE.Admin.Manager.BooksScrolls.LinkedRecipes',
   'FABRICATE.Admin.Manager.BooksScrolls.NoLinkedRecipes',
   'FABRICATE.Admin.Manager.BooksScrolls.OpenItem',

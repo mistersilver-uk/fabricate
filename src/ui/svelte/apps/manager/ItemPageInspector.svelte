@@ -51,6 +51,19 @@
     return 'fas fa-book';
   }
 
+  // Matches the Books & Scrolls library pill and the Knowledge row: a multi-recipe
+  // item names its own count, so one recipe item reads the same way on every screen.
+  function typePillLabel() {
+    if (recipeCount >= 2) {
+      return text(
+        'FABRICATE.Admin.Manager.BooksScrolls.TypeRecipeBook',
+        '{count} Recipe Book'
+      ).replace('{count}', recipeCount);
+    }
+    if (recipeCount === 1) return text('FABRICATE.Admin.Manager.BooksScrolls.TypeScroll', 'Scroll');
+    return text('FABRICATE.Admin.Manager.BooksScrolls.TypeIncomplete', 'Incomplete');
+  }
+
   // --- Use caps (item mode) ---
   const useLimited = $derived(item?.caps?.item?.limitUses === true);
   const maxUses = $derived.by(() => {
@@ -120,7 +133,7 @@
       <div class="manager-inspector-copy">
         <h3 class="manager-inspector-name" data-item-page-name>{item.resolvedName}</h3>
         <span class="manager-books-scrolls-inspector-meta">
-          <span class={`manager-chip ${recipeCount === 0 ? 'is-danger' : 'is-neutral'}`} data-item-page-type>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+          <span class={`manager-chip ${recipeCount === 0 ? 'is-danger' : 'is-neutral'}`} data-item-page-type>{typePillLabel()}</span>
           <button
             type="button"
             class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}

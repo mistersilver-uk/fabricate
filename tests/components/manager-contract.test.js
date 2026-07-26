@@ -65,6 +65,15 @@ const gatheringTasksBrowserPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte'
 );
+// The GM Knowledge surface (issue 785). `KnowledgeView` and the reusable
+// `ArmedDangerButton` sit at the manager root; the surface's own children live
+// under `knowledge/`, which is also where the pure projection lives.
+const knowledgePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/KnowledgeView.svelte');
+const armedDangerButtonPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte'
+);
+const knowledgeComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/knowledge');
 const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
 const toolEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolEditView.svelte');
 const toolBreakagePath = resolve(
@@ -105,6 +114,8 @@ const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
+const knowledgeSource = readFileSync(knowledgePath, 'utf8');
+const armedDangerButtonSource = readFileSync(armedDangerButtonPath, 'utf8');
 const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
 const toolEditSource = readFileSync(toolEditPath, 'utf8');
 const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
@@ -155,6 +166,11 @@ function staticTextCalls(source) {
 
 function isChangedManagerEnvironmentLocalizationKey(key) {
   return (
+    // The Knowledge surface's whole string tree is authored fresh in issue 785, so
+    // every fallback it renders is compared against en.json rather than only the
+    // keys an older change happened to touch.
+    key.startsWith('FABRICATE.Admin.Manager.Knowledge.') ||
+    key === 'FABRICATE.Admin.Manager.Nav.Knowledge' ||
     key.startsWith('FABRICATE.Admin.Manager.Environment.') ||
     key.startsWith('FABRICATE.Admin.Manager.EnvironmentEditor.') ||
     key.startsWith('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.') ||
@@ -467,11 +483,15 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
+    // `class="manager-empty"` is NOT in this list any more (issue 785): the manager's
+    // no-state panel is the shared `EmptyState` component, so the root imports and renders
+    // it rather than hand-rolling the dashed-panel markup.
     for (const snippet of [
       'class="manager-main"',
       'class="manager-toolbar"',
       'class="manager-filter"',
-      'class="manager-empty"',
+      "import EmptyState from './EmptyState.svelte'",
+      '<EmptyState',
     ]) {
       assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
     }
@@ -939,9 +959,14 @@ describe('CraftingSystemManager source contract', () => {
       rootPath,
       environmentEditPath,
       environmentsBrowserPath,
+      knowledgePath,
+      armedDangerButtonPath,
       ...readdirSync(environmentComponentDir)
         .filter((name) => name.endsWith('.svelte'))
         .map((name) => resolve(environmentComponentDir, name)),
+      ...readdirSync(knowledgeComponentDir)
+        .filter((name) => name.endsWith('.svelte'))
+        .map((name) => resolve(knowledgeComponentDir, name)),
     ];
     const failures = [];
 
@@ -2692,6 +2717,249 @@ describe('CraftingSystemManager source contract', () => {
         appSource.includes('foundry.utils.copyPlainText'),
       false,
       'Manager UUID copies should not bypass the Foundry clipboard service'
+    );
+  });
+
+  // The GM Knowledge surface (issue 785). Everything asserted here is a wiring
+  // decision whose absence is SILENT at runtime: an un-suppressed inspector holds a
+  // dead 300px strip open, an un-threaded `resolutionMode` hides the rail entry from
+  // the `global` + alchemy configuration that motivated the widened gate, and an
+  // ungated `setKnowledgeActive` puts a whole-world actors x items scan on every one
+  // of `refresh()`'s callers.
+  it('routes the Knowledge surface, releases its third column, and gates its projection', () => {
+    assert.ok(
+      rootSource.includes("import KnowledgeView from './KnowledgeView.svelte';"),
+      'root should import the Knowledge surface'
+    );
+    for (const snippet of [
+      "currentView === 'knowledge'",
+      'knowledge={knowledgeState}',
+      "const knowledgeState = $derived($viewState.knowledge || null)",
+      "store.setKnowledgeActive?.(currentView === 'knowledge')",
+      'store.selectKnowledgeActor?.(actorId)',
+      'store.expendRecipeItemUse?.(actorId, itemId)',
+      'store.deleteOwnedRecipeItem?.(actorId, itemId)',
+      'store.eraseLearnedRecipe?.(actorId, recipeId)',
+      'store.resetActorSystemKnowledge?.(actorId)',
+      'store.resetActorAllKnowledge?.(actorId)',
+      'resolutionMode: craftingResolutionMode,',
+      "const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '')",
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
+    }
+    // The CSS column release and this aside suppression are ONE decision expressed
+    // twice; doing only the first leaves an empty 300px inspector holding the strip.
+    assert.ok(
+      rootSource.includes("currentView !== 'knowledge'") &&
+        rootSource.includes('class="manager-inspector"'),
+      'the shared inspector is suppressed for the full-width knowledge surface'
+    );
+    // The projection is published TOP-LEVEL, never hung off selectedSystem.
+    assert.equal(
+      rootSource.includes('selectedSystem.knowledge'),
+      false,
+      'the knowledge projection must not be read off selectedSystem'
+    );
+
+    // The view owns the single armed token and every disarm rule.
+    for (const snippet of [
+      'data-knowledge-view',
+      'KnowledgeRoster',
+      'KnowledgeTabs',
+      'KnowledgeRecipeItemsTab',
+      'KnowledgeLearnedRecipesTab',
+      'filterKnowledgeRoster',
+      'let armedToken = $state',
+      "role=\"tabpanel\"",
+    ]) {
+      assert.ok(knowledgeSource.includes(snippet), `KnowledgeView should include ${snippet}`);
+    }
+    // The default tab is seeded ONCE from the store, never derived live from the
+    // definition count: a GM authoring the system's first recipe item elsewhere
+    // would otherwise yank the open tab and silently disarm an armed row.
+    assert.ok(
+      knowledgeSource.includes('let tabSeeded = $state(false)'),
+      'the default tab should be seeded once on surface entry'
+    );
+
+    // The armed control is a REAL focusable button, and its token is keyed on the
+    // target document id — never a row index, which the asynchronous re-projection
+    // would turn into a destructive misfire.
+    assert.ok(
+      armedDangerButtonSource.includes('<button\n  type="button"'),
+      'the armed confirmation should be a real button element'
+    );
+    assert.equal(
+      /sc-on-click/.test(armedDangerButtonSource),
+      false,
+      'the prototype span affordance must not be copied'
+    );
+    for (const snippet of [
+      "data-armed={armed ? 'true' : 'false'}",
+      'data-arm-token={token}',
+      'aria-label={consequence}',
+      "event.key !== 'Escape'",
+      'function handleBlur()',
+      'armedIcon = \'fas fa-triangle-exclamation\'',
+    ]) {
+      assert.ok(
+        armedDangerButtonSource.includes(snippet),
+        `ArmedDangerButton should include ${snippet}`
+      );
+    }
+    const copyRowSource = readFileSync(
+      resolve(knowledgeComponentDir, 'KnowledgeOwnedCopyRow.svelte'),
+      'utf8'
+    );
+    const learnedRowSource = readFileSync(
+      resolve(knowledgeComponentDir, 'KnowledgeLearnedRow.svelte'),
+      'utf8'
+    );
+    assert.ok(
+      copyRowSource.includes('`delete:${copy?.itemId'),
+      'the delete token should be keyed on the item document id'
+    );
+    assert.ok(
+      learnedRowSource.includes('`erase:${learned?.recipeId'),
+      'the erase token should be keyed on the recipe id'
+    );
+    // Only `spent` disables Expend. An `!inert` term would apply a gate the engine
+    // does not: `_filterNonExhausted` reads `timesUsed` alone.
+    assert.ok(
+      copyRowSource.includes('disabled={!copy.canExpend}'),
+      'Expend should be disabled purely from the projected affordance'
+    );
+    assert.equal(
+      /!\s*copy\.inert/.test(copyRowSource),
+      false,
+      'inert must not gate the Expend affordance'
+    );
+    // `inert` is an INDEPENDENT chip, so the fused "Spent · inert" label is retired.
+    assert.ok(
+      copyRowSource.includes('data-knowledge-inert'),
+      'inert should render as its own chip'
+    );
+  });
+
+  // The Knowledge SEAM (issue 785). Every rule here is invisible at unit level and
+  // silent at runtime if it regresses: dropping `reprojectKnowledge` from the item
+  // handler leaves a learn/expend/delete on another client unrendered, inverting the
+  // `doc?.pack` guard re-projects the whole world for a compendium write, flattening a
+  // `[hook, id]` tuple leaks the listener across every manager reopen, and removing an
+  // `isGM` gate hands a player a GM mutation.
+  it('registers the Knowledge hook set as tuples, filters it, and GM-gates every mutation', () => {
+    // Only actor-owned, NON-compendium items can change the projection. `Document#pack`
+    // falls back to `this.parent?.pack`, so an Item embedded in a compendium Actor is
+    // readable straight off the embedded doc.
+    assert.ok(
+      appSource.includes("if (doc?.parent?.documentName !== 'Actor') return;"),
+      'the item handler drops a world/compendium-root item'
+    );
+    assert.ok(
+      appSource.includes('if (doc?.pack) return;'),
+      'the item handler drops an item embedded in a COMPENDIUM actor'
+    );
+    // `updateActor` is key-filtered because it is noisy (every HP tick fires it);
+    // learned recipes, usage counts and learn counts all live under `flags`.
+    assert.ok(
+      appSource.includes("if ('flags' in diff) reprojectKnowledge();"),
+      "updateActor re-projects knowledge only on a 'flags' diff"
+    );
+    // Parent CRUD is load-bearing, not belt-and-braces: an `Actor.create` carrying
+    // `items[]` fires createActor and ZERO createItem.
+    assert.ok(
+      appSource.includes(
+        "...['createActor', 'deleteActor'].map((hook) => [hook, Hooks.on(hook, reprojectOnActorCrud)])"
+      ),
+      'createActor/deleteActor route through the knowledge reprojection too'
+    );
+    assert.ok(
+      appSource.includes('const reprojectKnowledge = () =>') &&
+        appSource.includes('scheduleKnowledgeRefresh'),
+      'the knowledge reprojection coalesces through the store scheduler'
+    );
+    for (const hook of ['createItem', 'updateItem', 'deleteItem']) {
+      assert.ok(appSource.includes(`'${hook}'`), `${hook} is registered`);
+    }
+
+    // EVERY `_userHooks` entry is an `[hookName, id]` tuple, and the unregister side
+    // destructures exactly that shape. A bare id makes it destructure `undefined`.
+    const hooksBlock = appSource.slice(
+      appSource.indexOf('this._userHooks = ['),
+      appSource.indexOf('_unregisterUserHooks() {')
+    );
+    assert.ok(hooksBlock.length > 0, 'the hook registration block is locatable');
+    const flatHooks = hooksBlock.replaceAll(/\s+/g, ' ');
+    const registrations = flatHooks.match(/Hooks\.on\(/g) || [];
+    const tuples = flatHooks.match(/\[ ?(?:hook|'[a-zA-Z]+') ?, ?Hooks\.on\(/g) || [];
+    assert.ok(registrations.length >= 4, 'the user hooks are registered here');
+    assert.equal(
+      tuples.length,
+      registrations.length,
+      'every Hooks.on id is registered inside a [hookName, id] tuple'
+    );
+    assert.ok(
+      appSource.includes('for (const [hook, id] of this._userHooks)'),
+      'the unregister side destructures the tuple'
+    );
+
+    // The GM gate is `isGM`, NOT `activeGM`: this is a single-client, user-initiated
+    // mutation from a GM-only Application, and `activeGM` would lock out the assistant
+    // GMs `show()` already admits.
+    assert.ok(
+      appSource.includes('if (game.user?.isGM !== true)') &&
+        appSource.includes('KNOWLEDGE_MESSAGES.gmOnly'),
+      'the knowledge gate denies a non-GM with the GM-only message'
+    );
+    assert.equal(
+      /activeGM/.test(appSource.slice(appSource.indexOf('_knowledgeActor('))),
+      false,
+      'the Knowledge seam must never gate on activeGM'
+    );
+    // All four mutating methods reach that gate — directly, or through the shared
+    // `_knowledgeTarget` resolver which calls it first.
+    for (const method of [
+      '_expendRecipeItemUse({',
+      '_deleteOwnedRecipeItem({',
+      '_eraseLearnedRecipe({',
+      '_resetActorKnowledge({',
+    ]) {
+      const start = appSource.indexOf(`async ${method}`);
+      assert.ok(start > 0, `${method} exists`);
+      const body = appSource.slice(start, start + 700);
+      assert.match(
+        body,
+        /this\._knowledge(Actor|Target)\(/,
+        `${method} resolves through the GM-gated helper`
+      );
+      assert.ok(body.includes('if (denied) return denied;'), `${method} returns the denial`);
+    }
+    assert.ok(
+      appSource.includes('const { actor, denied } = this._knowledgeActor(actorId);'),
+      '_knowledgeTarget itself runs the GM gate before any document lookup'
+    );
+
+    // The Foundry-free mutation bodies live in the collaborator, so the seam only
+    // resolves documents and delegates.
+    assert.ok(
+      appSource.includes(
+        "} from './svelte/apps/manager/knowledge/knowledgeMutations.js';"
+      ),
+      'the seam delegates its mutations to the plain-JS collaborator'
+    );
+    for (const call of [
+      'await expendOwnedRecipeItemUse({',
+      'await deleteOwnedRecipeItemCopy({',
+      'await eraseLearnedRecipeEntry({',
+      'await resetActorKnowledgeState({',
+    ]) {
+      assert.ok(appSource.includes(call), `the seam calls ${call}`);
+    }
+
+    // The roster is player characters only — the same predicate the Access roster uses.
+    assert.ok(
+      appSource.includes('game.fabricate?.isPlayerCharacterActor?.(actor)'),
+      'the Knowledge roster reuses the shared player-character predicate'
     );
   });
 

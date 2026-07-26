@@ -20,6 +20,7 @@
   row's right end; a multi-alternative box renders it at the box bottom instead.
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     currencyUnitLabel,
@@ -464,7 +465,12 @@
             {/each}
           </ul>
         {:else}
-          <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
+          <EmptyState
+            compact
+            icon="fas fa-tags"
+            title={text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}
+            dataAttr="data-recipe-tags-empty"
+          />
         {/if}
       </div>
     </div>

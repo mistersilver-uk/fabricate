@@ -17,6 +17,9 @@ const harness = createMountedComponentHarness({
     'src/utils/matchFolderVocabulary.js',
   ],
   compiledModules: [
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',

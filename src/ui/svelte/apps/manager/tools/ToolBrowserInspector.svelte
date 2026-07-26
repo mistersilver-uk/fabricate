@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     projectToolBehaviorFacts,
@@ -79,11 +80,19 @@
     </div>
   </section>
 {:else}
-  <section class="manager-empty manager-tool-browser-inspector is-empty" data-tool-browser-inspector-empty>
-    <div>
-      <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-      <h3>{text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}</h3>
-      <p>{text('FABRICATE.Admin.Manager.Tools.SelectHint', 'Choose a Tool to inspect its behavior.')}</p>
-    </div>
-  </section>
+  <!-- The inspector's no-selection state is the shared primitive at the sidebar scale.
+       It used to re-derive the panel by hand through
+       `.manager-tool-browser-inspector.is-empty`, which cancelled the dashed panel
+       (padding 0, border 0) and gave this ONE screen a 2rem glyph in a 46px tile and a
+       1.2rem title — a per-screen exception to the tile/type scale the primitive exists
+       to hold. `contextClass` keeps only the container concern: fill the inspector
+       column. -->
+  <EmptyState
+    compact
+    icon="fas fa-screwdriver-wrench"
+    title={text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}
+    hint={text('FABRICATE.Admin.Manager.Tools.SelectHint', 'Choose a Tool to inspect its behavior.')}
+    contextClass="manager-tool-browser-inspector-empty"
+    dataAttr="data-tool-browser-inspector-empty"
+  />
 {/if}

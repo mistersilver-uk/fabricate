@@ -264,8 +264,18 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
 
   // The original bug capped BOTH the list and the empty state. Without this symmetric
   // guard a re-cap of only the empty panel would ship green.
+  //
+  // Issue 785 moved the panel itself into the shared `EmptyState` primitive, so the cap
+  // guard follows it: the tab passes `contextClass="manager-recipe-tab-empty"` and the
+  // uncapped full-width rule lives in the global sheet, which is where a rule reached
+  // through the tab-body ancestor has to live (a scoped block cannot style a child
+  // component's root element).
   it('keeps the empty state a full-width uncapped panel', () => {
-    assertScopedRuleHasNoMaxWidth(booksTabSource, '.manager-recipe-section-empty', {
+    assert.ok(
+      booksTabSource.includes('contextClass="manager-recipe-tab-empty"'),
+      'the tab hands the panel its container class'
+    );
+    assertScopedRuleHasNoMaxWidth(css, '.fabricate-manager .manager-recipe-tab-empty', {
       mustContain: ['width: 100%'],
     });
   });

@@ -98,6 +98,13 @@ import {
 } from '../../../utils/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
+import { getFabricateFlag } from '../../../config/flags.js';
+import {
+  defaultKnowledgeTab,
+  projectKnowledgeSnapshot,
+  recipeItemLabelFromUuid as _recipeItemLabelFromUuid,
+  recipeItemTypeFromRecipeCount as _recipeItemTypeFromRecipeCount,
+} from '../apps/manager/knowledge/knowledgeStudio.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1840,28 +1847,10 @@ async function _documentDescriptionCandidate(doc, enrichToHtml) {
 // batched with `Promise.all` (never inside a Svelte `$derived`/`$effect`).
 // ---------------------------------------------------------------------------
 
-// Human label for a recipe item whose linked game-world item has not resolved
-// yet (or was deleted) — the trailing UUID segment, matching the manager's own
-// `_labelFromUuid`.
-function _recipeItemLabelFromUuid(uuid) {
-  if (!uuid) return '';
-  const parts = String(uuid).split('.');
-  return parts.at(-1) || '';
-}
-
-// Best-effort Book / Scroll / Tome label inferred from the linked item's type
-// and name. Defaults to 'Book' when nothing more specific is detectable.
-// Recipe-item "type" is derived purely from how many recipes it grants, so the
-// Books & Scrolls Type pill/filter is diagnostic: a multi-recipe tome is a "Book",
-// a single-recipe item is a "Scroll", and an item with no recipes linked yet is
-// "Incomplete" (distinct from the `linkMissing` broken-link state). Display strings
-// mirror the existing un-localised `derivedType`.
-function _recipeItemTypeFromRecipeCount(count) {
-  const n = Number(count) || 0;
-  if (n >= 2) return 'Book';
-  if (n === 1) return 'Scroll';
-  return 'Incomplete';
-}
+// `_recipeItemLabelFromUuid` and `_recipeItemTypeFromRecipeCount` now live in the
+// pure `knowledge/knowledgeStudio.js` projection and are imported back at the top
+// of this module (issue 785). The Books & Scrolls Type pill and the Knowledge
+// surface's Type column read the SAME derivation, so the two cannot drift.
 
 // The recipe-item definitions of a system that CONTAIN a recipe (issue 511
 // many-to-many). Canonical read is each definition's `recipeIds[]`; only a system
@@ -1916,6 +1905,14 @@ async function _resolveRecipeItemSource(uuid) {
 
 // Build a `recipeId -> Set(actorId)` index of learned recipes across every world
 // actor (best-effort; `game.*` may be unavailable in headless contexts → empty).
+//
+// The learned map MUST be read through `getFabricateFlag` (issue 785). Every
+// writer persists it at the doubly-nested `flags.fabricate.fabricate.learnedRecipes`
+// path (`normalizeFlagKey` prefixes `fabricate.`, then the flattened update path
+// nests it under the `fabricate` scope), so the old hand-written single-nested
+// `actor.flags.fabricate.learnedRecipes` read resolved to `undefined` in a real
+// world and "Learned by" was permanently 0. `getFabricateFlag` also try/catches
+// `getFlag`'s inactive-scope throw.
 function _buildLearnedRecipeActorIndex() {
   const index = new Map();
   const raw = globalThis.game?.actors;
@@ -1927,7 +1924,7 @@ function _buildLearnedRecipeActorIndex() {
         ? [...raw]
         : [];
   for (const actor of actors) {
-    const learned = actor?.flags?.fabricate?.learnedRecipes;
+    const learned = getFabricateFlag(actor, 'learnedRecipes', null);
     if (!learned || typeof learned !== 'object') continue;
     const actorId = actor.id || actor._id || '';
     for (const recipeId of Object.keys(learned)) {
@@ -2499,6 +2496,26 @@ export function createAdminStore(services) {
   let externalRefreshScheduled = false;
   let destroyed = false;
 
+  // --- GM Knowledge surface state (issue 785) ---
+  //
+  // `refresh()` is invoked by ~40 mutation paths and a whole-world `actors × items`
+  // scan has no cheap invalidation signature, so the knowledge projection MUST NOT
+  // join it. `knowledgeActive` makes `refreshKnowledge()` a total no-op while the
+  // surface is closed, and the cached raw snapshot is dropped on a system change.
+  //
+  // This shape is UNPRECEDENTED in this store, not borrowed: the graph tab is
+  // computed inside `refresh()` gated on `activeTab === 'graph'`, with no separate
+  // flag and no separate refresh function.
+  let knowledgeActive = false;
+  let knowledgeSnapshot = null;
+  let knowledgeSelectedActorId = '';
+  let knowledgeRefreshScheduled = false;
+  // Resolved ONCE per surface entry from the DEFINITION count, never as a live
+  // derivation — a GM authoring the system's first recipe item elsewhere would
+  // otherwise flip 0 → 1, yank the open tab mid-task and disarm an armed row.
+  let knowledgeDefaultTab = defaultKnowledgeTab(0);
+  let knowledgeDefaultTabResolved = false;
+
   // Per-store item-card memo (store-instance scope, NEVER module-global — avoids
   // cross-app/test bleed). See `_buildItemCards` for the signature shape and the
   // disclosed source-document freshness trade. Cleared in `refresh()` on a
@@ -2545,6 +2562,11 @@ export function createAdminStore(services) {
       typeof services.getFoundrySystemId === 'function'
         ? String(services.getFoundrySystemId() || '')
         : '',
+    // The GM Knowledge surface projection (issue 785). A TOP-LEVEL sibling key,
+    // deliberately NEVER hung off `selectedSystem`: that would force a
+    // `selectedSystem` reference rebuild on every knowledge publish and let a
+    // late phase-2 `refresh()` publish clobber freshly projected rows.
+    knowledge: projectKnowledgeSnapshot(null, { active: false }),
     ..._emptyEnvironmentState(false),
     ..._emptyTravelState(),
   });
@@ -4676,14 +4698,20 @@ export function createAdminStore(services) {
     });
   }
 
-  function _scheduleExternalRefresh() {
-    if (destroyed || externalRefreshScheduled) return;
-    externalRefreshScheduled = true;
+  // The coalescing primitive both external-change schedulers share: collapse a
+  // burst of hook callbacks in one turn into a single refresh.
+  function _onMicrotask(callback) {
     const schedule =
       typeof queueMicrotask === 'function'
         ? queueMicrotask
-        : (callback) => Promise.resolve().then(callback);
-    schedule(async () => {
+        : (task) => Promise.resolve().then(task);
+    schedule(callback);
+  }
+
+  function _scheduleExternalRefresh() {
+    if (destroyed || externalRefreshScheduled) return;
+    externalRefreshScheduled = true;
+    _onMicrotask(async () => {
       externalRefreshScheduled = false;
       if (destroyed) return;
       await refresh();
@@ -5141,6 +5169,263 @@ export function createAdminStore(services) {
   }
 
   // ---------------------------------------------------------------------------
+  // GM Knowledge surface (issue 785)
+  //
+  // Read path: the seam enumerates actors/items and resolves definitions; this
+  // store caches the RAW snapshot and publishes the PURE projection as top-level
+  // `viewState.knowledge` — always a new object, never on `selectedSystem`.
+  //
+  // Write path: every action awaits its seam call, notifies, then calls
+  // `refreshKnowledge({ force: true })` and NEVER `refresh()`. GM gating lives at
+  // the top of each seam method; this store never touches `game.*`.
+  // ---------------------------------------------------------------------------
+
+  function _knowledgeRawCharacter(actorId) {
+    const characters = Array.isArray(knowledgeSnapshot?.characters)
+      ? knowledgeSnapshot.characters
+      : [];
+    return characters.find((character) => String(character?.id) === String(actorId)) || null;
+  }
+
+  function _knowledgeRawOwnedCopy(actorId, itemId) {
+    const copies = _knowledgeRawCharacter(actorId)?.ownedCopies || [];
+    return copies.find((copy) => String(copy?.itemId) === String(itemId)) || null;
+  }
+
+  // Localized copy for the Knowledge surface's two heavyweight confirms. Every key
+  // is a STATIC literal at its call site (an interpolated key is invisible to both
+  // `ui-lang-keys-resolve` and `lang-keys-no-orphans`, so a missing message would
+  // ship silently); `data` is passed to the localizer and interpolated into the
+  // English fallback only when no localizer is present.
+  function _knowledgeText(key, fallback, data = null) {
+    const localized = data ? services.localize?.(key, data) : services.localize?.(key);
+    if (localized) return localized;
+    if (!data) return fallback;
+    return Object.entries(data).reduce(
+      (text, [name, value]) => text.replace(`{${name}}`, String(value)),
+      fallback
+    );
+  }
+
+  function _notifyKnowledgeResult(result) {
+    const message = result?.message;
+    if (!message) return;
+    const text = services.localize?.(message, result?.messageData) || message;
+    if (result?.success === true) services.notify?.info?.(text);
+    else services.notify?.error?.(text);
+  }
+
+  function _publishKnowledge() {
+    viewState.update((prev) => ({
+      ...prev,
+      knowledge: projectKnowledgeSnapshot(knowledgeSnapshot, {
+        active: knowledgeActive,
+        selectedActorId: knowledgeSelectedActorId,
+        defaultTab: knowledgeDefaultTab,
+      }),
+    }));
+  }
+
+  function _clearKnowledgeCache() {
+    knowledgeSnapshot = null;
+    knowledgeDefaultTabResolved = false;
+    knowledgeSelectedActorId = '';
+  }
+
+  /**
+   * Re-read the Knowledge snapshot. A TOTAL no-op while the surface is closed —
+   * that gate is what keeps the noisy item hooks free and keeps the whole-world
+   * scan off every one of `refresh()`'s ~40 callers.
+   *
+   * @param {{force?: boolean}} [options] `force` re-reads the seam; otherwise a
+   *   cached snapshot is simply re-published.
+   * @returns {Promise<boolean>} whether a projection was published.
+   */
+  async function refreshKnowledge({ force = false } = {}) {
+    if (!knowledgeActive) return false;
+    if (force || !knowledgeSnapshot) {
+      const systemId = get(selectedSystemId);
+      knowledgeSnapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
+      if (!knowledgeDefaultTabResolved) {
+        knowledgeDefaultTab = defaultKnowledgeTab(knowledgeSnapshot?.definitionCount || 0);
+        knowledgeDefaultTabResolved = true;
+      }
+    }
+    _publishKnowledge();
+    return true;
+  }
+
+  /**
+   * Hook entry point. Coalesces a burst of externally-driven actor/item writes
+   * into ONE `refreshKnowledge` through the same microtask pattern
+   * `_scheduleExternalRefresh` uses, which also collapses the echo a store
+   * action's own write produces into its explicit refresh.
+   */
+  function scheduleKnowledgeRefresh() {
+    if (destroyed || !knowledgeActive || knowledgeRefreshScheduled) return;
+    knowledgeRefreshScheduled = true;
+    _onMicrotask(async () => {
+      knowledgeRefreshScheduled = false;
+      if (destroyed) return;
+      await refreshKnowledge({ force: true });
+    });
+  }
+
+  /**
+   * Enter or leave the Knowledge surface. Entering resolves the default inner tab
+   * once from the definition count; leaving drops the cache so a later entry
+   * re-resolves both.
+   *
+   * @param {boolean} active
+   * @returns {Promise<boolean>} the resolved active state.
+   */
+  async function setKnowledgeActive(active) {
+    const next = active === true;
+    knowledgeActive = next;
+    if (!next) {
+      _clearKnowledgeCache();
+      _publishKnowledge();
+      return false;
+    }
+    await refreshKnowledge({ force: true });
+    return true;
+  }
+
+  /**
+   * Select a roster character. Pure re-publication — no seam read.
+   *
+   * @param {string} actorId
+   * @returns {boolean}
+   */
+  function selectKnowledgeActor(actorId) {
+    knowledgeSelectedActorId = String(actorId || '');
+    if (!knowledgeActive) return false;
+    _publishKnowledge();
+    return true;
+  }
+
+  async function _runKnowledgeMutation(call) {
+    const result = (await call()) || {
+      success: false,
+      message: 'FABRICATE.Knowledge.Manage.Failed',
+    };
+    _notifyKnowledgeResult(result);
+    await refreshKnowledge({ force: true });
+    return result;
+  }
+
+  /**
+   * Spend one charge of an owned recipe-item copy. The seam anchors the write to
+   * the definition the projected row already resolved, so the GM's click acts on
+   * exactly the book the row displayed.
+   *
+   * @param {string} actorId
+   * @param {string} itemId
+   */
+  async function expendRecipeItemUse(actorId, itemId) {
+    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
+    return _runKnowledgeMutation(() =>
+      services.expendRecipeItemUse?.({
+        actorId,
+        itemId,
+        definitionId: copy?.definitionId || '',
+        systemId: get(selectedSystemId),
+      })
+    );
+  }
+
+  /**
+   * Delete one owned copy. A stacked copy (`quantity > 1`) deletes the WHOLE
+   * document behind a confirm naming the quantity: `recipeItemUsage.timesUsed`
+   * and `recipeItemLearning.learnedCount` are per-DOCUMENT counters shared by
+   * every unit, so decrementing a stack would leave one set of counters attached
+   * to fewer units and falsify every derived `remaining`.
+   *
+   * @param {string} actorId
+   * @param {string} itemId
+   */
+  async function deleteOwnedRecipeItem(actorId, itemId) {
+    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
+    const quantity = Number(copy?.quantity) || 1;
+    if (quantity > 1) {
+      const confirmed = await services.confirmDialog?.({
+        title: _knowledgeText(
+          'FABRICATE.Admin.Manager.Knowledge.DeleteStackTitle',
+          'Delete the whole stack?'
+        ),
+        content: `<p>${_knowledgeText(
+          'FABRICATE.Admin.Manager.Knowledge.DeleteStackContent',
+          'This copy is a stack of {quantity}. Deleting removes every unit, because uses and learns are tracked per document.',
+          { quantity }
+        )}</p>`,
+        yes: () => true,
+        no: () => false,
+      });
+      if (!confirmed) return { success: false, cancelled: true };
+    }
+    return _runKnowledgeMutation(() => services.deleteOwnedRecipeItem?.({ actorId, itemId }));
+  }
+
+  /**
+   * Erase one learned recipe. Frees the learn budget but deliberately LEAVES
+   * discovery progress intact — an erase is an un-learn, a reset is an amnesia.
+   *
+   * @param {string} actorId
+   * @param {string} recipeId
+   */
+  async function eraseLearnedRecipe(actorId, recipeId) {
+    return _runKnowledgeMutation(() => services.eraseLearnedRecipe?.({ actorId, recipeId }));
+  }
+
+  async function _confirmKnowledgeReset(titleKey, titleFallback, contentKey, contentFallback) {
+    const note = _knowledgeText(
+      'FABRICATE.Admin.Manager.Knowledge.ResetDiscoveryNote',
+      'Erasing a single memory leaves discovery progress intact; a reset also clears it.'
+    );
+    return services.confirmDialog?.({
+      title: _knowledgeText(titleKey, titleFallback),
+      content: `<p>${_knowledgeText(contentKey, contentFallback)}</p><p>${note}</p>`,
+      yes: () => true,
+      no: () => false,
+    });
+  }
+
+  /**
+   * Reset this character's learned knowledge for the SELECTED system.
+   *
+   * @param {string} actorId
+   */
+  async function resetActorSystemKnowledge(actorId) {
+    const confirmed = await _confirmKnowledgeReset(
+      'FABRICATE.Admin.Manager.Knowledge.ResetSystemTitle',
+      'Reset this system?',
+      'FABRICATE.Admin.Manager.Knowledge.ResetSystemContent',
+      'Clear every recipe this character has learned in the selected crafting system.'
+    );
+    if (!confirmed) return { success: false, cancelled: true };
+    const systemId = get(selectedSystemId);
+    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId }));
+  }
+
+  /**
+   * Reset this character's learned knowledge across EVERY system. The only grain
+   * that can clear orphan learned keys, which `forgetSystemLearnedRecipes`
+   * deliberately leaves in place because they cannot be attributed to a system.
+   *
+   * @param {string} actorId
+   */
+  async function resetActorAllKnowledge(actorId) {
+    const confirmed = await _confirmKnowledgeReset(
+      'FABRICATE.Admin.Manager.Knowledge.ResetAllTitle',
+      'Reset every system?',
+      'FABRICATE.Admin.Manager.Knowledge.ResetAllContent',
+      'Clear every recipe this character has learned across all crafting systems, including entries whose recipe no longer exists.'
+    );
+    if (!confirmed) return { success: false, cancelled: true };
+    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId: null }));
+  }
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
@@ -5171,6 +5456,9 @@ export function createAdminStore(services) {
 
     selectedSystemId.set(systemId);
     _clearSystemScopedSearches();
+    // The Knowledge snapshot is scoped to ONE system's recipe-item definitions
+    // (identity is system-scoped), so it can never survive a system change.
+    _clearKnowledgeCache();
     selectedEnvironmentId.set('');
     selectedEnvironmentSystemId.set(systemId || '');
     _setEnvironmentDraftState(null, { persistedDraft: null });
@@ -8385,6 +8673,9 @@ export function createAdminStore(services) {
     unsubscribeTravelMarkerMove = null;
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
+    knowledgeRefreshScheduled = false;
+    knowledgeActive = false;
+    _clearKnowledgeCache();
   }
 
   unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();
@@ -8619,6 +8910,16 @@ export function createAdminStore(services) {
     setMapRegionLink: travel.setMapRegionLink,
     deleteRealm: travel.deleteRealm,
     setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
+    // --- GM Knowledge surface (issue 785) ---
+    setKnowledgeActive,
+    refreshKnowledge,
+    scheduleKnowledgeRefresh,
+    selectKnowledgeActor,
+    expendRecipeItemUse,
+    deleteOwnedRecipeItem,
+    eraseLearnedRecipe,
+    resetActorSystemKnowledge,
+    resetActorAllKnowledge,
     refresh,
     refreshGatheringConfig,
     refreshAccessRosters,

@@ -154,6 +154,16 @@ export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
 
   // Tools browser (harness waits on `.manager-tools-row`).
   'tools normal': ['.manager-tools-row'],
+
+  // GM Knowledge surface (issue 785). Both widths pin the owned-copy row, which the
+  // harness proves is rendered right before each of these assertions. The NARROW
+  // label is measured at ~880px — deliberately ABOVE the 831px single-column
+  // collapse, because that band is where three columns still hold, the detail pane is
+  // at its narrowest, and the row's action cluster is therefore at real risk of
+  // clipping. The class is lowercase-and-hyphen only so the drift guard's
+  // `/'(\.[a-z-]+)'/g` recovery can see it in the harness source.
+  'knowledge normal': ['.manager-knowledge-copy-row'],
+  'knowledge narrow': ['.manager-knowledge-copy-row'],
 };
 
 /**

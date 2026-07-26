@@ -24,6 +24,7 @@
      with all players", never "Played by <one name>".
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -120,14 +121,17 @@
         </ul>
       {/if}
     {:else}
-      <!-- The tab's OWN empty primitive (`.manager-recipe-section-empty`), the one the
-           Results/Ingredients tabs use — not the rail's medallion card. A rail card and
-           a tab empty-state are different surfaces, and re-homing the rail's version
-           verbatim would have put a second empty-state design on the same tab strip. -->
-      <div class="manager-recipe-section-empty" data-recipe-access-empty>
-        <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.EmptyTitle', 'No access granted')}</p>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.NoAccessGrants', 'No player or character has been granted this recipe yet.')}</p>
-      </div>
+      <!-- The shared no-state primitive at the sidebar/inline scale. This tab used to
+           carry its own `.manager-recipe-section-empty` panel; that was a second
+           empty-state design sitting beside the manager's one, so it is gone. -->
+      <EmptyState
+        compact
+        icon="fas fa-user-shield"
+        title={text('FABRICATE.Admin.Manager.Recipe.AccessTab.EmptyTitle', 'No access granted')}
+        hint={text('FABRICATE.Admin.Manager.Recipe.AccessTab.NoAccessGrants', 'No player or character has been granted this recipe yet.')}
+        contextClass="manager-recipe-tab-empty"
+        dataAttr="data-recipe-access-empty"
+      />
     {/if}
 
     <button type="button" class="manager-button manager-recipe-tab-action" data-recipe-open-access onclick={() => onOpenAccess()}>

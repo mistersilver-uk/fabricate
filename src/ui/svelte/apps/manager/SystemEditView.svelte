@@ -9,6 +9,7 @@
   the whole crafting manager admin is GM-scoped.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
@@ -765,7 +766,11 @@
           {#if !modifiersCollapsed}
           <div id="manager-section-body-modifiers" class="manager-section-body">
           {#if characterModifierLibrary.length === 0}
-            <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Empty', 'No character modifiers yet.')}</p>
+            <EmptyState
+              compact
+              icon="fas fa-sliders"
+              title={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Empty', 'No character modifiers yet.')}
+            />
           {:else}
             <ul class="manager-character-modifier-list">
               {#each characterModifierLibrary as entry, index (entry.id)}
@@ -1004,7 +1009,11 @@
             </div>
           </div>
           {#if currencyUnits.length === 0}
-            <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
+            <EmptyState
+              compact
+              icon="fas fa-coins"
+              title={text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}
+            />
           {:else}
             <ul class="manager-character-modifier-list manager-currency-provider-managed-list manager-currency-provider-managed-grid">
               {#each currencyUnits as unit (unit.id)}
@@ -1031,7 +1040,11 @@
             </ul>
           {/if}
         {:else if currencyUnits.length === 0}
-          <p class="manager-muted manager-character-modifier-empty">{text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}</p>
+          <EmptyState
+            compact
+            icon="fas fa-coins"
+            title={text('FABRICATE.Admin.Manager.CurrencyUnits.Empty', 'No currency units yet.')}
+          />
         {:else}
           <ul class="manager-character-modifier-list">
             {#each currencyUnits as unit, index (unit.id)}

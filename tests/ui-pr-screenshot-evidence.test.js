@@ -243,6 +243,34 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
+  it('maps every changed Knowledge surface file to BOTH the surface view and its armed-Delete view (issue 785)', () => {
+    // The armed frame needs its OWN view id because `collect` publishes only
+    // `candidates[0]`: appended to the surface view, the lower-numbered un-armed
+    // owned-copies frame would win forever and the armed state would never ship.
+    for (const file of [
+      'src/ui/svelte/apps/manager/KnowledgeView.svelte',
+      'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte',
+      'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
+      'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+      'src/ui/svelte/apps/manager/knowledge/knowledgeMutations.js',
+    ]) {
+      const ids = mapChangedFilesToViews([file]).map((view) => view.id);
+      assert.ok(ids.includes('manager-knowledge'), file);
+      assert.ok(ids.includes('manager-knowledge-delete-armed'), file);
+    }
+    const surface = VIEW_RECIPES.find((view) => view.id === 'manager-knowledge');
+    assert.deepEqual(surface.smokeLabels, [
+      'manager-knowledge-owned-copies',
+      'manager-knowledge-empty-tab',
+      'manager-knowledge-learned-lost-copy',
+      'manager-knowledge-party-pool-warning',
+      'manager-knowledge-narrow',
+    ]);
+  });
+
   it('maps recipe Tool authoring files only to the existing Tools-tab frame', () => {
     for (const file of [
       'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
@@ -1009,6 +1037,78 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
+  // Both regressions below made `collect` throw for evidence that was entirely valid,
+  // so the documented
+  // `test:foundry:screenshots --target-labels=$(screenshots:ui:targets)` -> `collect`
+  // workflow could not complete. Neither was caught before because the fixture helper
+  // mirrored the buggy expectations: it built `targetLabels` with the same raw
+  // `flatMap` the validator used, and gave every frame a clip-shaped width/height.
+  it('accepts a run whose target labels are deduped across views that share a label', () => {
+    // `manager-default-selection` belongs to the systems view AND the
+    // theme-or-global-ui fallback, so any change matching both yields a raw flatMap
+    // longer than the run's recorded SET of labels.
+    const changedFiles = [
+      'styles/fabricate.css',
+      'src/ui/svelte/apps/manager/SystemsBrowserView.svelte',
+    ];
+    const views = mapChangedFilesToViews(changedFiles);
+    const rawLabels = views.flatMap(view => view.smokeLabels);
+    const dedupedLabels = [...new Set(rawLabels)];
+    assert.ok(
+      dedupedLabels.length < rawLabels.length,
+      'fixture precondition: this changed-file set must match two views sharing a label'
+    );
+    // A css change also matches the Tool Studio recipes, whose parity frames carry
+    // pinned dimensions — so build frames from TOOL_STUDIO_VIEWS where they apply and
+    // fall back to generic geometry elsewhere.
+    const toolStudioByViewId = new Map(TOOL_STUDIO_VIEWS.map(frame => [frame[0], frame]));
+    const frames = views.map((view, index) =>
+      toolStudioByViewId.get(view.id) || [view.id, view.smokeLabels[0], 800 + index, 600 + index]
+    );
+    withScreenshotFixtures(
+      automatedEvidenceFixtures({ frames, targetLabels: dedupedLabels }),
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles,
+          prNumber: 876,
+          root,
+          headSha: 'abc1234',
+        });
+        assert.equal(result.copied.length, views.length);
+      },
+    );
+  });
+
+  it('accepts an unclipped capture that declares no geometry in the manifest', () => {
+    // `screenshot()` records `options.clip?.width ?? null`, so a full-page frame — most
+    // of the walk — declares null. Comparing real pixels against null was fatal.
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    // Null the DECLARED geometry only. Patching it through `capturePatch` would also
+    // shrink the generated PNG, since the helper builds pixels from the same array —
+    // that would test a zero-sized image, not an unclipped one.
+    const fixtures = changedFileEvidenceFixtures(changedFiles);
+    const manifest = JSON.parse(fixtures['screenshot-manifest.json']);
+    manifest.captures = manifest.captures.map(capture => ({
+      ...capture,
+      width: null,
+      height: null,
+    }));
+    fixtures['screenshot-manifest.json'] = JSON.stringify(manifest);
+    withScreenshotFixtures(
+      fixtures,
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles,
+          prNumber: 876,
+          root,
+          headSha: 'abc1234',
+        });
+        assert.equal(result.copied.length, 1);
+        assert.equal(result.missing.length, 0);
+      },
+    );
+  });
+
   it('collects truthful r15-shaped Tool Studio parity and stress PNGs from one green current-head run', () => {
     withScreenshotFixtures(toolStudioEvidenceFixtures(), (root) => {
       const result = collectScreenshotEvidence({
@@ -1372,10 +1472,10 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(smokeLabelsForChangedFiles(['styles/theme.css']), [
       'manager-default-selection',
       'manager-components-normal',
-      'manager-environments-browse-normal',
       'manager-gathering-task-editor-normal',
-      'manager-gathering-events-normal',
-      'manager-essences-normal',
+      'player-crafting-simple',
+      'player-inventory',
+      'interactables-manager-list',
     ]);
     assert.deepEqual(smokeLabelsForChangedFiles(['docs/readme.md']), []);
   });

@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -463,23 +464,21 @@
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}>
     {#if (itemCards || []).length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-box-open" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Component.EmptyTitle', 'No components yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Component.EmptyHint', 'Drop Foundry items into this page to add components to the selected system.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-box-open"
+        title={text('FABRICATE.Admin.Manager.Component.EmptyTitle', 'No components yet')}
+        hint={text('FABRICATE.Admin.Manager.Component.EmptyHint', 'Drop Foundry items into this page to add components to the selected system.')}
+      />
     {:else if filteredComponents.length === 0}
       <!-- A filtered-to-nothing library is not an error state and does not want the full
            empty-panel apparatus: one dashed panel says it, and Clear filters is the way
            out (the Recipe Studio's treatment). -->
-      <div class="manager-empty manager-component-empty-filtered">
-        <div>
-          <p>{text('FABRICATE.Admin.Manager.Component.EmptySearchTitle', 'No components match your filters.')}</p>
-          <button type="button" class="manager-button" data-clear-filters="components" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        filtered
+        hint={text('FABRICATE.Admin.Manager.Component.EmptySearchTitle', 'No components match your filters.')}
+      >
+        <button type="button" class="manager-button" data-clear-filters="components" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+      </EmptyState>
     {:else}
       <!-- A card row has no columns, so this is a LIST, not a grid: a real
            `<ul role="list">` of `<li>` cards carrying `aria-current`, mirroring the

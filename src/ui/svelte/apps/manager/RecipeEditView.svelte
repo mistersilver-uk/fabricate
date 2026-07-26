@@ -21,6 +21,7 @@
   `onUpdateRecipe`/`onUpdateStep`.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import RecipeEditorTabs from './recipe/RecipeEditorTabs.svelte';
@@ -516,12 +517,10 @@
       </div>
     </div>
   {:else}
-    <div class="manager-empty">
-      <div>
-        <i class="fas fa-scroll" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}</h3>
-        <p>{text('FABRICATE.Admin.Manager.Recipe.EditMissingHint', 'Pick a recipe from the browser to open its editor.')}</p>
-      </div>
-    </div>
+    <EmptyState
+      icon="fas fa-scroll"
+      title={text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}
+      hint={text('FABRICATE.Admin.Manager.Recipe.EditMissingHint', 'Pick a recipe from the browser to open its editor.')}
+    />
   {/if}
 </main>

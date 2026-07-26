@@ -1382,8 +1382,10 @@ class Fabricate {
   }
 
   /**
-   * GM-only crafting-knowledge reset (issue 773) — the interim macro/console access
-   * path until #785 ships the Books & Scrolls Knowledge tab. Clears one actor's
+   * GM-only crafting-knowledge reset (issue 773). This is the GM API that the
+   * Knowledge surface's per-character reset control routes through (issue 785, both
+   * the "This system" and "All systems" grains), and it remains available to macros
+   * and the console for the same reset outside the manager UI. Clears one actor's
    * learned recipes (and their scoped discovery progress) for one crafting system
    * (`systemId`) or, when `systemId` is null, across every system, delegating to the
    * shared {@link RecipeVisibilityService#forgetLearnedRecipes} deletion primitive.

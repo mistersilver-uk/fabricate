@@ -9,6 +9,7 @@
   intentionally blank.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
@@ -114,11 +115,14 @@
   </section>
 
   {#if filteredRealms.length === 0}
-    <p class="manager-muted manager-travel-realms-empty">
-      {realms.length === 0
+    <EmptyState
+      compact
+      icon={realms.length === 0 ? 'fas fa-earth-americas' : 'fas fa-magnifying-glass'}
+      title={realms.length === 0
         ? text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')
         : text('FABRICATE.Admin.Manager.Travel.Realms.NoMatches', 'No realms match your search.')}
-    </p>
+      dataAttr="data-travel-realms-empty"
+    />
   {:else}
     <div class="manager-travel-realms-list" role="list">
       {#each pagedRealms as realm (realm.id)}

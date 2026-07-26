@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
@@ -258,26 +259,24 @@
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.Table', 'Gathering tasks table')}>
     {#if taskList.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-list-check" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyTitle', 'No gathering tasks yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyHint', 'Create gathering tasks before attaching them to environments.')}</p>
-          <button type="button" class="manager-button is-primary" onclick={() => onCreateTask(selectedSystemId)}>
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
-          </button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-list-check"
+        title={text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyTitle', 'No gathering tasks yet')}
+        hint={text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyHint', 'Create gathering tasks before attaching them to environments.')}
+      >
+        <button type="button" class="manager-button is-primary" onclick={() => onCreateTask(selectedSystemId)}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
+        </button>
+      </EmptyState>
     {:else if filteredTasks.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptySearchTitle', 'No gathering tasks match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptySearchHint', 'Clear search and filters to show all gathering tasks in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-search"
+        title={text('FABRICATE.Admin.Manager.Environment.Tasks.EmptySearchTitle', 'No gathering tasks match these filters')}
+        hint={text('FABRICATE.Admin.Manager.Environment.Tasks.EmptySearchHint', 'Clear search and filters to show all gathering tasks in this system.')}
+      >
+        <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+      </EmptyState>
     {:else}
       <div class="manager-gathering-tasks-table" role="table" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.TableShort', 'Gathering tasks')}>
         <div class="manager-table-head manager-gathering-task-table-head" role="row">

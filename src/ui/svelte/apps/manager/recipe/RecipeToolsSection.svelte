@@ -12,6 +12,7 @@
   empty copy (recipe / step / global).
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SearchablePopover from '../SearchablePopover.svelte';
 
@@ -70,9 +71,12 @@
 
 <div class="manager-recipe-tools-section" data-recipe-section={`${idPrefix}tools`}>
   {#if (toolIds || []).length === 0}
-    <div class="manager-recipe-tools-empty" data-recipe-tools-empty>
-      <p class="manager-muted">{emptyToolLabel}</p>
-    </div>
+    <EmptyState
+      compact
+      icon="fas fa-screwdriver-wrench"
+      title={emptyToolLabel}
+      dataAttr="data-recipe-tools-empty"
+    />
   {:else}
     <ul class="manager-recipe-tool-rows">
       {#each toolIds as toolId (toolId)}

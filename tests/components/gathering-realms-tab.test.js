@@ -55,6 +55,9 @@ describe('GatheringRealmsTab mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
@@ -72,7 +75,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
   it('renders an empty state when there are no realms', async () => {
     await mountTab({ realms: [] });
     assert.equal(rows().length, 0);
-    assert.ok(target.querySelector('.manager-travel-realms-empty'));
+    assert.ok(target.querySelector('[data-travel-realms-empty]'));
     remount();
   });
 

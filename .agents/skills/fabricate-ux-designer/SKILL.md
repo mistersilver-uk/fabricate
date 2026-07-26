@@ -62,7 +62,8 @@ Check:
 - spacing, typography, and information hierarchy
 - compact navigation, headers, cards, and fact components with long names or localized strings
 - contrast, focus states, and keyboard accessibility
-- empty states, loading states, and error states
+- empty states, loading states, and error states — each rendered through its shared primitive, not hand-rolled per screen
+- duplicate implementations of one meaning: a second component, a copied markup block, or a per-screen style override that re-derives a shipped primitive is a finding, and the fix is a prop or variant on the primitive rather than the copy
 - Svelte 5 rune usage and avoidable side effects
 - localization readiness for longer strings
 - screenshot artifacts for first visible state, clipping, spacing, alignment, image/content scale, scroll containment, and visible controls
@@ -78,6 +79,18 @@ See the CSS section of `CONTRIBUTING.md`
 
 ## Rules
 
+- **One implementation per meaning — this is mandatory, not a preference.**
+Wherever two or more places perform the same function, represent the same knowledge, or implement the same layout, that thing MUST exist as a single shared primitive Svelte component.
+Not a shared CSS class that each site hand-rolls markup against, and not a copy: a component, imported.
+A shared primitive that coexists with unconverted duplicates is not a primitive, it is a fourth way of doing the same thing — so extracting one obliges you to convert every existing site in the same change, or to state in the plan which sites are deferred and why.
+- **Prefer adding flexibility to an existing shared primitive over creating a new one.**
+A new prop, a variant class, or a slot on the primitive that already owns the meaning beats a second component that owns half of it.
+Creating a new primitive, or leaving a standalone/one-off implementation in place, requires EXPLICIT written justification in the plan or the review — name the behavioural mismatch that makes the existing primitive unusable.
+"It is only used once" is not a justification; "it is used once today" is how the second copy gets written.
+- **Prefer the primitive's own scoped `<style>` block over `styles/fabricate.css`, because it makes required-screenshot detection accurate.**
+`VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs` maps changed FILE PATHS to affected views.
+Styling that lives in the global stylesheet makes every tweak look like a global change, which matches the broad `theme-or-global-ui` recipe and demands a wide core set of frames; styling co-located in the component matches only the recipes that name that component, so the evidence is scoped to the views that actually render it.
+Two standing exceptions keep their rules in the global sheet: anything that must beat Foundry's host CSS (button geometry, focus rings — see the focus-ring rule below and `CONTRIBUTING.md`), and `:root`/theme token blocks.
 - Prefer Foundry-native patterns over novelty.
 - For popovers/dropdowns in the player app, prefer rendering in-place with `position: absolute` anchored to a `position: relative` ancestor over portaling with `position: fixed`.
 A portaled `position: fixed` element fed host-relative coordinates mis-positions (shifts by the window's viewport offset), and outside-click dismissal that relies on the portal escape hatch is fragile.

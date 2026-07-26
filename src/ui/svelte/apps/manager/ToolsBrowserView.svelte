@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ItemDropZone from './ItemDropZone.svelte';
@@ -150,16 +151,18 @@
       <p class="manager-tools-result-summary" data-tool-result-count>{countLabel(filteredTools.length)}</p>
       <div class="manager-tools-library-scroll" data-tool-library-scroll>
       {#if tools.length === 0}
-        <div class="manager-empty" data-tool-library-empty>
-          <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Tools.EmptyHintDrop', 'Create an unlinked Tool or drop an Item above.')}</p>
-        </div>
+        <EmptyState
+          icon="fas fa-screwdriver-wrench"
+          title={text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}
+          hint={text('FABRICATE.Admin.Manager.Tools.EmptyHintDrop', 'Create an unlinked Tool or drop an Item above.')}
+          dataAttr="data-tool-library-empty"
+        />
       {:else if filteredTools.length === 0}
-        <div class="manager-empty" data-tool-library-filtered-empty>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Tools.EmptySearch', 'No Tools match your search')}</h3>
-        </div>
+        <EmptyState
+          icon="fas fa-search"
+          title={text('FABRICATE.Admin.Manager.Tools.EmptySearch', 'No Tools match your search')}
+          dataAttr="data-tool-library-filtered-empty"
+        />
       {:else}
         <div class="manager-tools-library-list" role="list">
           {#each pagedTools as tool (tool.id)}

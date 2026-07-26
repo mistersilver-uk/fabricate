@@ -244,8 +244,19 @@ describe('RecipeEditView empty-state regression guards', () => {
     assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.EditMissingHint'), 'null branch uses EditMissingHint');
   });
 
-  it('reuses the manager-empty surface for the null-recipe state', () => {
-    assert.ok(editSource.includes('manager-empty'), 'empty state reuses the manager-empty surface');
+  // Issue 785: the surface is a shared COMPONENT now, not a bare class the view hand-rolls
+  // markup against, so the reuse is proven by the import + the element, not by the string.
+  it('reuses the shared EmptyState primitive for the null-recipe state', () => {
+    assert.ok(
+      editSource.includes("import EmptyState from './EmptyState.svelte'"),
+      'the view imports the shared no-state primitive'
+    );
+    assert.ok(editSource.includes('<EmptyState'), 'the null-recipe branch renders it');
+    assert.equal(
+      editSource.includes('class="manager-empty'),
+      false,
+      'the panel markup must not be hand-rolled beside the primitive'
+    );
   });
 
   it('no longer references the removed placeholder copy', () => {

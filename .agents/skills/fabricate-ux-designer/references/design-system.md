@@ -190,10 +190,22 @@ sans; mono is only for dice formulas and run IDs.
 Reuse shipped primitives before adapting the illustrative shapes below.
 The component and its live CSS are authoritative; examples in this document explain intent and are not copy-paste implementation templates.
 
+**The one-implementation-per-meaning rule.**
+Wherever two or more places perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component that every site imports — not a shared CSS class each site hand-rolls markup against, and not a copy.
+Prefer adding a prop, variant or slot to the primitive that already owns the meaning over introducing a second component that owns half of it.
+Creating a new primitive, or leaving a standalone implementation in place, requires explicit written justification naming the behavioural mismatch; "it is only used once" is not one.
+Extracting a primitive obliges you to convert the existing sites in the same change — a primitive with unconverted duplicates beside it has added a variant rather than removed one.
+
+**Put the primitive's CSS in its own scoped `<style>` block, not in `styles/fabricate.css`.**
+`VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs` maps changed file paths to the views whose screenshots a PR must publish.
+Global-stylesheet edits match the broad `theme-or-global-ui` recipe and demand a wide core set of frames regardless of what actually changed; CSS co-located in the component matches only the recipes naming that component, so the evidence set is the views that really render it.
+Keep in the global sheet only what must beat Foundry's host CSS (button geometry, focus rings) and the `:root`/theme token blocks.
+
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Primitive or contract | Shipped source | Reuse for |
 |---|---|---|
+| `EmptyState` | `src/ui/svelte/apps/manager/EmptyState.svelte` | EVERY manager no-state message — a central panel, or `compact` for a sidebar/inline one. Never hand-roll a dashed panel, an icon tile, or a bare "nothing here" sentence |
 | `Medallion` | `src/ui/svelte/components/Medallion.svelte` | Manager entity imagery with the canonical fallback icon, surface, radius, and sizing |
 | `StatusPill` | `src/ui/svelte/components/StatusPill.svelte` | Semantic icon-plus-label state chips; never hand-roll a local status ramp |
 | `DropZone` | `src/ui/svelte/components/DropZone.svelte` | Shared drag/drop activation, disabled state, label, and active-class behavior |

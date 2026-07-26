@@ -17,6 +17,7 @@
   live in the pure `recipeBrowserModel.js`; this component only renders.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import Medallion from '../../components/Medallion.svelte';
@@ -478,23 +479,21 @@
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Recipe.Table', 'Recipes table')}>
     {#if (recipes || []).length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-scroll" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-scroll"
+        title={text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}
+        hint={text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}
+      />
     {:else if model.filtered.length === 0}
       <!-- A filtered-to-nothing library is not an error state and does not want the
            full empty-panel apparatus: one dashed panel says it, and the Clear-filters
            button is the way out. -->
-      <div class="manager-empty manager-recipe-empty-filtered">
-        <div>
-          <p>{text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match your filters.')}</p>
-          <button type="button" class="manager-button" data-clear-filters="recipes" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        filtered
+        hint={text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match your filters.')}
+      >
+        <button type="button" class="manager-button" data-clear-filters="recipes" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+      </EmptyState>
     {:else}
       <div class="manager-recipes-table">
         <!--

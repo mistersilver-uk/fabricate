@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
@@ -698,51 +699,45 @@
 
       <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Environment.Table', 'Environments table')}>
         {#if environmentsLoading}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Environments.Loading', 'Loading environments...')}</h3>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-spinner fa-spin"
+            title={text('FABRICATE.Admin.Environments.Loading', 'Loading environments...')}
+          />
         {:else if environmentsError}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Environments.ErrorTitle', 'Could Not Load Environments')}</h3>
-              <p>{environmentsError}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-exclamation-triangle"
+            title={text('FABRICATE.Admin.Environments.ErrorTitle', 'Could Not Load Environments')}
+            hint={environmentsError}
+          />
         {:else if environmentList.length === 0}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-seedling" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.EmptyTitle', 'Prepare gathering building blocks first')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Environment.EmptyHint', 'Define gathering tasks and events before creating environments, then attach those building blocks to each location players can gather from.')}</p>
-              <div class="manager-action-group">
-                <button type="button" class="manager-button is-primary" onclick={onCreateEnvironment}>
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span>
-                </button>
-                <button type="button" class="manager-button" onclick={() => selectGatheringTab('tasks')}>
-                  <i class="fas fa-list-check" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenTasks', 'Review tasks')}</span>
-                </button>
-                <button type="button" class="manager-button" onclick={() => selectGatheringTab('encounters')}>
-                  <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents', 'Review events')}</span>
-                </button>
-              </div>
+          <EmptyState
+            icon="fas fa-seedling"
+            title={text('FABRICATE.Admin.Manager.Environment.EmptyTitle', 'Prepare gathering building blocks first')}
+            hint={text('FABRICATE.Admin.Manager.Environment.EmptyHint', 'Define gathering tasks and events before creating environments, then attach those building blocks to each location players can gather from.')}
+          >
+            <div class="manager-action-group">
+              <button type="button" class="manager-button is-primary" onclick={onCreateEnvironment}>
+                <i class="fas fa-plus" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span>
+              </button>
+              <button type="button" class="manager-button" onclick={() => selectGatheringTab('tasks')}>
+                <i class="fas fa-list-check" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenTasks', 'Review tasks')}</span>
+              </button>
+              <button type="button" class="manager-button" onclick={() => selectGatheringTab('encounters')}>
+                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents', 'Review events')}</span>
+              </button>
             </div>
-          </div>
+          </EmptyState>
         {:else if filteredEnvironments.length === 0}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-search" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.EmptySearchTitle', 'No environments match these filters')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Environment.EmptySearchHint', 'Clear search and filters to show all environments in this system.')}</p>
-              <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-search"
+            title={text('FABRICATE.Admin.Manager.Environment.EmptySearchTitle', 'No environments match these filters')}
+            hint={text('FABRICATE.Admin.Manager.Environment.EmptySearchHint', 'Clear search and filters to show all environments in this system.')}
+          >
+            <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
+          </EmptyState>
         {:else}
           <div class="manager-environments-table" role="table" aria-label={text('FABRICATE.Admin.Manager.Environment.TableShort', 'Environments')}>
             <div class="manager-table-head manager-environment-table-head" role="row">
@@ -1143,13 +1138,12 @@
       role="tabpanel"
       aria-labelledby={`manager-gathering-nav-${activeGatheringTab}`}
     >
-      <div class="manager-empty manager-gathering-placeholder">
-        <div>
-          <i class={activeTab?.icon || 'fas fa-seedling'} aria-hidden="true"></i>
-          <h3>{text(activeTab?.titleKey, activeTab?.titleFallback || '')}</h3>
-          <p>{text(activeTab?.hintKey, activeTab?.hintFallback || '')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon={activeTab?.icon || 'fas fa-seedling'}
+        title={text(activeTab?.titleKey, activeTab?.titleFallback || '')}
+        hint={text(activeTab?.hintKey, activeTab?.hintFallback || '')}
+        contextClass="manager-gathering-placeholder"
+      />
     </div>
   {/if}
 </main>

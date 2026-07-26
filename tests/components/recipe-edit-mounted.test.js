@@ -55,6 +55,9 @@ const RAW_MODULES = [
 
 // The new tab + section components the editor shell composes.
 const RECIPE_COMPILED = [
+  // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+  // the harness omits HANGS the suite (# cancelled) rather than failing it.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   // The Results tab's progressive reorder-permission card (issue 651). A component the

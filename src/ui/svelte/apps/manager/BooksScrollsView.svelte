@@ -20,7 +20,6 @@
   Props:
    - recipeItems: projected recipe items ({ id, resolvedName, resolvedImg,
      derivedType, enabled, caps, recipes, learnedByCount, linkMissing }).
-   - selectedSystemName: the system's display name (kicker).
    - visibilityMode: 'item' | 'knowledge' — chooses the use vs learning chip.
    - selectedRecipeItemId: the row currently open in the inspector.
    - onSelectRecipeItem(id): select a row (opens the inspector).
@@ -38,6 +37,7 @@
   recipe-item Overview tab use) and hands it upstream to create + link the definition.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
@@ -45,7 +45,6 @@
 
   let {
     recipeItems = [],
-    selectedSystemName = '',
     visibilityMode = 'knowledge',
     selectedRecipeItemId = '',
     onSelectRecipeItem = () => {},
@@ -98,6 +97,22 @@
     if (count === 0) return text('FABRICATE.Admin.Manager.BooksScrolls.NoRecipes', 'No recipes');
     if (count === 1) return text('FABRICATE.Admin.Manager.BooksScrolls.OneRecipe', '1 recipe');
     return text('FABRICATE.Admin.Manager.BooksScrolls.RecipeCount', '{n} recipes').replace('{n}', count);
+  }
+
+  // The type pill names the kind AND, for a multi-recipe item, how many recipes it
+  // holds ("3 Recipe Book"), matching the Knowledge surface so one recipe item is not
+  // described two different ways on two screens. `derivedType` stays the bare enum
+  // because the type FILTER above builds its options from those values.
+  function typePillLabel(item) {
+    const count = recipeCount(item);
+    if (count >= 2) {
+      return text(
+        'FABRICATE.Admin.Manager.BooksScrolls.TypeRecipeBook',
+        '{count} Recipe Book'
+      ).replace('{count}', count);
+    }
+    if (count === 1) return text('FABRICATE.Admin.Manager.BooksScrolls.TypeScroll', 'Scroll');
+    return text('FABRICATE.Admin.Manager.BooksScrolls.TypeIncomplete', 'Incomplete');
   }
 
   // Use cap chip (item visibility mode). Reads the new `caps.item` shape; falls
@@ -197,14 +212,10 @@
 </script>
 
 <main class="manager-main manager-books-scrolls-main" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls')} data-books-scrolls>
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.BooksScrolls.Library', 'Books & Scrolls')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.BooksScrolls.LibraryHint', 'Recipe items that grant recipes when read. Set their contents, uses and learning limits.')}</p>
-    </div>
-  </section>
-
+  <!-- No per-view page header: the shell's `.manager-header` already renders the system
+       kicker, the "Books & Scrolls" title and a subtitle, so a second one restated the
+       title inside the panel. Removed for the same reason as the components and recipes
+       libraries (issue 676). -->
   <section
     class={`manager-books-scrolls-drop-zone ${dropError ? 'is-error' : ''}`}
     data-books-scrolls-drop-zone
@@ -259,22 +270,21 @@
 
   <section class="manager-table-scroll manager-books-scrolls-scroll" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Table', 'Recipe items')}>
     {#if (recipeItems || []).length === 0}
-      <div class="manager-empty" data-books-scrolls-empty>
-        <div>
-          <i class="fas fa-book-sparkles" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyHint', 'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-book-sparkles"
+        title={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}
+        hint={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyHint', 'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.')}
+        dataAttr="data-books-scrolls-empty"
+      />
     {:else if filteredItems.length === 0}
-      <div class="manager-empty" data-books-scrolls-empty-filtered>
-        <div>
-          <i class="fas fa-filter" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterTitle', 'No recipe items match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint', 'Clear the filters to show every recipe item in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-filter"
+        title={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterTitle', 'No recipe items match these filters')}
+        hint={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint', 'Clear the filters to show every recipe item in this system.')}
+        dataAttr="data-books-scrolls-empty-filtered"
+      >
+        <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+      </EmptyState>
     {:else}
       <div class="manager-books-scrolls-list" role="list">
         <div class="manager-books-scrolls-head" aria-hidden="true">
@@ -299,7 +309,7 @@
             >
               <img class="manager-books-scrolls-thumb" src={recipeItemImage(item)} alt="" />
               <span class="manager-books-scrolls-name" data-books-scrolls-name={item.id} title={item.resolvedName}>{item.resolvedName}</span>
-              <span class={`manager-chip manager-books-scrolls-type-pill ${recipeCount(item) === 0 ? 'is-danger' : 'is-neutral'}`} data-books-scrolls-type={item.id}>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+              <span class={`manager-chip manager-books-scrolls-type-pill ${recipeCount(item) === 0 ? 'is-danger' : 'is-neutral'}`} data-books-scrolls-type={item.id}>{typePillLabel(item)}</span>
               {#if item.linkMissing}
                 <span class="manager-chip is-danger manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
                   <i class="fas fa-link-slash" aria-hidden="true"></i>

@@ -43,6 +43,9 @@ const harness = createMountedComponentHarness({
   // A `.svelte` the tree RENDERS but this list omits does not fail — it HANGS, and is
   // reported as `# cancelled`, never `# fail`.
   compiledModules: [
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     // The salvage result quantity + the progressive DC are the shared Stepper (issue

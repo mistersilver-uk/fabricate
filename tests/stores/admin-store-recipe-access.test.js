@@ -12,6 +12,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
+import {
+  createServices as createSharedServices,
+  makeSystem,
+} from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 
@@ -41,55 +45,16 @@ function makeRecipe(overrides = {}) {
   };
 }
 
-function makeSystem(overrides = {}) {
-  return {
-    id: 'sys1',
-    name: 'System One',
-    description: '',
-    resolutionMode: 'simple',
-    visibilityMode: 'restricted',
-    features: {},
-    categories: [],
-    itemTags: [],
-    essenceDefinitions: [],
-    items: [],
-    requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
-    craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
-    recipeVisibility: { listMode: 'global' },
-    recipeItemDefinitions: [],
-    ...overrides,
-  };
-}
-
+// The Access suite's system differs from the shared default in exactly one field, and
+// its services differ in none — so both come from the shared factory rather than a
+// second copy of the same thirty lines.
 function createServices(recipes, capture, extra = {}) {
-  const systems = [makeSystem()];
-  const systemManager = {
-    getSystems: () => systems,
-    getSystem: (id) => systems.find((s) => s.id === id) || null,
-    getItems: () => [],
-  };
-  const recipeManager = {
-    getRecipes: (filter) =>
-      filter?.craftingSystemId
-        ? recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId)
-        : recipes,
-    getRecipe: (id) => recipes.find((r) => r.id === id) || null,
-    updateRecipe: async (id, updates, options) => {
-      capture.push({ id, updates, options });
-    },
-  };
-  return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
-    getCraftingSystemManager: () => systemManager,
-    getRecipeManager: () => recipeManager,
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
-    localize: (key) => key,
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
-    ...extra,
-  };
+  return createSharedServices(
+    makeSystem({ visibilityMode: 'restricted' }),
+    recipes,
+    capture,
+    extra
+  );
 }
 
 function recipeById(vs, id) {

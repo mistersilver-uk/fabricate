@@ -45,6 +45,12 @@ globalThis.game = { actors: [] };
 // ---------------------------------------------------------------------------
 
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
+// The Knowledge projection's `spent` predicate, imported HERE so the two can be driven
+// over the same axes and required to agree (issue 785). It is a pure module and takes
+// no Foundry globals, so the deferred import above does not apply to it.
+const { isRecipeItemSpent } = await import(
+  '../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js'
+);
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -3774,3 +3780,465 @@ test('773 forgetLearnedRecipes no-ops for an actor without update()', async () =
   const result = await service.forgetLearnedRecipes({ getFlag: () => ({}) }, ['r-a']);
   assert.deepEqual(result, { success: false, count: 0 });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 785 — item-anchored use expenditure.
+//
+// `_applyRecipeItemUse(item, itemCaps)` is the SINGLE decision point for the use
+// increment, the exhaustion test and the `whenSpent` disposal, shared by the
+// recipe-driven craft path (`applyRecipeItemUseOnCraft`) and the GM-driven
+// Knowledge surface (`expendRecipeItemUse`).
+// ---------------------------------------------------------------------------
+
+const OWNED_COPY_ID = 'owned-copy-1';
+const OWNED_COPY_UUID = `Actor.a1.Item.${OWNED_COPY_ID}`;
+
+// One owned-copy builder for every 785 case: the seeded `recipeItemUsage` flag is the
+// only axis that varies. `FakeItem` carries no `id`, but the GM path resolves by
+// DOCUMENT ID, so one is attached here.
+function buildOwnedCopy({ id = OWNED_COPY_ID, usage = null } = {}) {
+  const item = new FakeItem({
+    uuid: `Actor.a1.Item.${id}`,
+    name: 'Tome of Testing',
+    flagsArg: usage ? { fabricate: { recipeItemUsage: usage } } : {},
+  });
+  item.id = id;
+  return item;
+}
+
+// Every payload the service handed to `setFlag` for the usage flag, in order. The
+// PAYLOAD is the assertable surface: `FakeDocument.setFlag` replaces via
+// `setPathValue` and is merge-blind, whereas real Foundry recursively merges an
+// `ObjectField`, so a `getFlag` read-back asserts the OPPOSITE of real behaviour
+// for any key the payload omits.
+function usageWrites(item) {
+  return item.setFlagCalls
+    .filter((call) => call.key === 'fabricate.recipeItemUsage')
+    .map((call) => call.value);
+}
+
+function learnCountWrites(item) {
+  return item.setFlagCalls.filter((call) => call.key === 'fabricate.recipeItemLearning');
+}
+
+// A definition as the Knowledge surface hands it over: caps only, no recipe.
+function buildUseCapDefinition(itemCaps = {}) {
+  return { id: 'book', originItemUuid: 'recipe-item-uuid', caps: { item: itemCaps, learn: {} } };
+}
+
+const APPLY_USE_CASES = [
+  {
+    name: 'uncapped — no write at all',
+    itemCaps: { limitUses: false, maxUses: 3, whenSpent: 'destroyed' },
+    usage: { timesUsed: 1 },
+    expectedWrites: [],
+    expectedDeletes: 0,
+  },
+  {
+    name: 'tracked increment below the cap',
+    itemCaps: { limitUses: true, maxUses: 3, whenSpent: 'destroyed' },
+    usage: { timesUsed: 1 },
+    expectedWrites: [{ timesUsed: 2 }],
+    expectedDeletes: 0,
+  },
+  {
+    name: "exhausted + 'inert' — flagged, kept",
+    itemCaps: { limitUses: true, maxUses: 2, whenSpent: 'inert' },
+    usage: { timesUsed: 1 },
+    expectedWrites: [{ timesUsed: 2, inert: true }],
+    expectedDeletes: 0,
+  },
+  {
+    name: "exhausted + 'destroyed' — usage written, then deleted",
+    itemCaps: { limitUses: true, maxUses: 2, whenSpent: 'destroyed' },
+    usage: { timesUsed: 1 },
+    expectedWrites: [{ timesUsed: 2 }],
+    expectedDeletes: 1,
+  },
+  {
+    // The GM path has no `_filterNonExhausted` pre-filter, so the core owns the
+    // already-spent refusal itself. Without it a stale row would drive one further
+    // increment and, under `whenSpent: 'destroyed'`, silently delete a player's book
+    // while reporting success.
+    name: 'already spent — no write, no delete',
+    itemCaps: { limitUses: true, maxUses: 5, whenSpent: 'destroyed' },
+    usage: { timesUsed: 5 },
+    expectedWrites: [],
+    expectedDeletes: 0,
+  },
+  {
+    name: 'over-spent — no write, no delete',
+    itemCaps: { limitUses: true, maxUses: 2, whenSpent: 'destroyed' },
+    usage: { timesUsed: 9 },
+    expectedWrites: [],
+    expectedDeletes: 0,
+  },
+  {
+    // A corrupt truthy non-numeric count. The craft path double-coerced
+    // (`Number(selected.timesUsed || 0) + 1` over an already-coerced value), so this
+    // has always produced 1; a single coercion would write `null`, force `exhausted`
+    // false, and make the `whenSpent` disposal branch unreachable for the copy.
+    name: 'corrupt non-numeric timesUsed coerces to zero, not NaN',
+    itemCaps: { limitUses: true, maxUses: 3, whenSpent: 'destroyed' },
+    usage: { timesUsed: 'abc' },
+    expectedWrites: [{ timesUsed: 1 }],
+    expectedDeletes: 0,
+  },
+  {
+    // The fifth (inert-but-not-spent) state: `_filterNonExhausted` reads `timesUsed`
+    // only, so this copy still has charges and is expendable. The write MUST carry
+    // `timesUsed` alone — Foundry's recursive ObjectField merge is then what
+    // preserves the pre-existing `inert: true`.
+    name: 'inert-but-not-spent — the write omits `inert` so the real merge preserves it',
+    itemCaps: { limitUses: true, maxUses: 5, whenSpent: 'inert' },
+    usage: { timesUsed: 1, inert: true },
+    expectedWrites: [{ timesUsed: 2 }],
+    expectedDeletes: 0,
+    expectNoInertKey: true,
+  },
+];
+
+for (const useCase of APPLY_USE_CASES) {
+  test(`785 _applyRecipeItemUse — ${useCase.name}`, async () => {
+    const service = buildService();
+    const item = buildOwnedCopy({ usage: useCase.usage });
+
+    await service._applyRecipeItemUse(item, service._capsForDefinition(
+      buildUseCapDefinition(useCase.itemCaps)
+    ).item);
+
+    assert.deepEqual(usageWrites(item), useCase.expectedWrites);
+    assert.equal(item.deleteCount, useCase.expectedDeletes);
+    if (useCase.expectNoInertKey) {
+      assert.ok(
+        !('inert' in usageWrites(item)[0]),
+        'the payload must omit `inert` entirely; the real ObjectField merge preserves it'
+      );
+    }
+  });
+}
+
+test('785 _capsForDefinition folds the legacy cap fields and treats a missing definition as uncapped', () => {
+  const service = buildService();
+
+  const legacy = service._capsForDefinition({
+    caps: {
+      item: { limitUses: true, maxUses: 2, destroyWhenExhausted: true },
+      learn: { limitRecipes: true, maxRecipes: 3, learningMode: 'party' },
+    },
+  });
+  assert.equal(legacy.item.whenSpent, 'destroyed', 'destroyWhenExhausted folds into whenSpent');
+  assert.equal(legacy.learn.limitLearning, true, 'limitRecipes folds into limitLearning');
+  assert.equal(legacy.learn.learnScope, 'total', "learningMode 'party' folds into learnScope");
+
+  assert.equal(service._capsForDefinition(null).item.limitUses, false, 'no definition is uncapped');
+  assert.equal(service._capsForDefinition(undefined).item.limitUses, false);
+});
+
+test('785 expendRecipeItemUse resolves the copy by DOCUMENT ID, not uuid', async () => {
+  const service = buildService();
+  const item = buildOwnedCopy({ usage: { timesUsed: 0 } });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+
+  // The uuid is NOT an accepted key — passing it resolves nothing.
+  const byUuid = await service.expendRecipeItemUse(
+    actor,
+    OWNED_COPY_UUID,
+    buildUseCapDefinition({ limitUses: true, maxUses: 3 })
+  );
+  assert.equal(byUuid.success, false);
+  assert.deepEqual(usageWrites(item), [], 'a uuid key writes nothing');
+
+  const byId = await service.expendRecipeItemUse(
+    actor,
+    OWNED_COPY_ID,
+    buildUseCapDefinition({ limitUses: true, maxUses: 3 })
+  );
+  assert.equal(byId.success, true);
+  assert.deepEqual(usageWrites(item), [{ timesUsed: 1 }]);
+});
+
+test('785 expendRecipeItemUse resolves through an EmbeddedCollection-shaped `actor.items`', async () => {
+  const service = buildService();
+  const item = buildOwnedCopy({ usage: { timesUsed: 0 } });
+  const owned = [item];
+  const actor = new FakeActor({ id: 'a1', items: [] });
+  // Real Foundry hands back an EmbeddedCollection whose `get` is the canonical lookup.
+  actor.items = {
+    get: (id) => owned.find((entry) => String(entry.id) === String(id)) || null,
+    [Symbol.iterator]: () => owned[Symbol.iterator](),
+  };
+
+  const result = await service.expendRecipeItemUse(
+    actor,
+    OWNED_COPY_ID,
+    buildUseCapDefinition({ limitUses: true, maxUses: 3 })
+  );
+
+  assert.equal(result.success, true);
+  assert.deepEqual(usageWrites(item), [{ timesUsed: 1 }]);
+});
+
+test('785 expendRecipeItemUse returns { success: false } for a vanished copy rather than throwing', async () => {
+  const service = buildService();
+  const definition = buildUseCapDefinition({ limitUses: true, maxUses: 3 });
+  const emptyActor = new FakeActor({ id: 'a1', items: [] });
+
+  const missing = await service.expendRecipeItemUse(emptyActor, OWNED_COPY_ID, definition);
+  assert.equal(missing.success, false);
+  assert.equal(missing.message, 'FABRICATE.Knowledge.Manage.NoItem');
+
+  // A caller that expects the result shape must never see a throw, whatever vanished.
+  for (const [label, actor] of [
+    ['a null actor', null],
+    ['an actor with no items', { id: 'a1' }],
+  ]) {
+    const result = await service.expendRecipeItemUse(actor, OWNED_COPY_ID, definition);
+    assert.equal(result.success, false, `${label} returns a result shape`);
+  }
+});
+
+test('785 expendRecipeItemUse applies NO visibility-mode or knowledge-mode gate (the GM named the copy)', async () => {
+  // No crafting system is registered at all and no recipe is involved: the GM path
+  // consults neither, so an engine gate would be impossible to satisfy here.
+  const service = buildService({ system: null });
+  const item = buildOwnedCopy({ usage: { timesUsed: 1 } });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+
+  const result = await service.expendRecipeItemUse(
+    actor,
+    OWNED_COPY_ID,
+    // Legacy caps ONLY — proof the caps route through `_getRecipeItemCaps`, since a
+    // raw `definition.caps.item.whenSpent` read is `undefined` and would not delete.
+    buildUseCapDefinition({ limitUses: true, maxUses: 2, destroyWhenExhausted: true })
+  );
+
+  assert.equal(result.success, true);
+  assert.deepEqual(usageWrites(item), [{ timesUsed: 2 }]);
+  assert.equal(item.deleteCount, 1, 'the legacy destroy cap disposes the copy');
+});
+
+test('785 expendRecipeItemUse writes NOTHING for an uncapped copy', async () => {
+  const service = buildService();
+  const item = buildOwnedCopy({ usage: { timesUsed: 1 } });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+
+  const result = await service.expendRecipeItemUse(
+    actor,
+    OWNED_COPY_ID,
+    buildUseCapDefinition({ limitUses: false, maxUses: 3 })
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.Manage.NoLimitedUses');
+  assert.deepEqual(item.setFlagCalls, [], 'zero writes of any kind');
+  assert.equal(item.deleteCount, 0);
+});
+
+test('785 expendRecipeItemUse writes NOTHING for an ALREADY-SPENT copy and says so distinctly', async () => {
+  // The GM path is the one with no `_filterNonExhausted` pre-filter, so a stale row
+  // (async re-projection, a second GM window, a macro spending the last charge) is
+  // reachable here and MUST NOT destroy the copy while reporting success.
+  const service = buildService();
+  const item = buildOwnedCopy({ usage: { timesUsed: 5 } });
+  const actor = new FakeActor({ id: 'a1', items: [item] });
+
+  const result = await service.expendRecipeItemUse(
+    actor,
+    OWNED_COPY_ID,
+    buildUseCapDefinition({ limitUses: true, maxUses: 5, whenSpent: 'destroyed' })
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(
+    result.message,
+    'FABRICATE.Knowledge.Manage.AlreadySpent',
+    'a spent copy is a different fact from an uncapped one and must read differently'
+  );
+  assert.deepEqual(item.setFlagCalls, [], 'zero writes of any kind');
+  assert.equal(item.deleteCount, 0, 'the copy survives');
+});
+
+// --- spent-predicate parity between the engine and the projection ----------
+//
+// `knowledgeStudio.isRecipeItemSpent` is a hand-written mirror of
+// `_filterNonExhausted`. A hand transcription is only as good as its last edit, so
+// the two are driven over the SAME generated axes here and required to agree. A
+// divergence would let a row claim a copy is spent while the runtime still grants
+// craftability from it — or the reverse, offering Expend on a dead copy.
+test('785 the projection\'s `spent` is the exact complement of `_filterNonExhausted`', () => {
+  const service = buildService();
+  const limitUsesAxis = [true, false, undefined];
+  const maxUsesAxis = [0, -1, 1, 3, '3', undefined, null, Number.NaN, Number.POSITIVE_INFINITY];
+  const timesUsedAxis = [undefined, null, 0, -1, 1, 3, 9, '3', 'abc', true];
+  let compared = 0;
+
+  for (const limitUses of limitUsesAxis) {
+    for (const maxUses of maxUsesAxis) {
+      for (const timesUsed of timesUsedAxis) {
+        const label = `limitUses=${String(limitUses)} maxUses=${String(maxUses)} timesUsed=${String(timesUsed)}`;
+        const definition = buildUseCapDefinition({ limitUses, maxUses });
+        const item = buildOwnedCopy({ usage: { timesUsed } });
+        // `_filterNonExhausted` anchors each candidate on the book that candidate IS,
+        // so pinning that resolution is what lets the axes reach the real predicate
+        // body unchanged. `_getRecipeItemCaps` reads `recipe` only to default the
+        // definition, so a null recipe is inert here.
+        service._matchDefinitionForItem = () => definition;
+        const engineSpent =
+          service._filterNonExhausted(null, [
+            { item, timesUsed: service._getRecipeItemUsage(item) },
+          ]).length === 0;
+        // The projection is handed the SEAM's shape: resolved caps plus the raw,
+        // un-coerced `timesUsed` straight off the usage flag.
+        const projectionSpent = isRecipeItemSpent({
+          ...service._capsForDefinition(definition).item,
+          timesUsed,
+        });
+        assert.equal(projectionSpent, engineSpent, label);
+        compared += 1;
+      }
+    }
+  }
+
+  assert.equal(compared, limitUsesAxis.length * maxUsesAxis.length * timesUsedAxis.length);
+});
+
+// --- craft-path extraction parity -----------------------------------------
+//
+// The craft path used to derive `nextUses` from `selected.timesUsed`, a value
+// snapshotted onto the candidate record by `_collectCandidateItems`; the extracted
+// core carries no candidate record and re-reads the usage flag itself. The two are
+// provably equal today (nothing awaits between collection and the write), so this
+// pins EQUIVALENCE — it must never be satisfied by threading the snapshot into the
+// core, which would carry the staleness window into the GM path. The pre-existing
+// AC4.4 / WHENSPENT.* / 705 craft tests are the byte-identical-behaviour guard.
+
+test('785 craft-path parity — the candidate snapshot equals the re-read, and the core does the write', async () => {
+  const system = buildWhenSpentSystem('inert', 5);
+  const recipe = buildMockRecipe({ recipeItemId: 'book', linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const item = new FakeItem({
+    uuid: 'recipe-item-uuid',
+    flagsArg: { fabricate: { recipeItemUsage: { timesUsed: 1 } } },
+  });
+  const craftingActor = new FakeActor({ id: 'a1', items: [item] });
+  const service = buildService({ system });
+
+  const selected = service._selectDeterministic(
+    service._filterNonExhausted(recipe, service._collectCandidateItems(recipe, craftingActor))
+  );
+  assert.equal(
+    selected.timesUsed,
+    service._getRecipeItemUsage(selected.item),
+    'the snapshotted candidate value and the independent re-read agree at write time'
+  );
+
+  const coreCalls = [];
+  const core = service._applyRecipeItemUse.bind(service);
+  service._applyRecipeItemUse = async (target, itemCaps) => {
+    coreCalls.push({ target, itemCaps });
+    return core(target, itemCaps);
+  };
+
+  await service.applyRecipeItemUseOnCraft({ recipe, craftingActor });
+
+  assert.equal(coreCalls.length, 1, 'the craft path routes its disposal branch through the core');
+  assert.equal(coreCalls[0].target, item, 'the core receives the SELECTED item');
+  assert.deepEqual(
+    coreCalls[0].itemCaps,
+    service._capsForDefinition(system.recipeItemDefinitions[0]).item,
+    "the core receives the SELECTED book's item caps"
+  );
+  assert.deepEqual(usageWrites(item), [{ timesUsed: 2 }]);
+  assert.equal(item.deleteCount, 0);
+});
+
+test('785 craft-path parity — the core re-reads the document, so a stale candidate snapshot cannot drive the write', async () => {
+  const service = buildService();
+  const item = buildOwnedCopy({ usage: { timesUsed: 1 } });
+  const itemCaps = service._capsForDefinition(
+    buildUseCapDefinition({ limitUses: true, maxUses: 5, whenSpent: 'inert' })
+  ).item;
+  // A candidate record snapshotted before an (imagined) interleaved write.
+  const staleCandidate = { item, timesUsed: 99 };
+
+  await service._applyRecipeItemUse(staleCandidate.item, itemCaps);
+
+  assert.deepEqual(
+    usageWrites(item),
+    [{ timesUsed: 2 }],
+    'the increment is against the document, never the stale snapshot (which would write 100)'
+  );
+});
+
+// --- D7 learn-budget cases reachable from the Knowledge surface ------------
+//
+// Erase frees a learn slot ONLY when the source copy is still owned;
+// `_freeLearnBudgetForEntry` early-returns on a falsy or dangling `sourceItemUuid`.
+// In every case the actor STILL holds the book, so an untouched per-copy counter is
+// a real negative rather than an absent-document artefact.
+
+const HELD_BOOK_UUID = 'Actor.a1.Item.book';
+
+const D7_BUDGET_CASES = [
+  {
+    name: 'a still-owned source copy frees its per-copy slot',
+    sourceItemUuid: HELD_BOOK_UUID,
+    expectedLearnCount: 0,
+    expectedLearnCountWrites: 1,
+  },
+  {
+    name: 'a dangling sourceItemUuid frees nothing',
+    sourceItemUuid: 'Actor.gone.Item.book',
+    expectedLearnCount: 1,
+    expectedLearnCountWrites: 0,
+  },
+  {
+    name: 'a null sourceItemUuid (auto-learn) frees nothing',
+    sourceItemUuid: null,
+    expectedLearnCount: 1,
+    expectedLearnCountWrites: 0,
+  },
+];
+
+for (const budgetCase of D7_BUDGET_CASES) {
+  test(`785 D7 erase budget — ${budgetCase.name}`, async () => {
+    const system = buildLearnModeSystem({
+      learningMode: 'once',
+      learnScope: 'perInstance',
+      learnsAllowed: 1,
+    });
+    const recipe = buildCappedRecipe({ id: 'r-a' });
+    const pool = makeDecrementablePartyPool({ 'system-1::book': 1 });
+    const book = new FakeItem({
+      uuid: HELD_BOOK_UUID,
+      sourceId: 'Compendium.world.items.book',
+      flagsArg: { fabricate: { recipeItemLearning: { learnedCount: 1 } } },
+    });
+    const recipeManager = {
+      getRecipes: () => [recipe],
+      getRecipe: (id) => (id === 'r-a' ? recipe : null),
+    };
+    const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, pool);
+    const actor = seedLearnedActor(
+      { 'r-a': { learnedAt: 1, sourceItemUuid: budgetCase.sourceItemUuid } },
+      {},
+      [book]
+    );
+
+    // The exact options object the Knowledge surface's per-row erase passes.
+    const result = await service.forgetLearnedRecipes(actor, ['r-a'], {
+      freeLearnBudget: true,
+      clearDiscovery: false,
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.count, 1, 'the learned entry is erased in every case');
+    assert.equal(service._getRecipeItemLearnCount(book), budgetCase.expectedLearnCount);
+    assert.equal(
+      learnCountWrites(book).length,
+      budgetCase.expectedLearnCountWrites,
+      'budget freeing is asserted at the payload level, not by a read-back'
+    );
+    assert.deepEqual(pool.decrements, [], 'a perInstance book never touches the shared pool');
+  });
+}

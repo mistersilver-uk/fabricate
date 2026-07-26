@@ -12,6 +12,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
+import { makeSystem } from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 
@@ -42,24 +43,9 @@ function makeRecipe(overrides = {}) {
 }
 
 function createServices({ recipes, system = {}, updateRecipe, notify }) {
-  const systems = [
-    {
-      id: 'sys1',
-      name: 'System One',
-      description: '',
-      resolutionMode: 'simple',
-      features: {},
-      categories: [],
-      itemTags: [],
-      essenceDefinitions: [],
-      items: [],
-      requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
-      craftingCheck: {},
-      recipeVisibility: { listMode: 'global' },
-      recipeItemDefinitions: [],
-      ...system,
-    },
-  ];
+  // The shared factory, with this suite's only two departures from it stated
+  // explicitly rather than re-listing the other twelve fields.
+  const systems = [makeSystem({ visibilityMode: undefined, craftingCheck: {}, ...system })];
   return {
     getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
     setSetting: async () => {},

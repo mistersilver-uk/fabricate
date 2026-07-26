@@ -117,6 +117,9 @@ describe('CompositionList mounted layout', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-composition-list-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
     for (const component of [
+      // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+      // the harness omits HANGS the suite (# cancelled) rather than failing it.
+      'src/ui/svelte/apps/manager/EmptyState.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',

@@ -21,6 +21,7 @@
   item regardless of Foundry item type, so no kind chip is rendered.
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
 
@@ -134,13 +135,18 @@
         {/each}
       </ul>
     {:else}
-      <!-- The tab's OWN empty primitive (`.manager-recipe-section-empty`), the one the
-           Results/Ingredients tabs use — not the rail's medallion card, which was a
-           300px-column surface. -->
-      <div class="manager-recipe-section-empty" data-recipe-item-empty>
-        <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.EmptyTitle', 'Not in any book or scroll')}</p>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.AppearsInEmpty', 'Not in any book or scroll yet.')}</p>
-      </div>
+      <!-- The shared no-state primitive at the sidebar/inline scale, replacing this
+           tab's own `.manager-recipe-section-empty` panel. `manager-recipe-tab-empty`
+           keeps the container concern (issue 796: a full-width, UNCAPPED panel) in the
+           global sheet, where an ancestor-reached rule can live. -->
+      <EmptyState
+        compact
+        icon="fas fa-book"
+        title={text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.EmptyTitle', 'Not in any book or scroll')}
+        hint={text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.AppearsInEmpty', 'Not in any book or scroll yet.')}
+        contextClass="manager-recipe-tab-empty"
+        dataAttr="data-recipe-item-empty"
+      />
     {/if}
 
     <button type="button" class="manager-button manager-recipe-tab-action" data-recipe-open-books onclick={() => onOpenBooksScrolls()}>
@@ -246,11 +252,6 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--fab-space-1);
-  }
-
-  /* Full-width dashed empty panel, split out of the old shared cap rule. */
-  .manager-recipe-section-empty {
-    width: 100%;
   }
 
   /* The shared rule sets `margin: 0 0 var(--fab-space-2)`, but the body already spaces the

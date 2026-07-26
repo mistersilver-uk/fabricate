@@ -17,6 +17,7 @@
   the legacy `.manager-travel-party-*` rules from the superseded travel view.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmOverridePicker from './RealmOverridePicker.svelte';
@@ -118,11 +119,14 @@
   </section>
 
   {#if filteredParties.length === 0}
-    <p class="manager-muted manager-travel-parties-empty">
-      {parties.length === 0
+    <EmptyState
+      compact
+      icon={parties.length === 0 ? 'fas fa-users' : 'fas fa-magnifying-glass'}
+      title={parties.length === 0
         ? text('FABRICATE.Admin.Manager.Travel.Parties.Empty', 'No parties yet.')
         : text('FABRICATE.Admin.Manager.Travel.Parties.NoMatches', 'No parties match your search.')}
-    </p>
+      dataAttr="data-travel-parties-empty"
+    />
   {:else}
     <div class="manager-travel-parties-list" role="list">
       {#each pagedParties as party (party.id)}

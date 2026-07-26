@@ -78,6 +78,9 @@ describe('GatheringTravelView mounted behavior', () => {
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
     writeRawModule('src/ui/svelte/util/gatheringFormat.js');
     writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmQuickList.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringTravelView.svelte.js')).href);

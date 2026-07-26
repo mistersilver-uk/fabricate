@@ -1649,6 +1649,9 @@ Requirements:
 1. `recipeId` must reference a valid recipe.
 2. `learnedAt` must be a valid timestamp.
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
+   It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and the craft-time auto-learn path writes it as `null`.
+4. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is the doubly nested `flags.fabricate.fabricate.learnedRecipes` (the flag helpers prefix `fabricate.`), so it is never read via a raw single-nested `actor.flags.fabricate.learnedRecipes` path.
+   A reader using the raw path finds nothing in a real world and silently reports zero.
 
 ### Alchemy Dead-Ends Flag
 
@@ -1833,6 +1836,7 @@ Tracks how many time an owned item granting knowledge of a recipe has been used 
 ```js
 Item.flags.fabricate.recipeItemUsage = {
   timesUsed: number,
+  inert?: boolean,
 };
 ```
 
@@ -1842,7 +1846,12 @@ Requirements:
 2. Usage is tracked per owned item instance.
 3. Maximum uses is configured per recipe item in `RecipeItemDefinition.caps.item.maxUses` (enabled by `caps.item.limitUses`), resolved from the recipe's linked definition.
 4. When `timesUsed >= maxUses`, the item is exhausted.
-5. If `caps.item.destroyWhenExhausted` is true, the item is destroyed when exhausted.
+5. On exhaustion the resolved `caps.item.whenSpent` decides disposal: `"destroyed"` deletes the item, `"inert"` (the default) keeps it and sets `inert: true` alongside the `timesUsed` write.
+   The legacy `caps.item.destroyWhenExhausted === true` is the derivation for `whenSpent: "destroyed"`; absent or false derives `"inert"`.
+6. `inert` is a **record** of the exhaustion event, **not a craftability gate**.
+   Item-based access is filtered on `timesUsed >= maxUses` alone and never reads `inert`, so after a GM raises `maxUses` a copy may be `inert: true` and still grant craftability.
+7. No Fabricate writer ever clears the flag — a merge write cannot remove a key, so it is sticky until something explicitly deletes it.
+   A GM clears it via the Foundry item flag editor or a future repair flow, mirroring the Tool Broken Flag's escape hatch but **not** its gate semantics: `toolBroken` _is_ a gate, `inert` is not.
 
 ### Recipe Item Learning Flag
 
@@ -1865,6 +1874,9 @@ Requirements:
 6. If `caps.learn.destroyWhenSpent` is true, the recipe item is destroyed when its budget is spent.
 7. This counter is independent of `recipeItemUsage.timesUsed` (craft-charges); the two are never conflated.
 8. When `caps.learn.learnScope === "total"`, the learn budget is NOT this per-document counter but a single GM-authoritative shared world pool keyed `system::defId` (the recipe-item party learn pool); every actor's learns draw from that one budget.
+9. **Deleting the holding document releases no consumed learn budget and leaves `Actor.flags.fabricate.learnedRecipes` untouched.**
+   The counter dies with the document, so a `perInstance` budget is effectively discarded rather than refunded; a `total` pool key is not decremented at all, because the refund path resolves the pool key through a **still-held** source copy.
+   Erasing a learned entry before deleting its source copy reclaims the slot; deleting first never can.
 
 ### Tool Item Usage Flag
 

@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
     DEFAULT_GATHERING_EVENT_IMG,
@@ -54,6 +55,7 @@
   // globs for the component EDITOR's frames.
   import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
+  import KnowledgeView from './KnowledgeView.svelte';
   import CraftingSettingsView from './CraftingSettingsView.svelte';
   import AccessTabView from './AccessTabView.svelte';
   import GrantAccessInspector from './GrantAccessInspector.svelte';
@@ -1493,11 +1495,17 @@
   // active route via `resolveActiveCraftingTab`. The group is unconditional as of
   // issue 745 (v1.3 headline).
   const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
+  // The Knowledge surface's gate is wider than Books & Scrolls': it is also shown
+  // for an alchemy system under ANY visibility mode, because `learnRecipeOnCraft`
+  // writes learned recipes regardless and under `global` alchemy they are the sole
+  // reveal source (issue 785).
+  const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '');
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
   const craftingNavItems = $derived(
     buildCraftingNavItems({
       visibilityMode: craftingVisibilityMode,
+      resolutionMode: craftingResolutionMode,
       recipeCount,
       recipeItemCount,
     })
@@ -1510,6 +1518,18 @@
   );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
+  // The Knowledge surface's projection is published TOP-LEVEL, never hung off
+  // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
+  // reference rebuild on every knowledge publish and let a late phase-2 publish
+  // clobber freshly projected rows.
+  const knowledgeState = $derived($viewState.knowledge || null);
+  // Entering the surface arms the store's whole-world scan; leaving it makes
+  // `refreshKnowledge` a total no-op again and drops the cached snapshot. Without
+  // this gate the scan would have to join `refresh()`, which ~40 mutation paths
+  // call and which has no cheap invalidation signature for actors × items.
+  $effect(() => {
+    store.setKnowledgeActive?.(currentView === 'knowledge');
+  });
   // The recipe whose access grant is open on the Access surface.
   const selectedRecipeForAccess = $derived(
     ($viewState.recipes || []).find((recipe) => recipe.id === selectedRecipeIdForAccess) || null
@@ -2117,6 +2137,7 @@
     if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings');
     if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access');
     if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls');
+    if (currentView === 'knowledge') return text('FABRICATE.Admin.Manager.Knowledge.Title', 'Knowledge');
     if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Title', 'Components');
     if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
@@ -2144,6 +2165,7 @@
     if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsHint', 'System-level crafting rules: resolution mode and recipe visibility.');
     if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Subtitle', 'Grant individual recipes to specific characters or players.');
     if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Subtitle', 'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.');
+    if (currentView === 'knowledge') return text('FABRICATE.Admin.Manager.Knowledge.Subtitle', 'Audit and correct what each character carries and has learned in the selected crafting system.');
     if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditSubtitle', 'Link a world item and recipes, then set its use and learn caps.');
     if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
     if (currentView === 'component-edit' && componentForEdit) return componentEditSubtitle();
@@ -2201,6 +2223,7 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions', 'Travel and party actions');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
+    if (currentView === 'knowledge') return text('FABRICATE.Admin.Manager.Knowledge.Actions', 'Knowledge actions');
     if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
@@ -2537,7 +2560,7 @@
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'tool-edit' || view === 'checks') && !selectedSystem) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'tool-edit' || view === 'checks' || view === 'knowledge') && !selectedSystem) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
@@ -4682,6 +4705,12 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</span>
         {/if}
+        {#if currentView === 'knowledge'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Nav.Knowledge', 'Knowledge')}</span>
+        {/if}
         {#if currentView === 'recipe-item-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
@@ -4851,6 +4880,9 @@
         </button>
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
+      {:else if currentView === 'knowledge'}
+        <!-- The Knowledge surface's only actions are per-character: they live in the
+             detail-pane header, next to the character they act on. -->
       {:else if currentView === 'component-edit'}
         <ComponentEditorHeader
           dirty={componentEditCombinedDirty}
@@ -5572,13 +5604,11 @@
       />
       {:else}
         <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}>
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-boxes" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-boxes"
+            title={text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}
+            hint={text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}
+          />
         </main>
       {/if}
     {:else if currentView === 'components'}
@@ -5667,7 +5697,6 @@
     {:else if currentView === 'books-scrolls' && selectedSystem}
       <BooksScrollsView
         recipeItems={recipeItemDefinitions}
-        selectedSystemName={selectedSystem?.name || ''}
         visibilityMode={craftingVisibilityMode}
         {selectedRecipeItemId}
         onSelectRecipeItem={(id) => selectRecipeItem(id)}
@@ -5675,6 +5704,17 @@
         onDropRecipeItem={(uuid) => dropRecipeItem(uuid)}
         dropEnabled={!!selectedSystemId}
         onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
+      />
+    {:else if currentView === 'knowledge' && selectedSystem}
+      <KnowledgeView
+        knowledge={knowledgeState}
+        selectedSystemName={selectedSystem?.name || ''}
+        onSelectActor={(actorId) => store.selectKnowledgeActor?.(actorId)}
+        onExpend={(actorId, itemId) => store.expendRecipeItemUse?.(actorId, itemId)}
+        onDelete={(actorId, itemId) => store.deleteOwnedRecipeItem?.(actorId, itemId)}
+        onErase={(actorId, recipeId) => store.eraseLearnedRecipe?.(actorId, recipeId)}
+        onResetSystem={(actorId) => store.resetActorSystemKnowledge?.(actorId)}
+        onResetAll={(actorId) => store.resetActorAllKnowledge?.(actorId)}
       />
     {:else if currentView === 'recipe-item-edit' && selectedSystem}
       <RecipeItemEditor
@@ -5784,8 +5824,12 @@
          `recipe-edit` joined this list in issue 676, the same route `component-edit`
          took in decision 4: its context rail is deleted and its content became real
          tabs (Access, Books & Scrolls) and an Overview control (Step mode), so the
-         editor has nothing to put in a third column and the tabs take the width back. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit'}
+         editor has nothing to put in a third column and the tabs take the width back.
+
+         `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
+         its third column (roster · detail), so a fourth would clip the detail pane's
+         action cluster at the 1024px minimum with no scrollbar. -->
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
     <aside class="manager-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
@@ -6014,7 +6058,11 @@
                       </header>
                     </article>
                   {:else}
-                    <p class="manager-muted manager-condition-modifier-row-empty">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-sliders"
+                      title={text('FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}
+                    />
                   {/each}
                 </div>
               </section>
@@ -6119,7 +6167,11 @@
                     {/if}
                   </article>
                 {:else}
-                  <p class="manager-muted manager-character-modifier-row-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
+                  <EmptyState
+                    compact
+                    icon="fas fa-sliders"
+                    title={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}
+                  />
                 {/each}
               </div>
             </section>
@@ -6134,13 +6186,11 @@
             {/if}
 
           {:else}
-            <div class="manager-empty">
-              <div>
-                <i class="fas fa-list-check" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}</h3>
-                <p>{text('FABRICATE.Admin.Manager.Environment.Tasks.InspectorHint', 'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.')}</p>
-              </div>
-            </div>
+            <EmptyState
+              icon="fas fa-list-check"
+              title={text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}
+              hint={text('FABRICATE.Admin.Manager.Environment.Tasks.InspectorHint', 'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.')}
+            />
           {/if}
         {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
           {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
@@ -6323,7 +6373,11 @@
                       {/if}
                     </article>
                   {:else}
-                    <p class="manager-muted manager-character-modifier-row-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-sliders"
+                      title={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}
+                    />
                   {/each}
                 </div>
               </section>
@@ -6395,13 +6449,11 @@
               {/if}
             </section>
           {:else if currentView !== 'gathering-event-edit'}
-            <div class="manager-empty">
-              <div>
-                <i class="fas fa-masks-theater" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select a gathering event')}</h3>
-                <p>{text('FABRICATE.Admin.Manager.Environment.Events.InspectorHint', 'The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.')}</p>
-              </div>
-            </div>
+            <EmptyState
+              icon="fas fa-masks-theater"
+              title={text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select a gathering event')}
+              hint={text('FABRICATE.Admin.Manager.Environment.Events.InspectorHint', 'The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.')}
+            />
           {/if}
         {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
           <section class="manager-inspector-card manager-gathering-rules-card" data-gathering-inspector-rules>
@@ -6889,13 +6941,11 @@
             </div>
           </section>
         {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-seedling" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Environment.InspectorHint', 'The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-seedling"
+            title={text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}
+            hint={text('FABRICATE.Admin.Manager.Environment.InspectorHint', 'The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.')}
+          />
         {/if}
       {:else if currentView === 'essences' || currentView === 'essence-edit'}
         {#if selectedEssenceForInspector}
@@ -7022,19 +7072,17 @@
             </div>
           </section>
         {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-              <h3>{currentView === 'essence-edit'
-                ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
-                : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}</h3>
-              <p>{currentView === 'essence-edit'
-                ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorHint', 'The inspector will show the essence ID after the draft is saved.')
-                : showEssenceSourceUi
-                ? text('FABRICATE.Admin.Manager.Essence.InspectorHint', 'The inspector shows source linkage and component usage for the selected essence.')
-                : text('FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint', 'The inspector shows identity and component usage for the selected essence.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-mortar-pestle"
+            title={currentView === 'essence-edit'
+              ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
+              : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}
+            hint={currentView === 'essence-edit'
+              ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorHint', 'The inspector will show the essence ID after the draft is saved.')
+              : showEssenceSourceUi
+              ? text('FABRICATE.Admin.Manager.Essence.InspectorHint', 'The inspector shows source linkage and component usage for the selected essence.')
+              : text('FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint', 'The inspector shows identity and component usage for the selected essence.')}
+          />
         {/if}
       {:else if currentView === 'components'}
         {#if selectedComponent}
@@ -7074,13 +7122,11 @@
             </div>
           </section>
         {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-boxes" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-boxes"
+            title={text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}
+            hint={text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.')}
+          />
         {/if}
       {:else if currentView === 'recipes'}
         <RecipeBrowserInspector
@@ -7242,13 +7288,11 @@
           </div>
         </section>
       {:else}
-        <div class="manager-empty">
-          <div>
-            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
-            <h3>{text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</h3>
-            <p>{text('FABRICATE.Admin.Manager.InspectorHint', 'The inspector shows counts, resolution mode, and enabled features for the selected system.')}</p>
-          </div>
-        </div>
+        <EmptyState
+          icon="fas fa-arrow-pointer"
+          title={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+          hint={text('FABRICATE.Admin.Manager.InspectorHint', 'The inspector shows counts, resolution mode, and enabled features for the selected system.')}
+        />
       {/if}
     </aside>
     {/if}
