@@ -17,6 +17,7 @@
    - armedToken, onExpend, onDelete, onArm, onDisarm.
 -->
 <script>
+  import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import KnowledgeOwnedCopyRow from './KnowledgeOwnedCopyRow.svelte';
@@ -38,22 +39,26 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <p class="manager-component-info-banner" data-knowledge-items-banner>
-    <i class="fas fa-circle-info" aria-hidden="true"></i>
-    <span>{text(
+  <!-- The permanent hint stays INFO on purpose. This tab also raises the conditional
+       party-pool hazard below, and a yellow permanent hint beside a yellow conditional one
+       spends the colour that is supposed to make the hazard stand out. -->
+  <Callout
+    text={text(
       'FABRICATE.Admin.Manager.Knowledge.RecipeItemsBanner',
       'Expending a use spends one charge as if the character read the item. Deleting removes the copy from their pack entirely.'
-    )}</span>
-  </p>
+    )}
+    dataAttr="data-knowledge-items-banner"
+  />
 
   {#if hasPartyPoolHazard}
-    <p class="manager-warning-band" data-knowledge-party-pool-warning>
-      <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{text(
+    <Callout
+      tone="warning"
+      text={text(
         'FABRICATE.Admin.Manager.Knowledge.PartyPoolWarning',
         'This character holds a party-pool copy. Erase the memory before deleting the copy — deleting the copy first strands its party-pool slot permanently.'
-      )}</span>
-    </p>
+      )}
+      dataAttr="data-knowledge-party-pool-warning"
+    />
   {/if}
 
   {#if copies.length === 0}

@@ -13,6 +13,7 @@
    - armedToken, onErase, onArm, onDisarm.
 -->
 <script>
+  import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import KnowledgeLearnedRow from './KnowledgeLearnedRow.svelte';
@@ -32,13 +33,16 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <p class="manager-warning-band manager-knowledge-learned-band" data-knowledge-learned-banner>
-    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-    <span>{text(
+  <!-- The erase caveat is the standing statement of how this tab behaves, so it is INFO,
+       matching the sibling tab's permanent hint. It is not a conditional hazard: nothing
+       is at risk until the GM arms a row, and that row raises its own confirmation. -->
+  <Callout
+    text={text(
       'FABRICATE.Admin.Manager.Knowledge.LearnedBanner',
       'Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.'
-    )}</span>
-  </p>
+    )}
+    dataAttr="data-knowledge-learned-banner"
+  />
 
   {#if learnedRecipes.length === 0}
     <EmptyState
