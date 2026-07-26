@@ -6852,6 +6852,70 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('leaves General out of the list until the first custom category exists, and explains it in the empty state (issue 878)', async () => {
+    // With no GM-defined categories the reserved row was the only thing in the list: a
+    // row that cannot be renamed, deleted or re-iconed, standing where the onboarding
+    // guidance belongs. It is now withheld until there is a custom entry beside it, and
+    // the empty-state card carries the explanation instead. General is still COUNTED —
+    // the card is what accounts for the 1 the counters report.
+    await openTagsScreen([], {
+      selectedSystemOverrides: { categories: [], componentCategories: [] },
+    });
+
+    assert.equal(
+      target.querySelector('[data-category-id]'),
+      null,
+      'no rows at all render for an empty recipe-category vocabulary, General included'
+    );
+    assert.deepEqual(
+      vocabularyCounters('recipe', 'recipe-categories'),
+      { tabBadge: '1', glanceTile: '1', entryChip: '1 entry' },
+      'General is counted even while it is not listed, and the chip reads as a singular'
+    );
+
+    const emptyPanel = target.querySelector('.manager-vocabulary-empty-panel');
+    assert.ok(emptyPanel, 'the empty-state card renders in place of the reserved row');
+    assert.ok(
+      emptyPanel.textContent.includes('Only General so far'),
+      'the card names General, so the counters reading 1 have a visible referent'
+    );
+    assert.ok(
+      emptyPanel.textContent.includes('Every recipe falls under General until you add one.'),
+      'the card explains what General does rather than merely naming it'
+    );
+    assert.ok(
+      !emptyPanel.classList.contains('is-compact'),
+      'the card is the full panel now that it is the only thing in the list'
+    );
+
+    target.querySelector('[data-vocabulary-tab="component"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-component-category-id]'), null);
+    assert.deepEqual(
+      vocabularyCounters('component', 'component-categories'),
+      { tabBadge: '1', glanceTile: '1', entryChip: '1 entry' },
+      'the component vocabulary resolves the same way from its own reserved bucket'
+    );
+    assert.ok(
+      target
+        .querySelector('.manager-vocabulary-empty-panel')
+        .textContent.includes('Every component falls under General until you add one.'),
+      'the component card explains its own General, not the recipe one'
+    );
+
+    // Tags again as the control: an empty tag vocabulary has genuinely nothing, so it
+    // must count 0 rather than inheriting a reserved bucket it does not have.
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      vocabularyCounters('tag', 'item-tags'),
+      { tabBadge: '3', glanceTile: '3', entryChip: '3 entries' },
+      'suppressing a reserved row never touches the vocabulary that has none'
+    );
+  });
+
   it('picks a per-category icon from the searchable popover and delegates it to the store (issue 878)', async () => {
     const calls = [];
     target = document.createElement('div');

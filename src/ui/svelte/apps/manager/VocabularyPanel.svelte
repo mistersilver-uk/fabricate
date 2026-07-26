@@ -81,19 +81,37 @@
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filteredRows = $derived((rows || []).filter((row) => matchesSearch(row)));
   const hasQuery = $derived(Boolean(normalizedSearchTerm));
+  const customRowCount = $derived((rows || []).length);
   // The count is the whole vocabulary (custom rows plus the reserved General row),
   // independent of the search query — it reports the library size, not the filter.
-  const entryCount = $derived((rows || []).length + (lockedRow ? 1 : 0));
+  // General is counted even in the state where it is deliberately NOT listed (see
+  // `showLockedRow`), which is what keeps this chip, the tab badge and the inspector's
+  // at-a-glance tile reporting the same number (issue 878).
+  const entryCount = $derived(customRowCount + (lockedRow ? 1 : 0));
+  // A reserved vocabulary with no custom entries now sits at exactly one entry as its
+  // resting state, so "1 entries" stopped being a rare edge and became the first thing
+  // a GM reads on this screen. The singular follows the `UsageCountSingular` precedent
+  // directly above, and incidentally fixes the one-tag tag vocabulary too.
   const entriesLabel = $derived(
-    text('FABRICATE.Admin.Manager.TagsCategories.EntriesCount', '{count} entries').replace(
-      '{count}',
-      entryCount
-    )
+    entryCount === 1
+      ? text('FABRICATE.Admin.Manager.TagsCategories.EntriesCountSingular', '1 entry')
+      : text('FABRICATE.Admin.Manager.TagsCategories.EntriesCount', '{count} entries').replace(
+          '{count}',
+          entryCount
+        )
   );
+  // The reserved row exists to distinguish custom entries from the fallback bucket, so
+  // it only earns a slot once there is something to distinguish it FROM. With no
+  // GM-defined entries it was a lone immovable row that could not be renamed, deleted,
+  // re-iconed or acted on in any way, occupying the space where the onboarding guidance
+  // belongs — so below one custom entry the empty-state card names and explains General
+  // instead, and the row appears alongside the first category the GM adds (issue 878).
+  // Keyed on the UNFILTERED custom count: a search miss must not make General blink out.
+  const showLockedRow = $derived(Boolean(lockedRow) && customRowCount > 0);
   // A query with no surviving rows is a search miss; a genuinely empty vocabulary
   // (no custom rows and no query) is the onboarding state. They render differently.
   const showNoResults = $derived(hasQuery && filteredRows.length === 0);
-  const showEmpty = $derived(!hasQuery && (rows || []).length === 0);
+  const showEmpty = $derived(!hasQuery && customRowCount === 0);
   const lockedFallbackHint = $derived(
     lockedHint ||
       text(
@@ -183,7 +201,7 @@
   </div>
 
   <div class="manager-vocabulary-list">
-    {#if lockedRow}
+    {#if showLockedRow}
       <div class="manager-vocabulary-card is-locked" {...{ [rowAttr]: lockedRow.id }}>
         <div class="manager-vocabulary-row">
           <span class="manager-vocabulary-icon is-locked-icon" aria-hidden="true"
@@ -282,17 +300,18 @@
       />
     {:else if showEmpty}
       <!--
-        A vocabulary with a reserved row is NEVER empty: General is rendered directly
-        above this. Claiming "no categories" beneath a visible category row is a lie, so
-        the reserved case renders the COMPACT guidance variant ("Only General so far")
-        rather than the full dashed nothing-here panel. Tags pass `lockedRow={null}` and
-        genuinely can be empty, so they keep the full panel (issue 878).
+        This card is the ONLY place a reserved vocabulary's General bucket appears while
+        no custom entry exists, so it carries the whole explanation ("Only General so
+        far" + what falls under it) and answers the entry chip's count of 1 above it.
+        It is the full dashed panel, not the compact one: the compact variant existed
+        purely because General used to render as a row directly above it, and shrinking
+        the only thing in an otherwise empty list is the opposite of what that traded
+        for. Tags reach the same card by genuinely having nothing at all (issue 878).
       -->
       <EmptyState
         icon={emptyIcon}
         title={emptyTitle}
         hint={emptyHint}
-        compact={!!lockedRow}
         contextClass="manager-vocabulary-empty-panel"
       />
     {/if}

@@ -2453,6 +2453,7 @@
           "UsageCount": "{count} references",
           "UsageCountSingular": "1 reference",
           "EntriesCount": "{count} entries",
+          "EntriesCountSingular": "1 entry",
           "OnlyGeneral": "Only General so far",
           "OnlyGeneralHint": "Every recipe falls under General until you add one. Group recipes that need clearer organisation by adding a category above.",
           "NoCategoryMatches": "No matches for \"{query}\".",
