@@ -1200,6 +1200,7 @@
           "tool": "Tool",
           "essence": "Essence",
           "recipe": "Recipe",
+          "recipeItem": "Book or scroll",
           "task": "Task",
           "event": "Event",
           "unknown": "Record"
