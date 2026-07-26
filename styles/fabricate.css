@@ -2193,10 +2193,6 @@
   margin-left: auto;
 }
 
-.fabricate-manager .manager-character-modifier-empty {
-  font-style: italic;
-}
-
 /*
   Whole-section collapse (issue 768) — a chevron toggle in each settings-list card
   header, mirroring the category-collapse affordance. The wrapped body preserves the
@@ -2977,13 +2973,6 @@
 
 .fabricate-manager .manager-character-modifier-override-hint {
   font-size: 0.75rem;
-  font-style: italic;
-}
-
-.fabricate-manager .manager-character-modifier-row-empty,
-.fabricate-manager .manager-character-modifier-empty-hint,
-.fabricate-manager .manager-condition-modifier-row-empty {
-  font-size: 0.8rem;
   font-style: italic;
 }
 
@@ -5936,61 +5925,11 @@
   line-height: 1.25;
 }
 
-/* Empty (onboarding) and no-results states span the whole grid, centred. */
-.fabricate-manager .manager-vocabulary-empty {
+/* Empty (onboarding) and no-results states span the whole grid. Both now render through
+   the shared `EmptyState` primitive, so only the grid-span survives here — a scoped block
+   cannot reach a track defined by the ancestor grid. */
+.fabricate-manager .manager-vocabulary-empty-panel {
   grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--fab-space-1);
-  min-width: 0;
-  padding: var(--fab-space-6) var(--fab-space-4);
-  border: 1px dashed var(--fab-mv2-border-strong);
-  border-radius: 11px;
-  color: var(--fab-mv2-text-muted);
-  background: var(--fab-overlay-light-025);
-}
-
-.fabricate-manager .manager-vocabulary-empty-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  margin-bottom: var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 14px;
-  background: var(--fab-overlay-light-06);
-  color: var(--fab-mv2-text-muted);
-  font-size: 1.2rem;
-}
-
-.fabricate-manager .manager-vocabulary-empty strong {
-  color: var(--fab-mv2-text);
-  font-size: 1rem;
-}
-
-.fabricate-manager .manager-vocabulary-empty strong,
-.fabricate-manager .manager-vocabulary-empty span {
-  min-width: 0;
-  overflow-wrap: break-word;
-}
-
-.fabricate-manager .manager-vocabulary-noresults {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-5) var(--fab-space-4);
-  color: var(--fab-mv2-text-muted);
-}
-
-.fabricate-manager .manager-vocabulary-noresults > i {
-  font-size: 1.15rem;
-  opacity: 0.6;
 }
 
 .fabricate-manager .manager-essence-identity {
@@ -7801,25 +7740,13 @@
   list-style: none;
 }
 
-/* Requirement sections (Ingredients / Results / Tools) — empty-state scaffold. */
-.fabricate-manager .manager-recipe-section-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-04);
-}
-
-.fabricate-manager .manager-recipe-section-empty-title {
-  margin: 0;
-  font-weight: 600;
-}
-
-.fabricate-manager .manager-recipe-section-empty .manager-muted {
-  margin: 0;
+/* Requirement sections (Ingredients / Results / Tools / Access / Books & Scrolls) render
+   their no-state message through the shared `EmptyState` primitive, so the second
+   empty-state design that used to live here is gone (issue 785). What remains is the
+   container concern a scoped block cannot express: issue 796 requires the panel to be a
+   full-width UNCAPPED surface inside the tab body. */
+.fabricate-manager .manager-recipe-tab-empty {
+  width: 100%;
 }
 
 .fabricate-manager .manager-recipe-req-rows,
@@ -7965,21 +7892,6 @@
   background: var(--fab-danger-soft);
 }
 
-/* Single centered dashed empty panel (§D3). */
-.fabricate-manager .manager-recipe-tools-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--fab-space-4);
-  border: 1px dashed var(--fab-border-strong);
-  border-radius: 9px;
-  text-align: center;
-}
-
-.fabricate-manager .manager-recipe-tools-empty p {
-  margin: 0;
-}
-
 /* Global-tools card (multi-step): accent border + accent-soft fill, globe medallion. */
 .fabricate-manager .manager-recipe-tools-global {
   display: flex;
@@ -8063,7 +7975,7 @@
    Rehomed from the deleted RecipeContextRail, which showed it only while this tab was
    open. It lives in the GLOBAL sheet, not a scoped Svelte <style>, for two reasons: the
    rest of the recipe studio's chrome already does (`.manager-recipe-tab`,
-   `.manager-recipe-val-*`, `.manager-recipe-section-empty`), and a component-scoped
+   `.manager-recipe-val-*`), and a component-scoped
    block is INVISIBLE to `recipe-studio-font-size.test.js`, which renders raw markup
    against this file — which is exactly why the rail's summary was never gated and could
    drift unmeasured. The `manager-recipe-rail-*` class names are kept verbatim so nothing
@@ -9342,10 +9254,6 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
-}
-
-.fabricate-manager .manager-recipe-tags-empty {
-  font-size: 0.85rem;
 }
 
 .fabricate-manager .manager-recipe-tag-chips {
@@ -13140,118 +13048,13 @@
   text-align: center;
 }
 
-/* The no-state panel, matched to the reference prototype:
-     padding 44px 20px · 1.5px dashed · radius 12px · no fill · 9px stack gap
-   Height is padding-driven, as in the prototype — the old 220px floor made every empty
-   state taller than its design. `EmptyState.svelte` is the markup contract for this;
-   the styling stays here so there is ONE source of truth rather than a component with
-   its own scoped copy. */
-.fabricate-manager .manager-empty {
-  display: grid;
-  place-items: center;
-  padding: 44px 20px;
-  border: 1.5px dashed var(--fab-mv2-border);
-  border-radius: 12px;
-  color: var(--fab-text-subtle);
-  text-align: center;
-}
-
-.fabricate-manager .manager-empty > div {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-
-/*
-  Filtered to nothing is not an error and does not want the full empty-panel apparatus
-  (a 46px icon, an <h3>, a paragraph). One dashed panel says it in a sentence, and the
-  Clear-filters button — which the prototype has no equivalent of, and which is kept —
-  is the way out of it.
-*/
-.fabricate-manager .manager-recipe-empty-filtered,
-.fabricate-manager .manager-component-empty-filtered {
-  align-content: center;
-  min-height: 0;
-  padding: 40px;
-  border-color: var(--fab-mv2-border-strong);
-  border-radius: 12px;
-  background: transparent;
-}
-
-.fabricate-manager .manager-recipe-empty-filtered > div,
-.fabricate-manager .manager-component-empty-filtered > div {
-  display: grid;
-  gap: var(--fab-space-3);
-  justify-items: center;
-}
-
-.fabricate-manager .manager-recipe-empty-filtered p,
-.fabricate-manager .manager-component-empty-filtered p {
-  margin: 0;
-  font-size: 0.8rem;
-}
-
-/* A 46px rounded tile holding an 18px glyph in the SUBTLE tone — the prototype's icon is
-   both smaller and dimmer than a heading. It previously rendered at 1.55rem in the full
-   text colour, which read as the loudest thing in an otherwise quiet panel. Spacing comes
-   from the stack gap, not a margin. */
-.fabricate-manager .manager-empty > div > i {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  color: var(--fab-text-subtle);
-  background: var(--fab-surface-soft);
-  font-size: 18px;
-}
-
-/* Serif title at the prototype's 13px/600 in the secondary tone, over an 11px body in the
-   subtle tone capped at 280px so the sentence wraps into a readable column instead of
-   spanning a wide pane. Matches the Tool Studio's type scale rather than the ambient ~1rem
-   the old 0.98rem heading approximated. */
-.fabricate-manager .manager-empty h3 {
-  margin: 0;
-  color: var(--fab-text-secondary);
-  font-family: var(--fab-font-serif);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.fabricate-manager .manager-empty p {
-  max-width: 280px;
-  margin: 0;
-  color: var(--fab-text-subtle);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-/* The sidebar / inline scale of the same vocabulary: same dashed panel, tile and type,
-   just less furniture. A roster column or an inline card cannot afford the 44px hero
-   padding, and the alternative — a bare sentence — is what made these states look
-   unrelated to each other in the first place. */
-.fabricate-manager .manager-empty.is-compact {
-  padding: var(--fab-space-4) var(--fab-space-3);
-}
-
-.fabricate-manager .manager-empty.is-compact > div {
-  gap: var(--fab-space-chip);
-}
-
-.fabricate-manager .manager-empty.is-compact > div > i {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  font-size: 14px;
-}
-
-.fabricate-manager .manager-empty.is-compact h3 {
-  font-size: 12px;
-}
+/* The no-state panel's own appearance now lives in its component's scoped block
+   (`src/ui/svelte/apps/manager/EmptyState.svelte`), not here: co-located CSS keeps
+   `VIEW_RECIPES` screenshot detection scoped to the views that render the panel instead
+   of matching the broad `theme-or-global-ui` recipe. What remains global are the few
+   LAYOUT-CONTEXT rules a scoped block cannot express, because their subject is reached
+   through an ancestor the component does not render (search this file for
+   `> .manager-empty` and `-empty { flex`). */
 
 .fabricate-manager .manager-setup-card {
   display: grid;
@@ -17004,11 +16807,6 @@
   flex: 0 0 34px;
 }
 
-.fabricate-manager .manager-environment-comp-empty {
-  margin: var(--fab-space-chip) 0 0;
-  padding: var(--fab-space-chip) var(--fab-space-2);
-}
-
 .fabricate-manager .manager-environment-comp-menu-wrap {
   position: relative;
 }
@@ -18093,10 +17891,6 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-travel-realms-empty {
-  margin: 0;
-}
-
 .fabricate-manager .manager-travel-realms-list {
   display: flex;
   flex-direction: column;
@@ -18236,10 +18030,6 @@
 
 .fabricate-manager .manager-map-link-region-card .manager-inspector-title-row {
   margin: 0;
-}
-
-.fabricate-manager .manager-travel-map-links-empty {
-  padding: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-travel-realms-row:hover {
@@ -18476,10 +18266,6 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--fab-space-3);
   min-width: 0;
-}
-
-.fabricate-manager .manager-travel-parties-empty {
-  margin: 0;
 }
 
 .fabricate-manager .manager-travel-parties-list {
@@ -18918,8 +18704,7 @@
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-travel-hint,
-.fabricate-manager .manager-travel-empty-hint {
+.fabricate-manager .manager-travel-hint {
   margin: 0;
   color: var(--fab-text-muted);
   font-size: 12px;
@@ -20202,20 +19987,14 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-tool-browser-inspector.is-empty {
+/* LAYOUT CONTEXT ONLY for the shared `EmptyState` primitive: the inspector column's
+   no-selection panel fills the remaining height. The appearance (dashed panel, tile,
+   type scale) belongs to `EmptyState.svelte`'s scoped block, and the per-screen 2rem
+   glyph / 1.2rem title exception that used to live here is gone — a primitive with a
+   per-screen size override is a second empty-state design. */
+.fabricate-manager .manager-tool-browser-inspector-empty {
   flex: 1 1 auto;
-  align-items: center;
-  justify-content: center;
   min-height: 0;
-  text-align: center;
-}
-
-.fabricate-manager .manager-tool-browser-inspector.is-empty > div > i {
-  font-size: 2rem;
-}
-
-.fabricate-manager .manager-tool-browser-inspector.is-empty h3 {
-  font-size: 1.2rem;
 }
 
 .fabricate-manager .manager-tool-inspector-hero {
@@ -20752,17 +20531,9 @@
   color: var(--fab-warning-text);
 }
 
-/* The erase caveat is a WARNING band, not an info banner: it is the standing statement
-   that the action is destructive and may not refund a slot. The prototype renders it
-   taller than a one-line info strip, so it takes the roomier vertical padding and the
-   readable body scale rather than the info banner's compact 0.66rem. */
-.fabricate-manager .manager-knowledge-learned-band {
-  margin: 0;
-  padding: var(--fab-space-3);
-  font-size: 0.7rem;
-  font-weight: 500;
-  line-height: 1.45;
-}
+/* Both Knowledge tab hints render through the shared `Callout` primitive (issue 785),
+   which carries this taller treatment for every tone, so the per-screen band that used to
+   re-size the shared warning band here is gone. */
 
 .fabricate-manager .manager-knowledge-row-actions {
   display: flex;
