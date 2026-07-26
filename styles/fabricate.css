@@ -1746,6 +1746,16 @@
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
+/* Books & Scrolls is the only manager surface with FOUR unconditional grid children: its
+   own section header, the drop zone, the filter toolbar and the table. The shared
+   `auto auto 1fr` template only names three, so the `1fr` landed on the TOOLBAR — which
+   absorbed every pixel of slack and floated mid-panel — while the table fell into an
+   implicit `auto` row pinned to the bottom of the view. Same failure family as the
+   components pager above: the growing track must be the scrolling table. */
+.fabricate-manager[data-manager-view="books-scrolls"] .manager-main {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
 /*
   The recipe library (issue 643) is filter bar → list → pager, with no per-view page
   header of its own: the shell's `.manager-header` is the only one. The rows are named

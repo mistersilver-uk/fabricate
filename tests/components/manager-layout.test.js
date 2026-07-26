@@ -4987,3 +4987,39 @@ test('recipe tag list spans the full row width on its own line below the control
     await browser.close();
   }
 });
+
+// The Books & Scrolls surface is the only manager view with FOUR unconditional grid
+// children (its own section header, the drop zone, the filter toolbar, the table). The
+// shared `.manager-main` template names three tracks, so before issue 785 the `1fr`
+// landed on the TOOLBAR — it swallowed every pixel of slack and floated mid-panel while
+// the table fell into an implicit `auto` row pinned to the bottom of the view. This
+// guard ties the template to the markup: adding a fifth section without widening the
+// template reintroduces exactly that defect, and no test covered this route before.
+test('the Books & Scrolls route names one grid track per section and grows the table', () => {
+  const source = readFileSync(resolve(managerComponentDir, 'BooksScrollsView.svelte'), 'utf8');
+  const main = source.slice(source.indexOf('<main class="manager-main'));
+  const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
+  assert.equal(children.length, 4, 'expected four unconditional top-level grid children');
+
+  const block = blockFor('.fabricate-manager[data-manager-view="books-scrolls"] .manager-main');
+  const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();
+  assert.ok(template, 'the books-scrolls route must declare its own grid-template-rows');
+
+  // Tracks are SPACE-separated, and `minmax(0, 1fr)` contains a space of its own, so
+  // tokenize functional notation as one unit rather than splitting on whitespace.
+  const tracks = template.match(/[a-z-]+\([^)]*\)|\S+/g) || [];
+  assert.equal(
+    tracks.length,
+    children.length,
+    `expected ${children.length} tracks for ${children.length} children, got "${template}"`
+  );
+  assert.equal(
+    tracks.at(-1),
+    'minmax(0, 1fr)',
+    'the scrolling table is the last child, so it must be the growing track'
+  );
+  assert.ok(
+    tracks.slice(0, -1).every((track) => track === 'auto'),
+    `only the table may grow; header/drop-zone/toolbar must be auto, got "${template}"`
+  );
+});
