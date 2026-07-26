@@ -410,6 +410,9 @@ Each row has two actions.
 
 ### Learned Recipes Tab
 
+The tab opens with a short note, in the same neutral style as the note on the Recipe items tab, explaining that erasing a memory frees a learning slot only when the copy it was learned from is still owned.
+It is a standing explanation of how the tab behaves, not a warning about something at risk: the amber warning style is reserved for a hazard you can still avoid, such as the shared-learning-budget ordering described below.
+
 This tab lists every recipe the selected character has learned, one row per recipe, independently of which copies they currently own.
 A learned recipe is never removed just because its source copy is gone.
 Each row shows the recipe's image, name, and category, and a line naming where it was learned from.
