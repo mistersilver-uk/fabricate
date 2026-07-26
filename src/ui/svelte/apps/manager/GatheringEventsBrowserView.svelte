@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
@@ -271,26 +272,24 @@
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Environment.Events.Table', 'Gathering events table')}>
     {#if eventList.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-masks-theater" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Environment.Events.EmptyTitle', 'No gathering events yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Environment.Events.EmptyHint', 'Create reusable events before attaching them to environments.')}</p>
-          <button type="button" class="manager-button is-primary" onclick={() => onCreateEvent(selectedSystemId)}>
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Environment.Events.Create', 'Create gathering event')}</span>
-          </button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-masks-theater"
+        title={text('FABRICATE.Admin.Manager.Environment.Events.EmptyTitle', 'No gathering events yet')}
+        hint={text('FABRICATE.Admin.Manager.Environment.Events.EmptyHint', 'Create reusable events before attaching them to environments.')}
+      >
+        <button type="button" class="manager-button is-primary" onclick={() => onCreateEvent(selectedSystemId)}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Create', 'Create gathering event')}</span>
+        </button>
+      </EmptyState>
     {:else if filteredEvents.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Environment.Events.EmptySearchTitle', 'No events match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Environment.Events.EmptySearchHint', 'Clear search and filters to show all events in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-search"
+        title={text('FABRICATE.Admin.Manager.Environment.Events.EmptySearchTitle', 'No events match these filters')}
+        hint={text('FABRICATE.Admin.Manager.Environment.Events.EmptySearchHint', 'Clear search and filters to show all events in this system.')}
+      >
+        <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+      </EmptyState>
     {:else}
       <div class="manager-gathering-events-table" role="table" aria-label={text('FABRICATE.Admin.Manager.Environment.Events.TableShort', 'Gathering events')}>
         <div class="manager-table-head manager-gathering-event-table-head" role="row">

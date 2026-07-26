@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { dragDrop } from '../../actions/dragDrop.js';
@@ -467,12 +468,10 @@
     </section>
 
   {:else}
-    <div class="manager-empty">
-      <div>
-        <i class="fas fa-masks-theater" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select an event to edit')}</h3>
-        <p>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEventHint', 'Choose an event from the browser to edit its identity, matching, and modifiers.')}</p>
-      </div>
-    </div>
+    <EmptyState
+      icon="fas fa-masks-theater"
+      title={text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select an event to edit')}
+      hint={text('FABRICATE.Admin.Manager.Environment.Events.SelectEventHint', 'Choose an event from the browser to edit its identity, matching, and modifiers.')}
+    />
   {/if}
 </main>

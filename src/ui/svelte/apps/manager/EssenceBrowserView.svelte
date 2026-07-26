@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
 
@@ -120,22 +121,19 @@
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Essence.Table', 'Essences table')}>
     {#if essenceCards.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Essence.EmptyTitle', 'No essences yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Essence.EmptyHint', 'Create an essence definition to start assigning essence quantities to components.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-mortar-pestle"
+        title={text('FABRICATE.Admin.Manager.Essence.EmptyTitle', 'No essences yet')}
+        hint={text('FABRICATE.Admin.Manager.Essence.EmptyHint', 'Create an essence definition to start assigning essence quantities to components.')}
+      />
     {:else if filteredEssences.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Essence.EmptySearchTitle', 'No essences match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Essence.EmptySearchHint', 'Clear search and filters to show all essences in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearSearch}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-search"
+        title={text('FABRICATE.Admin.Manager.Essence.EmptySearchTitle', 'No essences match these filters')}
+        hint={text('FABRICATE.Admin.Manager.Essence.EmptySearchHint', 'Clear search and filters to show all essences in this system.')}
+      >
+        <button type="button" class="manager-button" onclick={clearSearch}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
+      </EmptyState>
     {:else}
       <div class={`manager-essences-table ${showSourceUi ? '' : 'has-no-source'}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Essence.TableShort', 'Essences')}>
         <div class="manager-table-head manager-essence-table-head" role="row">

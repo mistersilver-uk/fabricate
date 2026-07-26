@@ -38,6 +38,7 @@
   recipe-item Overview tab use) and hands it upstream to create + link the definition.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
@@ -275,22 +276,21 @@
 
   <section class="manager-table-scroll manager-books-scrolls-scroll" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Table', 'Recipe items')}>
     {#if (recipeItems || []).length === 0}
-      <div class="manager-empty" data-books-scrolls-empty>
-        <div>
-          <i class="fas fa-book-sparkles" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyHint', 'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-book-sparkles"
+        title={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}
+        hint={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyHint', 'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.')}
+        dataAttr="data-books-scrolls-empty"
+      />
     {:else if filteredItems.length === 0}
-      <div class="manager-empty" data-books-scrolls-empty-filtered>
-        <div>
-          <i class="fas fa-filter" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterTitle', 'No recipe items match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint', 'Clear the filters to show every recipe item in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-filter"
+        title={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterTitle', 'No recipe items match these filters')}
+        hint={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint', 'Clear the filters to show every recipe item in this system.')}
+        dataAttr="data-books-scrolls-empty-filtered"
+      >
+        <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+      </EmptyState>
     {:else}
       <div class="manager-books-scrolls-list" role="list">
         <div class="manager-books-scrolls-head" aria-hidden="true">

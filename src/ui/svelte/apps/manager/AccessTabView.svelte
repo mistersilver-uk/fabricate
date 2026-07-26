@@ -17,6 +17,7 @@
    - onSelectRecipe(id): row-select handler.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
@@ -143,22 +144,19 @@
 
   <section class="manager-table-scroll manager-access-scroll" aria-label={text('FABRICATE.Admin.Manager.Access.Table', 'Recipe access table')}>
     {#if (recipes || []).length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-user-lock" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-user-lock"
+        title={text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}
+        hint={text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}
+      />
     {:else if filteredRecipes.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Access.EmptySearchHint', 'Clear search and filters to show every recipe in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-search"
+        title={text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match these filters')}
+        hint={text('FABRICATE.Admin.Manager.Access.EmptySearchHint', 'Clear search and filters to show every recipe in this system.')}
+      >
+        <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
+      </EmptyState>
     {:else}
       <div class="manager-access-list" role="list">
         {#each paginatedRecipes as recipe (recipe.id)}

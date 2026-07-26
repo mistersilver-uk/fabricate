@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -1038,20 +1039,19 @@
 
       <div class="manager-task-required-tools-scroll" data-gathering-task-required-tools-scroll>
         {#if libraryToolList.length === 0}
-          <div class="manager-empty is-compact" data-gathering-task-required-tools-library-empty>
-            <div>
-              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsLibraryEmptyTitle', 'No tools in this system’s library')}</h3>
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsLibraryEmptyHint', 'Open the Tools page from the left rail to add tools first.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="fas fa-screwdriver-wrench"
+            title={text('FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsLibraryEmptyTitle', 'No tools in this system’s library')}
+            hint={text('FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsLibraryEmptyHint', 'Open the Tools page from the left rail to add tools first.')}
+            dataAttr="data-gathering-task-required-tools-library-empty"
+          />
         {:else if filteredLibraryTools.length === 0}
-          <div class="manager-empty is-compact">
-            <div>
-              <i class="fas fa-search" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyToolSearchTitle', 'No tools match your search')}</h3>
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="fas fa-search"
+            title={text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyToolSearchTitle', 'No tools match your search')}
+          />
         {:else}
           <div class="manager-task-required-tools-grid" data-gathering-task-required-tools-grid>
             {#each paginatedLibraryTools as tool (tool.id)}
@@ -1134,19 +1134,17 @@
 
       <div class="manager-task-component-browser-scroll" data-gathering-task-component-browser-scroll>
         {#if componentCards.length === 0}
-          <div class="manager-empty is-compact">
-            <div>
-              <i class="fas fa-box-open" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.NoComponents', 'No components available')}</h3>
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="fas fa-box-open"
+            title={text('FABRICATE.Admin.Manager.Environment.Tasks.NoComponents', 'No components available')}
+          />
         {:else if filteredComponentCards.length === 0}
-          <div class="manager-empty is-compact">
-            <div>
-              <i class="fas fa-search" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyComponentSearchTitle', 'No components match these filters')}</h3>
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="fas fa-search"
+            title={text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyComponentSearchTitle', 'No components match these filters')}
+          />
         {:else}
           <div class="manager-task-component-grid" data-gathering-task-component-grid role="list">
             {#each paginatedComponentCards as item (item.id)}
@@ -1216,20 +1214,17 @@
 
       <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropRulesTable', 'Drop rules table')}>
         {#if dropRows.length === 0}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-gift" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.NoDrops', 'No drops have been added.')}</h3>
-              <button type="button" class="manager-button is-primary" onclick={onAddDrop}>{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</button>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-gift"
+            title={text('FABRICATE.Admin.Manager.Environment.Tasks.NoDrops', 'No drops have been added.')}
+          >
+            <button type="button" class="manager-button is-primary" onclick={onAddDrop}>{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</button>
+          </EmptyState>
         {:else if filteredRows.length === 0}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-search" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyDropSearchTitle', 'No drop rules match this search')}</h3>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-search"
+            title={text('FABRICATE.Admin.Manager.Environment.Tasks.EmptyDropSearchTitle', 'No drop rules match this search')}
+          />
         {:else}
           <div class={`manager-gathering-task-drops-table${rankedMode ? ' is-ranked-mode' : ''}`} role="table" data-gathering-task-drops-table>
             <div class="manager-table-head manager-gathering-task-drop-table-head" role="row">
@@ -1363,12 +1358,10 @@
       <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropCalculationHelp', 'Final drop chance = base chance + matching drop-level time/weather modifiers. Gathering modifiers affect the d100 roll.')}</span>
     </section>
   {:else}
-    <div class="manager-empty">
-      <div>
-        <i class="fas fa-list-check" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}</h3>
-      </div>
-    </div>
+    <EmptyState
+      icon="fas fa-list-check"
+      title={text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}
+    />
   {/if}
 </main>
 

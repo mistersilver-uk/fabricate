@@ -23,6 +23,7 @@
    - onLinkRecipe(recipeId) / onRemoveRecipe(recipeId): link / unlink a recipe.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../systems/characterPrerequisites.js';
   import { buildRecipeItemPreviewRow } from '../../util/recipeItemPreviewRow.js';
@@ -344,13 +345,11 @@
       </aside>
     </div>
   {:else}
-    <div class="manager-empty">
-      <div>
-        <i class="fas fa-book" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.RecipeItem.SelectItem', 'Select a recipe item')}</h3>
-        <p>{text('FABRICATE.Admin.Manager.RecipeItem.EditMissingHint', 'Pick a recipe item from Books & Scrolls to open its editor.')}</p>
-      </div>
-    </div>
+    <EmptyState
+      icon="fas fa-book"
+      title={text('FABRICATE.Admin.Manager.RecipeItem.SelectItem', 'Select a recipe item')}
+      hint={text('FABRICATE.Admin.Manager.RecipeItem.EditMissingHint', 'Pick a recipe item from Books & Scrolls to open its editor.')}
+    />
   {/if}
 </main>
 

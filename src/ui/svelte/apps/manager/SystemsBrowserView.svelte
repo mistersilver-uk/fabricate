@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
@@ -128,34 +129,31 @@
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.SystemsTable', 'Crafting systems table')}>
     {#if systemsLoading}
-      <div class="manager-empty" data-systems-loading>
-        <div>
-          <i class="fas fa-spinner" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.LoadingSystemsHint', 'Fabricate is finishing startup before the system library is shown.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-spinner"
+        title={text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}
+        hint={text('FABRICATE.Admin.Manager.LoadingSystemsHint', 'Fabricate is finishing startup before the system library is shown.')}
+        dataAttr="data-systems-loading"
+      />
     {:else if (systems || []).length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-layer-group" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.EmptyTitle', 'No crafting systems yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.EmptyHint', 'Create a system to start organizing components and recipes.')}</p>
-          <button type="button" class="manager-button is-primary" onclick={onCreateSystem}>
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.CreateSystem', 'Create system')}</span>
-          </button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-layer-group"
+        title={text('FABRICATE.Admin.Manager.EmptyTitle', 'No crafting systems yet')}
+        hint={text('FABRICATE.Admin.Manager.EmptyHint', 'Create a system to start organizing components and recipes.')}
+      >
+        <button type="button" class="manager-button is-primary" onclick={onCreateSystem}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.CreateSystem', 'Create system')}</span>
+        </button>
+      </EmptyState>
     {:else if filteredSystems.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.EmptySearchTitle', 'No systems match this search')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.EmptySearchHint', 'Clear the search to show all configured systems.')}</p>
-          <button type="button" class="manager-button" onclick={() => searchTerm = ''}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-search"
+        title={text('FABRICATE.Admin.Manager.EmptySearchTitle', 'No systems match this search')}
+        hint={text('FABRICATE.Admin.Manager.EmptySearchHint', 'Clear the search to show all configured systems.')}
+      >
+        <button type="button" class="manager-button" onclick={() => searchTerm = ''}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
+      </EmptyState>
     {:else}
       <div class="manager-systems-table" role="table" aria-label={text('FABRICATE.Admin.Manager.SystemsTableShort', 'Crafting systems')}>
         <div class="manager-table-head" role="row">

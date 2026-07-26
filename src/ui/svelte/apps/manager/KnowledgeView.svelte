@@ -29,6 +29,7 @@
    - onResetSystem(actorId) / onResetAll(actorId)
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Medallion from '../../components/Medallion.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
@@ -168,16 +169,15 @@
     aria-label={text('FABRICATE.Admin.Manager.Knowledge.DetailLabel', 'Character knowledge')}
   >
     {#if !selectedCharacter}
-      <div class="manager-empty" data-knowledge-no-selection>
-        <div>
-          <i class="fas fa-user" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Knowledge.NoSelectionTitle', 'Select a character')}</h3>
-          <p>{text(
-            'FABRICATE.Admin.Manager.Knowledge.NoSelectionHint',
-            'Pick a player character to review the recipe items they carry and the recipes they have learned.'
-          )}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-user"
+        title={text('FABRICATE.Admin.Manager.Knowledge.NoSelectionTitle', 'Select a character')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Knowledge.NoSelectionHint',
+          'Pick a player character to review the recipe items they carry and the recipes they have learned.'
+        )}
+        dataAttr="data-knowledge-no-selection"
+      />
     {:else}
       <header class="manager-knowledge-detail-header" data-knowledge-detail-header>
         <div class="manager-knowledge-detail-identity">

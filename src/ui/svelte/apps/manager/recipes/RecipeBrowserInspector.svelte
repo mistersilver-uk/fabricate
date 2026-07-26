@@ -27,6 +27,7 @@
   it is unit tested without a DOM and is written once for both lists.
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -711,11 +712,9 @@
     </div>
   </section>
 {:else}
-  <div class="manager-empty">
-    <div>
-      <i class="fas fa-scroll" aria-hidden="true"></i>
-      <h3>{text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}</h3>
-      <p>{text('FABRICATE.Admin.Manager.Recipe.InspectorHint', 'The inspector shows recipe status, structure, and requirements for the selected row.')}</p>
-    </div>
-  </div>
+  <EmptyState
+    icon="fas fa-scroll"
+    title={text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}
+    hint={text('FABRICATE.Admin.Manager.Recipe.InspectorHint', 'The inspector shows recipe status, structure, and requirements for the selected row.')}
+  />
 {/if}

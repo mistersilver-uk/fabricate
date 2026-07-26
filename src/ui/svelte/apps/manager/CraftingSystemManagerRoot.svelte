@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
     DEFAULT_GATHERING_EVENT_IMG,
@@ -5615,13 +5616,11 @@
       />
       {:else}
         <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}>
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-boxes" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-boxes"
+            title={text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}
+            hint={text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}
+          />
         </main>
       {/if}
     {:else if currentView === 'components'}
@@ -6072,7 +6071,11 @@
                       </header>
                     </article>
                   {:else}
-                    <p class="manager-muted manager-condition-modifier-row-empty">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-sliders"
+                      title={text('FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}
+                    />
                   {/each}
                 </div>
               </section>
@@ -6177,7 +6180,11 @@
                     {/if}
                   </article>
                 {:else}
-                  <p class="manager-muted manager-character-modifier-row-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
+                  <EmptyState
+                    compact
+                    icon="fas fa-sliders"
+                    title={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}
+                  />
                 {/each}
               </div>
             </section>
@@ -6192,13 +6199,11 @@
             {/if}
 
           {:else}
-            <div class="manager-empty">
-              <div>
-                <i class="fas fa-list-check" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}</h3>
-                <p>{text('FABRICATE.Admin.Manager.Environment.Tasks.InspectorHint', 'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.')}</p>
-              </div>
-            </div>
+            <EmptyState
+              icon="fas fa-list-check"
+              title={text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}
+              hint={text('FABRICATE.Admin.Manager.Environment.Tasks.InspectorHint', 'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.')}
+            />
           {/if}
         {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
           {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
@@ -6381,7 +6386,11 @@
                       {/if}
                     </article>
                   {:else}
-                    <p class="manager-muted manager-character-modifier-row-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-sliders"
+                      title={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}
+                    />
                   {/each}
                 </div>
               </section>
@@ -6453,13 +6462,11 @@
               {/if}
             </section>
           {:else if currentView !== 'gathering-event-edit'}
-            <div class="manager-empty">
-              <div>
-                <i class="fas fa-masks-theater" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select a gathering event')}</h3>
-                <p>{text('FABRICATE.Admin.Manager.Environment.Events.InspectorHint', 'The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.')}</p>
-              </div>
-            </div>
+            <EmptyState
+              icon="fas fa-masks-theater"
+              title={text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select a gathering event')}
+              hint={text('FABRICATE.Admin.Manager.Environment.Events.InspectorHint', 'The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.')}
+            />
           {/if}
         {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
           <section class="manager-inspector-card manager-gathering-rules-card" data-gathering-inspector-rules>
@@ -6947,13 +6954,11 @@
             </div>
           </section>
         {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-seedling" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Environment.InspectorHint', 'The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-seedling"
+            title={text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}
+            hint={text('FABRICATE.Admin.Manager.Environment.InspectorHint', 'The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.')}
+          />
         {/if}
       {:else if currentView === 'essences' || currentView === 'essence-edit'}
         {#if selectedEssenceForInspector}
@@ -7080,19 +7085,17 @@
             </div>
           </section>
         {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-              <h3>{currentView === 'essence-edit'
-                ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
-                : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}</h3>
-              <p>{currentView === 'essence-edit'
-                ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorHint', 'The inspector will show the essence ID after the draft is saved.')
-                : showEssenceSourceUi
-                ? text('FABRICATE.Admin.Manager.Essence.InspectorHint', 'The inspector shows source linkage and component usage for the selected essence.')
-                : text('FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint', 'The inspector shows identity and component usage for the selected essence.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-mortar-pestle"
+            title={currentView === 'essence-edit'
+              ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
+              : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}
+            hint={currentView === 'essence-edit'
+              ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorHint', 'The inspector will show the essence ID after the draft is saved.')
+              : showEssenceSourceUi
+              ? text('FABRICATE.Admin.Manager.Essence.InspectorHint', 'The inspector shows source linkage and component usage for the selected essence.')
+              : text('FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint', 'The inspector shows identity and component usage for the selected essence.')}
+          />
         {/if}
       {:else if currentView === 'components'}
         {#if selectedComponent}
@@ -7132,13 +7135,11 @@
             </div>
           </section>
         {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-boxes" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.')}</p>
-            </div>
-          </div>
+          <EmptyState
+            icon="fas fa-boxes"
+            title={text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}
+            hint={text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.')}
+          />
         {/if}
       {:else if currentView === 'recipes'}
         <RecipeBrowserInspector
@@ -7300,13 +7301,11 @@
           </div>
         </section>
       {:else}
-        <div class="manager-empty">
-          <div>
-            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
-            <h3>{text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</h3>
-            <p>{text('FABRICATE.Admin.Manager.InspectorHint', 'The inspector shows counts, resolution mode, and enabled features for the selected system.')}</p>
-          </div>
-        </div>
+        <EmptyState
+          icon="fas fa-arrow-pointer"
+          title={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+          hint={text('FABRICATE.Admin.Manager.InspectorHint', 'The inspector shows counts, resolution mode, and enabled features for the selected system.')}
+        />
       {/if}
     </aside>
     {/if}

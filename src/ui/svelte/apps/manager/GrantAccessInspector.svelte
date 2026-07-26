@@ -14,6 +14,7 @@
    - onSaveAccess(recipeId, { characterIds, playerIds }): persists the full snapshot.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
@@ -171,13 +172,11 @@
 
 <div class="manager-access-inspector" data-access-inspector>
   {#if !recipe}
-    <div class="manager-empty">
-      <div>
-        <i class="fas fa-hand-pointer" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Access.NoSelectionTitle', 'Select a recipe')}</h3>
-        <p>{text('FABRICATE.Admin.Manager.Access.NoSelectionHint', 'Choose a recipe to grant access to characters or players.')}</p>
-      </div>
-    </div>
+    <EmptyState
+      icon="fas fa-hand-pointer"
+      title={text('FABRICATE.Admin.Manager.Access.NoSelectionTitle', 'Select a recipe')}
+      hint={text('FABRICATE.Admin.Manager.Access.NoSelectionHint', 'Choose a recipe to grant access to characters or players.')}
+    />
   {:else}
     <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Access.GrantTitle', 'Grant access')}</p>
     <div class="manager-inspector-title-row">
