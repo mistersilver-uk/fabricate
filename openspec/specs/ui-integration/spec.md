@@ -98,6 +98,16 @@ Trailing content inside the panel — a Clear-filters control, a primary CTA, or
 An inline value slot is NOT a no-state message: text standing where a value would be inside a control row (an unassigned travel actor beside its clear button and picker) stays an inline hint, since a dashed panel inside a control row is a layout defect rather than reuse.
 A single per-screen size override of the shared panel is a second empty-state design and is forbidden; every no-state message shares one tile and type scale.
 
+#### Modal dialogs
+
+Every centred manager modal renders through one shared modal-chrome primitive.
+The chrome is the dialog surface itself, portaled into the manager area with Escape and outside-click dismissal, and it owns exactly four things: the panel, a compact heading of a title over an optional muted subtitle, a round close control aligned with the title, and a right-aligned footer rail for the dialog's actions.
+Everything between the heading and the footer belongs to the feature and carries that feature's own scoped styling.
+
+A manager modal MUST NOT be assembled from a raw HTML string handed to a Foundry dialog.
+Such a dialog inherits Foundry's page-title headings, unstyled list markup, and full-width footer button, which is a second modal design standing beside the shared one; it also cannot use any shared primitive, since a string is not a component.
+The post-import reference report and the bulk-import folder-categorization step are both import-flow modals and MUST therefore be visually indistinguishable in chrome.
+
 #### Standing statements
 
 A permanent explanation of how a surface behaves and a conditional hazard warning are the same layout and render through one shared callout primitive: a leading semantic glyph plus one sentence in a tinted, rounded strip.

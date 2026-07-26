@@ -44,56 +44,6 @@ function readItemQuantity(item) {
   return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
 }
 
-/** Minimal HTML-escape for values interpolated into DialogV2 raw HTML (F4). */
-function escapeImportReportHtml(value) {
-  return String(value ?? '').replace(
-    /[&<>"']/g,
-    (character) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
-  );
-}
-
-/**
- * Render the pure import-report content into escaped, theme-classed HTML for the
- * informational DialogV2. No colour literals (theme-colour-contract gate).
- */
-function renderImportReportHtml(content) {
-  const esc = escapeImportReportHtml;
-  const parts = [`<section class="fabricate-import-report">`];
-  parts.push(`<p class="fabricate-import-report__headline">${esc(content.headline)}</p>`);
-
-  if (!content.hasReported) {
-    parts.push(`<p class="fabricate-import-report__empty">${esc(content.emptyStateLabel)}</p>`);
-  } else {
-    parts.push(
-      `<div class="fabricate-import-report__scroll" style="max-height: 20rem; overflow-y: auto;">`
-    );
-    for (const group of content.groups) {
-      parts.push(
-        `<h2 class="fabricate-import-report__kind">${esc(group.kindLabel)} (${group.count})</h2>`
-      );
-      parts.push(`<ul class="fabricate-import-report__list">`);
-      for (const row of group.rows) {
-        const owner = row.ownerName
-          ? `${esc(row.ownerTypeLabel)}: ${esc(row.ownerName)}`
-          : esc(row.ownerTypeLabel);
-        parts.push(
-          `<li><span class="fabricate-import-report__owner">${owner}</span> ` +
-            `<code class="fabricate-import-report__ref" style="overflow-wrap: anywhere; word-break: break-all;">${esc(row.referenceValue)}</code></li>`
-        );
-      }
-      parts.push(`</ul>`);
-    }
-    parts.push(`</div>`);
-  }
-
-  if (content.handledCount > 0) {
-    parts.push(`<p class="fabricate-import-report__handled">${esc(content.handledLine)}</p>`);
-  }
-  parts.push(`</section>`);
-  return parts.join('');
-}
-
 function getFolderCollectionValues(folders) {
   if (!folders) return [];
   if (Array.isArray(folders)) return folders;
@@ -496,11 +446,18 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           URL.revokeObjectURL(url);
         }
       },
+      // Resolves to the assembled post-import report content (the pure
+      // `buildImportReportContent` output) so the Svelte manager root can render it in
+      // the shared `ManagerModal` chrome, or to `null` when there is nothing to report
+      // (no dialog API, cancelled, failed, or an already-existing system that was
+      // skipped). This service no longer renders the report itself: issue 877 replaced
+      // the raw-HTML DialogV2 with `ImportReportModal`, so the app shell hands DATA to
+      // the UI instead of a hand-escaped HTML string.
       renderSystemImportDialog: async () => {
         const DialogV2 = foundry.applications?.api?.DialogV2;
         if (!DialogV2) {
           ui.notifications.warn('Dialog API not available.');
-          return;
+          return null;
         }
         const formContent = `
           <p>Select a Fabricate system JSON file to import.</p>
@@ -527,7 +484,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           },
           rejectClose: false,
         });
-        if (!result || !result.file) return;
+        if (!result || !result.file) return null;
 
         // The import itself (parse → validate → persist) is the only work whose
         // failure is an "Import failed" toast; the post-success report render is
@@ -541,7 +498,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           const validation = validateImportData(data);
           if (!validation.valid) {
             ui.notifications.error(`Invalid file: ${validation.errors.join('; ')}`);
-            return;
+            return null;
           }
           if (validation.warnings.length > 0) {
             for (const w of validation.warnings) ui.notifications.warn(w);
@@ -564,14 +521,14 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         } catch (err) {
           // Hard failures stay on the DISTINCT error-toast path (never the report).
           ui.notifications.error(`Import failed: ${err.message}`);
-          return;
+          return null;
         }
 
         if (summary.system.skipped) {
           // "already exists — skipped" stays a toast; it does NOT open the report.
           ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
           await this._adminStore.refresh();
-          return;
+          return null;
         }
 
         const verb = summary.collisions.some(
@@ -588,16 +545,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
         await this._adminStore.refresh();
 
-        // Post-import GM-readable report (informational DialogV2 — single OK).
-        const content = buildImportReportContent(summary, (key, data) => localize(key, data));
-        await DialogV2.wait({
-          window: { title: content.title },
-          content: renderImportReportHtml(content),
-          buttons: [
-            { action: 'ok', label: localize('FABRICATE.Admin.ImportReport.Close'), default: true },
-          ],
-          rejectClose: false,
-        });
+        // Post-import GM-readable report. Assembly stays here (pure + Foundry-free);
+        // the manager root renders the returned content in `ImportReportModal`.
+        return buildImportReportContent(summary, (key, data) => localize(key, data));
       },
     };
   }

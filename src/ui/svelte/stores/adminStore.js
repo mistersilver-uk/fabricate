@@ -8600,8 +8600,12 @@ export function createAdminStore(services) {
     services.notify.info(`Exported "${system.name}" (${recipes.length} recipes).`);
   }
 
+  // Resolves to the post-import report content when an import ran to completion, and
+  // to null otherwise (cancelled, failed, or an existing system that was skipped). The
+  // manager root renders that content in `ImportReportModal`; before issue 877 the app
+  // shell rendered a raw-HTML DialogV2 itself and this returned nothing.
   async function importSystem() {
-    await services.renderSystemImportDialog();
+    return (await services.renderSystemImportDialog()) ?? null;
   }
 
   // --- Item/Component management ---

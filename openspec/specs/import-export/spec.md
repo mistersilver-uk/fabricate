@@ -70,7 +70,9 @@ External references point at world documents that may be absent: component `orig
 Import MUST accept the pre-`1.16.0` source-reference field names (`sourceUuid` / `sourceItemUuid` / `fallbackItemIds`) on components, recipe-item definitions, and tools, and emit the renamed fields (`registeredItemUuid` / `originItemUuid` / `aliasItemUuids`); an export produced after the rename carries the new names.
 Import MUST preserve unresolved references rather than dropping them.
 Import MUST return a structured `unresolvedReferences[]` collection, each entry carrying `kind`, `ownerType`, `ownerId`, `ownerName`, `referenceValue`, and a `disposition` of `remapped`, `retained`, or `reported`.
-Import MUST surface that collection to the GM in a readable report.
+Import MUST surface that collection to the GM in a readable report, grouped by reference kind, with each entry naming its owner and showing the unresolved reference value verbatim.
+Every `kind` and every `ownerType` the import can emit MUST have a localized label, including the values that reach the report only through a dynamic pass-through helper; the report MUST never display a raw localization key.
+A component's salvage result and catalyst references are owned by that COMPONENT, not by a recipe, and the report MUST label them accordingly.
 
 ### Copy-mode identifier rebinding
 
