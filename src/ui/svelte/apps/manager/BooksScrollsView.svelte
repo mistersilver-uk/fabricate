@@ -100,6 +100,22 @@
     return text('FABRICATE.Admin.Manager.BooksScrolls.RecipeCount', '{n} recipes').replace('{n}', count);
   }
 
+  // The type pill names the kind AND, for a multi-recipe item, how many recipes it
+  // holds ("3 Recipe Book"), matching the Knowledge surface so one recipe item is not
+  // described two different ways on two screens. `derivedType` stays the bare enum
+  // because the type FILTER above builds its options from those values.
+  function typePillLabel(item) {
+    const count = recipeCount(item);
+    if (count >= 2) {
+      return text(
+        'FABRICATE.Admin.Manager.BooksScrolls.TypeRecipeBook',
+        '{count} Recipe Book'
+      ).replace('{count}', count);
+    }
+    if (count === 1) return text('FABRICATE.Admin.Manager.BooksScrolls.TypeScroll', 'Scroll');
+    return text('FABRICATE.Admin.Manager.BooksScrolls.TypeIncomplete', 'Incomplete');
+  }
+
   // Use cap chip (item visibility mode). Reads the new `caps.item` shape; falls
   // back to a maxUses of 1 when absent.
   function useLimited(item) {
@@ -299,7 +315,7 @@
             >
               <img class="manager-books-scrolls-thumb" src={recipeItemImage(item)} alt="" />
               <span class="manager-books-scrolls-name" data-books-scrolls-name={item.id} title={item.resolvedName}>{item.resolvedName}</span>
-              <span class={`manager-chip manager-books-scrolls-type-pill ${recipeCount(item) === 0 ? 'is-danger' : 'is-neutral'}`} data-books-scrolls-type={item.id}>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+              <span class={`manager-chip manager-books-scrolls-type-pill ${recipeCount(item) === 0 ? 'is-danger' : 'is-neutral'}`} data-books-scrolls-type={item.id}>{typePillLabel(item)}</span>
               {#if item.linkMissing}
                 <span class="manager-chip is-danger manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
                   <i class="fas fa-link-slash" aria-hidden="true"></i>

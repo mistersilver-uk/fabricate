@@ -57,8 +57,17 @@
   // The enum `recipeItemTypeFromRecipeCount` returns is hard-coded English by
   // design (it is a diagnostic enum, not display copy), so the mapping to keys
   // happens HERE rather than by minting a second localized type vocabulary.
-  function typeLabel(type) {
-    if (type === 'Book') return text('FABRICATE.Admin.Manager.Knowledge.TypeBook', 'Book');
+  // A multi-recipe item carries its own count ("3 Recipe Book"), which is why the row
+  // no longer renders a separate "N recipe(s) inside" chip — that stated the same
+  // number twice. `recipeItemTypeFromRecipeCount` still returns the bare enum, because
+  // the Books & Scrolls type FILTER builds its options from those values and would
+  // otherwise grow one option per distinct count.
+  function typeLabel(type, count) {
+    if (type === 'Book') {
+      return fill(text('FABRICATE.Admin.Manager.Knowledge.TypeRecipeBook', '{count} Recipe Book'), {
+        count: Number(count) || 0,
+      });
+    }
     if (type === 'Scroll') return text('FABRICATE.Admin.Manager.Knowledge.TypeScroll', 'Scroll');
     return text('FABRICATE.Admin.Manager.Knowledge.TypeIncomplete', 'Incomplete');
   }
@@ -150,7 +159,9 @@
              state vocabulary and saves a line in the narrow band. -->
         <span class="manager-knowledge-copy-heading">
           <strong class="manager-knowledge-copy-name" title={copy.name}>{copy.name}</strong>
-          <span class="manager-chip" data-knowledge-type={copy.type}>{typeLabel(copy.type)}</span>
+          <span class="manager-chip" data-knowledge-type={copy.type} data-knowledge-recipe-count={copy.recipeCount}
+            >{typeLabel(copy.type, copy.recipeCount)}</span
+          >
           {#if copy.quantity > 1}
             <span class="manager-chip" data-knowledge-quantity>
               {fill(text('FABRICATE.Admin.Manager.Knowledge.Quantity', '×{quantity}'), { quantity: copy.quantity })}
@@ -182,11 +193,6 @@
               <span>{matchTierLabel(copy.matchTier)}</span>
             </span>
           {/if}
-          <span class="manager-chip is-neutral" data-knowledge-recipe-count>
-            {fill(text('FABRICATE.Admin.Manager.Knowledge.RecipesInside', '{count} recipe(s) inside'), {
-              count: copy.recipeCount,
-            })}
-          </span>
         </span>
       </span>
     </span>

@@ -56,7 +56,9 @@ describe('ItemPageInspector (mounted)', () => {
   it('renders the name, type, description, and a "recipes inside" preview with a +N more line', async () => {
     const root = await harness.mount({ item: makeItem(), visibilityMode: 'knowledge' });
     assert.equal(root.querySelector('[data-item-page-name]').textContent.trim(), "Journeyman's Primer");
-    assert.equal(root.querySelector('[data-item-page-type]').textContent.trim(), 'Book');
+    // The pill names the recipe count for a multi-recipe item (5 in this fixture),
+    // matching the Books & Scrolls library row and the Knowledge surface.
+    assert.equal(root.querySelector('[data-item-page-type]').textContent.trim(), '5 Recipe Book');
     assert.equal(root.querySelector('[data-item-page-desc]').textContent.trim(), 'Starter recipes for every apprentice.');
 
     // Only the first three recipes preview; the rest collapse into "+2 more".

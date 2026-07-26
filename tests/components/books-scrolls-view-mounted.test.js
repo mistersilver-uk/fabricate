@@ -75,7 +75,10 @@ describe('BooksScrollsView (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-books-scrolls-item]').length, 3);
     assert.equal(root.querySelector('[data-books-scrolls-name="primer"]').textContent.trim(), "Journeyman's Primer");
     // Type pill: Book (2+ recipes) is neutral, Scroll (1) is neutral, Incomplete (0) is danger.
-    assert.equal(root.querySelector('[data-books-scrolls-type="primer"]').textContent.trim(), 'Book');
+    // A multi-recipe item names its own count in the type pill, matching the
+    // Knowledge surface; a single-recipe item stays "Scroll" and an empty one
+    // "Incomplete".
+    assert.equal(root.querySelector('[data-books-scrolls-type="primer"]').textContent.trim(), '2 Recipe Book');
     assert.ok(!root.querySelector('[data-books-scrolls-type="primer"]').classList.contains('is-danger'));
     assert.equal(root.querySelector('[data-books-scrolls-type="scroll"]').textContent.trim(), 'Scroll');
     assert.equal(root.querySelector('[data-books-scrolls-recipe-count="primer"] span').textContent.trim(), '2 recipes');

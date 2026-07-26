@@ -283,9 +283,15 @@ describe('KnowledgeView mounted behaviour', () => {
     // keyboard GM is walking a multi-use copy with. Moving it here would force a
     // re-tab after every single charge.
     assert.equal(target.ownerDocument.activeElement, expend, 'Expend keeps its own focus');
+    // The type pill carries the count for a multi-recipe item, so the row no longer
+    // renders a separate "N recipe(s) inside" chip stating the same number twice.
     assert.match(
+      target.querySelector('[data-knowledge-copy="i1"] [data-knowledge-type]').textContent,
+      /2 Recipe Book/
+    );
+    assert.doesNotMatch(
       target.querySelector('[data-knowledge-copy="i1"]').textContent,
-      /2 recipe\(s\) inside/
+      /recipe\(s\) inside/
     );
     assert.equal(
       target.querySelector('[data-knowledge-copy="i1"] [data-knowledge-type]').dataset

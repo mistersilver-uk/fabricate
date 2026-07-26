@@ -4561,7 +4561,7 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
     }
 
     // PASS 2 — link membership now that every copy exists. The Type pill and the
-    // "N recipe(s) inside" sub-label read truthfully from here on.
+    // count in the type pill ("N Recipe Book") read truthfully from here on.
     for (const definitionId of definitionIds) {
       await csm.updateRecipeItemDefinition(systemId, definitionId, { recipeIds: [recipeId] });
     }
