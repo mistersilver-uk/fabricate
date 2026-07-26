@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG, DEFAULT_GATHERING_TASK_IMG } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
@@ -147,7 +148,11 @@
     </div>
 
     {#if included.length === 0}
-      <p class="manager-muted manager-environment-comp-empty">{kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedEvents', 'No events are available in this environment yet.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedTasks', 'No tasks are available in this environment yet.')}</p>
+      <EmptyState
+        compact
+        icon={kind === 'event' ? 'fas fa-masks-theater' : 'fas fa-list-check'}
+        title={kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedEvents', 'No events are available in this environment yet.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedTasks', 'No tasks are available in this environment yet.')}
+      />
     {:else}
       <ul class="manager-environment-comp-rows">
         {#each included as entry, index (entry.id)}
@@ -252,7 +257,11 @@
         <span class="manager-environment-comp-count">{availableToAdd.length} {unit}</span>
       </header>
       {#if availableToAdd.length === 0}
-        <p class="manager-muted manager-environment-comp-empty">{kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableEventsToAdd', 'No matching or non-matching events to add.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableTasksToAdd', 'No matching or non-matching tasks to add.')}</p>
+        <EmptyState
+          compact
+          icon="fas fa-circle-plus"
+          title={kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableEventsToAdd', 'No matching or non-matching events to add.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableTasksToAdd', 'No matching or non-matching tasks to add.')}
+        />
       {:else}
         <ul class="manager-environment-comp-rows is-available-to-add">
           {#each availableToAdd as entry (entry.id)}
@@ -334,7 +343,11 @@
         <span class="manager-environment-comp-count">{excluded.length} {unit}</span>
       </header>
       {#if excluded.length === 0}
-        <p class="manager-muted manager-environment-comp-empty">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoExcluded', 'Nothing is excluded.')}</p>
+        <EmptyState
+          compact
+          icon="fas fa-ban"
+          title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoExcluded', 'Nothing is excluded.')}
+        />
       {:else}
         <ul class="manager-environment-comp-rows">
           {#each excluded as entry (entry.id)}
@@ -390,7 +403,11 @@
         <span class="manager-environment-comp-count">{nonMatching.length} {unit}</span>
       </header>
       {#if nonMatching.length === 0}
-        <p class="manager-muted manager-environment-comp-empty">{kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingEvents', 'No non-matching or disabled events.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingTasks', 'No non-matching or disabled tasks.')}</p>
+        <EmptyState
+          compact
+          icon="fas fa-filter-circle-xmark"
+          title={kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingEvents', 'No non-matching or disabled events.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingTasks', 'No non-matching or disabled tasks.')}
+        />
       {:else}
         <ul class="manager-environment-comp-rows is-non-matching">
           {#each paginatedNonMatching as entry (entry.id)}

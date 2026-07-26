@@ -10,6 +10,7 @@
   store's confirm dialog with referenced-by evidence.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
 
@@ -130,7 +131,11 @@
   </form>
 
   {#if realmList.length === 0}
-    <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')}</p>
+    <EmptyState
+      compact
+      icon="fas fa-earth-americas"
+      title={text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')}
+    />
   {:else}
     <div class="manager-travel-realm-layout">
       <ul class="manager-travel-realm-list" aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.ListLabel', 'Realms')}>

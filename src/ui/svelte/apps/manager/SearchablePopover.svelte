@@ -49,6 +49,7 @@
     onChoose(id) — called with the chosen option id
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../actions/portal.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
@@ -301,7 +302,7 @@
           {#each filteredOptions as option (option.id)}
             {@render optionRow(option)}
           {:else}
-            <p class="manager-travel-empty-hint">{emptyHint}</p>
+            <EmptyState compact icon="fas fa-magnifying-glass" title={emptyHint} />
           {/each}
         {/if}
       </div>

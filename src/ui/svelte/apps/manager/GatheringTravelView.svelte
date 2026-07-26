@@ -19,6 +19,7 @@
   player-facing channel beyond what the GM is permitted to see.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringRealmQuickList from './GatheringRealmQuickList.svelte';
@@ -225,7 +226,11 @@
       </div>
 
       {#if !hasParties}
-        <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.PartyListEmpty', 'No parties yet.')}</p>
+        <EmptyState
+          compact
+          icon="fas fa-users"
+          title={text('FABRICATE.Admin.Manager.Travel.PartyListEmpty', 'No parties yet.')}
+        />
       {:else}
         <ul class="manager-travel-party-rows">
           {#each parties as party (party.id)}
@@ -271,7 +276,11 @@
           </ol>
         </div>
       {:else if !selectedParty}
-        <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.SelectPartyHint', 'Select a party to manage its members, travel actor, and current realm.')}</p>
+        <EmptyState
+          compact
+          icon="fas fa-hand-pointer"
+          title={text('FABRICATE.Admin.Manager.Travel.SelectPartyHint', 'Select a party to manage its members, travel actor, and current realm.')}
+        />
       {:else}
         <!-- Rename + enable -->
         <div class="manager-travel-party-head">
@@ -322,7 +331,11 @@
             <p class="manager-travel-field-error" id="manager-travel-member-error" role="alert">{fieldErrors.members}</p>
           {/if}
           {#if selectedParty.memberCards.length === 0}
-            <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}</p>
+            <EmptyState
+              compact
+              icon="fas fa-user-plus"
+              title={text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}
+            />
           {:else}
             <ul class="manager-travel-member-list">
               {#each selectedParty.memberCards as member (member.uuid)}
@@ -411,7 +424,11 @@
                       <span class="manager-travel-option-name">{actor.name}</span>
                     </button>
                   {:else}
-                    <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-user-plus"
+                      title={text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}
+                    />
                   {/each}
                 </div>
               </div>
@@ -445,7 +462,13 @@
                 <i class="fas fa-times" aria-hidden="true"></i>
               </button>
             {:else}
-              <span class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.TravelActorEmpty', 'No travel actor assigned.')}</span>
+              <!-- NOT a no-state panel: this is the inline VALUE slot of the current
+                   travel-actor row, sitting where the portrait + name would be, beside
+                   the row's clear button and the picker trigger. It stays a plain inline
+                   hint (`.manager-travel-hint`, the rule the deleted
+                   `.manager-travel-empty-hint` shared) rather than becoming an
+                   `EmptyState`, which would put a dashed panel inside a control row. -->
+              <span class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.TravelActorEmpty', 'No travel actor assigned.')}</span>
             {/if}
           </div>
 
@@ -484,7 +507,11 @@
                       <span class="manager-travel-option-name">{actor.name}</span>
                     </button>
                   {:else}
-                    <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.NoActorsInWorld', 'No actors exist in this world yet — create an Actor first.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-user-slash"
+                      title={text('FABRICATE.Admin.Manager.Travel.NoActorsInWorld', 'No actors exist in this world yet — create an Actor first.')}
+                    />
                   {/each}
                 </div>
               </div>
@@ -498,7 +525,11 @@
           <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.OverrideHint', "Set the party's current realm for this crafting system.")}</p>
 
           {#if !hasRealms}
-            <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')}</p>
+            <EmptyState
+              compact
+              icon="fas fa-earth-americas"
+              title={text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')}
+            />
           {:else}
             <div class="manager-travel-realm-chips" role="group" aria-label={text('FABRICATE.Admin.Manager.Travel.RealmSelectLabel', 'Override realms')}>
               {#each systemRealms as realm (realm.id)}

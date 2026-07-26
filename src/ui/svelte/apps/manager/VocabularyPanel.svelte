@@ -17,6 +17,7 @@
   each tab keeps its own distinct test hook rather than three tabs colliding on one.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
 
@@ -288,16 +289,19 @@
       </div>
     {/each}
     {#if showNoResults}
-      <div class="manager-vocabulary-noresults">
-        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-        <span>{searchMissTitle.replace('{query}', searchTerm.trim())}</span>
-      </div>
+      <EmptyState
+        compact
+        icon="fas fa-magnifying-glass"
+        title={searchMissTitle.replace('{query}', searchTerm.trim())}
+        contextClass="manager-vocabulary-empty-panel"
+      />
     {:else if showEmpty}
-      <div class="manager-vocabulary-empty">
-        <span class="manager-vocabulary-empty-icon" aria-hidden="true"><i class={emptyIcon}></i></span>
-        <strong>{emptyTitle}</strong>
-        <span>{emptyHint}</span>
-      </div>
+      <EmptyState
+        icon={emptyIcon}
+        title={emptyTitle}
+        hint={emptyHint}
+        contextClass="manager-vocabulary-empty-panel"
+      />
     {/if}
   </div>
 </section>

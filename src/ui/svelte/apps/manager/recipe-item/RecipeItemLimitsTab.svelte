@@ -27,6 +27,7 @@
    - onPatch(patch).
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../SegmentedControl.svelte';
 
@@ -348,7 +349,12 @@
                 <span id="recipe-item-required-knowledge-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge', 'Required Knowledge')}</span>
                 <p class="manager-muted manager-recipe-item-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeHint', 'The character must already know these recipes to learn from this book or scroll.')}</p>
                 {#if prerequisiteOptions.length === 0}
-                  <p class="manager-muted manager-recipe-item-prereq-empty" data-recipe-item-required-knowledge-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeEmpty', 'No recipes to require yet')}</p>
+                  <EmptyState
+                    compact
+                    icon="fas fa-graduation-cap"
+                    title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeEmpty', 'No recipes to require yet')}
+                    dataAttr="data-recipe-item-required-knowledge-empty"
+                  />
                 {:else}
                   <div class="manager-tag-search">
                     <input
@@ -399,7 +405,12 @@
                 <span id="recipe-item-character-prereqs-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites', 'Learning prerequisites')}</span>
                 <p class="manager-muted manager-recipe-item-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesHint', 'The character must have these attributes to learn.')}</p>
                 {#if characterPrerequisites.length === 0}
-                  <p class="manager-muted manager-recipe-item-prereq-empty" data-recipe-item-character-prereq-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone', 'No prerequisites yet — add them in System Settings.')}</p>
+                  <EmptyState
+                    compact
+                    icon="fas fa-user-shield"
+                    title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone', 'No prerequisites yet — add them in System Settings.')}
+                    dataAttr="data-recipe-item-character-prereq-empty"
+                  />
                 {:else}
                   <div class="manager-tag-search">
                     <input
@@ -487,16 +498,9 @@
     line-height: 1.4;
   }
 
-  /* Inline empty state shown instead of the search input when a column has no
-     options — a real, readable text node (not a disabled-input placeholder). */
-  .manager-recipe-item-prereq-empty {
-    margin: 0;
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px dashed var(--fab-border);
-    border-radius: 6px;
-    font-size: 0.72rem;
-    line-height: 1.4;
-  }
+  /* The inline empty state shown instead of the search input when a column has no
+     options is the shared `EmptyState` primitive at the compact scale; its own dashed
+     panel used to be re-derived here. */
 
   /* The typeahead search stretches to fill its column width (overrides the global
      toolbar-oriented max-width/min-width so a narrow column can't overflow), but
