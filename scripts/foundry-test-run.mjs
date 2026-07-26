@@ -6875,7 +6875,14 @@ async function main() {
           // Two authored recipe categories, so the library's group-by-category treatment
           // is exercised with MORE THAN ONE group. A single "General" bucket proves
           // nothing about grouping (issue 643).
-          recipeCategories: ['Alchemy', 'Smithing'],
+          //
+          // The key is `categories`, NOT `recipeCategories`: `_normalizeSystem` reads
+          // `system.categories` (CraftingSystemManager.js), while `recipeCategories` at
+          // system level is the FEATURE-FLAG BOOLEAN. One name, two meanings, and no
+          // alias between them — so the array seeded under the flag's name was silently
+          // discarded and this fixture had zero authored categories for as long as the
+          // seed has existed, leaving issue 643's grouping treatment unexercised.
+          categories: ['Alchemy', 'Smithing'],
           requirements: {
             currency: {
               enabled: true,
