@@ -20683,6 +20683,10 @@
 
 .fabricate-manager .manager-knowledge-copy-meta {
   display: inline-flex;
+
+  /* The source name and the no-refund clause share this line, so it wraps rather than
+     clipping in the 832–1000px band where the detail pane is at its narrowest. */
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-1);
   min-width: 0;
@@ -20691,14 +20695,20 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-knowledge-frees-no-slot {
+/* The no-refund clause rides INSIDE the source line rather than on its own row, so it
+   inherits that line's size and spacing and only overrides the tone. It replaced a
+   separate `.manager-knowledge-frees-no-slot` sub-label whose text restated the cause
+   the source line had already given. */
+.fabricate-manager .manager-knowledge-no-refund {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);
+
+  /* Doubles the parent's 4px gap so the clause reads as a separate statement from the
+     source name rather than running on from it. */
+  margin-inline-start: var(--fab-space-1);
   min-width: 0;
   color: var(--fab-warning-text);
-  font-size: 0.62rem;
-  line-height: 1.35;
 }
 
 .fabricate-manager .manager-knowledge-row-actions {

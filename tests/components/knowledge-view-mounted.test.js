@@ -377,6 +377,15 @@ describe('KnowledgeView mounted behaviour', () => {
                   recipeName: 'Field Poultice',
                   sourceItemUuid: null,
                 }),
+                // The copy IS still owned here — only the learn cap is missing. This is
+                // why the clause stays cause-specific: "no owned copy to refund" would
+                // be a false statement about this row.
+                rawLearned({
+                  recipeId: 'r4',
+                  recipeName: 'Tincture of Ash',
+                  sourceCapped: false,
+                  sourceItemName: 'Uncapped Compendium',
+                }),
               ],
             }),
           ],
@@ -387,12 +396,44 @@ describe('KnowledgeView mounted behaviour', () => {
     const owned = target.querySelector('[data-knowledge-learned="r1"]');
     const lost = target.querySelector('[data-knowledge-learned="r2"]');
     const auto = target.querySelector('[data-knowledge-learned="r3"]');
+    const uncapped = target.querySelector('[data-knowledge-learned="r4"]');
+
+    // A refundable row carries the source line alone — no clause, no second sub-label.
     assert.match(owned.textContent, /Learned from Alchemist Cook Book/);
-    assert.equal(owned.querySelector('[data-knowledge-frees-no-slot]'), null);
-    assert.match(lost.textContent, /Learned from Scroll of Elixirs \(copy no longer owned\)/);
-    assert.ok(lost.querySelector('[data-knowledge-frees-no-slot]'));
+    assert.equal(owned.querySelector('[data-knowledge-no-refund]'), null);
+
+    // The other three state the reason as ONE icon-led clause inside the source line.
+    // The old markup rendered a separate "Frees no slot" label whose cause the source
+    // line had already given, so the row said the same thing twice.
+    const clause = (row) => row.querySelector('[data-knowledge-no-refund]');
+
+    assert.match(lost.textContent, /Learned from Scroll of Elixirs/);
+    assert.equal(clause(lost).dataset.knowledgeNoRefund, 'notOwned');
+    assert.match(clause(lost).textContent, /no owned copy to refund/);
+    assert.ok(clause(lost).querySelector('i.fas'), 'the clause leads with an icon');
+    // The parenthetical is retired: the clause is now the single statement of the cause.
+    assert.doesNotMatch(lost.textContent, /copy no longer owned/);
+
     assert.match(auto.textContent, /Learned by crafting/);
-    assert.ok(auto.querySelector('[data-knowledge-frees-no-slot]'));
+    assert.equal(clause(auto).dataset.knowledgeNoRefund, 'noSource');
+    assert.match(clause(auto).textContent, /no source copy to refund/);
+
+    // Owned copy, no learn cap: the clause must NOT claim the copy is missing.
+    assert.match(uncapped.textContent, /Learned from Uncapped Compendium/);
+    assert.equal(clause(uncapped).dataset.knowledgeNoRefund, 'uncapped');
+    assert.match(clause(uncapped).textContent, /no learn limit to refund/);
+    assert.doesNotMatch(uncapped.textContent, /no owned copy/);
+
+    // Every clause sits INSIDE the source line, never as a second sub-label.
+    for (const row of [lost, auto, uncapped]) {
+      assert.ok(
+        row.querySelector('[data-knowledge-source] [data-knowledge-no-refund]'),
+        'the clause must be nested in the source line'
+      );
+    }
+
+    // Nothing anywhere still renders the retired sub-label.
+    assert.equal(target.querySelector('[data-knowledge-frees-no-slot]'), null);
   });
 
   it('shows a per-character fact cluster and hides the zero-valued roll-ups', async () => {

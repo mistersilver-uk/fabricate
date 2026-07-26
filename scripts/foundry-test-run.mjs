@@ -4434,7 +4434,7 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
  *
  * A grant-only access fixture actor carries a learned entry whose `sourceItemUuid`
  * dangles (its copy is gone) and NO owned copies, which gives both the "copy no longer
- * owned" source rung with its "Frees no slot" sub-label and a dashed empty tab state.
+ * owned" source rung with its icon-led no-refund clause and a dashed empty tab state.
  * Its untouched siblings stay empty-inventory, which is what puts the dimmed "Nothing
  * tracked" row in the roster.
  *
@@ -4801,12 +4801,16 @@ async function exerciseKnowledgeSurface(page, { fixture }) {
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-knowledge-empty-tab');
 
-  // (3) Learned recipes — the "copy no longer owned" source rung and the per-row
-  // "Frees no slot" sub-label that states D7's prohibition positively.
+  // (3) Learned recipes — the lost-copy source rung, and the icon-led no-refund clause
+  // that states D7's prohibition positively. The clause is nested INSIDE the source
+  // line (it replaced a separate sub-label that restated the source line's own cause),
+  // so assert the nesting rather than just its presence.
   await openKnowledgeTab('learnedRecipes');
   await page.locator('.fabricate-manager [data-knowledge-source="lostCopy"]').first()
     .waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator('.fabricate-manager [data-knowledge-frees-no-slot]').first()
+  await page
+    .locator('.fabricate-manager [data-knowledge-source="lostCopy"] [data-knowledge-no-refund="notOwned"]')
+    .first()
     .waitFor({ state: 'visible', timeout: 5_000 });
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-knowledge-learned-lost-copy');

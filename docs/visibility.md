@@ -413,13 +413,13 @@ Each row has two actions.
 This tab lists every recipe the selected character has learned, one row per recipe, independently of which copies they currently own.
 A learned recipe is never removed just because its source copy is gone.
 Each row shows the recipe's image, name, and category, and a line naming where it was learned from.
-When the source copy is gone, the line still names the book or scroll it came from, marked as no longer owned.
+When the source copy is gone, the line still names the book or scroll it came from.
 
 Each row has one action, **Erase memory**, which un-learns the recipe for this character.
 It asks you to confirm first, the same click-to-arm, click-to-confirm pattern as Delete on the Recipe items tab.
 Erasing frees up a learning slot on the source book only when that book still has a copy this character owns, and only when that book's **Limited learning** is on.
 An automatically learned recipe, one whose source copy is gone, or one whose source book has no learning limit, all free nothing when erased.
-Such a row is labelled **Frees no slot** so you know what to expect before you act.
+Such a row says so at the end of its **Learned from** line, naming the reason — no owned copy to refund, no source copy to refund, or no learn limit to refund — so you know what to expect before you act.
 Erasing leaves the character's discovery progress on that recipe untouched, unlike the reset control below.
 
 ### Erase Memory Before Delete

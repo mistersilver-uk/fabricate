@@ -3,7 +3,7 @@
   The Learned recipes tab of the Knowledge surface (issue 785).
 
   Its single banner states the general rule WITHOUT promising slot recovery: the
-  per-row truth is the "Frees no slot" sub-label each affected row carries, which
+  per-row truth is the no-refund clause each affected row carries on its source line, which
   turns the prohibition into a positive statement. The erase-vs-reset
   `discoveryProgress` asymmetry is disclosed in the reset dialog instead — it is
   only actionable once the GM picks a grain — so no third strip lands here.

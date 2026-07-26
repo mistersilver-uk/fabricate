@@ -827,8 +827,9 @@ The chips are the row's only status signal, and compositing them through a group
 The other tiers are diagnostic rather than actionable and are carried in the row's title, so the narrowest pane is not given a bare fourth chip on every row.
 - Expend does **not** move focus: the row survives, so its own button keeps focus and a keyboard GM can walk a multi-use copy without re-tabbing.
 Only the destructive actions, whose row unmounts, move focus to the owning tab panel.
-- A learned row whose source copy is gone states that fact in its source line, and any learned row whose erase will free no budget carries a per-row "Frees no slot" sub-label rather than a banner promise the erase cannot keep.
-The sub-label's condition is the full four-condition rule in Knowledge Reset / Erase, which includes a still-owned source copy whose definition simply carries no learn cap — a case the three early-returns do not cover.
+- A learned row whose erase will free no budget states WHY as a single icon-led clause appended to its source line, rather than a banner promise the erase cannot keep.
+It MUST NOT be a second sub-label: the previous pairing stated one fact twice, because a source line reading "(copy no longer owned)" was itself the cause of a separate "Frees no slot".
+The clause is cause-SPECIFIC and MUST NOT collapse to one string, because the condition is the full four-condition rule in Knowledge Reset / Erase: a still-owned source copy whose definition carries no learn cap frees nothing, so a clause claiming there is no owned copy would be false for that row.
 
 **Confirmation affordance.** The two high-frequency row actions (Delete a copy, Erase a memory) use an inline two-step arm rather than a modal: the first click arms the control, the second executes.
 It is a real focusable `button`, its icon swaps as well as its label so the state survives greyscale, its `aria-label` carries the full consequence sentence, and `data-armed` is the test hook.
@@ -848,7 +849,7 @@ The dialog body is where the erase-versus-reset discovery-progress asymmetry is 
 The Recipe items tab carries one persistent info banner naming what its two row actions do — expending a use spends one charge as if the character read the item, and deleting removes the copy from their pack entirely.
 It is not a restatement of the page subtitle two rows above it.
 The party-pool ordering hazard renders as a **conditional** warning band, raised only when the selected character owns a `learnScope: "total"` copy that is the source of a still-learned entry; a permanent band for a conditional hazard is noise.
-The Learned recipes tab's band states the general rule without promising slot recovery, and the per-row "Frees no slot" sub-label carries the per-row truth.
+The Learned recipes tab's band states the general rule without promising slot recovery, and the per-row no-refund clause carries the per-row truth.
 
 **Refresh and reference contract.** The projection MUST NOT join the shared admin-store `refresh()`, which ~40 mutation paths invoke and which has no cheap invalidation signature for a whole-world actors-by-items scan.
 It is computed by a separate refresh gated on a `knowledgeActive` flag, so it is a total no-op while the surface is closed, and while the surface is open the externally-driven actor/item hooks coalesce into one refresh through the existing microtask scheduler.

@@ -23,6 +23,16 @@ export const USES_CHIP_REMAINING = 'remaining';
 export const USES_CHIP_SPENT = 'spent';
 
 /** How a learned entry's source is displayed; the ladder is in `learnedRecipeSource`. */
+/**
+ * Why an erase frees no learn budget. Rendered as a single trailing clause on the
+ * learned row's source line, replacing the old separate "Frees no slot" sub-label,
+ * which restated a cause the same row had already given ("copy no longer owned").
+ */
+export const NO_REFUND_NONE = '';
+export const NO_REFUND_NO_SOURCE = 'noSource';
+export const NO_REFUND_NOT_OWNED = 'notOwned';
+export const NO_REFUND_UNCAPPED = 'uncapped';
+
 export const LEARNED_SOURCE_OWNED_COPY = 'ownedCopy';
 export const LEARNED_SOURCE_LOST_COPY = 'lostCopy';
 export const LEARNED_SOURCE_UUID = 'uuid';
@@ -193,9 +203,28 @@ export function learnedRecipeSource(raw = {}) {
  * @returns {boolean}
  */
 export function eraseFreesNoSlot(raw = {}) {
-  if (!raw.sourceItemUuid) return true;
-  if (raw.sourceOwned !== true) return true;
-  return raw.sourceCapped !== true;
+  return eraseNoRefundReason(raw) !== NO_REFUND_NONE;
+}
+
+/**
+ * WHY erasing this entry frees no learn budget, or `NO_REFUND_NONE` when it does.
+ *
+ * The three reasons are NOT interchangeable in the UI, which is the whole point of
+ * naming them: only `NO_REFUND_NOT_OWNED` is caused by the copy being gone. Under
+ * `NO_REFUND_UNCAPPED` the copy IS still owned and the source line says so, so a
+ * blanket "no owned copy to refund" would be a false statement about that row.
+ *
+ * `eraseFreesNoSlot` is derived from this, so the boolean and the reason cannot
+ * disagree about whether a refund happens.
+ *
+ * @param {{sourceItemUuid?: string|null, sourceOwned?: boolean, sourceCapped?: boolean}} raw
+ * @returns {string} one of the `NO_REFUND_*` values
+ */
+export function eraseNoRefundReason(raw = {}) {
+  if (!raw.sourceItemUuid) return NO_REFUND_NO_SOURCE;
+  if (raw.sourceOwned !== true) return NO_REFUND_NOT_OWNED;
+  if (raw.sourceCapped !== true) return NO_REFUND_UNCAPPED;
+  return NO_REFUND_NONE;
 }
 
 /**
@@ -256,6 +285,7 @@ export function projectLearnedRecipeRow(raw = {}) {
     sourceKind: source.kind,
     sourceName: source.name,
     freesNoSlot: eraseFreesNoSlot(raw),
+    noRefundReason: eraseNoRefundReason(raw),
   };
 }
 
