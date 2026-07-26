@@ -13,8 +13,14 @@
  * default capturing stub outright.
  */
 
+// Sonar flags `Math.random()` as S2245 (a MAJOR vulnerability) even in test code,
+// and a single new-code finding above rating A fails the quality gate. A monotonic
+// counter is both gate-safe and strictly better here: fixture ids become
+// deterministic, so a failing assertion names the same recipe on every run.
+let recipeIdSequence = 0;
+
 export function makeRecipe(overrides = {}) {
-  const id = overrides.id || `recipe-${Math.random().toString(36).slice(2)}`;
+  const id = overrides.id || `recipe-${(recipeIdSequence += 1)}`;
   const name = overrides.name || `Recipe ${id}`;
   const craftingSystemId = overrides.craftingSystemId || 'sys1';
   return {
