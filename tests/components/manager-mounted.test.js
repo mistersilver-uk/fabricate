@@ -166,8 +166,9 @@ function compileManagerRoot() {
   // are always rendered in the root tree, so omitting either HANGS the mounted suite.
   writeCompiledSvelte('src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte');
-  // The shared modal chrome both import-flow modals render through (issue 877). Same
-  // rule as above: an omission cancels the suite, never fails it.
+  // The post-import reference report and the shared modal chrome both modals render
+  // through (issue 877). Same rule as above: an omission cancels the suite, never fails it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ImportReportModal.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ManagerModal.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/AccessTabView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GrantAccessInspector.svelte');

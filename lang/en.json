@@ -1177,6 +1177,7 @@
         "HeadlineNeedsAttention": "Import succeeded — {count} reference(s) need attention.",
         "HeadlineAllResolved": "Import succeeded — all references resolved.",
         "EmptyState": "Nothing needs your attention.",
+        "EmptyStateTitle": "Everything resolved",
         "HandledLine": "{count} reference(s) resolved automatically.",
         "Close": "Close",
         "Kind": {
