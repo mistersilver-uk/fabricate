@@ -42,7 +42,7 @@
   {#if learnedRecipes.length === 0}
     <div class="manager-empty" data-knowledge-learned-empty>
       <div>
-        <i class="fas fa-brain" aria-hidden="true"></i>
+        <i class="fas fa-graduation-cap" aria-hidden="true"></i>
         <h3>{text('FABRICATE.Admin.Manager.Knowledge.LearnedEmptyTitle', 'Nothing learned yet')}</h3>
         <p>{text(
           'FABRICATE.Admin.Manager.Knowledge.LearnedEmptyHint',

@@ -118,7 +118,7 @@ for (const { visibilityMode, resolutionMode, expected } of KNOWLEDGE_GATE_CASES)
   });
 }
 
-test('the Knowledge entry carries no count badge and the boxes-stacked icon', () => {
+test('the Knowledge entry carries no count badge and the brain icon', () => {
   const items = buildCraftingNavItems({
     visibilityMode: 'knowledge',
     recipeCount: 7,
@@ -126,7 +126,7 @@ test('the Knowledge entry carries no count badge and the boxes-stacked icon', ()
   });
   const knowledge = items.find((item) => item.id === 'knowledge');
   assert.equal(knowledge.view, 'knowledge');
-  assert.equal(knowledge.icon, 'fas fa-boxes-stacked');
+  assert.equal(knowledge.icon, 'fas fa-brain');
   assert.equal(knowledge.labelKey, 'FABRICATE.Admin.Manager.Nav.Knowledge');
   assert.equal(knowledge.labelFallback, 'Knowledge');
   // A count property would change the Crafting parent badge, which sums

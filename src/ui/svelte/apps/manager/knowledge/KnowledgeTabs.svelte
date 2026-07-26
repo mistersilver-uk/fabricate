@@ -26,7 +26,9 @@
 
   const tabs = [
     [KNOWLEDGE_TAB_RECIPE_ITEMS, 'fas fa-book'],
-    [KNOWLEDGE_TAB_LEARNED_RECIPES, 'fas fa-brain'],
+    // `fa-graduation-cap` is the prototype's glyph for this tab, and it also keeps the
+    // inner tab distinct from the rail entry, which now carries `fa-brain`.
+    [KNOWLEDGE_TAB_LEARNED_RECIPES, 'fas fa-graduation-cap'],
   ];
 
   function text(key, fallback) {

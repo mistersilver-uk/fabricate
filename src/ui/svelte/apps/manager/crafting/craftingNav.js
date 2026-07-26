@@ -120,7 +120,7 @@ export function buildCraftingNavItems({
     items.push({
       id: 'knowledge',
       view: 'knowledge',
-      icon: 'fas fa-boxes-stacked',
+      icon: 'fas fa-brain',
       labelKey: 'FABRICATE.Admin.Manager.Nav.Knowledge',
       labelFallback: 'Knowledge',
     });
