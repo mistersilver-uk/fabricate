@@ -6,6 +6,10 @@
   add form, and rows. The right inspector rail (stat tiles, contextual help,
   reference-safe reassurance) lives in the shared manager inspector slot in
   CraftingSystemManagerRoot, not here.
+
+  The strip uses the shared `.manager-editor-tab*` treatment every other manager tab
+  bar uses (issue 878) rather than its own vocabulary-only look, and the view renders
+  NO page header of its own — the shell's `.manager-header` is the only one.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -72,6 +76,26 @@
       count: counts.itemTags || 0,
     },
   ]);
+
+  // Roving-tabindex arrow/Home/End focus move, matching `knowledge/KnowledgeTabs` and
+  // `recipe-item/RecipeItemEditorTabs` (issue 878) — this strip now shares their
+  // `.manager-editor-tab*` treatment, so it shares their keyboard contract too.
+  function handleTabKeydown(event, index) {
+    const lastIndex = tabs.length - 1;
+    let nextIndex = null;
+    if (event.key === 'ArrowRight') nextIndex = index === lastIndex ? 0 : index + 1;
+    if (event.key === 'ArrowLeft') nextIndex = index === 0 ? lastIndex : index - 1;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = lastIndex;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex].id;
+    onTabChange(nextTab);
+    event.currentTarget
+      .closest('[role="tablist"]')
+      ?.querySelector(`#vocabulary-tab-${nextTab}`)
+      ?.focus();
+  }
 
   function existsIn(rows, value) {
     const normalized = String(value || '')
@@ -188,46 +212,40 @@
   class="manager-main manager-tags-categories"
   aria-label={text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.TagsCategories.Kicker', 'System vocabulary')}
-      </p>
-      <h2 class="manager-title">
-        {text('FABRICATE.Admin.Manager.TagsCategories.Library', 'Tags & Categories')}
-      </h2>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.TagsCategories.LibraryHint',
-          'Define the recipe categories, component categories and component tags the rest of the system references.'
-        )}
-      </p>
-    </div>
-  </section>
-
+  <!-- No per-view page header: the shell's `.manager-header` already renders the
+       "Tags & Categories" title and its subtitle, so a second one restated the title
+       inside the panel. Removed for the same reason as the components and recipes
+       libraries (issue 676) and Books & Scrolls (issue 785). -->
   <nav
-    class="manager-tabs manager-vocabulary-tabs"
+    class="manager-editor-tabs manager-vocabulary-tabs"
     role="tablist"
     aria-label={text('FABRICATE.Admin.Manager.TagsCategories.TabList', 'Vocabulary tabs')}
   >
-    {#each tabs as tab (tab.id)}
+    {#each tabs as tab, index (tab.id)}
       <button
         type="button"
         role="tab"
-        class={`manager-tab ${activeTab === tab.id ? 'is-active' : ''}`}
+        id={`vocabulary-tab-${tab.id}`}
+        class="manager-editor-tab-button"
+        class:is-active={activeTab === tab.id}
         aria-selected={activeTab === tab.id}
+        aria-controls={`vocabulary-panel-${tab.id}`}
+        tabindex={activeTab === tab.id ? 0 : -1}
         data-vocabulary-tab={tab.id}
         onclick={() => onTabChange(tab.id)}
+        onkeydown={(event) => handleTabKeydown(event, index)}
       >
         <i class={tab.icon} aria-hidden="true"></i>
         <span>{tab.label}</span>
-        <span class="manager-tab-count">{tab.count}</span>
+        <span class="manager-chip is-neutral manager-editor-tab-badge">{tab.count}</span>
       </button>
     {/each}
   </nav>
 
   <section
     class="manager-tags-categories-workspace"
+    role="tabpanel"
+    id={`vocabulary-panel-${activeTab}`}
     aria-label={text(
       'FABRICATE.Admin.Manager.TagsCategories.Workspace',
       'Tags and categories workspace'
@@ -294,15 +312,10 @@
         )}
         showIcon={true}
         iconLabel={text('FABRICATE.Admin.Manager.TagsCategories.IconLabel', 'Icon')}
-        iconPlaceholder={text(
-          'FABRICATE.Admin.Manager.TagsCategories.IconPlaceholder',
-          'e.g. fas fa-flask'
-        )}
         changeIconLabel={text(
           'FABRICATE.Admin.Manager.TagsCategories.ChangeIcon',
           'Change icon'
         )}
-        saveIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.SaveIcon', 'Save icon')}
         onAdd={onAddCategory}
         onRemove={(row) => onRemoveCategory(row.name)}
         onSetIcon={onSetCategoryIcon}
@@ -377,15 +390,10 @@
         )}
         showIcon={true}
         iconLabel={text('FABRICATE.Admin.Manager.TagsCategories.IconLabel', 'Icon')}
-        iconPlaceholder={text(
-          'FABRICATE.Admin.Manager.TagsCategories.IconPlaceholder',
-          'e.g. fas fa-flask'
-        )}
         changeIconLabel={text(
           'FABRICATE.Admin.Manager.TagsCategories.ChangeIcon',
           'Change icon'
         )}
-        saveIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.SaveIcon', 'Save icon')}
         onAdd={onAddComponentCategory}
         onRemove={(row) => onRemoveComponentCategory(row.name)}
         onSetIcon={onSetComponentCategoryIcon}

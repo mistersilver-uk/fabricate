@@ -628,8 +628,17 @@ export const KNOWN_ORPHANS = [
   'FABRICATE.Admin.Manager.TagsCategories.HowItWorksGeneral',
   'FABRICATE.Admin.Manager.TagsCategories.HowItWorksTags',
   'FABRICATE.Admin.Manager.TagsCategories.HowItWorksTitle',
+  // Both icon fields became the shared searchable IconPicker in issue 878, so neither a
+  // free-text Font Awesome placeholder nor a "Save icon" commit button exists any more.
+  'FABRICATE.Admin.Manager.TagsCategories.IconPlaceholder',
   'FABRICATE.Admin.Manager.TagsCategories.InspectorHint',
   'FABRICATE.Admin.Manager.TagsCategories.ItemTagCount',
+  // The view's duplicate page header was removed in issue 878 (the shell already renders
+  // one), exactly as issue 676 did for the components library and issue 785 for Books &
+  // Scrolls — whose `Library`/`LibraryHint` pairs sit in this list for the same reason.
+  'FABRICATE.Admin.Manager.TagsCategories.Kicker',
+  'FABRICATE.Admin.Manager.TagsCategories.Library',
+  'FABRICATE.Admin.Manager.TagsCategories.LibraryHint',
   'FABRICATE.Admin.Manager.TagsCategories.References',
   'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirm',
   'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirmTitle',
@@ -637,6 +646,9 @@ export const KNOWN_ORPHANS = [
   'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryConfirmTitle',
   'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirm',
   'FABRICATE.Admin.Manager.TagsCategories.RemoveTagConfirmTitle',
+  // See `IconPlaceholder` above: the icon popover commits the choice on select, so the
+  // click-to-expand editor's explicit save button is gone (issue 878).
+  'FABRICATE.Admin.Manager.TagsCategories.SaveIcon',
   'FABRICATE.Admin.Manager.TagsCategories.SearchLabel',
   'FABRICATE.Admin.Manager.TagsCategories.SearchPlaceholder',
   'FABRICATE.Admin.Manager.TagsCategories.Selected',

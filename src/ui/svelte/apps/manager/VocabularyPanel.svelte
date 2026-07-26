@@ -5,6 +5,11 @@
   search + entry-count row, and the row grid with per-category icons and an inline
   delete-confirm strip.
 
+  A row's icon IS the shared searchable `IconPicker` trigger (issue 878) — clicking it
+  opens the same popover the gathering time-of-day, weather and biome icon fields use,
+  and choosing an option commits immediately. It replaced a click-to-expand strip that
+  asked the GM to type a raw Font Awesome class and press "Save icon".
+
   Extracted when the screen gained its THIRD vocabulary (component categories, issue
   676) and redesigned into a tabbed screen (issue 689). Recipe categories, component
   categories, and item tags are structurally identical tabs over independent
@@ -18,6 +23,7 @@
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
+  import IconPicker from '../../components/IconPicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
 
@@ -55,10 +61,8 @@
     // category tabs — decorative only, so no add-form icon field and no click-to-edit.
     decorativeIcon = '',
     iconLabel = '',
-    iconPlaceholder = '',
     defaultIcon = 'fas fa-folder',
     changeIconLabel = '',
-    saveIconLabel = '',
     lockedHint = '',
     removeConfirmHint = '',
     confirmRemoveLabel = '',
@@ -68,8 +72,6 @@
 
   let searchTerm = $state('');
   let pendingRemovalId = $state('');
-  let editingIconId = $state('');
-  let editingIconValue = $state('');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -92,6 +94,13 @@
   // (no custom rows and no query) is the onboarding state. They render differently.
   const showNoResults = $derived(hasQuery && filteredRows.length === 0);
   const showEmpty = $derived(!hasQuery && (rows || []).length === 0);
+  const lockedFallbackHint = $derived(
+    lockedHint ||
+      text(
+        'FABRICATE.Admin.Manager.TagsCategories.BuiltInFallback',
+        'Built-in fallback — cannot be renamed or removed.'
+      )
+  );
 
   function matchesSearch(row) {
     if (!normalizedSearchTerm) return true;
@@ -136,17 +145,6 @@
     pendingRemovalId = '';
     onRemove(row);
   }
-
-  function startIconEdit(row) {
-    editingIconId = row.id;
-    editingIconValue = row.icon || '';
-  }
-
-  function saveIconEdit(row) {
-    onSetIcon(row.name, editingIconValue.trim());
-    editingIconId = '';
-    editingIconValue = '';
-  }
 </script>
 
 <section class="manager-vocabulary-panel" aria-label={label}>
@@ -163,7 +161,7 @@
     {addFailedFeedback}
     {showIcon}
     {iconLabel}
-    {iconPlaceholder}
+    {changeIconLabel}
     {defaultIcon}
     {onAdd}
   />
@@ -191,14 +189,17 @@
           <span class="manager-vocabulary-icon is-locked-icon" aria-hidden="true"
             ><i class="fas fa-lock"></i></span
           >
-          <div class="manager-vocabulary-main">
+          <!--
+            The reserved row's explanatory sentence sits INLINE beside the name and
+            truncates rather than stacking under it (issue 878). Stacked, it was the one
+            card in the grid with two lines of copy, so it outgrew every sibling row —
+            the grid is `align-items: start`, so the taller card simply stuck out. One
+            line keeps the row's height governed by the same 34px icon tile as the rest.
+          -->
+          <div class="manager-vocabulary-main is-inline">
             <strong>{lockedRow.name}</strong>
-            <span class="manager-muted"
-              >{lockedHint ||
-                text(
-                  'FABRICATE.Admin.Manager.TagsCategories.BuiltInFallback',
-                  'Built-in fallback — cannot be renamed or removed.'
-                )}</span
+            <span class="manager-muted manager-vocabulary-locked-hint" title={lockedFallbackHint}
+              >{lockedFallbackHint}</span
             >
           </div>
           {#if (lockedRow.totalUsage || 0) > 0}
@@ -219,15 +220,15 @@
       <div class="manager-vocabulary-card" {...{ [rowAttr]: row.id }}>
         <div class="manager-vocabulary-row">
           {#if showIcon}
-            <button
-              type="button"
-              class="manager-vocabulary-icon is-editable"
-              title={changeIconLabel}
-              aria-label={changeIconLabel}
-              onclick={() => startIconEdit(row)}
-            >
-              <i class={row.icon || defaultIcon} aria-hidden="true"></i>
-            </button>
+            <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker={row.id}>
+              <IconPicker
+                value={row.icon || defaultIcon}
+                iconOnly={true}
+                triggerClass="manager-vocabulary-icon-trigger"
+                buttonTitle={changeIconLabel}
+                onChange={(icon) => onSetIcon(row.name, icon)}
+              />
+            </span>
           {:else if decorativeIcon}
             <span class="manager-vocabulary-icon is-decorative" aria-hidden="true">
               <i class={decorativeIcon}></i>
@@ -258,22 +259,6 @@
             <i class="fas fa-trash" aria-hidden="true"></i>
           </button>
         </div>
-        {#if editingIconId === row.id}
-          <div class="manager-vocabulary-icon-edit" data-vocabulary-icon-edit={row.id}>
-            <span class="manager-vocabulary-icon-input">
-              <i class={editingIconValue.trim() || defaultIcon} aria-hidden="true"></i>
-              <input
-                type="text"
-                bind:value={editingIconValue}
-                placeholder={iconPlaceholder}
-                aria-label={iconLabel}
-              />
-            </span>
-            <button type="button" class="manager-button is-primary" onclick={() => saveIconEdit(row)}
-              >{saveIconLabel}</button
-            >
-          </div>
-        {/if}
         {#if pendingRemovalId === row.id}
           <div class="manager-vocabulary-confirm" data-vocabulary-confirm={row.id} role="alertdialog">
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>

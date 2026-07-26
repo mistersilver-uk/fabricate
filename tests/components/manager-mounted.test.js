@@ -6526,8 +6526,38 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-vocabulary-tab="tag"]'));
     assert.ok(target.textContent.includes('potions'), 'recipe tab shows its custom category');
     assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
-    // A referenced category carries a per-category icon on its row.
-    assert.ok(target.querySelector('[data-category-id="potions"] .manager-vocabulary-icon i'));
+    // A referenced category carries a per-category icon on its row, and that icon IS the
+    // shared searchable IconPicker trigger (issue 878) — not a raw class input.
+    assert.ok(
+      target.querySelector(
+        '[data-vocabulary-icon-picker="potions"] .essence-icon-picker-trigger.manager-vocabulary-icon-trigger i'
+      ),
+      'the row icon renders the shared IconPicker trigger'
+    );
+
+    // Item 5 of issue 878: the view renders NO page header of its own — the shell's
+    // `.manager-header` already carries the title and subtitle for this route.
+    assert.equal(
+      target.querySelector('.manager-tags-categories .manager-section-header'),
+      null,
+      'the tags route must not render a second page header'
+    );
+    // Item 3: the strip uses the shared editor-tab treatment, not a bespoke one.
+    const vocabularyTabs = target.querySelector('.manager-vocabulary-tabs');
+    assert.ok(
+      vocabularyTabs.classList.contains('manager-editor-tabs'),
+      'the vocabulary tab strip reuses the shared editor tab bar'
+    );
+    assert.ok(
+      target
+        .querySelector('[data-vocabulary-tab="recipe"]')
+        .classList.contains('manager-editor-tab-button'),
+      'each vocabulary tab reuses the shared editor tab button'
+    );
+    assert.ok(
+      target.querySelector('[data-vocabulary-tab="recipe"] .manager-editor-tab-badge'),
+      'each vocabulary tab carries the shared editor tab badge'
+    );
 
     // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
     assert.ok(target.querySelector('[data-tags-evidence="how-it-works"]'));
@@ -6553,10 +6583,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a blocked add never reaches the store'
     );
 
-    // A valid add shows a success hint and delegates with the authored icon.
+    // A valid add shows a success hint and delegates. The icon field is the shared
+    // IconPicker now (issue 878), and an UNTOUCHED one stays empty so the row still
+    // falls back to the default folder glyph — the picked-icon path is its own test.
     setInputValue(categoryInput, 'Elixirs');
-    const iconInput = target.querySelector('#manager-category-add-icon');
-    setInputValue(iconInput, 'fas fa-flask');
     await tick();
     flushSync();
     assert.ok(target.querySelector('.manager-vocabulary-hint.is-success'));
@@ -6567,7 +6597,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     const addCall = calls.find((call) => call[0] === 'addCategory');
-    assert.deepEqual(addCall, ['addCategory', 'Elixirs', 'fas fa-flask']);
+    assert.deepEqual(addCall, ['addCategory', 'Elixirs', '']);
     assert.equal(categoryInput.value, '');
 
     // Per-tab search filters only the active vocabulary and shows an empty state.
@@ -6613,8 +6643,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the decorative tag tile uses the fa-tag glyph'
     );
     assert.ok(
-      !target.querySelector('[data-tag-id="ore"] .manager-vocabulary-icon.is-editable'),
-      'the tag tile is decorative, not click-to-edit'
+      !target.querySelector('[data-tag-id="ore"] [data-vocabulary-icon-picker]'),
+      'the tag tile is decorative, not an icon picker'
     );
     const tagInput = target.querySelector('#manager-tag-add');
     setInputValue(tagInput, 'SPICE');
@@ -6739,7 +6769,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(!calls.some((call) => call[0] === 'removeComponentCategory'));
   });
 
-  it('edits a per-category icon inline and delegates it to the store (issue 689)', async () => {
+  it('picks a per-category icon from the searchable popover and delegates it to the store (issue 878)', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -6755,23 +6785,101 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    // The editable icon button on a custom category row opens an inline icon editor.
-    target
-      .querySelector('[data-category-id="potions"] .manager-vocabulary-icon.is-editable')
-      .click();
+    // The row's icon tile IS the shared IconPicker trigger: clicking it opens the same
+    // searchable popover the gathering time-of-day / weather / biome icon fields use,
+    // rather than the free-text "type a Font Awesome class, then Save icon" strip it
+    // replaced (issue 878). The popover portals to `.fabricate-manager`, so it is found
+    // from the manager root rather than from inside the row.
+    const picker = target.querySelector('[data-vocabulary-icon-picker="potions"]');
+    assert.ok(picker, 'the custom category row renders an icon picker');
+    assert.equal(
+      target.querySelector('[data-vocabulary-icon-edit="potions"]'),
+      null,
+      'the free-text icon-edit strip is gone'
+    );
+    picker.querySelector('.essence-icon-picker-trigger').click();
     await tick();
     flushSync();
-    const edit = target.querySelector('[data-vocabulary-icon-edit="potions"]');
-    assert.ok(edit, 'the icon editor strip opens for the row');
-    setInputValue(edit.querySelector('input'), 'fas fa-vial');
+
+    const popover = target.querySelector('.essence-icon-picker-popover');
+    assert.ok(popover, 'the searchable icon popover opens');
+    const search = popover.querySelector('.essence-icon-picker-search input');
+    assert.ok(search, 'the popover leads with a search box');
+    setInputValue(search, 'vial');
     await tick();
     flushSync();
-    edit.querySelector('.manager-button.is-primary').click();
+
+    const option = popover.querySelector('.essence-icon-picker-option');
+    assert.ok(option, 'the search narrows the option list');
+    option.click();
     await tick();
     flushSync();
     assert.deepEqual(
       calls.find((call) => call[0] === 'setCategoryIcon'),
-      ['setCategoryIcon', 'potions', 'fas fa-vial']
+      ['setCategoryIcon', 'potions', 'fas fa-flask-vial'],
+      'choosing an option commits immediately — no separate save step'
+    );
+    assert.equal(
+      target.querySelector('.essence-icon-picker-popover'),
+      null,
+      'the popover closes once an icon is chosen'
+    );
+  });
+
+  it('adds a category with an icon chosen from the same searchable popover (issue 878)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Tags & Categories').click();
+    await tick();
+    flushSync();
+
+    // The add form's icon field is the SAME control as the row tile, not a second
+    // free-text one (issue 878, item 4).
+    const iconField = target.querySelector('[data-vocabulary-add-icon]');
+    assert.ok(iconField, 'the add form renders an icon field');
+    assert.equal(
+      iconField.querySelector('input'),
+      null,
+      'the add form icon field is a picker, not a Font Awesome class box'
+    );
+    const trigger = iconField.querySelector(
+      '.essence-icon-picker-trigger.manager-vocabulary-icon-trigger'
+    );
+    assert.ok(trigger, 'the add form icon field renders the shared IconPicker trigger');
+
+    trigger.click();
+    await tick();
+    flushSync();
+    const popover = target.querySelector('.essence-icon-picker-popover');
+    setInputValue(popover.querySelector('.essence-icon-picker-search input'), 'vial');
+    await tick();
+    flushSync();
+    popover.querySelector('.essence-icon-picker-option').click();
+    await tick();
+    flushSync();
+
+    setInputValue(target.querySelector('#manager-category-add'), 'Elixirs');
+    await tick();
+    flushSync();
+    target
+      .querySelector('[aria-label="Recipe categories"] form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.find((call) => call[0] === 'addCategory'),
+      ['addCategory', 'Elixirs', 'fas fa-flask-vial'],
+      'the picked icon rides along with the new category'
     );
   });
 
