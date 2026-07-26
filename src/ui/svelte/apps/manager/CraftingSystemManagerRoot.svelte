@@ -4825,18 +4825,6 @@
         <h1 class="manager-title">{viewTitle()}</h1>
         <p class="manager-subtitle">{viewSubtitle()}</p>
       {/if}
-      <!-- The roster-size roll-up is GLOBAL to the surface, so it sits beside the page
-           title rather than joining the per-character fact cluster in the detail
-           header (issue 785). It counts the whole player-character roster, which is
-           what the string says: a "tracked" count would contradict the "Nothing
-           tracked" rows rendered directly beneath it. -->
-      {#if currentView === 'knowledge'}
-        <div class="manager-knowledge-header-pills" data-knowledge-header-pills>
-          <span class="manager-chip is-info" data-knowledge-tracked-chip>
-            {text('FABRICATE.Admin.Manager.Knowledge.TrackedChip', '{count} player characters').replace('{count}', String(knowledgeState?.characterCount || 0))}
-          </span>
-        </div>
-      {/if}
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
         <div class="manager-environment-header-pills" data-environment-status-pills>
           <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">

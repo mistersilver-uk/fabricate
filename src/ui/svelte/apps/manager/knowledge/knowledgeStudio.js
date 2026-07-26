@@ -377,7 +377,6 @@ export function projectKnowledgeSnapshot(raw, options = {}) {
       definitionCount: 0,
       defaultTab,
       characters: [],
-      characterCount: 0,
       selectedActorId: '',
       selectedCharacter: null,
     };
@@ -395,7 +394,6 @@ export function projectKnowledgeSnapshot(raw, options = {}) {
     definitionCount: Number(raw.definitionCount) || 0,
     defaultTab,
     characters,
-    characterCount: characters.length,
     selectedActorId: selectedCharacter?.id || '',
     selectedCharacter,
   };

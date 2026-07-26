@@ -280,7 +280,7 @@ describe('adminStore knowledge publication', () => {
     await harness.store.setKnowledgeActive(true);
     const knowledge = knowledgeOf(harness.store);
 
-    assert.equal(knowledge.characterCount, 2);
+    assert.equal(knowledge.characters.length, 2);
     assert.equal(knowledge.selectedActorId, 'a1');
     const character = knowledge.selectedCharacter;
     assert.equal(character.itemCount, 2);

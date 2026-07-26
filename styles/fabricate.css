@@ -16454,10 +16454,8 @@
   opacity: 0.6;
 }
 
-/* Header status pills (chrome, for environment-edit and the GM Knowledge surface's
-   global "N player characters" roll-up, issue 785) */
-.fabricate-manager .manager-environment-header-pills,
-.fabricate-manager .manager-knowledge-header-pills {
+/* Header status pills (chrome, for the environment-edit draft status cluster) */
+.fabricate-manager .manager-environment-header-pills {
   display: flex;
   align-items: center;
   gap: var(--fab-space-chip);

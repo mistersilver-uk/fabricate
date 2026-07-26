@@ -4662,13 +4662,6 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
       '.manager-knowledge-roster-search',
       0,
     ],
-    [
-      // The header pills container previously had NO rule at all, so its tracked chip
-      // rendered with no top margin — a live visual defect as well as a reuse miss.
-      '.fabricate-manager .manager-environment-header-pills,\n.fabricate-manager .manager-knowledge-header-pills {',
-      '.manager-knowledge-header-pills {',
-      1,
-    ],
   ]) {
     assert.ok(css.includes(shared), `expected the joined rule ${shared}`);
     assert.equal(
@@ -4713,6 +4706,9 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     'manager-recipe-tags-empty',
     // The per-screen re-size of the shared warning band.
     'manager-knowledge-learned-band',
+    // The Knowledge page-header roll-up pill: every other browser surface reports its
+    // count in the nav-rail badge, so a header pill was a one-screen divergence.
+    'manager-knowledge-header-pills',
   ]) {
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
   }

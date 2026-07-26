@@ -4441,7 +4441,6 @@
             "RecipeItems": "Recipe items"
           },
           "Title": "Knowledge",
-          "TrackedChip": "{count} player characters",
           "TypeIncomplete": "Incomplete",
           "TypeRecipeBook": "{count} Recipe Book",
           "TypeScroll": "Scroll",

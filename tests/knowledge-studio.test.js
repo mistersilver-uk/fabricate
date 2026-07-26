@@ -310,7 +310,6 @@ describe('knowledgeStudio snapshot projection', () => {
     ]) {
       const projected = projectKnowledgeSnapshot(snapshot, options);
       assert.equal(projected.characters.length, 0, `${label}: no characters`);
-      assert.equal(projected.characterCount, 0, `${label}: no count`);
       assert.equal(projected.selectedCharacter, null, `${label}: no selection`);
     }
   });
@@ -319,7 +318,7 @@ describe('knowledgeStudio snapshot projection', () => {
     const projected = projectKnowledgeSnapshot(raw, { active: true, selectedActorId: 'missing' });
     assert.equal(projected.selectedActorId, 'a1');
     assert.equal(projected.selectedCharacter.name, 'Aria');
-    assert.equal(projected.characterCount, 2);
+    assert.equal(projected.characters.length, 2);
     assert.equal(projected.definitionCount, 2);
   });
 

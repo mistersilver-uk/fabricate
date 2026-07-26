@@ -7623,9 +7623,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the shared inspector aside is suppressed for the knowledge route'
     );
-    assert.ok(
-      target.querySelector('[data-knowledge-tracked-chip]'),
-      'the tracked-characters roll-up renders in the page header'
+    // The page header carries no roster roll-up pill: the count belongs in the nav-rail
+    // badge like every other browser surface, so its absence is the contract.
+    assert.equal(
+      target.querySelector('[data-knowledge-header-pills]'),
+      null,
+      'the knowledge page header renders no roster roll-up pill'
     );
   });
 
