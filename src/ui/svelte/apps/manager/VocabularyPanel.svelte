@@ -281,10 +281,18 @@
         contextClass="manager-vocabulary-empty-panel"
       />
     {:else if showEmpty}
+      <!--
+        A vocabulary with a reserved row is NEVER empty: General is rendered directly
+        above this. Claiming "no categories" beneath a visible category row is a lie, so
+        the reserved case renders the COMPACT guidance variant ("Only General so far")
+        rather than the full dashed nothing-here panel. Tags pass `lockedRow={null}` and
+        genuinely can be empty, so they keep the full panel (issue 878).
+      -->
       <EmptyState
         icon={emptyIcon}
         title={emptyTitle}
         hint={emptyHint}
+        compact={!!lockedRow}
         contextClass="manager-vocabulary-empty-panel"
       />
     {/if}

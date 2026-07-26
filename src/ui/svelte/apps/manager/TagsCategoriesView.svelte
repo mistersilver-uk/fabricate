@@ -278,7 +278,7 @@
         )}
         emptyTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneral',
-          'No recipe categories yet'
+          'Only General so far'
         )}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralHint',
@@ -356,7 +356,7 @@
         )}
         emptyTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralComponent',
-          'No component categories yet'
+          'Only General so far'
         )}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralComponentHint',
