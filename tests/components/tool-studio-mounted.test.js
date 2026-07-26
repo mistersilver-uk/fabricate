@@ -34,6 +34,10 @@ const harness = createMountedComponentHarness({
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // The shared side-panel explainer card and icon fact row (issue 881); the behavior
+    // preview renders both.
+    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
@@ -245,7 +249,9 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelector('[data-tool-how-it-works] button'), null);
     assert.equal(
-      root.querySelector('[data-tool-how-it-works] a.manager-tool-docs-link')?.textContent.trim(),
+      root
+        .querySelector('[data-tool-how-it-works] a.manager-explainer-card-docs')
+        ?.textContent.trim(),
       'Read the docs'
     );
     assert.equal(root.querySelector('[data-tool-name]'), null);
@@ -787,6 +793,12 @@ describe('Tool Studio editor (mounted)', () => {
       null
     );
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
+    // Issue 881: every effective-rule row is the shared icon fact row, so the preview and
+    // the library inspector cannot drift back into two geometries for one projection.
+    assert.equal(
+      root.querySelectorAll('[data-tool-preview-rule] > .manager-icon-fact-row').length,
+      4
+    );
     assert.ok(root.querySelector('[data-tool-preview-live-update]'));
   });
 

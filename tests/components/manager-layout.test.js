@@ -17,11 +17,20 @@ const enPath = resolve(__dirname, '../../lang/en.json');
 // be read out of `styles/fabricate.css` are read out of the component source instead.
 const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/apps/manager/EmptyState.svelte');
 const calloutPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Callout.svelte');
+// The shared side-panel explainer card and icon fact row (issue 881) follow the same rule:
+// their appearance is in their own scoped block, so it is read out of the component.
+const explainerCardPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/ExplainerCard.svelte'
+);
+const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/IconFactRow.svelte');
 const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
 const emptyStateSource = readFileSync(emptyStatePath, 'utf8');
 const calloutSource = readFileSync(calloutPath, 'utf8');
+const explainerCardSource = readFileSync(explainerCardPath, 'utf8');
+const iconFactRowSource = readFileSync(iconFactRowPath, 'utf8');
 const en = JSON.parse(readFileSync(enPath, 'utf8'));
 
 // Only the scoped `<style>` block, with CSS comments stripped. Both primitives document the
@@ -41,6 +50,8 @@ function scopedStyles(componentSource) {
 
 const emptyStateStyles = scopedStyles(emptyStateSource);
 const calloutStyles = scopedStyles(calloutSource);
+const explainerCardStyles = scopedStyles(explainerCardSource);
+const iconFactRowStyles = scopedStyles(iconFactRowSource);
 
 function blockIn(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1022,6 +1033,8 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   for (const [name, styles] of Object.entries({
     EmptyState: emptyStateStyles,
     Callout: calloutStyles,
+    ExplainerCard: explainerCardStyles,
+    IconFactRow: iconFactRowStyles,
   })) {
     assert.equal(
       /--fab-mv2-/.test(styles),
@@ -1157,6 +1170,146 @@ test('the shared callout keeps one shape and lets tone change only its colours',
     false,
     'a tone must not change the callout geometry or type scale'
   );
+});
+
+// Issue 881: three surfaces explained themselves three ways. The Tool Studio preview
+// rendered `.manager-tool-how-it-works` (its own bordered card, its own 0.625rem heading,
+// a glyph-led list at 0.6875rem/1.5); the Tags & Categories inspector rendered the same
+// meaning as a disc-bulleted `.manager-evidence-list` at 0.82rem AND as a bare
+// `.manager-muted` paragraph. `ExplainerCard` is the one implementation, and it reuses the
+// manager's existing card shell and card-title contract rather than restating them.
+test('the shared explainer card reuses the card shell and owns only the explainer parts', () => {
+  const titleBlock = blockIn(explainerCardStyles, '.manager-explainer-card-title');
+  const listBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list');
+  const rowBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li');
+  const rowGlyphBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li > i');
+
+  // The card shell and the heading come from the manager's ONE contract for each, applied
+  // as classes on the primitive's own elements — not re-declared in this scoped block.
+  assert.ok(
+    explainerCardSource.includes('class="manager-inspector-card manager-explainer-card"'),
+    'the explainer wears the shared side-panel card shell'
+  );
+  assert.ok(
+    explainerCardSource.includes('class="manager-card-title manager-explainer-card-title"'),
+    'the explainer title wears the shared card-title contract'
+  );
+  assert.equal(
+    /padding:|border-radius:|border: 1px|font-weight:|text-transform:|font-family:/.test(
+      titleBlock + blockIn(explainerCardStyles, '.manager-explainer-card')
+    ),
+    false,
+    'the explainer must not restate the card shell or the heading scale, weight or family'
+  );
+
+  // The body treatment is the Tool Studio's, which issue 881 names as the reference.
+  for (const declaration of [
+    'grid-template-columns: 20px minmax(0, 1fr);',
+    'font-size: 0.6875rem;',
+    'line-height: 1.5;',
+    'color: var(--fab-text-muted);',
+  ]) {
+    assert.ok(rowBlock.includes(declaration), `an explainer row should declare ${declaration}`);
+  }
+  assert.ok(listBlock.includes('list-style: none;'), 'the explainer list drops disc markers');
+  assert.ok(
+    rowGlyphBlock.includes('color: var(--fab-accent);'),
+    'the row glyph is the accent, as in the Tool Studio reference'
+  );
+
+  // Every re-derivation is gone from the global sheet, not merely unused: a surviving
+  // rule is what the next copy gets written against.
+  for (const dead of [
+    'manager-tool-how-it-works',
+    'manager-tool-docs-link',
+    'manager-evidence-list',
+    'manager-tool-inspector-rule-card',
+  ]) {
+    assert.equal(css.includes(dead), false, `${dead} was replaced and must not survive as CSS`);
+  }
+});
+
+// The second half of the same change: the Tool Studio built one fact row twice, from the
+// SAME `projectToolBehaviorFacts` projection, at two geometries.
+test('the shared icon fact row is one well, used by every behavior-fact surface', () => {
+  const rowBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row');
+  const glyphBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row > i');
+  const titleBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row strong');
+  const subtitleBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row small');
+
+  for (const declaration of [
+    'grid-template-columns: 28px minmax(0, 1fr);',
+    'padding: 9px 11px;',
+    'border-radius: 6px;',
+    'background: var(--fab-bg-1);',
+    'border: 1px solid var(--fab-border);',
+  ]) {
+    assert.ok(rowBlock.includes(declaration), `the fact row should declare ${declaration}`);
+  }
+  assert.ok(glyphBlock.includes('color: var(--fab-accent);'), 'the leading glyph is the accent');
+  assert.ok(titleBlock.includes('font-size: 0.76rem;'), 'the fact title keeps the reference scale');
+  assert.ok(
+    subtitleBlock.includes('font-size: 0.64rem;') &&
+      subtitleBlock.includes('color: var(--fab-text-muted);'),
+    'the qualifying line is the muted micro scale'
+  );
+
+  // The container keeps only what a scoped block cannot reach: how rows are stacked.
+  const listBlock = blockFor('.fabricate-manager .manager-tool-preview-rules > li');
+  assert.equal(
+    /border|background|padding|grid-template-columns/.test(listBlock),
+    false,
+    'the rules list must not re-derive the row it now renders through the primitive'
+  );
+});
+
+// A primitive that coexists with unconverted duplicates is a fourth way of doing the same
+// thing, so the CONTRACT MARKUP must exist in exactly one place: the primitive itself.
+test('every explainer and fact-row site renders through the primitive, not by hand', () => {
+  const managerComponents = readdirSync(managerComponentDir, {
+    recursive: true,
+    withFileTypes: true,
+  })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.endsWith('.svelte') &&
+        entry.name !== 'ExplainerCard.svelte' &&
+        entry.name !== 'IconFactRow.svelte'
+    )
+    .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
+    .join('\n');
+
+  for (const dead of [
+    'manager-tool-how-it-works',
+    'manager-tool-docs-link',
+    'manager-evidence-list',
+    'manager-tool-inspector-rule-card',
+    'manager-explainer-card-list',
+    'manager-icon-fact-row',
+  ]) {
+    assert.equal(
+      managerComponents.includes(dead),
+      false,
+      `${dead} should render through the shared primitive, not hand-rolled markup`
+    );
+  }
+
+  // And the converted sites really do import it — an assertion that only deleted the old
+  // class names would pass on a screen that had simply dropped the card.
+  for (const [componentPath, imports] of [
+    ['tools/ToolBehaviorPreview.svelte', ['ExplainerCard', 'IconFactRow']],
+    ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
+    ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
+  ]) {
+    const source = readFileSync(resolve(managerComponentDir, componentPath), 'utf8');
+    for (const primitive of imports) {
+      assert.ok(
+        new RegExp(`import ${primitive} from '[^']*${primitive}\\.svelte'`).test(source),
+        `${componentPath} should import the shared ${primitive}`
+      );
+    }
+  }
 });
 
 test('manager gathering rules inspector stacks descriptions above normal-weight selects', () => {

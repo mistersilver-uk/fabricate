@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import EmptyState from './EmptyState.svelte';
+  import ExplainerCard from './ExplainerCard.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
     DEFAULT_GATHERING_EVENT_IMG,
@@ -817,16 +818,19 @@
   });
   // The Tags & Categories screen shows one vocabulary tab at a time; the active tab
   // is owned here so the inspector's contextual help can follow it (the view is a
-  // controlled component over this state). Each help block is title + three bullets.
+  // controlled component over this state). Each help block is a title plus three
+  // glyph-led rows, rendered by the shared `ExplainerCard` (issue 881) — the same
+  // primitive the Tool Studio's "How Tools work in Fabricate" card renders, so the two
+  // right-hand panels no longer state one meaning at two heading and body scales.
   let tagsActiveTab = $state('recipe');
   const tagsHelp = $derived.by(() => {
     if (tagsActiveTab === 'component') {
       return {
         title: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle', 'How component categories work'),
         items: [
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.')
+          { icon: 'fas fa-cubes', text: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.') },
+          { icon: 'fas fa-scroll', text: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.') },
+          { icon: 'fas fa-arrow-rotate-left', text: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.') }
         ]
       };
     }
@@ -834,21 +838,30 @@
       return {
         title: text('FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle', 'How component tags work'),
         items: [
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.')
+          { icon: 'fas fa-tag', text: text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.') },
+          { icon: 'fas fa-font', text: text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.') },
+          { icon: 'fas fa-list-check', text: text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.') }
         ]
       };
     }
     return {
       title: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle', 'How recipe categories work'),
       items: [
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.'),
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.'),
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.')
+        { icon: 'fas fa-folder-tree', text: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.') },
+        { icon: 'fas fa-lock', text: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.') },
+        { icon: 'fas fa-scroll', text: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.') }
       ]
     };
   });
+  // The reference-safety reassurance was a bare `.manager-muted` paragraph under its own
+  // card title — the third re-derivation of the explainer (issue 881). One glyph-led row
+  // in the shared card says the same thing at the shared scale.
+  const tagsReferenceSafeItems = $derived([
+    {
+      icon: 'fas fa-shield-halved',
+      text: text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint', 'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.')
+    }
+  ]);
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
   const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
@@ -5873,19 +5886,21 @@
           </div>
         </section>
 
-        <section class="manager-inspector-card" data-tags-evidence="how-it-works">
-          <h3 class="manager-card-title">{tagsHelp.title}</h3>
-          <ul class="manager-evidence-list">
-            {#each tagsHelp.items as tip (tip)}
-              <li>{tip}</li>
-            {/each}
-          </ul>
-        </section>
+        <ExplainerCard
+          icon="fas fa-circle-question"
+          title={tagsHelp.title}
+          items={tagsHelp.items}
+          dataAttr="data-tags-evidence"
+          dataValue="how-it-works"
+        />
 
-        <section class="manager-inspector-card" data-tags-evidence="reference-safe">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle', 'Reference-safe by default')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint', 'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.')}</p>
-        </section>
+        <ExplainerCard
+          icon="fas fa-shield-halved"
+          title={text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle', 'Reference-safe by default')}
+          items={tagsReferenceSafeItems}
+          dataAttr="data-tags-evidence"
+          dataValue="reference-safe"
+        />
       {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
           {#if selectedGatheringTask}

@@ -9791,21 +9791,9 @@
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-evidence-list {
-  margin: var(--fab-space-chip) 0 0;
-  padding: 0 0 0 var(--fab-space-4);
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.82rem;
-  line-height: 1.4;
-}
-
-.fabricate-manager .manager-evidence-list > li {
-  margin: 0 0 var(--fab-space-1);
-}
-
-.fabricate-manager .manager-evidence-list > li:last-child {
-  margin-bottom: 0;
-}
+/* The evidence-list bullet rules are gone: its one consumer, the Tags & Categories contextual
+   help, was a disc-bulleted re-derivation of the Tool Studio's explainer list at a
+   different body scale. Both render `ExplainerCard.svelte` now (issue 881). */
 
 .fabricate-manager .manager-fact {
   display: block;
@@ -13762,30 +13750,6 @@
   list-style: none;
 }
 
-.fabricate-manager .manager-tool-preview-rules > div {
-  display: grid;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-tool-preview-rules dt {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.fabricate-manager .manager-tool-preview-rules dd {
-  margin: 0;
-  font-size: 0.76rem;
-  font-weight: 600;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
 .fabricate-manager .manager-tool-tab-stack {
   display: flex;
   flex-direction: column;
@@ -14134,39 +14098,12 @@
   gap: var(--fab-space-1);
 }
 
+/* The row itself is `IconFactRow.svelte`, whose appearance lives in that component's
+   scoped block (issue 881). What stays here is the LIST's concern only: an <li> is a grid
+   item, whose `min-width: auto` default lets a long unbreakable fact widen the whole
+   column. A scoped block cannot reach an ancestor, so a container concern stays global. */
 .fabricate-manager .manager-tool-preview-rules > li {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 9px 11px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager .manager-tool-preview-rules > li > i {
-  color: var(--fab-mv2-accent);
-  text-align: center;
-}
-
-.fabricate-manager .manager-tool-preview-rules strong,
-.fabricate-manager .manager-tool-preview-rules small {
-  display: block;
-}
-
-.fabricate-manager .manager-tool-preview-rules strong {
-  font-size: 0.76rem;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.fabricate-manager .manager-tool-preview-rules small {
-  margin-top: var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.64rem;
-  line-height: 1.3;
 }
 
 .fabricate-manager .manager-tool-preview-live {
@@ -14197,67 +14134,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-tool-how-it-works {
-  display: grid;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-04);
-}
-
-.fabricate-manager .manager-tool-how-it-works h3 {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  margin: 0;
-  font-size: 0.625rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.fabricate-manager .manager-tool-how-it-works ol {
-  display: grid;
-  gap: 11px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-tool-docs-link {
-  justify-self: stretch;
-  min-height: 32px;
-}
-
-.fabricate-manager .manager-tool-how-it-works li {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--fab-space-2);
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.6875rem;
-  line-height: 1.5;
-}
-
-.fabricate-manager .manager-tool-how-it-works li > i,
-.fabricate-manager .manager-tool-how-it-works li button {
-  color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-tool-how-it-works li > i {
-  margin-top: 0.2em;
-}
-
-.fabricate-manager .manager-tool-how-it-works li button {
-  grid-column: 2;
-  justify-self: start;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-size: 0.66rem;
-}
+/* The tool how-it-works card rules are gone: the Tool Studio's explainer is now the shared
+   `ExplainerCard.svelte`, which wears the manager's own `.manager-inspector-card` shell
+   and `.manager-card-title` heading instead of restating a bordered card and a fourth
+   heading scale, and keeps its remaining rules in its own scoped block (issue 881). Its
+   `li button` rules went with it — nothing has rendered a button in that list. */
 
 .fabricate-manager .manager-tool-overview-fields {
   display: grid;
@@ -14847,15 +14728,6 @@
 
   .fabricate-manager .manager-tool-authority-readonly {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .fabricate-manager .manager-tool-how-it-works li {
-    grid-template-columns: 20px minmax(0, 1fr);
-  }
-
-  .fabricate-manager .manager-tool-how-it-works li button {
-    grid-column: 2;
-    justify-self: start;
   }
 
   .fabricate-manager .manager-tool-repair-option {
@@ -20111,38 +19983,9 @@
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-tool-inspector-rule-card {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 7px;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card > i {
-  color: var(--fab-mv2-accent);
-  text-align: center;
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card > span {
-  display: grid;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card strong {
-  font-size: 0.72rem;
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card small {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.64rem;
-  line-height: 1.3;
-}
+/* The tool inspector rule-card rules are gone: the library inspector renders the SAME
+   `IconFactRow.svelte` the editor's behavior preview does, from the same behavior-fact
+   projection, so the two geometries this class used to hold apart are one (issue 881). */
 
 .fabricate-manager .manager-tool-inspector-details {
   display: flex;

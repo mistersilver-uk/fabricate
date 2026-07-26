@@ -148,6 +148,11 @@ function compileManagerRoot() {
   // strip both Knowledge tabs render (issue 785); same rule, same consequence.
   writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/Callout.svelte');
+  // The shared side-panel explainer card and icon fact row (issue 881). The root renders
+  // the explainer directly in the Tags & Categories inspector and reaches the fact row
+  // through the Tool Studio's browser inspector, so both are in the root's static graph.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ExplainerCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/IconFactRow.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',
@@ -6599,11 +6604,44 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
-    assert.ok(target.querySelector('[data-tags-evidence="how-it-works"]'));
+    const howItWorks = target.querySelector('[data-tags-evidence="how-it-works"]');
+    assert.ok(howItWorks);
     assert.ok(target.querySelector('[data-tags-evidence="at-a-glance"]'));
     assert.ok(target.querySelector('[data-tags-category-fact="component-categories"]'));
     assert.ok(target.querySelector('[data-tags-category-fact="references"]'));
-    assert.ok(target.querySelector('[data-tags-evidence="reference-safe"]'));
+    const referenceSafe = target.querySelector('[data-tags-evidence="reference-safe"]');
+    assert.ok(referenceSafe);
+
+    // Issue 881: both contextual-help cards render through the SAME explainer primitive
+    // the Tool Studio's "How Tools work in Fabricate" card uses, so the rail stops
+    // re-deriving one meaning as a disc-bulleted list and a bare paragraph. Rendering the
+    // card shell, the shared card title and the glyph-led rows is the observable contract.
+    for (const card of [howItWorks, referenceSafe]) {
+      assert.ok(
+        card.classList.contains('manager-inspector-card') &&
+          card.classList.contains('manager-explainer-card'),
+        'the tags help cards wear the shared side-panel card shell'
+      );
+      assert.ok(
+        card.querySelector('h3.manager-card-title.manager-explainer-card-title > i'),
+        'the tags help cards carry the shared glyph-led card title'
+      );
+    }
+    assert.equal(
+      howItWorks.querySelectorAll('.manager-explainer-card-list > li').length,
+      3,
+      'the recipe-categories help renders its three rows through the explainer list'
+    );
+    assert.equal(
+      referenceSafe.querySelectorAll('.manager-explainer-card-list > li').length,
+      1,
+      'the reference-safety reassurance is one explainer row, not a bare paragraph'
+    );
+    assert.equal(
+      target.querySelector('.manager-evidence-list'),
+      null,
+      'the retired bullet list must be gone from the rail, not merely unstyled'
+    );
 
     // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');
@@ -10804,6 +10842,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       /Check bonus.*Adds @prof/
     );
     assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
+    // Issue 881: the library inspector renders the SAME icon fact row the editor's
+    // behavior preview does, from the same behavior-fact projection — one implementation,
+    // so the two side panels cannot hold two geometries for one meaning.
+    assert.equal(
+      inspector.querySelectorAll('[data-tool-inspector-rule] > .manager-icon-fact-row').length,
+      4
+    );
   });
 
   it('shows canonical validation context in the selected Tool inspector', async () => {

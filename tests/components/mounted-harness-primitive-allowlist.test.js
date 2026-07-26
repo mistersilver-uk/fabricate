@@ -30,6 +30,12 @@ const SHARED_PRIMITIVES = [
   // through it, so adding it to a third screen would silently pull it into every suite
   // that mounts a tree containing that screen.
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
+  // The manager's ONE "how this surface works" explainer card and ONE icon fact row
+  // (issue 881). Both are side-panel primitives, so the Tool Studio and the Tags &
+  // Categories rail already pull them into two different mounted trees and the next
+  // side panel will pull them into a third.
+  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

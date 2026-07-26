@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import EmptyState from '../EmptyState.svelte';
+  import IconFactRow from '../IconFactRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     projectToolBehaviorFacts,
@@ -71,10 +72,10 @@
       {#each facts as fact (fact.id)}
         <section data-tool-inspector-rule={fact.id}>
           <p class="manager-kicker manager-tool-inspector-section-kicker">{fact.heading}</p>
-          <div class="manager-tool-inspector-rule-card">
-            <i class={fact.icon} aria-hidden="true"></i>
-            <span><strong>{fact.title}</strong><small>{fact.subtitle}</small></span>
-          </div>
+          <!-- The SAME row the editor's behavior preview renders, from the same
+               `projectToolBehaviorFacts` projection — one component now, not a second
+               geometry for one meaning (issue 881). -->
+          <IconFactRow icon={fact.icon} title={fact.title} subtitle={fact.subtitle} />
         </section>
       {/each}
     </div>

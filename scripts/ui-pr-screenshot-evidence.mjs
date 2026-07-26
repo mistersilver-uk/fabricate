@@ -69,6 +69,11 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+  // The shared side-panel primitives the Tool Studio's preview and library inspector
+  // render (issue 881). Their CSS is co-located in their own scoped blocks precisely so a
+  // change to them maps HERE rather than to the broad `theme-or-global-ui` recipe — which
+  // only works if the recipes that render them name them.
+  /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
 ];
 
 export const VIEW_RECIPES = Object.freeze([
@@ -306,7 +311,13 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-tags-categories',
     label: 'Manager tags and categories',
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      // The inspector rail's contextual help and reference-safety card render through the
+      // shared explainer primitive (issue 881), whose CSS is co-located in its own scoped
+      // block; these frames are the ones that show it on this screen.
+      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
+    ],
   },
   // Issue 752: the Item tags vocabulary rows (evidence for #735's row rendering).
   // Its OWN recipe, not a preferred label on manager-tags-categories: `collect`
