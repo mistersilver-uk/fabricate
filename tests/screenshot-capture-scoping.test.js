@@ -132,43 +132,71 @@ test('Fabricate ApplicationV2 cleanup awaits close and guards Manager detachment
 
 // ── Scoping map: a changed-file set → the EXACT captured-label set ──────────────
 
-test('a broad styles/theme.css change scopes to theme-or-global-ui (6 labels), NOT the full set', () => {
+test('a broad styles/theme.css change scopes to theme-or-global-ui (6 core windows), NOT the full set', () => {
   const views = mapChangedFilesToViews(['styles/theme.css']);
   assert.deepEqual(views.map(v => v.id), ['theme-or-global-ui']);
   const labels = smokeLabelsForChangedFiles(['styles/theme.css']);
+  // One frame per app-AREA shell plus the two manager archetypes (library vs editor),
+  // rather than several frames from one area. See the recipe's comment for why each
+  // earns its place; adding to this set costs every global change.
   assert.deepEqual(labels, [
     'manager-default-selection',
     'manager-components-normal',
-    'manager-environments-browse-normal',
     'manager-gathering-task-editor-normal',
-    'manager-gathering-events-normal',
-    'manager-essences-normal',
+    'player-crafting-simple',
+    'player-inventory',
+    'interactables-manager-list',
   ]);
   // The scoped set is a tiny fraction of the full capture catalogue, never all of it.
   assert.equal(labels.length, 6);
   assert.ok(labels.length < SCREENSHOT_CAPTURE_ORDER.length);
 });
 
-test('styles/fabricate.css scopes to the Tool parity/stress set, two rail frames, and global fallback', () => {
+test('the global set spans every app-area shell, not just the manager', () => {
+  const themeView = VIEW_RECIPES.find(v => v.id === 'theme-or-global-ui');
+  // The regression this guards: the set was once manager-only, so a global stylesheet
+  // change published six frames and verified the player app not at all — even though
+  // `.fabricate-app` carries its own global rules and its own Foundry-override block.
+  assert.ok(themeView.smokeLabels.some(l => l.startsWith('manager-')), 'no manager frame');
+  assert.ok(themeView.smokeLabels.some(l => l.startsWith('player-')), 'no player-app frame');
+  assert.ok(
+    themeView.smokeLabels.some(l => l.startsWith('interactables-')),
+    'no interactables-window frame'
+  );
+});
+
+test('styles/fabricate.css scopes to the two rail frames and the global core set — NOT Tool Studio', () => {
   const views = mapChangedFilesToViews(['styles/fabricate.css']);
   assert.deepEqual(views.map(v => v.id).sort(), [
-    '01-library-1280x720',
-    '02-overview-1280x720',
-    '03-breakage-1280x720',
-    '04-requirements-1280x720',
-    '05-validation-1280x720',
-    '06-breakage-900x700',
     'manager-rail-collapsed',
     'manager-rail-expanded',
-    'stress-immune',
-    'stress-invalid-validation',
-    'stress-long-name',
-    'stress-repair',
-    'stress-replacement',
-    'stress-wrapping-680',
     'theme-or-global-ui',
-    'zero-state-empty-library-1280x720',
   ]);
+  // The regression this guards: the global stylesheet used to be a Tool Studio trigger,
+  // so every CSS edit anywhere demanded all 12 Tool Studio parity and stress frames.
+  const ids = views.map(v => v.id);
+  assert.ok(
+    !ids.some(id => /library-1280x720|overview|breakage|requirements|validation|stress-/.test(id)),
+    'a global stylesheet change must not pull in Tool Studio frames'
+  );
+});
+
+test('Tool Studio frames are triggered only by Tool Studio files', () => {
+  const own = mapChangedFilesToViews([
+    'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
+  ]).map(v => v.id);
+  assert.ok(own.includes('01-library-1280x720'), 'its own file must still trigger the set');
+  assert.ok(own.includes('stress-wrapping-680'), 'stress frames too');
+  // The manager ROUTER hosts every manager view, so it is a global change, not a Tool
+  // Studio one.
+  const root = mapChangedFilesToViews([
+    'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  ]).map(v => v.id);
+  assert.ok(root.includes('theme-or-global-ui'), 'the router must route to the global set');
+  assert.ok(
+    !root.some(id => /1280x720|stress-/.test(id)),
+    'the router must not pull in Tool Studio frames'
+  );
 });
 
 test('a scoped non-UI change yields an empty target set (skip the capture run)', () => {
@@ -188,16 +216,19 @@ test('every VIEW_RECIPES smoke label is a capturable routine in the pure map', (
   }
 });
 
-test("theme-or-global-ui's six labels are all reachable and live in phase-D0", () => {
+test("theme-or-global-ui's six labels are all reachable and span phase-D0 and phase-E", () => {
   const themeView = VIEW_RECIPES.find(v => v.id === 'theme-or-global-ui');
   for (const label of themeView.smokeLabels) {
     assert.ok(isCapturableLabel(label), `${label} unreachable`);
-    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0);
   }
-  // A scoped run for these captures phase-D0 only; phase-E is safely skipped.
+  // A scoped global run now needs BOTH phases, because the set covers the player app as
+  // well as the manager. That is the deliberate cost of the coverage: the old
+  // manager-only set could skip phase E precisely because it never looked at
+  // `.fabricate-app`.
   const phases = phasesForTargetLabels(themeView.smokeLabels);
-  assert.deepEqual([...phases], [CAPTURE_PHASE_D0]);
-  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_E, themeView.smokeLabels), false);
+  assert.deepEqual([...phases].sort(), [CAPTURE_PHASE_D0, CAPTURE_PHASE_E].sort());
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_D0, themeView.smokeLabels), true);
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_E, themeView.smokeLabels), true);
 });
 
 test('a player/craft target set needs phase-E; collect throws when a mapped view has zero candidates', () => {
@@ -950,15 +981,20 @@ test('the Tool Studio fixture composes durable Tool identity through the canonic
 test("theme-or-global-ui's multi-section target set keeps exactly the sections its labels touch (spine label rides the always-run spine)", () => {
   const themeView = VIEW_RECIPES.find((v) => v.id === 'theme-or-global-ui');
   const targets = themeView.smokeLabels;
-  // Its labels span the spine (manager-default-selection) + three sections.
+  // Its labels span the spine (manager-default-selection) + three D0 sections, and the
+  // two player frames additionally pull in phase E.
   assert.ok(D0_SPINE_LABELS.includes('manager-default-selection'));
   assert.equal(isD0SectionNeededForTargets('components-checks', targets), true); // manager-components-normal
-  assert.equal(isD0SectionNeededForTargets('tags-essences', targets), true); // manager-essences-normal
-  assert.equal(isD0SectionNeededForTargets('gathering', targets), true); // environments/tasks/events
-  // No theme label lands in these, so they stay skippable.
+  assert.equal(isD0SectionNeededForTargets('gathering', targets), true); // gathering-task-editor
+  assert.equal(isD0SectionNeededForTargets('overview-interactables', targets), true); // interactables-manager-list
+  // No theme label lands in these, so they stay skippable. `tags-essences` became
+  // skippable when the set stopped over-sampling manager browsers: the essences and
+  // environments frames added a fourth and fifth manager library without adding an
+  // app-area, so they were dropped in favour of player-app coverage.
   assert.equal(isD0SectionNeededForTargets('recipes', targets), false);
+  assert.equal(isD0SectionNeededForTargets('tags-essences', targets), false);
+  assert.equal(isD0SectionNeededForTargets('tools', targets), false);
   assert.equal(isD0SectionNeededForTargets('knowledge', targets), false);
-  assert.equal(isD0SectionNeededForTargets('overview-interactables', targets), false);
   assert.equal(isD0SectionNeededForTargets('import-alchemy-experimental', targets), false);
 });
 

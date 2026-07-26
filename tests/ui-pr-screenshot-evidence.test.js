@@ -1472,10 +1472,10 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(smokeLabelsForChangedFiles(['styles/theme.css']), [
       'manager-default-selection',
       'manager-components-normal',
-      'manager-environments-browse-normal',
       'manager-gathering-task-editor-normal',
-      'manager-gathering-events-normal',
-      'manager-essences-normal',
+      'player-crafting-simple',
+      'player-inventory',
+      'interactables-manager-list',
     ]);
     assert.deepEqual(smokeLabelsForChangedFiles(['docs/readme.md']), []);
   });

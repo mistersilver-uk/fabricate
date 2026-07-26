@@ -54,11 +54,21 @@ const KNOWLEDGE_MATCHES = [
   // both change what the captured frames show.
   /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.js$/,
 ];
+// ONLY Tool Studio's own files. It deliberately excludes two shared surfaces it used
+// to match:
+//
+// - `styles/fabricate.css`. A global stylesheet edit pulled in all 12 Tool Studio
+//   parity and stress frames regardless of relevance, which is most of why a
+//   single-screen change could demand 28 published views. A global change now routes
+//   to `theme-or-global-ui`, whose set samples every app-area shell instead of
+//   over-sampling one screen.
+// - `CraftingSystemManagerRoot.svelte`. The manager router hosts every manager view,
+//   so a change there is a global manager change, not a Tool Studio one; it now routes
+//   to `theme-or-global-ui` as well.
 const TOOL_STUDIO_MATCHES = [
-  /^src\/ui\/svelte\/apps\/manager\/(?:CraftingSystemManagerRoot|ToolsBrowserView|ToolEditView)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/(?:ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
-  /^styles\/fabricate\.css$/,
 ];
 
 export const VIEW_RECIPES = Object.freeze([
@@ -899,17 +909,59 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    // The minimal core-window set for a change that can regress ANY surface: the global
+    // stylesheet, a theme block, or the manager router that hosts every manager view.
+    //
+    // Chosen to sample every app-AREA shell rather than to enumerate screens, because
+    // `styles/fabricate.css` is namespaced per area and its Foundry-override blocks
+    // (button height/alignment, focus rings) are written per area class — so a
+    // regression in one area is invisible in another. Rule counts in that file, which
+    // are a fair proxy for blast radius: `.fabricate-manager` ~2694,
+    // `.fabricate-interactables-manager` ~41, `.fabricate-app` ~18.
+    //
+    // 1 `manager-default-selection`   — `.fabricate-manager` shell: window chrome, rail,
+    //                                   and the crafting-system library rows.
+    // 2 `manager-components-normal`   — the densest row/chip/grid library; a bare
+    //                                   generic selector leaking out of a `.fabricate*`
+    //                                   root shows up here first (it is what broke the
+    //                                   dnd5e Armor Class badge).
+    // 3 `manager-gathering-task-editor-normal`
+    //                                 — the EDITOR archetype (fields, tabs, validation),
+    //                                   structurally unlike a browser, so it catches
+    //                                   button/field/focus-ring regressions a library
+    //                                   frame cannot.
+    // 4 `player-crafting-simple`      — `.fabricate-app`, the player-facing crafting
+    //                                   window. The previous set was manager-only, so a
+    //                                   global change got NO player-app verification.
+    // 5 `player-inventory`            — the second `.fabricate-app` archetype
+    //                                   (list/detail + scroll), cheap once phase E runs.
+    // 6 `interactables-manager-list`  — `.fabricate-interactables-manager`, its own
+    //                                   window and the second-largest rule block.
+    //
+    // Deliberately NOT included: the chat-card and roll-prompt surfaces
+    // (`.fabricate-craft-chat`, `.fabricate-gather-chat`, `.fabricate-roll-prompt`) are
+    // small, simple and low-rule-count; and the rail frames, which already have their
+    // own `styles/` recipes and would duplicate. Adding a screen here costs every
+    // global change, so additions want the same blast-radius argument.
+    //
+    // 4 and 5 are phase-E labels, so a scoped global run now needs phase E as well as
+    // D0. That is a deliberate cost: the old D0-only set was cheaper precisely because
+    // it never looked at the player app.
     id: 'theme-or-global-ui',
     label: 'Global UI styling or theme',
     smokeLabels: [
       'manager-default-selection',
       'manager-components-normal',
-      'manager-environments-browse-normal',
       'manager-gathering-task-editor-normal',
-      'manager-gathering-events-normal',
-      'manager-essences-normal',
+      'player-crafting-simple',
+      'player-inventory',
+      'interactables-manager-list',
     ],
-    matches: [/^styles\//, /\.css$/],
+    matches: [
+      /^styles\//,
+      /\.css$/,
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+    ],
   },
 ]);
 
