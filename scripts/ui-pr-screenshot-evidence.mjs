@@ -1099,9 +1099,16 @@ function validateScreenshotRunEvidence({ sourceRoot, views, headSha }) {
   if (!expectedHead || summaryRun.headSha !== expectedHead || manifest.headSha !== expectedHead) {
     throw new Error('Screenshot evidence is stale for the requested PR head SHA');
   }
-  const expectedLabels = views
-    .flatMap((view) => view.smokeLabels)
-    .sort((a, b) => a.localeCompare(b));
+  // DEDUPED, because the run records a SET of target labels while a label may belong
+  // to more than one view recipe (`manager-default-selection` is in both the systems
+  // view and the theme-or-global-ui fallback). Comparing a raw flatMap against the
+  // run's deduped set made this check fail for every change whose file set matched
+  // two views sharing a label — i.e. the documented
+  // `test:foundry:screenshots --target-labels=$(screenshots:ui:targets)` -> `collect`
+  // workflow was unrunnable there, since `targets` dedupes and this side did not.
+  const expectedLabels = [...new Set(views.flatMap((view) => view.smokeLabels))].sort((a, b) =>
+    a.localeCompare(b)
+  );
   const summaryLabels = [...(summaryRun.targetLabels || [])].sort((a, b) => a.localeCompare(b));
   const manifestLabels = [...(manifest.targetLabels || [])].sort((a, b) => a.localeCompare(b));
   if (
@@ -1124,7 +1131,15 @@ function validateScreenshotCapture(view, source, evidence) {
   }
   const actual = readPngDimensions(view, source);
   if (isToolStudioView(view)) validateToolStudioCaptureRules(view, capture, actual);
-  if (actual.width !== capture.width || actual.height !== capture.height) {
+  // The manifest records geometry ONLY for a clipped capture: `screenshot()` writes
+  // `options.clip?.width ?? null`, so an unclipped full-page frame declares null. This
+  // cross-check exists to catch a frame that disagrees with the clip it claims, so it
+  // is meaningless — and was unconditionally fatal — when nothing was declared. Reading
+  // real pixels and comparing them to null failed every non-clipped view, which is most
+  // of them. `readPngDimensions` still runs above, so a corrupt or zero-sized PNG is
+  // rejected for every view regardless.
+  const declaresGeometry = capture.width != null && capture.height != null;
+  if (declaresGeometry && (actual.width !== capture.width || actual.height !== capture.height)) {
     throw new Error(
       `PNG dimensions do not match its manifest for ${view.id}: ` +
       `${actual.width}x${actual.height} actual; ${capture.width}x${capture.height} declared`
