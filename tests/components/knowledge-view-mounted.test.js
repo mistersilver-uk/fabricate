@@ -33,6 +33,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',

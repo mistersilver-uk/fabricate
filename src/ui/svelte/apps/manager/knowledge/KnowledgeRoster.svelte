@@ -18,6 +18,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import EmptyState from '../EmptyState.svelte';
   import Medallion from '../../../components/Medallion.svelte';
 
   let {
@@ -62,27 +63,25 @@
 
   <div class="manager-knowledge-roster-scroll">
     {#if totalCount === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-user-slash" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Knowledge.RosterEmptyTitle', 'No player characters')}</h3>
-          <p>{text(
-            'FABRICATE.Admin.Manager.Knowledge.RosterEmptyHint',
-            'Assign a player character in this world to audit its recipe knowledge.'
-          )}</p>
-        </div>
-      </div>
+      <EmptyState
+        compact
+        icon="fas fa-user-slash"
+        title={text('FABRICATE.Admin.Manager.Knowledge.RosterEmptyTitle', 'No player characters')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Knowledge.RosterEmptyHint',
+          'Assign a player character in this world to audit its recipe knowledge.'
+        )}
+      />
     {:else if characters.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Knowledge.RosterNoMatchTitle', 'No characters match this search')}</h3>
-          <p>{text(
-            'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchHint',
-            'Clear the search to show every player character.'
-          )}</p>
-        </div>
-      </div>
+      <EmptyState
+        compact
+        icon="fas fa-search"
+        title={text('FABRICATE.Admin.Manager.Knowledge.RosterNoMatchTitle', 'No characters match this search')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchHint',
+          'Clear the search to show every player character.'
+        )}
+      />
     {:else}
       <!-- Plain button stack rather than a list/listitem pairing: the row IS the
            control, and a `<button role="listitem">` both loses its button semantics

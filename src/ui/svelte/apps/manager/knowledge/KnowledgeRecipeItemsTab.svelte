@@ -17,6 +17,7 @@
    - armedToken, onExpend, onDelete, onArm, onDisarm.
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import KnowledgeOwnedCopyRow from './KnowledgeOwnedCopyRow.svelte';
 
@@ -56,16 +57,15 @@
   {/if}
 
   {#if copies.length === 0}
-    <div class="manager-empty" data-knowledge-items-empty>
-      <div>
-        <i class="fas fa-boxes-stacked" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Knowledge.ItemsEmptyTitle', 'No owned copies')}</h3>
-        <p>{text(
-          'FABRICATE.Admin.Manager.Knowledge.ItemsEmptyHint',
-          "This character carries none of this system's recipe items."
-        )}</p>
-      </div>
-    </div>
+    <EmptyState
+      dataAttr="data-knowledge-items-empty"
+      icon="fas fa-boxes-stacked"
+      title={text('FABRICATE.Admin.Manager.Knowledge.ItemsEmptyTitle', 'No owned copies')}
+      hint={text(
+        'FABRICATE.Admin.Manager.Knowledge.ItemsEmptyHint',
+        "This character carries none of this system's recipe items."
+      )}
+    />
   {:else}
     <ul class="manager-knowledge-row-list" role="list">
       {#each copies as copy (copy.itemId)}

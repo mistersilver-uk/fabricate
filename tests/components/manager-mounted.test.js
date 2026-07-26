@@ -143,6 +143,9 @@ function compileManagerRoot() {
   // mounted manager test as `# cancelled`, it does not fail one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
+  // The shared no-state primitive. The Knowledge roster and both tab bodies render it,
+  // so it is in the root's static graph too.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

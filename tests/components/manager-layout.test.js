@@ -961,31 +961,63 @@ test('manager inspector count labels wrap without truncation', () => {
 });
 
 test('manager empty states use refined heading and setup-panel styling', () => {
+  const emptyPanelBlock = blockFor('.fabricate-manager .manager-empty');
   const emptyIconBlock = blockFor('.fabricate-manager .manager-empty > div > i');
-  const emptyLayerIconBlock = blockFor(
-    '.fabricate-manager .manager-empty > div > i.fa-layer-group'
-  );
   const emptyHeadingBlock = blockFor('.fabricate-manager .manager-empty h3');
+  const emptyBodyBlock = blockFor('.fabricate-manager .manager-empty p');
+  const emptyCompactIconBlock = blockFor(
+    '.fabricate-manager .manager-empty.is-compact > div > i'
+  );
   const setupCardBlock = blockFor('.fabricate-manager .manager-setup-card');
   const setupHeaderBlock = blockFor('.fabricate-manager .manager-setup-card-header');
   const setupListBlock = blockFor('.fabricate-manager .manager-setup-list');
   const setupLinksBlock = blockFor('.fabricate-manager .manager-setup-links');
 
+  // Matched to the reference prototype: a 46px rounded tile holding an 18px SUBTLE glyph,
+  // a 13px/600 serif title in the secondary tone, and an 11px body capped at 280px. The
+  // icon is deliberately quieter than the title — it used to render at 1.55rem in the full
+  // text colour and was the loudest thing in an otherwise quiet panel.
   assert.ok(
-    emptyIconBlock.includes('font-size: 1.55rem;'),
-    'generic empty-state icons should be larger than body text'
+    emptyPanelBlock.includes('border: 1.5px dashed var(--fab-mv2-border);') &&
+      emptyPanelBlock.includes('border-radius: 12px;'),
+    'the no-state panel should be a rounded 1.5px dashed panel'
   );
   assert.ok(
-    emptyLayerIconBlock.includes('font-size: 1.9rem;'),
-    'no-systems empty icon should be more prominent'
+    !emptyPanelBlock.includes('min-height:'),
+    'panel height should be padding-driven as in the prototype, not floored'
   );
   assert.ok(
-    emptyHeadingBlock.includes('font-weight: 600;'),
-    'empty-state headings should be lighter than heavy admin titles'
+    !emptyPanelBlock.includes('background:'),
+    'the prototype panel carries no fill'
   );
   assert.ok(
-    emptyHeadingBlock.includes('font-size: 0.98rem;'),
-    'empty-state headings should stay compact'
+    emptyIconBlock.includes('font-size: 18px;') &&
+      emptyIconBlock.includes('color: var(--fab-text-subtle);') &&
+      emptyIconBlock.includes('background: var(--fab-surface-soft);'),
+    'the glyph should be a small subtle icon on a soft rounded tile'
+  );
+  // A per-icon size exception would reintroduce the inconsistency the primitive exists to
+  // remove, so every empty state shares one tile scale.
+  assert.equal(
+    css.includes('.manager-empty > div > i.fa-layer-group'),
+    false,
+    'no empty-state icon should carry its own size exception'
+  );
+  assert.ok(
+    emptyHeadingBlock.includes('font-weight: 600;') &&
+      emptyHeadingBlock.includes('font-size: 13px;') &&
+      emptyHeadingBlock.includes('font-family: var(--fab-font-serif);'),
+    'the title should be the prototype 13px/600 serif'
+  );
+  assert.ok(
+    emptyBodyBlock.includes('font-size: 11px;') && emptyBodyBlock.includes('max-width: 280px;'),
+    'the body should be 11px and capped so it wraps into a readable column'
+  );
+  // The sidebar/inline scale is the SAME vocabulary, not a second look.
+  assert.ok(
+    emptyCompactIconBlock.includes('width: 32px;') &&
+      emptyCompactIconBlock.includes('font-size: 14px;'),
+    'the compact variant should shrink the same tile rather than restyle it'
   );
   assert.ok(
     setupCardBlock.includes('display: grid;'),

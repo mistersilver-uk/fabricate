@@ -13,6 +13,7 @@
    - armedToken, onErase, onArm, onDisarm.
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import KnowledgeLearnedRow from './KnowledgeLearnedRow.svelte';
 
@@ -40,16 +41,15 @@
   </p>
 
   {#if learnedRecipes.length === 0}
-    <div class="manager-empty" data-knowledge-learned-empty>
-      <div>
-        <i class="fas fa-graduation-cap" aria-hidden="true"></i>
-        <h3>{text('FABRICATE.Admin.Manager.Knowledge.LearnedEmptyTitle', 'Nothing learned yet')}</h3>
-        <p>{text(
-          'FABRICATE.Admin.Manager.Knowledge.LearnedEmptyHint',
-          'This character has not learned any recipe in this crafting system.'
-        )}</p>
-      </div>
-    </div>
+    <EmptyState
+      dataAttr="data-knowledge-learned-empty"
+      icon="fas fa-graduation-cap"
+      title={text('FABRICATE.Admin.Manager.Knowledge.LearnedEmptyTitle', 'Nothing learned yet')}
+      hint={text(
+        'FABRICATE.Admin.Manager.Knowledge.LearnedEmptyHint',
+        "This character has not learned any recipe in this crafting system."
+      )}
+    />
   {:else}
     <ul class="manager-knowledge-row-list" role="list">
       {#each learnedRecipes as learned (learned.recipeId)}

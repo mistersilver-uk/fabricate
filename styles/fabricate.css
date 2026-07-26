@@ -11643,22 +11643,10 @@
   padding: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-task-required-tools-scroll > .manager-empty > div > i {
-  width: 32px;
-  height: 32px;
-  margin-bottom: var(--fab-space-chip);
-  font-size: 1.1rem;
-}
-
-.fabricate-manager .manager-task-required-tools-scroll > .manager-empty h3 {
-  font-size: 0.86rem;
-  margin: 0 0 var(--fab-space-1);
-}
-
-.fabricate-manager .manager-task-required-tools-scroll > .manager-empty p {
-  font-size: 0.78rem;
-  margin: 0;
-}
+/* The tile/title/body overrides that used to live here are gone: this markup already
+   carried `is-compact`, which had NO rule behind it, so the compact look was hand-rolled
+   through these descendant selectors at its own sizes (0.86rem / 0.78rem). `is-compact`
+   now carries it for every consumer, so this context keeps only its layout concern. */
 
 .fabricate-manager .manager-task-required-tools-grid {
   flex: 1 1 auto;
@@ -13152,18 +13140,28 @@
   text-align: center;
 }
 
-/* The dashed panel is rounded, matching the reference prototype's empty state. It was
-   square-cornered while every other panel, card and chip in the manager is rounded. */
+/* The no-state panel, matched to the reference prototype:
+     padding 44px 20px · 1.5px dashed · radius 12px · no fill · 9px stack gap
+   Height is padding-driven, as in the prototype — the old 220px floor made every empty
+   state taller than its design. `EmptyState.svelte` is the markup contract for this;
+   the styling stays here so there is ONE source of truth rather than a component with
+   its own scoped copy. */
 .fabricate-manager .manager-empty {
   display: grid;
   place-items: center;
-  min-height: 220px;
-  padding: var(--fab-space-4);
-  border: 1px dashed var(--fab-mv2-border);
+  padding: 44px 20px;
+  border: 1.5px dashed var(--fab-mv2-border);
   border-radius: 12px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-subtle);
   text-align: center;
-  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-empty > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
 }
 
 /*
@@ -13195,41 +13193,64 @@
   font-size: 0.8rem;
 }
 
-/* The glyph sits on a rounded tile, as in the reference prototype. The 46px box already
-   existed; it was transparent, so the icon floated with nothing anchoring it. */
+/* A 46px rounded tile holding an 18px glyph in the SUBTLE tone — the prototype's icon is
+   both smaller and dimmer than a heading. It previously rendered at 1.55rem in the full
+   text colour, which read as the loudest thing in an otherwise quiet panel. Spacing comes
+   from the stack gap, not a margin. */
 .fabricate-manager .manager-empty > div > i {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 46px;
   height: 46px;
-  margin-bottom: var(--fab-space-3);
   border-radius: 12px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text-subtle);
   background: var(--fab-surface-soft);
-  font-size: 1.55rem;
+  font-size: 18px;
 }
 
-.fabricate-manager .manager-empty > div > i.fa-layer-group {
-  width: 54px;
-  height: 54px;
-  font-size: 1.9rem;
-}
-
-.fabricate-manager .manager-empty h3,
-.fabricate-manager .manager-empty p {
-  margin: 0 0 var(--fab-space-2);
-}
-
+/* Serif title at the prototype's 13px/600 in the secondary tone, over an 11px body in the
+   subtle tone capped at 280px so the sentence wraps into a readable column instead of
+   spanning a wide pane. Matches the Tool Studio's type scale rather than the ambient ~1rem
+   the old 0.98rem heading approximated. */
 .fabricate-manager .manager-empty h3 {
-  color: var(--fab-mv2-text);
-  font-size: 0.98rem;
+  margin: 0;
+  color: var(--fab-text-secondary);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.25;
 }
 
 .fabricate-manager .manager-empty p {
-  line-height: 1.4;
+  max-width: 280px;
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* The sidebar / inline scale of the same vocabulary: same dashed panel, tile and type,
+   just less furniture. A roster column or an inline card cannot afford the 44px hero
+   padding, and the alternative — a bare sentence — is what made these states look
+   unrelated to each other in the first place. */
+.fabricate-manager .manager-empty.is-compact {
+  padding: var(--fab-space-4) var(--fab-space-3);
+}
+
+.fabricate-manager .manager-empty.is-compact > div {
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-empty.is-compact > div > i {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 14px;
+}
+
+.fabricate-manager .manager-empty.is-compact h3 {
+  font-size: 12px;
 }
 
 .fabricate-manager .manager-setup-card {
