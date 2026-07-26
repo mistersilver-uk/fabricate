@@ -483,11 +483,15 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
+    // `class="manager-empty"` is NOT in this list any more (issue 785): the manager's
+    // no-state panel is the shared `EmptyState` component, so the root imports and renders
+    // it rather than hand-rolling the dashed-panel markup.
     for (const snippet of [
       'class="manager-main"',
       'class="manager-toolbar"',
       'class="manager-filter"',
-      'class="manager-empty"',
+      "import EmptyState from './EmptyState.svelte'",
+      '<EmptyState',
     ]) {
       assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
     }

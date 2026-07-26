@@ -69,6 +69,9 @@ describe('GatheringPartiesTab mounted behavior', () => {
     writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
     writeRawModule('src/ui/svelte/actions/portal.js');
     writeRawModule('src/ui/svelte/actions/dragDrop.js');
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
@@ -89,7 +92,7 @@ describe('GatheringPartiesTab mounted behavior', () => {
   it('renders an empty state when there are no parties', async () => {
     await mountTab({ parties: [] });
     assert.equal(rows().length, 0);
-    assert.ok(target.querySelector('.manager-travel-parties-empty'));
+    assert.ok(target.querySelector('[data-travel-parties-empty]'));
     remount();
   });
 

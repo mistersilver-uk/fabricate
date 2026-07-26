@@ -144,8 +144,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
   // The shared no-state primitive. The Knowledge roster and both tab bodies render it,
-  // so it is in the root's static graph too.
+  // so it is in the root's static graph too. `Callout` is the shared standing-statement
+  // strip both Knowledge tabs render (issue 785); same rule, same consequence.
   writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/Callout.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

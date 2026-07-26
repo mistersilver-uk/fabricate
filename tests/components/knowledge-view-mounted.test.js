@@ -34,6 +34,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // The shared standing-statement strip both tab bodies render (issue 785).
+    'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',

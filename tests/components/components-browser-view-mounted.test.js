@@ -34,6 +34,9 @@ const browser = createMountedComponentHarness({
     'src/utils/browserGroupCounts.js'
   ],
   compiledModules: [
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/StatusPill.svelte',

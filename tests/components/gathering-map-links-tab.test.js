@@ -21,6 +21,9 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-map-links-tab-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
   compiledModules: [
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte',
     'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte'
@@ -43,7 +46,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
   it('shows the no-scene empty state when no scene is active', async () => {
     await mountTab({ sceneUuid: '', sceneRegions: [] });
     assert.equal(rows().length, 0);
-    const empty = harness.target.querySelector('.manager-travel-map-links-empty');
+    const empty = harness.target.querySelector('[data-travel-map-links-empty]');
     assert.ok(empty);
     assert.match(empty.textContent, /Activate a scene/);
     harness.remount();
@@ -52,7 +55,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
   it('shows the no-regions empty state when the active scene has no regions', async () => {
     await mountTab({ sceneUuid: 'Scene.s1', sceneRegions: [] });
     assert.equal(rows().length, 0);
-    const empty = harness.target.querySelector('.manager-travel-map-links-empty');
+    const empty = harness.target.querySelector('[data-travel-map-links-empty]');
     assert.ok(empty);
     assert.match(empty.textContent, /no regions/i);
     harness.remount();

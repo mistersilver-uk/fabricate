@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -12,14 +12,44 @@ const colorPickerPath = resolve(
   '../../src/ui/svelte/components/ManagerColorPicker.svelte'
 );
 const enPath = resolve(__dirname, '../../lang/en.json');
+// The shared no-state and standing-statement primitives keep their CSS in their own
+// scoped `<style>` blocks (issue 785), not in the global sheet, so the rules that used to
+// be read out of `styles/fabricate.css` are read out of the component source instead.
+const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/apps/manager/EmptyState.svelte');
+const calloutPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Callout.svelte');
+const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
+const emptyStateSource = readFileSync(emptyStatePath, 'utf8');
+const calloutSource = readFileSync(calloutPath, 'utf8');
 const en = JSON.parse(readFileSync(enPath, 'utf8'));
 
-function blockFor(selector) {
+// Only the scoped `<style>` block, with CSS comments stripped. Both primitives document the
+// global layout-context rules they deliberately left behind, and those doc comments quote
+// selectors (and the words `<style>`) — matching prose instead of a rule would assert
+// nothing, so the block is located by its column-0 delimiters rather than by a loose match.
+const STYLE_OPEN = '\n<style>\n';
+
+function scopedStyles(componentSource) {
+  const start = componentSource.lastIndexOf(STYLE_OPEN);
+  const end = componentSource.lastIndexOf('\n</style>');
+  if (start < 0 || end <= start) return '';
+  return componentSource
+    .slice(start + STYLE_OPEN.length, end)
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+const emptyStateStyles = scopedStyles(emptyStateSource);
+const calloutStyles = scopedStyles(calloutSource);
+
+function blockIn(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escaped}\\s*\\{[\\s\\S]*?\\}`));
+  const match = source.match(new RegExp(`${escaped}\\s*\\{[\\s\\S]*?\\}`));
   return match?.[0] || '';
+}
+
+function blockFor(selector) {
+  return blockIn(css, selector);
 }
 
 async function readRenderedToolGeometry(width, view) {
@@ -961,13 +991,14 @@ test('manager inspector count labels wrap without truncation', () => {
 });
 
 test('manager empty states use refined heading and setup-panel styling', () => {
-  const emptyPanelBlock = blockFor('.fabricate-manager .manager-empty');
-  const emptyIconBlock = blockFor('.fabricate-manager .manager-empty > div > i');
-  const emptyHeadingBlock = blockFor('.fabricate-manager .manager-empty h3');
-  const emptyBodyBlock = blockFor('.fabricate-manager .manager-empty p');
-  const emptyCompactIconBlock = blockFor(
-    '.fabricate-manager .manager-empty.is-compact > div > i'
-  );
+  // Read from the PRIMITIVE, not the global sheet (issue 785): `EmptyState.svelte` owns the
+  // appearance in its scoped block so a change to it maps to the views that render it
+  // rather than to the broad `theme-or-global-ui` screenshot recipe.
+  const emptyPanelBlock = blockIn(emptyStateStyles, '.manager-empty');
+  const emptyIconBlock = blockIn(emptyStateStyles, '.manager-empty > div > i');
+  const emptyHeadingBlock = blockIn(emptyStateStyles, '.manager-empty h3');
+  const emptyBodyBlock = blockIn(emptyStateStyles, '.manager-empty p');
+  const emptyCompactIconBlock = blockIn(emptyStateStyles, '.manager-empty.is-compact > div > i');
   const setupCardBlock = blockFor('.fabricate-manager .manager-setup-card');
   const setupHeaderBlock = blockFor('.fabricate-manager .manager-setup-card-header');
   const setupListBlock = blockFor('.fabricate-manager .manager-setup-list');
@@ -978,10 +1009,26 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   // icon is deliberately quieter than the title — it used to render at 1.55rem in the full
   // text colour and was the loudest thing in an otherwise quiet panel.
   assert.ok(
-    emptyPanelBlock.includes('border: 1.5px dashed var(--fab-mv2-border);') &&
+    emptyPanelBlock.includes('border: 1.5px dashed var(--fab-border);') &&
       emptyPanelBlock.includes('border-radius: 12px;'),
     'the no-state panel should be a rounded 1.5px dashed panel'
   );
+  // A shared primitive must be portable across app areas. `--fab-mv2-*` is declared on
+  // `.fabricate-manager` only, so referencing it makes the declaration invalid at
+  // computed-value time anywhere else (`.fabricate-app`, `.fabricate-admin`,
+  // `.fabricate-interactables-manager`) and the colour silently falls back to inheritance.
+  // Nothing fails; it just looks wrong, and the trigger is the reuse the primitive exists
+  // to enable. Theme-root tokens (`:root` + all seven theme blocks) resolve everywhere.
+  for (const [name, styles] of Object.entries({
+    EmptyState: emptyStateStyles,
+    Callout: calloutStyles,
+  })) {
+    assert.equal(
+      /--fab-mv2-/.test(styles),
+      false,
+      `${name} must reference theme-root tokens, not .fabricate-manager-scoped aliases`
+    );
+  }
   assert.ok(
     !emptyPanelBlock.includes('min-height:'),
     'panel height should be padding-driven as in the prototype, not floored'
@@ -996,13 +1043,37 @@ test('manager empty states use refined heading and setup-panel styling', () => {
       emptyIconBlock.includes('background: var(--fab-surface-soft);'),
     'the glyph should be a small subtle icon on a soft rounded tile'
   );
-  // A per-icon size exception would reintroduce the inconsistency the primitive exists to
-  // remove, so every empty state shares one tile scale.
+  // A per-icon OR per-screen size exception would reintroduce the inconsistency the
+  // primitive exists to remove, so every empty state shares one tile and type scale. The
+  // global sheet is checked too: it may only carry LAYOUT-CONTEXT rules for the panel, and
+  // a `font-size` reaching it through an ancestor is how the Tool Studio inspector once
+  // grew a 2rem glyph and a 1.2rem title of its own (issue 785).
   assert.equal(
     css.includes('.manager-empty > div > i.fa-layer-group'),
     false,
     'no empty-state icon should carry its own size exception'
   );
+  for (const [selector, block] of Object.entries({
+    '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty': blockFor(
+      '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty'
+    ),
+    '.fabricate-manager .manager-tool-browser-inspector-empty': blockFor(
+      '.fabricate-manager .manager-tool-browser-inspector-empty'
+    ),
+    '.fabricate-manager .manager-recipe-tab-empty': blockFor(
+      '.fabricate-manager .manager-recipe-tab-empty'
+    ),
+    '.fabricate-manager .manager-vocabulary-empty-panel': blockFor(
+      '.fabricate-manager .manager-vocabulary-empty-panel'
+    ),
+  })) {
+    assert.ok(block, `${selector} should still carry its layout-context rule`);
+    assert.equal(
+      /font-size|font-family|font-weight|border-radius|border:|background:/.test(block),
+      false,
+      `${selector} may place the shared panel, never restyle it`
+    );
+  }
   assert.ok(
     emptyHeadingBlock.includes('font-weight: 600;') &&
       emptyHeadingBlock.includes('font-size: 13px;') &&
@@ -1038,6 +1109,53 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   assert.ok(
     setupLinksBlock.includes('flex-wrap: wrap;'),
     'setup links should wrap in narrow inspectors'
+  );
+});
+
+// Issue 785: the two Knowledge tabs rendered the same standing statement at two sizes —
+// a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
+// `Callout` is ONE shape for both tones; a tone that also changed the geometry or the type
+// would put the drift straight back.
+test('the shared callout keeps one shape and lets tone change only its colours', () => {
+  const calloutBlock = blockIn(calloutStyles, '.manager-callout');
+  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i');
+  const warningBlock = blockIn(calloutStyles, '.manager-callout.is-warning');
+  const warningIconBlock = blockIn(calloutStyles, '.manager-callout.is-warning > i');
+
+  // The taller treatment — the one already approved visually — is the ONLY shape.
+  for (const declaration of [
+    'padding: var(--fab-space-3);',
+    'font-size: 0.7rem;',
+    'font-weight: 500;',
+    'line-height: 1.45;',
+    'border-radius: 8px;',
+  ]) {
+    assert.ok(calloutBlock.includes(declaration), `the callout should declare ${declaration}`);
+  }
+  assert.ok(
+    calloutBlock.includes('border: 1px solid var(--fab-info-border);') &&
+      calloutBlock.includes('background: var(--fab-info-soft);'),
+    'the default tone is info, drawn from the info token ramp'
+  );
+  assert.ok(
+    calloutIconBlock.includes('color: var(--fab-info);'),
+    'the glyph carries the tone at full strength'
+  );
+
+  // Tone is a colour concern only.
+  assert.ok(
+    warningBlock.includes('border-color: var(--fab-warning-border);') &&
+      warningBlock.includes('background: var(--fab-warning-soft);'),
+    'the warning tone repaints the edge and the fill'
+  );
+  assert.ok(
+    warningIconBlock.includes('color: var(--fab-warning);'),
+    'the warning tone repaints the glyph'
+  );
+  assert.equal(
+    /padding|font-size|font-weight|line-height|gap:/.test(warningBlock),
+    false,
+    'a tone must not change the callout geometry or type scale'
   );
 });
 
@@ -4562,6 +4680,11 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
 
   // Class names that carry no CSS and no consumer: each sat beside a `data-knowledge-*`
   // attribute already doing the hook job.
+  //
+  // The second block (issue 785) is the bespoke no-state and standing-statement classes the
+  // shared `EmptyState` / `Callout` primitives replaced. Each was a per-screen re-derivation
+  // of one meaning — a dashed panel, an icon tile, or a bare "nothing here" sentence — and
+  // leaving any of them in the sheet is how the next copy gets written against it.
   for (const dead of [
     'manager-knowledge-quantity-chip',
     'manager-knowledge-type-pill',
@@ -4570,8 +4693,52 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     'manager-knowledge-match-chip',
     'manager-knowledge-category-pill',
     'manager-knowledge-expend',
+    // Central no-state panels that were hand-rolled beside the primitive.
+    'manager-recipe-empty-filtered',
+    'manager-component-empty-filtered',
+    'manager-recipe-section-empty',
+    'manager-vocabulary-empty-icon',
+    'manager-vocabulary-noresults',
+    // Bare inline "nothing here" sentences with their own bespoke class.
+    'manager-travel-empty-hint',
+    'manager-environment-comp-empty',
+    'manager-character-modifier-empty',
+    'manager-character-modifier-row-empty',
+    'manager-condition-modifier-row-empty',
+    'manager-recipe-item-prereq-empty',
+    'manager-travel-map-links-empty',
+    'manager-travel-realms-empty',
+    'manager-travel-parties-empty',
+    'manager-recipe-tools-empty',
+    'manager-recipe-tags-empty',
+    // The per-screen re-size of the shared warning band.
+    'manager-knowledge-learned-band',
   ]) {
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
+  }
+
+  // And they must be gone from the MARKUP too, not merely unstyled: an unconverted site is
+  // what makes a primitive a fourth way of doing the same thing.
+  const managerComponents = readdirSync(managerComponentDir, {
+    recursive: true,
+    withFileTypes: true,
+  })
+    // The primitives themselves are the ONE place the contract markup may be written.
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.endsWith('.svelte') &&
+        entry.name !== 'EmptyState.svelte' &&
+        entry.name !== 'Callout.svelte'
+    )
+    .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
+    .join('\n');
+  for (const dead of ['class="manager-empty', 'manager-recipe-section-empty"']) {
+    assert.equal(
+      managerComponents.includes(dead),
+      false,
+      `${dead} should render through the shared primitive, not hand-rolled markup`
+    );
   }
 });
 
