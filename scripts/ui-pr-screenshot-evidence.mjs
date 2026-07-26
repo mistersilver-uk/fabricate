@@ -411,25 +411,33 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/utils\/recipeBrowserModel\.js$/,
     ],
   },
+  // Issue 877 turned the report from a raw-HTML DialogV2 into a Svelte modal, so the
+  // rendering file is now `ImportReportModal.svelte` rather than the app shell's HTML
+  // builder — and `ManagerModal.svelte`, the chrome BOTH import-flow modals render
+  // through, changes this frame's appearance too. All four are load-bearing.
   {
     id: 'manager-import-report',
-    label: 'Manager import — post-import unresolved-reference report (#492)',
+    label: 'Manager import — post-import unresolved-reference report (#492, #877)',
     smokeLabels: ['manager-import-report'],
     matches: [
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/systems\/importReportContent\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
     ],
   },
   // Issue 771: folder-aware categorization mapping modal, shown before a folder /
   // whole-pack component drop commits. Its own single-frame view (collect publishes only
   // candidates[0] per id). Mapped to the mapping component AND the drop-path service file
-  // that opens it, so a change to either republishes the frame.
+  // that opens it, so a change to either republishes the frame — plus the shared modal
+  // chrome it renders through since issue 877.
   {
     id: 'manager-import-folder-mapping',
     label: 'Manager import — folder-aware categorization mapping step (#771)',
     smokeLabels: ['manager-import-folder-mapping'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
     ],
   },

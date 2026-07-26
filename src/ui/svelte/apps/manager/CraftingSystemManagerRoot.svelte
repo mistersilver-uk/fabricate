@@ -62,6 +62,7 @@
   import ItemPageInspector from './ItemPageInspector.svelte';
   import RecipeItemEditor from './RecipeItemEditor.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
+  import ImportReportModal from './ImportReportModal.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -157,6 +158,10 @@
   // component drop commits, seeded with the per-folder groups the drop resolved to.
   let importMappingOpen = $state(false);
   let importMappingFolders = $state([]);
+  // Post-import reference report (issue 877): the store resolves the assembled
+  // `buildImportReportContent` output once a system import completes, and this renders
+  // it in the same ManagerModal chrome the mapping step above uses.
+  let importReportContent = $state(null);
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
@@ -2991,8 +2996,11 @@
     store.createSystem?.();
   }
 
-  function importSystem() {
-    store.importSystem?.();
+  // The store resolves the post-import report content (or null when the import was
+  // cancelled, failed, or skipped an existing system). Opening the report is driven by
+  // that content being present, so there is no separate open flag to fall out of sync.
+  async function importSystem() {
+    importReportContent = (await store.importSystem?.()) ?? null;
   }
 
   function exportSystem(systemId = selectedSystemId) {
@@ -7306,5 +7314,11 @@
     onAddCategory={addComponentCategory}
     onCommit={commitImportFolderMapping}
     onClose={() => importMappingOpen = false}
+  />
+
+  <ImportReportModal
+    open={importReportContent !== null}
+    content={importReportContent}
+    onClose={() => importReportContent = null}
   />
 </div>

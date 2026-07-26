@@ -661,6 +661,9 @@ describe('UI PR screenshot evidence', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
       'src/systems/importReportContent.js',
+      // Issue 877 moved the rendering into a Svelte modal built on the shared chrome.
+      'src/ui/svelte/apps/manager/ImportReportModal.svelte',
+      'src/ui/svelte/apps/manager/ManagerModal.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
       assert.ok(
@@ -670,6 +673,16 @@ describe('UI PR screenshot evidence', () => {
     }
     const view = VIEW_RECIPES.find(recipe => recipe.id === 'manager-import-report');
     assert.deepEqual(view.smokeLabels, ['manager-import-report']);
+  });
+
+  // The shared modal chrome (issue 877) is rendered by BOTH import-flow modals, so a
+  // change to it must republish both frames, not just the report's.
+  it('maps the shared ManagerModal chrome to both import-flow frames', () => {
+    const ids = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    ]).map(view => view.id);
+    assert.ok(ids.includes('manager-import-report'));
+    assert.ok(ids.includes('manager-import-folder-mapping'));
   });
 
   it('maps the recipe shell broadly while each focused recipe tab maps only its frames', () => {

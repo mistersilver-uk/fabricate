@@ -509,7 +509,12 @@ function collectBrokenInternalReferences(payload, out) {
   // Recipe ingredient-option / result / catalyst component refs (issue 570 D2),
   // including the recursive `alternatives[]` and the flat `ingredients`/`results`
   // aliases, at both top level and per step.
-  const reportIngredientRef = (ref, owner) => {
+  // `ownerType` travels with the owner because these walkers are shared by TWO owner
+  // classes: a recipe's ingredient/result/catalyst refs, and a COMPONENT's salvage
+  // result/catalyst refs. Hard-coding 'recipe' here (as it was before issue 877) made
+  // the report label a salvage row "Recipe: Iron Ore" for a component owner, and left
+  // the `OwnerType.component` label unreachable from this collector.
+  const reportIngredientRef = (ref, owner, ownerType) => {
     if (!ref || typeof ref !== 'object') return;
     const componentId =
       (ref.match && typeof ref.match === 'object'
@@ -519,49 +524,54 @@ function collectBrokenInternalReferences(payload, out) {
       ref.systemItemId ||
       null;
     if (componentId && !componentIds.has(componentId)) {
-      push(REFERENCE_KINDS.COMPONENT_LINK, 'recipe', owner, componentId);
+      push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
     }
-    for (const alt of arrayOf(ref.alternatives)) reportIngredientRef(alt, owner);
+    for (const alt of arrayOf(ref.alternatives)) reportIngredientRef(alt, owner, ownerType);
   };
-  const reportResultRef = (result, owner) => {
+  const reportResultRef = (result, owner, ownerType) => {
     const componentId = result?.componentId || result?.systemItemId || null;
     if (componentId && !componentIds.has(componentId)) {
-      push(REFERENCE_KINDS.COMPONENT_LINK, 'recipe', owner, componentId);
+      push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
     }
   };
-  const reportResultGroups = (resultGroups, owner) => {
+  const reportResultGroups = (resultGroups, owner, ownerType) => {
     for (const group of arrayOf(resultGroups)) {
-      for (const result of arrayOf(group?.results)) reportResultRef(result, owner);
+      for (const result of arrayOf(group?.results)) reportResultRef(result, owner, ownerType);
     }
   };
-  const reportIngredientSet = (set, owner) => {
+  const reportIngredientSet = (set, owner, ownerType) => {
     if (!set || typeof set !== 'object') return;
     for (const group of arrayOf(set.ingredientGroups)) {
-      for (const option of arrayOf(group?.options)) reportIngredientRef(option, owner);
+      for (const option of arrayOf(group?.options)) reportIngredientRef(option, owner, ownerType);
     }
-    for (const ingredient of arrayOf(set.ingredients)) reportIngredientRef(ingredient, owner);
-    for (const catalyst of arrayOf(set.catalysts)) reportIngredientRef(catalyst, owner);
+    for (const ingredient of arrayOf(set.ingredients))
+      reportIngredientRef(ingredient, owner, ownerType);
+    for (const catalyst of arrayOf(set.catalysts)) reportIngredientRef(catalyst, owner, ownerType);
   };
   for (const recipe of arrayOf(payload.recipes)) {
     if (!recipe || typeof recipe !== 'object') continue;
-    for (const set of arrayOf(recipe.ingredientSets)) reportIngredientSet(set, recipe);
-    reportResultGroups(recipe.resultGroups, recipe);
-    for (const result of arrayOf(recipe.results)) reportResultRef(result, recipe);
-    for (const catalyst of arrayOf(recipe.catalysts)) reportIngredientRef(catalyst, recipe);
+    for (const set of arrayOf(recipe.ingredientSets)) reportIngredientSet(set, recipe, 'recipe');
+    reportResultGroups(recipe.resultGroups, recipe, 'recipe');
+    for (const result of arrayOf(recipe.results)) reportResultRef(result, recipe, 'recipe');
+    for (const catalyst of arrayOf(recipe.catalysts))
+      reportIngredientRef(catalyst, recipe, 'recipe');
     for (const step of arrayOf(recipe.steps)) {
       if (!step || typeof step !== 'object') continue;
-      for (const set of arrayOf(step.ingredientSets)) reportIngredientSet(set, recipe);
-      reportResultGroups(step.resultGroups, recipe);
-      for (const catalyst of arrayOf(step.catalysts)) reportIngredientRef(catalyst, recipe);
+      for (const set of arrayOf(step.ingredientSets)) reportIngredientSet(set, recipe, 'recipe');
+      reportResultGroups(step.resultGroups, recipe, 'recipe');
+      for (const catalyst of arrayOf(step.catalysts))
+        reportIngredientRef(catalyst, recipe, 'recipe');
     }
   }
 
-  // Component salvage result refs + legacy salvage catalysts (issue 570 D2).
+  // Component salvage result refs + legacy salvage catalysts (issue 570 D2). The owner
+  // here is a COMPONENT, so the report says "Component: <name>" (issue 877).
   for (const component of arrayOf(system.components)) {
     const salvage = component?.salvage;
     if (!salvage || typeof salvage !== 'object') continue;
-    reportResultGroups(salvage.resultGroups, component);
-    for (const catalyst of arrayOf(salvage.catalysts)) reportIngredientRef(catalyst, component);
+    reportResultGroups(salvage.resultGroups, component, 'component');
+    for (const catalyst of arrayOf(salvage.catalysts))
+      reportIngredientRef(catalyst, component, 'component');
   }
 
   // Essence sourceComponentId → components (fall back to the legacy

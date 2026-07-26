@@ -10182,8 +10182,8 @@ async function main() {
         // features restored by the phase finally), so it is independent of prior
         // sections and safe to skip as a unit.
         if (shouldRunScreenshotSection('import-alchemy-experimental')) {
-        // ── Post-import unresolved-reference report (#492) ─────────────────────
-        // The GM-facing import report is a DialogV2 that only appears AFTER an
+        // ── Post-import unresolved-reference report (#492, restyled in #877) ───
+        // The GM-facing import report is a manager modal that only appears AFTER an
         // import, and only surfaces its "needs attention" list when the imported
         // system carries references that cannot resolve in the target world. The
         // default smoke performs no import, so `check-screenshots` has no frame to
@@ -10273,13 +10273,13 @@ async function main() {
           await importDialog.locator('input[name="conflictMode"][value="copy"]').check({ force: true });
           await importDialog.locator('button[data-action="ok"], button:has-text("Import")').first().click();
 
-          // The post-import report is its own DialogV2 carrying `.fabricate-import-report`.
-          const reportDialog = page
-            .locator('.application.dialog:has(.fabricate-import-report), .dialog:has(.fabricate-import-report)')
-            .first();
+          // Since issue 877 the report is a Svelte modal portaled INTO the manager window
+          // (the shared ManagerModal chrome the folder-mapping step below also uses), not
+          // a separate DialogV2 application.
+          const reportDialog = page.locator('.fabricate-manager [data-import-report]').first();
           await reportDialog.waitFor({ state: 'visible', timeout: 15_000 });
-          // Prove the "needs attention" grouped list rendered (the reported source item).
-          await reportDialog.locator('.fabricate-import-report__kind').first()
+          // Prove the "needs attention" grouped cards rendered (the reported source item).
+          await reportDialog.locator('[data-import-report-group]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           // The import fires info/warn toasts that can bleed over the dialog; clear
           // them first. The report IS the intended overlay here, so — like the roll
@@ -10288,7 +10288,7 @@ async function main() {
           await screenshot(page, 'manager-import-report');
 
           // Dismiss the report so the smoke can continue.
-          await reportDialog.locator('button[data-action="ok"], button:has-text("Close")').first().click().catch(() => {});
+          await reportDialog.locator('[data-import-report-close]').first().click().catch(() => {});
           await reportDialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
 
           // Delete the throwaway "(Copy)" system created by the import so no later
