@@ -5053,12 +5053,8 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
 test('every remaining hand-rolled chip site is declared, so the migration can only shrink', () => {
   const UNCONVERTED = [
     'CraftingSystemManagerRoot.svelte',
-    'EditorValidationSurface.svelte',
-    'ImportFolderMappingModal.svelte',
-    'ImportReportModal.svelte',
     'TagsCategoriesView.svelte',
     'VocabularyPanel.svelte',
-    'checks/ChecksValidationTab.svelte',
   ];
 
   const remaining = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })

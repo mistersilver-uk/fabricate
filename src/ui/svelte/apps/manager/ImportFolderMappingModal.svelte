@@ -20,6 +20,7 @@
   as folders are skipped (a skipped folder's items are excluded from the import).
 -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { matchFolderNameToVocabulary } from '../../../../utils/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
@@ -257,13 +258,15 @@
               <i class="fas fa-folder" aria-hidden="true"></i>
               <strong>{row.group.folderName}</strong>
             </span>
-            <span
-              class="manager-chip manager-import-mapping-count"
+            <!-- "12 items" is a PHRASE, so it stays in the UI face rather than taking the
+                 `mono` prop; only the figures inside it need to stop shifting width. -->
+            <Chip
+              class="manager-import-mapping-count"
               data-import-mapping-count
               style="font-variant-numeric: tabular-nums;"
             >
               {itemCountLabel(row.group.itemCount)}
-            </span>
+            </Chip>
             <button
               type="button"
               class={`manager-button is-subtle manager-import-mapping-skip ${row.state.skipped ? 'is-active' : ''}`}

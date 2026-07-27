@@ -24,6 +24,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/portal.js',
   ],
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/apps/manager/ImportReportModal.svelte',

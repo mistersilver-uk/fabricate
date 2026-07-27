@@ -13,10 +13,17 @@
   are switched off (or the read-only gathering d100 roll) are omitted upstream.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { evaluateCheckReadiness } from './checksReadiness.js';
 
   let { sections = [] } = $props();
+
+  function severityTone(severity) {
+    if (severity === 'critical') return 'danger';
+    if (severity === 'warning') return 'warning';
+    return 'neutral';
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -108,9 +115,9 @@
               <ul class="manager-recipe-issue-list" data-issue-severity={severity}>
                 {#each issuesBy[severity] as issue, index (issue.id + index)}
                   <li class={`manager-editor-issue is-${severity}`} data-subsystem={subsystem} data-issue={issue.id}>
-                    <span class={`manager-chip ${severity === 'critical' ? 'is-danger' : severity === 'warning' ? 'is-warning' : 'is-neutral'}`}>
+                    <Chip tone={severityTone(severity)}>
                       {text(`FABRICATE.Admin.Manager.Checks.Validation.Severity.${severity}`, severity)}
-                    </span>
+                    </Chip>
                     <span class="manager-recipe-issue-title">{issueTitle(issue.id)}</span>
                   </li>
                 {/each}

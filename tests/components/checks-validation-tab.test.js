@@ -16,7 +16,12 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
   ],
-  compiledModules: ['src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte'],
+  compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
+  ],
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
 });
 

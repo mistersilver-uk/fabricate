@@ -1,5 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
+
   let {
     title = 'Validation',
     intro = '',
@@ -61,7 +63,7 @@
             {#if row.target}
               <button type="button" class="manager-button is-ghost manager-recipe-val-view" onclick={() => onSelectIssue(row.target)}>View</button>
             {/if}
-            <span class={`manager-chip manager-recipe-val-pill is-${row.status}`}>{statusLabels[row.status]}</span>
+            <Chip class={`manager-recipe-val-pill is-${row.status}`}>{statusLabels[row.status]}</Chip>
           </li>
         {/each}
       </ul>

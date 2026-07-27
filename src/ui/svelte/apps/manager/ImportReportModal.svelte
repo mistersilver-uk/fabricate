@@ -19,6 +19,7 @@
   vocabulary as the mapping step's per-folder rows.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ManagerModal from './ManagerModal.svelte';
   import { localize } from '../../util/foundryBridge.js';
@@ -67,15 +68,15 @@
           <section class="manager-import-report-group" data-import-report-group={group.kind}>
             <header class="manager-import-report-group-head">
               <h4 class="manager-import-report-kind">{group.kindLabel}</h4>
-              <span class="manager-chip is-mono" data-import-report-count>{group.count}</span>
+              <Chip mono data-import-report-count>{group.count}</Chip>
             </header>
             <ul class="manager-import-report-rows">
               {#each group.rows as row, index (`${group.kind}-${index}`)}
                 <li class="manager-import-report-row" data-import-report-row>
                   <span class="manager-import-report-owner">{ownerLabel(row)}</span>
-                  <span class="manager-chip is-mono manager-import-report-ref" data-import-report-ref>
+                  <Chip mono class="manager-import-report-ref" data-import-report-ref>
                     {row.referenceValue}
-                  </span>
+                  </Chip>
                 </li>
               {/each}
             </ul>
@@ -172,7 +173,9 @@
     overflow-wrap: anywhere;
   }
 
-  .manager-import-report-ref {
+  /* The reference is a `Chip` (issue 883), so this component's scoping hash is not on
+     it. Reach it through `:global`, nested under a selector that DOES carry the hash. */
+  .manager-import-report-row :global(.manager-import-report-ref) {
     overflow-wrap: anywhere;
     word-break: break-all;
   }
