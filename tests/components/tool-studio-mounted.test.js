@@ -223,6 +223,22 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(sourceCard.querySelector('[data-tool-source-picker]'), null);
     assert.equal(sourceCard.querySelector('.manager-tool-source-replace'), null);
     assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 6);
+    // The bold lead-in and its prose are one sentence and need a separator between them.
+    // A literal space in the template is the last token inside the `{#if}`, and Svelte
+    // trims block-trailing whitespace, so they rendered welded: "…game-world Item.Drag any
+    // Item…". Every existing assertion here matches MID-sentence and so cannot see the
+    // join; this one straddles it. Found in a screenshot, not by a test (issue 881).
+    for (const row of root.querySelectorAll('[data-tool-how-it-works] li')) {
+      const lead = row.querySelector('strong')?.textContent;
+      if (!lead) continue;
+      // Asserted on the JOIN, not the string start: the row's textContent carries leading
+      // whitespace from the glyph element, so anchoring at position 0 fails on markup that
+      // is actually correct.
+      assert.ok(
+        row.textContent.includes(`${lead} `),
+        `explainer lead-in "${lead}" must be followed by a space, got "${row.textContent.slice(0, 60)}"`
+      );
+    }
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
       /supplies the name, art, and description/

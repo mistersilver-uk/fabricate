@@ -6642,6 +6642,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the retired bullet list must be gone from the rail, not merely unstyled'
     );
+    // A bold lead-in and its prose are one sentence, so they need a separator. A literal
+    // space there is the last token inside the `{#if}` and Svelte trims block-trailing
+    // whitespace, which ran them together ("…Item.Drag any Item…") — invisible to every
+    // structural assertion above and only caught in a screenshot (issue 881).
+    for (const row of howItWorks.querySelectorAll('.manager-explainer-card-list > li')) {
+      const lead = row.querySelector('strong');
+      if (!lead) continue;
+      assert.match(
+        row.textContent,
+        new RegExp(`${lead.textContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`),
+        `explainer lead-in "${lead.textContent}" must be separated from its prose`
+      );
+    }
 
     // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');
