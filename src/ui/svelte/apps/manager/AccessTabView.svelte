@@ -20,7 +20,7 @@
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
+  import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
 
   let {
@@ -67,10 +67,6 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function recipeImage(recipe) {
-    return recipe?.recipeItemImg || recipe?.img || DEFAULT_CRAFTING_IMAGE;
   }
 
   function categoryLabel(recipe) {
@@ -169,7 +165,7 @@
             data-access-row={recipe.id}
             onclick={() => onSelectRecipe(recipe.id)}
           >
-            <img class="manager-recipe-thumb" src={recipeImage(recipe)} alt="" />
+            <img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)} alt="" />
             <span class="manager-access-copy">
               <span class="manager-access-heading">
                 <span class="manager-access-name" title={recipe.name}>{recipe.name}</span>

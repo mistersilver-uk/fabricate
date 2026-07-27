@@ -5820,7 +5820,13 @@ describe('createAdminStore', () => {
           'category',
           'enabled',
           'locked',
+          // The legacy book scalars issue 884 deliberately KEEPS. Named individually
+          // so deleting the whole legacy block, rather than the one image line, fails
+          // here instead of silently emptying the Books & Scrolls consumers.
           'recipeItemId',
+          'recipeItemIds',
+          'recipeItemName',
+          'recipeItemSourceUuid',
           'isSimple',
           'visibilitySummary',
           'stepCount',
@@ -5836,6 +5842,68 @@ describe('createAdminStore', () => {
           assert.ok(field in recipe, `recipe entry should have field: ${field}`);
         }
       }
+    });
+
+    // Issue 884. Book membership is many-to-many, so "the containing book" is not a
+    // well-defined thing to borrow an image from: which definition lands at index 0 is
+    // the order of `selectedSystem.recipeItemDefinitions`, an authoring accident. The
+    // projection therefore carries NO book image at all, and the four GM readers resolve
+    // `recipe.img` through the shared helper instead.
+    it('viewState.recipes projects no containing-book image, in either membership order', async () => {
+      const TOME_IMG = 'icons/sundries/books/book-tooled-eye-gold-red.webp';
+      const SCROLL_IMG = 'icons/sundries/scrolls/scroll-bound-blue.webp';
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      // r1 belongs to BOTH books, and their artwork DIFFERS — so a borrowed icon would
+      // visibly change with nothing but the definition order.
+      sys.recipeItemDefinitions = [
+        { id: 'def-tome', name: 'Tome', img: TOME_IMG, originItemUuid: '', recipeIds: ['r1'] },
+        { id: 'def-scroll', name: 'Scroll', img: SCROLL_IMG, originItemUuid: '', recipeIds: ['r1'] },
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const assertOwnImageOnly = (order, expectedFirstBookName) => {
+        const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+        assert.ok(row, `the recipe row is projected (${order})`);
+        assert.equal(
+          'recipeItemImg' in row,
+          false,
+          `the book-image field is gone entirely, not merely emptied (${order})`
+        );
+        assert.equal(row.img, 'recipe.png', `the row carries the recipe's OWN image (${order})`);
+        assert.equal(
+          Object.values(row).some((value) => value === TOME_IMG || value === SCROLL_IMG),
+          false,
+          `no projected field smuggles a containing book's artwork through (${order})`
+        );
+        // Membership itself is untouched: both ids, plus the legacy first-book scalars.
+        assert.deepEqual(
+          [...row.recipeItemIds].sort(),
+          ['def-scroll', 'def-tome'],
+          `both containing books still project (${order})`
+        );
+        // Load-bearing for the SECOND phase: every other assertion here is
+        // order-insensitive (the id comparison is sorted), so on their own they would
+        // still pass if `refresh()` had silently re-published a cached projection —
+        // which is exactly what this case's title claims to rule out. `recipeItemName`
+        // is derived from `containingDefinitions[0]`, the same index the deleted
+        // `recipeItemImg` came from, so it is the field that genuinely flips with the
+        // reversal. It passes today by design: this guards the re-derivation, it does
+        // not chase a bug.
+        assert.equal(
+          row.recipeItemName,
+          expectedFirstBookName,
+          `the first book's name survives and tracks definition order (${order})`
+        );
+      };
+
+      assertOwnImageOnly('tome first', 'Tome');
+
+      sys.recipeItemDefinitions.reverse();
+      await store.refresh();
+      assertOwnImageOnly('scroll first', 'Scroll');
     });
 
     it('viewState.recipes entries project the raw visibility object for the restriction editor', async () => {

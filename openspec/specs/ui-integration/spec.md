@@ -671,7 +671,7 @@ The library does not render a page header of its own.
 
 Rows are **cards, not table columns**.
 A card row has no columns, so the list is a real list (`ul` / `li`, `role="list"`), not a table/row/cell structure with column headers.
-Each row shows the recipe's image medallion (the resolved recipe image, falling back to a glyph), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle, and the Edit / Duplicate / Delete action group.
+Each row shows the recipe's image medallion (the recipe's own image, resolved through `resolveRecipeImage`, falling back to `DEFAULT_RECIPE_IMAGE` — never a containing book's artwork), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle, and the Edit / Duplicate / Delete action group.
 
 The row's on/off toggle carries **no On/Off text**.
 The track colour is the state, its `aria-label` names the state for assistive tech, and the `Disabled` pill states it in words — a third copy on every row only crowds the description out.
@@ -817,8 +817,8 @@ The component branch owns the salvage surface, and the preview never **renders**
 It is a Crafting nav sub-item that appears **only** while `visibilityMode === "restricted"` (`craftingEffect.showAccess`); the other modes do not list it.
 It authors the canonical `Recipe.access = { characterIds, playerIds }` grant, replacing the legacy `visibility.allowedUserIds` player list.
 
-The list (`AccessTabView`) shows the selected system's recipes with a search box, a Category filter, and an Access filter (`all` / granted / no-access); each row shows the recipe icon, name, category, and a grant chip (`N char · N player`, or a danger `No access` chip when no character or player is granted).
-Selecting a row opens the `GrantAccessInspector` for that recipe.
+The list (`AccessTabView`) shows the selected system's recipes with a search box, a Category filter, and an Access filter (`all` / granted / no-access); each row shows the recipe's **own** icon — resolved through the shared `resolveRecipeImage` helper, per `data-models/spec.md` `## Recipe` requirement 16, never a containing book's artwork — plus its name, category, and a grant chip (`N char · N player`, or a danger `No access` chip when no character or player is granted).
+Selecting a row opens the `GrantAccessInspector` for that recipe, whose header thumbnail resolves the same way.
 
 The inspector authors the grant through **two independent rosters** — Characters and Players — each with its own search box and pager:
 
@@ -1168,7 +1168,7 @@ If the required linkage is missing, show a validation warning.
 
 `recipe.locked` is persisted and engine-honoured (`guardCraftStart` refuses a locked craft), and the Overview tab is where it is written.
 
-A locked recipe stays **visible** to players but only a GM can craft it — a different concept from the Overview's recipe-item _image_ lock (which merely means the image comes from a linked recipe item), so it carries its own copy and its own hooks.
+A locked recipe stays **visible** to players but only a GM can craft it, a distinct concept that carries its own copy and its own hooks.
 
 The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
 The change persists immediately (like `enabled`), outside the recipe draft's Save.

@@ -16,6 +16,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
+import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -541,6 +542,16 @@ describe('RecipesBrowserView column header (issue 643)', () => {
   it('renders no column header when the library is empty', async () => {
     const root = await browser.mount({ recipes: [] });
     assert.equal(root.querySelector('.manager-recipe-table-head'), null);
+  });
+});
+
+// Issue 884 — the row medallion is the recipe's own icon, resolved through the shared
+// helper. It used to prefer the first containing book's artwork.
+describe('RecipesBrowserView row medallion (issue 884)', () => {
+  itResolvesTheRecipesOwnImage({
+    harness: browser,
+    mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'r1', ...imageOverrides })] }),
+    selectImg: (root) => root.querySelector('[data-recipe-id="r1"] .fab-medallion-img').getAttribute('src')
   });
 });
 
@@ -1459,5 +1470,19 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
     assert.equal(root.querySelector('[data-recipe-produces-outcome]'), null, 'no outcome sections without a check');
     assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
+  });
+
+  // Issue 884 — the hero medallion is the recipe's own icon, resolved through the
+  // shared helper. It used to prefer the first containing book's artwork.
+  itResolvesTheRecipesOwnImage({
+    harness: inspector,
+    mountProps: (imageOverrides) => ({
+      selectedRecipe: makeRecipe({ id: 'r1', ...imageOverrides }),
+      recipeCount: 1
+    }),
+    selectImg: (root) =>
+      root
+        .querySelector('.manager-recipe-browser-inspector-hero .fab-medallion-img')
+        .getAttribute('src')
   });
 });

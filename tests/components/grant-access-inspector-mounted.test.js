@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -177,5 +178,17 @@ describe('GrantAccessInspector (mounted)', () => {
     const root = await harness.mount({ recipe: null, characters: [], players: [] });
     assert.ok(root.querySelector('.manager-empty'));
     assert.equal(root.querySelectorAll('[data-access-roster]').length, 0);
+  });
+
+  // Issue 884 — the header thumbnail is the recipe's own icon, resolved through the
+  // shared helper. It used to prefer the first containing book's artwork.
+  itResolvesTheRecipesOwnImage({
+    harness,
+    mountProps: (imageOverrides) => ({
+      recipe: { ...makeRecipe(), ...imageOverrides },
+      characters: makeCharacters(1),
+      players: makePlayers(1)
+    }),
+    selectImg: (root) => root.querySelector('.manager-inspector-icon img.manager-recipe-thumb').getAttribute('src')
   });
 });

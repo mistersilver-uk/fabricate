@@ -22,6 +22,15 @@ const browserInspectorPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
 );
+// The Access SURFACE (the Crafting nav's grant list + its inspector) — NOT
+// `accessTabPath` above, which is the recipe EDITOR's own Access tab. The two are
+// different components; only these two ever borrowed a containing book's image, so a
+// negative image guard written against the editor tab would pass while proving nothing.
+const accessSurfacePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/AccessTabView.svelte');
+const grantAccessInspectorPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'
+);
 const storePath = resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js');
 const modelPath = resolve(repoRoot, 'src/models/Recipe.js');
 const managerPath = resolve(repoRoot, 'src/systems/RecipeManager.js');
@@ -49,6 +58,8 @@ const tabsSource = readFileSync(tabsPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const browserSource = readFileSync(browserPath, 'utf8');
 const browserInspectorSource = readFileSync(browserInspectorPath, 'utf8');
+const accessSurfaceSource = readFileSync(accessSurfacePath, 'utf8');
+const grantAccessInspectorSource = readFileSync(grantAccessInspectorPath, 'utf8');
 const storeSource = readFileSync(storePath, 'utf8');
 const modelSource = readFileSync(modelPath, 'utf8');
 const managerSource = readFileSync(managerPath, 'utf8');
@@ -866,35 +877,104 @@ describe('recipe default image is the blueprint, sourced from one canonical lite
   });
 });
 
-describe('recipe image helpers prefer the linked recipe-item image', () => {
-  it('RecipesBrowserView row thumbnail prefers recipeItemImg, then the shared resolver', () => {
-    assert.ok(
-      browserSource.includes("import { resolveRecipeImage } from '../../util/craftingImageDefaults.js'"),
-      'browser imports the shared resolver'
-    );
-    assert.ok(
-      browserSource.includes('recipe?.recipeItemImg || resolveRecipeImage(recipe)'),
-      'row image prefers the linked item image, then the shared resolver'
-    );
-    assert.equal(browserSource.includes("recipe?.img || 'icons/svg/item-bag.svg'"), false, 'no bag-SVG row fallback');
+// Issue 884 — a recipe's icon is its OWN `img` and nothing else. The four GM readers
+// used to prefix a book image the store projected from the FIRST definition CONTAINING
+// the recipe; membership being many-to-many, that made the rendered icon a function of
+// definition order rather than of anything the GM authored. They now share ONE
+// chokepoint, `resolveRecipeImage`, which is also the only one of the old four chains
+// that treated the generic item bag as "no image".
+describe('recipe image readers resolve the recipe own image through the shared helper', () => {
+  const READERS = [
+    ['RecipesBrowserView', browserSource, '../../util/craftingImageDefaults.js'],
+    ['RecipeBrowserInspector', browserInspectorSource, '../../../util/craftingImageDefaults.js'],
+    ['AccessTabView', accessSurfaceSource, '../../util/craftingImageDefaults.js'],
+    ['GrantAccessInspector', grantAccessInspectorSource, '../../util/craftingImageDefaults.js'],
+  ];
+
+  it('imports the shared resolver in all four readers, and owns no single-use wrapper', () => {
+    for (const [name, source, specifier] of READERS) {
+      assert.ok(
+        source.includes(`import { resolveRecipeImage } from '${specifier}'`),
+        `${name} imports the shared resolver`
+      );
+      assert.equal(
+        /function\s+recipeImage\s*\(/.test(source),
+        false,
+        `${name} no longer owns a single-use image wrapper`
+      );
+      assert.equal(
+        source.includes('recipeItemImg'),
+        false,
+        `${name} never prefers a containing book's image`
+      );
+      assert.equal(
+        source.includes('icons/svg/item-bag.svg'),
+        false,
+        `${name} carries no bag-SVG fallback of its own`
+      );
+    }
   });
 
-  // The library inspector's hero image moved out of the root with the inspector
-  // (issue 643) and now uses the SAME shared resolver as the row, rather than a
-  // second, subtly different `img || DEFAULT_RECIPE_IMAGE` fallback chain.
-  it('the extracted library inspector resolves its hero image the same way the row does', () => {
+  // The Access pair imported DEFAULT_CRAFTING_IMAGE for the deleted wrapper ALONE, so
+  // the import was SWAPPED rather than added. CI `lint` does not cover `src/ui`, so a
+  // left-behind dead import has no other guard.
+  it('leaves no dead DEFAULT_CRAFTING_IMAGE import behind in the Access pair', () => {
+    for (const [name, source] of [
+      ['AccessTabView', accessSurfaceSource],
+      ['GrantAccessInspector', grantAccessInspectorSource],
+    ]) {
+      assert.equal(
+        source.includes('DEFAULT_CRAFTING_IMAGE'),
+        false,
+        `${name} no longer names the constant its deleted wrapper used`
+      );
+    }
+  });
+
+  // Each call passes the identifier that surface actually binds: the browser inspector's
+  // prop is `selectedRecipe` and it has no `recipe` in scope at its render site at all.
+  it('calls the resolver at each existing render site with that surface own identifier', () => {
     assert.ok(
-      browserInspectorSource.includes(
-        "import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js'"
+      browserSource.includes('<Medallion src={resolveRecipeImage(recipe)}'),
+      'the row medallion resolves the row recipe'
+    );
+    assert.ok(
+      browserInspectorSource.includes('<Medallion src={resolveRecipeImage(selectedRecipe)}'),
+      'the library inspector hero resolves its selectedRecipe prop'
+    );
+    assert.ok(
+      accessSurfaceSource.includes(
+        '<img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)}'
       ),
-      'the library inspector imports the shared resolver'
+      'the Access row keeps its plain thumbnail element and only changes the src'
     );
     assert.ok(
-      browserInspectorSource.includes('recipe?.recipeItemImg || resolveRecipeImage(recipe)'),
-      'inspector hero image prefers the linked item image, then the shared resolver'
+      grantAccessInspectorSource.includes(
+        '<img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)}'
+      ),
+      'the Grant Access header keeps its plain thumbnail element and only changes the src'
     );
-    // The root imports the shared constant for the editor header's medallion, but must
-    // never re-own a local image-resolution helper.
+  });
+
+  it('leaves the store with no book image for any reader to prefer, membership intact', () => {
+    assert.equal(
+      storeSource.includes('recipeItemImg'),
+      false,
+      'the projection no longer derives an image from the first containing book'
+    );
+    for (const field of [
+      'recipeItemIds',
+      'recipeItemId',
+      'recipeItemName',
+      'recipeItemSourceUuid',
+    ]) {
+      assert.ok(storeSource.includes(field), `the projection keeps ${field}`);
+    }
+  });
+
+  // The root imports the shared resolver for the editor header's medallion, but must
+  // never re-own a local image-resolution helper.
+  it('keeps the manager root free of a recipe image helper of its own', () => {
     assert.equal(
       /function\s+recipeImage\s*\(/.test(rootSource),
       false,
