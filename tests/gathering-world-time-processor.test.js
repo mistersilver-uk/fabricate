@@ -139,9 +139,13 @@ describe('GatheringWorldTimeProcessor', () => {
       callAll: (name, payload) => hookCalls.push({ name, payload }),
     };
     const writes = [];
+    let respawnCalls = 0;
     const richState = {
       nodesEnabled: (id) => id === SYS,
-      respawnInteractableNode: async ({ node }) => ({ changed: false, node }),
+      respawnInteractableNode: async ({ node }) => {
+        respawnCalls += 1;
+        return { changed: false, node };
+      },
     };
     const processor = new GatheringWorldTimeProcessor({
       richState,
@@ -152,6 +156,7 @@ describe('GatheringWorldTimeProcessor', () => {
 
     const changed = await processor._processInteractableNodeRespawn(2 * 3600);
 
+    assert.equal(respawnCalls, 1, 'respawnInteractableNode ran exactly once');
     assert.deepEqual(changed, [], 'nothing is reported changed');
     assert.equal(writes.length, 0, 'no region-behaviour document write');
     assert.deepEqual(hookCalls, [], 'no fabricate.gathering.nodeRespawned emission');
