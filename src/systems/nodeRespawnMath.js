@@ -61,8 +61,24 @@ export function respawnIntervalSeconds(respawn, secondsPerUnit) {
  *                    authoritative per-environment respawn path)
  *  - `expression`  → roll per interval (`rollExpression(expr)` → integer)
  * clamped to `node.max`, advancing the `respawn.lastEvaluatedWorldTime` anchor by
- * the consumed intervals so a same-tick refresh never re-rolls. World time that
- * stands still or runs backwards only re-anchors (never gains).
+ * the consumed intervals so a same-tick refresh never re-rolls.
+ *
+ * `respawn.lastEvaluatedWorldTime` is an ACCRUAL anchor (issue 403): a high-water
+ * mark of the entitlement already granted, and therefore monotonic
+ * non-decreasing. Three cases, in this order:
+ *  - anchor ABSENT (nullish or non-finite) → seed it at `now` and report a change
+ *    so the caller persists it. This is a seed, not a re-anchor, and it must be
+ *    decided BEFORE the backward comparison: `normalizeRespawn` emits `null` for
+ *    an unevaluated pool and `Number(null) === 0` is finite, so a `null` anchor
+ *    otherwise reads as "anchored at world time 0" and takes the forward branch
+ *    for any `now > 0` — a spurious full restock on first evaluation.
+ *  - anchor present and `now < anchor` (world time ran backwards) → FREEZE:
+ *    report no change and write nothing, so no persisted state is rewritten and
+ *    no clamp rides along on the write. Re-anchoring here would re-grant every
+ *    interval between the rewound instant and the anchor on the way forward.
+ *  - anchor present and `now === anchor` → nothing to do.
+ * A consequence every consumer must tolerate: the anchor may legitimately sit
+ * AHEAD of `now`.
  *
  * @param {object} node Normalized node object (config + state).
  * @param {object} ctx
@@ -82,20 +98,23 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
   if (!(interval > 0)) return { changed: false, node };
   const nowTime = Number(now);
   if (!Number.isFinite(nowTime)) return { changed: false, node };
-  const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-    ? Number(respawn.lastEvaluatedWorldTime)
-    : nowTime;
-
-  // World time stood still or ran backwards: re-anchor, never regenerate.
-  if (nowTime <= last) {
-    if (respawn.lastEvaluatedWorldTime !== nowTime) {
-      return {
-        changed: true,
-        node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: nowTime } },
-      };
-    }
-    return { changed: false, node };
+  // Absent anchor FIRST, ahead of the backward comparison: a `null` anchor (the
+  // shape `normalizeRespawn`/`_mergeNodeConfigState` persist for an unevaluated
+  // pool) coerces to a finite 0, so it would otherwise take the forward branch.
+  // The predicate is nullish OR non-finite — keeping the finiteness half stops a
+  // garbage anchor persisting as `NaN` and yielding a `NaN` count.
+  const storedAnchor = respawn.lastEvaluatedWorldTime;
+  if (storedAnchor == null || !Number.isFinite(Number(storedAnchor))) {
+    return {
+      changed: true,
+      node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: nowTime } },
+    };
   }
+  const last = Number(storedAnchor);
+
+  // World time stood still or ran backwards: freeze the accrual anchor and write
+  // nothing at all (no gain, no re-anchor, no persisted node state).
+  if (nowTime <= last) return { changed: false, node };
 
   const max = Number(node.max || 0);
   const before = Number(node.current || 0);
