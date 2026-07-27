@@ -52,6 +52,20 @@ A run with failed steps, non-waived console errors, a degraded result, renderer 
 Screenshot files left by an interrupted or failed run are diagnostic artifacts.
 They are not publishable evidence until the generic provenance checks in `../../fabricate-ux-designer/references/visual-evidence-and-reuse.md` bind every collected view to one successful, non-degraded exact-head run.
 
+## Capture only after the head has settled
+
+Collected evidence is bound to one exact head SHA, so the capture is the LAST step of a delivery loop, never an early one.
+The order is: fetch `origin/main`, rebase, run the authoritative gates, commit every fix, push, and only then capture.
+
+Three orderings waste a full run and each has cost one.
+Committing a fix after the run that demonstrates it moves the head, and `screenshots:ui:collect` then refuses the evidence as stale for the requested head — the run proving the fix must come after the commit containing it.
+Publishing with a `--head-sha` that was never pushed writes object paths and PR-body links for a commit GitHub cannot resolve, and the check API rejects it with `No commit found for SHA`.
+Rebasing after a capture — including the mandatory rebase when `origin/main` moves — rewrites every SHA and discards the run.
+
+Fetch `origin/main` immediately before starting a capture, not after.
+A long capture races any merge to `main`, and a merge that touches files the branch also changes forces a rebase that invalidates the frames mid-flight.
+When that happens, stop the run and tear the harness down rather than letting it finish: `npm run test:foundry:down -- --clean` reclaims the worktree's container and network at the source.
+
 ## Local and CI behavior
 
 Local smoke runs benefit from the stable per-worktree identity and cache-preserving stop/restart path.
