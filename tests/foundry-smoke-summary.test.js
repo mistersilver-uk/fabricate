@@ -358,8 +358,11 @@ test('source: responsive evidence viewports narrowly waive Foundry minimum-resol
   const source = await readFile(HARNESS_PATH, 'utf8');
   assert.match(
     source,
-    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|900px by 700px\|680px by 700px/,
+    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|1280px by 520px\|900px by 700px\|680px by 700px/,
   );
+  // The waiver stays dimension-specific: an unexpected low-resolution run must still
+  // fail the smoke, so a catch-all pattern would defeat its purpose (issue 881).
+  assert.doesNotMatch(source, /display has a resolution of \(\?:\.\*\)/);
 });
 
 test('source: smoke-world cleanup removes stale chat cards before stale documents', async () => {
