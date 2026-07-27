@@ -5701,3 +5701,82 @@ test('a range input inside the gathering edit views stays transparent for the sl
     await browser.close();
   }
 });
+
+// The gathering task library's inspector rail stacks three cards: "Gathering task details",
+// "Drops summary" and "Used in environments". The middle one restated the whole
+// `.manager-inspector-card` contract and then diverged on the two values it changed — a
+// `--fab-mv2-surface-2` fill instead of the shell's, and 16px of horizontal padding instead
+// of 12px — so it read as a different KIND of card from its neighbours.
+//
+// Asserted on the RENDERED box rather than on the absence of a selector, so a fill
+// reintroduced by any route (a new rule, an ancestor, a different class) fails too, and so
+// this stays true if the shell's own values are ever retuned (issue 883).
+test('the gathering inspector rail cards render as one card, not three treatments', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 420, height: 600 } });
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+        '<aside class="manager-inspector" style="width:320px">' +
+        '<section class="manager-inspector-card" data-card="details">' +
+        '<h3 class="manager-card-title">Gathering task details</h3><p>Three facts</p>' +
+        '</section>' +
+        '<section class="manager-inspector-card" data-task-drops-summary data-card="drops">' +
+        '<h3 class="manager-card-title">Drops summary</h3>' +
+        '<div class="manager-task-drops-summary-list"><span class="manager-task-drop-summary-chip">' +
+        '<span class="manager-task-drop-summary-label">Nightshade</span>' +
+        '<strong class="manager-task-drop-summary-percent">80%</strong></span></div>' +
+        '</section>' +
+        '<section class="manager-inspector-card manager-task-environment-usage-card" data-card="usage">' +
+        '<h3 class="manager-card-title">Used in environments</h3><p>Not used yet.</p>' +
+        '</section>' +
+        '</aside></div>'
+    );
+    const measured = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-card]')).map((card) => {
+        const style = getComputedStyle(card);
+        return {
+          card: card.dataset.card,
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderTopColor,
+          borderWidth: style.borderTopWidth,
+          borderRadius: style.borderTopLeftRadius,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          width: Math.round(card.getBoundingClientRect().width),
+        };
+      })
+    );
+
+    const [details, drops, usage] = measured;
+    assert.equal(measured.length, 3, 'the fixture should render all three rail cards');
+    // A real fill, not a transparent card that trivially "matches".
+    assert.notEqual(
+      details.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      `the shared card shell should paint a fill, got ${details.backgroundColor}`
+    );
+    for (const property of [
+      'backgroundColor',
+      'borderColor',
+      'borderWidth',
+      'borderRadius',
+      'padding',
+      'width',
+    ]) {
+      assert.equal(
+        drops[property],
+        details[property],
+        `drops summary ${property} should match the details card, got ${drops[property]} vs ${details[property]}`
+      );
+      assert.equal(
+        usage[property],
+        details[property],
+        `environment usage ${property} should match the details card, got ${usage[property]} vs ${details[property]}`
+      );
+    }
+  } finally {
+    await page.close();
+    await browser.close();
+  }
+});

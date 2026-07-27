@@ -11031,14 +11031,14 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-task-drops-summary-card {
-  display: grid;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3) var(--fab-space-4);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
-}
+/* The drops summary card has no rule of its own (issue 883). It used to restate the whole
+   `.manager-inspector-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px
+   `--fab-mv2-border` edge and an 8px radius were all the same values the shell already
+   declares — and then diverged on the only two it changed: `--fab-mv2-surface-2` instead of
+   the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px.
+   So it read as a different card from the "Gathering task details" and "Used in
+   environments" cards immediately above and below it in the same rail, for no reason anyone
+   had stated. Deleting the rule is the fix: nothing here was additive. */
 
 .fabricate-manager .manager-task-drops-summary-list {
   display: flex;

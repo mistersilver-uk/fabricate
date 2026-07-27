@@ -5941,7 +5941,7 @@
               </div>
             </section>
 
-            <section class="manager-inspector-card manager-task-drops-summary-card" data-task-drops-summary>
+            <section class="manager-inspector-card" data-task-drops-summary>
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary', 'Drops summary')}</h3>
               {#if gatheringTaskDropRows(selectedGatheringTask).length === 0}
                 <p class="manager-muted" data-task-drops-summary-empty>{text('FABRICATE.Admin.Manager.Environment.Tasks.NoDropsConfigured', 'No drops configured yet.')}</p>
