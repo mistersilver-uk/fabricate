@@ -5054,8 +5054,6 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
   const UNCONVERTED = [
     'AccessTabView.svelte',
     'BooksScrollsView.svelte',
-    'ComponentEditView.svelte',
-    'ComponentsBrowserView.svelte',
     'CraftingSystemManagerRoot.svelte',
     'EditorValidationSurface.svelte',
     'EnvironmentsBrowserView.svelte',
@@ -5080,10 +5078,6 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     'TagsCategoriesView.svelte',
     'VocabularyPanel.svelte',
     'checks/ChecksValidationTab.svelte',
-    'component/ComponentEditorHeader.svelte',
-    'component/ComponentIdentityStrip.svelte',
-    'components/ComponentBrowserInspector.svelte',
-    'components/ComponentRow.svelte',
     'system/SystemEditorTabs.svelte',
   ];
 

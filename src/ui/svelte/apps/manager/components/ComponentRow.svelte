@@ -20,6 +20,7 @@
   Strings arrive pre-localized — this is a presentational leaf.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
 
@@ -71,13 +72,12 @@
     {#if categoryBadge}
       <!-- Suppressed for `general` by the caller: no redundant "General" chip, mirroring
            the Recipe Studio's badge-vs-filter asymmetry. `general` stays a FILTER option. -->
-      <span class="manager-chip manager-component-category-badge" data-component-category={categoryBadge}>{categoryBadge}</span>
+      <Chip class="manager-component-category-badge" data-component-category={categoryBadge}>{categoryBadge}</Chip>
     {/if}
     {#if difficultyBadge}
-      <span class="manager-chip is-info manager-component-difficulty-badge" data-component-difficulty>
-        <i class="fas fa-gauge-high" aria-hidden="true"></i>
+      <Chip tone="info" icon="fas fa-gauge-high" class="manager-component-difficulty-badge" data-component-difficulty>
         <span>{difficultyBadge}</span>
-      </span>
+      </Chip>
     {/if}
     <!-- Source origin is a real STATE, so it wears the shared StatusPill the recipe row's
          states use, not a raw chip. -->
@@ -85,13 +85,12 @@
     {#if essences.length > 0}
       <span class="manager-chip-row manager-component-essence-dots">
         {#each essences as essence (essence.id)}
-          <span
-            class="manager-chip manager-essence-compact-chip"
+          <Chip
+            class="manager-essence-compact-chip"
+            icon={essence.icon || 'fas fa-mortar-pestle'}
             title={`${essence.name || essence.id} ${essence.quantity}`}
             aria-label={`${essence.name || essence.id} ${essence.quantity}`}
-          >
-            <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
-          </span>
+          >{essence.quantity}</Chip>
         {/each}
       </span>
     {/if}

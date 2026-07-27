@@ -44,6 +44,7 @@
   clobbered by a swap.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import SearchablePopover from '../SearchablePopover.svelte';
@@ -209,15 +210,13 @@
       {/if}
 
       {#if hasRegisteredItemUuid && !sourceMissing}
-        <span class="manager-chip manager-component-identity-lock" data-component-identity-lock>
-          <i class="fas fa-lock" aria-hidden="true"></i>
+        <Chip icon="fas fa-lock" class="manager-component-identity-lock" data-component-identity-lock>
           <span>{`${text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')} ${sourceOriginLabel}`}</span>
-        </span>
+        </Chip>
       {:else if sourceMissing}
-        <span class="manager-chip is-warning" data-component-source-unresolved>
-          <i class="fas fa-link-slash" aria-hidden="true"></i>
+        <Chip tone="warning" icon="fas fa-link-slash" data-component-source-unresolved>
           <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.MissingLabel', 'Source item unresolved')}</span>
-        </span>
+        </Chip>
       {/if}
 
       {#if showOverflow}
