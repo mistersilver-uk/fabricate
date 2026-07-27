@@ -1528,7 +1528,12 @@
 
 /* The header "Unsaved" state chip sits in the button row, so it takes the button's
    6px rounded-rectangle corners and compact header height rather than the default
-   full-round chip pill — it reads as part of the toolbar, not a floating tag (§F6). */
+   full-round chip pill — it reads as part of the toolbar, not a floating tag (§F6).
+
+   Kept as-is through issue 883. This is an ANCESTOR-CONTEXT rule — a chip sized for the
+   container it sits in, like the tab badge's deliberate 18px/0.56rem — not a second
+   default scale a screen can opt into, which is what that issue removed. It is already
+   at four classes, so it still outranks the scoped block. */
 .fabricate-manager .manager-header-actions .manager-chip.is-warning {
   min-height: 38px;
   border-radius: 6px;
@@ -5567,37 +5572,23 @@
   max-width: 100%;
 }
 
-/* Pill (issue 643): fully-rounded rather than 6px-cornered, matching the Recipe
-   Studio language. `manager-chip` is shared by every manager screen, so this is
-   restyled once here rather than forked into a recipe-only component — a second
-   chip idiom sitting beside the old one would be plainly visible on any screen
-   that shows both. */
-.fabricate-manager .manager-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-chip);
-  width: fit-content;
-  max-width: 100%;
-  min-height: 24px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-06);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
+/* The chip's own appearance is NOT here. It lives in `Chip.svelte`'s scoped block
+   (issue 883), which is the one implementation of the manager's one chip. The base rule
+   this sheet used to carry — 24px at 0.75rem/1.2 — plus its `is-mono` variant and its
+   eight tone rules are DELETED rather than left inert: they existed only to paint the
+   sites that had not been converted yet, and a surviving base rule is exactly what the
+   next hand-rolled `<span class="manager-chip">` would quietly land on. With them gone,
+   a hand-rolled chip renders as bare text, which is the point.
 
-/* Numerics are mono everywhere in the Recipe Studio language: counts, DCs, step
-   numbers, quantities. Opt-in via `is-mono` so a text chip is unaffected.
-   `tabular-nums` keeps columns of numbers aligned even on the fallback face. */
-.fabricate-manager .manager-chip.is-mono {
-  font-family: var(--fab-font-mono);
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-}
+   What legitimately stays global is what a scoped block cannot reach: an ancestor-context
+   rule (a chip in the header action bar lining up with the 34px control beside it) and a
+   chip's position inside its parent's layout. Every such rule that also overrides a
+   declaration the primitive makes is written at THREE classes — `.fabricate-manager
+   .manager-chip.<sibling>` — because Svelte compiles the scoped block to
+   `.manager-chip.svelte-<hash>`, two classes, and `css: 'injected'` puts it after this
+   sheet, so a two-class sibling would tie and lose on source order with nothing failing.
+
+   `manager-chip-row` and `manager-chip-field` are CONTAINERS, not chips, and stay. */
 
 .fabricate-manager .manager-chip-row {
   display: flex;
@@ -5605,37 +5596,6 @@
   gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
-}
-
-.fabricate-manager .manager-chip.is-active {
-  border-color: var(--fab-success-border);
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-chip.is-disabled {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-warning-soft);
-}
-
-.fabricate-manager .manager-chip.is-warning {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-warning-soft);
-}
-
-/* Informational tone — the recipe library's active-filter chips. */
-.fabricate-manager .manager-chip.is-info {
-  border-color: var(--fab-info-border);
-  color: var(--fab-info-text);
-  background: var(--fab-info-soft);
-}
-
-.fabricate-manager .manager-chip.is-danger {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
 }
 
 .fabricate-manager .manager-stat {
@@ -12205,18 +12165,6 @@
   padding-right: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-chip.is-positive {
-  border-color: var(--fab-success-border);
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-chip.is-negative {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
-}
-
 .fabricate-manager .manager-drop-modifier-pill {
   max-width: 100%;
   border-color: var(--fab-mv2-border);
@@ -12490,11 +12438,6 @@
   margin: 0;
   color: var(--fab-warning-text);
   font-size: 0.9rem;
-}
-
-.fabricate-manager .manager-chip.is-neutral {
-  color: var(--fab-mv2-text-muted);
-  border-color: var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-task-summary-card h4,

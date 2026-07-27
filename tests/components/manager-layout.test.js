@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
@@ -68,6 +69,27 @@ function blockFor(selector) {
   return blockIn(css, selector);
 }
 
+// The global sheet no longer styles a chip at all — the base rule and its eight tone rules
+// were deleted with the last conversion (issue 883), because a surviving base is what the
+// next hand-rolled chip would land on. So a real-browser fixture that renders a chip and
+// loads only `styles/fabricate.css` now measures an UNSTYLED chip: no border, no padding,
+// no min-height. Every geometry assertion downstream of one would still pass, and would be
+// measuring something the app never renders.
+//
+// These two restore the truth by reproducing what Svelte actually ships: `chipCss` is the
+// component's real compiled CSS, which each fixture places AFTER the global sheet exactly
+// as `css: 'injected'` injects it, and `withChipHash` stamps the real scoping hash onto the
+// fixture's chips so the specificity matches too. Both halves are needed — the CSS without
+// the hash matches nothing, and the hash without the ordering proves the wrong winner.
+// `withScopeHash` matches the whole `manager-chip` token only, so a `manager-chip-row`
+// container is left alone.
+const chipScoped = scopedComponentCss(chipPath);
+const chipCss = chipScoped.css;
+
+function withChipHash(markup) {
+  return withScopeHash(markup, 'manager-chip', chipScoped.hashClass);
+}
+
 async function readRenderedToolGeometry(width, view) {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
@@ -91,7 +113,9 @@ async function readRenderedToolGeometry(width, view) {
         </main>`
         : `<main class="manager-main manager-tools-main"><div class="manager-tools-library-list"><article data-manager-tool-id="hammer"><button class="manager-tools-select-target"><span></span><span class="manager-tools-library-copy"><strong>Smith's Hammer</strong></span></button><div class="manager-tools-library-actions"></div></article></div></main><aside class="manager-inspector"><section data-tool-browser-inspector>Inspector</section></aside>`;
     await page.setContent(
-      `<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="${view}"><div class="manager-body"><aside class="manager-rail">Rail</aside>${editor}</div></div></div>`
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="${view}"><div class="manager-body"><aside class="manager-rail">Rail</aside>${editor}</div></div></div>`
+      )
     );
     return await page.evaluate(() => {
       const rect = (selector) => {
@@ -5046,12 +5070,17 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
 });
 
 // A staged conversion needs a ratchet, or it stalls half-done and the primitive becomes a
-// fourth variant. This pins the EXACT set of files still rendering a chip by hand: a new
-// hand-rolled site fails because the file is not on the list, and a converted one fails
-// because a listed file no longer matches. Both directions are what make it a ratchet
-// rather than a fading reminder — the list may only shrink, and it must reach empty.
+// fourth variant. This pinned the EXACT set of files still rendering a chip by hand: a new
+// hand-rolled site failed because the file was not on the list, and a converted one failed
+// because a listed file no longer matched. Both directions are what made it a ratchet
+// rather than a fading reminder — the list could only shrink, and it had to reach empty.
+//
+// It IS empty: every manager chip renders through `Chip.svelte`, and the global base rule
+// and its eight tone rules are gone from the sheet, so a hand-rolled `manager-chip` would
+// now render unstyled as well as failing here. The test STAYS at empty — that is what it
+// is for. It is the assertion that stops the next screen from starting the drift again.
 test('every remaining hand-rolled chip site is declared, so the migration can only shrink', () => {
-  const UNCONVERTED = ['CraftingSystemManagerRoot.svelte'];
+  const UNCONVERTED = [];
 
   const remaining = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'))
@@ -5129,7 +5158,7 @@ async function readRenderedKnowledgeGeometry(width) {
     // whole state vocabulary as chips on line 2.
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
-      `<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+      withChipHash(`<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`)
     );
     return await page.evaluate(() => {
       const box = (selector) => {
@@ -5190,6 +5219,7 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
           <meta charset="utf-8">
           <style>
             ${css}
+            ${chipCss}
             body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
             /* Simulate a host global list rhythm declared after our stylesheet. */
             li:not(:last-child) { margin-bottom: 4px; }
@@ -5254,6 +5284,7 @@ test('recipe tag list spans the full row width on its own line below the control
           <meta charset="utf-8">
           <style>
             ${css}
+            ${chipCss}
             body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
             .harness-row-width { width: 600px; }
             .fas::before, .fa-solid::before { content: "x"; }
@@ -5439,7 +5470,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
-      `<style>${css}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><nav class="manager-editor-tabs manager-vocabulary-tabs"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></nav><section class="manager-tags-categories-workspace"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></section></main></div></div>`
+      withChipHash(`<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><nav class="manager-editor-tabs manager-vocabulary-tabs"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></nav><section class="manager-tags-categories-workspace"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></section></main></div></div>`)
     );
     const geometry = await page.evaluate(() => {
       const locked = document.querySelector('[data-vocabulary-locked-card]');
@@ -5452,6 +5483,15 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
         hintRendered: Boolean(locked.querySelector('.manager-vocabulary-locked-hint')),
         triggerWidth: Math.round(triggerRect.width),
         triggerHeight: Math.round(triggerRect.height),
+        lockedChipHeight: Math.round(
+          locked.querySelector('.manager-chip').getBoundingClientRect().height
+        ),
+        lockedChipBackground: getComputedStyle(
+          locked.querySelector('.manager-chip')
+        ).backgroundColor,
+        defaultChipBackground: getComputedStyle(
+          document.querySelector('.manager-editor-tab-button .manager-chip')
+        ).backgroundColor,
       };
     });
     // The IconPicker's own `.essence-icon-picker-trigger` block is a full-width, 36px-min
@@ -5466,6 +5506,28 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       geometry.lockedHeight,
       geometry.customHeight,
       `the reserved row must match its siblings exactly (locked ${geometry.lockedHeight}px vs custom ${geometry.customHeight}px)`
+    );
+
+    // Two facts about the chip that ONLY a real browser can establish, and that the whole
+    // of issue 883 rests on.
+    //
+    // First, the row's chip renders at the primitive's compact 20px. The global sheet has
+    // no chip rule left at all, so this measures `Chip.svelte`'s own scoped block reaching
+    // a real page — if the injection or the scoping hash ever stopped matching, the chip
+    // would collapse to bare text and this drops well below 20.
+    assert.ok(
+      geometry.lockedChipHeight >= 20,
+      `the locked chip renders at the primitive's compact scale, got ${geometry.lockedChipHeight}px`
+    );
+    // Second, `manager-vocabulary-chip-locked` still WINS its fill. It is a global rule
+    // overriding a declaration the scoped block also makes, so it is written at three
+    // classes; at two it would tie and lose on source order, and the locked chip would
+    // silently repaint as an ordinary one. Comparing it against a default chip on the same
+    // page is what makes that a fact rather than a colour constant copied out of the sheet.
+    assert.notEqual(
+      geometry.lockedChipBackground,
+      geometry.defaultChipBackground,
+      'the locked chip must keep its own fill, not fall back to the default chip fill'
     );
     // The sentence itself is gone: ellipsised at real column widths it truncated to
     // "Built…", which read as breakage beside untruncated custom rows. It survives as the

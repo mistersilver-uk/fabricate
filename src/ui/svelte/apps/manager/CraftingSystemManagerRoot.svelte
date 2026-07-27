@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
   import {
@@ -4158,7 +4159,7 @@
       return {
         id: 'none',
         label: text('FABRICATE.Admin.Manager.Environment.SceneNone', 'No scene'),
-        className: 'is-disabled'
+        tone: 'disabled'
       };
     }
     const scene = linkedSceneForEnvironment(environment);
@@ -4166,14 +4167,14 @@
       return {
         id: 'missing',
         label: text('FABRICATE.Admin.Manager.Environment.SceneMissing', 'Scene unresolved'),
-        className: 'is-warning'
+        tone: 'warning'
       };
     }
     return {
       id: 'linked',
       label: text('FABRICATE.Admin.Manager.Environment.SceneLinked', 'Linked scene'),
       name: scene.name || environment.sceneUuid,
-      className: 'is-active'
+      tone: 'active'
     };
   }
 
@@ -4856,15 +4857,15 @@
       {/if}
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
         <div class="manager-environment-header-pills" data-environment-status-pills>
-          <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">
+          <Chip tone={environmentDraftForDisplay.enabled === false ? 'neutral' : 'active'} data-status-pill="active">
             {environmentDraftForDisplay.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-          </span>
-          <span class="manager-chip is-info" data-status-pill="selection">
+          </Chip>
+          <Chip tone="info" data-status-pill="selection">
             {environmentDraftForDisplay.selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
-          </span>
-          <span class="manager-chip is-info" data-status-pill="composition">
+          </Chip>
+          <Chip tone="info" data-status-pill="composition">
             {environmentDraftForDisplay.compositionMode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic', 'Automatic')}
-          </span>
+          </Chip>
         </div>
       {/if}
     </div>
@@ -4877,7 +4878,7 @@
         </button>
       {:else if currentView === 'recipe-edit'}
         {#if recipeEditDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button is-ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -4893,7 +4894,7 @@
         </button>
       {:else if currentView === 'recipe-item-edit'}
         {#if recipeItemEditDirty}
-          <span class="manager-chip is-warning" data-recipe-item-dirty>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning" data-recipe-item-dirty>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" data-recipe-item-back onclick={backToBooksScrolls} disabled={recipeItemEditSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -4927,7 +4928,7 @@
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
         {#if checksDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button is-primary" data-checks-save onclick={saveChecks} disabled={!checksDirty || checksSaving}>
           <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
@@ -4940,7 +4941,7 @@
         </button>
       {:else if currentView === 'essence-edit'}
         {#if essenceEditDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={cancelEssenceEdit} disabled={essenceEditSaving}>
           <i class="fas fa-times" aria-hidden="true"></i>
@@ -4979,7 +4980,7 @@
         </button>
       {:else if currentView === 'environment-edit'}
         {#if $viewState.environmentDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={backToEnvironmentsBrowse} disabled={$viewState.environmentSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -4995,7 +4996,7 @@
         </button>
       {:else if currentView === 'gathering-task-edit'}
         {#if gatheringTaskDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -5023,7 +5024,7 @@
         </button>
       {:else if currentView === 'gathering-event-edit'}
         {#if gatheringEventDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={backToGatheringEventLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -5912,10 +5913,10 @@
                   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Tasks.Selected', 'Selected gathering task')}</p>
                   <h2 class="manager-inspector-name" title={gatheringTaskName(selectedGatheringTask)}>{gatheringTaskName(selectedGatheringTask)}</h2>
                   <div class="manager-chip-row">
-                    <span class={`manager-chip ${selectedGatheringTask.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                    <Chip tone={selectedGatheringTask.enabled === false ? 'disabled' : 'active'}>
                       {selectedGatheringTask.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                    </span>
-                    <span class="manager-chip">{gatheringTaskAvailability(selectedGatheringTask)}</span>
+                    </Chip>
+                    <Chip>{gatheringTaskAvailability(selectedGatheringTask)}</Chip>
                   </div>
                 </div>
               </div>
@@ -6429,11 +6430,11 @@
                   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Events.Selected', 'Selected gathering event')}</p>
                   <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>{selectedGatheringEvent.name || text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')}</h2>
                   <div class="manager-chip-row">
-                    <span class={`manager-chip ${selectedGatheringEvent.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                    <Chip tone={selectedGatheringEvent.enabled === false ? 'disabled' : 'active'}>
                       {selectedGatheringEvent.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                    </span>
+                    </Chip>
                     {#if Array.isArray(selectedGatheringEvent.dangerTags) && selectedGatheringEvent.dangerTags.length > 0}
-                      <span class="manager-chip">{sortedDangerTags(selectedGatheringEvent.dangerTags).join(', ')}</span>
+                      <Chip>{sortedDangerTags(selectedGatheringEvent.dangerTags).join(', ')}</Chip>
                     {/if}
                   </div>
                 </div>
@@ -6694,7 +6695,7 @@
                         <li>
                           {realm.name}
                           {#if !realm.enabled}
-                            <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</span>
+                            <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</Chip>
                           {/if}
                         </li>
                       {/each}
@@ -6833,7 +6834,7 @@
                         <span class="manager-travel-region-thumb" aria-hidden="true"><i class="fas fa-map-location-dot"></i></span>
                         <span class="manager-travel-region-item-name">{linkedRealm?.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown realm')}</span>
                         {#if linkedRealm && !linkedRealm.enabled}
-                          <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
+                          <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip>
                         {/if}
                       </li>
                     </ul>
@@ -6908,9 +6909,9 @@
               <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Selected', 'Selected environment')}</p>
               <h2 class="manager-inspector-name" title={environmentName(selectedEnvironment)}>{environmentName(selectedEnvironment)}</h2>
               <div class="manager-chip-row">
-                <span class={`manager-chip ${selectedEnvironment.enabled === false ? 'is-disabled' : 'is-active'}`}>{environmentStatusLabel(selectedEnvironment)}</span>
-                <span class="manager-chip">{environmentSelectionModeLabel(selectedEnvironment)}</span>
-                <span class={`manager-chip ${selectedEnvironmentSceneState.className}`}>{selectedEnvironmentSceneState.label}</span>
+                <Chip tone={selectedEnvironment.enabled === false ? 'disabled' : 'active'}>{environmentStatusLabel(selectedEnvironment)}</Chip>
+                <Chip>{environmentSelectionModeLabel(selectedEnvironment)}</Chip>
+                <Chip tone={selectedEnvironmentSceneState.tone}>{selectedEnvironmentSceneState.label}</Chip>
               </div>
             </div>
 
@@ -6940,10 +6941,10 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.DraftState', 'Draft state')}</h3>
               <div class="manager-feature-list">
                 {#if environmentDirtyFor(selectedEnvironment)}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
+                  <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip>
                 {/if}
                 {#if environmentInvalidFor(selectedEnvironment)}
-                  <span class="manager-chip is-danger">{text('FABRICATE.Admin.Manager.Environment.ValidationCount', '{count} validation issues').replace('{count}', environmentValidationCount)}</span>
+                  <Chip tone="danger">{text('FABRICATE.Admin.Manager.Environment.ValidationCount', '{count} validation issues').replace('{count}', environmentValidationCount)}</Chip>
                 {/if}
               </div>
               {#if $viewState.environmentSaveError}
@@ -6997,7 +6998,7 @@
                 <h2 class="manager-inspector-name" title={selectedEssenceForInspector.name}>{selectedEssenceForInspector.name}</h2>
                 <div class="manager-chip-row">
                   {#if selectedEssenceForInspector.deleteBlocked}
-                    <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.DeleteBlockedShort', 'In use')}</span>
+                    <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.DeleteBlockedShort', 'In use')}</Chip>
                   {/if}
                 </div>
               </div>
@@ -7012,10 +7013,10 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.DraftState', 'Draft state')}</h3>
               <div class="manager-feature-list">
                 {#if essenceEditDirty}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</span>
+                  <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip>
                 {/if}
                 {#if essenceEditSaving}
-                  <span class="manager-chip">{text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...')}</span>
+                  <Chip>{text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...')}</Chip>
                 {/if}
               </div>
             </section>
@@ -7220,10 +7221,10 @@
               <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Column.System', 'System')}</p>
               <h2 class="manager-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>
               <div class="manager-chip-row">
-                <span class="manager-chip is-active">{resolutionModeLabel(selectedSystem.resolutionMode)}</span>
-                <span class={`manager-chip ${selectedSystem.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                <Chip tone="active">{resolutionModeLabel(selectedSystem.resolutionMode)}</Chip>
+                <Chip tone={selectedSystem.enabled === false ? 'disabled' : 'active'}>
                   {selectedSystem.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                </span>
+                </Chip>
               </div>
             </div>
           </div>
@@ -7259,7 +7260,7 @@
           {#if enabledFeatureLabels.length > 0}
             <div class="manager-feature-list">
               {#each enabledFeatureLabels as feature (feature)}
-                <span class="manager-chip is-active">{feature}</span>
+                <Chip tone="active">{feature}</Chip>
               {/each}
             </div>
           {:else}
