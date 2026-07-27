@@ -151,7 +151,8 @@
     options={orMenuOptions}
     optionGroups={[]}
     pickerClass="manager-recipe-or-picker"
-    triggerClass="manager-chip manager-recipe-or-trigger"
+    triggerChip
+    triggerClass="manager-recipe-or-trigger"
     triggerIcon="fas fa-code-branch"
     triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
     triggerAriaLabel={orMenuLabel}

@@ -7722,7 +7722,10 @@
   display: inline-flex;
 }
 
-.fabricate-manager .manager-recipe-duration-trigger {
+/* A control-height chip: 34px so it lines up with the inputs and buttons beside it.
+   Three classes because the primitive sets `min-height` and, on a button, `height: auto`
+   (issue 883). */
+.fabricate-manager .manager-chip.manager-recipe-duration-trigger {
   box-sizing: border-box;
   height: 34px;
   min-height: 34px;
@@ -8935,7 +8938,9 @@
 /* Outcome routing chips are rounded-corner rectangles, not the default full-round
    chip pill, so a routed outcome ("Flawed", "Standard") reads as a tag on the
    result set rather than a status bubble (issue 643). */
-.fabricate-manager .manager-recipe-routing-chip {
+/* Three classes: `gap` and `border-radius` both collide with the chip primitive, and a
+   999px pill would be a visible change (issue 883). */
+.fabricate-manager .manager-chip.manager-recipe-routing-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -9343,7 +9348,9 @@
    centring so the label sits left and the remove button right regardless of tag
    length; and the pinned height keeps every chip the same box despite tag glyphs
    or sub-pixel rounding. */
-.fabricate-manager .manager-recipe-tag-chip {
+/* Three classes: `justify-content` and `min-height` collide with the chip primitive,
+   and this pill carries a remove button so it is deliberately taller (issue 883). */
+.fabricate-manager .manager-chip.manager-recipe-tag-chip {
   gap: var(--fab-space-chip);
   box-sizing: border-box;
   margin: 0;

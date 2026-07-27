@@ -5074,7 +5074,6 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     'ItemPageInspector.svelte',
     'RealmEnvironmentsEditor.svelte',
     'RecipesBrowserView.svelte',
-    'SearchablePopover.svelte',
     'SystemEditView.svelte',
     'SystemOverviewView.svelte',
     'SystemsBrowserView.svelte',
@@ -5085,18 +5084,6 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     'component/ComponentIdentityStrip.svelte',
     'components/ComponentBrowserInspector.svelte',
     'components/ComponentRow.svelte',
-    'recipe/RecipeDurationEditor.svelte',
-    'recipe/RecipeEditorTabs.svelte',
-    // Hands the chip classes to `SearchablePopover` as a `triggerClass` STRING, so its
-    // conversion needs that component to accept a chip rather than a class name.
-    'recipe/RecipeIngredientGroupCard.svelte',
-    'recipe/RecipeIngredientOption.svelte',
-    'recipe/RecipeModeBanner.svelte',
-    'recipe/RecipeOverviewTab.svelte',
-    'recipe/RecipeRoutingAssignment.svelte',
-    'recipe/RecipeStepAccordion.svelte',
-    'recipe/RecipeValidationTab.svelte',
-    'recipes/RecipeBrowserInspector.svelte',
     'system/SystemEditorTabs.svelte',
   ];
 

@@ -36,6 +36,10 @@
      global sheet (`manager-editor-tab-badge` positions a badge inside a tab button, for
      instance). Those rules sit at a higher specificity than this scoped block by
      design — see the note in the style block below.
+   - element: bindable, the rendered DOM node. `bind:this` on a component yields the
+     component INSTANCE, not its node, so a caller that must measure or focus the chip
+     — `SearchablePopover` positions its popover off the trigger's bounding box and
+     restores focus to it on close — has no other way to reach it.
 
   Every other attribute — `title`, `aria-label`, `role`, `data-*` hooks, `onclick`,
   `type`, `disabled` — is forwarded through the rest spread, so a call site is not
@@ -48,6 +52,7 @@
     mono = false,
     icon = '',
     class: extraClass = '',
+    element = $bindable(null),
     children,
     ...rest
   } = $props();
@@ -81,7 +86,7 @@
 <!-- Written without internal whitespace on purpose: a newline between the glyph and the
      content becomes a text node, and callers assert on the chip's exact `textContent`
      (a count badge reading ' 1' instead of '1' is a real defect, not a test artefact). -->
-<svelte:element this={tag} class={classes} {...rest}
+<svelte:element this={tag} bind:this={element} class={classes} {...rest}
   >{#if icon}<i class={icon} aria-hidden="true"></i>{/if}{@render children?.()}</svelte:element
 >
 

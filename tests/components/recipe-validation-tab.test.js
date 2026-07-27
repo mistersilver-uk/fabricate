@@ -20,7 +20,12 @@ const harness = createMountedComponentHarness({
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
     'src/utils/recipeActivationMessages.js'
   ],
-  compiledModules: ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],
+  compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'
+  ],
   componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'
 });
 

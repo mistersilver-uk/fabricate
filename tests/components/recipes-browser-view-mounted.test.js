@@ -57,6 +57,9 @@ const inspector = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-browser-inspector-',
   rawModules: RECIPE_RAW_MODULES,
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     ...RECIPE_PRIMITIVES,
     'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
   ],

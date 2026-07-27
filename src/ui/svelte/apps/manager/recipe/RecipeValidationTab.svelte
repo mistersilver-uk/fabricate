@@ -13,6 +13,7 @@
   evaluator that could disagree. The category map below is display metadata only.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
   import { evaluateRecipeReadiness } from './recipeReadiness.js';
@@ -296,7 +297,7 @@
                 onclick={() => onSelectIssue(row.target)}
               >{text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}</button>
             {/if}
-            <span class={`manager-chip manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</span>
+            <Chip class={`manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</Chip>
           </li>
         {/each}
       </ul>

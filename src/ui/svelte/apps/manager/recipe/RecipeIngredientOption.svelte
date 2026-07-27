@@ -20,6 +20,7 @@
   row's right end; a multi-alternative box renders it at the box bottom instead.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
@@ -451,7 +452,7 @@
         {#if tags.length > 0}
           <ul class="manager-recipe-tag-chips">
             {#each tags as tag (tag)}
-              <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
+              <Chip tag="li" class="manager-recipe-tag-chip" data-recipe-tag={tag}>
                 <span>{tag}</span>
                 <button
                   type="button"
@@ -461,7 +462,7 @@
                   title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
                   onclick={() => removeTag(tag)}
                 ><i class="fas fa-times" aria-hidden="true"></i></button>
-              </li>
+              </Chip>
             {/each}
           </ul>
         {:else}

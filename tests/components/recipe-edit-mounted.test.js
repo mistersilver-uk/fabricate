@@ -55,6 +55,9 @@ const RAW_MODULES = [
 
 // The new tab + section components the editor shell composes.
 const RECIPE_COMPILED = [
+  // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+  // harness omits HANGS the suite (# cancelled) rather than failing it.
+  'src/ui/svelte/apps/manager/Chip.svelte',
   // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',
@@ -108,6 +111,9 @@ const stepsHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-steps-',
   rawModules: RAW_MODULES,
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
