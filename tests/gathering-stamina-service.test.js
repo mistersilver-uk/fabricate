@@ -26,6 +26,12 @@ function makeFakeActor() {
   };
 }
 
+// The raw persisted pool, so the accrual anchor (which `getActorStamina` does not
+// project) can be asserted directly.
+function staminaEntry(actor, systemId = 'sys') {
+  return actor.getFlag('fabricate', 'gatheringState')?.stamina?.[systemId] || {};
+}
+
 function makeService({
   economy = { stamina: { enabled: true, max: '40', start: '', regen: { policy: 'none' } }, nodes: { enabled: false } },
   evaluate = null,
@@ -162,7 +168,10 @@ test('regenerateActorStamina adds per-interval amount and advances the anchor', 
   assert.equal(next.lastRegenWorldTime, 3 * HOUR, 'anchor advanced by consumed intervals');
 });
 
-test('regenerateActorStamina re-anchors without gain when time runs backwards', async () => {
+// issue 403: `lastRegenWorldTime` is an ACCRUAL anchor and is monotonic
+// non-decreasing. A backward tick writes no actor state at all, so the anchor may
+// legitimately sit ahead of the current world time.
+test('regenerateActorStamina freezes the anchor without gain when time runs backwards', async () => {
   const { service } = makeService({
     economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } },
     evaluate: () => 2
@@ -174,6 +183,30 @@ test('regenerateActorStamina re-anchors without gain when time runs backwards', 
   const result = await service.regenerateActorStamina({ actor, systemId: 'sys', worldTime: 2 * HOUR });
   assert.equal(result, null, 'no-op on backwards time');
   assert.equal(service.getActorStamina(actor, 'sys').current, 10);
+  assert.equal(staminaEntry(actor).lastRegenWorldTime, 5 * HOUR, 'the anchor never moves backwards');
+});
+
+// The pool shape `setActorStamina` produces on an actor with NO prior pool: it
+// carries the anchor forward only when a previous entry had one, so a GM
+// `setGatheringStamina` on a fresh actor yields a pool with no anchor key at all.
+// An absent anchor must SEED (not freeze), or that pool never regenerates again.
+test('regenerateActorStamina seeds an anchorless pool at now, then regenerates from the seed', async () => {
+  const { service } = makeService({
+    economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } },
+    evaluate: () => 2
+  });
+  const actor = makeFakeActor();
+  await actor.setFlag('fabricate', 'gatheringState', {
+    stamina: { sys: { max: 40, current: 10, regenerationMode: 'auto' } }
+  });
+  const seeded = await service.regenerateActorStamina({ actor, systemId: 'sys', worldTime: 3 * HOUR });
+  assert.equal(seeded, null, 'seeding is not a regeneration — it grants no backlog');
+  assert.equal(staminaEntry(actor).lastRegenWorldTime, 3 * HOUR, 'anchored at now and persisted');
+  assert.equal(staminaEntry(actor).current, 10, 'the count is untouched by the seed');
+  // Second observation: a single call cannot distinguish "seeded correctly" from
+  // "frozen forever", so prove the seeded pool still accrues.
+  const later = await service.regenerateActorStamina({ actor, systemId: 'sys', worldTime: 5 * HOUR });
+  assert.equal(later.current, 14, '2 intervals × 2 measured from the seeded anchor');
 });
 
 test('regenerateActorStamina no-ops when regen is off or the pool is unmaterialized', async () => {

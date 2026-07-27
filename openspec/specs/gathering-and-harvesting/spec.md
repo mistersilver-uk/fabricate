@@ -897,6 +897,10 @@ A unit of `days` or `weeks` resolves its length from the active Foundry world ca
 Nodes authored before this schema may persist a raw `intervalSeconds`, which the runtime honours until a migration rewrites it to unit+amount.
 13. `chance`-mode respawn persists the evaluated roll/outcome so repeated listing refreshes do not reroll the same interval.
 14. Respawn advances its `lastEvaluatedWorldTime` anchor by exactly the consumed intervals, so a same-tick refresh never re-applies and the fractional remainder accrues toward the next interval.
+That anchor is an accrual anchor (see "World-Time Anchors and Rewind Policy") and is monotonic non-decreasing: a backward world-time delta leaves it untouched and writes no node state at all, so a rewind neither reduces a node count nor re-anchors the pool, and the anchor may legitimately sit ahead of the current world time.
+Because the backward branch performs no write, the library-config reconciliation that rides along on a write — including the clamp of a stored `current` down to the library `max` — does not run on a rewind either.
+This applies identically to a per-environment pool and to an interactable's OWN independent pool (issue 302), which share the same respawn arithmetic.
+A pool carrying no anchor — a missing value or a persisted `null` — is seeded at the current world time on its first evaluation, granting no backlog, and accrues normally from that instant.
 15. Respawn evaluation is deterministic from persisted state once evaluated.
 16. Respawn must not exceed the task's configured maximum node count unless a GM override explicitly changes the maximum or applies an overstock action.
 17. Respawn and restock events should be visible in GM logs or audit-style UI where practical.
@@ -1037,6 +1041,43 @@ an absent, invalid, or wrong-shape value (including a stray `"simple"`) falls ba
 It is GM configuration and is not part of the player gathering listing payload.
 This is the system-level default gathering resolution and relates to the existing per-task `resolutionMode`:
 today only `d100` is honored at runtime, and `progressive`/`routed` are modelled but unimplemented (surfaced disabled in the GM UI as a "coming soon" affordance).
+27. A stamina pool persists a `lastRegenWorldTime` accrual anchor (see "World-Time Anchors and Rewind Policy") recording the instant up to which regeneration has already been granted.
+A backward world-time delta leaves that anchor untouched and writes no actor state at all, so rewinding refunds no spent stamina, grants no regeneration, and mints none on the way forward again.
+A pool materialized without an anchor — for example by a GM `setGatheringStamina` on an actor with no prior pool, which persists no `lastRegenWorldTime` key — is seeded at the current world time on its first evaluation and regenerates normally thereafter.
+
+## World-Time Anchors and Rewind Policy
+
+### Purpose
+
+Define how gathering state anchored to world time behaves when world time moves backward, so that a rewind can neither re-grant an entitlement nor re-impose a restriction that was already resolved in the discarded timeline.
+
+### Requirements
+
+1. Gathering state anchored to world time belongs to one of three families — accrual anchor, restriction anchor, or commitment deadline — classified by what the anchor RECORDS rather than by which subsystem owns it.
+Any new time-anchored gathering field must be classified into one of these families explicitly when it is introduced, so the rules cannot drift apart per field.
+2. The governing principle behind the three families is that a rewind must neither re-grant an entitlement nor re-impose a restriction resolved in the discarded timeline, while a commitment still in flight is simply not yet due.
+3. An accrual anchor is a high-water mark of entitlement already granted.
+A resource-node pool's `respawn.lastEvaluatedWorldTime` and an actor stamina pool's `lastRegenWorldTime` are accrual anchors.
+4. An accrual anchor is monotonic non-decreasing.
+A world-time delta that runs backward, or that does not move the anchor's own clock forward at all, leaves it untouched and performs no persisted write for that resource, because moving it back would re-grant every interval between the rewound instant and the anchor once world time runs forward again.
+5. An accrual anchor may therefore legitimately sit ahead of the current world time.
+That is a valid state rather than corruption, and every consumer must tolerate it: the resource accrues nothing until world time passes the anchor again, at which point it resumes normally.
+6. An ABSENT accrual anchor is seeded, not frozen.
+A pool whose anchor is missing or persisted as `null` is anchored at the current world time on its first evaluation, granting no backlog, and accrues normally from that instant onward.
+Seeding is distinct from re-anchoring: it establishes an anchor that never existed, rather than moving an existing one backward.
+7. A restriction anchor measures a penalty running FROM a recorded instant, such as an interactable's cooldown `lastUsedWorldTime`.
+A restriction anchor that sits ahead of the current world time is measuring a penalty imposed in a discarded timeline, so the rule for this family is the inverse of the accrual rule: clamp it forward to the current world time rather than leave it to re-impose itself.
+The cooldown clamp is specified here for taxonomy completeness and is tracked separately (issue 891); it is not applied by the accrual-anchor behaviour described above.
+8. A commitment deadline records an absolute maturity instant for work already in flight, and its classification implies no adjustment for a world-time move in either direction, since a rewound world genuinely has not reached that instant yet.
+This family exists for completeness of the taxonomy only.
+A gathering run's `timeGate.availableAt` is named here purely as an illustrative contrast; it is normatively specified in `openspec/specs/recipes-and-steps/spec.md` and `openspec/specs/data-models/spec.md`, and this section asserts no rule over it.
+9. A field that merely RECORDS when something happened is not an anchor at all and sits outside the taxonomy.
+`startedAtWorldTime`, `completedAtWorldTime`, `updatedAtWorldTime`, and the world time stamped onto a history event are records: nothing is gated on them, a world-time move never adjusts them, and they may legitimately read as later than the current world time.
+10. Rewinding world time is not an undo of what happened in the rewound interval.
+Spent stamina is not refunded, consumed nodes are not restored, attempts completed inside the interval are not reversed, and tools broken inside it are not repaired.
+11. Because a backward tick writes nothing, a rewind also emits no respawn or regeneration signal and performs no persisted document write for the affected pools, including the interactable-scoped pools whose respawn would otherwise write their region behaviour document.
+12. A deliberate large rewind, or an actor imported from a world whose timeline ran further ahead, leaves that pool's accrual anchor ahead of the current world time, and the pool accrues nothing until world time catches up.
+Restoring accrual is a GM remedy rather than something the rewind performs automatically (issue 894).
 
 ## Gathering Risk and Encounters
 
