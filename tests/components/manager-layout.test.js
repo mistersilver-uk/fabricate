@@ -5085,12 +5085,6 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     'component/ComponentIdentityStrip.svelte',
     'components/ComponentBrowserInspector.svelte',
     'components/ComponentRow.svelte',
-    'environment/CompositionStatePill.svelte',
-    'environment/EnvironmentEditorTabs.svelte',
-    'environment/EnvironmentSummaryInspector.svelte',
-    'environment/EnvironmentValidationTab.svelte',
-    'environment/OverrideIndicator.svelte',
-    'environment/RuntimeStatePill.svelte',
     'recipe/RecipeDurationEditor.svelte',
     'recipe/RecipeEditorTabs.svelte',
     // Hands the chip classes to `SearchablePopover` as a `triggerClass` STRING, so its

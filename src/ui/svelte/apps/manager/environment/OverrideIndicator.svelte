@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
 
   let { active = false } = $props();
 
@@ -17,6 +18,9 @@
     : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OverrideOffTitle', 'Drop rate adjustment off'));
 </script>
 
-<span class={`manager-chip ${active ? 'is-active' : 'is-muted'} manager-environment-override-indicator`} data-drop-rate-override={active ? 'on' : 'off'} title={title}>
+<!-- The OFF state carries no tone. It used to carry `is-muted`, which matched no rule
+     anywhere in the sheet, so it already rendered as the default chip; naming a tone here
+     would be a visual change, not a faithful conversion (issue 883). -->
+<Chip tone={active ? 'active' : ''} class="manager-environment-override-indicator" data-drop-rate-override={active ? 'on' : 'off'} title={title}>
   <span>{label}</span>
-</span>
+</Chip>

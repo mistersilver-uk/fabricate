@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
   import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
 
   let {
@@ -12,6 +13,15 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // Issue severity is this surface's vocabulary; `Chip` names colour families. `info`
+  // deliberately maps to the receding NEUTRAL tone rather than the informational blue,
+  // preserving what the hand-rolled chip rendered.
+  function severityTone(severity) {
+    if (severity === 'critical') return 'danger';
+    if (severity === 'warning') return 'warning';
+    return 'neutral';
   }
 
   const readiness = $derived(evaluateEnvironmentReadiness(environment || {}, composition || {}));
@@ -89,7 +99,7 @@
           <ul class="manager-environment-issue-list" data-issue-severity={severity}>
             {#each issuesBy[severity] as issue, index (issue.id + index)}
               <li class={`manager-environment-issue is-${severity}`} data-issue={issue.id}>
-                <span class={`manager-chip ${severity === 'critical' ? 'is-danger' : severity === 'warning' ? 'is-warning' : 'is-neutral'}`}>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.${severity}`, severity)}</span>
+                <Chip tone={severityTone(severity)}>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.${severity}`, severity)}</Chip>
                 <span class="manager-environment-issue-title">{issueTitle(issue)}</span>
                 {#if issue.recordId}
                   <button type="button" class="manager-button manager-environment-issue-action" onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}>

@@ -484,7 +484,9 @@ describe('environment composition editor structure', () => {
     assert.ok(!shellSource.includes('BadgeWarning'), 'validation warning badge should not use severity text');
     assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
     assert.ok(tabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
-    assert.ok(tabsSource.includes("if (tone === 'warning') return 'is-warning'"), 'tabs should render warning-toned badge chips');
+    // The badge is a shared `Chip` since issue 883, so the tab strip hands it a tone NAME
+    // rather than an `is-` class; the mapping still has to exist.
+    assert.ok(tabsSource.includes("if (tone === 'warning') return 'warning'"), 'tabs should render warning-toned badge chips');
   });
 });
 

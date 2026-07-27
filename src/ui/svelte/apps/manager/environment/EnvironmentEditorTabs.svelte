@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
 
   let { activeTab = 'overview', badges = {}, onSelect = () => {} } = $props();
 
@@ -35,10 +36,12 @@
       .filter(badge => badge.label !== '' && badge.label !== 0);
   }
 
-  function badgeClass(tone) {
-    if (tone === 'danger') return 'is-danger';
-    if (tone === 'warning') return 'is-warning';
-    return 'is-neutral';
+  // A badge tone name is this component's own vocabulary; translate it to a `Chip`
+  // colour family rather than leaking one spelling into the other (issue 883).
+  function badgeTone(tone) {
+    if (tone === 'danger') return 'danger';
+    if (tone === 'warning') return 'warning';
+    return 'neutral';
   }
 
   function onKeydown(event, index) {
@@ -69,7 +72,7 @@
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.${tab.key}`, tab.fallback)}</span>
       {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <span class={`manager-chip ${badgeClass(badge.tone)} manager-environment-tab-badge`}>{badge.label}</span>
+        <Chip tone={badgeTone(badge.tone)} class="manager-environment-tab-badge">{badge.label}</Chip>
       {/each}
     </button>
   {/each}
