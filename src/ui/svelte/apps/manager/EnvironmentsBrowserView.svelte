@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -688,7 +689,7 @@
             {/each}
           </select>
         </label>
-        <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredEnvironments.length).replace('{total}', environmentList.length)}</span>
+        <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredEnvironments.length).replace('{total}', environmentList.length)}</Chip>
         {#if filtersActive}
           <button type="button" class="manager-button manager-clear-filters" data-clear-filters="environments" onclick={clearFilters}>
             <i class="fas fa-times" aria-hidden="true"></i>
@@ -761,16 +762,16 @@
                     {/if}
                     <span class="manager-chip-row">
                       {#if environmentDirtyFor(environment)}
-                        <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
+                        <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip>
                       {/if}
                       {#if environmentInvalidFor(environment)}
-                        <span class="manager-chip is-danger">{text('FABRICATE.Admin.Manager.Environment.Invalid', 'Invalid')}</span>
+                        <Chip tone="danger">{text('FABRICATE.Admin.Manager.Environment.Invalid', 'Invalid')}</Chip>
                       {/if}
                     </span>
                   </span>
                 </button>
                 <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}>
-                  <span class="manager-chip">{environmentSelectionModeLabel(displayEnvironment)}</span>
+                  <Chip>{environmentSelectionModeLabel(displayEnvironment)}</Chip>
                 </span>
                 <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Environments.Tasks', 'Tasks')}>
                   <strong class="manager-environment-task-count">{environmentTaskCount(environment)}</strong>

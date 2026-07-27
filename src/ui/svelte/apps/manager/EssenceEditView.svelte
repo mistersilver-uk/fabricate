@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
   import { DEFAULT_ESSENCE_ICON, getEssenceIconOption, normalizeEssenceIcon } from '../../util/essenceIcons.js';
@@ -93,24 +94,24 @@
     if (state === 'linked') {
       return {
         label: text('FABRICATE.Admin.Manager.Essence.SourceLinked', 'Linked source'),
-        className: 'is-active'
+        tone: 'active'
       };
     }
     if (state === 'missing') {
       return {
         label: text('FABRICATE.Admin.Manager.Essence.SourceMissing', 'Source item missing'),
-        className: 'is-warning'
+        tone: 'warning'
       };
     }
     if (state === 'stale') {
       return {
         label: text('FABRICATE.Admin.Manager.Essence.SourceStale', 'Source unresolved'),
-        className: 'is-warning'
+        tone: 'warning'
       };
     }
     return {
       label: text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source'),
-      className: 'is-disabled'
+      tone: 'disabled'
     };
   }
 
@@ -247,7 +248,7 @@
         <div class="manager-essence-source-panel">
           <div class="manager-edit-card-heading">
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</h3>
-            <span class={`manager-chip ${sourceState.className}`}>{sourceState.label}</span>
+            <Chip tone={sourceState.tone}>{sourceState.label}</Chip>
           </div>
           <div class="manager-essence-source-stack">
             <div class="manager-essence-source-summary">

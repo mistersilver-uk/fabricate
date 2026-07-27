@@ -17,6 +17,7 @@
   live in the pure `recipeBrowserModel.js`; this component only renders.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -419,7 +420,7 @@
 
     <div class="manager-recipe-filter-row is-chips">
       {#each model.chips as chip (chip.id)}
-        <span class="manager-chip is-info manager-recipe-filter-chip" data-recipe-filter-chip={chip.id}>
+        <Chip tone="info" class="manager-recipe-filter-chip" data-recipe-filter-chip={chip.id}>
           <span>{chipLabel(chip)}</span>
           <button
             type="button"
@@ -429,7 +430,7 @@
           >
             <i class="fas fa-times" aria-hidden="true"></i>
           </button>
-        </span>
+        </Chip>
       {/each}
       <!--
         The count is quiet right-aligned metadata, not a control: a bordered mono chip
@@ -567,10 +568,9 @@
                            takes the mono face (`is-mono`, tabular figures) when it
                            carries a number. The word-only kinds (Dynamic DC,
                            Progressive, the em dash) stay in the UI face. -->
-                      <span class={`manager-chip manager-recipe-check is-${check.kind} ${check.kind === 'dc' ? 'is-mono' : ''}`} data-recipe-check={check.kind} title={check.title || undefined}>
-                        <i class={check.icon} aria-hidden="true"></i>
+                      <Chip class={`manager-recipe-check is-${check.kind}`} mono={check.kind === 'dc'} icon={check.icon} data-recipe-check={check.kind} title={check.title || undefined}>
                         <span>{check.label}</span>
-                      </span>
+                      </Chip>
 
                       <button
                         type="button"

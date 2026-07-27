@@ -5054,12 +5054,8 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
   const UNCONVERTED = [
     'CraftingSystemManagerRoot.svelte',
     'EditorValidationSurface.svelte',
-    'EnvironmentsBrowserView.svelte',
-    'EssenceBrowserView.svelte',
-    'EssenceEditView.svelte',
     'ImportFolderMappingModal.svelte',
     'ImportReportModal.svelte',
-    'RecipesBrowserView.svelte',
     'TagsCategoriesView.svelte',
     'VocabularyPanel.svelte',
     'checks/ChecksValidationTab.svelte',

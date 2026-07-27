@@ -3632,15 +3632,12 @@
   font-weight: 400;
 }
 
+/* The check pill kept its own `min-height`, `padding`, `font-size` and `font-weight`
+   (issue 643 bumped the last two a step so "DC 16" was readable). Issue 883 made the
+   compact chip the only scale, so all four are gone and the pill is sized by the
+   primitive; only the no-wrap survives, and it collides with nothing the chip declares.
+   The `is-*` kind rules below stay at three classes and still outrank it on colour. */
 .fabricate-manager .manager-recipe-check {
-  min-height: 0;
-  padding: 3px var(--fab-space-1);
-  gap: var(--fab-space-chip);
-
-  /* Bumped a step (issue 643): the "DC 16" check pill was too small to read. The DC
-     value keeps its mono face via the `is-mono` modifier on the row. */
-  font-size: 0.7rem;
-  font-weight: 600;
   white-space: nowrap;
 }
 
