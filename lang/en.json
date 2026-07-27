@@ -1057,15 +1057,7 @@
     "Settings": {
       "Theme": {
         "Name": "Fabricate Theme",
-        "Hint": "Choose the colour theme for Fabricate's module UI.",
-        "Choices": {
-          "Fabricate": "Fabricate",
-          "Mythwright": "Mythwright",
-          "IronbloodForge": "Ironblood Forge",
-          "HearthHerb": "Hearth & Herb",
-          "StarglassArcana": "Starglass Arcana",
-          "FoundryNative": "Foundry Native"
-        }
+        "Hint": "Choose the colour theme for Fabricate's module UI."
       },
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
@@ -1206,19 +1198,7 @@
           "unknown": "Record"
         }
       },
-      "Actors": {
-        "Name": "Actor",
-        "None": "No actors available."
-      },
       "Actions": "Actions",
-      "Tabs": {
-        "Systems": "Systems",
-        "Items": "Components",
-        "Recipes": "Recipes",
-        "Environments": "Environments",
-        "Rules": "Rules",
-        "Graph": "Graph"
-      },
       "Manager": {
         "WindowTitle": "Crafting Systems",
         "GMOnly": "Only GMs can manage crafting systems.",
@@ -2150,14 +2130,6 @@
           "DiscardDirtyConfirm": "Discard changes",
           "DiscardDirtyCancel": "Keep editing",
           "SaveFailed": "Save failed. Check for duplicate or blank names and try again.",
-          "Visibility": {
-            "Title": "Visibility",
-            "RestrictToggle": "Restrict visibility to specific users",
-            "RestrictHint": "Restrict this recipe to specific players. When off, every player can see it.",
-            "AllowedUsers": "Allowed users",
-            "NoWorldUsers": "No non-GM players exist in this world yet.",
-            "NoUsersSelected": "Restricted with no users selected — no player can see this recipe."
-          },
           "EmptySetup": {
             "Kicker": "Recipe setup",
             "Title": "Set up recipes",
@@ -2232,9 +2204,6 @@
           "EmptyHint": "Drop Foundry items into this page to add components to the selected system.",
           "EmptySearchTitle": "No components match your filters.",
           "EmptySearchHint": "Clear search and filters to show all components in this system.",
-          "Column": {
-            "Component": "Component"
-          },
           "Source": "Source",
           "NoTags": "No tags",
           "NoEssences": "No essences",
@@ -4619,14 +4588,6 @@
           }
         }
       },
-      "Sidebar": {
-        "Title": "Crafting Systems",
-        "CreateSystem": "Create System",
-        "DeleteSystem": "Delete",
-        "ExportSystem": "Export System",
-        "ImportSystem": "Import System",
-        "Empty": "No systems created."
-      },
       "SystemSettings": {
         "Title": "Crafting System",
         "NoSystemSelected": "No Crafting System Selected",
@@ -4684,20 +4645,6 @@
       },
       "Features": {
         "Enable": "Enable",
-        "Categories": {
-          "Title": "Recipe Categories",
-          "Hint": "Organize and filter recipes by category in admin and crafting views.",
-          "Placeholder": "e.g. Cooking",
-          "Add": "Add",
-          "Empty": "No custom categories defined yet."
-        },
-        "ItemTags": {
-          "Title": "Item Tags",
-          "Hint": "Use tags for categorization, sorting, and search in components.",
-          "Placeholder": "e.g. armour:leather",
-          "Add": "Add",
-          "Empty": "No item tags defined yet."
-        },
         "Essences": {
           "Title": "Essences",
           "Hint": "Define essence types with descriptions and optional source items.",
@@ -4725,82 +4672,6 @@
           "Save": "Save Essence",
           "Cancel": "Cancel Editing",
           "Remove": "Remove Essence"
-        },
-        "MultiStepRecipes": {
-          "Title": "Multi-Step Recipes",
-          "Hint": "Allow recipes to define explicit ordered steps with per-step ingredient/result and time requirements."
-        },
-        "Gathering": {
-          "Title": "Gathering",
-          "Hint": "Enable gathering environments and task configuration for this crafting system."
-        },
-        "TimeRequirements": {
-          "Title": "Time Requirements",
-          "Hint": "Allow step-level crafting durations using minutes, hours, days, months, and years."
-        },
-        "CurrencyRequirements": {
-          "Title": "Currency Requirements",
-          "Hint": "Configure this system's currencies and how they are spent, via system adapter or macros.",
-          "MacroProvider": "Macro provider",
-          "SystemAdapter": "System adapter",
-          "SelectAdapter": "Select adapter",
-          "CheckMacro": "Check currency macro",
-          "DecrementMacro": "Decrement currency macro",
-          "FormatMacro": "Format currency macro",
-          "SaveConfig": "Save Currency Config"
-        },
-        "PropertyMacros": {
-          "Title": "Property Calculation Macros",
-          "Hint": "Use macros to compute result property updates from crafting context."
-        },
-        "CraftingChecks": {
-          "Title": "Crafting Checks",
-          "Hint": "Choose a system-level check macro that returns pass/fail or named outcomes. Leave the macro blank to disable crafting checks.",
-          "PassFail": "Pass / Fail",
-          "NamedOutcomes": "Named Outcomes",
-          "NoCheckMacro": "No check macro",
-          "OutcomesPlaceholder": "Outcomes (comma separated)",
-          "SaveConfig": "Save Check Config"
-        },
-        "OutcomeRouting": {
-          "Title": "Outcome Routing",
-          "Hint": "Map crafting-check outcomes to specific result groups when complex recipes are enabled."
-        },
-        "EffectTransfer": {
-          "Title": "Effect Transfer",
-          "Hint": "Transfer active effects from consumed ingredients to crafted result items."
-        },
-        "RecipeVisibility": {
-          "Title": "Recipe Visibility",
-          "Hint": "Control which players can see recipes.",
-          "Global": "Global (all recipes visible to all)",
-          "PlayerSpecific": "Player-specific (per-recipe restrictions)",
-          "KnowledgeBased": "Knowledge-based (item or learning)",
-          "SaveConfig": "Save Visibility Config",
-          "PlayerNote": "Per-recipe visibility restrictions can be configured in each recipe's editor. Restricted recipes are hidden from all players by default unless specific users are allowed.",
-          "KnowledgeByItem": "By item (must have recipe item)",
-          "KnowledgeByLearning": "By learning (must have learnt recipe)",
-          "KnowledgeByEither": "Item or learning (either method)",
-          "ItemLimitUses": "Limited uses of recipe items",
-          "ItemMaxUses": "Maximum uses",
-          "ItemDestroyWhenExhausted": "Delete when exhausted",
-          "ConsumeOnLearn": "Consume item on learn",
-          "DragDropEnabled": "Learn recipes from actor item drops",
-          "MaxUsesDecrease": "Decrease maximum uses",
-          "MaxUsesIncrease": "Increase maximum uses",
-          "LearnLimitRecipes": "Limited recipes learned per item",
-          "LearnLimitRecipesToggle": "Enabled",
-          "LearnLimitRecipesHint": "Cap how many recipes a player can learn from one recipe item.",
-          "MaxRecipes": "Maximum recipes",
-          "MaxRecipesDecrease": "Decrease maximum recipes",
-          "MaxRecipesIncrease": "Increase maximum recipes",
-          "DestroyWhenSpent": "Delete when spent",
-          "ListModeLabel": "List mode",
-          "ListModeHint": "How recipes are exposed to players.",
-          "KnowledgeModeHint": "How players gain access to a recipe.",
-          "ItemLimitUsesHint": "Cap how many times a recipe item grants access.",
-          "ConsumeOnLearnHint": "Delete the recipe item when a player learns it.",
-          "DragDropEnabledHint": "Dropping the item on an actor learns the recipe."
         }
       },
       "Items": {
@@ -4887,35 +4758,6 @@
           "ComponentNotFound": "Component not found.",
           "SaveFailed": "Failed to save component."
         }
-      },
-      "Recipes": {
-        "SearchPlaceholder": "Search recipes...",
-        "NewRecipe": "New Recipe",
-        "Import": "Import",
-        "Export": "Export",
-        "NoRecipes": "No Recipes Yet",
-        "NoRecipesHint": "Create recipes for the selected crafting system.",
-        "CreateRecipe": "Create Recipe",
-        "ColRecipe": "Recipe",
-        "ColLocked": "Locked",
-        "ColVisibility": "Visibility",
-        "ColCategory": "Category",
-        "ColType": "Type",
-        "ColComponents": "Components",
-        "ColEnabled": "Enabled",
-        "ColActions": "Actions",
-        "Disabled": "Disabled",
-        "LockedYes": "Yes",
-        "LockedNo": "No",
-        "Simple": "Simple",
-        "Advanced": "Advanced",
-        "Ingredient": "ingredient",
-        "Ingredients": "ingredients",
-        "Tool": "tool",
-        "Tools": "tools",
-        "Edit": "Edit",
-        "Duplicate": "Duplicate",
-        "Delete": "Delete"
       },
       "Environments": {
         "Title": "Gathering Environments",
@@ -5078,36 +4920,10 @@
         "DeleteResultNamed": "Delete result {name}",
         "Yes": "Yes",
         "No": "No"
-      },
-      "Rules": {
-        "Title": "Global Rules"
       }
     },
     "DropZone": {
       "DefaultLabel": "Drop items here"
-    },
-    "Import": {
-      "Title": "Import Crafting System",
-      "SummaryTitle": "Import Summary",
-      "SystemCreated": "Crafting system “{name}” created.",
-      "SystemUpdated": "Crafting system “{name}” updated.",
-      "SystemSkipped": "Crafting system “{name}” skipped (already exists).",
-      "ComponentsRemapped": "{count} component(s) remapped to world items.",
-      "ComponentsUnresolved": "{count} component(s) have unresolved source items.",
-      "RecipesImported": "{imported} of {total} recipe(s) imported.",
-      "RecipesSkipped": "{count} recipe(s) skipped (already exist).",
-      "CollisionsDetected": "{count} collision(s) detected.",
-      "DropPackJson": "Drop a pack JSON file or paste pack data",
-      "Overwrite": "Overwrite existing data",
-      "RetainFallbacks": "Retain existing fallback IDs"
-    },
-    "Error": {
-      "NoRecipe": "Recipe not found",
-      "NoActor": "No actor selected",
-      "MissingIngredients": "Missing required ingredients",
-      "MissingTools": "Missing required tools",
-      "InvalidRecipe": "Invalid recipe configuration",
-      "CraftingFailed": "Crafting failed"
     },
     "Alchemy": {
       "Title": "Alchemy",
@@ -5130,13 +4946,7 @@
       "AutoFillPartial": "Auto-fill: {count} ingredient group(s) could not be satisfied",
       "AutoFillComplete": "Workbench populated from recipe",
       "ComponentsNotFound": "Could not find any of the workbench components in your inventory",
-      "ComponentsMissing": "Some components could not be found: {names}",
-      "Palette": {
-        "NoComponents": "No components available",
-        "Available": "available",
-        "SearchPlaceholder": "Search components…",
-        "OwnedOnly": "Owned only"
-      }
+      "ComponentsMissing": "Some components could not be found: {names}"
     },
     "Gathering": {
       "Title": "Gathering",
@@ -5191,77 +5001,6 @@
       "BlindTaskLabel": "Gather",
       "FailureDefault": "Gathering produced no results.",
       "ErrorTitle": "Could Not Load Gathering",
-      "ActiveRuns": {
-        "Title": "Active Gathering",
-        "AvailableAt": "Available at world time {time}"
-      },
-      "Feedback": {
-        "Title": "Last Attempt",
-        "Succeeded": "Gathering succeeded.",
-        "Failed": "Gathering attempt failed.",
-        "WaitingTime": "Gathering started.",
-        "Cancelled": "Gathering was cancelled.",
-        "Blocked": "Gathering is currently blocked."
-      },
-      "History": {
-        "Title": "Recent History",
-        "SucceededSummary": "{results} results, {tools} tools used",
-        "CharacterModifiers": {
-          "Title": "Character Modifiers",
-          "RowsHeading": "Drop rows",
-          "EventsHeading": "Events",
-          "RowEmpty": "No character modifier contributions.",
-          "UnknownModifier": "Unknown modifier",
-          "RedactedSummary": "modifiers contributed {positive} / {negative}"
-        }
-      },
-      "Status": {
-        "waitingTime": "Waiting",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "cancelled": "Cancelled",
-        "unknown": "Unknown"
-      },
-      "Tabs": {
-        "Environments": "Environments",
-        "Log": "Gathering Log"
-      },
-      "Pagination": {
-        "Environments": "Environment pages",
-        "ShowingEnvironments": "Showing {start}-{end} of {total} environments",
-        "PreviousPage": "Previous environment page",
-        "NextPage": "Next environment page"
-      },
-      "Availability": {
-        "All": "All availability",
-        "Available": "Available",
-        "Blocked": "Blocked",
-        "Empty": "No tasks"
-      },
-      "Condition": {
-        "Time": "Time",
-        "Weather": "Weather",
-        "Visibility": "Visibility"
-      },
-      "Empty": {
-        "NoSelectableActorsTitle": "No Selectable Actors",
-        "NoSelectableActorsHint": "Ask the GM to grant ownership of an actor before gathering.",
-        "NoEnvironments": "No gathering environments are available.",
-        "NoFilteredEnvironments": "No environments match these filters.",
-        "SelectEnvironmentForTasks": "Select an environment to view its gathering tasks.",
-        "SelectEnvironmentForDetails": "Select an environment to view its details.",
-        "NoTasks": "No gathering tasks are available.",
-        "NoActiveRuns": "No active gathering runs.",
-        "NoHistory": "No gathering history yet."
-      },
-      "Notifications": {
-        "Started": "Gathering started.",
-        "Succeeded": "Gathering succeeded.",
-        "Failed": "Gathering attempt failed.",
-        "Blocked": "Gathering is currently blocked.",
-        "RefreshFailed": "Could not refresh gathering options.",
-        "StartFailed": "Could not start gathering."
-      },
       "Blocked": {
         "NoSelectableActors": "You do not have an actor available for gathering.",
         "InvalidRememberedActor": "The remembered gathering actor is no longer available.",
@@ -5294,46 +5033,12 @@
       },
       "Realm": {
         "UndiscoveredPlaceholder": "Undiscovered realm"
-      },
-      "Travel": {
-        "Guidance": {
-          "NoCurrentRealm": "Not available while no party realm set.",
-          "Excluded": "Not available in the party's current realm.",
-          "Travel": "Travel to a realm where this is available.",
-          "KnownDestinations": "Travel to: {names}.",
-          "UndiscoveredDestinations": "Available in {count} undiscovered realm(s)."
-        }
-      },
-      "Risk": {
-        "safe": "Safe",
-        "hazardous": "Hazardous",
-        "dangerous": "Dangerous",
-        "deadly": "Deadly",
-        "unsafe": "Unsafe",
-        "extreme": "Extreme"
-      },
-      "Diagnostics": {
-        "MissingCharacterModifier": "Character modifier \"{id}\" is not defined in this system's library.",
-        "MacroOverrideMissingUuid": "A row override using the macro provider is missing a macro UUID.",
-        "CharacterModifierBoundsInvalid": "A row character modifier has min > max.",
-        "CharacterModifierNonFinite": "A character modifier expression did not resolve to a finite number."
       }
     },
     "Labels": {
       "UnknownComponent": "Unknown Component",
       "UnknownTool": "Unknown Tool",
       "UnknownItem": "Unknown Item"
-    },
-    "Graph": {
-      "EdgeNormal": "Produces input for",
-      "EdgeCycle": "Cyclic dependency",
-      "NoRecipes": "No recipes in this system",
-      "NoConnections": "No recipe connections found",
-      "NodeCount": "{count} recipes",
-      "EdgeCount": "{count} connections",
-      "SearchPlaceholder": "Search recipes...",
-      "AllCategories": "All Categories",
-      "ResetView": "Reset View"
     },
     "Tool": {
       "BrokenNameSuffix": " (broken)"
