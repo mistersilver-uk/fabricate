@@ -3521,8 +3521,9 @@
 
    The recipe row leaves the shared 76px row-card geometry group (which the component,
    environment, gathering-task and essence rows still share): it is a denser card at
-   11px/12px padding and radius 9, ~62px tall, so a page of recipes shows more of the
-   library and less of the gaps between it. */
+   11px/12px padding, ~62px tall, so a page of recipes shows more of the library and
+   less of the gaps between it. Its edge, corner and fill are NOT here — they come from
+   the one browser-row treatment (issue 883). */
 .fabricate-manager .manager-recipe-row {
   display: flex;
   gap: var(--fab-space-3);
@@ -3531,10 +3532,7 @@
   min-width: 0;
   min-height: 62px;
   padding: 11px 12px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 9px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-recipe-row.is-off {
@@ -4777,9 +4775,10 @@
    rather than compressing, so the narrow (stacked) container query the smoke harness
    photographs reflows the meta under the identity instead of crushing it.
 
-   The geometry matches the recipe row, not the 76px/radius-8 group it left (issue 676):
-   a denser 11px/12px, radius-9, ~62px card, so a page of components shows more of the
-   library and less of the gaps between it. */
+   The geometry matches the recipe row, not the 76px group it left (issue 676): a denser
+   11px/12px, ~62px card, so a page of components shows more of the library and less of
+   the gaps between it. Its edge, corner and fill come from the one browser-row treatment
+   (issue 883). */
 .fabricate-manager .manager-component-row {
   display: flex;
   flex-wrap: wrap;
@@ -4789,10 +4788,7 @@
   min-width: 0;
   min-height: 62px;
   padding: 11px 12px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 9px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-component-row .manager-component-identity {
@@ -4857,10 +4853,7 @@
   width: 100%;
   min-height: 72px;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
   cursor: pointer;
 }
 
@@ -5048,19 +5041,58 @@
   min-width: 0;
 }
 
-/* The shared row-card geometry. The recipe row LEFT this group (issue 643), and the
-   component row followed it (issue 676): both are the denser 11px/12px, radius-9,
-   ~62px card, declared with their own library. */
+/* ONE browser-row treatment (issue 883).
+
+   The Tool Studio's row is canonical — a hairline edge, an 8px corner and a TRANSLUCENT
+   overlay fill that lets the panel behind it show through. Every other manager browser
+   row and value card joins this rule instead of restating it. Before this, eight
+   surfaces declared the same three properties eight times over and had already drifted
+   to three corner radii (8px, 9px, 10px) and two fills (the translucent overlay and a
+   solid `--fab-mv2-surface-2`), which is exactly how a set of copies decays.
+
+   Only the SKIN is shared, and deliberately so. Each surface keeps its own display
+   model, column template, padding and height below, because those genuinely differ: the
+   systems row is a four-column grid, the recipe and component rows are flex cards, the
+   gathering and essence rows key off their own `--fab-mv2-*-grid` custom properties, the
+   Tool Studio row is a flex COLUMN wrapping a body plus an inline editor, and the
+   vocabulary card is a container holding several rows behind `overflow: hidden`.
+
+   A `BrowserRow` Svelte component was considered and rejected on the evidence: it would
+   own nothing but this class name. The layout each row needs is imposed by the parent
+   table's grid template, which a scoped block cannot reach, and the rows differ in
+   element type (`div` / `li` / `article`), ARIA role (`row` versus list item) and
+   interaction (row-level click versus a button inside the row). The component would
+   degenerate into a tag-and-class passthrough, so the shared meaning is stated where it
+   actually lives — as one joined rule.
+
+   The essence row is here although issue 883's list omits it. It shared the geometry
+   group below with the environment and gathering-task rows, so unifying those two and
+   leaving it behind would have converted a shared declaration into the one remaining
+   per-surface copy of the treatment — the precise outcome this rule exists to remove. */
+.fabricate-manager .manager-tools-row,
+.fabricate-manager .manager-vocabulary-card,
+.fabricate-manager .manager-system-row,
+.fabricate-manager .manager-recipe-row,
+.fabricate-manager .manager-component-row,
+.fabricate-manager .manager-environment-row,
+.fabricate-manager .manager-gathering-task-row,
+.fabricate-manager .manager-gathering-event-row,
+.fabricate-manager .manager-essence-row {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+}
+
+/* The shared row-card geometry — size only; the skin is the joined rule above. The
+   recipe row LEFT this group (issue 643), and the component row followed it (issue 676):
+   both are the denser 11px/12px, ~62px card, declared with their own library. */
 .fabricate-manager .manager-environment-row,
 .fabricate-manager .manager-gathering-task-row,
 .fabricate-manager .manager-essence-row {
   width: 100%;
   min-height: 76px;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-recipe-row:hover,
@@ -5895,11 +5927,11 @@
   min-height: 0;
 }
 
+/* The edge, corner and fill come from the one browser-row treatment (issue 883); this
+   card carried its own 10px corner and a solid fill until then. `overflow: hidden` is
+   what clips its inner rows to that shared corner. */
 .fabricate-manager .manager-vocabulary-card {
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 10px;
-  background: var(--fab-mv2-surface-2);
   overflow: hidden;
 }
 
@@ -10086,14 +10118,12 @@
   min-width: 0;
 }
 
+/* Size only; the edge, corner and fill are the one browser-row treatment (issue 883). */
 .fabricate-manager .manager-gathering-event-row {
   width: 100%;
   min-height: 76px;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-gathering-event-row:hover {
@@ -15299,19 +15329,21 @@
   gap: var(--fab-space-2);
 }
 
+/* The reference row for issue 883. Its edge, corner and fill now live in the one
+   browser-row treatment that every manager row joins, so only what is specific to this
+   row — the column stack that carries the inline editor, the dirty-pip anchor and the
+   state transition — is declared here. */
 .fabricate-manager .manager-tools-row {
   display: flex;
   flex-direction: column;
   position: relative;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-03);
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
+/* Selection moves the EDGE only: the fill is already the shared treatment's, so
+   restating it here would be the same statement made twice. */
 .fabricate-manager .manager-tools-row.is-selected {
   border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-overlay-light-03);
   box-shadow: none;
 }
 

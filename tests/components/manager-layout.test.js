@@ -1604,9 +1604,13 @@ test('manager recipes browser defines a non-overflowing card row', () => {
     rowBlock.includes('padding: 11px 12px;'),
     'the recipe row uses the library card padding'
   );
-  assert.ok(
-    rowBlock.includes('border-radius: 9px;'),
-    'the recipe row uses the library card radius'
+  // The recipe row's own radius (9px) was retired by issue 883: the edge, corner and fill
+  // are the ONE browser-row treatment now, so the row block must declare none of them.
+  // Asserting their ABSENCE is what stops the copy being written back in.
+  assert.equal(
+    /border-radius:|border: 1px|background:/.test(rowBlock),
+    false,
+    'the recipe row must not restate the shared browser-row edge, corner or fill'
   );
 
   // A disabled row reads at .55, not .62 — far enough back that a page of rows separates
@@ -3247,9 +3251,12 @@ test('manager components browser defines drop target and compact responsive list
   }
   // The row geometry matches the recipe row, not the 76px group it left.
   assert.ok(rowBlock.includes('min-height: 62px;'), 'the component row is the denser ~62px card');
-  assert.ok(
-    rowBlock.includes('border-radius: 9px;'),
-    'the component row takes the recipe row radius'
+  // As for the recipe row: issue 883 retired the per-surface 9px corner in favour of the
+  // one shared browser-row treatment, so the row block declares size and nothing else.
+  assert.equal(
+    /border-radius:|border: 1px|background:/.test(rowBlock),
+    false,
+    'the component row must not restate the shared browser-row edge, corner or fill'
   );
   assert.ok(
     dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'),
@@ -4892,6 +4899,84 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
       `${dead} should render through the shared primitive, not hand-rolled markup`
     );
   }
+});
+
+// Issue 883: eight manager browser rows and value cards each declared their own edge,
+// corner and fill, and had already drifted to three corner radii (8px, 9px, 10px) and two
+// fills. The Tool Studio's row is canonical, and every other surface JOINS it.
+//
+// This guard is deliberately two-sided. Asserting the joined rule exists proves the shared
+// treatment is authored; asserting each row block no longer carries the properties proves
+// no surface kept a private copy, which is the failure mode a one-sided check misses.
+test('every manager browser row joins ONE edge, corner and fill treatment', () => {
+  const occurrences = (needle) => css.split(needle).length - 1;
+
+  const ROWS = [
+    // The canonical row, and the value card issue 883 names as the furthest drifted.
+    '.manager-tools-row',
+    '.manager-vocabulary-card',
+    '.manager-system-row',
+    '.manager-recipe-row',
+    '.manager-component-row',
+    '.manager-environment-row',
+    '.manager-gathering-task-row',
+    '.manager-gathering-event-row',
+    // Not in issue 883's list, but it shared the geometry group with the environment and
+    // gathering-task rows: converting those two and leaving it behind would have made it
+    // the one surviving per-surface copy of the very treatment being unified.
+    '.manager-essence-row',
+  ];
+
+  const shared = `${ROWS.map((row) => `.fabricate-manager ${row}`).join(',\n')} {`;
+  // Counted on the WHOLE selector list, not on its last selector. The Knowledge guard
+  // above can anchor on its last selector because that one is unique; every row class
+  // here legitimately opens other blocks too (a grid template, a responsive override),
+  // so only the full list identifies this rule.
+  assert.equal(
+    occurrences(shared),
+    1,
+    'the browser-row treatment should be authored exactly once, as one join'
+  );
+
+  const treatment = blockIn(css, shared.slice(0, -2));
+  for (const declaration of [
+    'border: 1px solid var(--fab-mv2-border);',
+    'border-radius: 8px;',
+    'background: var(--fab-overlay-light-03);',
+  ]) {
+    assert.ok(treatment.includes(declaration), `the shared row treatment declares ${declaration}`);
+  }
+
+  // No surface restates it, in ANY of its blocks — a private copy hiding in a later
+  // override is exactly what a first-match-only check would miss. The retired values were
+  // `border-radius: 9px` (recipe, component), `border-radius: 10px` (the vocabulary card)
+  // and a solid `--fab-mv2-surface-2` fill on six of the nine.
+  for (const row of ROWS) {
+    const escaped = row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const blocks = [
+      ...css.matchAll(new RegExp(`\\.fabricate-manager ${escaped}\\s*\\{[\\s\\S]*?\\}`, 'g')),
+    ].map(([block]) => block);
+    for (const block of blocks) {
+      // The shared rule itself matches here, starting at whichever of its selectors this
+      // is, so every such match is a SUFFIX of the treatment block rather than equal to
+      // it. Skipping on containment covers both, and a genuine restatement can only be
+      // skipped by being byte-identical to a suffix of the shared rule — i.e. by being it.
+      if (treatment.includes(block)) continue;
+      assert.equal(
+        /border-radius:|border: 1px solid|background: var\(--fab-mv2-surface-2\);/.test(block),
+        false,
+        `${row} must not restate the shared browser-row treatment:\n${block}`
+      );
+    }
+  }
+
+  // The selected Tool Studio row moved the EDGE only. It used to repaint the identical
+  // fill, which is the same statement made twice.
+  assert.equal(
+    blockFor('.fabricate-manager .manager-tools-row.is-selected').includes('background:'),
+    false,
+    'selection changes the edge, not the fill it already shares'
+  );
 });
 
 test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
