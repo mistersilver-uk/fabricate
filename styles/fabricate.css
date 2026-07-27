@@ -10406,7 +10406,12 @@
   text-decoration: underline;
 }
 
-.fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+/* Excludes `[type="range"]` for the reason documented on the task edit view's twin rule:
+   the chance slider paints its fill behind a transparent input, and this blanket rule
+   outranks the slider's own reset (issue 883). */
+.fabricate-manager
+  .manager-gathering-event-edit-view
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);
@@ -10486,7 +10491,16 @@
   overflow: auto;
 }
 
-.fabricate-manager .manager-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+/* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it:
+   a range input is drawn by the chance slider, which paints its own 6px track and a
+   coloured fill BEHIND the input and relies on the input itself being transparent. This
+   blanket field rule computes to (0,4,1) and beats the slider's own (0,3,1) reset, so
+   without the exclusion the input takes an opaque `--fab-mv2-surface-1` fill at 121x32 and
+   covers the bar completely — leaving only the thumb visible, which reads as "the slider
+   renders a dot and no bar" (issue 883). */
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);

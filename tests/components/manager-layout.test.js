@@ -5559,3 +5559,59 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
     await browser.close();
   }
 });
+
+// The chance slider paints a coloured fill in a 6px track BEHIND a transparent range
+// input, so anything that gives that input a background hides the bar completely and
+// leaves only the thumb — which reads as "the slider renders a dot and no bar".
+//
+// The gathering edit views carry a blanket field rule over `:is(input…, select, textarea)`
+// that computes to (0,4,1) and outranks the slider's own (0,3,1) reset. It excluded
+// checkbox and radio but not range, so every drop row in the task and event editors lost
+// its bar while the inspector — whose twin rule already excluded range — kept it.
+//
+// Asserted on the RENDERED background rather than on the selector text, so a future rule
+// that reintroduces a background by some other route fails too (issue 883).
+test('a range input inside the gathering edit views stays transparent for the slider fill', async () => {
+  const browser = await chromium.launch();
+  try {
+    for (const view of ['manager-gathering-task-edit-view', 'manager-gathering-event-edit-view']) {
+      const page = await browser.newPage({ viewport: { width: 900, height: 200 } });
+      try {
+        await page.setContent(
+          `<style>${css}</style>` +
+            `<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"><div class="${view}">` +
+            '<div class="manager-gathering-task-drop-row" role="row" style="width:640px">' +
+            '<span role="cell" class="manager-drop-cell manager-drop-rate-cell">' +
+            '<span class="manager-chance-slider manager-drop-rate-value">' +
+            '<span class="manager-chance-slider-control manager-drop-rate-control is-common" ' +
+            'style="--fab-drop-rate-value:90%; --fab-drop-rate-color:#5EC3B0;">' +
+            '<span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>' +
+            '<input type="range" min="0" max="100" step="1" value="90"/>' +
+            '</span></span></span></div></div></div>'
+        );
+        const seen = await page.evaluate(() => {
+          const input = document.querySelector('input[type="range"]');
+          const fill = document.querySelector('.manager-drop-rate-fill');
+          return {
+            inputBackground: getComputedStyle(input).backgroundColor,
+            fillWidth: Math.round(fill.getBoundingClientRect().width),
+            fillBackground: getComputedStyle(fill).backgroundColor,
+          };
+        });
+        assert.equal(
+          seen.inputBackground,
+          'rgba(0, 0, 0, 0)',
+          `${view}: the range input must stay transparent or it hides the slider fill, got ${seen.inputBackground}`
+        );
+        assert.ok(
+          seen.fillWidth > 0 && seen.fillBackground !== 'rgba(0, 0, 0, 0)',
+          `${view}: the slider fill must render, got ${seen.fillWidth}px ${seen.fillBackground}`
+        );
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
