@@ -4878,7 +4878,7 @@
         </button>
       {:else if currentView === 'recipe-edit'}
         {#if recipeEditDirty}
-          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip>
+          <Chip tone="warning" truncate title={text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}>{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button is-ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -4894,7 +4894,7 @@
         </button>
       {:else if currentView === 'recipe-item-edit'}
         {#if recipeItemEditDirty}
-          <Chip tone="warning" data-recipe-item-dirty>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip>
+          <Chip tone="warning" truncate data-recipe-item-dirty title={text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" data-recipe-item-back onclick={backToBooksScrolls} disabled={recipeItemEditSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>

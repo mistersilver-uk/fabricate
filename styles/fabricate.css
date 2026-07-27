@@ -1563,6 +1563,12 @@
 .fabricate-manager .manager-header-actions .manager-chip,
 .fabricate-manager .manager-action-group .manager-chip {
   min-height: 34px;
+
+  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
+     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
+     height it would read as a rounded rectangle instead of the pill it has always been
+     (issue 883). */
+  border-radius: 999px;
 }
 
 .fabricate-manager .manager-breadcrumbs {
@@ -7671,6 +7677,11 @@
 }
 
 .fabricate-manager .manager-recipe-steps-requirements .manager-chip {
+  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
+     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
+     height it would read as a rounded rectangle instead of the pill it has always been
+     (issue 883). */
+  border-radius: 999px;
   box-sizing: border-box;
   height: 34px;
   min-height: 34px;
@@ -7690,6 +7701,11 @@
    Three classes because the primitive sets `min-height` and, on a button, `height: auto`
    (issue 883). */
 .fabricate-manager .manager-chip.manager-recipe-duration-trigger {
+  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
+     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
+     height it would read as a rounded rectangle instead of the pill it has always been
+     (issue 883). */
+  border-radius: 999px;
   box-sizing: border-box;
   height: 34px;
   min-height: 34px;

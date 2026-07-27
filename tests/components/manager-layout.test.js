@@ -5022,12 +5022,30 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
 
   for (const declaration of [
     'min-height: 20px;',
-    'padding: 0 var(--fab-space-chip);',
+    // Vertical padding is REAL, not min-height slack. At `padding: 0` the space above and
+    // below a single line was only the gap between the 20px min-height and a 9.92px line
+    // box; a wrapped label spent it and sat flush against the border. 4px keeps a
+    // single-line chip at 17.92px — under the min-height, so unchanged — while a wrapped
+    // one keeps its padding (issue 883).
+    'padding: var(--fab-space-1) var(--fab-space-chip);',
     'font-size: 0.62rem;',
     'line-height: 1;',
   ]) {
     assert.ok(chipBlock.includes(declaration), `the chip declares the compact ${declaration}`);
   }
+
+  // 10px is the SAME as 999px at the 20px single-line height (999px clamps to half the
+  // shorter side), so a normal chip is unchanged; they diverge only once a chip wraps,
+  // where a stadium around two lines reads as broken. The pill returns for `truncate`,
+  // which is single-line by construction.
+  assert.ok(
+    chipBlock.includes('border-radius: 10px;'),
+    'the chip radius must follow a wrap rather than drawing a stadium around two lines'
+  );
+  assert.ok(
+    blockIn(chipStyles, '.manager-chip.is-truncated').includes('border-radius: 999px;'),
+    'a truncated chip is single-line, so it keeps the pill'
+  );
 
   // The opt-in join is gone from the global sheet, not merely unused: a surviving rule is
   // what the next screen gets added to.

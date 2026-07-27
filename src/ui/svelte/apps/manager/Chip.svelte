@@ -52,6 +52,7 @@
     mono = false,
     icon = '',
     class: extraClass = '',
+    truncate = false,
     element = $bindable(null),
     children,
     ...rest
@@ -76,6 +77,7 @@
       'manager-chip',
       TONES.has(tone) ? `is-${tone}` : '',
       mono ? 'is-mono' : '',
+      truncate ? 'is-truncated' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -127,14 +129,44 @@
     width: fit-content;
     max-width: 100%;
     min-height: 20px;
-    padding: 0 var(--fab-space-chip);
+    /* Vertical padding is REAL, not slack. With `padding: 0` the breathing room above and
+       below a single line was only the difference between the 20px min-height and a
+       9.92px line box; the moment a long label wrapped, that difference was spent and the
+       text sat flush against the border. 4px keeps a single-line chip at 17.92px — still
+       under the min-height, so every existing chip renders pixel-identically — while a
+       wrapped one keeps its padding (issue 883). */
+    padding: var(--fab-space-1) var(--fab-space-chip);
     border: 1px solid var(--fab-border);
-    border-radius: 999px;
+    /* 10px, not 999px: at the 20px single-line height these are THE SAME — 999px clamps to
+       half the shorter side, which is 10px — so a normal chip is unchanged. They diverge
+       only once a chip wraps, where 999px would draw a stadium around two lines of text
+       and 10px draws a rounded rectangle. The radius follows the wrap for free, with no
+       prop and no visual change to anything that does not wrap. */
+    border-radius: 10px;
     color: var(--fab-text);
     background: var(--fab-overlay-light-06);
     font-size: 0.62rem;
     font-weight: 700;
     line-height: 1;
+  }
+
+  /* Opt-in single-line chip. Wrapping is the DEFAULT because chip content arrives as a
+     snippet, so this component cannot derive a `title` from it — truncating everywhere
+     would silently hide user-authored names at ~140 call sites with nothing to recover
+     them. `truncate` is for chips whose ROW HEIGHT must not move (a toolbar beside 34px
+     buttons), and a caller that sets it should pass `title` so the full text stays
+     reachable. The pill returns here: a truncated chip is single-line by construction,
+     so the stadium is always correct (issue 883). */
+  .manager-chip.is-truncated {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    overflow: hidden;
+    border-radius: 999px;
+  }
+
+  /* The glyph must not be squeezed by a long label; the label owns the clipping. */
+  .manager-chip.is-truncated > i {
+    flex: 0 0 auto;
   }
 
   /* A chip rendered as a `button` must beat Foundry's host button geometry, which sets a
