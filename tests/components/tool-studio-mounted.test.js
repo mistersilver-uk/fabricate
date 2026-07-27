@@ -898,7 +898,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
   });
 
-  it('uses prototype preview copy and omits the live-update note outside Validation', async () => {
+  it('uses prototype preview copy and shows the live-update note on every tab', async () => {
     const root = await harness.mount(props({ activeTab: 'breakage' }));
 
     assert.equal(
@@ -916,7 +916,20 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof');
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /5 uses.*@prof/);
-    assert.equal(root.querySelector('[data-tool-preview-live-update]'), null);
+    // The note stands on EVERY tab (issue 883). The preview updates live whichever tab you
+    // are editing, so gating the statement on Validation understated it — the maintainer
+    // moved it above Effective rules and dropped the condition, which retires the
+    // prototype's tab-scoped placement deliberately.
+    //
+    // Asserted as a boolean rather than by comparing the node to `null`/an element: on
+    // failure node:assert serialises the actual value for its diff, and walking a mounted
+    // happy-dom element's circular tree exhausts the heap. The suite then reports
+    // `# cancelled` with no message, which reads like a hang rather than a failed
+    // expectation — this exact assertion cost an OOM to diagnose.
+    assert.ok(
+      !!root.querySelector('[data-tool-preview-live-update]'),
+      'the live-update note renders on every tab, not only Validation'
+    );
   });
 
   it('localizes effective behavior states instead of exposing stored mode tokens', async () => {

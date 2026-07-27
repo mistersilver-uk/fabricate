@@ -126,6 +126,6 @@
         <ToolValidationTab {tool} {authority} {validation} {saveError} {focusValidationNonce} />
       {/if}
     </div>
-    <ToolBehaviorPreview {tool} {authority} {managedItems} {activeTab} />
+    <ToolBehaviorPreview {tool} {authority} {managedItems} />
   </div>
 </main>

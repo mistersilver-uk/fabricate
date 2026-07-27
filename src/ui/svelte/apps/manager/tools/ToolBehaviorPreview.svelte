@@ -22,7 +22,11 @@
     bonus: 'data-tool-preview-bonus',
   };
 
-  let { tool = null, authority = 'toolSpecific', managedItems = [], activeTab = 'overview' } = $props();
+  // No `activeTab`: the live-update note used to render only on the Validation tab, which
+  // was this prop's sole consumer. The note now stands on every tab (issue 883) — the
+  // preview updates live regardless of which tab you are editing, so gating the statement
+  // on one tab understated it — and the prop went with the condition.
+  let { tool = null, authority = 'toolSpecific', managedItems = [] } = $props();
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -100,6 +104,7 @@
       <Chip tone="neutral" icon="fas fa-plus-minus">{bonusValue}</Chip>
     </div>
   </div>
+  <aside class="manager-tool-preview-live" data-tool-preview-live-update><i class="fas fa-circle-check" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate', 'This preview updates live as you change the controls on the left.')}</span></aside>
   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}</p>
   <ul class="manager-tool-preview-rules">
     {#each rules as rule (rule.id)}
@@ -121,7 +126,4 @@
     docsLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ReadDocs', 'Read the docs')}
     dataAttr="data-tool-how-it-works"
   />
-  {#if activeTab === 'validation'}
-    <aside class="manager-tool-preview-live" data-tool-preview-live-update><i class="fas fa-circle-check" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate', 'This preview updates live as you change the controls on the left.')}</span></aside>
-  {/if}
 </aside>
