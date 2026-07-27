@@ -16,7 +16,7 @@
 <script>
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
+  import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import RosterRow from './RosterRow.svelte';
 
@@ -54,10 +54,6 @@
           .replace('{chars}', characterCount)
           .replace('{players}', playerCount)
   );
-
-  function recipeImage() {
-    return recipe?.recipeItemImg || recipe?.img || DEFAULT_CRAFTING_IMAGE;
-  }
 
   function categoryLabel() {
     return getRecipeCategoryLabel(recipe?.category, localize);
@@ -180,7 +176,7 @@
   {:else}
     <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Access.GrantTitle', 'Grant access')}</p>
     <div class="manager-inspector-title-row">
-      <span class="manager-inspector-icon" aria-hidden="true"><img class="manager-recipe-thumb" src={recipeImage()} alt="" /></span>
+      <span class="manager-inspector-icon" aria-hidden="true"><img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)} alt="" /></span>
       <div class="manager-inspector-copy">
         <span class="manager-inspector-name" title={recipe.name}>{recipe.name}</span>
         <span class="manager-chip manager-access-category">{categoryLabel()}</span>

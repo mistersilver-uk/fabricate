@@ -1636,7 +1636,9 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
   const prepared = recipes.map((recipe) => {
     const display = _buildRecipeBrowserDisplay(recipe, selectedSystem);
     // Book membership (many-to-many): the books that contain this recipe. The
-    // legacy scalar `recipeItemId`/name/img reflect the FIRST containing book.
+    // legacy scalars `recipeItemId`/name/source reflect the FIRST containing book —
+    // an accident of definition order, which is exactly why NO image is derived from
+    // them (issue 884): a recipe's icon is its own `img` and nothing else.
     const containingDefinitions = _recipeItemDefinitionsContaining(
       selectedSystem.recipeItemDefinitions,
       recipe
@@ -1714,11 +1716,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),
       // Book membership: all books containing this recipe (many-to-many), plus the
-      // first book's id/name/img/source for legacy single-link consumers.
+      // first book's id/name/source for legacy single-link consumers. Deliberately no
+      // book IMAGE among them (issue 884): the GM readers resolve `recipe.img` through
+      // the shared `resolveRecipeImage` helper, never a containing book's artwork.
       recipeItemIds,
       recipeItemId,
       recipeItemName: recipeItemDefinition?.name || '',
-      recipeItemImg: recipeItemDefinition?.img || '',
       recipeItemSourceUuid: recipeItemDefinition?.originItemUuid || '',
       // The row's check pill: the system check's DC resolved through this recipe's
       // `checkTierId`, or `{ kind: 'none' }` when the system has no USABLE check

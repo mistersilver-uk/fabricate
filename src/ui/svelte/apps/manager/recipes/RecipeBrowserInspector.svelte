@@ -77,10 +77,6 @@
     return result;
   }
 
-  function recipeImage(recipe) {
-    return recipe?.recipeItemImg || resolveRecipeImage(recipe);
-  }
-
   // The 2x2 stat grid asks the four questions a GM actually has about a recipe they
   // are looking at: what does it take, what does it make, how many steps, and what do
   // I have to roll. (The old grid answered Category / Structure / Steps / Result-groups
@@ -394,7 +390,7 @@
     <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}</p>
 
     <div class="manager-recipe-browser-inspector-hero">
-      <Medallion src={recipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
+      <Medallion src={resolveRecipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
       <div class="manager-recipe-browser-inspector-identity">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <!--

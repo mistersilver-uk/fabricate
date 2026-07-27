@@ -186,13 +186,6 @@
     onSearchChange('');
   }
 
-  function recipeImage(recipe) {
-    // The linked-book image wins; otherwise the shared resolver maps an empty OR
-    // generic item-bag image → the recipe blueprint (never the bag SVG). The
-    // Medallion itself is an import-free leaf, so the CALLER resolves this.
-    return recipe?.recipeItemImg || resolveRecipeImage(recipe);
-  }
-
   function categoryLabel(category) {
     return getRecipeCategoryLabel(category, localize);
   }
@@ -542,7 +535,7 @@
                     aria-current={isSelectedRecipe(recipe) ? 'true' : undefined}
                   >
                     <button type="button" class="manager-recipe-identity" onclick={() => onSelectRecipe(recipe.id)}>
-                      <Medallion src={recipeImage(recipe)} icon="fas fa-scroll" size={40} />
+                      <Medallion src={resolveRecipeImage(recipe)} icon="fas fa-scroll" size={40} />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
                           <span class="manager-system-name" title={recipe.name}>{recipe.name}</span>
