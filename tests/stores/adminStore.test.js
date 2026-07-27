@@ -5864,7 +5864,7 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      const assertOwnImageOnly = (order) => {
+      const assertOwnImageOnly = (order, expectedFirstBookName) => {
         const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
         assert.ok(row, `the recipe row is projected (${order})`);
         assert.equal(
@@ -5884,14 +5884,26 @@ describe('createAdminStore', () => {
           ['def-scroll', 'def-tome'],
           `both containing books still project (${order})`
         );
-        assert.equal(typeof row.recipeItemName, 'string', `the first book's name survives (${order})`);
+        // Load-bearing for the SECOND phase: every other assertion here is
+        // order-insensitive (the id comparison is sorted), so on their own they would
+        // still pass if `refresh()` had silently re-published a cached projection —
+        // which is exactly what this case's title claims to rule out. `recipeItemName`
+        // is derived from `containingDefinitions[0]`, the same index the deleted
+        // `recipeItemImg` came from, so it is the field that genuinely flips with the
+        // reversal. It passes today by design: this guards the re-derivation, it does
+        // not chase a bug.
+        assert.equal(
+          row.recipeItemName,
+          expectedFirstBookName,
+          `the first book's name survives and tracks definition order (${order})`
+        );
       };
 
-      assertOwnImageOnly('tome first');
+      assertOwnImageOnly('tome first', 'Tome');
 
       sys.recipeItemDefinitions.reverse();
       await store.refresh();
-      assertOwnImageOnly('scroll first');
+      assertOwnImageOnly('scroll first', 'Scroll');
     });
 
     it('viewState.recipes entries project the raw visibility object for the restriction editor', async () => {
