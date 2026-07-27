@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
@@ -86,7 +87,7 @@
         </div>
       </div>
       <div class="manager-header-actions manager-tool-edit-actions">
-        {#if dirty}<span class="manager-chip is-warning" data-tool-editor-status>{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</span>{/if}
+        {#if dirty}<Chip tone="warning" data-tool-editor-status>{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip>{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
         <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.BackToTools', 'Back to tools')}</span></button>
         <button type="button" class="manager-button is-danger" data-tool-editor-delete aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.DeleteLabel', 'Delete Tool')} onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete')}</span></button>

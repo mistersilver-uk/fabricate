@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -49,15 +50,16 @@
       <div>
         <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Tool page')}</p>
         <h2 title={row.name}>{row.name}</h2>
-        <span class={`manager-chip ${row.enabled ? 'is-positive' : 'is-neutral'}`}>
-          <i class={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'} aria-hidden="true"></i>
+        <Chip
+          tone={row.enabled ? 'positive' : 'neutral'}
+          icon={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'}
+        >
           {row.enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
-        </span>
+        </Chip>
         {#if !row.validation.valid}
-          <span class="manager-chip is-danger" data-tool-validation-status="needs-attention">
-            <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+          <Chip tone="danger" icon="fas fa-circle-exclamation" data-tool-validation-status="needs-attention">
             {text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
-          </span>
+          </Chip>
         {/if}
       </div>
     </div>

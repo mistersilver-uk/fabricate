@@ -16185,7 +16185,13 @@
    They sit a step smaller than the tab label, and a min-width wider than their height
    (against the inherited chip min-height) keeps a single digit reading as a small
    pill with centred text rather than a circle. */
-.fabricate-manager .manager-editor-tab-badge {
+
+/* Written at THREE classes on purpose (issue 883). The chip's own rules now live in
+   `Chip.svelte`'s scoped block as `.manager-chip.svelte-<hash>` — two classes — injected
+   after the global sheet, so the old two-class form of this selector would have tied and
+   lost on source order, silently restoring the chip scale over this deliberately smaller
+   tab badge. Every tab badge is a chip, so qualifying on `.manager-chip` costs nothing. */
+.fabricate-manager .manager-chip.manager-editor-tab-badge {
   margin-left: var(--fab-space-2xs);
   min-width: 1.4rem;
   min-height: 18px;
@@ -19853,22 +19859,10 @@
   clip-path: inset(50%);
 }
 
-/* The compact chip scale, shared by the Tools library rows and the GM Knowledge
-   surface's rows (issue 785). One rule with several consumers rather than byte-identical
-   blocks. The Tools library row is canonical for row chip scale.
-
-   `-copy-heading` is here as well as `-copy-chips`: the type/quantity pills on the
-   owned-copy row and the category chip on the learned row live in the HEADING beside
-   the name, so without this they inherited the ambient chip size and out-sized the
-   Tools rows they sit alongside in the same manager. */
-.fabricate-manager .manager-tools-library-chips .manager-chip,
-.fabricate-manager .manager-knowledge-copy-chips .manager-chip,
-.fabricate-manager .manager-knowledge-copy-heading .manager-chip {
-  min-height: 20px;
-  padding: 0 var(--fab-space-chip);
-  font-size: 0.62rem;
-  line-height: 1;
-}
+/* The compact chip scale used to be an OPT-IN join here, listing the Tools library rows
+   and the two GM Knowledge row containers (issue 785). It is gone: the compact scale is
+   what a chip IS now, declared once in `Chip.svelte` (issue 883), so there is no longer
+   a size to opt into and no list for the next screen to be added to. */
 
 .fabricate-manager .manager-tools-library-actions {
   padding-right: var(--fab-space-3);
@@ -19966,11 +19960,8 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-tool-inspector-hero .manager-chip {
-  min-height: 20px;
-  padding: 0 var(--fab-space-chip);
-  font-size: 0.62rem;
-}
+/* The Tool inspector hero's own copy of the compact scale is gone (issue 883): it stated
+   exactly the values `Chip.svelte` now declares for every chip. */
 
 .fabricate-manager .manager-tool-browser-inspector > .manager-muted {
   margin: 0;

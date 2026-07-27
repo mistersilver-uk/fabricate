@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
@@ -24,6 +24,9 @@ const explainerCardPath = resolve(
   '../../src/ui/svelte/apps/manager/ExplainerCard.svelte'
 );
 const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/IconFactRow.svelte');
+// The shared chip (issue 883) owns its appearance in its own scoped block for the same
+// reason, so its scale is read out of the component rather than the global sheet.
+const chipPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte');
 const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
@@ -31,6 +34,7 @@ const emptyStateSource = readFileSync(emptyStatePath, 'utf8');
 const calloutSource = readFileSync(calloutPath, 'utf8');
 const explainerCardSource = readFileSync(explainerCardPath, 'utf8');
 const iconFactRowSource = readFileSync(iconFactRowPath, 'utf8');
+const chipSource = readFileSync(chipPath, 'utf8');
 const en = JSON.parse(readFileSync(enPath, 'utf8'));
 
 // Only the scoped `<style>` block, with CSS comments stripped. Both primitives document the
@@ -52,6 +56,7 @@ const emptyStateStyles = scopedStyles(emptyStateSource);
 const calloutStyles = scopedStyles(calloutSource);
 const explainerCardStyles = scopedStyles(explainerCardSource);
 const iconFactRowStyles = scopedStyles(iconFactRowSource);
+const chipStyles = scopedStyles(chipSource);
 
 function blockIn(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1035,6 +1040,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     Callout: calloutStyles,
     ExplainerCard: explainerCardStyles,
     IconFactRow: iconFactRowStyles,
+    Chip: chipStyles,
   })) {
     assert.equal(
       /--fab-mv2-/.test(styles),
@@ -1812,13 +1818,19 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   }
 
   const MONO = [
-    '.fabricate-manager .manager-chip.is-mono',
-    '.fabricate-manager .manager-editor-tab-badge',
+    // Read out of `Chip.svelte`'s scoped block, since the chip owns its own appearance
+    // (issue 883); everything else in this list is still global-sheet.
+    '.manager-chip.is-mono',
+    // Three classes deliberately, so it outranks the scoped chip block rather than tying
+    // with it and losing on source order (issue 883).
+    '.fabricate-manager .manager-chip.manager-editor-tab-badge',
     '.fabricate-manager .manager-environment-comp-order',
     '.fabricate-manager .manager-nav-count',
   ];
   for (const selector of MONO) {
-    const block = blockFor(selector);
+    const block = selector.startsWith('.manager-chip')
+      ? blockIn(chipStyles, selector)
+      : blockFor(selector);
     assert.ok(
       block.includes('font-family: var(--fab-font-mono);'),
       `${selector} renders a number and belongs in the mono face`
@@ -4793,18 +4805,10 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
       '.manager-knowledge-main {',
       1,
     ],
-    [
-      // The Tools library row is canonical for row chip scale. `-copy-heading` joined it
-      // because the type/quantity/category chips sit in the heading beside the name and
-      // otherwise inherited the ambient size, out-sizing the Tools rows alongside them.
-      '.fabricate-manager .manager-tools-library-chips .manager-chip,\n' +
-        '.fabricate-manager .manager-knowledge-copy-chips .manager-chip,\n' +
-        '.fabricate-manager .manager-knowledge-copy-heading .manager-chip {',
-      // Anchored on the LAST selector in the list: a mid-list selector is followed by a
-      // comma, so its `{` form never appears and counting it would prove nothing.
-      '.manager-knowledge-copy-heading .manager-chip {',
-      1,
-    ],
+    // The compact chip scale used to be a fourth entry here — an opt-in join listing the
+    // Tools library and the two Knowledge row containers. Issue 883 made the compact scale
+    // the ONLY scale, owned by `Chip.svelte`, so there is no join left to assert; its
+    // absence is checked by the chip's own contract test instead.
     [
       // The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button
       // scale; the Knowledge row actions and reset cluster join it rather than restating
@@ -4976,6 +4980,157 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
     blockFor('.fabricate-manager .manager-tools-row.is-selected').includes('background:'),
     false,
     'selection changes the edge, not the fill it already shares'
+  );
+});
+
+// Issue 883: the chip had two scales. The base `.manager-chip` rule in the global sheet was
+// 24px/`0.75rem`/700, and the Tool Studio and Knowledge surfaces opted OUT of it through a
+// three-selector join restating a compact 20px/`0.62rem`/1 scale — so chips out-sized the
+// Tool Studio's everywhere else, and fixing a screen meant lengthening that join.
+//
+// `Chip.svelte` is the one implementation and the compact scale is simply what a chip is.
+test('the shared chip owns ONE scale, and no surface can opt into a second', () => {
+  const chipBlock = blockIn(chipStyles, '.manager-chip');
+
+  for (const declaration of [
+    'min-height: 20px;',
+    'padding: 0 var(--fab-space-chip);',
+    'font-size: 0.62rem;',
+    'line-height: 1;',
+  ]) {
+    assert.ok(chipBlock.includes(declaration), `the chip declares the compact ${declaration}`);
+  }
+
+  // The opt-in join is gone from the global sheet, not merely unused: a surviving rule is
+  // what the next screen gets added to.
+  assert.equal(
+    css.includes('.manager-tools-library-chips .manager-chip'),
+    false,
+    'the opt-in compact-scale join must not survive'
+  );
+  assert.equal(
+    css.includes('.manager-tool-inspector-hero .manager-chip'),
+    false,
+    'the Tool inspector hero must not keep its own copy of the compact scale'
+  );
+
+  // Tone is COLOUR only. A tone that resized would rebuild the very drift the primitive
+  // removes, so no tone rule may carry a size property.
+  for (const tone of ['is-active', 'is-warning', 'is-info', 'is-danger', 'is-neutral']) {
+    const toneBlock = blockIn(chipStyles, `.manager-chip.${tone}`);
+    assert.equal(
+      /min-height:|padding:|font-size:|line-height:/.test(toneBlock),
+      false,
+      `${tone} must change colour only, never the chip's size`
+    );
+  }
+
+  // Any global rule that still needs to beat a chip declaration must be written at three
+  // classes or more. At two it TIES with the scoped `.manager-chip.svelte-<hash>` block and
+  // loses on source order, because `css: 'injected'` puts component CSS after the sheet —
+  // a silent regression no mounted test can see. The tab badge is the live case: it is
+  // deliberately SMALLER than a chip (18px/0.56rem) and would otherwise grow back.
+  assert.ok(
+    css.includes('.fabricate-manager .manager-chip.manager-editor-tab-badge {'),
+    'the smaller tab badge must outrank the chip block on specificity, not source order'
+  );
+  assert.equal(
+    css.includes('.fabricate-manager .manager-editor-tab-badge {'),
+    false,
+    'the two-class form would tie with the scoped chip block and lose'
+  );
+});
+
+// A staged conversion needs a ratchet, or it stalls half-done and the primitive becomes a
+// fourth variant. This pins the EXACT set of files still rendering a chip by hand: a new
+// hand-rolled site fails because the file is not on the list, and a converted one fails
+// because a listed file no longer matches. Both directions are what make it a ratchet
+// rather than a fading reminder — the list may only shrink, and it must reach empty.
+test('every remaining hand-rolled chip site is declared, so the migration can only shrink', () => {
+  const UNCONVERTED = [
+    'AccessTabView.svelte',
+    'BooksScrollsView.svelte',
+    'ComponentEditView.svelte',
+    'ComponentsBrowserView.svelte',
+    'CraftingSystemManagerRoot.svelte',
+    'EditorValidationSurface.svelte',
+    'EnvironmentsBrowserView.svelte',
+    'EssenceBrowserView.svelte',
+    'EssenceEditView.svelte',
+    'GatheringEventsBrowserView.svelte',
+    'GatheringPartiesTab.svelte',
+    'GatheringRealmQuickList.svelte',
+    'GatheringRealmsTab.svelte',
+    'GatheringTaskEditView.svelte',
+    'GatheringTasksBrowserView.svelte',
+    'GatheringTravelView.svelte',
+    'GrantAccessInspector.svelte',
+    'ImportFolderMappingModal.svelte',
+    'ImportReportModal.svelte',
+    'ItemPageInspector.svelte',
+    'RealmEnvironmentsEditor.svelte',
+    'RecipesBrowserView.svelte',
+    'SearchablePopover.svelte',
+    'SystemEditView.svelte',
+    'SystemOverviewView.svelte',
+    'SystemsBrowserView.svelte',
+    'TagsCategoriesView.svelte',
+    'VocabularyPanel.svelte',
+    'checks/ChecksValidationTab.svelte',
+    'component/ComponentEditorHeader.svelte',
+    'component/ComponentIdentityStrip.svelte',
+    'components/ComponentBrowserInspector.svelte',
+    'components/ComponentRow.svelte',
+    'environment/CompositionStatePill.svelte',
+    'environment/EnvironmentEditorTabs.svelte',
+    'environment/EnvironmentSummaryInspector.svelte',
+    'environment/EnvironmentValidationTab.svelte',
+    'environment/OverrideIndicator.svelte',
+    'environment/RuntimeStatePill.svelte',
+    'recipe-item/RecipeItemContentsTab.svelte',
+    'recipe-item/RecipeItemEditorTabs.svelte',
+    'recipe-item/RecipeItemLimitsTab.svelte',
+    'recipe-item/RecipeItemValidationTab.svelte',
+    'recipe/RecipeDurationEditor.svelte',
+    'recipe/RecipeEditorTabs.svelte',
+    // Hands the chip classes to `SearchablePopover` as a `triggerClass` STRING, so its
+    // conversion needs that component to accept a chip rather than a class name.
+    'recipe/RecipeIngredientGroupCard.svelte',
+    'recipe/RecipeIngredientOption.svelte',
+    'recipe/RecipeModeBanner.svelte',
+    'recipe/RecipeOverviewTab.svelte',
+    'recipe/RecipeRoutingAssignment.svelte',
+    'recipe/RecipeStepAccordion.svelte',
+    'recipe/RecipeValidationTab.svelte',
+    'recipes/RecipeBrowserInspector.svelte',
+    'system/SystemEditorTabs.svelte',
+  ];
+
+  const remaining = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'))
+    .map((entry) => ({
+      path: resolve(entry.parentPath, entry.name),
+      // POSIX, relative to the manager directory, so the list reads the same on every OS.
+      name: relative(managerComponentDir, resolve(entry.parentPath, entry.name)).replaceAll(
+        '\\',
+        '/'
+      ),
+    }))
+    // `Chip.svelte` IS the contract markup and is the one place it may be written.
+    .filter(({ name }) => name !== 'Chip.svelte')
+    // Matched anywhere in the file, not just in a `class=` attribute: one site passes the
+    // chip classes to another component as a STRING prop (`RecipeIngredientGroupCard`'s
+    // `triggerClass`), and an attribute-shaped check silently missed it. `manager-chip-row`
+    // and `manager-chip-field` are CONTAINERS, not chips, so the token must not match those
+    // or the ratchet could never reach empty.
+    .filter(({ path }) => /\bmanager-chip\b(?!-)/.test(readFileSync(path, 'utf8')))
+    .map(({ name }) => name)
+    .sort();
+
+  assert.deepEqual(
+    remaining,
+    [...UNCONVERTED].sort(),
+    'the hand-rolled chip list may only shrink: convert the file and delete its entry'
   );
 });
 

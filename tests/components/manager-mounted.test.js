@@ -153,6 +153,9 @@ function compileManagerRoot() {
   // through the Tool Studio's browser inspector, so both are in the root's static graph.
   writeCompiledSvelte('src/ui/svelte/apps/manager/ExplainerCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/IconFactRow.svelte');
+  // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
+  // trees today, and through every other manager screen as the conversion proceeds.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import {
@@ -88,13 +89,15 @@
       <h3 title={name}>{name}</h3>
       <p>{sourceContext}</p>
     </div>
-    <span class={`manager-chip ${tool?.enabled === false ? 'is-neutral' : 'is-positive'}`}>
-      <i class={tool?.enabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check'} aria-hidden="true"></i>
+    <Chip
+      tone={tool?.enabled === false ? 'neutral' : 'positive'}
+      icon={tool?.enabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
+    >
       {tool?.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-    </span>
+    </Chip>
     <div class="manager-tool-preview-chips">
-      <span class="manager-chip is-neutral"><i class="fas fa-heart-crack" aria-hidden="true"></i>{breakageLabel}</span>
-      <span class="manager-chip is-neutral"><i class="fas fa-plus-minus" aria-hidden="true"></i>{bonusValue}</span>
+      <Chip tone="neutral" icon="fas fa-heart-crack">{breakageLabel}</Chip>
+      <Chip tone="neutral" icon="fas fa-plus-minus">{bonusValue}</Chip>
     </div>
   </div>
   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}</p>

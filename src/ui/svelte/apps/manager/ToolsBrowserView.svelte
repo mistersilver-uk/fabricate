@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -103,7 +104,7 @@
     <div class="manager-tools-authority-heading">
       <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
       <div><strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</strong></div>
-      <span class="manager-chip is-neutral">{text('FABRICATE.Admin.Manager.Tools.AllTools', 'ALL TOOLS')}</span>
+      <Chip tone="neutral">{text('FABRICATE.Admin.Manager.Tools.AllTools', 'ALL TOOLS')}</Chip>
     </div>
     <div class="manager-tools-authority-segments" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}>
       {#each ['toolSpecific', 'checkDriven'] as authority (authority)}
@@ -179,17 +180,18 @@
                 <strong title={row.name}>{row.name}</strong>
                 <small>{row.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}</small>
                 <span class="manager-tools-library-chips">
-                  <span
-                    class={`manager-chip manager-tools-validation-chip ${row.validation.valid ? 'is-positive is-ready' : 'is-danger'}`}
+                  <Chip
+                    tone={row.validation.valid ? 'positive' : 'danger'}
+                    class={`manager-tools-validation-chip ${row.validation.valid ? 'is-ready' : ''}`}
+                    icon={row.validation.valid ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'}
                     data-tool-validation-status={row.validation.valid ? 'ready' : 'needs-attention'}
                   >
-                    <i class={row.validation.valid ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'} aria-hidden="true"></i>
                     {row.validation.valid
                       ? text('FABRICATE.Admin.Manager.Tools.ValidationReady', 'Ready')
                       : text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
-                  </span>
-                  <span class="manager-chip is-neutral">{breakageLabel(tool, row.breakage)}</span>
-                  <span class="manager-chip is-neutral">{onBreakLabel(row.onBreak)}</span>
+                  </Chip>
+                  <Chip tone="neutral">{breakageLabel(tool, row.breakage)}</Chip>
+                  <Chip tone="neutral">{onBreakLabel(row.onBreak)}</Chip>
                 </span>
               </span>
             </button>

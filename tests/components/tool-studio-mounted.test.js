@@ -38,6 +38,9 @@ const harness = createMountedComponentHarness({
     // preview renders both.
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    // The shared chip (issue 883); the library rows, the browser inspector, the editor
+    // tab bar and the behavior preview all render it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
