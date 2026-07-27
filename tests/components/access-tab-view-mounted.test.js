@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -106,5 +107,13 @@ describe('AccessTabView (mounted)', () => {
     const root = await harness.mount({ recipes: [] });
     assert.ok(root.querySelector('.manager-empty'));
     assert.equal(root.querySelectorAll('[data-access-row]').length, 0);
+  });
+
+  // Issue 884 — the row thumbnail is the recipe's own icon, resolved through the
+  // shared helper. It used to prefer the first containing book's artwork.
+  itResolvesTheRecipesOwnImage({
+    harness,
+    mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'alloy', ...imageOverrides })] }),
+    selectImg: (root) => root.querySelector('[data-access-row="alloy"] img.manager-recipe-thumb').getAttribute('src')
   });
 });
