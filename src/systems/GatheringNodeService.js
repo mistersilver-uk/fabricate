@@ -313,8 +313,8 @@ export class GatheringNodeService {
       return { changed: false, node: nodes };
     }
     // The respawn ARITHMETIC (interval resolution, gain per mode, anchor advance,
-    // backwards/stalled-time re-anchor, room===0 short-circuit, max-clamp early
-    // break) is the single pure implementation in `nodeRespawnMath`. This env
+    // absent-anchor seed, backward-time freeze, room===0 short-circuit, max-clamp
+    // early break) is the single pure implementation in `nodeRespawnMath`. This env
     // path injects the SAME calendar/random seams the per-token adapter uses —
     // `secondsPerUnit` (legacy `intervalSeconds` falls through inside the math),
     // the `rollD100() <= chance*100` chance seam, and a SYNCHRONOUS expression
@@ -365,8 +365,8 @@ export class GatheringNodeService {
     if (changed) {
       const nextCurrent = Number(node?.current ?? before);
       const max = Number(node?.max ?? nodes.max ?? 0);
-      // Only emit the respawn hook when the count actually moved (a pure
-      // re-anchor changes the node but gains nothing).
+      // Only emit the respawn hook when the count actually moved (a seed or a
+      // room===0 anchor advance changes the node but gains nothing).
       if (nextCurrent !== before) {
         this.callHook('fabricate.gathering.nodeRespawned', {
           environmentId,
