@@ -2265,8 +2265,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     const craftingHelp = target.querySelector('[data-checks-help="crafting"]');
     assert.ok(craftingHelp, 'Crafting tab shows its docs help card');
     assert.ok(
-      craftingHelp.classList.contains('manager-setup-card'),
-      'help card reuses the recipe setup-card format'
+      craftingHelp.classList.contains('manager-explainer-card') &&
+        craftingHelp.classList.contains('manager-inspector-card'),
+      'help card renders through the shared explainer primitive on the shared card shell'
     );
     const craftingDocs = craftingHelp.querySelector(
       'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
@@ -2626,16 +2627,54 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const { activeTab, href } of cases) {
       target = document.createElement('div');
       document.body.appendChild(target);
-      mounted = mount(ChecksRightMenuComponent, { target, props: { activeTab } });
+      mounted = mount(ChecksRightMenuComponent, {
+        target,
+        // An activation is supplied so the Active card renders too — it is the rail's other
+        // card and shares the same inspector-card contract (issue 883).
+        props: { activeTab, activation: { enabled: true, optional: true } },
+      });
       flushSync();
 
       const card = target.querySelector(`[data-checks-help="${activeTab}"]`);
       assert.ok(card, `${activeTab} menu renders a help card`);
       assert.ok(
-        card.classList.contains('manager-setup-card'),
-        'help card uses the setup-card format'
+        card.classList.contains('manager-explainer-card'),
+        'help card renders through the shared explainer primitive'
       );
       assert.ok(card.querySelector(`a[href="${href}"]`), `${activeTab} help card links to ${href}`);
+
+      // Two links is the reason `ExplainerCard` grew a link LIST (issue 883). They share
+      // one `.manager-setup-links` row and both wear the primitive's one ghost treatment,
+      // so a regression to a single-link primitive drops the Quickstart silently.
+      const linkRow = card.querySelector('.manager-setup-links');
+      assert.ok(linkRow, `${activeTab} help card renders its links as one card-link row`);
+      const linkHrefs = Array.from(linkRow.querySelectorAll('a.manager-explainer-card-docs')).map(
+        (anchor) => anchor.getAttribute('href')
+      );
+      assert.deepEqual(
+        linkHrefs,
+        [href, 'https://mistersilver-uk.github.io/fabricate/quickstart'],
+        `${activeTab} help card keeps both its docs page and the Quickstart`
+      );
+      for (const anchor of linkRow.querySelectorAll('a')) {
+        assert.ok(
+          anchor.classList.contains('is-ghost'),
+          'explainer links keep the primitive ghost treatment'
+        );
+      }
+
+      // The Active card is a plain inspector card under the manager's one card-title
+      // contract — not the `.manager-kicker` micro-label this rail used to use alone.
+      const activeCard = target.querySelector(`[data-checks-active="${activeTab}"]`);
+      assert.ok(activeCard, `${activeTab} menu renders its Active card`);
+      assert.ok(
+        activeCard.querySelector('h3.manager-card-title'),
+        'the Active card titles itself with the shared card-title contract'
+      );
+      assert.ok(
+        !activeCard.querySelector('.manager-kicker'),
+        'the Active card no longer carries a second heading treatment'
+      );
 
       unmount(mounted);
       mounted = null;

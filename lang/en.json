@@ -4107,7 +4107,6 @@
             "Label": "Checks context menu"
           },
           "Quickstart": "Quickstart",
-          "Resources": "Check resources",
           "Configuration": "Configuration",
           "PageKicker": "One per system",
           "Dirty": "Unsaved",
@@ -4158,7 +4157,6 @@
             "ModifierDefaultsAdd": "Add default modifier",
             "ModifierDefaultsAllSelected": "All modifiers are on by default.",
             "ModifierDefaultsNone": "No modifiers on by default.",
-            "HelpKicker": "Crafting checks",
             "HelpTitle": "About crafting checks",
             "HelpDesc": "The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.",
             "Docs": "Docs",
@@ -4242,7 +4240,6 @@
             "PageLead": "A system has a single salvage check. Its shape is determined by the system's salvage resolution mode and preserved when you switch modes.",
             "ConfigHint": "Roll, difficulty, and outcome settings for the salvage check will appear here.",
             "ProgressiveLead": "Progressive salvage spends the check value against each salvage result's difficulty, in order. The award mode decides how that spend stops.",
-            "HelpKicker": "Salvage checks",
             "HelpTitle": "About salvage checks",
             "HelpDesc": "The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.",
             "Docs": "Salvage docs"
@@ -4254,7 +4251,6 @@
             "D100Title": "Fixed d100 roll",
             "D100Lead": "In d100 mode the gathering check is a fixed d100 roll against each drop's chance. There is nothing to configure here.",
             "D100Hint": "Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.",
-            "HelpKicker": "Gathering checks",
             "HelpTitle": "About gathering checks",
             "HelpDesc": "The gathering check is shaped by the gathering resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.",
             "Docs": "Gathering docs"

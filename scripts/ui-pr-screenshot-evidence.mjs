@@ -267,6 +267,10 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksRightMenu\.svelte$/,
+      // The rail's standing help card renders through the shared explainer primitive
+      // (issue 883), whose CSS is co-located in its own scoped block; this is the frame
+      // that shows it on this screen.
+      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
     ],
   },
   {

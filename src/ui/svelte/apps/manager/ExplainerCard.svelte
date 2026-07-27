@@ -2,8 +2,8 @@
 <!--
   The manager's ONE "how this surface works" explainer card: a glyph-led uppercase card
   title, a list of glyph-led guidance rows (each an optional bold lead-in plus prose), and
-  an optional trailing docs link. Use it for the standing explanation a side panel offers
-  about the screen it accompanies.
+  an optional trailing row of docs links. Use it for the standing explanation a side panel
+  offers about the screen it accompanies.
 
   It exists because the same explanation was built three ways (issue 881). The Tool Studio
   preview rendered `.manager-tool-how-it-works` — its own bordered card, its own 0.625rem
@@ -32,8 +32,13 @@
    - title: the card title. Rendered through `.manager-card-title`.
    - items: the guidance rows, `[{ icon, lead, text }]`. `icon` is the row glyph (omit to
      release the glyph column), `lead` is the optional bold lead-in, `text` is the prose.
-   - docsHref / docsLabel: an optional trailing ghost docs link. Both are required for the
-     link to render, because a labelled link with no target is worse than none.
+   - links: the optional trailing ghost docs links, `[{ href, label, icon }]`. A link needs
+     BOTH an `href` and a `label` to render, because a labelled link with no target is worse
+     than none, and `icon` defaults to the outbound-arrow glyph. This is a LIST rather than
+     the single `docsHref`/`docsLabel` pair it replaces because the Checks rail offers two
+     ways out of the same card — its own docs page and the Quickstart — and a primitive that
+     capped the card at one link is exactly the incompatibility that keeps a hand-rolled
+     card alive beside it (issue 883).
    - dataAttr / dataValue: an optional test/screenshot hook, e.g.
      `dataAttr="data-tool-how-it-works"`.
 
@@ -41,12 +46,13 @@
   import-free `components/` leaf directory), which is why it lives here.
 -->
 <script>
+  const DEFAULT_LINK_ICON = 'fas fa-arrow-up-right-from-square';
+
   let {
     icon = '',
     title = '',
     items = [],
-    docsHref = '',
-    docsLabel = '',
+    links = [],
     dataAttr = '',
     dataValue = '',
   } = $props();
@@ -55,7 +61,9 @@
   // selector would still match.
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const rows = $derived(Array.isArray(items) ? items : []);
-  const showDocsLink = $derived(Boolean(docsHref) && Boolean(docsLabel));
+  const docsLinks = $derived(
+    (Array.isArray(links) ? links : []).filter((link) => link?.href && link?.label)
+  );
 </script>
 
 <section class="manager-inspector-card manager-explainer-card" {...hookAttributes}>
@@ -81,16 +89,29 @@
       </li>
     {/each}
   </ul>
-  {#if showDocsLink}
-    <a
-      class="manager-button is-ghost manager-explainer-card-docs"
-      href={docsHref}
-      target="_blank"
-      rel="noreferrer"
-    >
-      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      <span>{docsLabel}</span>
-    </a>
+  <!--
+    `.manager-setup-links` is the manager's existing contract for a wrapping row of card
+    links — `display: flex; flex-wrap: wrap` on the row and `flex: 1 1 112px` on each
+    button. It is reused here rather than re-derived in the scoped block below: a single
+    link still stretches to the card width exactly as it did when this was one anchor with
+    `justify-self: stretch`, and two share the row and wrap when the rail is narrow. The
+    `manager-explainer-card-docs` class carries no styling; it is the hook the Tool Studio
+    mounted suite selects the link by.
+  -->
+  {#if docsLinks.length > 0}
+    <div class="manager-setup-links">
+      {#each docsLinks as link (link.href)}
+        <a
+          class="manager-button is-ghost manager-explainer-card-docs"
+          href={link.href}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <i class={link.icon || DEFAULT_LINK_ICON} aria-hidden="true"></i>
+          <span>{link.label}</span>
+        </a>
+      {/each}
+    </div>
   {/if}
 </section>
 
@@ -156,10 +177,9 @@
     overflow-wrap: break-word;
   }
 
-  /* The link stretches because `.manager-inspector-card` is a stretch-aligned column; it
-     deliberately does NOT restate the button's own geometry, which is a global concern
-     (it has to beat Foundry's host button rules). */
-  .manager-explainer-card-docs {
-    justify-self: stretch;
-  }
+  /* No rule for the docs links. Their row is `.manager-setup-links`, whose flex/wrap/gap
+     and per-button `flex: 1 1 112px` already live in the global sheet as the manager's one
+     card-link-row contract; restating either here would be the second declaration this
+     pass exists to remove. The button's own geometry stays global too, because it has to
+     beat Foundry's host button rules. */
 </style>

@@ -59,6 +59,15 @@ const explainerCardStyles = scopedStyles(explainerCardSource);
 const iconFactRowStyles = scopedStyles(iconFactRowSource);
 const chipStyles = scopedStyles(chipSource);
 
+// "This name must not survive" assertions read component SOURCE, and this repo's components
+// carry long doc comments that name the very thing they replaced — which is the point of
+// them. Stripping HTML and block comments keeps such a guard pointed at markup and code.
+// `//` line comments are deliberately left in place: a URL contains `//`, so removing to
+// end-of-line would delete real code (`https://…/fabricate` in the checks rail, for one).
+function withoutComments(source) {
+  return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
 function blockIn(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = source.match(new RegExp(`${escaped}\\s*\\{[\\s\\S]*?\\}`));
@@ -1247,6 +1256,34 @@ test('the shared explainer card reuses the card shell and owns only the explaine
     'the row glyph is the accent, as in the Tool Studio reference'
   );
 
+  // Issue 883: the primitive takes a LIST of links, because the Checks rail offers two ways
+  // out of its card and a one-link primitive is exactly the incompatibility that kept a
+  // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
+  // than kept alongside — two ways to express one link is the drift this pass removes.
+  assert.ok(
+    /\blinks = \[\]/.test(explainerCardSource),
+    'the explainer takes a list of docs links'
+  );
+  for (const dead of ['docsHref', 'docsLabel']) {
+    assert.equal(
+      withoutComments(explainerCardSource).includes(dead),
+      false,
+      `${dead} was replaced by the link list and must not survive as a second way in`
+    );
+  }
+  // The link ROW is the manager's existing `.manager-setup-links` contract, reused rather
+  // than re-derived: a scoped copy of its flex/wrap/gap would be a second declaration of
+  // the same values.
+  assert.ok(
+    explainerCardSource.includes('<div class="manager-setup-links">'),
+    'the explainer links reuse the shared card-link row'
+  );
+  assert.equal(
+    /manager-explainer-card-docs\s*\{/.test(explainerCardStyles),
+    false,
+    'the explainer must not re-derive the card-link row it now reuses'
+  );
+
   // Every re-derivation is gone from the global sheet, not merely unused: a surviving
   // rule is what the next copy gets written against.
   for (const dead of [
@@ -1331,6 +1368,7 @@ test('every explainer and fact-row site renders through the primitive, not by ha
     ['tools/ToolBehaviorPreview.svelte', ['ExplainerCard', 'IconFactRow']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
     ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
+    ['checks/ChecksRightMenu.svelte', ['ExplainerCard']],
   ]) {
     const source = readFileSync(resolve(managerComponentDir, componentPath), 'utf8');
     for (const primitive of imports) {
@@ -1340,6 +1378,54 @@ test('every explainer and fact-row site renders through the primitive, not by ha
       );
     }
   }
+});
+
+// Issue 883: the Checks rail was the last manager inspector still building its own cards.
+// It rendered the standing explanation as a `.manager-setup-card` — the format the numbered
+// first-run "Set up X" procedures use — so this one rail had a card shell, a 38px icon tile
+// and a 0.98rem heading no other inspector had, sitting directly beside a `.manager-inspector-card`.
+// `.manager-setup-card` itself is NOT dead: the first-run procedures still use it, which is
+// exactly why the rail could not simply be left alone.
+test('the checks rail builds no card of its own', () => {
+  const rightMenu = withoutComments(
+    readFileSync(resolve(managerComponentDir, 'checks/ChecksRightMenu.svelte'), 'utf8')
+  );
+
+  for (const dead of [
+    'manager-setup-card',
+    'manager-setup-card-header',
+    'manager-setup-links',
+    'manager-setup-list',
+  ]) {
+    assert.equal(
+      rightMenu.includes(dead),
+      false,
+      `${dead} is the first-run procedure format; the checks rail must not borrow it`
+    );
+  }
+
+  // Both cards on the rail wear the shared shell, and the Active card titles itself with
+  // the manager's one card-title contract rather than a second heading treatment.
+  assert.ok(
+    rightMenu.includes('<section class="manager-inspector-card" data-checks-active={activeTab}>'),
+    'the Active card wears the shared inspector-card shell'
+  );
+  assert.ok(
+    rightMenu.includes('<h3 class="manager-card-title">{activeTitle}</h3>'),
+    'the Active card titles itself with the shared card-title contract'
+  );
+  assert.equal(
+    rightMenu.includes('manager-kicker'),
+    false,
+    'the rail should carry no second heading treatment'
+  );
+
+  // The procedure format stays available to the surfaces it belongs to, so this is a
+  // conversion rather than a deletion.
+  assert.ok(
+    css.includes('.fabricate-manager .manager-setup-card {'),
+    'the first-run procedure card keeps its own format'
+  );
 });
 
 test('manager gathering rules inspector stacks descriptions above normal-weight selects', () => {

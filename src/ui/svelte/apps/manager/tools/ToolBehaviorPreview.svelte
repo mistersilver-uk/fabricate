@@ -122,8 +122,12 @@
     icon="fas fa-circle-question"
     title={text('FABRICATE.Admin.Manager.Tools.Editor.HowToolsWorkTitle', 'How Tools work in Fabricate')}
     items={howToolsWorkItems}
-    docsHref="https://mistersilver-uk.github.io/fabricate/tools"
-    docsLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ReadDocs', 'Read the docs')}
+    links={[
+      {
+        href: 'https://mistersilver-uk.github.io/fabricate/tools',
+        label: text('FABRICATE.Admin.Manager.Tools.Editor.ReadDocs', 'Read the docs'),
+      },
+    ]}
     dataAttr="data-tool-how-it-works"
   />
 </aside>
