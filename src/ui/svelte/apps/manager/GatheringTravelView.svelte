@@ -19,6 +19,7 @@
   player-facing channel beyond what the GM is permitted to see.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -244,14 +245,14 @@
               >
                 <span class="manager-travel-party-name">{party.name}</span>
                 <span class="manager-travel-party-meta">
-                  <span class={`manager-chip ${party.enabled ? 'is-active' : 'is-disabled'}`}>
+                  <Chip tone={party.enabled ? 'active' : 'disabled'}>
                     {party.enabled
                       ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
                       : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
-                  </span>
-                  <span class="manager-chip">{memberCountLabel(party)}</span>
+                  </Chip>
+                  <Chip>{memberCountLabel(party)}</Chip>
                   {#if party.hasStaleReference}
-                    <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Travel.StaleBadge', 'Needs repair')}</span>
+                    <Chip tone="warning">{text('FABRICATE.Admin.Manager.Travel.StaleBadge', 'Needs repair')}</Chip>
                   {/if}
                 </span>
               </button>

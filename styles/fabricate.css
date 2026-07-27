@@ -8938,6 +8938,7 @@
 /* Outcome routing chips are rounded-corner rectangles, not the default full-round
    chip pill, so a routed outcome ("Flawed", "Standard") reads as a tag on the
    result set rather than a status bubble (issue 643). */
+
 /* Three classes: `gap` and `border-radius` both collide with the chip primitive, and a
    999px pill would be a visible change (issue 883). */
 .fabricate-manager .manager-chip.manager-recipe-routing-chip {
@@ -9348,6 +9349,7 @@
    centring so the label sits left and the remove button right regardless of tag
    length; and the pinned height keeps every chip the same box despite tag glyphs
    or sub-pixel rounding. */
+
 /* Three classes: `justify-content` and `min-height` collide with the chip primitive,
    and this pill carries a remove button so it is deliberately taller (issue 883). */
 .fabricate-manager .manager-chip.manager-recipe-tag-chip {
@@ -18047,7 +18049,9 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-travel-realms-count-chip {
+/* Three classes: the tighter 4px gap collides with the chip primitive’s 6px
+   (issue 883), and at two classes it would tie with the scoped block and lose. */
+.fabricate-manager .manager-chip.manager-travel-realms-count-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);
@@ -18306,7 +18310,9 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-travel-parties-members-chip {
+/* Three classes: the tighter 4px gap collides with the chip primitive’s 6px
+   (issue 883), and at two classes it would tie with the scoped block and lose. */
+.fabricate-manager .manager-chip.manager-travel-parties-members-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);

@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
@@ -530,19 +531,22 @@
     return `${modifierEffectiveOperator(entry)}${magnitude}%`;
   }
 
-  function modifierClass(entry) {
+  // A `Chip` tone name (issue 883), so no `is-` prefix. The drop-modifier pill keeps
+  // its own positive/negative colours at three-class specificity; this only decides
+  // which of the three states a row is in.
+  function modifierTone(entry) {
     if (entry && entry.kind === 'character') {
-      return entry.operator === '-' ? 'is-negative' : 'is-positive';
+      return entry.operator === '-' ? 'negative' : 'positive';
     }
     if (entry && (entry.kind === 'weather' || entry.kind === 'timeOfDay' || entry.kind === 'biome')) {
       const magnitude = Math.abs(Math.trunc(Number(entry.value || 0)));
-      if (magnitude === 0) return 'is-neutral';
-      return modifierEffectiveOperator(entry) === '-' ? 'is-negative' : 'is-positive';
+      if (magnitude === 0) return 'neutral';
+      return modifierEffectiveOperator(entry) === '-' ? 'negative' : 'positive';
     }
     const number = Number((entry && typeof entry === 'object' ? entry.value : entry) || 0);
-    if (number < 0) return 'is-negative';
-    if (number > 0) return 'is-positive';
-    return 'is-neutral';
+    if (number < 0) return 'negative';
+    if (number > 0) return 'positive';
+    return 'neutral';
   }
 
   function normalizeDropRate(value) {
@@ -1122,12 +1126,12 @@
       {#if selectedComponentTags.length > 0}
         <div class="manager-toolbar-pills manager-selected-tag-row manager-task-component-pills" role="list" aria-label={text('FABRICATE.Admin.Manager.Component.SelectedTags', 'Selected component tags')} data-gathering-component-tag-pills>
           {#each selectedComponentTags as tag (tag)}
-            <span class="manager-chip manager-selected-tag-pill" role="listitem" data-gathering-component-tag-pill={tag}>
+            <Chip class="manager-selected-tag-pill" role="listitem" data-gathering-component-tag-pill={tag}>
               {tag}
               <button type="button" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.RemoveComponentTagFilter', 'Remove {tag}').replace('{tag}', tag)} onclick={() => removeComponentTag(tag)}>
                 <i class="fas fa-xmark" aria-hidden="true"></i>
               </button>
-            </span>
+            </Chip>
           {/each}
         </div>
       {/if}
@@ -1319,19 +1323,18 @@
                 <span role="cell" class="manager-drop-cell manager-chip-row">
                   <span class="manager-drop-modifier-list">
                     {#if hasModifierOverflow(row)}
-                      <span class="manager-chip is-neutral manager-drop-modifier-overflow">{text('FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint', 'See selected rule for modifiers')}</span>
+                      <Chip tone="neutral" class="manager-drop-modifier-overflow">{text('FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint', 'See selected rule for modifiers')}</Chip>
                     {:else if visibleModifierEntries(row).length > 0}
                       {#each visibleModifierEntries(row) as modifier (modifier.id)}
-                        <span class={`manager-chip manager-drop-modifier-pill ${modifierClass(modifier)}`}>
-                          <i class={modifierIcon(modifier)} aria-hidden="true"></i>
+                        <Chip tone={modifierTone(modifier)} icon={modifierIcon(modifier)} class="manager-drop-modifier-pill">
                           <span>{modifierLabel(modifier)}</span>
                           {#if modifier.kind !== 'character'}
                             <strong>{modifierValueLabel(modifier)}</strong>
                           {/if}
-                        </span>
+                        </Chip>
                       {/each}
                     {:else}
-                      <span class="manager-chip is-neutral">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoModifiers', 'Not specified')}</span>
+                      <Chip tone="neutral">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoModifiers', 'Not specified')}</Chip>
                     {/if}
                   </span>
                 </span>

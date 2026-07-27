@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -248,7 +249,7 @@
         <option value="mismatch">{text('FABRICATE.Admin.Manager.Environment.Tasks.AvailabilityMismatch', 'Not current')}</option>
       </select>
     </label>
-    <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredTasks.length).replace('{total}', taskList.length)}</span>
+    <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredTasks.length).replace('{total}', taskList.length)}</Chip>
     {#if filtersActive}
       <button type="button" class="manager-button manager-clear-filters" data-clear-filters="gathering-tasks" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>
