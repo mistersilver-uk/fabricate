@@ -1771,6 +1771,17 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+/* Tab strip, then the scrolling vocabulary workspace which takes the slack. Named
+   explicitly rather than left to the shared `auto auto 1fr`: this view carried its own
+   duplicate page header until issue 878, so it had three children for three tracks. With
+   the header gone there are TWO, and the shared template's `1fr` would land on an EMPTY
+   third row — the workspace would size to its content and the panel's remaining height
+   would sit dead below it. Same failure family as the books-scrolls toolbar above: the
+   growing track must be the scrolling list. */
+.fabricate-manager[data-manager-view="tags"] .manager-main {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .fabricate-manager[data-manager-view="essence-edit"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
 }
@@ -5679,54 +5690,14 @@
   max-width: 760px;
 }
 
-/* Tag & Categories tab bar (issue 689). Underline tabs, one shown at a time; each
-   carries a leading icon and a count badge tracking that vocabulary's custom entries. */
+/* Tags & Categories tab bar (issue 689, restyled in issue 878). The strip's own look —
+   underline, badge, hover and active treatment — is the shared `.manager-editor-tab*`
+   set the recipe-item, recipe, environment, system, tool and knowledge tab bars use, so
+   the ONLY thing left here is the panel inset: this strip is `.manager-main`'s first
+   child now that the view's duplicate page header is gone, so it owns the top padding
+   that header used to supply. `.manager-editor-tabs` already draws the divider under it. */
 .fabricate-manager .manager-vocabulary-tabs {
-  display: flex;
-  gap: var(--fab-space-4);
-  flex-wrap: wrap;
-  min-width: 0;
-  border-bottom: 1px solid var(--fab-mv2-border);
-}
-
-.fabricate-manager .manager-vocabulary-tabs .manager-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) 2px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: none;
-  color: var(--fab-mv2-text-muted);
-  font: inherit;
-  line-height: 1.2;
-  height: auto;
-  margin-bottom: -1px;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-vocabulary-tabs .manager-tab.is-active {
-  border-bottom-color: var(--fab-mv2-accent);
-  background: none;
-  color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-vocabulary-tabs .manager-tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5rem;
-  padding: 0 var(--fab-space-2xs);
-  border-radius: 999px;
-  background: var(--fab-overlay-light-035);
-  font-size: var(--fab-font-size-xs, 0.75rem);
-}
-
-.fabricate-manager .manager-vocabulary-tabs .manager-tab.is-active .manager-tab-count {
-  background: var(--fab-accent-soft);
-  border: 1px solid var(--fab-accent-border);
-  color: var(--fab-mv2-accent);
+  padding: var(--fab-space-3) var(--fab-space-3) 0;
 }
 
 /* Search sits inline with the entry count on one row; the search sizes to content
@@ -5790,12 +5761,6 @@
   color: var(--fab-mv2-accent);
 }
 
-.fabricate-manager button.manager-vocabulary-icon.is-editable {
-  font: inherit;
-  line-height: 1;
-  cursor: pointer;
-}
-
 .fabricate-manager .manager-vocabulary-icon.is-locked-icon {
   border: 1px dashed var(--fab-mv2-border-strong);
   background: var(--fab-overlay-light-035);
@@ -5807,21 +5772,51 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-vocabulary-icon-input {
+/* BOTH vocabulary icon controls — the per-row tile and the add form's field — are the
+   same shared `IconPicker` under one trigger class (issue 878), so this tile geometry is
+   declared once rather than per site. The picker's default trigger is a full-width
+   three-column combo (preview / label / caret); exactly as `.manager-condition-add` and
+   `.manager-condition-pill` do for the gathering icon fields, the host re-shapes the
+   `icon-only` trigger into its own tile. The class pair sits at (0,3,0) so it beats the
+   base `.fabricate-manager .essence-icon-picker-trigger` block, which is declared later
+   in this file and would otherwise win on source order alone. */
+.fabricate-manager .manager-vocabulary-icon-picker {
+  position: relative;
   display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
+  flex: 0 0 auto;
   min-width: 0;
 }
 
-.fabricate-manager .manager-vocabulary-icon-edit {
-  display: flex;
+.fabricate-manager .essence-icon-picker-trigger.manager-vocabulary-icon-trigger {
+  display: inline-flex;
   align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
-  background: var(--fab-overlay-light-025);
-  min-width: 0;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-accent);
+  background: var(--fab-accent-soft);
+  cursor: pointer;
+}
+
+.fabricate-manager
+  .essence-icon-picker-trigger.manager-vocabulary-icon-trigger
+  .essence-icon-picker-preview {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+}
+
+.fabricate-manager
+  .essence-icon-picker-trigger.manager-vocabulary-icon-trigger
+  .essence-icon-picker-trigger-caret {
+  display: none;
 }
 
 /* Inline delete-confirm strip (issue 689): the destructive cascade is confirmed in
@@ -5876,6 +5871,14 @@
 
 .fabricate-manager .manager-vocabulary-form-fields > .manager-button {
   flex: none;
+}
+
+/* The icon field is a 34px picker tile, not a text box (issue 878), so it must NOT take
+   the growing `flex` the rule above hands every `.manager-field` in this row — that left
+   a dead gap between the tile and the Add button. Stated at the same (0,3,0) specificity
+   and after it, because `.manager-vocabulary-icon-field` alone is (0,2,0) and loses. */
+.fabricate-manager .manager-vocabulary-form-fields > .manager-vocabulary-icon-field {
+  flex: 0 0 auto;
 }
 
 /* The row list is the dense multi-column card grid the prototype anchors on; each
@@ -5934,6 +5937,22 @@
   min-width: 0;
   overflow-wrap: anywhere;
   line-height: 1.25;
+}
+
+/* The reserved (General) row's explanatory sentence runs INLINE beside the name and
+   truncates instead of stacking under it (issue 878). Stacked it was two lines of copy —
+   the only card in an `align-items: start` grid whose content exceeded the 34px icon
+   tile — so that one row stood taller than every sibling. Inline and clipped, the row's
+   height is governed by the same tile as the rest, and the full sentence stays reachable
+   through the element's `title`. */
+.fabricate-manager .manager-vocabulary-main.is-inline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-vocabulary-main.is-inline > strong {
+  flex: 0 0 auto;
 }
 
 /* Empty (onboarding) and no-results states span the whole grid. Both now render through

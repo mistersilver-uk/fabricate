@@ -4709,6 +4709,9 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     // The Knowledge page-header roll-up pill: every other browser surface reports its
     // count in the nav-rail badge, so a header pill was a one-screen divergence.
     'manager-knowledge-header-pills',
+    // The reserved row's inline explanatory sentence: ellipsised to fit one line it
+    // truncated to "Built…", so it became the row's tooltip instead (issue 878).
+    'manager-vocabulary-locked-hint',
   ]) {
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
   }
@@ -5028,4 +5031,111 @@ test('the Books & Scrolls route names one grid track per section and grows the t
     tracks.slice(0, -1).every((track) => track === 'auto'),
     `only the table may grow; header/drop-zone/toolbar must be auto, got "${template}"`
   );
+});
+
+// The same defect family on the Tags & Categories route (issue 878). It carried its own
+// duplicate page header until now, which happened to give it exactly three children for
+// the shared three-track `auto auto 1fr`. Deleting the header takes it to TWO, and the
+// shared template's `1fr` would then land on an EMPTY third row — the vocabulary
+// workspace would size to its content and the panel's remaining height would sit dead
+// below it, the mirror image of the books-scrolls toolbar float. The guard ties the
+// template to the markup rather than to a literal count, and pins the absence of a second
+// page header so it cannot come back unnoticed.
+test('the Tags & Categories route names one grid track per section and grows the workspace', () => {
+  const source = readFileSync(resolve(managerComponentDir, 'TagsCategoriesView.svelte'), 'utf8');
+  // This view's opening `<main>` tag is attribute-per-line, so it cannot be located by the
+  // one-line `<main class="manager-main` literal the books-scrolls guard above uses.
+  const mainStart = source.indexOf('<main');
+  assert.notEqual(mainStart, -1, 'the view must render a `.manager-main` grid');
+  const main = source.slice(mainStart);
+  const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
+  assert.equal(children.length, 2, 'expected two unconditional top-level grid children');
+  assert.equal(
+    main.includes('manager-section-header'),
+    false,
+    'the view must not render a second page header (issue 676/785/878)'
+  );
+
+  const block = blockFor('.fabricate-manager[data-manager-view="tags"] .manager-main');
+  const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();
+  assert.ok(template, 'the tags route must declare its own grid-template-rows');
+
+  // Tracks are SPACE-separated, and `minmax(0, 1fr)` contains a space of its own, so
+  // tokenize functional notation as one unit rather than splitting on whitespace.
+  const tracks = template.match(/[a-z-]+\([^)]*\)|\S+/g) || [];
+  assert.equal(
+    tracks.length,
+    children.length,
+    `expected ${children.length} tracks for ${children.length} children, got "${template}"`
+  );
+  assert.equal(
+    tracks.at(-1),
+    'minmax(0, 1fr)',
+    'the scrolling vocabulary workspace is the last child, so it must be the growing track'
+  );
+  assert.ok(
+    tracks.slice(0, -1).every((track) => track === 'auto'),
+    `only the workspace may grow; the tab strip must be auto, got "${template}"`
+  );
+});
+
+// Rendered-geometry guard for the reserved General row (issue 878). Its explanatory
+// sentence used to stack under the name, making it the one card in an `align-items: start`
+// grid whose content exceeded the 34px icon tile — so it stood visibly taller than every
+// sibling. Source-reading cannot see that; only layout can, so this measures both cards.
+test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 760, height: 600 } });
+  try {
+    const lockedRow = `<div class="manager-vocabulary-row">
+      <span class="manager-vocabulary-icon is-locked-icon"><i class="fas fa-lock"></i></span>
+      <div class="manager-vocabulary-main is-inline" title="Built-in fallback &mdash; cannot be renamed or removed."><strong>General</strong></div>
+      <span class="manager-chip manager-vocabulary-chip-locked"><i class="fas fa-lock"></i>Locked</span>
+    </div>`;
+    const customRow = `<div class="manager-vocabulary-row">
+      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></span>
+      <div class="manager-vocabulary-main"><strong>Potions</strong></div>
+      <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
+      <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
+    </div>`;
+    await page.setContent(
+      `<style>${css}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><nav class="manager-editor-tabs manager-vocabulary-tabs"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></nav><section class="manager-tags-categories-workspace"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></section></main></div></div>`
+    );
+    const geometry = await page.evaluate(() => {
+      const locked = document.querySelector('[data-vocabulary-locked-card]');
+      const custom = document.querySelector('[data-vocabulary-custom-card]');
+      const trigger = custom.querySelector('.manager-vocabulary-icon-trigger');
+      const triggerRect = trigger.getBoundingClientRect();
+      return {
+        lockedHeight: Math.round(locked.getBoundingClientRect().height),
+        customHeight: Math.round(custom.getBoundingClientRect().height),
+        hintRendered: Boolean(locked.querySelector('.manager-vocabulary-locked-hint')),
+        triggerWidth: Math.round(triggerRect.width),
+        triggerHeight: Math.round(triggerRect.height),
+      };
+    });
+    // The IconPicker's own `.essence-icon-picker-trigger` block is a full-width, 36px-min
+    // three-column combo declared LATER in the sheet, so the row tile only stays a 34px
+    // square while the vocabulary override outranks it on specificity, not source order.
+    assert.deepEqual(
+      { width: geometry.triggerWidth, height: geometry.triggerHeight },
+      { width: 34, height: 34 },
+      'the row icon picker trigger must render as the 34px vocabulary tile'
+    );
+    assert.equal(
+      geometry.lockedHeight,
+      geometry.customHeight,
+      `the reserved row must match its siblings exactly (locked ${geometry.lockedHeight}px vs custom ${geometry.customHeight}px)`
+    );
+    // The sentence itself is gone: ellipsised at real column widths it truncated to
+    // "Built…", which read as breakage beside untruncated custom rows. It survives as the
+    // row's tooltip, so the card carries the name alone and the height follows for free.
+    assert.equal(
+      geometry.hintRendered,
+      false,
+      'the reserved row must not render an inline explanatory sentence'
+    );
+  } finally {
+    await browser.close();
+  }
 });

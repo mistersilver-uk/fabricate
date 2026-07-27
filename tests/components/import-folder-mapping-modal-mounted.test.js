@@ -14,6 +14,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    // InlineVocabularyAdd imports IconPicker STATICALLY (issue 878), so the picker's own
+    // dependencies are in this graph even though this modal never sets `showIcon` and so
+    // never renders the field. Membership follows the import graph, not the rendered tree.
+    'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
     'src/utils/matchFolderVocabulary.js',
   ],
   compiledModules: [
@@ -22,6 +27,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     // The shared modal chrome (issue 877): portal, centring, title/subtitle, close and
     // footer rail. This modal renders THROUGH it, so omitting it breaks the mount.
