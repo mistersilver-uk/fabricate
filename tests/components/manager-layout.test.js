@@ -5060,13 +5060,9 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     'ImportFolderMappingModal.svelte',
     'ImportReportModal.svelte',
     'RecipesBrowserView.svelte',
-    'SystemEditView.svelte',
-    'SystemOverviewView.svelte',
-    'SystemsBrowserView.svelte',
     'TagsCategoriesView.svelte',
     'VocabularyPanel.svelte',
     'checks/ChecksValidationTab.svelte',
-    'system/SystemEditorTabs.svelte',
   ];
 
   const remaining = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })

@@ -2560,8 +2560,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-character-modifier-roll-tag {
-  font-size: 0.7rem;
+/* Three classes since issue 883: the roll tag is a `Chip`, whose scoped block also sits
+   at two classes and is injected after this sheet, so the two-class form would tie and
+   lose on source order. Only the fill survives — the tag's own `font-size: 0.7rem` went
+   with the second chip scale, since size is exactly what the primitive unifies. */
+.fabricate-manager .manager-chip.manager-character-modifier-roll-tag {
   background: var(--fab-mv2-surface-2);
 }
 
