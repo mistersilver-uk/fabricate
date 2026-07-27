@@ -15,6 +15,12 @@ function economyForMode(mode) {
   return { stamina: { enabled: mode === 'stamina' }, nodes: { enabled: mode === 'nodes' } };
 }
 
+// The persisted stamina accrual anchor, read straight off the actor flag (the
+// public `getActorStamina` projection deliberately omits it).
+function staminaAnchor(actor, systemId = SYSTEM) {
+  return actor.getFlag('fabricate', 'gatheringState')?.stamina?.[systemId]?.lastRegenWorldTime;
+}
+
 function staminaConfig(regen = {}) {
   return {
     systems: {
@@ -185,14 +191,34 @@ describe('gathering economy — stamina regeneration over world time', () => {
     assert.equal(second.current, 10);
   });
 
-  it('does not regenerate when world time runs backwards (re-anchors, never negative)', async () => {
+  it('freezes the anchor without gain when world time runs backwards (issue 403)', async () => {
     const { service } = makeRichState({ config: staminaConfig() });
     const actor = makeFakeActor();
+    // `setActorStamina` on an actor with no prior pool omits `lastRegenWorldTime`
+    // entirely — the live GM `setGatheringStamina` shape — so the first evaluation
+    // SEEDS the anchor rather than re-anchoring it.
     await service.setActorStamina(actor, { systemId: SYSTEM, current: 4, max: 100 });
+    assert.equal(staminaAnchor(actor), undefined, 'a fresh GM-set pool carries no anchor at all');
     await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 10 * HOUR });
+    assert.equal(staminaAnchor(actor), 10 * HOUR, 'the absent anchor is seeded at now and persisted');
     const back = await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 2 * HOUR });
     assert.equal(back, null);
     assert.equal(service.getActorStamina(actor, SYSTEM).current, 4);
+    assert.equal(staminaAnchor(actor), 10 * HOUR, 'the rewind writes no actor state — the anchor is frozen');
+  });
+
+  it('grants no free stamina across a rewind then fast-forward, and stays live afterwards (issue 403)', async () => {
+    const { service } = makeRichState({ config: staminaConfig() });
+    const actor = makeFakeActor();
+    await service.setActorStamina(actor, { systemId: SYSTEM, current: 4, max: 100 });
+    await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 10 * HOUR }); // seed at 10h
+    await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 2 * HOUR }); // rewind
+    const forward = await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 10 * HOUR });
+    assert.equal(forward, null, 'no regeneration for time already accounted for');
+    assert.equal(service.getActorStamina(actor, SYSTEM).current, 4);
+    // Second observation: the pool is seeded, not frozen forever.
+    const later = await service.regenerateActorStamina({ actor, systemId: SYSTEM, worldTime: 12 * HOUR });
+    assert.equal(later.current, 14, '2 intervals × 5 measured from the untouched anchor');
   });
 
   it('skips regen when the pool has no max or the system is not in stamina mode', async () => {
@@ -340,12 +366,26 @@ describe('gathering economy — node respawn over world time', () => {
     assert.equal(env.nodeRuntime['task-node'].current, 1); // unchanged, no crash
   });
 
-  it('re-anchors without gain when world time runs backwards (overTime)', async () => {
+  it('freezes the anchor without gain when world time runs backwards (overTime, issue 403)', async () => {
     const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR }, current: 0, max: 5 });
-    await service.respawnNodes({ environment: env, worldTime: 10 * HOUR }); // anchor at 10h
-    await service.respawnNodes({ environment: env, worldTime: 2 * HOUR }); // time goes backwards
+    await service.respawnNodes({ environment: env, worldTime: 10 * HOUR }); // seeds the anchor at 10h
+    const back = await service.respawnNodes({ environment: env, worldTime: 2 * HOUR }); // time goes backwards
+    assert.equal(back, null, 'a rewind performs no persisted environment write');
     assert.equal(env.nodeRuntime['task-node'].current, 0); // no gain
-    assert.equal(env.nodeRuntime['task-node'].respawn.lastEvaluatedWorldTime, 2 * HOUR); // re-anchored
+    assert.equal(env.nodeRuntime['task-node'].respawn.lastEvaluatedWorldTime, 10 * HOUR); // frozen, ahead of now
+  });
+
+  it('grants no free nodes across a rewind then fast-forward, and stays live afterwards (issue 403)', async () => {
+    const { service, env } = nodeService({ respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR }, current: 1, max: 5 });
+    await service.respawnNodes({ environment: env, worldTime: 10 * HOUR }); // seed at 10h
+    await service.respawnNodes({ environment: env, worldTime: 2 * HOUR }); // rewind
+    const forward = await service.respawnNodes({ environment: env, worldTime: 10 * HOUR }); // back to the original instant
+    assert.equal(forward, null, 'no free regeneration across a rewind/fast-forward cycle');
+    assert.equal(env.nodeRuntime['task-node'].current, 1);
+    assert.equal(env.nodeRuntime['task-node'].respawn.lastEvaluatedWorldTime, 10 * HOUR);
+    // Second observation: past the frozen anchor the pool accrues normally again.
+    await service.respawnNodes({ environment: env, worldTime: 13 * HOUR });
+    assert.equal(env.nodeRuntime['task-node'].current, 4, '+3 intervals measured from the frozen anchor');
   });
 
   it('evaluates the amount expression with the nodeRespawn kind and environment context', async () => {
@@ -454,6 +494,40 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
     await service.respawnNodes({ environment: env, worldTime: 0 }); // anchor
     await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
     assert.equal(env.nodeRuntime['lib-1'].current, 2);
+  });
+
+  it('seeds a null respawn anchor at the current world time instead of granting a full restock (issue 403)', async () => {
+    // `_mergeNodeConfigState` rewrites the anchor through `numberOrNullStrict`, so
+    // a library-backed pool that has never been evaluated presents `null` — the
+    // NORMAL production shape. `Number(null) === 0` is finite, so the first tick
+    // used to read as "anchored at world time 0" and grant floor(now / interval).
+    const { service, env } = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }
+    });
+    // `current` (0) is BELOW `max` (3) on purpose: with no room the forward branch
+    // merely advances the anchor and the case would pass vacuously.
+    await service.respawnNodes({ environment: env, worldTime: 5 * HOUR });
+    assert.equal(env.nodeRuntime['lib-1'].current, 0, 'seeding grants no backlog');
+    assert.equal(env.nodeRuntime['lib-1'].respawn.lastEvaluatedWorldTime, 5 * HOUR, 'anchored at now');
+    // Second observation: a single call cannot tell "seeded" from "frozen forever".
+    await service.respawnNodes({ environment: env, worldTime: 7 * HOUR });
+    assert.equal(env.nodeRuntime['lib-1'].current, 2, '+2 intervals after the seed');
+  });
+
+  it('a backward tick never truncates a pool whose stored count exceeds the library max (issue 403)', async () => {
+    // The reported "rewinding reduced my node count" defect: the clamp in
+    // `_mergeNodeConfigState` rode along on the persisted re-anchor. Freezing
+    // writes NOTHING, so there is no write for the clamp to ride on — pinned by
+    // the null return rather than the count alone, so a no-op write cannot pass.
+    const { service, env } = libService({
+      task: LIB_TASK({ nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
+      nodeRuntime: { 'lib-1': { enabled: true, max: 5, current: 5, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR, lastEvaluatedWorldTime: 10 * HOUR } } }
+    });
+    const back = await service.respawnNodes({ environment: env, worldTime: 2 * HOUR });
+    assert.equal(back, null, 'no environment write at all on a rewind');
+    assert.equal(env.nodeRuntime['lib-1'].current, 5, 'the over-cap count survives the rewind');
+    assert.equal(env.nodeRuntime['lib-1'].respawn.lastEvaluatedWorldTime, 10 * HOUR);
   });
 
   it('GM restock refills a depleted library pool, clamped to max', async () => {
