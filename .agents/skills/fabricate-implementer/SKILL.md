@@ -84,6 +84,18 @@ New-code duplication over 3% fails the gate too, and near-identical per-manager 
 When the duplication gate fails, query SonarCloud's `api/duplications/show` per changed file for the exact duplicated spans instead of guessing which blocks collide.
 - A mounted-component suite does NOT fail loudly when a rendered `.svelte` (or a module it transitively imports) is missing from the harness allowlist (`createMountedComponentHarness`'s compiled-component list / `RAW_MODULES`) — it **hangs**, and `node --test` reports the blocked tests as `# cancelled N`, never `# fail`.
 When you add a component, or make an existing tree render a new one, register it in EVERY harness that mounts that tree (e.g. both `tests/components/recipe-edit-mounted.test.js` and `tests/components/manager-mounted.test.js`), and after the change confirm the mounted suites report `# cancelled 0` — not just `# fail 0`.
+- Never assert a DOM node against `null` (`assert.equal(el, null)`, `assert.strictEqual(el, someNode)`).
+On failure `node:assert` serialises the actual value to build its diff and walks a mounted happy-dom element's circular tree until the heap dies, so a two-second assertion failure surfaces as a heap OOM and a `# cancelled` suite with no message — indistinguishable from the harness-allowlist hang above.
+Assert the boolean instead: `assert.ok(!el, 'why')` or `assert.ok(Boolean(el), 'why')`.
+- A negative control only proves something once you have proved the mutation applied.
+A string replacement that silently matched nothing, or that hit a declaration another rule also uses, leaves the suite passing and reads as "the guard is fine" when nothing was perturbed.
+Print the substitution count (or re-grep the file) and assert it is non-zero BEFORE running the test, then restore.
+- Stage your work (`git add -u`) before any mutate-test-restore cycle.
+The natural cleanup after a control is `git checkout -- <file>`, which restores from the index and therefore DELETES uncommitted work in that file.
+Staging first makes the restore return your change instead of discarding it.
+- A passing suite does not prove a test still exercises the code you changed.
+Tests that build their own fixture markup (a Playwright `setContent` string, a hand-written HTML block) keep passing after the component stops emitting that markup, and assertions that match mid-sentence cannot see a defect at the join between two rendered fragments.
+When you change a component's markup, check whether its tests render the component or a copy of it, and retarget the ones asserting on a copy.
 - Do not run `npm ci`, create a dependency junction, or otherwise install dependencies in the lane.
 Report any focused check that cannot run with the existing lane environment.
 - When code hand-maintains a mirror of another part of the repo (selectors, labels, path/recipe maps, fixture lists), add a guard test that fails when they drift — e.g. assert every mapping entry resolves to a real tracked file or emitted symbol.

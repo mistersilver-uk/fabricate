@@ -201,6 +201,25 @@ Extracting a primitive obliges you to convert the existing sites in the same cha
 Global-stylesheet edits match the broad `theme-or-global-ui` recipe and demand a wide core set of frames regardless of what actually changed; CSS co-located in the component matches only the recipes naming that component, so the evidence set is the views that really render it.
 Keep in the global sheet only what must beat Foundry's host CSS (button geometry, focus rings) and the `:root`/theme token blocks.
 
+**A scoped rule and a two-class global rule tie, and the scoped one wins.**
+Svelte compiles a scoped selector to `.the-class.svelte-<hash>` — two classes, (0,2,0) — and `css: 'injected'` puts it in `document.head` AFTER Foundry's `<link>` for `styles/fabricate.css`.
+So a global rule such as `.fabricate-manager .manager-vocabulary-chip-locked` is also (0,2,0), ties, and loses on source order the moment the primitive owns that property.
+Any global rule that must still beat a primitive needs three classes — `.fabricate-manager .manager-chip.manager-vocabulary-chip-locked` — and what legitimately stays global is what a scoped block cannot reach: an ancestor-context rule, or the element's placement in a parent's layout.
+
+**A blanket field rule outranks a component's own reset.**
+`.fabricate-manager .some-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea)` computes to (0,4,1), because `:is()` takes the highest specificity among its arguments.
+A component that paints its own visuals BEHIND a native control — the chance slider draws a track and a coloured fill behind a transparent `input[type="range"]` — declares its reset at (0,3,1) and therefore loses, taking an opaque background that covers what it drew.
+Exclude the type from every such rule, and enumerate them all before declaring it fixed: this exact bug shipped three times because two rules were patched and a third, reachable through a different ancestor, was missed.
+
+**A primitive must reference theme-ROOT tokens only.**
+`--fab-mv2-*` and similar aliases are declared inside `.fabricate-manager`, so an area-agnostic component that references one is fine in the manager and silently wrong everywhere else: outside that area the property is not in scope, the declaration becomes invalid at computed-value time, and the colour falls back to inheritance.
+Nothing fails and no test catches it — the trigger is exactly the reuse the primitive exists to enable.
+Use tokens declared in `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, and say so in the component's `<style>` so the next editor does not reintroduce it.
+
+**Svelte trims whitespace at the end of a block.**
+A literal space as the last token inside `{#if}` never reaches the DOM, so a bold lead-in welds to the prose after it ("…game-world Item.Drag any Item…").
+Use the expression `{' '}`, which survives the trim.
+
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Primitive or contract | Shipped source | Reuse for |
@@ -533,3 +552,13 @@ Critical/Warning count pills + a green-check / red-x checklist.
    Space in 4px steps; radius 5 / 8 / 10 / 12 / 999; controls on the 34 / 40 / 42 rhythm.
 7. **No colour literals in UI.**
    Only `var(--fab-*)`; verify the screen reskins under all six themes before calling it done.
+8. **When it renders correctly in isolation but wrong in Foundry, read the runtime.**
+   A Playwright repro that loads only `styles/fabricate.css` — or even Foundry's and the
+   system's stylesheets too — omits the ancestor a view-scoped rule needs, so it renders
+   correctly and proves nothing.
+   Ask for `getComputedStyle` from the live app instead, and query the OCCLUDING element
+   rather than the one that looks wrong: an element can compute a perfect size and colour
+   while something above it paints over the result.
+   Rule out a stale module chunk first with a hard reload, since Foundry caches it
+   aggressively and a scope-hash mismatch between cached JS and injected CSS renders correct
+   structure with no styling at all.
