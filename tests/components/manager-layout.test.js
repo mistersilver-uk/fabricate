@@ -2055,7 +2055,11 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-tools-row-editor .manager-drop-rate-percent input[type="text"]'
   );
   const componentPillsBlock = blockFor('.fabricate-manager .manager-task-component-pills');
-  const selectedTagPillBlock = blockFor('.fabricate-manager .manager-selected-tag-pill');
+  // Three classes since issue 883: the pill is a `Chip`, whose scoped block also sits at
+  // two classes and is injected after this sheet, so the two-class form would lose.
+  const selectedTagPillBlock = blockFor(
+    '.fabricate-manager .manager-chip.manager-selected-tag-pill'
+  );
   const dropCardBlock = blockFor('.fabricate-manager .manager-task-drops-card');
   const dropHeaderBlock = blockFor(
     '.fabricate-manager .manager-task-drops-card .manager-task-card-header'
@@ -5087,10 +5091,6 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     'environment/EnvironmentValidationTab.svelte',
     'environment/OverrideIndicator.svelte',
     'environment/RuntimeStatePill.svelte',
-    'recipe-item/RecipeItemContentsTab.svelte',
-    'recipe-item/RecipeItemEditorTabs.svelte',
-    'recipe-item/RecipeItemLimitsTab.svelte',
-    'recipe-item/RecipeItemValidationTab.svelte',
     'recipe/RecipeDurationEditor.svelte',
     'recipe/RecipeEditorTabs.svelte',
     // Hands the chip classes to `SearchablePopover` as a `triggerClass` STRING, so its
