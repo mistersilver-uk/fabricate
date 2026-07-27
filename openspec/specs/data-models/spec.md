@@ -807,6 +807,7 @@ Recipe = {
   id: string,
   name: string,
   description: string,
+  img: string, // default DEFAULT_RECIPE_IMAGE ('icons/sundries/documents/blueprint-recipe-alchemical.webp'); see requirement 16
   craftingSystemId: string,
   enabled: boolean,
   // GM-authored Result Order Permission: may a player reorder this recipe's progressive
@@ -938,6 +939,13 @@ Recipe = {
     It survives export/import (the importer re-stamps it) and is retained across GM edits (an edit that omits `importSource` inherits the stored value through the `{ ...recipe.toJSON(), ...updates }` merge in `updateRecipe`).
 15. Legacy `toolBonusModes` input is ignored immediately and omitted from canonical Recipe writes.
     Recipe and Step data persist Tool references only; prerequisite, bonus, breakage, and on-break behavior belong to the referenced Tool or its Crafting System.
+16. A Recipe's displayed image is its own `img` and nothing else (issue 884).
+    A recipe item definition's artwork — a book or scroll — is never substituted at any surface, regardless of membership.
+    Book membership is many-to-many (`RecipeItemDefinition.recipeIds[]`), so "the containing book" is not well defined and a borrowed icon would track definition resolution order rather than anything the GM authored.
+    An unset image — empty, whitespace, or Foundry's generic `icons/svg/item-bag.svg` sentinel — resolves to `DEFAULT_RECIPE_IMAGE` (mirrored in the UI as `DEFAULT_CRAFTING_IMAGE`, pinned equal by `tests/crafting-image-defaults.test.js`), never to a book-shaped fallback.
+    Every image-resolving caller must pass through one of two deliberately mirrored chokepoints — `resolveRecipeImage` (`src/ui/svelte/util/craftingImageDefaults.js`) for the GM manager and `InventoryListingBuilder._resolveRecipeImg` for the player surfaces — rather than re-deriving the rule at the call site.
+    The legacy scalars `recipe.recipeItemId` and `recipe.linkedRecipeItemUuid` are never inputs to image resolution; their remaining non-image consumers are unaffected.
+    The `src/systems` resolvers still consult `recipe.recipeItemId` ahead of `img`; closing that path is deferred to issue 887, and it is reachable in a migrated world because `CraftingSystemManager._migrateLegacyRecipeItems` runs un-gated on every `initialize()` and repopulates the scalar from a standalone alchemy `linkedRecipeItemUuid` that the 1.13.0 migration preserved.
 
 ### Validation Guidance
 
