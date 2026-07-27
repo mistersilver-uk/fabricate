@@ -37,6 +37,7 @@
   recipe-item Overview tab use) and hands it upstream to create + link the definition.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
@@ -259,7 +260,7 @@
         <option value="unlimited">{isItemMode ? text('FABRICATE.Admin.Manager.BooksScrolls.Unlimited', 'Unlimited') : text('FABRICATE.Admin.Manager.BooksScrolls.LearnFreely', 'Learn freely')}</option>
       </select>
     </label>
-    <span class="manager-chip" data-books-scrolls-count>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredItems.length).replace('{total}', (recipeItems || []).length)}</span>
+    <Chip data-books-scrolls-count>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredItems.length).replace('{total}', (recipeItems || []).length)}</Chip>
     {#if filtersActive}
       <button type="button" class="manager-button manager-clear-filters" data-clear-filters="books-scrolls" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>
@@ -309,31 +310,37 @@
             >
               <img class="manager-books-scrolls-thumb" src={recipeItemImage(item)} alt="" />
               <span class="manager-books-scrolls-name" data-books-scrolls-name={item.id} title={item.resolvedName}>{item.resolvedName}</span>
-              <span class={`manager-chip manager-books-scrolls-type-pill ${recipeCount(item) === 0 ? 'is-danger' : 'is-neutral'}`} data-books-scrolls-type={item.id}>{typePillLabel(item)}</span>
+              <Chip tone={recipeCount(item) === 0 ? 'danger' : 'neutral'} class="manager-books-scrolls-type-pill" data-books-scrolls-type={item.id}>{typePillLabel(item)}</Chip>
               {#if item.linkMissing}
-                <span class="manager-chip is-danger manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
-                  <i class="fas fa-link-slash" aria-hidden="true"></i>
+                <Chip tone="danger" icon="fas fa-link-slash" class="manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
                   <span>{text('FABRICATE.Admin.Manager.BooksScrolls.LinkMissing', 'Item missing')}</span>
-                </span>
+                </Chip>
               {/if}
             </button>
 
-            <span
-              class={`manager-chip manager-books-scrolls-recipe-chip ${recipeCount(item) === 0 ? 'is-danger' : ''}`}
+            <Chip
+              tone={recipeCount(item) === 0 ? 'danger' : ''}
+              icon={recipeCount(item) === 0 ? 'fas fa-circle-exclamation' : 'fas fa-scroll'}
+              class="manager-books-scrolls-recipe-chip"
               data-books-scrolls-recipe-count={item.id}
             >
-              <i class={recipeCount(item) === 0 ? 'fas fa-circle-exclamation' : 'fas fa-scroll'} aria-hidden="true"></i>
               <span>{recipeCountLabel(item)}</span>
-            </span>
+            </Chip>
 
-            <span
-              class={`manager-chip manager-books-scrolls-cap-chip ${capLimited(item) ? 'is-limited' : 'is-unlimited'}`}
+            <!-- A limited cap reads as a "waiting/attention" warning tint; an uncapped item
+                 (Unlimited / Learn freely) reads as a neutral informational blue. Those were
+                 hand-written `is-limited` / `is-unlimited` rules restating the primitive's own
+                 warning and info tokens exactly, so they are tones now (issue 883); the state
+                 stays readable through `data-books-scrolls-cap-limited`. -->
+            <Chip
+              tone={capLimited(item) ? 'warning' : 'info'}
+              icon={isItemMode ? 'fas fa-fire-flame-curved' : 'fas fa-graduation-cap'}
+              class="manager-books-scrolls-cap-chip"
               data-books-scrolls-cap-chip={item.id}
               data-books-scrolls-cap-limited={capLimited(item)}
             >
-              <i class={isItemMode ? 'fas fa-fire-flame-curved' : 'fas fa-graduation-cap'} aria-hidden="true"></i>
               <span>{capChipLabel(item)}</span>
-            </span>
+            </Chip>
 
             <div class="manager-books-scrolls-actions">
               <button
@@ -550,12 +557,14 @@
     min-width: 0;
   }
 
-  .manager-books-scrolls-type-pill {
+  /* All three are `Chip`s (issue 883), so this component's scoping hash is not on them.
+     Reach them through `:global`, nested under a selector that DOES carry the hash. */
+  .manager-books-scrolls-identity :global(.manager-books-scrolls-type-pill) {
     flex: none;
   }
 
-  .manager-books-scrolls-recipe-chip,
-  .manager-books-scrolls-cap-chip {
+  .manager-books-scrolls-listitem :global(.manager-books-scrolls-recipe-chip),
+  .manager-books-scrolls-listitem :global(.manager-books-scrolls-cap-chip) {
     justify-self: start;
     white-space: nowrap;
   }
@@ -565,20 +574,5 @@
     align-items: center;
     justify-self: end;
     gap: var(--fab-space-2);
-  }
-
-  /* Limited caps read as a "waiting/attention" warning tint; an uncapped item
-     (Unlimited / Learn freely) reads as a neutral informational blue. Both use
-     semantic tokens only — no literals. */
-  .manager-books-scrolls-cap-chip.is-limited {
-    color: var(--fab-warning-text);
-    background: var(--fab-warning-soft);
-    border-color: var(--fab-warning-border);
-  }
-
-  .manager-books-scrolls-cap-chip.is-unlimited {
-    color: var(--fab-info-text);
-    background: var(--fab-info-soft);
-    border-color: var(--fab-info-border);
   }
 </style>

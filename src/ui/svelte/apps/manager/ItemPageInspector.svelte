@@ -19,6 +19,7 @@
    - onToggleQuickLimit(id, limited): flip Limited use / Limited learning.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -133,7 +134,7 @@
       <div class="manager-inspector-copy">
         <h3 class="manager-inspector-name" data-item-page-name>{item.resolvedName}</h3>
         <span class="manager-books-scrolls-inspector-meta">
-          <span class={`manager-chip ${recipeCount === 0 ? 'is-danger' : 'is-neutral'}`} data-item-page-type>{typePillLabel()}</span>
+          <Chip tone={recipeCount === 0 ? 'danger' : 'neutral'} data-item-page-type>{typePillLabel()}</Chip>
           <button
             type="button"
             class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
@@ -181,7 +182,7 @@
               <span class="manager-books-scrolls-recipe-preview-icon" aria-hidden="true"><i class="fas fa-scroll"></i></span>
               <span class="manager-books-scrolls-recipe-preview-name">{recipe.name}</span>
               {#if recipe.category}
-                <span class="manager-chip is-neutral">{recipe.category}</span>
+                <Chip tone="neutral">{recipe.category}</Chip>
               {/if}
             </div>
           {/each}

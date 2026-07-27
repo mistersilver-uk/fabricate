@@ -5052,17 +5052,13 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
 // rather than a fading reminder — the list may only shrink, and it must reach empty.
 test('every remaining hand-rolled chip site is declared, so the migration can only shrink', () => {
   const UNCONVERTED = [
-    'AccessTabView.svelte',
-    'BooksScrollsView.svelte',
     'CraftingSystemManagerRoot.svelte',
     'EditorValidationSurface.svelte',
     'EnvironmentsBrowserView.svelte',
     'EssenceBrowserView.svelte',
     'EssenceEditView.svelte',
-    'GrantAccessInspector.svelte',
     'ImportFolderMappingModal.svelte',
     'ImportReportModal.svelte',
-    'ItemPageInspector.svelte',
     'RecipesBrowserView.svelte',
     'SystemEditView.svelte',
     'SystemOverviewView.svelte',
