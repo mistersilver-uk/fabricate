@@ -7559,8 +7559,23 @@
    being later in the file, won the tie: the radio stretched to fill the flex line (~643px in
    a 669px card), starving the option body to 0px so every description wrapped one word per
    line, and squared off the dot. A radio is a custom-drawn control, never a text field, so
-   exclude it here — the same fix-once-for-every-surface move as the stepper. */
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),
+   exclude it here — the same fix-once-for-every-surface move as the stepper.
+
+   `:not([type='range'])` — the THIRD blanket field rule to need it, after the two
+   f4402c27 fixed (issue 883). A chance slider paints a 6px track and a coloured fill BEHIND
+   a transparent range input. This rule computes to (0,4,1) and beats the slider's own
+   (0,3,1) reset, so the gathering EVENT editor's "Drop rate" field — a `.manager-field` that
+   neither edit-view rule reached — took an opaque `--fab-mv2-bg` fill across a 518x36 box
+   and covered a 402px fill completely, leaving only the thumb. That is the reported symptom
+   of issue 883 surviving in a third place. The gathering drop inspector escaped it only
+   because `.manager-drop-editor-card [data-gathering-drop-inspector-rate] … input[type="range"]`
+   re-declares `background: transparent` at (0,5,1); the height half of this rule is also why
+   the event editor's slider stood 36px tall with 8px of side padding rather than the 28px/0
+   the control asks for.
+
+   Safe to exclude wholesale: `ChanceSlider.svelte` is the only source of a `type="range"`
+   input in the codebase, and it always wants a transparent, unpadded control. */
+.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea,
 .fabricate-manager .manager-component-inline-control {
@@ -7572,7 +7587,9 @@
   background: var(--fab-mv2-bg);
 }
 
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),
+/* Same exclusion, same reason, and this half is why the event editor's slider also stood
+   36px tall with 8px of side padding instead of the 28px/0 the control asks for. */
+.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-component-inline-control {
   height: 36px;
@@ -12347,7 +12364,11 @@
   padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
-.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="text"] {
+/* `[type="number"]`, not `[type="text"]`: the inspector's rate field is rendered by
+   `ChanceSlider` now (issue 883), and the shared control uses a real number input. Keyed on
+   the type it actually renders rather than on `:is([type="text"], [type="number"])`, so a
+   branch that matches nothing cannot rot here unnoticed. */
+.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="number"] {
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
@@ -12360,7 +12381,7 @@
   grid-template-columns: 64px minmax(0, 1fr);
 }
 
-.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="text"] {
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="number"] {
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-chip);

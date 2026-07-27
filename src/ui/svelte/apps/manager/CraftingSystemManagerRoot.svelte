@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ChanceSlider from '../../components/ChanceSlider.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
@@ -4324,38 +4325,11 @@
     return 'var(--fab-drop-rate-legendary)';
   }
 
-  function onGatheringDropRateInput(rowId, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    input.value = normalized;
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      updateGatheringTaskDrop(rowId, { dropRate });
-    }
-  }
-
-  function onGatheringDropRateBlur(row, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      input.value = String(dropRate);
-      updateGatheringTaskDrop(row.id, { dropRate });
-      return;
-    }
-    input.value = String(gatheringDropRateValue(row));
-  }
-
-  function onGatheringDropRateKeydown(row, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const currentValue = event.currentTarget.value === '' ? gatheringDropRateValue(row) : Number(event.currentTarget.value);
-    const dropRate = gatheringDropRateValue({ dropRate: (Number.isFinite(currentValue) ? currentValue : gatheringDropRateValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
-    event.currentTarget.value = String(dropRate);
-    updateGatheringTaskDrop(row.id, { dropRate });
-  }
-
+  // The drop-rate input/blur/keydown trio that used to live here is gone with the
+  // hand-rolled slider it drove (issue 883). `ChanceSlider` owns those three handlers now,
+  // including the commit-on-blur behaviour: an empty field reverts to the model value on
+  // blur rather than being committed. The COUNT field below still hand-rolls them, because
+  // it is a bare numeric field with no slider and no shared control to render through.
   function onGatheringDropCountInput(rowId, event) {
     const input = event.currentTarget;
     const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
@@ -6006,18 +5980,22 @@
               <div class="manager-drop-editor-values">
                 <label class="manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>
                   <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')}</span>
-                  <span class="manager-drop-rate-value">
-                    <span class="manager-drop-rate-percent">
-                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onGatheringDropRateInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropRateBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropRateKeydown(selectedGatheringDrop, event)} />
-                      <span aria-hidden="true">%</span>
-                    </span>
-                    <span class={`manager-drop-rate-control ${gatheringDropRateTierClass(selectedGatheringDrop.dropRate)}`} style={`--fab-drop-rate-value: ${gatheringDropRateValue(selectedGatheringDrop)}%; --fab-drop-rate-color: ${gatheringDropRateTierColor(selectedGatheringDrop.dropRate)};`}>
-                      <span class="manager-drop-rate-track" aria-hidden="true">
-                        <span class="manager-drop-rate-fill"></span>
-                      </span>
-                      <input type="range" min="0" max="100" step="1" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate: Number(event.currentTarget.value) })} onkeydown={(event) => event.stopPropagation()} />
-                    </span>
-                  </span>
+                  <!--
+                    The shared control (issue 883). This inspector used to hand-roll the same
+                    track/fill/range structure the drop ROWS render through `ChanceSlider`, and
+                    re-derive the same `--fab-drop-rate-value` / `--fab-drop-rate-color` inline.
+                    `min` stays 0 here: a task drop has a real "none" tier at 0, unlike a
+                    gathering event.
+                  -->
+                  <ChanceSlider
+                    value={gatheringDropRateValue(selectedGatheringDrop)}
+                    numberLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent', 'Drop chance percent')}
+                    rangeLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')}
+                    resolveColor={gatheringDropRateTierColor}
+                    controlClass={gatheringDropRateTierClass(selectedGatheringDrop.dropRate)}
+                    stopPropagation={true}
+                    onChange={(dropRate) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate })}
+                  />
                 </label>
 
                 <label class="manager-field manager-drop-count-editor" data-gathering-drop-inspector-count>

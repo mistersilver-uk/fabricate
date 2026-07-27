@@ -2419,15 +2419,30 @@ describe('CraftingSystemManager source contract', () => {
       'data-gathering-drop-inspector-count',
       'gatheringDropRateTierClass',
       'gatheringDropRateTierColor',
-      'onGatheringDropRateKeydown',
       'onGatheringDropCountKeydown',
-      'manager-drop-rate-control',
-      'manager-drop-rate-track',
-      'manager-drop-rate-fill',
+      'ChanceSlider',
     ]) {
       assert.ok(
         rootSource.includes(snippet),
         `root should include selected drop inspector ${snippet}`
+      );
+    }
+    // Issue 883: the inspector's slider IS `ChanceSlider`. It used to hand-roll the same
+    // track/fill/range structure and its own input/blur/keydown trio beside it, so the
+    // structure and the handlers must be gone from the root, not merely unused — a
+    // surviving copy is what the next divergence gets written against.
+    for (const dead of [
+      'manager-drop-rate-control',
+      'manager-drop-rate-track',
+      'manager-drop-rate-fill',
+      'onGatheringDropRateInput',
+      'onGatheringDropRateBlur',
+      'onGatheringDropRateKeydown',
+    ]) {
+      assert.equal(
+        rootSource.includes(dead),
+        false,
+        `root should render the drop-rate slider through ChanceSlider, not ${dead}`
       );
     }
     assert.ok(

@@ -8872,10 +8872,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     const inspectorRateInput = inspectorRateEditor.querySelector(
       '.manager-drop-rate-percent input'
     );
-    assert.equal(inspectorRateInput.getAttribute('type'), 'text');
-    assert.equal(inspectorRateInput.getAttribute('inputmode'), 'numeric');
+    // Issue 883: the inspector renders the shared `ChanceSlider`, exactly as the drop ROWS
+    // do, so its field is a real number input with the control's own min/max rather than a
+    // text input policed by a local digit regex.
+    assert.equal(inspectorRateInput.getAttribute('type'), 'number');
+    assert.equal(inspectorRateInput.getAttribute('min'), '0');
+    assert.equal(inspectorRateInput.getAttribute('max'), '100');
     assert.equal(inspectorRateInput.value, '0');
     const inspectorRateControl = inspectorRateEditor.querySelector('.manager-drop-rate-control');
+    assert.ok(inspectorRateControl.classList.contains('manager-chance-slider-control'));
     assert.ok(inspectorRateControl.classList.contains('is-none'));
     assert.ok(inspectorRateControl.getAttribute('style').includes('--fab-drop-rate-value: 0%;'));
     assert.ok(
@@ -8883,11 +8888,33 @@ describe('CraftingSystemManager mounted behavior', () => {
         .getAttribute('style')
         .includes('--fab-drop-rate-color: var(--fab-drop-rate-none);')
     );
-    inspectorRateInput.value = '09x';
+    inspectorRateInput.value = '9';
     inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(inspectorRateInput.value, '9');
+    // Out of range clamps rather than being held un-committed until blur — the behaviour
+    // the drop rows have shipped with all along.
+    inspectorRateInput.value = '150';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '100');
+    // Commit-on-blur is preserved: an emptied field reverts to the model value on blur
+    // instead of committing an empty rate.
+    inspectorRateInput.value = '9';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    inspectorRateInput.value = '';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '', 'an emptied field is left alone while editing');
+    inspectorRateInput.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '9', 'blur restores the model value, it does not commit empty');
     let refreshedInspectorRateInput = selectedDropInspector.querySelector(
       '[data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
     );
@@ -9181,7 +9208,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(
       target.querySelector(
-        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]'
+        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
       ).value,
       '35'
     );
@@ -9917,7 +9944,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(
       target.querySelector(
-        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]'
+        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
       ).value,
       '25'
     );

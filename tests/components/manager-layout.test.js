@@ -2301,13 +2301,13 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropEditorValuesBlock = blockFor('.fabricate-manager .manager-drop-editor-values');
   const dropEditorRatePercentBlock = blockFor(
-    '.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="text"]'
+    '.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="number"]'
   );
   const dropEditorRateValueBlock = blockFor(
     '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-value'
   );
   const dropEditorRateInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="text"]'
+    '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="number"]'
   );
   const dropEditorRateSuffixBlock = blockFor(
     '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent > span[aria-hidden="true"]'
@@ -4338,8 +4338,11 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   // in the file, squared the dot and stretched it to fill the flex line.
   // `.manager-component-inline-control` joins it because it renders OUTSIDE a
   // `.manager-field` and would otherwise inherit Foundry's native control.
+  // `:not([type='range'])` (issue 883) excludes the chance slider, whose 6px track and
+  // coloured fill are painted BEHIND a transparent input that this rule was stretching to
+  // 36px and filling opaquely.
   const fieldInputBlock = blockFor(
-    ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),\n" +
+    ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
       '.fabricate-manager .manager-field select,\n' +
       '.fabricate-manager .manager-component-inline-control'
   );
@@ -5777,6 +5780,143 @@ test('the gathering inspector rail cards render as one card, not three treatment
     }
   } finally {
     await page.close();
+    await browser.close();
+  }
+});
+
+// Issue 883 retired the last two hand-rolled copies of the chance slider — the gathering
+// drop INSPECTOR and the gathering EVENT editor — in favour of `ChanceSlider`. Both had
+// been surviving on unrelated CSS accidents: the inspector's fill was visible only because
+// `.manager-drop-editor-card` happened to exclude `[type="range"]` from its blanket field
+// rule, and the event editor's rows needed f4402c27 to add the same exclusion.
+//
+// This asserts the RENDERED result at both converted sites: a transparent range input, a
+// fill with real width and colour, and a number field that is actually sized — the last
+// because the conversion moved those fields from `[type="text"]` to `[type="number"]`, so a
+// stylesheet still keyed on the old type would leave them unstyled and this would catch it.
+const CHANCE_SLIDER_FIXTURE =
+  '<span class="manager-chance-slider manager-drop-rate-value" data-chance-slider>' +
+  '<span class="manager-chance-slider-number manager-drop-rate-percent">' +
+  '<input type="number" min="0" max="100" step="1" value="80" aria-label="Chance"/>' +
+  '<span aria-hidden="true">%</span></span>' +
+  '<span class="manager-chance-slider-control manager-drop-rate-control is-common" ' +
+  'style="--fab-drop-rate-value:80%; --fab-drop-rate-color:#5EC3B0;">' +
+  '<span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>' +
+  '<input type="range" min="0" max="100" step="1" value="80"/>' +
+  '</span></span>';
+
+test('both converted chance-slider sites render a real fill, not a bare thumb', async () => {
+  // The fixture is hand-written, so it is pinned to what the component actually renders —
+  // otherwise a renamed class would leave this measuring markup the app never produces.
+  const chanceSliderSource = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/ChanceSlider.svelte'),
+    'utf8'
+  );
+  for (const claim of [
+    'manager-chance-slider manager-drop-rate-value',
+    'manager-chance-slider-number manager-drop-rate-percent',
+    'manager-chance-slider-control manager-drop-rate-control',
+    'manager-drop-rate-track',
+    'manager-drop-rate-fill',
+    'type="number"',
+    'type="range"',
+  ]) {
+    assert.ok(
+      chanceSliderSource.includes(claim),
+      `the fixture assumes ChanceSlider renders ${claim}`
+    );
+  }
+
+  const sites = [
+    {
+      name: 'gathering drop inspector',
+      // The dense inspector treatment: 28px, matching the drop rows it mirrors.
+      percentHeight: 28,
+      markup:
+        '<aside class="manager-inspector manager-drop-inspector-stack" style="width:320px">' +
+        '<section class="manager-inspector-card manager-drop-editor-card">' +
+        '<div class="manager-drop-editor-values">' +
+        '<label class="manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
+        `<span>Drop chance</span>${CHANCE_SLIDER_FIXTURE}</label>` +
+        '</div></section></aside>',
+    },
+    {
+      name: 'gathering event editor',
+      // 36px, and deliberately NOT normalised to the inspector's 28px. This field is a
+      // full-width form control in a normal editor card, so it takes the manager standard
+      // `.manager-field` height; 28px is the DENSE treatment for a table cell and the
+      // inspector rail. The divergence pre-dates this conversion and is a real difference
+      // of context, not a second spelling of one control (issue 883).
+      percentHeight: 36,
+      markup:
+        '<main class="manager-main manager-gathering-event-edit-view" style="width:640px">' +
+        '<section class="manager-task-availability-card" data-gathering-event-drop-rate>' +
+        '<div class="manager-task-availability-row">' +
+        '<label class="manager-field manager-drop-rate-editor">' +
+        `<span>Drop rate (%)</span>${CHANCE_SLIDER_FIXTURE}</label>` +
+        '</div></section></main>',
+    },
+  ];
+
+  const browser = await chromium.launch();
+  try {
+    for (const site of sites) {
+      const page = await browser.newPage({ viewport: { width: 900, height: 260 } });
+      try {
+        await page.setContent(
+          `<style>${css}</style>` +
+            `<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">${site.markup}</div>`
+        );
+        const seen = await page.evaluate(() => {
+          const range = document.querySelector('input[type="range"]');
+          const number = document.querySelector('.manager-drop-rate-percent input');
+          const track = document.querySelector('.manager-drop-rate-track');
+          const fill = document.querySelector('.manager-drop-rate-fill');
+          return {
+            rangeBackground: getComputedStyle(range).backgroundColor,
+            fillWidth: Math.round(fill.getBoundingClientRect().width),
+            trackWidth: Math.round(track.getBoundingClientRect().width),
+            fillBackground: getComputedStyle(fill).backgroundColor,
+            numberHeight: Math.round(number.getBoundingClientRect().height),
+            numberWidth: Math.round(number.getBoundingClientRect().width),
+          };
+        });
+
+        assert.equal(
+          seen.rangeBackground,
+          'rgba(0, 0, 0, 0)',
+          `${site.name}: the range input must stay transparent or it hides the fill, got ${seen.rangeBackground}`
+        );
+        assert.ok(
+          seen.trackWidth > 0,
+          `${site.name}: the slider track must have width, got ${seen.trackWidth}px`
+        );
+        // Not merely present: at 80% the fill must cover most of the track, in its colour.
+        assert.ok(
+          seen.fillWidth > seen.trackWidth * 0.7,
+          `${site.name}: the fill should span ~80% of the ${seen.trackWidth}px track, got ${seen.fillWidth}px`
+        );
+        assert.equal(
+          seen.fillBackground,
+          'rgb(94, 195, 176)',
+          `${site.name}: the fill should paint its tier colour, got ${seen.fillBackground}`
+        );
+        // The number field moved from `[type="text"]` to `[type="number"]` in this
+        // conversion; a rule still keyed on the old type leaves it at the unstyled default.
+        assert.equal(
+          seen.numberHeight,
+          site.percentHeight,
+          `${site.name}: the percent field should keep its ${site.percentHeight}px control height, got ${seen.numberHeight}px`
+        );
+        assert.ok(
+          seen.numberWidth > 20,
+          `${site.name}: the percent field should be laid out, got ${seen.numberWidth}px`
+        );
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
     await browser.close();
   }
 });
