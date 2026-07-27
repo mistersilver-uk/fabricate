@@ -126,6 +126,42 @@ describe('GatheringWorldTimeProcessor', () => {
     });
   });
 
+  // issue 403: on a backward world-time tick the accrual anchor freezes and
+  // `respawnInteractableNode` reports `changed: false`. Unlike the environment
+  // path — which guards its hook on the count actually moving — this pass fired
+  // `fabricate.gathering.nodeRespawned` on every `changed` result, so the freeze
+  // also removes a spurious zero-gain emission AND a region-behaviour document
+  // write per unlinked interactable per backward tick.
+  it('skips the behaviour write and the nodeRespawned hook when the scoped pool reports no change', async () => {
+    const { scene } = scopedBehavior();
+    const hookCalls = [];
+    globalThis.Hooks = {
+      callAll: (name, payload) => hookCalls.push({ name, payload }),
+    };
+    const writes = [];
+    let respawnCalls = 0;
+    const richState = {
+      nodesEnabled: (id) => id === SYS,
+      respawnInteractableNode: async ({ node }) => {
+        respawnCalls += 1;
+        return { changed: false, node };
+      },
+    };
+    const processor = new GatheringWorldTimeProcessor({
+      richState,
+      scenes: () => [scene],
+      applyInteractableBehaviorUpdate: async (ref, update) => writes.push({ ref, update }),
+      enabledGatheringSystems: enabledSystemsSeam(),
+    });
+
+    const changed = await processor._processInteractableNodeRespawn(2 * 3600);
+
+    assert.equal(respawnCalls, 1, 'respawnInteractableNode ran exactly once');
+    assert.deepEqual(changed, [], 'nothing is reported changed');
+    assert.equal(writes.length, 0, 'no region-behaviour document write');
+    assert.deepEqual(hookCalls, [], 'no fabricate.gathering.nodeRespawned emission');
+  });
+
   it('forwards worldTime verbatim to every pass and returns the aggregate shape', async () => {
     const { scene } = scopedBehavior();
     globalThis.Hooks = { callAll: () => {} };
