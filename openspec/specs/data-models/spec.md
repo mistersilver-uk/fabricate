@@ -945,7 +945,12 @@ Recipe = {
     An unset image — empty, whitespace, or Foundry's generic `icons/svg/item-bag.svg` sentinel — resolves to `DEFAULT_RECIPE_IMAGE` (mirrored in the UI as `DEFAULT_CRAFTING_IMAGE`, pinned equal by `tests/crafting-image-defaults.test.js`), never to a book-shaped fallback.
     Every image-resolving caller must pass through one of two deliberately mirrored chokepoints — `resolveRecipeImage` (`src/ui/svelte/util/craftingImageDefaults.js`) for the GM manager and `InventoryListingBuilder._resolveRecipeImg` for the player surfaces — rather than re-deriving the rule at the call site.
     The legacy scalars `recipe.recipeItemId` and `recipe.linkedRecipeItemUuid` are never inputs to image resolution; their remaining non-image consumers are unaffected.
-    The `src/systems` resolvers still consult `recipe.recipeItemId` ahead of `img`; closing that path is deferred to issue 887, and it is reachable in a migrated world because `CraftingSystemManager._migrateLegacyRecipeItems` runs un-gated on every `initialize()` and repopulates the scalar from a standalone alchemy `linkedRecipeItemUuid` that the 1.13.0 migration preserved.
+    Shipped code does not yet meet that chokepoint rule everywhere, so the callers that still re-derive it are recorded here rather than left implicit.
+    Four `src/systems` resolvers re-derive it and prefer the borrowed recipe-item image ahead of `recipe.img` — `InventoryListingBuilder._resolveIndexedRecipeImg`, the inline block in `CraftingListingBuilder`, `CraftingEngine._resolveRecipePromptImg`, and `RunJournalBuilder._resolveCraftingRunImg`.
+    Closing that path is deferred to issue 887, and it is reachable in a migrated world because `CraftingSystemManager._migrateLegacyRecipeItems` runs un-gated on every `initialize()` and repopulates the scalar from a standalone alchemy `linkedRecipeItemUuid` that the 1.13.0 migration preserved.
+    `RecipeManager.resolveRecipeIcon` and `resolveRecipeIconAsync` also re-derive it under `src/systems`, but order it the other way — an authored non-default `img` wins outright and the borrow outranks only the default — and both are caller-less; issue 887 covers them too.
+    The one re-derivation inside `src/ui` is `buildRecipeGraph` (`src/ui/svelte/util/recipeGraphBuilder.js`), which takes `recipe.img || DEFAULT_RECIPE_IMAGE` at the call site: it borrows nothing, but it does not treat the `icons/svg/item-bag.svg` sentinel (or a whitespace-only `img`) as "no image".
+    It carries no user impact today, because the Graph surface is an unimplemented placeholder gated behind `fabricate.experimentalFeatures` (issue 442).
 
 ### Validation Guidance
 

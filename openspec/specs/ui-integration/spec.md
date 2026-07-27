@@ -1168,7 +1168,7 @@ If the required linkage is missing, show a validation warning.
 
 `recipe.locked` is persisted and engine-honoured (`guardCraftStart` refuses a locked craft), and the Overview tab is where it is written.
 
-A locked recipe stays **visible** to players but only a GM can craft it — a different concept from the Overview's recipe-item _image_ lock (which merely means the image comes from a linked recipe item), so it carries its own copy and its own hooks.
+A locked recipe stays **visible** to players but only a GM can craft it, a distinct concept that carries its own copy and its own hooks.
 
 The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
 The change persists immediately (like `enabled`), outside the recipe draft's Save.
