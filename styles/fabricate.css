@@ -5956,12 +5956,16 @@
   flex: 0 0 34px;
 }
 
-.fabricate-manager .manager-vocabulary-chip-unused {
+/* Three classes since issue 883: both are `Chip`s, and both restate the fill and
+   foreground the primitive already sets. The scoped chip block also sits at two classes
+   and is injected after this sheet, so the two-class form would tie and lose on source
+   order — an unused row would silently repaint itself as a default chip. */
+.fabricate-manager .manager-chip.manager-vocabulary-chip-unused {
   background: transparent;
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-vocabulary-chip-locked {
+.fabricate-manager .manager-chip.manager-vocabulary-chip-locked {
   background: var(--fab-overlay-light-035);
   color: var(--fab-mv2-text-muted);
 }

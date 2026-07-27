@@ -5051,11 +5051,7 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
 // because a listed file no longer matches. Both directions are what make it a ratchet
 // rather than a fading reminder — the list may only shrink, and it must reach empty.
 test('every remaining hand-rolled chip site is declared, so the migration can only shrink', () => {
-  const UNCONVERTED = [
-    'CraftingSystemManagerRoot.svelte',
-    'TagsCategoriesView.svelte',
-    'VocabularyPanel.svelte',
-  ];
+  const UNCONVERTED = ['CraftingSystemManagerRoot.svelte'];
 
   const remaining = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'))

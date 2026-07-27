@@ -12,6 +12,7 @@
   NO page header of its own — the shell's `.manager-header` is the only one.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import VocabularyPanel from './VocabularyPanel.svelte';
 
@@ -239,7 +240,7 @@
       >
         <i class={tab.icon} aria-hidden="true"></i>
         <span>{tab.label}</span>
-        <span class="manager-chip is-neutral manager-editor-tab-badge">{tab.count}</span>
+        <Chip tone="neutral" class="manager-editor-tab-badge">{tab.count}</Chip>
       </button>
     {/each}
   </nav>
