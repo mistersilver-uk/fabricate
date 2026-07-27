@@ -1528,7 +1528,12 @@
 
 /* The header "Unsaved" state chip sits in the button row, so it takes the button's
    6px rounded-rectangle corners and compact header height rather than the default
-   full-round chip pill — it reads as part of the toolbar, not a floating tag (§F6). */
+   full-round chip pill — it reads as part of the toolbar, not a floating tag (§F6).
+
+   Kept as-is through issue 883. This is an ANCESTOR-CONTEXT rule — a chip sized for the
+   container it sits in, like the tab badge's deliberate 18px/0.56rem — not a second
+   default scale a screen can opt into, which is what that issue removed. It is already
+   at four classes, so it still outranks the scoped block. */
 .fabricate-manager .manager-header-actions .manager-chip.is-warning {
   min-height: 38px;
   border-radius: 6px;
@@ -1558,6 +1563,12 @@
 .fabricate-manager .manager-header-actions .manager-chip,
 .fabricate-manager .manager-action-group .manager-chip {
   min-height: 34px;
+
+  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
+     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
+     height it would read as a rounded rectangle instead of the pill it has always been
+     (issue 883). */
+  border-radius: 999px;
 }
 
 .fabricate-manager .manager-breadcrumbs {
@@ -2164,24 +2175,27 @@
   padding: var(--fab-space-4);
 }
 
+/*
+  ONE right-hand-panel surface for the whole manager (issue 881).
+
+  This rail used to sit on `--fab-mv2-surface-2`, with the Recipe Studio views carved out
+  onto `--fab-mv2-surface-1` (issue 643) and the Tool Studio's own preview column written
+  as a third, bespoke `--fab-bg-2` aside. Two of those three were already the same shade —
+  `--fab-mv2-surface-1` IS `--fab-bg-2` — so the odd one out was the shared rule, which is
+  why the Tags & Categories rail read visibly lighter than the Tool Studio panel it is
+  supposed to match. Unifying on the darker shade removes the per-view exception rather
+  than adding a `[data-manager-view="tags"]` one.
+*/
 .fabricate-manager .manager-inspector {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border-left: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-mv2-surface-1);
   overflow-y: auto;
   max-height: 100%;
   min-height: 0;
-}
-
-/* Recipe Studio only: the context rail sits on the SAME surface as the main
-   editor panel (`--fab-mv2-surface-1`), one step darker than the shared inspector
-   shade used on every other manager screen. The border-left is kept (issue 643). */
-.fabricate-manager[data-manager-view="recipe-edit"] .manager-inspector,
-.fabricate-manager[data-manager-view="recipes"] .manager-inspector {
-  background: var(--fab-mv2-surface-1);
 }
 
 .fabricate-manager .manager-character-modifier-card {
@@ -2557,8 +2571,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-character-modifier-roll-tag {
-  font-size: 0.7rem;
+/* Three classes since issue 883: the roll tag is a `Chip`, whose scoped block also sits
+   at two classes and is injected after this sheet, so the two-class form would tie and
+   lose on source order. Only the fill survives — the tag's own `font-size: 0.7rem` went
+   with the second chip scale, since size is exactly what the primitive unifies. */
+.fabricate-manager .manager-chip.manager-character-modifier-roll-tag {
   background: var(--fab-mv2-surface-2);
 }
 
@@ -3180,7 +3197,12 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-selected-tag-pill {
+/* Three classes, not two (issue 883). `Chip.svelte` declares `padding`, `border` and
+   `background` in a scoped block that compiles to `.manager-chip.svelte-<hash>` — also
+   two classes — and is injected AFTER this sheet, so a two-class form here would tie and
+   lose on source order. Every rule below that overrides a chip declaration is written the
+   same way. */
+.fabricate-manager .manager-chip.manager-selected-tag-pill {
   padding-right: var(--fab-space-1);
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
@@ -3518,8 +3540,9 @@
 
    The recipe row leaves the shared 76px row-card geometry group (which the component,
    environment, gathering-task and essence rows still share): it is a denser card at
-   11px/12px padding and radius 9, ~62px tall, so a page of recipes shows more of the
-   library and less of the gaps between it. */
+   11px/12px padding, ~62px tall, so a page of recipes shows more of the library and
+   less of the gaps between it. Its edge, corner and fill are NOT here — they come from
+   the one browser-row treatment (issue 883). */
 .fabricate-manager .manager-recipe-row {
   display: flex;
   gap: var(--fab-space-3);
@@ -3528,10 +3551,7 @@
   min-width: 0;
   min-height: 62px;
   padding: 11px 12px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 9px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-recipe-row.is-off {
@@ -3623,15 +3643,12 @@
   font-weight: 400;
 }
 
+/* The check pill kept its own `min-height`, `padding`, `font-size` and `font-weight`
+   (issue 643 bumped the last two a step so "DC 16" was readable). Issue 883 made the
+   compact chip the only scale, so all four are gone and the pill is sized by the
+   primitive; only the no-wrap survives, and it collides with nothing the chip declares.
+   The `is-*` kind rules below stay at three classes and still outrank it on colour. */
 .fabricate-manager .manager-recipe-check {
-  min-height: 0;
-  padding: 3px var(--fab-space-1);
-  gap: var(--fab-space-chip);
-
-  /* Bumped a step (issue 643): the "DC 16" check pill was too small to read. The DC
-     value keeps its mono face via the `is-mono` modifier on the row. */
-  font-size: 0.7rem;
-  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -4774,9 +4791,10 @@
    rather than compressing, so the narrow (stacked) container query the smoke harness
    photographs reflows the meta under the identity instead of crushing it.
 
-   The geometry matches the recipe row, not the 76px/radius-8 group it left (issue 676):
-   a denser 11px/12px, radius-9, ~62px card, so a page of components shows more of the
-   library and less of the gaps between it. */
+   The geometry matches the recipe row, not the 76px group it left (issue 676): a denser
+   11px/12px, ~62px card, so a page of components shows more of the library and less of
+   the gaps between it. Its edge, corner and fill come from the one browser-row treatment
+   (issue 883). */
 .fabricate-manager .manager-component-row {
   display: flex;
   flex-wrap: wrap;
@@ -4786,10 +4804,7 @@
   min-width: 0;
   min-height: 62px;
   padding: 11px 12px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 9px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-component-row .manager-component-identity {
@@ -4854,10 +4869,7 @@
   width: 100%;
   min-height: 72px;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
   cursor: pointer;
 }
 
@@ -5045,19 +5057,58 @@
   min-width: 0;
 }
 
-/* The shared row-card geometry. The recipe row LEFT this group (issue 643), and the
-   component row followed it (issue 676): both are the denser 11px/12px, radius-9,
-   ~62px card, declared with their own library. */
+/* ONE browser-row treatment (issue 883).
+
+   The Tool Studio's row is canonical — a hairline edge, an 8px corner and a TRANSLUCENT
+   overlay fill that lets the panel behind it show through. Every other manager browser
+   row and value card joins this rule instead of restating it. Before this, eight
+   surfaces declared the same three properties eight times over and had already drifted
+   to three corner radii (8px, 9px, 10px) and two fills (the translucent overlay and a
+   solid `--fab-mv2-surface-2`), which is exactly how a set of copies decays.
+
+   Only the SKIN is shared, and deliberately so. Each surface keeps its own display
+   model, column template, padding and height below, because those genuinely differ: the
+   systems row is a four-column grid, the recipe and component rows are flex cards, the
+   gathering and essence rows key off their own `--fab-mv2-*-grid` custom properties, the
+   Tool Studio row is a flex COLUMN wrapping a body plus an inline editor, and the
+   vocabulary card is a container holding several rows behind `overflow: hidden`.
+
+   A `BrowserRow` Svelte component was considered and rejected on the evidence: it would
+   own nothing but this class name. The layout each row needs is imposed by the parent
+   table's grid template, which a scoped block cannot reach, and the rows differ in
+   element type (`div` / `li` / `article`), ARIA role (`row` versus list item) and
+   interaction (row-level click versus a button inside the row). The component would
+   degenerate into a tag-and-class passthrough, so the shared meaning is stated where it
+   actually lives — as one joined rule.
+
+   The essence row is here although issue 883's list omits it. It shared the geometry
+   group below with the environment and gathering-task rows, so unifying those two and
+   leaving it behind would have converted a shared declaration into the one remaining
+   per-surface copy of the treatment — the precise outcome this rule exists to remove. */
+.fabricate-manager .manager-tools-row,
+.fabricate-manager .manager-vocabulary-card,
+.fabricate-manager .manager-system-row,
+.fabricate-manager .manager-recipe-row,
+.fabricate-manager .manager-component-row,
+.fabricate-manager .manager-environment-row,
+.fabricate-manager .manager-gathering-task-row,
+.fabricate-manager .manager-gathering-event-row,
+.fabricate-manager .manager-essence-row {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+}
+
+/* The shared row-card geometry — size only; the skin is the joined rule above. The
+   recipe row LEFT this group (issue 643), and the component row followed it (issue 676):
+   both are the denser 11px/12px, ~62px card, declared with their own library. */
 .fabricate-manager .manager-environment-row,
 .fabricate-manager .manager-gathering-task-row,
 .fabricate-manager .manager-essence-row {
   width: 100%;
   min-height: 76px;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-recipe-row:hover,
@@ -5527,37 +5578,23 @@
   max-width: 100%;
 }
 
-/* Pill (issue 643): fully-rounded rather than 6px-cornered, matching the Recipe
-   Studio language. `manager-chip` is shared by every manager screen, so this is
-   restyled once here rather than forked into a recipe-only component — a second
-   chip idiom sitting beside the old one would be plainly visible on any screen
-   that shows both. */
-.fabricate-manager .manager-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-chip);
-  width: fit-content;
-  max-width: 100%;
-  min-height: 24px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-06);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
+/* The chip's own appearance is NOT here. It lives in `Chip.svelte`'s scoped block
+   (issue 883), which is the one implementation of the manager's one chip. The base rule
+   this sheet used to carry — 24px at 0.75rem/1.2 — plus its `is-mono` variant and its
+   eight tone rules are DELETED rather than left inert: they existed only to paint the
+   sites that had not been converted yet, and a surviving base rule is exactly what the
+   next hand-rolled `<span class="manager-chip">` would quietly land on. With them gone,
+   a hand-rolled chip renders as bare text, which is the point.
 
-/* Numerics are mono everywhere in the Recipe Studio language: counts, DCs, step
-   numbers, quantities. Opt-in via `is-mono` so a text chip is unaffected.
-   `tabular-nums` keeps columns of numbers aligned even on the fallback face. */
-.fabricate-manager .manager-chip.is-mono {
-  font-family: var(--fab-font-mono);
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-}
+   What legitimately stays global is what a scoped block cannot reach: an ancestor-context
+   rule (a chip in the header action bar lining up with the 34px control beside it) and a
+   chip's position inside its parent's layout. Every such rule that also overrides a
+   declaration the primitive makes is written at THREE classes — `.fabricate-manager
+   .manager-chip.<sibling>` — because Svelte compiles the scoped block to
+   `.manager-chip.svelte-<hash>`, two classes, and `css: 'injected'` puts it after this
+   sheet, so a two-class sibling would tie and lose on source order with nothing failing.
+
+   `manager-chip-row` and `manager-chip-field` are CONTAINERS, not chips, and stay. */
 
 .fabricate-manager .manager-chip-row {
   display: flex;
@@ -5565,37 +5602,6 @@
   gap: var(--fab-space-chip);
   flex-wrap: wrap;
   min-width: 0;
-}
-
-.fabricate-manager .manager-chip.is-active {
-  border-color: var(--fab-success-border);
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-chip.is-disabled {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-warning-soft);
-}
-
-.fabricate-manager .manager-chip.is-warning {
-  border-color: var(--fab-warning-border);
-  color: var(--fab-warning-text);
-  background: var(--fab-warning-soft);
-}
-
-/* Informational tone — the recipe library's active-filter chips. */
-.fabricate-manager .manager-chip.is-info {
-  border-color: var(--fab-info-border);
-  color: var(--fab-info-text);
-  background: var(--fab-info-soft);
-}
-
-.fabricate-manager .manager-chip.is-danger {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
 }
 
 .fabricate-manager .manager-stat {
@@ -5892,11 +5898,11 @@
   min-height: 0;
 }
 
+/* The edge, corner and fill come from the one browser-row treatment (issue 883); this
+   card carried its own 10px corner and a solid fill until then. `overflow: hidden` is
+   what clips its inner rows to that shared corner. */
 .fabricate-manager .manager-vocabulary-card {
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 10px;
-  background: var(--fab-mv2-surface-2);
   overflow: hidden;
 }
 
@@ -5916,12 +5922,16 @@
   flex: 0 0 34px;
 }
 
-.fabricate-manager .manager-vocabulary-chip-unused {
+/* Three classes since issue 883: both are `Chip`s, and both restate the fill and
+   foreground the primitive already sets. The scoped chip block also sits at two classes
+   and is injected after this sheet, so the two-class form would tie and lose on source
+   order — an unused row would silently repaint itself as a default chip. */
+.fabricate-manager .manager-chip.manager-vocabulary-chip-unused {
   background: transparent;
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-vocabulary-chip-locked {
+.fabricate-manager .manager-chip.manager-vocabulary-chip-locked {
   background: var(--fab-overlay-light-035);
   color: var(--fab-mv2-text-muted);
 }
@@ -7549,8 +7559,23 @@
    being later in the file, won the tie: the radio stretched to fill the flex line (~643px in
    a 669px card), starving the option body to 0px so every description wrapped one word per
    line, and squared off the dot. A radio is a custom-drawn control, never a text field, so
-   exclude it here — the same fix-once-for-every-surface move as the stepper. */
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),
+   exclude it here — the same fix-once-for-every-surface move as the stepper.
+
+   `:not([type='range'])` — the THIRD blanket field rule to need it, after the two
+   f4402c27 fixed (issue 883). A chance slider paints a 6px track and a coloured fill BEHIND
+   a transparent range input. This rule computes to (0,4,1) and beats the slider's own
+   (0,3,1) reset, so the gathering EVENT editor's "Drop rate" field — a `.manager-field` that
+   neither edit-view rule reached — took an opaque `--fab-mv2-bg` fill across a 518x36 box
+   and covered a 402px fill completely, leaving only the thumb. That is the reported symptom
+   of issue 883 surviving in a third place. The gathering drop inspector escaped it only
+   because `.manager-drop-editor-card [data-gathering-drop-inspector-rate] … input[type="range"]`
+   re-declares `background: transparent` at (0,5,1); the height half of this rule is also why
+   the event editor's slider stood 36px tall with 8px of side padding rather than the 28px/0
+   the control asks for.
+
+   Safe to exclude wholesale: `ChanceSlider.svelte` is the only source of a `type="range"`
+   input in the codebase, and it always wants a transparent, unpadded control. */
+.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-field textarea,
 .fabricate-manager .manager-component-inline-control {
@@ -7562,7 +7587,9 @@
   background: var(--fab-mv2-bg);
 }
 
-.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),
+/* Same exclusion, same reason, and this half is why the event editor's slider also stood
+   36px tall with 8px of side padding instead of the 28px/0 the control asks for. */
+.fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
 .fabricate-manager .manager-field select,
 .fabricate-manager .manager-component-inline-control {
   height: 36px;
@@ -7667,6 +7694,11 @@
 }
 
 .fabricate-manager .manager-recipe-steps-requirements .manager-chip {
+  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
+     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
+     height it would read as a rounded rectangle instead of the pill it has always been
+     (issue 883). */
+  border-radius: 999px;
   box-sizing: border-box;
   height: 34px;
   min-height: 34px;
@@ -7682,7 +7714,15 @@
   display: inline-flex;
 }
 
-.fabricate-manager .manager-recipe-duration-trigger {
+/* A control-height chip: 34px so it lines up with the inputs and buttons beside it.
+   Three classes because the primitive sets `min-height` and, on a button, `height: auto`
+   (issue 883). */
+.fabricate-manager .manager-chip.manager-recipe-duration-trigger {
+  /* Explicit pill: these are single-line chips made TALL to align with adjacent 34px
+     controls, not chips that wrap. The primitive's 10px radius follows a wrap; at this
+     height it would read as a rounded rectangle instead of the pill it has always been
+     (issue 883). */
+  border-radius: 999px;
   box-sizing: border-box;
   height: 34px;
   min-height: 34px;
@@ -8895,7 +8935,10 @@
 /* Outcome routing chips are rounded-corner rectangles, not the default full-round
    chip pill, so a routed outcome ("Flawed", "Standard") reads as a tag on the
    result set rather than a status bubble (issue 643). */
-.fabricate-manager .manager-recipe-routing-chip {
+
+/* Three classes: `gap` and `border-radius` both collide with the chip primitive, and a
+   999px pill would be a visible change (issue 883). */
+.fabricate-manager .manager-chip.manager-recipe-routing-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -9303,7 +9346,10 @@
    centring so the label sits left and the remove button right regardless of tag
    length; and the pinned height keeps every chip the same box despite tag glyphs
    or sub-pixel rounding. */
-.fabricate-manager .manager-recipe-tag-chip {
+
+/* Three classes: `justify-content` and `min-height` collide with the chip primitive,
+   and this pill carries a remove button so it is deliberately taller (issue 883). */
+.fabricate-manager .manager-chip.manager-recipe-tag-chip {
   gap: var(--fab-space-chip);
   box-sizing: border-box;
   margin: 0;
@@ -9791,21 +9837,9 @@
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-evidence-list {
-  margin: var(--fab-space-chip) 0 0;
-  padding: 0 0 0 var(--fab-space-4);
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.82rem;
-  line-height: 1.4;
-}
-
-.fabricate-manager .manager-evidence-list > li {
-  margin: 0 0 var(--fab-space-1);
-}
-
-.fabricate-manager .manager-evidence-list > li:last-child {
-  margin-bottom: 0;
-}
+/* The evidence-list bullet rules are gone: its one consumer, the Tags & Categories contextual
+   help, was a disc-bulleted re-derivation of the Tool Studio's explainer list at a
+   different body scale. Both render `ExplainerCard.svelte` now (issue 881). */
 
 .fabricate-manager .manager-fact {
   display: block;
@@ -10095,14 +10129,12 @@
   min-width: 0;
 }
 
+/* Size only; the edge, corner and fill are the one browser-row treatment (issue 883). */
 .fabricate-manager .manager-gathering-event-row {
   width: 100%;
   min-height: 76px;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
 }
 
 .fabricate-manager .manager-gathering-event-row:hover {
@@ -10391,7 +10423,12 @@
   text-decoration: underline;
 }
 
-.fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+/* Excludes `[type="range"]` for the reason documented on the task edit view's twin rule:
+   the chance slider paints its fill behind a transparent input, and this blanket rule
+   outranks the slider's own reset (issue 883). */
+.fabricate-manager
+  .manager-gathering-event-edit-view
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);
@@ -10471,7 +10508,16 @@
   overflow: auto;
 }
 
-.fabricate-manager .manager-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+/* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it:
+   a range input is drawn by the chance slider, which paints its own 6px track and a
+   coloured fill BEHIND the input and relies on the input itself being transparent. This
+   blanket field rule computes to (0,4,1) and beats the slider's own (0,3,1) reset, so
+   without the exclusion the input takes an opaque `--fab-mv2-surface-1` fill at 121x32 and
+   covers the bar completely — leaving only the thumb visible, which reads as "the slider
+   renders a dot and no bar" (issue 883). */
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);
@@ -11002,14 +11048,14 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-task-drops-summary-card {
-  display: grid;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3) var(--fab-space-4);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
-}
+/* The drops summary card has no rule of its own (issue 883). It used to restate the whole
+   `.manager-inspector-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px
+   `--fab-mv2-border` edge and an 8px radius were all the same values the shell already
+   declares — and then diverged on the only two it changed: `--fab-mv2-surface-2` instead of
+   the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px.
+   So it read as a different card from the "Gathering task details" and "Used in
+   environments" cards immediately above and below it in the same rail, for no reason anyone
+   had stated. Deleting the rule is the fix: nothing here was additive. */
 
 .fabricate-manager .manager-task-drops-summary-list {
   display: flex;
@@ -12166,18 +12212,6 @@
   padding-right: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-chip.is-positive {
-  border-color: var(--fab-success-border);
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-chip.is-negative {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
-}
-
 .fabricate-manager .manager-drop-modifier-pill {
   max-width: 100%;
   border-color: var(--fab-mv2-border);
@@ -12330,7 +12364,11 @@
   padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
-.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="text"] {
+/* `[type="number"]`, not `[type="text"]`: the inspector's rate field is rendered by
+   `ChanceSlider` now (issue 883), and the shared control uses a real number input. Keyed on
+   the type it actually renders rather than on `:is([type="text"], [type="number"])`, so a
+   branch that matches nothing cannot rot here unnoticed. */
+.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="number"] {
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
@@ -12343,7 +12381,7 @@
   grid-template-columns: 64px minmax(0, 1fr);
 }
 
-.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="text"] {
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="number"] {
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-chip);
@@ -12451,11 +12489,6 @@
   margin: 0;
   color: var(--fab-warning-text);
   font-size: 0.9rem;
-}
-
-.fabricate-manager .manager-chip.is-neutral {
-  color: var(--fab-mv2-text-muted);
-  border-color: var(--fab-mv2-border);
 }
 
 .fabricate-manager .manager-task-summary-card h4,
@@ -13695,13 +13728,16 @@
   grid-row: 3;
 }
 
+/* The Tool Studio's right-hand panel is the shared inspector surface written through the
+   shared token, not a bespoke `--fab-bg-2` aside that happened to resolve to the same
+   colour (issue 881). Only its grid placement and its roomier padding are its own. */
 .fabricate-manager .manager-tool-preview {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-4);
   border-left: 1px solid var(--fab-mv2-border);
-  background: var(--fab-bg-2);
+  background: var(--fab-mv2-surface-1);
   grid-column: 3;
   grid-row: 2 / 4;
 }
@@ -13760,30 +13796,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.fabricate-manager .manager-tool-preview-rules > div {
-  display: grid;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-tool-preview-rules dt {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.fabricate-manager .manager-tool-preview-rules dd {
-  margin: 0;
-  font-size: 0.76rem;
-  font-weight: 600;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
 }
 
 .fabricate-manager .manager-tool-tab-stack {
@@ -14134,39 +14146,12 @@
   gap: var(--fab-space-1);
 }
 
+/* The row itself is `IconFactRow.svelte`, whose appearance lives in that component's
+   scoped block (issue 881). What stays here is the LIST's concern only: an <li> is a grid
+   item, whose `min-width: auto` default lets a long unbreakable fact widen the whole
+   column. A scoped block cannot reach an ancestor, so a container concern stays global. */
 .fabricate-manager .manager-tool-preview-rules > li {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--fab-space-2);
   min-width: 0;
-  padding: 9px 11px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager .manager-tool-preview-rules > li > i {
-  color: var(--fab-mv2-accent);
-  text-align: center;
-}
-
-.fabricate-manager .manager-tool-preview-rules strong,
-.fabricate-manager .manager-tool-preview-rules small {
-  display: block;
-}
-
-.fabricate-manager .manager-tool-preview-rules strong {
-  font-size: 0.76rem;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.fabricate-manager .manager-tool-preview-rules small {
-  margin-top: var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.64rem;
-  line-height: 1.3;
 }
 
 .fabricate-manager .manager-tool-preview-live {
@@ -14197,67 +14182,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-tool-how-it-works {
-  display: grid;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-04);
-}
-
-.fabricate-manager .manager-tool-how-it-works h3 {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  margin: 0;
-  font-size: 0.625rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.fabricate-manager .manager-tool-how-it-works ol {
-  display: grid;
-  gap: 11px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-tool-docs-link {
-  justify-self: stretch;
-  min-height: 32px;
-}
-
-.fabricate-manager .manager-tool-how-it-works li {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--fab-space-2);
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.6875rem;
-  line-height: 1.5;
-}
-
-.fabricate-manager .manager-tool-how-it-works li > i,
-.fabricate-manager .manager-tool-how-it-works li button {
-  color: var(--fab-mv2-accent);
-}
-
-.fabricate-manager .manager-tool-how-it-works li > i {
-  margin-top: 0.2em;
-}
-
-.fabricate-manager .manager-tool-how-it-works li button {
-  grid-column: 2;
-  justify-self: start;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-size: 0.66rem;
-}
+/* The tool how-it-works card rules are gone: the Tool Studio's explainer is now the shared
+   `ExplainerCard.svelte`, which wears the manager's own `.manager-inspector-card` shell
+   and `.manager-card-title` heading instead of restating a bordered card and a fourth
+   heading scale, and keeps its remaining rules in its own scoped block (issue 881). Its
+   `li button` rules went with it — nothing has rendered a button in that list. */
 
 .fabricate-manager .manager-tool-overview-fields {
   display: grid;
@@ -14849,15 +14778,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .fabricate-manager .manager-tool-how-it-works li {
-    grid-template-columns: 20px minmax(0, 1fr);
-  }
-
-  .fabricate-manager .manager-tool-how-it-works li button {
-    grid-column: 2;
-    justify-self: start;
-  }
-
   .fabricate-manager .manager-tool-repair-option {
     grid-template-columns: max-content minmax(0, 1fr) max-content;
   }
@@ -15421,19 +15341,21 @@
   gap: var(--fab-space-2);
 }
 
+/* The reference row for issue 883. Its edge, corner and fill now live in the one
+   browser-row treatment that every manager row joins, so only what is specific to this
+   row — the column stack that carries the inline editor, the dirty-pip anchor and the
+   state transition — is declared here. */
 .fabricate-manager .manager-tools-row {
   display: flex;
   flex-direction: column;
   position: relative;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-03);
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
+/* Selection moves the EDGE only: the fill is already the shared treatment's, so
+   restating it here would be the same statement made twice. */
 .fabricate-manager .manager-tools-row.is-selected {
   border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-overlay-light-03);
   box-shadow: none;
 }
 
@@ -16275,7 +16197,13 @@
    They sit a step smaller than the tab label, and a min-width wider than their height
    (against the inherited chip min-height) keeps a single digit reading as a small
    pill with centred text rather than a circle. */
-.fabricate-manager .manager-editor-tab-badge {
+
+/* Written at THREE classes on purpose (issue 883). The chip's own rules now live in
+   `Chip.svelte`'s scoped block as `.manager-chip.svelte-<hash>` — two classes — injected
+   after the global sheet, so the old two-class form of this selector would have tied and
+   lost on source order, silently restoring the chip scale over this deliberately smaller
+   tab badge. Every tab badge is a chip, so qualifying on `.manager-chip` costs nothing. */
+.fabricate-manager .manager-chip.manager-editor-tab-badge {
   margin-left: var(--fab-space-2xs);
   min-width: 1.4rem;
   min-height: 18px;
@@ -18119,7 +18047,9 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-travel-realms-count-chip {
+/* Three classes: the tighter 4px gap collides with the chip primitive’s 6px
+   (issue 883), and at two classes it would tie with the scoped block and lose. */
+.fabricate-manager .manager-chip.manager-travel-realms-count-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);
@@ -18378,7 +18308,9 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-travel-parties-members-chip {
+/* Three classes: the tighter 4px gap collides with the chip primitive’s 6px
+   (issue 883), and at two classes it would tie with the scoped block and lose. */
+.fabricate-manager .manager-chip.manager-travel-parties-members-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);
@@ -19943,22 +19875,10 @@
   clip-path: inset(50%);
 }
 
-/* The compact chip scale, shared by the Tools library rows and the GM Knowledge
-   surface's rows (issue 785). One rule with several consumers rather than byte-identical
-   blocks. The Tools library row is canonical for row chip scale.
-
-   `-copy-heading` is here as well as `-copy-chips`: the type/quantity pills on the
-   owned-copy row and the category chip on the learned row live in the HEADING beside
-   the name, so without this they inherited the ambient chip size and out-sized the
-   Tools rows they sit alongside in the same manager. */
-.fabricate-manager .manager-tools-library-chips .manager-chip,
-.fabricate-manager .manager-knowledge-copy-chips .manager-chip,
-.fabricate-manager .manager-knowledge-copy-heading .manager-chip {
-  min-height: 20px;
-  padding: 0 var(--fab-space-chip);
-  font-size: 0.62rem;
-  line-height: 1;
-}
+/* The compact chip scale used to be an OPT-IN join here, listing the Tools library rows
+   and the two GM Knowledge row containers (issue 785). It is gone: the compact scale is
+   what a chip IS now, declared once in `Chip.svelte` (issue 883), so there is no longer
+   a size to opt into and no list for the next screen to be added to. */
 
 .fabricate-manager .manager-tools-library-actions {
   padding-right: var(--fab-space-3);
@@ -20056,11 +19976,8 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-tool-inspector-hero .manager-chip {
-  min-height: 20px;
-  padding: 0 var(--fab-space-chip);
-  font-size: 0.62rem;
-}
+/* The Tool inspector hero's own copy of the compact scale is gone (issue 883): it stated
+   exactly the values `Chip.svelte` now declares for every chip. */
 
 .fabricate-manager .manager-tool-browser-inspector > .manager-muted {
   margin: 0;
@@ -20111,38 +20028,9 @@
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-tool-inspector-rule-card {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 7px;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card > i {
-  color: var(--fab-mv2-accent);
-  text-align: center;
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card > span {
-  display: grid;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card strong {
-  font-size: 0.72rem;
-}
-
-.fabricate-manager .manager-tool-inspector-rule-card small {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.64rem;
-  line-height: 1.3;
-}
+/* The tool inspector rule-card rules are gone: the library inspector renders the SAME
+   `IconFactRow.svelte` the editor's behavior preview does, from the same behavior-fact
+   projection, so the two geometries this class used to hold apart are one (issue 881). */
 
 .fabricate-manager .manager-tool-inspector-details {
   display: flex;

@@ -22,6 +22,7 @@
   each tab keeps its own distinct test hook rather than three tabs colliding on one.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
@@ -194,10 +195,9 @@
         aria-label={searchLabel}
       />
     </label>
-    <span class="manager-chip manager-vocabulary-count" data-vocabulary-shown-count>
-      <i class="fas fa-hashtag" aria-hidden="true"></i>
+    <Chip icon="fas fa-hashtag" class="manager-vocabulary-count" data-vocabulary-shown-count>
       <span>{entriesLabel}</span>
-    </span>
+    </Chip>
   </div>
 
   <div class="manager-vocabulary-list">
@@ -221,15 +221,10 @@
             <strong>{lockedRow.name}</strong>
           </div>
           {#if (lockedRow.totalUsage || 0) > 0}
-            <span class="manager-chip is-warning"
-              ><i class="fas fa-link" aria-hidden="true"></i>{refText(lockedRow)}</span
-            >
+            <Chip tone="warning" icon="fas fa-link">{refText(lockedRow)}</Chip>
           {/if}
-          <span class="manager-chip manager-vocabulary-chip-locked"
-            ><i class="fas fa-lock" aria-hidden="true"></i>{text(
-              'FABRICATE.Admin.Manager.TagsCategories.Locked',
-              'Locked'
-            )}</span
+          <Chip icon="fas fa-lock" class="manager-vocabulary-chip-locked"
+            >{text('FABRICATE.Admin.Manager.TagsCategories.Locked', 'Locked')}</Chip
           >
         </div>
       </div>
@@ -256,15 +251,10 @@
             <strong>{row.displayName || row.name}</strong>
           </div>
           {#if row.totalUsage > 0}
-            <span class="manager-chip is-warning"
-              ><i class="fas fa-link" aria-hidden="true"></i>{refText(row)}</span
-            >
+            <Chip tone="warning" icon="fas fa-link">{refText(row)}</Chip>
           {:else}
-            <span class="manager-chip manager-vocabulary-chip-unused"
-              ><i class="fa-regular fa-circle" aria-hidden="true"></i>{text(
-                'FABRICATE.Admin.Manager.TagsCategories.Unused',
-                'Unused'
-              )}</span
+            <Chip icon="fa-regular fa-circle" class="manager-vocabulary-chip-unused"
+              >{text('FABRICATE.Admin.Manager.TagsCategories.Unused', 'Unused')}</Chip
             >
           {/if}
           <button

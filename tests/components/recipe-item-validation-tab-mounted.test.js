@@ -9,7 +9,12 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-validation-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-  compiledModules: ['src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte'],
+  compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
+    // omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
+  ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte'
 });
 

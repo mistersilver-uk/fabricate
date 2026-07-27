@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
   import Stepper from '../../components/Stepper.svelte';
@@ -968,12 +969,9 @@
                    off. Hiding it meant authoring an ordered progressive list, or a
                    routed set of groups, with nothing on screen saying which — precisely
                    when the panel is at its most confusing. -->
-              <span class="manager-chip is-info manager-salvage-mode-pill" data-salvage-mode={salvageResolutionMode}>
-                {#if salvageModeOption?.icon}
-                  <i class={salvageModeOption.icon} aria-hidden="true"></i>
-                {/if}
+              <Chip tone="info" icon={salvageModeOption?.icon || ''} class="manager-salvage-mode-pill" data-salvage-mode={salvageResolutionMode}>
                 <span>{salvageModeLabel}</span>
-              </span>
+              </Chip>
               <span class="manager-component-heading-divider" aria-hidden="true"></span>
             {/if}
             <span class="manager-component-micro-label">{text('FABRICATE.Admin.Manager.Component.SalvageEditor.EnabledMicro', 'Enabled')}</span>

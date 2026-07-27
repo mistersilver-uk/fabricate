@@ -34,6 +34,13 @@ const harness = createMountedComponentHarness({
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // The shared side-panel explainer card and icon fact row (issue 881); the behavior
+    // preview renders both.
+    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    // The shared chip (issue 883); the library rows, the browser inspector, the editor
+    // tab bar and the behavior preview all render it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
@@ -219,6 +226,22 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(sourceCard.querySelector('[data-tool-source-picker]'), null);
     assert.equal(sourceCard.querySelector('.manager-tool-source-replace'), null);
     assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 6);
+    // The bold lead-in and its prose are one sentence and need a separator between them.
+    // A literal space in the template is the last token inside the `{#if}`, and Svelte
+    // trims block-trailing whitespace, so they rendered welded: "…game-world Item.Drag any
+    // Item…". Every existing assertion here matches MID-sentence and so cannot see the
+    // join; this one straddles it. Found in a screenshot, not by a test (issue 881).
+    for (const row of root.querySelectorAll('[data-tool-how-it-works] li')) {
+      const lead = row.querySelector('strong')?.textContent;
+      if (!lead) continue;
+      // Asserted on the JOIN, not the string start: the row's textContent carries leading
+      // whitespace from the glyph element, so anchoring at position 0 fails on markup that
+      // is actually correct.
+      assert.ok(
+        row.textContent.includes(`${lead} `),
+        `explainer lead-in "${lead}" must be followed by a space, got "${row.textContent.slice(0, 60)}"`
+      );
+    }
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
       /supplies the name, art, and description/
@@ -245,7 +268,9 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelector('[data-tool-how-it-works] button'), null);
     assert.equal(
-      root.querySelector('[data-tool-how-it-works] a.manager-tool-docs-link')?.textContent.trim(),
+      root
+        .querySelector('[data-tool-how-it-works] a.manager-explainer-card-docs')
+        ?.textContent.trim(),
       'Read the docs'
     );
     assert.equal(root.querySelector('[data-tool-name]'), null);
@@ -787,6 +812,12 @@ describe('Tool Studio editor (mounted)', () => {
       null
     );
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
+    // Issue 881: every effective-rule row is the shared icon fact row, so the preview and
+    // the library inspector cannot drift back into two geometries for one projection.
+    assert.equal(
+      root.querySelectorAll('[data-tool-preview-rule] > .manager-icon-fact-row').length,
+      4
+    );
     assert.ok(root.querySelector('[data-tool-preview-live-update]'));
   });
 
@@ -867,7 +898,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
   });
 
-  it('uses prototype preview copy and omits the live-update note outside Validation', async () => {
+  it('uses prototype preview copy and shows the live-update note on every tab', async () => {
     const root = await harness.mount(props({ activeTab: 'breakage' }));
 
     assert.equal(
@@ -885,7 +916,20 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof');
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /5 uses.*@prof/);
-    assert.equal(root.querySelector('[data-tool-preview-live-update]'), null);
+    // The note stands on EVERY tab (issue 883). The preview updates live whichever tab you
+    // are editing, so gating the statement on Validation understated it — the maintainer
+    // moved it above Effective rules and dropped the condition, which retires the
+    // prototype's tab-scoped placement deliberately.
+    //
+    // Asserted as a boolean rather than by comparing the node to `null`/an element: on
+    // failure node:assert serialises the actual value for its diff, and walking a mounted
+    // happy-dom element's circular tree exhausts the heap. The suite then reports
+    // `# cancelled` with no message, which reads like a hang rather than a failed
+    // expectation — this exact assertion cost an OOM to diagnose.
+    assert.ok(
+      !!root.querySelector('[data-tool-preview-live-update]'),
+      'the live-update note renders on every tab, not only Validation'
+    );
   });
 
   it('localizes effective behavior states instead of exposing stored mode tokens', async () => {

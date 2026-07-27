@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ChanceSlider from '../../components/ChanceSlider.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -186,13 +187,10 @@
     onUpdateEvent({ dangerTags: dangerTags.filter(value => value !== tag) });
   }
 
-  function onDropRateInput(event) {
-    const raw = Number(event.currentTarget.value);
-    if (!Number.isFinite(raw)) return;
-    const clamped = Math.min(100, Math.max(1, Math.floor(raw)));
-    onUpdateEvent({ dropRate: clamped });
-  }
-
+  // `onDropRateInput` is gone with the hand-rolled slider it drove (issue 883):
+  // `ChanceSlider` does the clamping-and-stepping itself, against the `min={1}` the markup
+  // passes it. `dropRateValid` stays, because it judges the STORED value — an event
+  // imported or migrated with a 0 rate must still surface its error.
 </script>
 
 <main
@@ -378,34 +376,32 @@
       <div class="manager-task-availability-row">
         <label class="manager-field manager-drop-rate-editor">
           <span>{text('FABRICATE.Admin.Manager.Environment.Events.DropRatePercent', 'Drop rate (%)')}</span>
-          <span class="manager-drop-rate-value">
-            <span class="manager-drop-rate-percent">
-              <input
-                type="text"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                value={dropRateValue}
-                oninput={onDropRateInput}
-                data-gathering-event-field="dropRate"
-                aria-label={text('FABRICATE.Admin.Manager.Environment.Events.DropRatePercent', 'Drop rate (%)')}
-              />
-              <span aria-hidden="true">%</span>
-            </span>
-            <span class={`manager-drop-rate-control ${dropRateTierClass(dropRateValue)}`} style={`--fab-drop-rate-value: ${dropRateValue}%; --fab-drop-rate-color: ${dropRateTierColor(dropRateValue)};`}>
-              <span class="manager-drop-rate-track" aria-hidden="true">
-                <span class="manager-drop-rate-fill"></span>
-              </span>
-              <input
-                type="range"
-                min="1"
-                max="100"
-                step="1"
-                value={dropRateValue}
-                oninput={onDropRateInput}
-                aria-label={text('FABRICATE.Admin.Manager.Environment.Events.DropRatePercent', 'Drop rate (%)')}
-              />
-            </span>
-          </span>
+          <!--
+            The shared control (issue 883). This view used to hand-roll the same
+            track/fill/range structure the gathering drop rows render through `ChanceSlider`,
+            and re-derive the same `--fab-drop-rate-value` / `--fab-drop-rate-color` inline.
+
+            `min={1}` is kept, and it is NOT drift: an event's floor genuinely is 1. This
+            surface says so in its own hint ("Chance from 1 to 100…"), enforces it in
+            `dropRateValid`, and shows a validation error below 1. A task DROP has a real
+            "none" tier at 0, so its sliders floor at 0. Two domain rules, not two spellings
+            of one.
+
+            The fill also gets fractionally more honest here: the hand-rolled markup set the
+            fill width to the raw value while the thumb sat at `(value - 1) / 99`, so bar and
+            thumb disagreed slightly at every position. `ChanceSlider` derives both from the
+            same range, so they now agree.
+          -->
+          <ChanceSlider
+            value={dropRateValue}
+            min={1}
+            numberLabel={text('FABRICATE.Admin.Manager.Environment.Events.DropRatePercent', 'Drop rate (%)')}
+            rangeLabel={text('FABRICATE.Admin.Manager.Environment.Events.DropRatePercent', 'Drop rate (%)')}
+            resolveColor={dropRateTierColor}
+            controlClass={dropRateTierClass(dropRateValue)}
+            numberInputProps={{ 'data-gathering-event-field': 'dropRate' }}
+            onChange={(dropRate) => onUpdateEvent({ dropRate })}
+          />
           {#if !dropRateValid}
             <span class="manager-field-error">{text('FABRICATE.Admin.Manager.Environment.Events.DropRateInvalid', 'Drop rate must be between 1 and 100.')}</span>
           {/if}

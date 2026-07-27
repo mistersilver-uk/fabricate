@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -118,7 +119,7 @@
         <option value="disabled">{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option>
       </select>
     </label>
-    <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredSystems.length).replace('{total}', systems.length)}</span>
+    <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredSystems.length).replace('{total}', systems.length)}</Chip>
     {#if filtersActive}
       <button type="button" class="manager-button manager-clear-filters" data-clear-filters="systems" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>
@@ -186,7 +187,7 @@
               </span>
             </span>
             <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}>
-              <span class="manager-chip">{resolutionModeLabel(system.resolutionMode)}</span>
+              <Chip>{resolutionModeLabel(system.resolutionMode)}</Chip>
             </span>
             <span role="cell" class="manager-labeled-cell manager-status-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}>
               <button

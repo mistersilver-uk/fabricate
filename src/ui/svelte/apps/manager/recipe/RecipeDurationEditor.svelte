@@ -18,6 +18,7 @@
     onChange(next)  — called with the normalized requirement or null
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../../actions/portal.js';
@@ -166,10 +167,12 @@
   bind:this={pickerRoot}
   use:dismissOnOutsideClick={{ enabled: open, onDismiss: close, additionalNodes: () => [popoverRoot] }}
 >
-  <button
+  <Chip
+    tag="button"
+    bind:element={triggerButton}
+    icon="fa-solid fa-clock"
+    class={`manager-recipe-duration-trigger ${hasDuration ? '' : 'is-empty'}`}
     type="button"
-    bind:this={triggerButton}
-    class={`manager-chip manager-recipe-duration-trigger ${hasDuration ? '' : 'is-empty'}`}
     data-recipe-duration-trigger
     aria-haspopup="dialog"
     aria-expanded={open}
@@ -181,9 +184,8 @@
     onclick={toggle}
     oncontextmenu={clearDuration}
   >
-    <i class="fa-solid fa-clock" aria-hidden="true"></i>
     <span>{triggerLabel}</span>
-  </button>
+  </Chip>
 
   {#if open}
     <div

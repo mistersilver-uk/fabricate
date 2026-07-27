@@ -27,6 +27,7 @@
   it is unit tested without a DOM and is written once for both lists.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
@@ -404,9 +405,9 @@
           {#if showRecipeCategories}
             <!-- Through the SAME label helper the rows use: a recipe with no category
                  (or the reserved `general`) is localized, not rendered raw. -->
-            <span class="manager-chip" data-recipe-category>
+            <Chip data-recipe-category>
               {getRecipeCategoryLabel(selectedRecipe.category, localize)}
-            </span>
+            </Chip>
           {/if}
           <StatusPill
             tone={selectedRecipe.enabled === false ? 'subtle' : 'success'}

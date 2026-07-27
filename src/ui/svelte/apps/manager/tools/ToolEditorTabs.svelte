@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let { activeTab = 'overview', errorCount = 0, requirementCount = 0, onChange = () => {} } = $props();
@@ -67,12 +68,13 @@
       <i class={tab[2]} aria-hidden="true"></i>
       <span>{text(`Tab${tab[0][0].toUpperCase()}${tab[0].slice(1)}`, tab[1])}</span>
       {#if tab[0] === 'requirements' && requirementCount > 0}
-        <span class="manager-chip is-neutral manager-editor-tab-badge">{requirementCount}</span>
+        <Chip tone="neutral" class="manager-editor-tab-badge">{requirementCount}</Chip>
       {:else if tab[0] === 'validation'}
-        <span
-          class={`manager-chip manager-editor-tab-badge ${errorCount > 0 ? 'is-danger' : 'is-positive is-valid'}`}
+        <Chip
+          tone={errorCount > 0 ? 'danger' : 'positive'}
+          class={`manager-editor-tab-badge ${errorCount > 0 ? '' : 'is-valid'}`}
           aria-label={errorCount > 0 ? issueCountText(errorCount) : text('AllValid', 'All checks pass')}
-        >{errorCount > 0 ? errorCount : '✓'}</span>
+        >{errorCount > 0 ? errorCount : '✓'}</Chip>
       {/if}
     </button>
   {/each}

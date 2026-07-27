@@ -10,6 +10,7 @@
   store's confirm dialog with referenced-by evidence.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
@@ -153,7 +154,7 @@
                 <i class="fas fa-eye-slash manager-travel-realm-secret-flag" aria-hidden="true" title={text('FABRICATE.Admin.Manager.Travel.Realms.SecretChip', 'Secret')}></i>
               {/if}
               {#if !realm.enabled}
-                <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.Realms.DisabledChip', 'Disabled')}</span>
+                <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.Realms.DisabledChip', 'Disabled')}</Chip>
               {/if}
             </button>
             <button

@@ -27,6 +27,7 @@
    - onPatch(patch).
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../SegmentedControl.svelte';
@@ -384,8 +385,7 @@
                 {#if selectedRequiredKnowledge.length > 0}
                   <div class="manager-selected-tag-row" role="list">
                     {#each selectedRequiredKnowledge as option (option.id)}
-                      <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-required-knowledge={option.id}>
-                        <i class="fas fa-scroll" aria-hidden="true"></i>
+                      <Chip class="manager-selected-tag-pill" icon="fas fa-scroll" role="listitem" data-recipe-item-required-knowledge={option.id}>
                         <span>{option.name}</span>
                         <button
                           type="button"
@@ -394,7 +394,7 @@
                           title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeRemove', 'Remove')}
                           onclick={() => removeRequiredKnowledge(option.id)}
                         ><i class="fas fa-xmark" aria-hidden="true"></i></button>
-                      </span>
+                      </Chip>
                     {/each}
                   </div>
                 {/if}
@@ -440,8 +440,7 @@
                 {#if selectedCharacterPrerequisites.length > 0}
                   <div class="manager-selected-tag-row" data-recipe-item-character-prereq-chips role="list">
                     {#each selectedCharacterPrerequisites as prereq (prereq.id)}
-                      <span class="manager-chip manager-selected-tag-pill" role="listitem" data-recipe-item-character-prereq={prereq.id} title={prerequisitePreview(prereq)}>
-                        <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
+                      <Chip class="manager-selected-tag-pill" icon={prereq.icon || 'fas fa-user-check'} role="listitem" data-recipe-item-character-prereq={prereq.id} title={prerequisitePreview(prereq)}>
                         <span>{prereq.name}</span>
                         <button
                           type="button"
@@ -450,7 +449,7 @@
                           title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove', 'Remove')}
                           onclick={() => removeCharacterPrerequisite(prereq.id)}
                         ><i class="fas fa-xmark" aria-hidden="true"></i></button>
-                      </span>
+                      </Chip>
                     {/each}
                   </div>
                 {/if}

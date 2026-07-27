@@ -17,6 +17,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
 
   let { activeTab = 'overview', badges = {}, onSelect = () => {} } = $props();
 
@@ -51,11 +52,14 @@
       .filter(badge => badge.label !== '' && badge.label !== 0);
   }
 
-  function badgeClass(tone) {
-    if (tone === 'danger') return 'is-danger';
-    if (tone === 'warning') return 'is-warning';
-    if (tone === 'success') return 'is-active';
-    return 'is-neutral';
+  // A badge tone name is this component's own vocabulary; `Chip` names the colour
+  // families differently (`success` is `active` there), so translate rather than leak
+  // one spelling into the other (issue 883).
+  function badgeTone(tone) {
+    if (tone === 'danger') return 'danger';
+    if (tone === 'warning') return 'warning';
+    if (tone === 'success') return 'active';
+    return 'neutral';
   }
 
   function isDangerTab(tab) {
@@ -90,7 +94,7 @@
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(`FABRICATE.Admin.Manager.RecipeItem.Tabs.${tab.key}`, tab.fallback)}</span>
       {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <span class={`manager-chip ${badgeClass(badge.tone)} manager-editor-tab-badge`} data-recipe-item-tab-badge={tab.id} data-badge-tone={badge.tone}>{badge.label}</span>
+        <Chip tone={badgeTone(badge.tone)} class="manager-editor-tab-badge" data-recipe-item-tab-badge={tab.id} data-badge-tone={badge.tone}>{badge.label}</Chip>
       {/each}
     </button>
   {/each}

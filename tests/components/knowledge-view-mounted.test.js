@@ -36,6 +36,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).
     'src/ui/svelte/apps/manager/Callout.svelte',
+    // The shared chip (issue 883). The tab bar's count badge and both row types render it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',

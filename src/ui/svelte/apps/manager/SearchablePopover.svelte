@@ -27,6 +27,13 @@
                    Callers that pass no groups render exactly as before.
     value        — id of the currently selected option (for aria-selected)
     triggerClass — class string for the trigger button (consumer-controlled)
+    triggerChip  — render the trigger through the shared `Chip` primitive instead of a
+                   bare `<button>` (issue 883). The recipe editor's "or…" control is a
+                   dashed accent CHIP, and a chip is only a chip when it renders through
+                   that component: the scale lives in its scoped block, which a class
+                   name handed to a button in THIS component can never reach. Callers
+                   pass only their own modifier class in `triggerClass`; the chip's own
+                   class hook comes from the primitive.
     triggerIcon  — leading icon class on the trigger (optional)
     triggerImg   — leading portrait image src on the trigger (optional; mirrors
                    how list options render `option.img`), shown before the label
@@ -49,6 +56,7 @@
     onChoose(id) — called with the chosen option id
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../actions/portal.js';
@@ -60,6 +68,7 @@
     value = '',
     disabled = false,
     triggerClass = '',
+    triggerChip = false,
     triggerIcon = '',
     triggerImg = '',
     triggerLabel = '',
@@ -198,6 +207,20 @@
     popoverStyle = [`left: ${layout.left}px;`, 'right: auto;', `width: ${layout.width}px;`, `max-height: ${layout.maxHeight}px;`, vertical].join(' ');
   }
 
+  // One attribute set for both trigger shapes. Writing it twice would be a copy the
+  // duplication gate counts and a place for the two shapes to drift apart.
+  const triggerAttributes = $derived({
+    type: 'button',
+    'aria-haspopup': 'dialog',
+    'aria-expanded': open,
+    disabled,
+    'data-recipe-add': triggerAddMarker || undefined,
+    title: triggerTitle || undefined,
+    'aria-label': triggerAriaLabel || undefined,
+    onclick: toggle,
+    onkeydown: stop
+  });
+
   $effect(() => {
     if (!open || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
@@ -225,23 +248,21 @@
   bind:this={pickerRoot}
   use:dismissOnOutsideClick={{ enabled: open, onDismiss: () => close(), additionalNodes: () => [popoverRoot] }}
 >
-  <button
-    type="button"
-    bind:this={triggerButton}
-    class={triggerClass}
-    aria-haspopup="dialog"
-    aria-expanded={open}
-    {disabled}
-    data-recipe-add={triggerAddMarker || undefined}
-    title={triggerTitle || undefined}
-    aria-label={triggerAriaLabel || undefined}
-    onclick={toggle}
-    onkeydown={stop}
-  >
+  {#snippet triggerBody()}
     {#if triggerImg}<span class="manager-travel-portrait" aria-hidden="true"><img src={triggerImg} alt="" /></span>{:else if triggerIcon}<i class={triggerIcon} aria-hidden="true"></i>{/if}
     {#if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span>{/if}
     {#if showChevron}<i class={open ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>{/if}
-  </button>
+  {/snippet}
+
+  {#if triggerChip}
+    <Chip tag="button" bind:element={triggerButton} class={triggerClass} {...triggerAttributes}
+      >{@render triggerBody()}</Chip
+    >
+  {:else}
+    <button bind:this={triggerButton} class={triggerClass} {...triggerAttributes}>
+      {@render triggerBody()}
+    </button>
+  {/if}
 
   {#if open}
     <div
@@ -282,7 +303,7 @@
             <i class={option.icon} aria-hidden="true"></i>
           {/if}
           <span class="manager-travel-option-name">{option.label}</span>
-          {#if option.trailing}<span class="manager-chip is-disabled">{option.trailing}</span>{/if}
+          {#if option.trailing}<Chip tone="disabled">{option.trailing}</Chip>{/if}
         </button>
       {/snippet}
 

@@ -27,6 +27,7 @@
      `checks` win over the local computation (labels still come from this tab's copy).
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -163,7 +164,7 @@
           <div class="manager-recipe-val-copy">
             <span class="manager-recipe-val-title">{row.title}</span>
           </div>
-          <span class={`manager-chip manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</span>
+          <Chip class={`manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</Chip>
         </li>
       {/each}
     </ul>

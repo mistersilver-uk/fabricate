@@ -7,6 +7,7 @@
   includedRealmIds; each list is searchable and paginated independently.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
 
@@ -90,7 +91,7 @@
               </span>
               <span class="manager-realm-env-name">{environment.name}</span>
               {#if environment.enabled === false}
-                <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
+                <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip>
               {/if}
               <button
                 type="button"
@@ -141,7 +142,7 @@
               </span>
               <span class="manager-realm-env-name">{environment.name}</span>
               {#if environment.enabled === false}
-                <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
+                <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip>
               {/if}
               <button
                 type="button"

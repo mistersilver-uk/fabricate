@@ -69,8 +69,10 @@ describe('GatheringPartiesTab mounted behavior', () => {
     writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
     writeRawModule('src/ui/svelte/actions/portal.js');
     writeRawModule('src/ui/svelte/actions/dragDrop.js');
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but the
-    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    // The shared no-state primitive (issue 785) and the manager's ONE chip (issue 883).
+    // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
+    // rather than failing it.
+    writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');

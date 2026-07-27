@@ -10,6 +10,7 @@
   crafting manager admin is GM-scoped.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -102,10 +103,10 @@
     return text(`FABRICATE.Admin.Manager.SystemOverview.${meta[0]}`, meta[1]);
   }
 
-  function severityClass(severity) {
-    if (severity === 'critical') return 'is-danger';
-    if (severity === 'warning') return 'is-warning';
-    return 'is-neutral';
+  function severityTone(severity) {
+    if (severity === 'critical') return 'danger';
+    if (severity === 'warning') return 'warning';
+    return 'neutral';
   }
 
   function severityLabel(severity) {
@@ -133,9 +134,9 @@
       <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.SystemOverview.Subtitle', 'Review every validation issue across this crafting system and jump straight to the editor that owns each one.')}</p>
     </div>
     <div class="manager-chip-row" data-system-overview-counts>
-      <span class="manager-chip is-danger" data-overview-count="critical">{counts.critical} {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</span>
-      <span class="manager-chip is-warning" data-overview-count="warning">{counts.warning} {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</span>
-      <span class="manager-chip is-neutral" data-overview-count="info">{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</span>
+      <Chip tone="danger" data-overview-count="critical">{counts.critical} {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</Chip>
+      <Chip tone="warning" data-overview-count="warning">{counts.warning} {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</Chip>
+      <Chip tone="neutral" data-overview-count="info">{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</Chip>
     </div>
   </section>
 
@@ -153,11 +154,11 @@
   {:else}
     {#each groups as group (group.kind)}
       <section class="manager-task-core-card manager-system-overview-group" data-system-overview-group={group.kind}>
-        <h3 class="manager-card-title">{groupLabel(group.kind)} <span class="manager-chip is-neutral">{group.issues.length}</span></h3>
+        <h3 class="manager-card-title">{groupLabel(group.kind)} <Chip tone="neutral">{group.issues.length}</Chip></h3>
         <ul class="manager-system-overview-list">
           {#each group.issues as issue, index (issue.code + ':' + (issue.entityId ?? '') + ':' + index)}
             <li class="manager-system-overview-row" data-overview-issue={issue.code} data-overview-kind={issue.kind}>
-              <span class={`manager-chip ${severityClass(issue.severity)}`} data-overview-severity={issue.severity}>{severityLabel(issue.severity)}</span>
+              <Chip tone={severityTone(issue.severity)} data-overview-severity={issue.severity}>{severityLabel(issue.severity)}</Chip>
               <span class="manager-system-overview-entity">{issue.entityName}</span>
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>
               {#if canDeepLink(issue)}

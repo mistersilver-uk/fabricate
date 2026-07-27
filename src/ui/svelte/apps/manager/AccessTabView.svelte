@@ -17,6 +17,7 @@
    - onSelectRecipe(id): row-select handler.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -129,7 +130,7 @@
         <option value="none">{text('FABRICATE.Admin.Manager.Access.FilterNone', 'No access')}</option>
       </select>
     </label>
-    <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredRecipes.length).replace('{total}', (recipes || []).length)}</span>
+    <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredRecipes.length).replace('{total}', (recipes || []).length)}</Chip>
     {#if filtersActive}
       <button type="button" class="manager-button manager-clear-filters" data-clear-filters="access" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>
@@ -169,18 +170,16 @@
             <span class="manager-access-copy">
               <span class="manager-access-heading">
                 <span class="manager-access-name" title={recipe.name}>{recipe.name}</span>
-                <span class="manager-chip manager-access-category">{categoryLabel(recipe)}</span>
+                <Chip class="manager-access-category">{categoryLabel(recipe)}</Chip>
               </span>
               {#if granted}
-                <span class="manager-chip is-active manager-access-grant-chip" data-access-grant={recipe.id}>
-                  <i class="fas fa-users" aria-hidden="true"></i>
+                <Chip tone="active" icon="fas fa-users" class="manager-access-grant-chip" data-access-grant={recipe.id}>
                   <span>{grantChipLabel(recipe)}</span>
-                </span>
+                </Chip>
               {:else}
-                <span class="manager-chip is-danger manager-access-grant-chip" data-access-grant={recipe.id}>
-                  <i class="fas fa-lock" aria-hidden="true"></i>
+                <Chip tone="danger" icon="fas fa-lock" class="manager-access-grant-chip" data-access-grant={recipe.id}>
                   <span>{text('FABRICATE.Admin.Manager.Access.NoAccess', 'No access')}</span>
-                </span>
+                </Chip>
               {/if}
             </span>
             <i class="fas fa-chevron-right manager-access-chevron" aria-hidden="true"></i>
@@ -247,11 +246,13 @@
     white-space: nowrap;
   }
 
-  .manager-access-category {
+  /* Both are `Chip`s (issue 883), so this component's scoping hash is not on them.
+     Reach them through `:global`, nested under a selector that DOES carry the hash. */
+  .manager-access-heading :global(.manager-access-category) {
     flex: 0 0 auto;
   }
 
-  .manager-access-grant-chip {
+  .manager-access-copy :global(.manager-access-grant-chip) {
     align-self: flex-start;
   }
 

@@ -6171,11 +6171,18 @@ async function main() {
   const ignoredErrorPatternDefaults = [
     /favicon/i,
     // The screenshot walk deliberately exercises the responsive Manager at
-    // these three evidence viewports. Foundry emits its own minimum-resolution
+    // these four evidence viewports. Foundry emits its own minimum-resolution
     // warning even though the application remains usable and is the subject of
     // the capture. Keep this waiver dimension-specific so an unexpected
     // low-resolution run still fails the smoke.
-    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater\..*display has a resolution of (?:1280px by 720px|900px by 700px|680px by 700px)\./i,
+    //
+    // `1280px by 520px` is the short viewport the Tool Studio pagination
+    // assertions set themselves (`expectScrollable: true`) to prove the library
+    // footer stays reachable when the list must scroll. The harness chooses that
+    // height, so failing on Foundry's advisory about it fails the run for doing
+    // exactly what it was told — any scoped set including the Tool Studio parity
+    // walk tripped it (issue 881).
+    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater\..*display has a resolution of (?:1280px by 720px|1280px by 520px|900px by 700px|680px by 700px)\./i,
     // Headless canvas-draw race: activating/redrawing a scene that gains new
     // placeables mid-capture (e.g. the issue-335 Manage-Interactables marker
     // fixtures) can momentarily read a canvas layer constant before the layer is

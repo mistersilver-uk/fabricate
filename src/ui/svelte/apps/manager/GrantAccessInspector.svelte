@@ -14,6 +14,7 @@
    - onSaveAccess(recipeId, { characterIds, playerIds }): persists the full snapshot.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
@@ -179,14 +180,13 @@
       <span class="manager-inspector-icon" aria-hidden="true"><img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)} alt="" /></span>
       <div class="manager-inspector-copy">
         <span class="manager-inspector-name" title={recipe.name}>{recipe.name}</span>
-        <span class="manager-chip manager-access-category">{categoryLabel()}</span>
+        <Chip class="manager-access-category">{categoryLabel()}</Chip>
       </div>
     </div>
     <div class="manager-access-summary">
-      <span class={`manager-chip ${characterCount + playerCount === 0 ? 'is-danger' : 'is-active'}`} data-access-summary>
-        <i class="fas fa-users" aria-hidden="true"></i>
+      <Chip tone={characterCount + playerCount === 0 ? 'danger' : 'active'} icon="fas fa-users" data-access-summary>
         <span>{summaryLabel}</span>
-      </span>
+      </Chip>
     </div>
 
     {#each sections as section (section.key)}
@@ -275,7 +275,9 @@
     margin-bottom: var(--fab-space-1);
   }
 
-  .manager-access-category {
+  /* The category pill is a `Chip` (issue 883), so this component's scoping hash is not
+     on it. Reach it through `:global`, nested under a selector that DOES carry it. */
+  .manager-inspector-copy :global(.manager-access-category) {
     align-self: flex-start;
   }
 

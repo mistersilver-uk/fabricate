@@ -697,21 +697,29 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
     );
   });
 
-  it('scopes the context-rail background to the Recipe Studio views (matching the main panel)', () => {
-    // The shared inspector is one shade lighter (--fab-mv2-surface-2) than the main
-    // editor panel. In the Recipe Studio views only, the rail drops onto the SAME
-    // surface as the panel (--fab-mv2-surface-1); other screens keep their shade
-    // (issue 643).
+  it('puts the context rail on the ONE shared right-hand-panel surface', () => {
+    // Issue 643 put the Recipe Studio rail on the SAME surface as its main editor panel
+    // (--fab-mv2-surface-1) while every other screen kept the lighter --fab-mv2-surface-2.
+    // Issue 881 removed that split: the Tool Studio's right panel is the same shade the
+    // Recipe Studio rail already used, so the odd one out was the shared rule, and the
+    // Tags & Categories rail read visibly lighter than the panel it must match. One shade
+    // now, so the per-view carve-out must be GONE, not merely unused.
     assert.match(
       css,
-      /\.fabricate-manager\[data-manager-view="recipe-edit"\]\s+\.manager-inspector,\s*\.fabricate-manager\[data-manager-view="recipes"\]\s+\.manager-inspector\s*\{\s*background:\s*var\(--fab-mv2-surface-1\);\s*\}/,
-      'recipe-edit + recipes inspector background override'
+      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-mv2-surface-1\);/,
+      'the shared inspector sits on --fab-mv2-surface-1 on every screen'
     );
-    // The global inspector rule is untouched: still the lighter shared shade.
+    assert.doesNotMatch(
+      css,
+      /\[data-manager-view="(?:recipe-edit|recipes)"\]\s+\.manager-inspector\s*\{[^}]*background:/,
+      'no per-view inspector background override survives'
+    );
+    // The Tool Studio's own right-hand panel resolves through the same token, so the two
+    // panels cannot drift apart by having one written as a raw ramp step.
     assert.match(
       css,
-      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-mv2-surface-2\);/,
-      'the shared inspector keeps --fab-mv2-surface-2 on every other screen'
+      /\.fabricate-manager\s+\.manager-tool-preview\s*\{[^}]*background:\s*var\(--fab-mv2-surface-1\);/,
+      'the Tool Studio preview panel shares the inspector surface token'
     );
   });
 

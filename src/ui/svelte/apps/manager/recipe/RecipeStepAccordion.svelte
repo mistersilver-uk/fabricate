@@ -20,6 +20,7 @@
   `step.timeRequirement`; otherwise (the requirement tabs) it stays a read-only chip.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { formatTimeRequirement } from '../../../util/recipeDuration.js';
   import RecipeDurationEditor from './RecipeDurationEditor.svelte';
@@ -135,10 +136,9 @@
               onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
             />
           {:else}
-            <span class={`manager-chip ${step.timeRequirement ? '' : 'is-empty'}`} data-recipe-step-time={step.id}>
-              <i class="fa-solid fa-clock" aria-hidden="true"></i>
+            <Chip class={step.timeRequirement ? '' : 'is-empty'} icon="fa-solid fa-clock" data-recipe-step-time={step.id}>
               <span>{step.timeRequirement ? formatTimeRequirement(step.timeRequirement) : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span>
-            </span>
+            </Chip>
           {/if}
         </div>
         <div class="manager-recipe-steps-row-controls">

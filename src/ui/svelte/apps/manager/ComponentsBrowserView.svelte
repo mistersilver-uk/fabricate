@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -434,7 +435,7 @@
 
     <div class="manager-component-filter-row is-chips">
       {#each chips as chip (chip.id)}
-        <span class="manager-chip is-info manager-component-filter-chip" data-component-filter-chip={chip.id}>
+        <Chip tone="info" class="manager-component-filter-chip" data-component-filter-chip={chip.id}>
           <span>{chipLabel(chip)}</span>
           <button
             type="button"
@@ -444,7 +445,7 @@
           >
             <i class="fas fa-times" aria-hidden="true"></i>
           </button>
-        </span>
+        </Chip>
       {/each}
       <!--
         The count is quiet right-aligned metadata, not a control: a bordered chip read as

@@ -29,6 +29,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import Chip from '../Chip.svelte';
   import { USES_CHIP_SPENT, USES_CHIP_UNLIMITED } from './knowledgeStudio.js';
 
   let {
@@ -115,10 +116,11 @@
     );
   }
 
+  // A `Chip` tone name, without the `is-` prefix the raw class carried (issue 883).
   function usesChipTone(row) {
-    if (row.usesChip === USES_CHIP_UNLIMITED) return 'is-info';
-    if (row.usesChip === USES_CHIP_SPENT) return 'is-danger';
-    return 'is-warning';
+    if (row.usesChip === USES_CHIP_UNLIMITED) return 'info';
+    if (row.usesChip === USES_CHIP_SPENT) return 'danger';
+    return 'warning';
   }
 
   function usesChipIcon(row) {
@@ -159,39 +161,38 @@
              state vocabulary and saves a line in the narrow band. -->
         <span class="manager-knowledge-copy-heading">
           <strong class="manager-knowledge-copy-name" title={copy.name}>{copy.name}</strong>
-          <span class="manager-chip" data-knowledge-type={copy.type} data-knowledge-recipe-count={copy.recipeCount}
-            >{typeLabel(copy.type, copy.recipeCount)}</span
+          <Chip data-knowledge-type={copy.type} data-knowledge-recipe-count={copy.recipeCount}
+            >{typeLabel(copy.type, copy.recipeCount)}</Chip
           >
           {#if copy.quantity > 1}
-            <span class="manager-chip" data-knowledge-quantity>
+            <Chip data-knowledge-quantity>
               {fill(text('FABRICATE.Admin.Manager.Knowledge.Quantity', '×{quantity}'), { quantity: copy.quantity })}
-            </span>
+            </Chip>
           {/if}
         </span>
         <span class="manager-knowledge-copy-chips">
-          <span
-            class={`manager-chip ${usesChipTone(copy)}`}
+          <Chip
+            tone={usesChipTone(copy)}
+            icon={usesChipIcon(copy)}
             data-knowledge-uses-chip={copy.usesChip}
           >
-            <i class={usesChipIcon(copy)} aria-hidden="true"></i>
             <span>{usesChipLabel(copy)}</span>
-          </span>
+          </Chip>
           {#if copy.inert}
-            <span class="manager-chip is-danger" data-knowledge-inert>
-              <i class="fas fa-ban" aria-hidden="true"></i>
+            <Chip tone="danger" icon="fas fa-ban" data-knowledge-inert>
               <span>{text('FABRICATE.Admin.Manager.Knowledge.Inert', 'Inert')}</span>
-            </span>
+            </Chip>
           {/if}
           {#if copy.matchTier === 'duplicate'}
-            <span
-              class="manager-chip is-warning"
+            <Chip
+              tone="warning"
+              icon="fas fa-triangle-exclamation"
               data-knowledge-match-tier={copy.matchTier}
               title={duplicateMatchHint()}
               aria-label={duplicateMatchHint()}
             >
-              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
               <span>{matchTierLabel(copy.matchTier)}</span>
-            </span>
+            </Chip>
           {/if}
         </span>
       </span>

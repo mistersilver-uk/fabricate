@@ -17,6 +17,7 @@
   the legacy `.manager-travel-party-*` rules from the superseded travel view.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -154,15 +155,14 @@
                 </span>
               {/if}
               <span class="manager-travel-parties-name">{party.name}</span>
-              <span class={`manager-chip ${party.enabled ? 'is-active' : 'is-disabled'}`}>
+              <Chip tone={party.enabled ? 'active' : 'disabled'}>
                 {party.enabled
                   ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
                   : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
-              </span>
-              <span class="manager-chip is-neutral manager-travel-parties-members-chip" title={memberCountLabel(party)} aria-label={memberCountLabel(party)}>
-                <i class="fas fa-users" aria-hidden="true"></i>
+              </Chip>
+              <Chip tone="neutral" icon="fas fa-users" class="manager-travel-parties-members-chip" title={memberCountLabel(party)} aria-label={memberCountLabel(party)}>
                 <span>{party.memberCount ?? 0}</span>
-              </span>
+              </Chip>
             </div>
 
             <div class="manager-travel-parties-right">

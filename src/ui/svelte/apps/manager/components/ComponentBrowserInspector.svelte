@@ -27,6 +27,7 @@
   Strings are localized here; the CALLER resolves nothing but the actions.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -111,9 +112,9 @@
       <div class="manager-component-browser-inspector-identity">
         <h2 class="manager-inspector-name" title={selectedComponent.name}>{selectedComponent.name}</h2>
         <div class="manager-chip-row">
-          <span class="manager-chip" data-component-category>
+          <Chip data-component-category>
             {getComponentCategoryLabel(selectedComponent.category, localize)}
-          </span>
+          </Chip>
           <StatusPill tone={linkedPill.tone} icon={linkedPill.icon} label={linkedPill.label} />
         </div>
       </div>

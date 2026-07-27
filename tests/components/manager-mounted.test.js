@@ -148,6 +148,14 @@ function compileManagerRoot() {
   // strip both Knowledge tabs render (issue 785); same rule, same consequence.
   writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/Callout.svelte');
+  // The shared side-panel explainer card and icon fact row (issue 881). The root renders
+  // the explainer directly in the Tags & Categories inspector and reaches the fact row
+  // through the Tool Studio's browser inspector, so both are in the root's static graph.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ExplainerCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/IconFactRow.svelte');
+  // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
+  // trees today, and through every other manager screen as the conversion proceeds.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',
@@ -2257,8 +2265,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     const craftingHelp = target.querySelector('[data-checks-help="crafting"]');
     assert.ok(craftingHelp, 'Crafting tab shows its docs help card');
     assert.ok(
-      craftingHelp.classList.contains('manager-setup-card'),
-      'help card reuses the recipe setup-card format'
+      craftingHelp.classList.contains('manager-explainer-card') &&
+        craftingHelp.classList.contains('manager-inspector-card'),
+      'help card renders through the shared explainer primitive on the shared card shell'
     );
     const craftingDocs = craftingHelp.querySelector(
       'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
@@ -2618,16 +2627,54 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const { activeTab, href } of cases) {
       target = document.createElement('div');
       document.body.appendChild(target);
-      mounted = mount(ChecksRightMenuComponent, { target, props: { activeTab } });
+      mounted = mount(ChecksRightMenuComponent, {
+        target,
+        // An activation is supplied so the Active card renders too — it is the rail's other
+        // card and shares the same inspector-card contract (issue 883).
+        props: { activeTab, activation: { enabled: true, optional: true } },
+      });
       flushSync();
 
       const card = target.querySelector(`[data-checks-help="${activeTab}"]`);
       assert.ok(card, `${activeTab} menu renders a help card`);
       assert.ok(
-        card.classList.contains('manager-setup-card'),
-        'help card uses the setup-card format'
+        card.classList.contains('manager-explainer-card'),
+        'help card renders through the shared explainer primitive'
       );
       assert.ok(card.querySelector(`a[href="${href}"]`), `${activeTab} help card links to ${href}`);
+
+      // Two links is the reason `ExplainerCard` grew a link LIST (issue 883). They share
+      // one `.manager-setup-links` row and both wear the primitive's one ghost treatment,
+      // so a regression to a single-link primitive drops the Quickstart silently.
+      const linkRow = card.querySelector('.manager-setup-links');
+      assert.ok(linkRow, `${activeTab} help card renders its links as one card-link row`);
+      const linkHrefs = Array.from(linkRow.querySelectorAll('a.manager-explainer-card-docs')).map(
+        (anchor) => anchor.getAttribute('href')
+      );
+      assert.deepEqual(
+        linkHrefs,
+        [href, 'https://mistersilver-uk.github.io/fabricate/quickstart'],
+        `${activeTab} help card keeps both its docs page and the Quickstart`
+      );
+      for (const anchor of linkRow.querySelectorAll('a')) {
+        assert.ok(
+          anchor.classList.contains('is-ghost'),
+          'explainer links keep the primitive ghost treatment'
+        );
+      }
+
+      // The Active card is a plain inspector card under the manager's one card-title
+      // contract — not the `.manager-kicker` micro-label this rail used to use alone.
+      const activeCard = target.querySelector(`[data-checks-active="${activeTab}"]`);
+      assert.ok(activeCard, `${activeTab} menu renders its Active card`);
+      assert.ok(
+        activeCard.querySelector('h3.manager-card-title'),
+        'the Active card titles itself with the shared card-title contract'
+      );
+      assert.ok(
+        !activeCard.querySelector('.manager-kicker'),
+        'the Active card no longer carries a second heading treatment'
+      );
 
       unmount(mounted);
       mounted = null;
@@ -6599,11 +6646,57 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
-    assert.ok(target.querySelector('[data-tags-evidence="how-it-works"]'));
+    const howItWorks = target.querySelector('[data-tags-evidence="how-it-works"]');
+    assert.ok(howItWorks);
     assert.ok(target.querySelector('[data-tags-evidence="at-a-glance"]'));
     assert.ok(target.querySelector('[data-tags-category-fact="component-categories"]'));
     assert.ok(target.querySelector('[data-tags-category-fact="references"]'));
-    assert.ok(target.querySelector('[data-tags-evidence="reference-safe"]'));
+    const referenceSafe = target.querySelector('[data-tags-evidence="reference-safe"]');
+    assert.ok(referenceSafe);
+
+    // Issue 881: both contextual-help cards render through the SAME explainer primitive
+    // the Tool Studio's "How Tools work in Fabricate" card uses, so the rail stops
+    // re-deriving one meaning as a disc-bulleted list and a bare paragraph. Rendering the
+    // card shell, the shared card title and the glyph-led rows is the observable contract.
+    for (const card of [howItWorks, referenceSafe]) {
+      assert.ok(
+        card.classList.contains('manager-inspector-card') &&
+          card.classList.contains('manager-explainer-card'),
+        'the tags help cards wear the shared side-panel card shell'
+      );
+      assert.ok(
+        card.querySelector('h3.manager-card-title.manager-explainer-card-title > i'),
+        'the tags help cards carry the shared glyph-led card title'
+      );
+    }
+    assert.equal(
+      howItWorks.querySelectorAll('.manager-explainer-card-list > li').length,
+      3,
+      'the recipe-categories help renders its three rows through the explainer list'
+    );
+    assert.equal(
+      referenceSafe.querySelectorAll('.manager-explainer-card-list > li').length,
+      1,
+      'the reference-safety reassurance is one explainer row, not a bare paragraph'
+    );
+    assert.equal(
+      target.querySelector('.manager-evidence-list'),
+      null,
+      'the retired bullet list must be gone from the rail, not merely unstyled'
+    );
+    // A bold lead-in and its prose are one sentence, so they need a separator. A literal
+    // space there is the last token inside the `{#if}` and Svelte trims block-trailing
+    // whitespace, which ran them together ("…Item.Drag any Item…") — invisible to every
+    // structural assertion above and only caught in a screenshot (issue 881).
+    for (const row of howItWorks.querySelectorAll('.manager-explainer-card-list > li')) {
+      const lead = row.querySelector('strong');
+      if (!lead) continue;
+      assert.match(
+        row.textContent,
+        new RegExp(`${lead.textContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`),
+        `explainer lead-in "${lead.textContent}" must be separated from its prose`
+      );
+    }
 
     // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');
@@ -8779,10 +8872,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     const inspectorRateInput = inspectorRateEditor.querySelector(
       '.manager-drop-rate-percent input'
     );
-    assert.equal(inspectorRateInput.getAttribute('type'), 'text');
-    assert.equal(inspectorRateInput.getAttribute('inputmode'), 'numeric');
+    // Issue 883: the inspector renders the shared `ChanceSlider`, exactly as the drop ROWS
+    // do, so its field is a real number input with the control's own min/max rather than a
+    // text input policed by a local digit regex.
+    assert.equal(inspectorRateInput.getAttribute('type'), 'number');
+    assert.equal(inspectorRateInput.getAttribute('min'), '0');
+    assert.equal(inspectorRateInput.getAttribute('max'), '100');
     assert.equal(inspectorRateInput.value, '0');
     const inspectorRateControl = inspectorRateEditor.querySelector('.manager-drop-rate-control');
+    assert.ok(inspectorRateControl.classList.contains('manager-chance-slider-control'));
     assert.ok(inspectorRateControl.classList.contains('is-none'));
     assert.ok(inspectorRateControl.getAttribute('style').includes('--fab-drop-rate-value: 0%;'));
     assert.ok(
@@ -8790,11 +8888,33 @@ describe('CraftingSystemManager mounted behavior', () => {
         .getAttribute('style')
         .includes('--fab-drop-rate-color: var(--fab-drop-rate-none);')
     );
-    inspectorRateInput.value = '09x';
+    inspectorRateInput.value = '9';
     inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(inspectorRateInput.value, '9');
+    // Out of range clamps rather than being held un-committed until blur — the behaviour
+    // the drop rows have shipped with all along.
+    inspectorRateInput.value = '150';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '100');
+    // Commit-on-blur is preserved: an emptied field reverts to the model value on blur
+    // instead of committing an empty rate.
+    inspectorRateInput.value = '9';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    inspectorRateInput.value = '';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '', 'an emptied field is left alone while editing');
+    inspectorRateInput.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '9', 'blur restores the model value, it does not commit empty');
     let refreshedInspectorRateInput = selectedDropInspector.querySelector(
       '[data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
     );
@@ -9088,7 +9208,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(
       target.querySelector(
-        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]'
+        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
       ).value,
       '35'
     );
@@ -9824,7 +9944,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(
       target.querySelector(
-        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]'
+        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
       ).value,
       '25'
     );
@@ -10804,6 +10924,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       /Check bonus.*Adds @prof/
     );
     assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
+    // Issue 881: the library inspector renders the SAME icon fact row the editor's
+    // behavior preview does, from the same behavior-fact projection — one implementation,
+    // so the two side panels cannot hold two geometries for one meaning.
+    assert.equal(
+      inspector.querySelectorAll('[data-tool-inspector-rule] > .manager-icon-fact-row').length,
+      4
+    );
   });
 
   it('shows canonical validation context in the selected Tool inspector', async () => {

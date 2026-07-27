@@ -9,6 +9,7 @@
   the whole crafting manager admin is GM-scoped.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
@@ -603,7 +604,7 @@
           -->
           <div class="manager-action-group">
             {#if detailsDirty}
-              <span class="manager-chip is-warning" data-system-details-dirty>{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</span>
+              <Chip tone="warning" data-system-details-dirty>{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</Chip>
             {/if}
             <button type="submit" class="manager-button is-primary">
               <i class="fas fa-save" aria-hidden="true"></i>
@@ -790,7 +791,7 @@
                       <span class="manager-modifier-icon"><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i></span>
                       <span class="manager-modifier-label">{entry.label}</span>
                       {#if characterModifierIsRoll(entry)}
-                        <span class="manager-chip manager-character-modifier-roll-tag">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag', 'Roll')}</span>
+                        <Chip class="manager-character-modifier-roll-tag">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag', 'Roll')}</Chip>
                       {/if}
                       {#if modifierExpression}
                         <span class="manager-modifier-expression" data-character-modifier-expression>
@@ -1150,7 +1151,7 @@
                   <div class="manager-character-modifier-summary">
                     <span class="manager-character-modifier-icon"><i class={unit.icon || 'fa-solid fa-coins'} aria-hidden="true"></i></span>
                     <span class="manager-character-modifier-label">{unit.label || unit.id}</span>
-                    <span class="manager-chip">{(unit.contains || []).length} {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</span>
+                    <Chip>{(unit.contains || []).length} {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</Chip>
                     <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')} data-move-currency-up={unit.id} disabled={index === 0} onclick={() => reorderList(onReorderCurrencyUnit, index, -1, unit.label || unit.id, currencyUnits.length)}>
                       <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
                     </button>

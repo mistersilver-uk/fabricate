@@ -64,6 +64,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
+import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
@@ -198,11 +199,18 @@ const FIXTURE = `
     </section>
   </div>`;
 
+// See the twin note in `recipe-studio-font-size.test.js`: the chip's appearance moved into
+// `Chip.svelte`'s scoped block (issue 883), so this gate reproduces Svelte's real delivery
+// — the component's compiled CSS appended after the global sheet, and the real scoping hash
+// on the fixture's chips — rather than dropping the chip roles and losing the coverage.
+const chip = scopedComponentCss(resolve(repoRoot, 'src/ui/svelte/apps/manager/Chip.svelte'));
+const SCOPED_FIXTURE = withScopeHash(FIXTURE, 'manager-chip', chip.hashClass);
+
 function page() {
   return `<!doctype html><html><head><meta charset="utf-8">
-    <style>${foundryCss}</style><style>${fabricateCss}</style>
+    <style>${foundryCss}</style><style>${fabricateCss}</style><style>${chip.css}</style>
     <style>:root{--font-primary:Arial,sans-serif}</style></head>
-    <body class="game">${FIXTURE}</body></html>`;
+    <body class="game">${SCOPED_FIXTURE}</body></html>`;
 }
 
 // px at the 16px root: rem * 16. Each entry names the Phase 0 prototype target it
@@ -224,13 +232,18 @@ const EXPECTED = {
   'sort-select': 11.52,
   'essence-select': 11.52,
   'toolbar-button': 11.52, // 0.72rem — the sort-direction toggle at the compact scale
-  'filter-chip': 12, // 0.75rem — the chip family
+  // Every chip role below MOVED from 12 (0.75rem) to 9.92 (0.62rem) in issue 883. That is
+  // the deliberate change, not drift: the compact Tool Studio scale is now the only chip
+  // scale, so these five roles are re-pinned to it rather than being relaxed or dropped.
+  // They also read much closer to the prototype numbers their old comments quoted (9px,
+  // 9.5px) than the 12px they were pinned at.
+  'filter-chip': 9.92, // 0.62rem — the one chip scale (was 12)
   count: 10.88, // 0.68rem — quiet right-aligned metadata, not a control
   // ── The list.
   'row-name': 12.16, // 0.76rem serif — bleed fix; prototype row name 13.5px serif
   'row-description': 12.48, // 0.78rem — prototype row description 11px sans
-  'row-badge': 12, // 0.75rem — prototype row badge/chip 9px sans
-  'row-difficulty': 12, // same chip family
+  'row-badge': 9.92, // 0.62rem — prototype row badge/chip 9px sans (was 12)
+  'row-difficulty': 9.92, // same chip family
   // ── The browser inspector (issue 676). It shares the recipe inspector's rules.
   'inspector-label': 9.28, // 0.58rem — a section micro-label on the panel background
   'inspector-flavour': 11.52, // 0.72rem — the description, whole
@@ -249,12 +262,12 @@ const EXPECTED = {
   // ── The identity STRIP (issue 676). It is display, not a form: the read-only boxed
   // Name/Description fields it replaced are gone, and with them `readonly-value`.
   'identity-name': 18, // 1.125rem serif — prototype identity name 18px/600. Exact.
-  'identity-lock': 12, // 0.75rem — the chip family; prototype lock badge 9px sans
+  'identity-lock': 9.92, // 0.62rem — prototype lock badge 9px sans (was 12)
   'identity-description': 13, // 0.8125rem/1.65 — prototype description 13px/1.65. Exact.
   'identity-note': 10, // 0.625rem — prototype premise note 10px sans. Exact.
   'drop-target': 10, // 0.625rem — prototype drop-target label 10px/1.4 sans. Exact.
   // ── The salvage panel.
-  'salvage-mode-pill': 12, // 0.75rem — the chip family; prototype mode pill 9.5px sans
+  'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
   'info-banner': 10.56, // 0.66rem — prototype roll-budget banner 10.5px sans
   'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.

@@ -9,6 +9,7 @@
   intentionally blank.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -144,16 +145,14 @@
               <span class="manager-travel-realms-icon" aria-hidden="true"><i class={REALM_ICON}></i></span>
               <span class="manager-travel-realms-name">{realm.name}</span>
               {#if !realm.enabled}
-                <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
+                <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip>
               {/if}
-              <span class="manager-chip is-neutral manager-travel-realms-count-chip">
-                <i class="fas fa-seedling" aria-hidden="true"></i>
+              <Chip tone="neutral" icon="fas fa-seedling" class="manager-travel-realms-count-chip">
                 <span>{environmentCountLabel(realm)}</span>
-              </span>
-              <span class="manager-chip is-neutral manager-travel-realms-count-chip">
-                <i class="fas fa-people-group" aria-hidden="true"></i>
+              </Chip>
+              <Chip tone="neutral" icon="fas fa-people-group" class="manager-travel-realms-count-chip">
                 <span>{partyCountLabel(realm)}</span>
-              </span>
+              </Chip>
             </div>
             <span class="manager-travel-realms-chevron" aria-hidden="true">
               <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>

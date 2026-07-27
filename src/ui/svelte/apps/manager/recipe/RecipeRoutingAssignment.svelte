@@ -19,6 +19,7 @@
     onAdd(id) / onRemove(id)
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SearchablePopover from '../SearchablePopover.svelte';
 
@@ -62,7 +63,7 @@
   {:else}
     <div class="manager-recipe-routing-assignment-chips">
       {#each chips as chip (chip.id)}
-        <span class="manager-chip is-active manager-recipe-routing-chip" data-routing-chip={chip.id}>
+        <Chip tone="active" class="manager-recipe-routing-chip" data-routing-chip={chip.id}>
           <span class="manager-recipe-routing-chip-label">{chip.name}</span>
           <button
             type="button"
@@ -73,7 +74,7 @@
             title={chip.name}
             onclick={() => onRemove(chip.id)}
           ><i class="fas fa-times" aria-hidden="true"></i></button>
-        </span>
+        </Chip>
       {/each}
 
       <SearchablePopover

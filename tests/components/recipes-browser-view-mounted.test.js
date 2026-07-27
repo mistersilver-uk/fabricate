@@ -31,6 +31,11 @@ const RECIPE_RAW_MODULES = [
 ];
 
 const RECIPE_PRIMITIVES = [
+  // The manager's ONE chip (issue 883). Both harnesses below render it now that the
+  // browser's filter and check pills are `Chip`s, so it is hoisted here rather than
+  // repeated: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
+  // reads the WHOLE file, so naming it in only one of two harnesses reads as covered.
+  'src/ui/svelte/apps/manager/Chip.svelte',
   // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',

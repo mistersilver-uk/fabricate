@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
@@ -110,7 +111,7 @@
         </select>
       </label>
     {/if}
-    <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredEssences.length).replace('{total}', essenceCards.length)}</span>
+    <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredEssences.length).replace('{total}', essenceCards.length)}</Chip>
     {#if filtersActive}
       <button type="button" class="manager-button manager-clear-filters" data-clear-filters="essences" onclick={clearSearch}>
         <i class="fas fa-times" aria-hidden="true"></i>
@@ -181,9 +182,9 @@
               </span>
             {/if}
             <span role="cell" class="manager-labeled-cell" data-label={text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}>
-              <span class={essence.deleteBlocked ? 'manager-chip is-warning' : 'manager-chip'}>
+              <Chip tone={essence.deleteBlocked ? 'warning' : ''}>
                 {text('FABRICATE.Admin.Manager.Essence.ComponentUsageCount', '{count} components').replace('{count}', essence.componentUsageCount || 0)}
-              </span>
+              </Chip>
             </span>
             <span role="cell" class="manager-action-group manager-labeled-cell" data-label={text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
               <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}').replace('{name}', essence.name)} title={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')} onclick={(event) => editEssence(essence, event)}>

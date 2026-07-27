@@ -4,6 +4,7 @@
   import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import Chip from '../Chip.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
   import ToolRepairRequirements from './ToolRepairRequirements.svelte';
@@ -142,7 +143,7 @@
   <section class="manager-tool-authority-readonly" data-tool-breakage-authority-explanation>
     <span class="manager-tool-authority-icon"><i class="fas fa-sliders" aria-hidden="true"></i></span>
     <div><p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</p><h3>{authority === 'checkDriven' ? text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven') : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')}</h3><p>{text('FABRICATE.Admin.Manager.Tools.Editor.AuthorityExplanation', 'Set for every Tool from the Tools library.')}</p></div>
-    <span class="manager-chip is-neutral"><i class="fas fa-lock" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System-wide')}</span></span>
+    <Chip tone="neutral" icon="fas fa-lock"><span>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System-wide')}</span></Chip>
   </section>
 
   <section class="manager-tool-breakage-method">

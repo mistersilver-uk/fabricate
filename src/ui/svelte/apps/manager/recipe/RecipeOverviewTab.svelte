@@ -12,6 +12,7 @@
   exception and emits `onToggleEnabled()`.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
   import {
@@ -396,10 +397,9 @@
           <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.Duration', 'Duration')}</h3>
           <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.DurationHint', 'How long this recipe takes to craft. Leave at zero for an instant craft.')}</p>
         </div>
-        <span class="manager-chip manager-recipe-duration-pill" data-recipe-duration-summary>
-          <i class="fa-solid fa-clock" aria-hidden="true"></i>
+        <Chip class="manager-recipe-duration-pill" icon="fa-solid fa-clock" data-recipe-duration-summary>
           <span>{formatTimeRequirementCompact(recipe?.timeRequirement || null)}</span>
-        </span>
+        </Chip>
       </div>
       <RecipeDurationSteppers
         timeRequirement={recipe?.timeRequirement || null}

@@ -11,6 +11,7 @@
    - onChange(tabId).
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     KNOWLEDGE_TAB_LEARNED_RECIPES,
@@ -89,7 +90,7 @@
     >
       <i class={tab[1]} aria-hidden="true"></i>
       <span>{tabLabel(tab[0])}</span>
-      <span class="manager-chip is-neutral manager-editor-tab-badge">{badgeFor(tab[0])}</span>
+      <Chip tone="neutral" class="manager-editor-tab-badge">{badgeFor(tab[0])}</Chip>
     </button>
   {/each}
 </div>

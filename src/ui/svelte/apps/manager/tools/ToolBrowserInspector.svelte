@@ -1,6 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
+  import IconFactRow from '../IconFactRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     projectToolBehaviorFacts,
@@ -48,15 +50,16 @@
       <div>
         <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Tool page')}</p>
         <h2 title={row.name}>{row.name}</h2>
-        <span class={`manager-chip ${row.enabled ? 'is-positive' : 'is-neutral'}`}>
-          <i class={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'} aria-hidden="true"></i>
+        <Chip
+          tone={row.enabled ? 'positive' : 'neutral'}
+          icon={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'}
+        >
           {row.enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
-        </span>
+        </Chip>
         {#if !row.validation.valid}
-          <span class="manager-chip is-danger" data-tool-validation-status="needs-attention">
-            <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+          <Chip tone="danger" icon="fas fa-circle-exclamation" data-tool-validation-status="needs-attention">
             {text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
-          </span>
+          </Chip>
         {/if}
       </div>
     </div>
@@ -71,10 +74,10 @@
       {#each facts as fact (fact.id)}
         <section data-tool-inspector-rule={fact.id}>
           <p class="manager-kicker manager-tool-inspector-section-kicker">{fact.heading}</p>
-          <div class="manager-tool-inspector-rule-card">
-            <i class={fact.icon} aria-hidden="true"></i>
-            <span><strong>{fact.title}</strong><small>{fact.subtitle}</small></span>
-          </div>
+          <!-- The SAME row the editor's behavior preview renders, from the same
+               `projectToolBehaviorFacts` projection — one component now, not a second
+               geometry for one meaning (issue 881). -->
+          <IconFactRow icon={fact.icon} title={fact.title} subtitle={fact.subtitle} />
         </section>
       {/each}
     </div>

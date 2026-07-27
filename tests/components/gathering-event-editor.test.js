@@ -11,7 +11,10 @@ const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemMan
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
+const chanceSliderPath = resolve(repoRoot, 'src/ui/svelte/components/ChanceSlider.svelte');
+
 const editorSource = readFileSync(editorPath, 'utf8');
+const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
@@ -32,10 +35,27 @@ describe('GatheringEventEditView source contract', () => {
     );
   });
 
+  // The 1..100 floor is an EVENT rule — the hint says "Chance from 1 to 100", `dropRateValid`
+  // enforces it and an error renders below it — so it survives the move to the shared
+  // control (issue 883) rather than being normalised away to the task-drop floor of 0. The
+  // clamp itself now lives one seam further out, in `ChanceSlider`, so the contract is
+  // asserted across BOTH halves: the editor asks for the floor, the control honours it.
   it('clamps dropRate to 1..100 before dispatching the update', () => {
-    assert.ok(editorSource.includes('Math.min(100, Math.max(1, Math.floor(raw)))'), 'dropRate input should clamp to 1..100 before calling onUpdateEvent');
-    assert.ok(editorSource.includes('min="1"'), 'dropRate input element should set min=1');
-    assert.ok(editorSource.includes('max="100"'), 'dropRate input element should set max=100');
+    assert.ok(/\bmin=\{1\}/.test(editorSource), 'editor should ask the shared slider for a floor of 1');
+    assert.equal(
+      /\bmax=/.test(editorSource),
+      false,
+      'the ceiling is the shared slider default; restating it would be a second declaration'
+    );
+    assert.ok(/\bmax = 100\b/.test(chanceSliderSource), 'the shared slider ceiling is 100');
+    assert.ok(
+      chanceSliderSource.includes('return Math.min(upper, Math.max(lower, stepped));'),
+      'the shared slider clamps to its own min/max before reporting a change'
+    );
+    assert.ok(
+      editorSource.includes('dropRateValid') && editorSource.includes('DropRateInvalid'),
+      'the editor still judges a STORED rate below the floor and says so'
+    );
   });
 
   it('renders a validation hint when the name is empty', () => {
@@ -67,10 +87,42 @@ describe('GatheringEventEditView source contract', () => {
       editorSource.includes("import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';"),
       'editor should import the drop-rate tier helpers'
     );
-    assert.ok(editorSource.includes('manager-drop-rate-control'), 'editor should render the drop-rate slider control');
-    assert.ok(editorSource.includes('manager-drop-rate-percent'), 'editor should render the drop-rate percent input');
-    assert.ok(editorSource.includes('manager-drop-rate-fill'), 'editor should render the drop-rate fill bar');
-    assert.ok(editorSource.includes('type="range"'), 'editor should render a range input alongside the text input');
+    // Issue 883: the widget is the shared `ChanceSlider`, not a local re-derivation of it.
+    assert.ok(
+      editorSource.includes("import ChanceSlider from '../../components/ChanceSlider.svelte';"),
+      'editor should import the shared chance slider'
+    );
+    assert.ok(editorSource.includes('<ChanceSlider'), 'editor should render the shared chance slider');
+    assert.ok(
+      /resolveColor=\{dropRateTierColor\}/.test(editorSource) &&
+        /controlClass=\{dropRateTierClass\(dropRateValue\)\}/.test(editorSource),
+      'editor should feed the shared slider its tier colour and tier class'
+    );
+    for (const dead of [
+      'manager-drop-rate-control',
+      'manager-drop-rate-percent',
+      'manager-drop-rate-track',
+      'manager-drop-rate-fill',
+      'type="range"',
+    ]) {
+      assert.equal(
+        editorSource.includes(dead),
+        false,
+        `editor should render through the shared slider, not hand-rolled ${dead}`
+      );
+    }
+    // Matched as a definition and as a binding, not as a bare name: the source comment
+    // recording the removal names the handler on purpose.
+    assert.equal(
+      /function\s+onDropRateInput\s*\(/.test(editorSource),
+      false,
+      'the local drop-rate handler should be gone, not merely unused'
+    );
+    assert.equal(
+      /oninput=\{onDropRateInput\}/.test(editorSource),
+      false,
+      'nothing should still bind the removed drop-rate handler'
+    );
   });
 
   it('drops the redundant Event modifier UI', () => {

@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
+import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
@@ -121,11 +122,22 @@ const FIXTURE = `
     </section>
   </div>`;
 
+// The chip owns its appearance in `Chip.svelte`'s scoped block (issue 883), so the global
+// sheet alone no longer styles it and every chip role here would fall to the 14px bleed
+// baseline. The gate keeps the coverage by reproducing what Svelte actually ships: the
+// component's real compiled CSS, appended AFTER the global sheet exactly as `css:
+// 'injected'` injects it, with the real scoping hash stamped onto the fixture's chips so
+// the SPECIFICITY matches too. Both halves matter — this is the only place in the repo
+// where a global rule that ties with the scoped block, and silently loses on source order,
+// can be caught.
+const chip = scopedComponentCss(resolve(repoRoot, 'src/ui/svelte/apps/manager/Chip.svelte'));
+const SCOPED_FIXTURE = withScopeHash(FIXTURE, 'manager-chip', chip.hashClass);
+
 function page() {
   return `<!doctype html><html><head><meta charset="utf-8">
-    <style>${foundryCss}</style><style>${fabricateCss}</style>
+    <style>${foundryCss}</style><style>${fabricateCss}</style><style>${chip.css}</style>
     <style>:root{--font-primary:Arial,sans-serif}</style></head>
-    <body class="game">${FIXTURE}</body></html>`;
+    <body class="game">${SCOPED_FIXTURE}</body></html>`;
 }
 
 // px at the 16px root: rem * 16.

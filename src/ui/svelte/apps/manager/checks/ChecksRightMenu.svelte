@@ -7,10 +7,20 @@
 
   Each check is a singleton shaped by the system's resolution mode, so the menu
   is a reference/help card explaining that coupling and linking to the relevant
-  documentation page — the same card format as the recipes "Set up recipes"
-  card.
+  documentation pages.
+
+  Both cards render on the manager's shared inspector contracts (issue 883). The
+  Active card is a `.manager-inspector-card` under a `.manager-card-title`, like
+  every other card in every other rail; the help card is the shared
+  `ExplainerCard`. It used to be a hand-rolled `.manager-setup-card` — the format
+  the numbered first-run "Set up X" procedures use — which gave this rail a card
+  shell, an icon tile and a 0.98rem heading that no other inspector had. That card
+  is the reason `ExplainerCard` now takes a LIST of links: this surface offers two
+  ways out (its own docs page and the Quickstart) and the primitive only spoke of
+  one.
 -->
 <script>
+  import ExplainerCard from '../ExplainerCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let { activeTab = 'crafting', activation = null, onToggleActive = () => {} } = $props();
@@ -57,51 +67,87 @@
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
 
+  // The Quickstart is the second way out of every one of these cards, so it is built once
+  // rather than restated per tab.
+  const quickstartLink = {
+    href: `${DOCS_BASE}/quickstart`,
+    label: text('FABRICATE.Admin.Manager.Checks.Quickstart', 'Quickstart'),
+    icon: 'fas fa-circle-question'
+  };
+
+  // The description stays ONE explainer row rather than being split into a row per rule:
+  // these are already-authored, already-translated sentences, and rewriting them into a
+  // list would be a content change wearing a consistency change's clothes.
   const MENUS = {
     crafting: {
       icon: 'fas fa-hammer',
-      kicker: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpKicker', 'Crafting checks'),
       title: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpTitle', 'About crafting checks'),
-      desc: text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
-        'The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.'
-      ),
-      docsHref: `${DOCS_BASE}/crafting-checks`,
-      docsLabel: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs')
+      items: [
+        {
+          text: text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
+            'The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.'
+          )
+        }
+      ],
+      links: [
+        {
+          href: `${DOCS_BASE}/crafting-checks`,
+          label: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs'),
+          icon: 'fas fa-book-open'
+        },
+        quickstartLink
+      ]
     },
     salvage: {
       icon: 'fas fa-recycle',
-      kicker: text('FABRICATE.Admin.Manager.Checks.Salvage.HelpKicker', 'Salvage checks'),
       title: text('FABRICATE.Admin.Manager.Checks.Salvage.HelpTitle', 'About salvage checks'),
-      desc: text(
-        'FABRICATE.Admin.Manager.Checks.Salvage.HelpDesc',
-        'The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
-      ),
-      docsHref: `${DOCS_BASE}/salvage`,
-      docsLabel: text('FABRICATE.Admin.Manager.Checks.Salvage.Docs', 'Salvage docs')
+      items: [
+        {
+          text: text(
+            'FABRICATE.Admin.Manager.Checks.Salvage.HelpDesc',
+            'The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
+          )
+        }
+      ],
+      links: [
+        {
+          href: `${DOCS_BASE}/salvage`,
+          label: text('FABRICATE.Admin.Manager.Checks.Salvage.Docs', 'Salvage docs'),
+          icon: 'fas fa-book-open'
+        },
+        quickstartLink
+      ]
     },
     gathering: {
       icon: 'fas fa-seedling',
-      kicker: text('FABRICATE.Admin.Manager.Checks.Gathering.HelpKicker', 'Gathering checks'),
       title: text('FABRICATE.Admin.Manager.Checks.Gathering.HelpTitle', 'About gathering checks'),
-      desc: text(
-        'FABRICATE.Admin.Manager.Checks.Gathering.HelpDesc',
-        'The gathering check is shaped by the task resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.'
-      ),
-      docsHref: `${DOCS_BASE}/gathering-environments`,
-      docsLabel: text('FABRICATE.Admin.Manager.Checks.Gathering.Docs', 'Gathering docs')
+      items: [
+        {
+          text: text(
+            'FABRICATE.Admin.Manager.Checks.Gathering.HelpDesc',
+            'The gathering check is shaped by the task resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.'
+          )
+        }
+      ],
+      links: [
+        {
+          href: `${DOCS_BASE}/gathering-environments`,
+          label: text('FABRICATE.Admin.Manager.Checks.Gathering.Docs', 'Gathering docs'),
+          icon: 'fas fa-book-open'
+        },
+        quickstartLink
+      ]
     }
   };
 
   const menu = $derived(MENUS[activeTab] || MENUS.crafting);
-  const quickstart = text('FABRICATE.Admin.Manager.Checks.Quickstart', 'Quickstart');
-  const resources = text('FABRICATE.Admin.Manager.Checks.Resources', 'Check resources');
 </script>
 
 <aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.Checks.Menu.Label', 'Checks context menu')}>
   {#if activation}
     <section class="manager-inspector-card" data-checks-active={activeTab}>
-      <p class="manager-kicker">{activeTitle}</p>
+      <h3 class="manager-card-title">{activeTitle}</h3>
       {#if showActiveToggle}
         <button
           type="button"
@@ -120,24 +166,12 @@
     </section>
   {/if}
 
-  <section class="manager-setup-card" data-checks-help={activeTab} aria-label={menu.title}>
-    <div class="manager-setup-card-header">
-      <i class={menu.icon} aria-hidden="true"></i>
-      <div>
-        <p class="manager-kicker">{menu.kicker}</p>
-        <h3>{menu.title}</h3>
-      </div>
-    </div>
-    <p class="manager-muted">{menu.desc}</p>
-    <div class="manager-setup-links" aria-label={resources}>
-      <a class="manager-button" href={menu.docsHref} target="_blank" rel="noreferrer">
-        <i class="fas fa-book-open" aria-hidden="true"></i>
-        <span>{menu.docsLabel}</span>
-      </a>
-      <a class="manager-button" href={`${DOCS_BASE}/quickstart`} target="_blank" rel="noreferrer">
-        <i class="fas fa-circle-question" aria-hidden="true"></i>
-        <span>{quickstart}</span>
-      </a>
-    </div>
-  </section>
+  <ExplainerCard
+    icon={menu.icon}
+    title={menu.title}
+    items={menu.items}
+    links={menu.links}
+    dataAttr="data-checks-help"
+    dataValue={activeTab}
+  />
 </aside>

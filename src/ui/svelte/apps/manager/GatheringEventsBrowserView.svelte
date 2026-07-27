@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -261,7 +262,7 @@
         {/each}
       </select>
     </label>
-    <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredEvents.length).replace('{total}', eventList.length)}</span>
+    <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredEvents.length).replace('{total}', eventList.length)}</Chip>
     {#if filtersActive}
       <button type="button" class="manager-button manager-clear-filters" data-clear-filters="gathering-events" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>

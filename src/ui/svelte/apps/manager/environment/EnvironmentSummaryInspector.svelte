@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, viewScene } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import { sceneDocumentImage } from '../../../util/sceneImages.js';
@@ -56,9 +57,9 @@
   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Summary', 'Environment summary')}</p>
   <h2 class="manager-inspector-name" title={environment?.name || ''}>{environment?.name || text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Unnamed', 'Unnamed environment')}</h2>
   <div class="manager-chip-row">
-    <span class={`manager-chip ${active ? 'is-active' : 'is-neutral'}`}>{active ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
-    <span class="manager-chip is-info">{selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}</span>
-    <span class="manager-chip is-info">{compositionMode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic', 'Automatic')}</span>
+    <Chip tone={active ? 'active' : 'neutral'}>{active ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</Chip>
+    <Chip tone="info">{selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}</Chip>
+    <Chip tone="info">{compositionMode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic', 'Automatic')}</Chip>
   </div>
 </section>
 
@@ -97,8 +98,8 @@
 <section class="manager-inspector-card">
   <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ValidationSummary', 'Validation summary')}</h3>
   <div class="manager-chip-row">
-    <span class={`manager-chip ${critical > 0 ? 'is-danger' : 'is-positive'}`}>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.critical', 'Critical')}: {critical}</span>
-    <span class={`manager-chip ${warning > 0 ? 'is-warning' : 'is-neutral'}`}>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.warning', 'Warning')}: {warning}</span>
+    <Chip tone={critical > 0 ? 'danger' : 'positive'}>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.critical', 'Critical')}: {critical}</Chip>
+    <Chip tone={warning > 0 ? 'warning' : 'neutral'}>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.warning', 'Warning')}: {warning}</Chip>
   </div>
 </section>
 

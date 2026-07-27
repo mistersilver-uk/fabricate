@@ -1,6 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
+  import ExplainerCard from './ExplainerCard.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
     DEFAULT_GATHERING_EVENT_IMG,
@@ -817,16 +820,19 @@
   });
   // The Tags & Categories screen shows one vocabulary tab at a time; the active tab
   // is owned here so the inspector's contextual help can follow it (the view is a
-  // controlled component over this state). Each help block is title + three bullets.
+  // controlled component over this state). Each help block is a title plus three
+  // glyph-led rows, rendered by the shared `ExplainerCard` (issue 881) — the same
+  // primitive the Tool Studio's "How Tools work in Fabricate" card renders, so the two
+  // right-hand panels no longer state one meaning at two heading and body scales.
   let tagsActiveTab = $state('recipe');
   const tagsHelp = $derived.by(() => {
     if (tagsActiveTab === 'component') {
       return {
         title: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle', 'How component categories work'),
         items: [
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.')
+          { icon: 'fas fa-cubes', text: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.') },
+          { icon: 'fas fa-scroll', text: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.') },
+          { icon: 'fas fa-arrow-rotate-left', text: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.') }
         ]
       };
     }
@@ -834,21 +840,30 @@
       return {
         title: text('FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle', 'How component tags work'),
         items: [
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.')
+          { icon: 'fas fa-tag', text: text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.') },
+          { icon: 'fas fa-font', text: text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.') },
+          { icon: 'fas fa-list-check', text: text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.') }
         ]
       };
     }
     return {
       title: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle', 'How recipe categories work'),
       items: [
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.'),
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.'),
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.')
+        { icon: 'fas fa-folder-tree', text: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.') },
+        { icon: 'fas fa-lock', text: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.') },
+        { icon: 'fas fa-scroll', text: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.') }
       ]
     };
   });
+  // The reference-safety reassurance was a bare `.manager-muted` paragraph under its own
+  // card title — the third re-derivation of the explainer (issue 881). One glyph-led row
+  // in the shared card says the same thing at the shared scale.
+  const tagsReferenceSafeItems = $derived([
+    {
+      icon: 'fas fa-shield-halved',
+      text: text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint', 'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.')
+    }
+  ]);
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
   const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
@@ -4145,7 +4160,7 @@
       return {
         id: 'none',
         label: text('FABRICATE.Admin.Manager.Environment.SceneNone', 'No scene'),
-        className: 'is-disabled'
+        tone: 'disabled'
       };
     }
     const scene = linkedSceneForEnvironment(environment);
@@ -4153,14 +4168,14 @@
       return {
         id: 'missing',
         label: text('FABRICATE.Admin.Manager.Environment.SceneMissing', 'Scene unresolved'),
-        className: 'is-warning'
+        tone: 'warning'
       };
     }
     return {
       id: 'linked',
       label: text('FABRICATE.Admin.Manager.Environment.SceneLinked', 'Linked scene'),
       name: scene.name || environment.sceneUuid,
-      className: 'is-active'
+      tone: 'active'
     };
   }
 
@@ -4310,38 +4325,11 @@
     return 'var(--fab-drop-rate-legendary)';
   }
 
-  function onGatheringDropRateInput(rowId, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    input.value = normalized;
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      updateGatheringTaskDrop(rowId, { dropRate });
-    }
-  }
-
-  function onGatheringDropRateBlur(row, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      input.value = String(dropRate);
-      updateGatheringTaskDrop(row.id, { dropRate });
-      return;
-    }
-    input.value = String(gatheringDropRateValue(row));
-  }
-
-  function onGatheringDropRateKeydown(row, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const currentValue = event.currentTarget.value === '' ? gatheringDropRateValue(row) : Number(event.currentTarget.value);
-    const dropRate = gatheringDropRateValue({ dropRate: (Number.isFinite(currentValue) ? currentValue : gatheringDropRateValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
-    event.currentTarget.value = String(dropRate);
-    updateGatheringTaskDrop(row.id, { dropRate });
-  }
-
+  // The drop-rate input/blur/keydown trio that used to live here is gone with the
+  // hand-rolled slider it drove (issue 883). `ChanceSlider` owns those three handlers now,
+  // including the commit-on-blur behaviour: an empty field reverts to the model value on
+  // blur rather than being committed. The COUNT field below still hand-rolls them, because
+  // it is a bare numeric field with no slider and no shared control to render through.
   function onGatheringDropCountInput(rowId, event) {
     const input = event.currentTarget;
     const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
@@ -4843,15 +4831,15 @@
       {/if}
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
         <div class="manager-environment-header-pills" data-environment-status-pills>
-          <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">
+          <Chip tone={environmentDraftForDisplay.enabled === false ? 'neutral' : 'active'} data-status-pill="active">
             {environmentDraftForDisplay.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-          </span>
-          <span class="manager-chip is-info" data-status-pill="selection">
+          </Chip>
+          <Chip tone="info" data-status-pill="selection">
             {environmentDraftForDisplay.selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
-          </span>
-          <span class="manager-chip is-info" data-status-pill="composition">
+          </Chip>
+          <Chip tone="info" data-status-pill="composition">
             {environmentDraftForDisplay.compositionMode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic', 'Automatic')}
-          </span>
+          </Chip>
         </div>
       {/if}
     </div>
@@ -4864,7 +4852,7 @@
         </button>
       {:else if currentView === 'recipe-edit'}
         {#if recipeEditDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning" truncate title={text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}>{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button is-ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -4880,7 +4868,7 @@
         </button>
       {:else if currentView === 'recipe-item-edit'}
         {#if recipeItemEditDirty}
-          <span class="manager-chip is-warning" data-recipe-item-dirty>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning" truncate data-recipe-item-dirty title={text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" data-recipe-item-back onclick={backToBooksScrolls} disabled={recipeItemEditSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -4914,7 +4902,7 @@
         <!-- no header actions for the tags view -->
       {:else if currentView === 'checks'}
         {#if checksDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button is-primary" data-checks-save onclick={saveChecks} disabled={!checksDirty || checksSaving}>
           <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
@@ -4927,7 +4915,7 @@
         </button>
       {:else if currentView === 'essence-edit'}
         {#if essenceEditDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={cancelEssenceEdit} disabled={essenceEditSaving}>
           <i class="fas fa-times" aria-hidden="true"></i>
@@ -4966,7 +4954,7 @@
         </button>
       {:else if currentView === 'environment-edit'}
         {#if $viewState.environmentDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={backToEnvironmentsBrowse} disabled={$viewState.environmentSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -4982,7 +4970,7 @@
         </button>
       {:else if currentView === 'gathering-task-edit'}
         {#if gatheringTaskDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -5010,7 +4998,7 @@
         </button>
       {:else if currentView === 'gathering-event-edit'}
         {#if gatheringEventDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</span>
+          <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip>
         {/if}
         <button type="button" class="manager-button" onclick={backToGatheringEventLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -5873,19 +5861,21 @@
           </div>
         </section>
 
-        <section class="manager-inspector-card" data-tags-evidence="how-it-works">
-          <h3 class="manager-card-title">{tagsHelp.title}</h3>
-          <ul class="manager-evidence-list">
-            {#each tagsHelp.items as tip (tip)}
-              <li>{tip}</li>
-            {/each}
-          </ul>
-        </section>
+        <ExplainerCard
+          icon="fas fa-circle-question"
+          title={tagsHelp.title}
+          items={tagsHelp.items}
+          dataAttr="data-tags-evidence"
+          dataValue="how-it-works"
+        />
 
-        <section class="manager-inspector-card" data-tags-evidence="reference-safe">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle', 'Reference-safe by default')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint', 'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.')}</p>
-        </section>
+        <ExplainerCard
+          icon="fas fa-shield-halved"
+          title={text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle', 'Reference-safe by default')}
+          items={tagsReferenceSafeItems}
+          dataAttr="data-tags-evidence"
+          dataValue="reference-safe"
+        />
       {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
           {#if selectedGatheringTask}
@@ -5897,10 +5887,10 @@
                   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Tasks.Selected', 'Selected gathering task')}</p>
                   <h2 class="manager-inspector-name" title={gatheringTaskName(selectedGatheringTask)}>{gatheringTaskName(selectedGatheringTask)}</h2>
                   <div class="manager-chip-row">
-                    <span class={`manager-chip ${selectedGatheringTask.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                    <Chip tone={selectedGatheringTask.enabled === false ? 'disabled' : 'active'}>
                       {selectedGatheringTask.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                    </span>
-                    <span class="manager-chip">{gatheringTaskAvailability(selectedGatheringTask)}</span>
+                    </Chip>
+                    <Chip>{gatheringTaskAvailability(selectedGatheringTask)}</Chip>
                   </div>
                 </div>
               </div>
@@ -5925,7 +5915,7 @@
               </div>
             </section>
 
-            <section class="manager-inspector-card manager-task-drops-summary-card" data-task-drops-summary>
+            <section class="manager-inspector-card" data-task-drops-summary>
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary', 'Drops summary')}</h3>
               {#if gatheringTaskDropRows(selectedGatheringTask).length === 0}
                 <p class="manager-muted" data-task-drops-summary-empty>{text('FABRICATE.Admin.Manager.Environment.Tasks.NoDropsConfigured', 'No drops configured yet.')}</p>
@@ -5990,18 +5980,22 @@
               <div class="manager-drop-editor-values">
                 <label class="manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>
                   <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')}</span>
-                  <span class="manager-drop-rate-value">
-                    <span class="manager-drop-rate-percent">
-                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onGatheringDropRateInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropRateBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropRateKeydown(selectedGatheringDrop, event)} />
-                      <span aria-hidden="true">%</span>
-                    </span>
-                    <span class={`manager-drop-rate-control ${gatheringDropRateTierClass(selectedGatheringDrop.dropRate)}`} style={`--fab-drop-rate-value: ${gatheringDropRateValue(selectedGatheringDrop)}%; --fab-drop-rate-color: ${gatheringDropRateTierColor(selectedGatheringDrop.dropRate)};`}>
-                      <span class="manager-drop-rate-track" aria-hidden="true">
-                        <span class="manager-drop-rate-fill"></span>
-                      </span>
-                      <input type="range" min="0" max="100" step="1" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate: Number(event.currentTarget.value) })} onkeydown={(event) => event.stopPropagation()} />
-                    </span>
-                  </span>
+                  <!--
+                    The shared control (issue 883). This inspector used to hand-roll the same
+                    track/fill/range structure the drop ROWS render through `ChanceSlider`, and
+                    re-derive the same `--fab-drop-rate-value` / `--fab-drop-rate-color` inline.
+                    `min` stays 0 here: a task drop has a real "none" tier at 0, unlike a
+                    gathering event.
+                  -->
+                  <ChanceSlider
+                    value={gatheringDropRateValue(selectedGatheringDrop)}
+                    numberLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent', 'Drop chance percent')}
+                    rangeLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')}
+                    resolveColor={gatheringDropRateTierColor}
+                    controlClass={gatheringDropRateTierClass(selectedGatheringDrop.dropRate)}
+                    stopPropagation={true}
+                    onChange={(dropRate) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate })}
+                  />
                 </label>
 
                 <label class="manager-field manager-drop-count-editor" data-gathering-drop-inspector-count>
@@ -6414,11 +6408,11 @@
                   <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Events.Selected', 'Selected gathering event')}</p>
                   <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>{selectedGatheringEvent.name || text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')}</h2>
                   <div class="manager-chip-row">
-                    <span class={`manager-chip ${selectedGatheringEvent.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                    <Chip tone={selectedGatheringEvent.enabled === false ? 'disabled' : 'active'}>
                       {selectedGatheringEvent.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                    </span>
+                    </Chip>
                     {#if Array.isArray(selectedGatheringEvent.dangerTags) && selectedGatheringEvent.dangerTags.length > 0}
-                      <span class="manager-chip">{sortedDangerTags(selectedGatheringEvent.dangerTags).join(', ')}</span>
+                      <Chip>{sortedDangerTags(selectedGatheringEvent.dangerTags).join(', ')}</Chip>
                     {/if}
                   </div>
                 </div>
@@ -6679,7 +6673,7 @@
                         <li>
                           {realm.name}
                           {#if !realm.enabled}
-                            <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</span>
+                            <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</Chip>
                           {/if}
                         </li>
                       {/each}
@@ -6818,7 +6812,7 @@
                         <span class="manager-travel-region-thumb" aria-hidden="true"><i class="fas fa-map-location-dot"></i></span>
                         <span class="manager-travel-region-item-name">{linkedRealm?.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown realm')}</span>
                         {#if linkedRealm && !linkedRealm.enabled}
-                          <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
+                          <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip>
                         {/if}
                       </li>
                     </ul>
@@ -6893,9 +6887,9 @@
               <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Selected', 'Selected environment')}</p>
               <h2 class="manager-inspector-name" title={environmentName(selectedEnvironment)}>{environmentName(selectedEnvironment)}</h2>
               <div class="manager-chip-row">
-                <span class={`manager-chip ${selectedEnvironment.enabled === false ? 'is-disabled' : 'is-active'}`}>{environmentStatusLabel(selectedEnvironment)}</span>
-                <span class="manager-chip">{environmentSelectionModeLabel(selectedEnvironment)}</span>
-                <span class={`manager-chip ${selectedEnvironmentSceneState.className}`}>{selectedEnvironmentSceneState.label}</span>
+                <Chip tone={selectedEnvironment.enabled === false ? 'disabled' : 'active'}>{environmentStatusLabel(selectedEnvironment)}</Chip>
+                <Chip>{environmentSelectionModeLabel(selectedEnvironment)}</Chip>
+                <Chip tone={selectedEnvironmentSceneState.tone}>{selectedEnvironmentSceneState.label}</Chip>
               </div>
             </div>
 
@@ -6925,10 +6919,10 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.DraftState', 'Draft state')}</h3>
               <div class="manager-feature-list">
                 {#if environmentDirtyFor(selectedEnvironment)}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
+                  <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip>
                 {/if}
                 {#if environmentInvalidFor(selectedEnvironment)}
-                  <span class="manager-chip is-danger">{text('FABRICATE.Admin.Manager.Environment.ValidationCount', '{count} validation issues').replace('{count}', environmentValidationCount)}</span>
+                  <Chip tone="danger">{text('FABRICATE.Admin.Manager.Environment.ValidationCount', '{count} validation issues').replace('{count}', environmentValidationCount)}</Chip>
                 {/if}
               </div>
               {#if $viewState.environmentSaveError}
@@ -6982,7 +6976,7 @@
                 <h2 class="manager-inspector-name" title={selectedEssenceForInspector.name}>{selectedEssenceForInspector.name}</h2>
                 <div class="manager-chip-row">
                   {#if selectedEssenceForInspector.deleteBlocked}
-                    <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.DeleteBlockedShort', 'In use')}</span>
+                    <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.DeleteBlockedShort', 'In use')}</Chip>
                   {/if}
                 </div>
               </div>
@@ -6997,10 +6991,10 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.DraftState', 'Draft state')}</h3>
               <div class="manager-feature-list">
                 {#if essenceEditDirty}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</span>
+                  <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip>
                 {/if}
                 {#if essenceEditSaving}
-                  <span class="manager-chip">{text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...')}</span>
+                  <Chip>{text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...')}</Chip>
                 {/if}
               </div>
             </section>
@@ -7205,10 +7199,10 @@
               <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Column.System', 'System')}</p>
               <h2 class="manager-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>
               <div class="manager-chip-row">
-                <span class="manager-chip is-active">{resolutionModeLabel(selectedSystem.resolutionMode)}</span>
-                <span class={`manager-chip ${selectedSystem.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                <Chip tone="active">{resolutionModeLabel(selectedSystem.resolutionMode)}</Chip>
+                <Chip tone={selectedSystem.enabled === false ? 'disabled' : 'active'}>
                   {selectedSystem.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                </span>
+                </Chip>
               </div>
             </div>
           </div>
@@ -7244,7 +7238,7 @@
           {#if enabledFeatureLabels.length > 0}
             <div class="manager-feature-list">
               {#each enabledFeatureLabels as feature (feature)}
-                <span class="manager-chip is-active">{feature}</span>
+                <Chip tone="active">{feature}</Chip>
               {/each}
             </div>
           {:else}

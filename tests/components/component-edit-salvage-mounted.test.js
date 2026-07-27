@@ -52,6 +52,9 @@ const harness = createMountedComponentHarness({
   // component under test must be listed here too — the harness imports `componentPath`
   // from the temp tree but only compiles what `compiledModules` names.
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',

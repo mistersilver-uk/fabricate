@@ -17,6 +17,7 @@
    - onOpenSettings(): routes to the Crafting Settings screen.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { resolutionModeOptions } from '../resolutionModeOptions.js';
 
@@ -43,16 +44,18 @@
     </p>
     <p class="manager-recipe-mode-banner-desc manager-muted">{text(mode.descKey, mode.descFallback)}</p>
   </div>
-  <button
+  <Chip
+    tag="button"
+    tone="info"
+    icon="fas fa-arrow-up-right-from-square"
+    class="manager-recipe-mode-banner-action"
     type="button"
-    class="manager-chip is-info manager-recipe-mode-banner-action"
     data-recipe-mode-banner-settings
     title={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint', 'Resolution mode is set for the whole crafting system, not per recipe.')}
     onclick={() => onOpenSettings()}
   >
-    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Settings', 'System settings')}</span>
-  </button>
+  </Chip>
 </div>
 
 <style>
@@ -124,7 +127,9 @@
     white-space: normal;
   }
 
-  .manager-recipe-mode-banner-action {
+  /* The action is a `Chip` (issue 883), so this component's scoping hash is not on it.
+     Reach it through `:global`, nested under a selector that DOES carry the hash. */
+  .manager-recipe-mode-banner :global(.manager-recipe-mode-banner-action) {
     flex: 0 0 auto;
   }
 </style>

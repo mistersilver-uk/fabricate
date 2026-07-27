@@ -14,6 +14,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
   // Shared pure resolver: an empty OR generic item-bag image falls back to the
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
@@ -54,18 +55,20 @@
       <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.RecipeItem.Contents.Heading', 'Recipes inside')}</h3>
     </div>
     <div class="manager-recipe-item-link-recipe">
-      <button
+      <Chip
+        tag="button"
+        tone="neutral"
+        icon="fas fa-plus"
+        class="manager-recipe-item-link-recipe-toggle"
         type="button"
-        class="manager-chip is-neutral manager-recipe-item-link-recipe-toggle"
         data-recipe-item-link-recipe-toggle
         aria-haspopup="listbox"
         aria-expanded={linkOpen}
         disabled={linkable.length === 0}
         onclick={() => { linkOpen = !linkOpen; }}
       >
-        <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}</span>
-      </button>
+      </Chip>
       {#if linkOpen && linkable.length > 0}
         <div class="manager-recipe-item-link-recipe-list" role="listbox" data-recipe-item-link-recipe-list aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}>
           {#each linkable as recipe (recipe.id)}
@@ -147,11 +150,12 @@
     position: relative;
   }
 
-  .manager-recipe-item-link-recipe-toggle {
-    cursor: pointer;
-  }
-
-  .manager-recipe-item-link-recipe-toggle:disabled {
+  /* The toggle is a `Chip` (issue 883), so it is NOT in this component's scope: Svelte
+     stamps its hash on this component's own elements only, and a child component's root
+     never carries it. Reaching it needs `:global`, nested under a selector that DOES
+     carry the hash so nothing leaks. `cursor: pointer` is gone because the primitive's
+     own button rule already sets it; only the disabled state is this component's own. */
+  .manager-recipe-item-link-recipe :global(.manager-recipe-item-link-recipe-toggle:disabled) {
     opacity: 0.5;
     cursor: not-allowed;
   }
