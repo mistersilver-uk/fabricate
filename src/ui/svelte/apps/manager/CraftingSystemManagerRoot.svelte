@@ -3415,12 +3415,6 @@
 
   async function saveGatheringTaskDraft() {
     if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return false;
-    // Clear before the attempt, not only on success (mirrors saveRecipeItemDraft). A retry that
-    // fails the same way writes a byte-identical string, which $state treats as clean, so the
-    // role="alert" region is never re-inserted and a screen reader announces nothing. Dropping
-    // it first lets the alert leave the DOM while the save is in flight and be re-inserted when
-    // the same failure recurs.
-    gatheringTaskSaveError = '';
     const { valid, errors } = gatheringTaskValidation;
     if (!valid) {
       gatheringTaskSaveError = errors[0] || '';
@@ -3428,6 +3422,14 @@
     }
     const proceed = await store.confirmGatheringLibraryTaskCompositionLoss?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
+    // Cleared here — once an attempt is actually committed to, and before the awaited store call
+    // (mirrors saveRecipeItemDraft). A retry that fails the same way writes a byte-identical
+    // string, which $state treats as clean, so the role="alert" region is never re-inserted and a
+    // screen reader announces nothing. Dropping it before the await lets the alert leave the DOM
+    // while the save is in flight and be re-inserted when the same failure recurs. It is
+    // deliberately NOT at the top of the function: the early returns above make no new attempt,
+    // and quietly removing a standing failure notice announces nothing at all in its place.
+    gatheringTaskSaveError = '';
     gatheringTaskSaving = true;
     try {
       const ok = await store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft);
@@ -3536,9 +3538,6 @@
 
   async function saveGatheringEventDraft() {
     if (!gatheringEventDraft || !selectedSystemId || !selectedGatheringEventId) return false;
-    // Cleared up front for the same reason as saveGatheringTaskDraft: an unchanged error string
-    // is not a DOM mutation, so a repeated identical failure would never re-announce.
-    gatheringEventSaveError = '';
     const { valid, errors } = gatheringEventValidation;
     if (!valid) {
       gatheringEventSaveError = errors[0] || '';
@@ -3546,6 +3545,11 @@
     }
     const proceed = await store.confirmGatheringLibraryEventCompositionLoss?.(selectedSystemId, selectedGatheringEventId, gatheringEventDraft) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
+    // Cleared at the same point, and for the same reason, as in saveGatheringTaskDraft: an
+    // unchanged error string is not a DOM mutation, so a repeated identical failure would never
+    // re-announce — and the early returns above are left alone so a cancelled confirmation does
+    // not wipe a failure notice the GM has not yet acted on.
+    gatheringEventSaveError = '';
     gatheringEventSaving = true;
     try {
       const ok = await store.updateGatheringLibraryEvent?.(selectedSystemId, selectedGatheringEventId, gatheringEventDraft);

@@ -1810,6 +1810,14 @@ function createStore(calls = [], options = {}) {
       });
       return true;
     },
+    // Also absent until issue 919. The root optional-chains to `undefined` and reads that as
+    // "proceed", so the cancel branch of the save was undrivable and nothing pinned what a
+    // cancellation must leave on screen. Proceeding stays the default, which is exactly what
+    // the missing method already meant.
+    confirmGatheringLibraryTaskCompositionLoss: (systemId, taskId, draft) => {
+      calls.push(['confirmGatheringLibraryTaskCompositionLoss', systemId, taskId, draft]);
+      return options.confirmGatheringLibraryTaskCompositionLossResult !== false;
+    },
     duplicateGatheringLibraryTask: (...args) => {
       calls.push(['duplicateGatheringLibraryTask', ...args]);
       return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
@@ -1845,6 +1853,11 @@ function createStore(calls = [], options = {}) {
         };
       });
       return true;
+    },
+    // Mirrors confirmGatheringLibraryTaskCompositionLoss above.
+    confirmGatheringLibraryEventCompositionLoss: (systemId, eventId, draft) => {
+      calls.push(['confirmGatheringLibraryEventCompositionLoss', systemId, eventId, draft]);
+      return options.confirmGatheringLibraryEventCompositionLossResult !== false;
     },
     createToolDraft: (initialPatch = {}, systemId = 'alchemy') => {
       const created = {
@@ -14738,8 +14751,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleSaveAttempt();
   }
 
+  // Every one of these alerts is asserted THROUGH the toolbar, so the node an identity check
+  // compares is the same node the rendering check found. Querying one scoped and the other bare
+  // would still agree today, but would silently drift apart the moment anything carrying one of
+  // these data attributes rendered outside `.manager-header-actions`.
+  function saveErrorNode(selector) {
+    return target.querySelector(`.manager-header-actions ${selector}`);
+  }
+
   function assertSaveErrorRendered(selector) {
-    const alert = target.querySelector(`.manager-header-actions ${selector}`);
+    const alert = saveErrorNode(selector);
     assert.ok(alert, `expected the failed-save alert ${selector} in the header toolbar`);
     assert.equal(alert.getAttribute('role'), 'alert', 'the failed-save alert is a live region');
     assert.equal(
@@ -14827,6 +14848,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   }
 
+  // The counterpart constraint, and the reason the pre-attempt clear sits AFTER the
+  // composition-loss confirmation rather than at the top of the save: cancelling that
+  // confirmation makes no new attempt at all, so a failure the GM has not yet dealt with has to
+  // stay exactly where it is. Clearing first would delete the alert node with nothing put in its
+  // place — and a removal, unlike an insertion, is typically not announced at all, so the GM
+  // would be left with strictly less than they started with.
+  async function assertCancelledConfirmKeepsSaveError(selector, storeOptions, cancelKey) {
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    const standingAlert = saveErrorNode(selector);
+
+    storeOptions[cancelKey] = false;
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    assert.strictEqual(
+      saveErrorNode(selector),
+      standingAlert,
+      'a cancelled confirmation leaves the standing failure alert in place, untouched'
+    );
+  }
+
   // The two gathering rejection paths log through console.error before they surface the
   // alert, so silence just that call rather than dumping an expected stack into the run.
   async function withSilencedConsoleError(run) {
@@ -14883,6 +14925,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     await assertRepeatFailureReAnnounces('[data-gathering-task-save-error]');
   });
 
+  it('keeps a standing gathering-task save error when the composition-loss warning is cancelled', async () => {
+    const storeOptions = { updateGatheringLibraryTaskResult: false };
+    await openDirtyGatheringTaskEditor([], storeOptions);
+    await assertCancelledConfirmKeepsSaveError(
+      '[data-gathering-task-save-error]',
+      storeOptions,
+      'confirmGatheringLibraryTaskCompositionLossResult'
+    );
+  });
+
   it('surfaces a gathering-event save that returns false, and clears it on the next success', async () => {
     const calls = [];
     const storeOptions = { updateGatheringLibraryEventResult: false };
@@ -14937,6 +14989,16 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('re-announces a gathering-event save that fails the same way twice', async () => {
     await openDirtyGatheringEventEditor([], { updateGatheringLibraryEventResult: false });
     await assertRepeatFailureReAnnounces('[data-gathering-event-save-error]');
+  });
+
+  it('keeps a standing gathering-event save error when the composition-loss warning is cancelled', async () => {
+    const storeOptions = { updateGatheringLibraryEventResult: false };
+    await openDirtyGatheringEventEditor([], storeOptions);
+    await assertCancelledConfirmKeepsSaveError(
+      '[data-gathering-event-save-error]',
+      storeOptions,
+      'confirmGatheringLibraryEventCompositionLossResult'
+    );
   });
 
   it('surfaces a recipe-item save that returns false, and clears it on the next success', async () => {
