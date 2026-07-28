@@ -5983,11 +5983,36 @@ test('the manager themes select options, not just the closed select', () => {
   );
   assert.match(optionRule, /color:\s*var\(--fab-mv2-[a-z0-9-]+\)/);
 
+  // The selected row must be marked the SAME way on both rendering paths — the engines
+  // that paint the list in-page and the customizable-select picker. An accent-filled bar
+  // on one and a subtle overlay on the other is one control reading as two designs
+  // depending on which browser the GM happens to run.
   const checkedRule = blockFor('.fabricate-manager select option:checked');
   assert.ok(checkedRule, 'the selected row needs its own treatment');
   assert.match(
     checkedRule,
-    /background:\s*var\(--fab-mv2-accent\)/,
-    "Foundry's default highlight renders the selected row unreadably against these surfaces"
+    /background:\s*var\(--fab-overlay-light-08\)/,
+    'the checked row shares the picker treatment rather than painting a filled bar'
   );
+  assert.match(checkedRule, /color:\s*var\(--fab-mv2-accent\)/);
+
+  // `color-scheme` is the only layer here that reaches every engine: it is what makes the
+  // platform-drawn popup dark at all, and without it the rules above are cosmetic.
+  assert.match(
+    blockFor('.fabricate-manager'),
+    /color-scheme:\s*dark/,
+    'the manager root must declare the dark UA scheme, as the player root already does'
+  );
+
+  // …and the opt-in that makes those colours visible at all. Without it the rules above
+  // are correct and inert on the engines most players use, because a legacy select popup
+  // is painted by the platform rather than the page.
+  assert.match(
+    css,
+    /@supports \(appearance: base-select\)/,
+    'the option colours only reach a Chromium popup through the customizable-select opt-in'
+  );
+  const picker = blockFor('.fabricate-manager select::picker(select)');
+  assert.ok(picker, 'the picker surface must be themed, not left as the platform default');
+  assert.match(picker, /background:\s*var\(--fab-mv2-surface-2\)/);
 });
