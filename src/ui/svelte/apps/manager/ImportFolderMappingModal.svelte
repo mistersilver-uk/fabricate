@@ -131,8 +131,9 @@
   );
   const importDisabled = $derived(importCount === 0);
 
-  function tagOptionsFor(state) {
-    // Existing tags not yet assigned to this row (RecipeRoutingAssignment shape).
+  // Every existing tag, in the RecipeRoutingAssignment shape. The row's state is taken but
+  // not read: the list is not filtered down to the tags the row has yet to be assigned.
+  function tagOptionsFor(_state) {
     return (itemTags || []).map((tag) => ({ id: tag, name: `#${tag}` }));
   }
 

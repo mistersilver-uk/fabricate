@@ -7,7 +7,6 @@
 
   let {
     environment = null,
-    composition = { counts: {}, conditions: {} },
     realmRecords = [],
     realmsEnabled = false,
     biomeOptions = [],

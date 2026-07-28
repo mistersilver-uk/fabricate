@@ -28,7 +28,6 @@
   const isSucceeded = $derived(status === 'succeeded');
   const hasSteps = $derived(runType === 'crafting' || runType === 'salvage');
   const steps = $derived(Array.isArray(run?.steps) ? run.steps : []);
-  const stepCount = $derived(steps.length);
   const TERMINAL_STEP = new Set(['succeeded', 'failed']);
   // The step whose detail to show: the active step when present, else the last
   // EXECUTED step for a terminal run. All recipe steps are pre-created, so a run

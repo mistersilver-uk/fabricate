@@ -9,7 +9,6 @@
 
   let {
     events = [],
-    environments = [],
     selectedEventId = '',
     selectedSystemId = '',
     gatheringConfig = null,

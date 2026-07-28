@@ -20,7 +20,6 @@
   let sceneName = $state('');
   let sceneThumb = $state('');
   let canView = $state(false);
-  let resolved = $state(false);
 
   function playerCanView(doc) {
     try {
@@ -40,11 +39,7 @@
     sceneName = '';
     sceneThumb = '';
     canView = false;
-    resolved = false;
-    if (!uuid || typeof globalThis.fromUuid !== 'function') {
-      resolved = true;
-      return;
-    }
+    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
     let cancelled = false;
     Promise.resolve(globalThis.fromUuid(uuid))
       .then(doc => {
@@ -54,11 +49,8 @@
           sceneThumb = sceneDocumentImage(doc) || '';
           canView = playerCanView(doc);
         }
-        resolved = true;
       })
-      .catch(() => {
-        if (!cancelled) resolved = true;
-      });
+      .catch(() => {});
     return () => { cancelled = true; };
   });
 

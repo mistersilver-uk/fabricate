@@ -113,7 +113,6 @@
       {#if activeTab === 'overview'}
         <EnvironmentOverviewTab
           environment={environmentDraft}
-          {composition}
           {realmRecords}
           {realmsEnabled}
           {biomeOptions}

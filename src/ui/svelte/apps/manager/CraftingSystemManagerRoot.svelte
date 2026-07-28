@@ -169,6 +169,11 @@
   let recipeItemDraftBaseline = $state(null);
   let recipeItemLinkedSourceSnapshot = $state(null);
   let recipeItemEditSaving = $state(false);
+  // Written on every failed save and never read — the missing READER is the defect, so the
+  // write is kept as its evidence rather than deleted. A GM whose recipe-item save fails is
+  // shown nothing. Tracked in issue 919 (silent save failures), which adds the Draft-state
+  // `manager-inspector-card` section that renders it.
+  // eslint-disable-next-line no-unused-vars
   let recipeItemSaveFailed = $state(false);
   let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker. (The
@@ -200,10 +205,17 @@
   let gatheringTaskDraft = $state(null);
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
+  // Assigned user-facing failure text (including the localized
+  // FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed) that nothing renders. Kept as the
+  // evidence of the missing reader; see issue 919.
+  // eslint-disable-next-line no-unused-vars
   let gatheringTaskSaveError = $state('');
   let gatheringEventDraft = $state(null);
   let gatheringEventDraftBaseline = $state(null);
   let gatheringEventSaving = $state(false);
+  // Assigned user-facing failure text that nothing renders. Kept as the evidence of the
+  // missing reader; see issue 919.
+  // eslint-disable-next-line no-unused-vars
   let gatheringEventSaveError = $state('');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
@@ -392,12 +404,6 @@
   // Complex recipes need a resolution mode that allows multiple ingredient/result
   // sets; simple/progressive systems craft exactly one set into one result.
   const recipeMultiSetAllowed = $derived(!['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple'));
-  // Both routed modes route a result group across multiple result groups (by the
-  // ingredient set in routedByIngredients, by the check outcome in routedByCheck);
-  // the routing basis is a property of the system mode, not a per-recipe choice.
-  const recipeRouted = $derived(
-    ['routedByIngredients', 'routedByCheck'].includes(selectedSystem?.resolutionMode || 'simple')
-  );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   // Experimental toggle (issue 745): the Crafting group is now unconditional; this
   // gate only decides whether the unimplemented Graph placeholder is advertised.
@@ -803,10 +809,6 @@
     const name = String(item?.name || '').toLowerCase();
     return !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm);
   }));
-  const toolsPaginatedComponentCards = $derived(toolsFilteredComponentCards.slice(
-    toolsComponentPageIndex * toolsComponentPageSize,
-    (toolsComponentPageIndex + 1) * toolsComponentPageSize
-  ));
   const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
   const categoryRows = $derived(buildCategoryRows(
     selectedSystem?.categories || [],
@@ -1816,19 +1818,8 @@
   const focusedToolValidation = $derived(
     $viewState.toolDraftValidation || { valid: false, errors: ['missing'] }
   );
-  const dirtyToolIds = $derived(
-    $viewState.toolDraftDirty && focusedToolDraft?.id ? [focusedToolDraft.id] : []
-  );
   const selectedLibraryTool = $derived(
     libraryToolsList.find(tool => tool.id === focusedToolDraft?.id) || null
-  );
-  const selectedLibraryToolDirty = $derived(
-    selectedLibraryTool ? dirtyToolIds.includes(selectedLibraryTool.id) : false
-  );
-  const selectedToolDraftValidation = $derived(
-    currentView === 'tool-edit' && focusedToolDraft
-      ? focusedToolValidation
-      : { valid: true, errors: [] }
   );
 
   $effect(() => {
@@ -1925,41 +1916,6 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function toolsComponentCardImage(item) {
-    return item?.img || 'icons/svg/item-bag.svg';
-  }
-
-  function toolsComponentDescription(item) {
-    return String(item?.description || '').trim();
-  }
-
-  function onToolsComponentSearchInput(event) {
-    toolsComponentSearchTerm = event.currentTarget.value;
-    toolsComponentPageIndex = 0;
-  }
-
-  function onToolsComponentDragStart(item, event) {
-    const componentId = String(item?.id || '').trim();
-    if (!componentId) return;
-    event.dataTransfer?.setData?.('text/plain', JSON.stringify({ type: 'FabricateManagedComponent', componentId }));
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
-  }
-
-  function gatheringDropModeLabel(mode) {
-    const labels = {
-      highestRankedDrop: text('FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop'),
-      allDrops: text('FABRICATE.Admin.Manager.Environment.Rules.AllDrops', 'All successful drops'),
-      limitedDrops: text('FABRICATE.Admin.Manager.Environment.Rules.LimitedDrops', 'Limit successful drops')
-    };
-    return labels[mode] || labels.highestRankedDrop;
-  }
-
-  function gatheringEventPolicyLabel(policy) {
-    return policy === 'failureWithEvent'
-      ? text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')
-      : text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds');
   }
 
   function updateSelectedGatheringRules(updates) {
@@ -2269,10 +2225,6 @@
     return system?.features?.[view.feature] === true;
   }
 
-  function isSelectedRecipe(recipe) {
-    return selectedRecipe?.id === recipe.id;
-  }
-
   function isPromise(value) {
     return value && typeof value.then === 'function';
   }
@@ -2427,7 +2379,7 @@
     return true;
   }
 
-  function confirmGatheringEventRouteExit(nextView) {
+  function confirmGatheringEventRouteExit(_nextView) {
     if (activeView !== 'gathering-event-edit') return true;
     if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true);
     const confirmed = store.confirmDiscardDirtyGatheringEventDraft?.() ?? false;
@@ -2435,7 +2387,7 @@
     return finishGatheringEventRouteExit(confirmed);
   }
 
-  function confirmComponentRouteExit(nextView) {
+  function confirmComponentRouteExit(_nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditCombinedDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
@@ -2451,7 +2403,7 @@
     return finishEnvironmentRouteExit(confirmed);
   }
 
-  function confirmEssenceRouteExit(nextView) {
+  function confirmEssenceRouteExit(_nextView) {
     if (activeView !== 'essence-edit') return true;
     if (essenceEditDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
@@ -2504,7 +2456,7 @@
     return finishRecipeItemRouteExit(confirmed);
   }
 
-  function confirmGatheringTaskRouteExit(nextView) {
+  function confirmGatheringTaskRouteExit(_nextView) {
     if (activeView !== 'gathering-task-edit') return true;
     if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
     const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
@@ -2844,7 +2796,7 @@
       recipeDraftBaseline = cloneRecipeDraft(recipeDraft);
       activeView = 'recipes';
       return result;
-    } catch (err) {
+    } catch {
       recipeSaveFailed = true;
       return false;
     } finally {
@@ -3165,10 +3117,6 @@
     setView('checks');
   }
 
-  function cancelComponentEdit() {
-    backToComponentsBrowse();
-  }
-
   function handleComponentDraftChange(draft) {
     componentEditDraft = draft || null;
     componentEditDirty = draft?.dirty === true;
@@ -3190,7 +3138,7 @@
       componentEditDraft = null;
       activeView = 'components';
       return true;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       componentEditSaving = false;
@@ -3357,7 +3305,7 @@
       essenceEditDraft = null;
       activeView = canShowEssences ? 'essences' : 'systems';
       return result;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       essenceEditSaving = false;
@@ -3915,11 +3863,6 @@
     onUpdateEventCharacterModifier(ref.id, { expressionOverride });
   }
 
-  function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
-    if (!environmentId || !direction) return;
-    store.moveEnvironmentDraft?.(environmentId, direction);
-  }
-
   function selectGatheringTab(tabId) {
     activeGatheringTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
     gatheringMenuExpanded = true;
@@ -4119,7 +4062,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(recipeItemDraft);
       activeView = 'books-scrolls';
       return result;
-    } catch (err) {
+    } catch {
       recipeItemSaveFailed = true;
       return false;
     } finally {
@@ -4196,19 +4139,6 @@
       return;
     }
     craftingMenuExpanded = !craftingMenuExpanded;
-  }
-
-  function environmentListIndex(environmentId) {
-    return environmentList.findIndex(environment => environment.id === environmentId);
-  }
-
-  function canMoveEnvironmentUp(environmentId) {
-    return environmentListIndex(environmentId) > 0;
-  }
-
-  function canMoveEnvironmentDown(environmentId) {
-    const index = environmentListIndex(environmentId);
-    return index >= 0 && index < environmentList.length - 1;
   }
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
@@ -4370,11 +4300,6 @@
 
   function gatheringDropImage(row) {
     return row?.img || gatheringManagedItemImage(row?.componentId) || 'icons/svg/item-bag.svg';
-  }
-
-  function gatheringTaskDropLabel(row) {
-    const name = gatheringDropName(row);
-    return `${name} x${row?.quantity || 1} (${row?.dropRate ?? 1}%)`;
   }
 
   function gatheringOptionLabel(kind, id) {
@@ -4597,19 +4522,19 @@
     return environment?.id && $viewState.environmentDraft?.id === environment.id && environmentValidationCount > 0;
   }
 
-  function environmentDisplay(environment) {
-    if (!environment) return null;
-    if (shouldUseEnvironmentDraftForDisplay && environmentDraftForDisplay?.id === environment.id) {
-      return environmentDraftForDisplay;
-    }
-    return environment;
-  }
-
   // `componentSourceState` lived here to tone the inline components inspector's source
   // chip. That inspector is now `ComponentBrowserInspector` (issue 676), which derives
   // its own linked badge, and the browser row derives its origin pill in
   // `ComponentsBrowserView` — so the helper had no callers left.
 
+  // No caller left. Deleting this and its two helpers (usageEvidenceItems,
+  // salvageSummaryLabel) would strip the only readers of the twelve component Salvage* and
+  // Usage* lang keys, orphaning them and failing the lang-keys-no-orphans ratchet, which may
+  // not be grown. lang/en.json is outside this change's owned paths, so the trio is
+  // suppressed rather than deleted; code and keys should be removed together in a follow-up.
+  // (Do not spell those keys with their leading namespace here: the orphan scanner treats a
+  // dotted key literal in a COMMENT as a reference, and a partial one covers a whole subtree.)
+  // eslint-disable-next-line no-unused-vars
   function componentEvidenceItems(item) {
     const evidence = [];
     if (!item) return evidence;
@@ -4662,10 +4587,6 @@
     if (summary.hasTimeRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTime', 'time'));
     if (summary.hasCurrencyRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageCost', 'cost'));
     return parts.join(', ');
-  }
-
-  function stackedLabel(key, fallback) {
-    return `${text(key, fallback)}:`;
   }
 
   function normalizeVocabularyKey(value) {

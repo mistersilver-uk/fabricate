@@ -36,6 +36,7 @@
     itemSearchTerm = '',
     selectedComponentId = '',
     selectedSystemId = '',
+    // eslint-disable-next-line no-unused-vars -- deliberately reader-less; see the note below
     selectedSystemResolutionMode = 'simple',
     // Whether the system is progressive on ANY axis that reads `component.difficulty` —
     // crafting resolution mode, salvage resolution mode, or the gathering economy's

@@ -170,17 +170,24 @@
       || (showSourceUi && (sourceTouched || sourceComponentId !== sourceIdentity(essence)));
   }
 
+  // A throw is a failure exactly as a `false` return is. Returning the outcome directly
+  // keeps `result` a const in handleSave, so no path can reach the check unassigned. The
+  // save is passed as a thunk so the delegating call keeps its literal shape at the call
+  // site, which the manager source contract pins.
+  async function saveOutcome(save) {
+    try {
+      return await save();
+    } catch {
+      return false;
+    }
+  }
+
   async function handleSave(event) {
     event.preventDefault();
     if (!validName || saving) return;
     saveFailed = false;
     const updates = buildUpdates();
-    let result = false;
-    try {
-      result = await onSave(draftId || null, updates);
-    } catch (err) {
-      result = false;
-    }
+    const result = await saveOutcome(() => onSave(draftId || null, updates));
     if (result === false) {
       saveFailed = true;
     }
