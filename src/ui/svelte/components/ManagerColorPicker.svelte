@@ -10,6 +10,9 @@
     buttonTitle = 'Choose colour',
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
+    // Forwarded to the popover: false offers the preset palette only. See
+    // ManagerColorPopover for why the per-essence colour (issue 917) has no free hex.
+    allowCustom = true,
     onChange = () => {}
   } = $props();
 
@@ -161,6 +164,7 @@
       {customColor}
       {presetGridLabel}
       {customHexLabel}
+      {allowCustom}
       {onChange}
       popoverStyle={popoverStyle}
       portalTarget={() => getPopoverHost()}

@@ -8,6 +8,11 @@
     customColor = '',
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
+    // Whether the free-hex entry is offered alongside the preset palette. Callers whose
+    // stored model has no `customColor` sibling (the per-essence colour, issue 917) set
+    // this false: the palette is then the whole vocabulary, because a free hex cannot be
+    // guaranteed legible across all seven themes.
+    allowCustom = true,
     onChange = () => {},
     onDismiss = () => {},
     manageDismiss = true,
@@ -82,13 +87,15 @@
       </button>
     {/each}
   </span>
-  <label class="manager-color-custom">
-    <span>{customHexLabel}</span>
-    <input
-      value={customColor || ''}
-      placeholder="hex"
-      data-manager-custom-color
-      oninput={(event) => updateCustomColor(event.currentTarget.value)}
-    />
-  </label>
+  {#if allowCustom}
+    <label class="manager-color-custom">
+      <span>{customHexLabel}</span>
+      <input
+        value={customColor || ''}
+        placeholder="hex"
+        data-manager-custom-color
+        oninput={(event) => updateCustomColor(event.currentTarget.value)}
+      />
+    </label>
+  {/if}
 </span>

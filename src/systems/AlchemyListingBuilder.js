@@ -501,6 +501,7 @@ export class AlchemyListingBuilder {
       name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
       img: null,
       icon: stringOrNull(def?.icon),
+      colorToken: stringOrNull(def?.colorToken),
       quantity: Math.max(1, Number(match.amount) || 1),
     };
   }
@@ -546,6 +547,10 @@ export class AlchemyListingBuilder {
    * Shared essence-map → display-list resolver. Maps `{ essenceId: quantity }`
    * against the system's `essenceDefinitions`, dropping zero/invalid quantities and
    * falling back to the raw id when a definition is missing.
+   *
+   * `colorToken` carries the GM-authored per-essence colour (issue 917) alongside the
+   * icon; null (unauthored) renders in the theme accent, which is how every essence
+   * chip renders today.
    */
   _resolveEssenceList(rawMap, system) {
     const raw = rawMap && typeof rawMap === 'object' ? rawMap : {};
@@ -560,6 +565,7 @@ export class AlchemyListingBuilder {
         id: stringOrNull(essenceId),
         name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
         icon: stringOrNull(def?.icon),
+        colorToken: stringOrNull(def?.colorToken),
         quantity: qty,
       });
     }

@@ -398,6 +398,10 @@ function compileManagerRoot() {
     'src/models/Recipe.js',
     'src/models/Ingredient.js',
     'src/models/IngredientSet.js',
+    // IngredientSet imports the shared essence allocator (issue 917). This list is
+    // hand-rolled with no validator, so omitting a transitive raw module HANGS this
+    // suite as `# cancelled` rather than failing it.
+    'src/utils/essenceAllocation.js',
     'src/models/IngredientGroup.js',
     'src/models/Result.js',
     'src/models/Tool.js',
