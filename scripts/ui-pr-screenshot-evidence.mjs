@@ -76,6 +76,26 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
 ];
 
+// The Component Studio BROWSER's own files (issue 676): the view and every component in
+// `components/`, which is the browser's directory (`component/` is the EDITOR's, mirroring
+// the Recipe Studio's `recipes/` vs `recipe/` split). Shared by every browser frame below.
+const COMPONENTS_BROWSER_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+];
+
+// A single-frame components-browser view: one same-named smoke label over the shared
+// browser match list, plus whatever extra file that STATE additionally depends on. Same
+// argument as `recipeEditFrame` above — Sonar's Automatic Analysis counts repeated object
+// literals and ignores `cpd.exclusions`, so a fresh sibling literal near-identical to its
+// neighbour trips the new-code duplication gate.
+const componentsBrowserFrame = (id, label, extraMatches = []) => ({
+  id,
+  label,
+  smokeLabels: [id],
+  matches: [...COMPONENTS_BROWSER_MATCHES, ...extraMatches],
+});
+
 export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-systems',
@@ -147,28 +167,61 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/config\/currency(?:Presets|Providers)\.js$/,
     ],
   },
-  // The Component Studio (issue 676). Two dirs, deliberately distinct: `components/`
-  // is the BROWSER's, `component/` is the EDITOR's — mirroring the Recipe Studio's
-  // `recipes/` vs `recipe/` split.
+  // The Component Studio (issue 676). See COMPONENTS_BROWSER_MATCHES for the two
+  // deliberately-distinct directories.
   {
     id: 'manager-components',
     label: 'Manager components browser',
+    // The only components-browser view with TWO frames, so it is the one entry here that
+    // cannot come from `componentsBrowserFrame` (which keys its single label off the id).
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
-      /^src\/utils\/componentBrowserModel\.js$/,
-    ],
+    matches: [...COMPONENTS_BROWSER_MATCHES, /^src\/utils\/componentBrowserModel\.js$/],
   },
-  {
-    id: 'manager-components-progressive',
-    label: 'Manager components browser — progressive difficulty badge (value + None)',
-    smokeLabels: ['manager-components-progressive'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+  componentsBrowserFrame(
+    'manager-components-progressive',
+    'Manager components browser — progressive difficulty badge (value + None)',
+  ),
+  // Issue 772: the bulk-edit state — rows multi-selected, the selection toolbar, and the
+  // rail's staged bulk panel. A DEDICATED view id, not extra labels on `manager-components`:
+  // `collect` publishes only `candidates[0]` from a path-sorted list, so appending the label
+  // there would publish an arbitrary components frame and the staged state — the whole point
+  // of the evidence — would never reach the PR. The two extra triggers are the shared
+  // selection primitive (which renders on every row AND in the toolbar) and the pure
+  // selection/staging model behind the panel.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit',
+    'Manager components browser — bulk edit (multi-select, selection toolbar, staged rail panel)',
+    [
+      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
+      /^src\/utils\/componentBulkEditModel\.js$/,
     ],
-  },
+  ),
+  // The bulk panel's other two states, each its OWN view for the same `candidates[0]`
+  // reason as the staged frame above — and each a separate FRAME because no one
+  // photograph can hold them. An axis chip cannot read "leave unchanged" and "will
+  // overwrite" at once, and the staged frame is the one the prototype parity table
+  // compares, so the unstaged face — the sole route to "clear essences on every selected
+  // component" — needs a frame of its own or it ships unevidenced.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit-unstaged',
+    'Manager components browser — bulk edit, pristine draft (every axis unstaged, Apply inert)',
+    [
+      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
+      /^src\/utils\/componentBulkEditModel\.js$/,
+    ],
+  ),
+  // The Progressive DC section is gated on `componentDifficultyAxisProgressive`, so it
+  // renders on the progressive smoke system and on no other — which is also the only
+  // system in this world that can evidence the panel's empty item-tag copy, since it
+  // authors no tags. Its extra trigger is the staging model alone, deliberately: the
+  // section is built from `Chip` and `Stepper`, but neither is named here because both are
+  // global primitives with no other `VIEW_RECIPES` entry, and conscripting this one frame
+  // as their evidence would mis-route every future change to them.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit-progressive',
+    'Manager components browser — bulk edit, progressive DC section + empty item-tag copy',
+    [/^src\/utils\/componentBulkEditModel\.js$/],
+  ),
   // Issue 801: the grouped-category CONTINUATION frame — a category split across a page
   // boundary, its continuation slice ("N of M") at the head of the next page. Its OWN view
   // id (one file per published frame; `collect` emits only `candidates[0]`) so the
@@ -227,6 +280,12 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/component\/.+\.svelte$/,
+      // The essence quantity card (issue 772) lives under `components/` — the BROWSER's
+      // directory, because the browser's bulk panel renders it too — but the EDITOR renders
+      // it as well, four-up. Named here explicitly: without this a change to the card would
+      // route evidence to the browser frames and NEVER to this one, which is the silent
+      // drift the comment on `manager-component-edit-difficulty` below was written after.
+      /^src\/ui\/svelte\/apps\/manager\/components\/EssenceQuantityCard\.svelte$/,
     ],
   },
   {

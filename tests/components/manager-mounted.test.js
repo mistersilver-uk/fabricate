@@ -34,6 +34,10 @@ const sharedComponentNames = [
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',
+  // The manager's ONE selection control (issue 772). `ChecklistCardRow` renders it after
+  // the conversion, which puts it in this root's static graph through the Tool Studio; the
+  // component browser's multi-select puts it there a second way.
+  'SelectionCheckbox',
   // The check-modifier catalogue's default set + a recipe's eligible-modifier override
   // both render the shared pill multi-select (issue 770). A `.svelte` the tree renders
   // but the allowlist omits HANGS the suite (# cancelled) rather than failing it.
@@ -81,6 +85,17 @@ function compileManagerRoot() {
   // map globs for the EDITOR.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte');
+  // The shared essence quantity card (issue 772), extracted out of the editor and rendered
+  // by the browser's bulk-edit panel too. `ComponentEditView` above imports it statically,
+  // so omitting it here HANGS every mounted manager test as `# cancelled` — this suite
+  // hand-rolls its compile loop and has no closure validator to fail loudly instead.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte');
+  // The browser's multi-select toolbar and the bulk edit panel that REPLACES the
+  // single-component inspector in the rail (issue 772). `ComponentsBrowserView` imports the
+  // first statically and the root imports the second, so omitting either HANGS every
+  // mounted manager test as `# cancelled` for the same reason as the card above.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -400,6 +415,10 @@ function compileManagerRoot() {
     // the sibling of recipeBrowserModel below. Imported by ComponentsBrowserView AND by
     // the root (which lifts the browser state).
     'src/utils/componentBrowserModel.js',
+    // The pure bulk selection + staging model (issue 772). Imported by
+    // ComponentsBrowserView, by the bulk edit panel AND by the root (which owns the staged
+    // draft); omitting it HANGS every mounted manager test as `# cancelled`.
+    'src/utils/componentBulkEditModel.js',
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
@@ -1344,7 +1363,13 @@ function createStore(calls = [], options = {}) {
 
   function componentCardsFor(id) {
     if (options.emptyComponents) return [];
-    const cards = (componentItems[id] || []).map((item) =>
+    // Pad the managed list so the browser paginates. A selection is held on the lifted
+    // browser state, not on the page, so proving that Apply carries an id the current page
+    // does not even render needs more rows than one page holds.
+    const padded = options.extraComponentItems
+      ? [...(componentItems[id] || []), ...options.extraComponentItems]
+      : componentItems[id] || [];
+    const cards = padded.map((item) =>
       options.missingComponentSource && item.id === 'c1'
         ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
         : item
@@ -1395,7 +1420,29 @@ function createStore(calls = [], options = {}) {
       applySelectedSystem(id);
       return true;
     },
-    createSystem: () => calls.push(['createSystem']),
+    // The real action returns the created system on success and `false` when the GM
+    // backed out of the dirty-environment confirm, because the root routes it through
+    // `afterTruthyResult` to decide whether to navigate.
+    createSystem: () => {
+      calls.push(['createSystem']);
+      if (Object.hasOwn(options, 'createSystemResult')) return options.createSystemResult;
+      // Model the real action: it registers the system, SELECTS it, and refreshes before
+      // resolving. A stub that only returns an object would let the root navigate to
+      // whichever system was already selected and still pass.
+      const created = {
+        id: 'created-system',
+        name: 'New Crafting System',
+        description: 'Configure categories, item tags, essences, and crafting behaviour.',
+        features: {},
+      };
+      systemDetails[created.id] = created;
+      viewState.update((state) => ({
+        ...state,
+        systems: [...state.systems, { id: created.id, name: created.name, selected: false }],
+      }));
+      applySelectedSystem(created.id);
+      return created;
+    },
     importSystem: () => calls.push(['importSystem']),
     exportSystem: (id) => calls.push(['exportSystem', id]),
     deleteSystem: (id) => calls.push(['deleteSystem', id]),
@@ -1522,6 +1569,21 @@ function createStore(calls = [], options = {}) {
       calls.push(['updateComponent', id, updates]);
       if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
       return options.updateComponentResult ?? true;
+    },
+    // The set-apply bulk write (issue 772). It takes the selection `Set` directly and
+    // already refreshes internally, so the root neither converts nor re-refreshes; the
+    // recorded call is normalized to an array purely so a test can compare it.
+    applyComponentBulkEdit: (componentIds, edit) => {
+      const ids = [...(componentIds || [])];
+      calls.push(['applyComponentBulkEdit', ids, edit]);
+      // The real action returns the write RESULT, never a boolean: `null` for "nothing was
+      // written" and `{updated}` counting the components that actually CHANGED, which is
+      // what the toast names. Defaulting to `ids.length` keeps the common case honest while
+      // a test can hand back a smaller count, or `null`, to drive the other branches.
+      if (Object.hasOwn(options, 'applyComponentBulkEditResult')) {
+        return options.applyComponentBulkEditResult;
+      }
+      return { updated: ids.length, componentIds: ids };
     },
     addEssence: (name, description, icon, sourceComponentId) => {
       calls.push(['addEssence', name, description, icon, sourceComponentId]);
@@ -5921,6 +5983,382 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.textContent.includes('Compendium.fabricate.items.iron-ore'),
       false,
       'missing source warning should not print the raw UUID'
+    );
+  });
+
+  // ── Issue 772: the rail swap ────────────────────────────────────────────────────
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only
+  // place the swap between `ComponentBrowserInspector` and `ComponentBulkEditPanel` — and
+  // the root-owned draft's lifecycle around it — can be proved at all.
+  async function openComponentsBrowser(calls = [], options = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, options),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {}, onCopySourceUuid: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Components').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  function tickComponentRow(id) {
+    target.querySelector(`[data-component-select="${id}"]`).click();
+    flushSync();
+  }
+
+  it('swaps the single-component inspector for the bulk panel at the FIRST selected row', async () => {
+    await openComponentsBrowser();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail opens on the single-component inspector'
+    );
+    assert.ok(!target.querySelector('[data-component-bulk-panel]'));
+
+    tickComponentRow('c1');
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-panel]')),
+      'ONE ticked row is already a bulk edit — the threshold is > 0, not > 1'
+    );
+    assert.ok(
+      !target.querySelector('[data-component-inspector]'),
+      'the panel REPLACES the inspector rather than stacking beside it'
+    );
+    assert.match(
+      target.querySelector('[data-component-bulk-count]').textContent,
+      /1 component selected/
+    );
+  });
+
+  it('restores the inspector and DISCARDS the staged draft when the selection clears', async () => {
+    await openComponentsBrowser();
+    tickComponentRow('c1');
+
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'add'
+    );
+    assert.equal(target.querySelector('[data-component-bulk-apply]').disabled, false);
+
+    // The panel's own escape — the documented way back to unlink / delete / copy-source.
+    target.querySelector('[data-component-bulk-clear]').click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail returns to the single-component inspector'
+    );
+
+    tickComponentRow('c1');
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'none',
+      'the staged draft was discarded on the count-to-zero transition, not carried forward'
+    );
+    assert.equal(
+      target.querySelector('[data-component-bulk-apply]').disabled,
+      true,
+      'so a re-opened panel cannot apply a stale edit'
+    );
+  });
+
+  it('applies every staged axis in ONE set-apply write, then resets the selection and the draft', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+
+    tickComponentRow('c1');
+    tickComponentRow('c2');
+    assert.match(
+      target.querySelector('[data-component-bulk-count]').textContent,
+      /2 components selected/
+    );
+
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    // Straight past `add` to `remove`, so the write carries BOTH tag axes.
+    target.querySelector('[data-bulk-tag="herb"]').click();
+    flushSync();
+    target.querySelector('[data-bulk-tag="herb"]').click();
+    flushSync();
+    const categorySelect = target.querySelector('[data-component-bulk-category]');
+    categorySelect.value = 'Reagent';
+    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
+    assert.equal(applyCalls.length, 1, 'ONE set-apply write for the whole selection');
+    assert.deepEqual(applyCalls[0][1].sort(), ['c1', 'c2']);
+    assert.deepEqual(applyCalls[0][2], {
+      category: 'Reagent',
+      addTags: ['ore'],
+      removeTags: ['herb'],
+    });
+    assert.ok(
+      !('essences' in applyCalls[0][2]) && !('difficulty' in applyCalls[0][2]),
+      'an unstaged axis is NEVER sent — a present key is an instruction to write'
+    );
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'applying clears the selection, so the rail returns to the inspector'
+    );
+    tickComponentRow('c1');
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'none',
+      'and the staged draft is gone with it'
+    );
+  });
+
+  it('sends a staged all-zero essence map, because that is an instruction to CLEAR', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    // The steppers cannot reach this state on a fresh draft — `Stepper` emits nothing at
+    // the zero boundary — so the staged-axis chip is the only path to it.
+    target.querySelector('[data-component-bulk-essences-staged]').click();
+    flushSync();
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCall = calls.find((call) => call[0] === 'applyComponentBulkEdit');
+    assert.ok(Boolean(applyCall), 'an all-zero staged map is a REAL edit, not a no-op');
+    assert.ok('essences' in applyCall[2], 'the key must be PRESENT for the write to clear');
+  });
+
+  // Capture `ui.notifications.info`. Nothing else in this suite needs the Foundry `ui`
+  // global, so it is installed per-test and removed again rather than left standing where
+  // an unrelated test could come to depend on it.
+  async function applyBulkEditOverRows(ids, options = {}) {
+    const messages = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openComponentsBrowser([], options);
+      for (const id of ids) tickComponentRow(id);
+      target.querySelector('[data-bulk-tag="ore"]').click();
+      flushSync();
+      target.querySelector('[data-component-bulk-apply]').click();
+      await tick();
+      flushSync();
+      return messages;
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  // The apply toast is the ONLY feedback that survives the panel unmounting on success —
+  // applying clears the selection, so the rail is back on the single-component inspector
+  // by the time the GM reads anything. Nothing asserted it before, which is how "Applied
+  // bulk changes to 1 components." shipped green past a panel that gets the same
+  // singular right twice.
+  it('says "1 component" in the applied toast at the panel\'s own > 0 threshold', async () => {
+    const messages = await applyBulkEditOverRows(['c1']);
+    assert.deepEqual(messages, ['Applied bulk changes to 1 component.']);
+  });
+
+  it('and keeps the plural for a real multi-row apply', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2']);
+    assert.deepEqual(messages, ['Applied bulk changes to 2 components.']);
+  });
+
+  // The count the GM is told is the count that actually CHANGED, not the count they ticked.
+  // The write primitive compares each component before and after, so ticking two and adding
+  // a tag one already carries updates ONE. Naming the selection size instead would report
+  // work that did not happen — and the toast is the only record of it.
+  it('names the components that actually changed, not the ones selected', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2'], {
+      applyComponentBulkEditResult: { updated: 1, componentIds: ['c1'] },
+    });
+    assert.deepEqual(messages, ['Applied bulk changes to 1 component.']);
+  });
+
+  // A write that legitimately changed nothing is not a failure and must not read as
+  // "Applied bulk changes to 0 components."
+  it('says nothing needed changing when the write updated none', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2'], {
+      applyComponentBulkEditResult: { updated: 0, componentIds: [] },
+    });
+    assert.deepEqual(messages, ['No components needed changing.']);
+  });
+
+  // `store.applyComponentBulkEdit?.(…)` resolves to `undefined` when the action is absent.
+  // The root used to test `applied === false`, so `undefined` fell through to the success
+  // path: selection cleared, toast fired, nothing written. Any falsy result must abort.
+  it('does not claim success when the store action is missing', async () => {
+    const messages = await applyBulkEditOverRows(['c1'], {
+      applyComponentBulkEditResult: null,
+    });
+    assert.deepEqual(messages, [], 'no toast for a write that never happened');
+  });
+
+  // A selection lives on the lifted browser state, not on the page, and the root builds the
+  // Apply payload from `itemCards` rather than from the rendered rows. Both halves were
+  // proved separately — the view suite pages away and asserts the COUNT survives, the model
+  // suite asserts the reducer is page-independent — but nothing drove the real Apply with a
+  // selection the current page cannot render. That is the composition a GM actually performs
+  // on the library size this feature exists for.
+  it('applies a selection that spans two pages, including the row page 2 cannot see', async () => {
+    const calls = [];
+    // Twelve rows over a ten-row page: `c1` sits on page 1, `pad-11` on page 2.
+    const extraComponentItems = Array.from({ length: 30 }, (_, index) => ({
+      id: `pad-${index + 2}`,
+      name: `Padding ${index + 2}`,
+      img: 'icons/commodities/metal/ore-chunk-grey.webp',
+      description: 'Bulk-selection padding.',
+      tags: [],
+      category: 'general',
+      essences: [],
+    }));
+    await openComponentsBrowser(calls, { extraComponentItems });
+
+    tickComponentRow('c1');
+    target.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.ok(
+      !target.querySelector('[data-component-select="c1"]'),
+      'pre-condition: page 2 does not render the first selection'
+    );
+    // Whichever row page 2 happens to open on — the point is that it is NOT `c1`, not
+    // which padding row the sort produces.
+    const offPageId = target
+      .querySelector('[data-component-select]')
+      .getAttribute('data-component-select');
+    tickComponentRow(offPageId);
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
+    assert.equal(applyCalls.length, 1, 'ONE write for the whole cross-page selection');
+    assert.deepEqual(
+      [...applyCalls[0][1]].sort(),
+      ['c1', offPageId].sort(),
+      'the off-page id reaches the write, not just the count'
+    );
+  });
+
+  // Creating a crafting system already SELECTED it in the store, but the GM was left on
+  // the systems library — one more click from the thing they had just asked for, and with
+  // no signal about which row was the new one.
+  it('creating a crafting system opens the System Overview of the NEW system', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls, {}), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'systems',
+      'pre-condition: the manager opens on the systems library'
+    );
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    // The whole point: the NEW system, not whichever one happened to be selected before.
+    assert.equal(
+      target.querySelector('#manager-system-name')?.value,
+      'New Crafting System',
+      'the overview shows the system that was just created'
+    );
+  });
+
+  // …but only when a system was actually created. Backing out of the dirty-environment
+  // confirm returns `false`, and navigating anyway would abandon the very edit the GM just
+  // chose to keep.
+  it('a cancelled crafting-system create stays on the systems library', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { createSystemResult: false }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+  });
+
+  // ── The root's own prop forwarding ──────────────────────────────────────────────
+  // Three props are computed HERE and handed down, and the view/panel suites all supply
+  // them directly — so every one of them could be mis-wired with those suites still
+  // green. This test mounts the root and reads the DOM the forwarding produces:
+  //  - `difficultyAxisProgressive` into the browser (the row badge), and
+  //  - `showProgressiveDifficulty` into the panel (the DC section), both of which regress
+  //    to the pre-issue-772 CRAFTING-only bug if re-derived from `resolutionMode`;
+  //  - `selectedCards` into the panel, which must be the SELECTION and not the library:
+  //    the overwrite warning counts authored essences over it, so the library would
+  //    overstate the hazard on rows the GM never ticked.
+  // The fixture is deliberately progressive for SALVAGE while `resolutionMode` is
+  // `routedByCheck`, because that is the only shape where the two predicates disagree.
+  it('forwards the three-axis DC predicate and the SELECTED cards, not the crafting mode and the library', async () => {
+    await openComponentsBrowser([], {
+      alchemyResolutionMode: 'routedByCheck',
+      salvageResolutionMode: 'progressive',
+    });
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-id="c1"] [data-component-difficulty]')),
+      'the row DC badge follows the salvage axis, not the crafting resolution mode'
+    );
+
+    // c2 has NO authored essences; c1 has earth 2.
+    tickComponentRow('c2');
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-difficulty]')),
+      'and so does the panel\'s progressive DC section'
+    );
+
+    target.querySelector('[data-component-bulk-essences-staged]').click();
+    flushSync();
+    assert.ok(
+      !target.querySelector('[data-component-bulk-essence-warning]'),
+      'no selected row has an authored essence value, so there is no hazard to warn about'
+    );
+
+    tickComponentRow('c1');
+    const warning = target.querySelector('[data-component-bulk-essence-warning]');
+    assert.ok(Boolean(warning), 'ticking the row that DOES have one raises the warning');
+    assert.equal(
+      warning.getAttribute('data-component-bulk-essence-warning'),
+      '1',
+      'and it counts the selection'
     );
   });
 
@@ -14216,4 +14654,5 @@ describe('CraftingSystemManager mounted behavior', () => {
       'tool-lantern'
     );
   });
+
 });

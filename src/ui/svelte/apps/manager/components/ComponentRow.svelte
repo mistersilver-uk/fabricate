@@ -17,11 +17,26 @@
   icons on every row turned it into a toolbar and truncated the description, which is
   the finding the Recipe Studio already recorded and ruling 1 makes binding here.
 
+  ── THE BULK SELECTION BOX (issue 772) ───────────────────────────────────────────
+  A `SelectionCheckbox` at the row's TRAILING edge, AFTER the `fa-pen`, per the prototype
+  — not a raw `<input type="checkbox">` at the leading edge wearing Foundry's default
+  control chrome, which is a second selection design.
+
+  It is a SIBLING of the row's identity `<button>`, never nested in it, so clicking the box
+  selects the row for bulk edit and clicking the row still opens it in the inspector.
+  `SelectionCheckbox` renders NO `<button>`, which is load-bearing: the Foundry smoke walk
+  reaches Edit through `.manager-component-row … button:has(i.fa-pen)` and a looser
+  `.manager-component-row button` selector elsewhere must not start matching this control.
+
+  `.is-bulk-selected` is a DIFFERENT question from `.is-selected` — "this row is in the set
+  the Apply will write to" versus "you are here" — and a row can carry both.
+
   Strings arrive pre-localized — this is a presentational leaf.
 -->
 <script>
   import Chip from '../Chip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
+  import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
 
   let {
@@ -39,16 +54,24 @@
     editLabel = '',
     editTitle = '',
     noDescriptionText = '',
+    // Whether this row is ticked for BULK edit (issue 772), and the pre-localized
+    // accessible name for the box that ticks it.
+    bulkSelected = false,
+    selectLabel = '',
     onSelect = () => {},
-    onEdit = () => {}
+    onEdit = () => {},
+    onToggleSelect = () => {}
   } = $props();
 
   const essences = $derived(Array.isArray(component?.essences) ? component.essences : []);
 </script>
 
 <li
-  class={`manager-component-row ${selected ? 'is-selected' : ''}`}
+  class="manager-component-row"
+  class:is-selected={selected}
+  class:is-bulk-selected={bulkSelected}
   data-component-id={component?.id}
+  data-component-bulk-selected={bulkSelected}
   aria-current={selected ? 'true' : undefined}
 >
   <button
@@ -107,5 +130,16 @@
     >
       <i class="fas fa-pen" aria-hidden="true"></i>
     </button>
+    <!-- AFTER the pen, per the prototype. `.manager-action-group` is a `<span>`, so the
+         primitive renders its own `<label>` (`wrapper="label"`) — without it the visible
+         box would have no label association and no click target. -->
+    <SelectionCheckbox
+      size="lg"
+      wrapper="label"
+      checked={bulkSelected}
+      ariaLabel={selectLabel}
+      data-component-select={component?.id}
+      onChange={() => onToggleSelect(component?.id)}
+    />
   </span>
 </li>

@@ -4959,7 +4959,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
   // shared `EmptyState` / `Callout` primitives replaced. Each was a per-screen re-derivation
   // of one meaning — a dashed panel, an icon tile, or a bare "nothing here" sentence — and
   // leaving any of them in the sheet is how the next copy gets written against it.
-  for (const dead of [
+  const retired = [
     'manager-knowledge-quantity-chip',
     'manager-knowledge-type-pill',
     'manager-knowledge-uses-chip',
@@ -4993,7 +4993,31 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     // The reserved row's inline explanatory sentence: ellipsised to fit one line it
     // truncated to "Built…", so it became the row's tooltip instead (issue 878).
     'manager-vocabulary-locked-hint',
-  ]) {
+    // The third block (issue 772): classes retired by extracting three shared primitives
+    // and CONVERTING the duplicates that would otherwise have sat beside them. A primitive
+    // whose duplicate survives has added a variant rather than removed one, so each of
+    // these names is the proof that the conversion actually happened.
+    //
+    // The Tool Studio checklist row's hand-rolled check box, now `SelectionCheckbox`.
+    'manager-checklist-card-check',
+    // The component editor's hand-rolled tag pill, now `Chip tone="tag"`.
+    //
+    // The CONTAINER is retired with it, and that is not tidiness: this assertion is a bare
+    // `css.includes(dead)` substring test, and `manager-component-tag-toggles` (plural)
+    // CONTAINS `manager-component-tag-toggle`. Left in the sheet as layout context under
+    // the "layout stays global" rule, it would have kept the singular entry below true
+    // forever and made this ratchet impossible to satisfy. The surviving run is
+    // `manager-component-tag-run`.
+    'manager-component-tag-toggles',
+    'manager-component-tag-toggle',
+    // The component editor's hand-rolled −/input/+ essence row, now the shared `Stepper`
+    // inside `EssenceQuantityCard`. The card's own appearance classes are deliberately NOT
+    // here: they MOVED into that component's scoped block rather than dying, so they are
+    // absent from the sheet for a different reason and are still rendered.
+    'manager-component-essence-stepper',
+    'manager-component-essence-quantity',
+  ];
+  for (const dead of retired) {
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
   }
 
@@ -5011,9 +5035,22 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
         entry.name !== 'EmptyState.svelte' &&
         entry.name !== 'Callout.svelte'
     )
-    .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
+    // COMMENTS ARE NOT MARKUP. This half asks whether a retired class is still RENDERED;
+    // a component that documents why it stopped rendering one is the opposite of the
+    // failure, and several already do. Stripping the two block-comment forms — Svelte's
+    // `<!-- -->` doc block and the `/* */` used inside `<script>` — is what lets the list
+    // below be the ratchet's own list rather than a hardcoded pair (issue 772).
+    .map((entry) =>
+      readFileSync(resolve(entry.parentPath, entry.name), 'utf8')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+    )
     .join('\n');
-  for (const dead of ['class="manager-empty', 'manager-recipe-section-empty"']) {
+  // The markup half used to walk a HARDCODED two-string list, which made it vacuous for
+  // every name added to the ratchet after it was written: a retired class could be deleted
+  // from the sheet and left rendering in a component, and both halves would still pass. It
+  // walks the SAME list now, so retiring a name is one edit and both halves bite.
+  for (const dead of [...retired, 'class="manager-empty', 'manager-recipe-section-empty"']) {
     assert.equal(
       managerComponents.includes(dead),
       false,
@@ -5919,4 +5956,63 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
   } finally {
     await browser.close();
   }
+});
+
+/*
+  The OPEN state of a manager `<select>` (issue 772).
+
+  `.fabricate-manager select` themes the CLOSED field, so a manager dropdown looks correct
+  until it is opened — and then the option list fell back to the browser's black-on-white
+  default, in every native select the manager renders. The player app has carried
+  `.fabricate-app select option` for a long time; the manager root is `.fabricate-manager`
+  and never inherited it.
+
+  This is asserted from the STYLESHEET rather than from a rendered frame because it cannot
+  be photographed: a native select's popup is painted by the browser, not into the page DOM,
+  so Playwright never sees it and no smoke screenshot can contain the defect. It was found
+  by opening the control by hand. A source assertion is therefore the only gate available,
+  and its job is to stop the rule being deleted as "unused".
+*/
+test('the manager themes select options, not just the closed select', () => {
+  const optionRule = blockFor('.fabricate-manager select option');
+  assert.ok(optionRule, 'the manager must theme its option list, not only the closed field');
+  assert.match(
+    optionRule,
+    /background:\s*var\(--fab-mv2-[a-z0-9-]+\)/,
+    'an option list without a painted background falls back to the browser default white'
+  );
+  assert.match(optionRule, /color:\s*var\(--fab-mv2-[a-z0-9-]+\)/);
+
+  // The selected row must be marked the SAME way on both rendering paths — the engines
+  // that paint the list in-page and the customizable-select picker. An accent-filled bar
+  // on one and a subtle overlay on the other is one control reading as two designs
+  // depending on which browser the GM happens to run.
+  const checkedRule = blockFor('.fabricate-manager select option:checked');
+  assert.ok(checkedRule, 'the selected row needs its own treatment');
+  assert.match(
+    checkedRule,
+    /background:\s*var\(--fab-overlay-light-08\)/,
+    'the checked row shares the picker treatment rather than painting a filled bar'
+  );
+  assert.match(checkedRule, /color:\s*var\(--fab-mv2-accent\)/);
+
+  // `color-scheme` is the only layer here that reaches every engine: it is what makes the
+  // platform-drawn popup dark at all, and without it the rules above are cosmetic.
+  assert.match(
+    blockFor('.fabricate-manager'),
+    /color-scheme:\s*dark/,
+    'the manager root must declare the dark UA scheme, as the player root already does'
+  );
+
+  // …and the opt-in that makes those colours visible at all. Without it the rules above
+  // are correct and inert on the engines most players use, because a legacy select popup
+  // is painted by the platform rather than the page.
+  assert.match(
+    css,
+    /@supports \(appearance: base-select\)/,
+    'the option colours only reach a Chromium popup through the customizable-select opt-in'
+  );
+  const picker = blockFor('.fabricate-manager select::picker(select)');
+  assert.ok(picker, 'the picker surface must be themed, not left as the platform default');
+  assert.match(picker, /background:\s*var\(--fab-mv2-surface-2\)/);
 });

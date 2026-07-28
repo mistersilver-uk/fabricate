@@ -791,8 +791,12 @@ Represent one curated item entry available to recipes and salvage operations.
 15. Requirement 5 is enforced by normalization, in both directions.
     Component normalization must clamp `salvage.enabled` to `false` whenever the normalized `salvage.resultGroups` is empty, and — in `simple` mode — whenever no success group survives the clamp.
     In `simple` mode the clamp additionally drops surplus groups: it keeps the first success group at `resultGroups[0]`, keeps at most one reserved `role: 'failure'` group (only when `salvageCraftingCheck.simple.rollFormula` is authored), and re-orders a failure-first input so the success group lands at index 0.
-    The clamp applies to every writer that passes through normalization — GM edits, import, copy-mode, and migration — and only ever turns `enabled` off, never on.
+    The clamp applies to every writer that passes through normalization — GM edits, import, copy-mode, migration, and the set-apply bulk write — and only ever turns `enabled` off, never on.
     Enforcement must not rest on a UI control's disabled state: a GM surface that merely refuses to _enable_ a zero-group component does not prevent a component from _becoming_ zero-group while enabled.
+16. The set-apply component write carries every bulk axis in one persist: category overwrite, additive tag union, tag removal applied after the union, whole-map essence replacement, and progressive DC.
+    An axis is written only when the caller supplies it; supplying an empty essence map or a zero difficulty is an instruction to CLEAR that value, not an absent instruction, and a removal-only call is a real edit rather than a no-op.
+    Every written component is re-normalized under the owning system's essence and salvage context, exactly as a single-component write is, so an essence outside the system's definitions cannot be introduced and the salvage invariants of this data model continue to hold.
+    The bulk axes never carry salvage: salvage is only ever touched by that shared normalization, never edited by this write.
 
 ## Recipe
 

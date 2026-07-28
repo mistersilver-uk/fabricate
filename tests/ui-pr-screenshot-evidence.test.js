@@ -393,6 +393,111 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(componentViewIds.includes('manager-components-grouped-continuation'));
   });
 
+  it('maps the issue-772 bulk-edit frame to its OWN view id and its four triggers', () => {
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
+    // A dedicated id with exactly one smoke label. Appending the label to
+    // `manager-components` would be silently useless: `collect` publishes only
+    // `candidates[0]` from a path-sorted list, so the staged bulk state — the whole point
+    // of the evidence — would never reach the PR.
+    assert.deepEqual(byId['manager-components-bulk-edit'], ['manager-components-bulk-edit']);
+    assert.equal(
+      byId['manager-components'].includes('manager-components-bulk-edit'),
+      false,
+      'the browser view must not also claim the bulk-edit label',
+    );
+
+    // The browser view, any file in the browser's own directory, the shared selection
+    // primitive and the pure staging model all republish the frame.
+    for (const file of [
+      'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
+      'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
+      'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte',
+      'src/ui/svelte/components/SelectionCheckbox.svelte',
+      'src/utils/componentBulkEditModel.js',
+    ]) {
+      assert.ok(
+        mapChangedFilesToViews([file]).map(view => view.id).includes('manager-components-bulk-edit'),
+        `${file} must republish the bulk-edit frame`,
+      );
+    }
+
+    // The two narrow triggers must NOT drag in the whole components-browser set — and in
+    // particular the model is not a Tool Studio or theme change. It republishes the bulk
+    // panel's three frames and nothing else.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/utils/componentBulkEditModel.js']).map(view => view.id),
+      [
+        'manager-components-bulk-edit',
+        'manager-components-bulk-edit-unstaged',
+        'manager-components-bulk-edit-progressive',
+      ],
+    );
+  });
+
+  it('gives the bulk panel THREE frames, because one photograph cannot hold its four sections', () => {
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view]));
+    // Each is its own view with exactly one same-named label — `collect` publishes only
+    // `candidates[0]`, so three states need three view ids or two of them never ship.
+    for (const id of [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-components-bulk-edit-progressive',
+    ]) {
+      assert.deepEqual(byId[id].smokeLabels, [id], `${id} must carry exactly its own label`);
+      assert.equal(
+        byId['manager-components'].smokeLabels.includes(id),
+        false,
+        'the plain browser view must not claim a bulk-edit label',
+      );
+    }
+
+    // The UNSTAGED frame shares the staged frame's trigger set: it is the same panel on
+    // the same system, and the axis chip whose unstaged face it exists to photograph is
+    // rendered by the same files.
+    assert.deepEqual(
+      byId['manager-components-bulk-edit-unstaged'].matches.map(String),
+      byId['manager-components-bulk-edit'].matches.map(String),
+    );
+
+    // The PROGRESSIVE frame does NOT conscript the global primitives its section is built
+    // from. `Chip` and `Stepper` have no `VIEW_RECIPES` entry at all, and naming them on
+    // this one frame would route every future change to them at a components screenshot.
+    for (const primitive of [
+      'src/ui/svelte/components/Chip.svelte',
+      'src/ui/svelte/components/Stepper.svelte',
+    ]) {
+      assert.equal(
+        mapChangedFilesToViews([primitive]).map(view => view.id)
+          .includes('manager-components-bulk-edit-progressive'),
+        false,
+        `${primitive} must not be a trigger for the progressive bulk frame`,
+      );
+    }
+  });
+
+  it('routes the shared essence card to the EDITOR frames as well as the browser ones (issue 772)', () => {
+    // `EssenceQuantityCard` lives under `components/` — the BROWSER's directory, because
+    // the bulk panel renders it — but the component EDITOR renders it too. Without the
+    // explicit entry on `manager-component-edit`, a change to the card would route evidence
+    // only to the browser frames and never to the editor ones: matching-nothing-forever's
+    // quieter cousin, and green the whole time.
+    const ids = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
+    ]).map(view => view.id);
+    assert.ok(ids.includes('manager-component-edit'), 'the editor frame must be republished');
+    assert.ok(ids.includes('manager-components'), 'the browser frames must still be republished');
+    assert.ok(ids.includes('manager-components-bulk-edit'));
+
+    // A sibling in the same directory that the editor does NOT render must not gain the
+    // editor frame — the entry is a named file, not a widened directory glob.
+    assert.equal(
+      mapChangedFilesToViews([
+        'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte',
+      ]).map(view => view.id).includes('manager-component-edit'),
+      false,
+    );
+  });
+
   it('maps player gathering app files to the player-gathering recipes (incl. the realm-lock frame)', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/gathering/GatheringView.svelte',
@@ -1354,6 +1459,13 @@ describe('UI PR screenshot evidence', () => {
     // forwards `label` to captureStableManagerView as a variable — so the literal lives in
     // the helper CALL's options object, not in the captureStableManagerView call itself.
     for (const match of harness.matchAll(/captureGroupedContinuationFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
+      emitted.add(match[1]);
+    }
+    // Issue 772: the three bulk-edit frames route through the shared
+    // captureComponentBulkEditFrame(page, results, { stepName, label, stage }) helper for
+    // the same reason — the literal lives in the helper CALL, and the helper forwards
+    // `label` onward as a variable.
+    for (const match of harness.matchAll(/captureComponentBulkEditFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     // The Results-tab captures (issue 643) route through captureRecipeResultsTab(page,

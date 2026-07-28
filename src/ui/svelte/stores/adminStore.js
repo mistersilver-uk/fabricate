@@ -4961,7 +4961,27 @@ export function createAdminStore(services) {
   }
 
   // --- refresh ---
+  /**
+   * Refreshes overlap, and the later one is not necessarily the one that finishes last.
+   *
+   * `refresh` reads the selected system ONCE at the top and then does async work — item
+   * enrichment, environment state, the graph — before publishing. Two runs can therefore be
+   * in flight together, each holding the selection as it was when IT started, and whichever
+   * finishes last wins. `createSystem` produces exactly that overlap on its own: the manager
+   * fires `fabricate.craftingSystemsChanged` from inside the write, the store answers it by
+   * scheduling a refresh, and only then does `createSystem` select the new system and
+   * refresh again. The older run is holding the PREVIOUS selection, so when it published
+   * last the new system appeared briefly and then flicked back to the one the GM started on.
+   *
+   * Each run takes a ticket and publishes only while it is still the newest. A superseded
+   * run finishes its work and drops its result, which is correct: a newer run is already
+   * producing the state that replaces it.
+   */
+  let refreshTicket = 0;
+
   async function refresh() {
+    const ticket = ++refreshTicket;
+    const isCurrent = () => ticket === refreshTicket;
     const systemManager = services.getCraftingSystemManager();
     const recipeManager = services.getRecipeManager();
     if (!_fabricateReady(systemManager, recipeManager)) {
@@ -5068,6 +5088,7 @@ export function createAdminStore(services) {
     // Phase 1: publish all synchronous selected-system context immediately so
     // manager can paint its selected rail, menu, and inspector before slower
     // item/environment work finishes.
+    if (!isCurrent()) return;
     viewState.update((prev) => ({
       ...prev,
       systems: systemList,
@@ -5145,6 +5166,8 @@ export function createAdminStore(services) {
       graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
     }
 
+    // A newer refresh has already taken over; publishing here would put its work back.
+    if (!isCurrent()) return;
     viewState.update((prev) => ({
       ...prev,
       systems: systemList,
@@ -5470,8 +5493,19 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * Create a crafting system, select it, and report it back so the caller can navigate.
+   *
+   * Returns the created system on success and `false` when the GM backed out of the
+   * dirty-environment confirm — `false` specifically, because the manager root routes
+   * this through the same "did it happen?" helper as `selectSystem`, and that helper
+   * treats only `false` as "no". Returning `null` here would read as success and
+   * navigate away from an edit the GM just chose to keep.
+   *
+   * @returns {Promise<object|false>}
+   */
   async function createSystem() {
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     const systemManager = services.getCraftingSystemManager();
     const name = _nextSystemName(systemManager);
@@ -5483,6 +5517,7 @@ export function createAdminStore(services) {
     activeTab.set('systems');
     await services.setSetting('lastManagedCraftingSystem', system.id);
     await refresh();
+    return system;
   }
 
   async function deleteSystem(systemId) {
@@ -8651,6 +8686,57 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * Apply one staged bulk edit to a SET of components in the selected system (issue 772)
+   * through the manager's set-apply primitive: ONE persist and ONE refresh for the whole
+   * selection, rather than N `updateComponent` round trips.
+   *
+   * `edit` carries only the STAGED axes — `category`, `addTags`, `removeTags`, `essences`,
+   * `difficulty`. Presence is meaningful for the last two: an empty `essences` map and a
+   * zero `difficulty` are instructions to CLEAR, so this passes the caller's object through
+   * untouched rather than pruning "empty" keys.
+   *
+   * `refresh()` republishes `itemCards` and the `selectedSystem` projection, so the browser
+   * rows re-render with no bespoke invalidation.
+   *
+   * Returns the write RESULT rather than a boolean, for two reasons. A boolean cannot
+   * distinguish "wrote nothing" from "wrote", so an empty edit had to report `true` — a
+   * success for a write that never happened. And the primitive already counts honestly:
+   * it compares each component before and after and only counts the ones that genuinely
+   * changed, so selecting five components and adding a tag three already carry is an
+   * `updated` of two. Discarding that left the caller able to name only the SELECTION
+   * size, which overstates what happened.
+   *
+   * `null` means nothing was written, for any reason — a bad or empty argument, no
+   * selected system, or a throw that has already been reported to the GM.
+   *
+   * @param {Iterable<string>} componentIds
+   * @param {object} [edit]
+   * @returns {Promise<{updated: number, componentIds: string[]}|null>} the write result, or
+   *   `null` when no write happened.
+   */
+  async function applyComponentBulkEdit(componentIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    const ids = Array.from(componentIds || [], String).filter(Boolean);
+    if (ids.length === 0 || !sysId) return null;
+    if (!edit || typeof edit !== 'object') return null;
+    if (Object.keys(edit).length === 0) return null;
+
+    try {
+      const result = await systemManager.applyBulkEditToComponents(sysId, ids, edit);
+      await refresh();
+      return {
+        updated: Number(result?.updated) || 0,
+        componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
+      };
+    } catch (err) {
+      console.error('Fabricate | Failed to apply component bulk edit:', err);
+      services.notify?.error?.(err?.message || 'Failed to apply component bulk edit');
+      return null;
+    }
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
@@ -8889,6 +8975,7 @@ export function createAdminStore(services) {
     importSystem,
     deleteComponent,
     updateComponent,
+    applyComponentBulkEdit,
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,

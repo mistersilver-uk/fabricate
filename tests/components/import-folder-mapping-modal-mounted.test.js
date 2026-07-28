@@ -29,6 +29,9 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // The manager's ONE selection control (issue 772). The match-by-name toggle renders
+    // through it now rather than as a raw checkbox wearing Foundry's control chrome.
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',

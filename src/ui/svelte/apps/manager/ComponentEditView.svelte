@@ -6,16 +6,18 @@
   import Stepper from '../../components/Stepper.svelte';
   import SearchablePopover from './SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
+  // The shared essence quantity card (issue 772). It lives under `components/` — the
+  // BROWSER's directory — because the browser's bulk-edit panel renders it too; the
+  // screenshot evidence map names it explicitly in the editor's recipe so a change to it
+  // still routes evidence to the `manager-component-edit` frames.
+  import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
     getEffectiveComponentCategories,
     normalizeComponentCategory
   } from '../../../../utils/componentCategories.js';
-  import {
-    adjustComponentEssenceQuantity,
-    clampComponentEssenceQuantity
-  } from '../../util/componentEditor.js';
+  import { clampComponentEssenceQuantity } from '../../util/componentEditor.js';
   import {
     SALVAGE_DC_CUSTOM,
     buildSalvageDcOptions,
@@ -337,17 +339,14 @@
     };
   }
 
+  // The ONE essence write path (issue 772). `Stepper` inside `EssenceQuantityCard` emits
+  // the clamped ABSOLUTE value for its −/+ adjuncts and for a typed entry alike, so the
+  // separate `adjustEssence(id, delta)` the hand-rolled −/+ buttons needed is gone. The
+  // clamp stays here regardless: `Stepper`'s own `min` guards its adjuncts, but the draft
+  // is what the save reads.
   function setEssenceQuantity(essenceId, rawValue) {
     const quantity = clampComponentEssenceQuantity(rawValue);
     const next = essenceDraft.map(entry => entry.id === essenceId ? { ...entry, quantity } : entry);
-    essenceDraft = next;
-  }
-
-  function adjustEssence(essenceId, delta) {
-    const next = essenceDraft.map(entry => {
-      if (entry.id !== essenceId) return entry;
-      return { ...entry, quantity: adjustComponentEssenceQuantity(entry.quantity, delta) };
-    });
     essenceDraft = next;
   }
 
@@ -735,11 +734,17 @@
            ── WHY THIS IS A SIBLING SECTION AND NOT INSIDE SALVAGE ──────────────────
            The redesign prototype renders this card INSIDE the salvage panel, gated on
            the SALVAGE mode being progressive. Fabricate cannot: this value is
-           `component.difficulty`, and the manager root gates the section on the
-           system's CRAFTING `resolutionMode` (`componentDifficultyShown`), which is a
-           different axis. Nesting it under salvage would hide it for every
-           progressive-CRAFTING system whose salvage is simple or disabled — the exact
-           configuration the smoke harness drives when it fills this input.
+           `component.difficulty`, ONE component-level scalar that THREE engines read —
+           progressive recipes, progressive salvage and progressive gathering — so the
+           manager root gates the section on `componentDifficultyAxisProgressive`, which
+           is true when the system is progressive on ANY of those three axes
+           (`componentDifficultyShown` is that predicate plus the editor's own view and
+           selection terms). Nesting the card under salvage would hide it for every
+           progressive-CRAFTING or progressive-GATHERING system whose salvage is simple or
+           disabled — the exact configuration the smoke harness drives when it fills this
+           input. The browser row's read-only DC badge and the browser's bulk-edit
+           progressive-DC section read the same axis predicate, so all three appear
+           together (issue 772).
 
            STAGED, not written on change — the value rides the editor's draft and
            persists on Save, so it contributes to the dirty state and the exit guard.
@@ -794,26 +799,40 @@
           </div>
         </div>
         {#if tagDraft.length > 0}
-          <div class="manager-component-tag-toggles" data-component-edit-tags>
+          <!-- The pill IS the shared `Chip` (issue 772). It was a hand-rolled
+               `.manager-component-tag-toggle` button styled from the global sheet, and the
+               bulk-edit panel renders the same control one screen away — two
+               implementations of one control in one studio is exactly what the shared
+               primitives rule forbids, so the pill converted rather than being copied.
+               `tone="tag"` carries the purple the retired `is-on` rule declared.
+
+               The container was renamed to `manager-component-tag-run` in the same change:
+               the retired-class ratchet in `tests/components/manager-layout.test.js` is a
+               bare substring test over the stylesheet, and the old plural container name
+               CONTAINED the singular pill name it retires, so keeping it would have made
+               the ratchet entry impossible to satisfy. -->
+          <div class="manager-component-tag-run" data-component-edit-tags>
             {#each tagDraft as option (option.tag)}
               <!-- `aria-pressed` is the state, not a class: this is a toggle button, and
-                   the checked/unchecked ICON is decorative reinforcement of it. -->
-              <button
+                   the checked/unchecked ICON is decorative reinforcement of it. `type` and
+                   every `data-*` hook ride Chip's rest spread onto the real `<button>`.
+                   Written without internal whitespace: `Chip` records that call sites
+                   assert on exact `textContent`. -->
+              <Chip
+                tag="button"
                 type="button"
-                class={`manager-component-tag-toggle ${option.checked ? 'is-on' : ''}`}
+                tone={option.checked ? 'tag' : 'neutral'}
+                icon="fas fa-tag"
                 aria-pressed={option.checked === true}
                 data-component-edit-tag-toggle={option.tag}
                 data-component-tag-checked={option.checked === true}
                 onclick={() => toggleTag(option.tag, option.checked !== true)}
                 disabled={saving}
-              >
-                <i class="fas fa-tag" aria-hidden="true"></i>
-                <span>{option.tag}</span>
-                <i
+              >{option.tag}<i
                   class={option.checked ? 'fas fa-circle-check' : 'far fa-circle'}
                   aria-hidden="true"
-                ></i>
-              </button>
+                ></i></Chip
+              >
             {/each}
           </div>
         {:else}
@@ -833,57 +852,27 @@
           {#if essenceDraft.length > 0}
             <div class="manager-component-essence-grid">
               {#each essenceDraft as option (option.id)}
-                <!-- IDENTITY FIRST, then the stepper (issue 676, brief §C5). The card was
-                     one 5-column run rendering −, qty, +, icon, name: the control came
-                     before the thing it counted, and nothing distinguished a contributed
-                     essence from an untouched one. `is-inactive` carries that tint. -->
-                <article
-                  class={`manager-component-essence-card ${Number(option.quantity) > 0 ? 'is-active' : 'is-inactive'}`}
-                  data-component-edit-essence={option.id}
-                  data-component-essence-active={Number(option.quantity) > 0}
-                >
-                  <div class="manager-component-essence-identity">
-                    <span class="manager-component-essence-icon" aria-hidden="true">
-                      <i class={option.icon || 'fas fa-mortar-pestle'}></i>
-                    </span>
-                    <strong class="manager-component-essence-name" title={option.name}>{option.name}</strong>
-                  </div>
+                <!-- The card is the shared `EssenceQuantityCard` (issue 772). It was
+                     hand-rolled here — a `manager-icon-button` −, a raw
+                     `<input type="number">` and a + — and the bulk-edit panel renders the
+                     same card, so it was extracted rather than copied. Its number control
+                     is now the shared `Stepper`, which is why the keyboard, clamp and
+                     commit behaviour matches the progressive DC above.
 
-                  <div class="manager-component-essence-stepper">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      onclick={() => adjustEssence(option.id, -1)}
-                      aria-label={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
-                      title={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
-                      disabled={saving}
-                    >
-                      <i class="fas fa-minus" aria-hidden="true"></i>
-                    </button>
-
-                    <input
-                      class="manager-component-essence-quantity"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={option.quantity}
-                      aria-label={text('FABRICATE.Admin.Items.Editor.QuantityLabel', 'Quantity for {name}').replace('{name}', option.name)}
-                      oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
-                      disabled={saving}
-                    />
-
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      onclick={() => adjustEssence(option.id, 1)}
-                      aria-label={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
-                      title={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
-                      disabled={saving}
-                    >
-                      <i class="fas fa-plus" aria-hidden="true"></i>
-                    </button>
-                  </div>
-                </article>
+                     `adjustEssence` is no longer called from here: `Stepper` emits the
+                     already-clamped ABSOLUTE value for both its adjuncts and its typed
+                     input, so one `setEssenceQuantity` covers every path. -->
+                <EssenceQuantityCard
+                  id={option.id}
+                  name={option.name}
+                  icon={option.icon}
+                  quantity={option.quantity}
+                  disabled={saving}
+                  ariaLabel={text('FABRICATE.Admin.Items.Editor.QuantityLabel', 'Quantity for {name}').replace('{name}', option.name)}
+                  decrementLabel={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
+                  incrementLabel={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
+                  onChange={(quantity) => setEssenceQuantity(option.id, quantity)}
+                />
               {/each}
             </div>
           {:else}

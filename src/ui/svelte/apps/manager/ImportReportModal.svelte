@@ -143,7 +143,11 @@
     min-width: 0;
     margin: 0;
     color: var(--fab-text);
-    font-size: 0.8rem;
+
+    /* The post-import report is the sibling of the mapping dialog it follows, so both
+       read at the shared editor control scale (issue 772) rather than at the manager's
+       default body size. */
+    font-size: 0.78rem;
     font-weight: 600;
     line-height: 1.2;
   }
@@ -169,7 +173,7 @@
     flex: 1;
     min-width: 0;
     color: var(--fab-text-secondary);
-    font-size: 0.76rem;
+    font-size: var(--fab-recipe-control-font);
     overflow-wrap: anywhere;
   }
 

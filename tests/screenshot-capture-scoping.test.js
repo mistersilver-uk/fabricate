@@ -410,6 +410,157 @@ test('a component-only target set runs ONLY components-checks; recipes is skippa
   assert.equal(isD0SectionNeededForTargets('gathering', targets), false);
 });
 
+// The bulk panel has FOUR sections and no single frame can hold them all, so issue 772
+// ships three: the staged frame and the pristine/unstaged frame on the essence-bearing
+// Arcane Forge, and the Progressive DC frame on the progressive system. The first two are
+// components-checks captures; the third rides the existing progressive walk position.
+const BULK_EDIT_LABELS = [
+  'manager-components-bulk-edit',
+  'manager-components-bulk-edit-unstaged',
+  'manager-components-bulk-edit-progressive',
+];
+// The one shared scaffold all three route through. Every net-zero property is asserted
+// against THIS body, because it is where selection, capture and teardown now live.
+const BULK_EDIT_SCAFFOLD = HARNESS.match(
+  /async function captureComponentBulkEditFrame\([\s\S]*?\n\}\n/,
+)?.[0];
+
+test('the issue-772 bulk-edit frames are scoped to the sections that can render them', () => {
+  for (const label of BULK_EDIT_LABELS) {
+    assert.equal(isCapturableLabel(label), true, label);
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0, label);
+  }
+
+  // The two Arcane Forge frames belong to the components section — a bulk-edit target must
+  // not resurrect the recipes, tools or gathering walks.
+  const arcaneTargets = ['manager-components-bulk-edit', 'manager-components-bulk-edit-unstaged'];
+  assert.equal(isD0SectionNeededForTargets('components-checks', arcaneTargets), true);
+  for (const name of ['recipes', 'tags-essences', 'gathering', 'tools', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, arcaneTargets), false, name);
+  }
+
+  // The Progressive DC frame is gated on `componentDifficultyAxisProgressive`, which is
+  // false on Arcane Forge (routedByCheck crafting, routed salvage, d100 gathering) and
+  // true only on the deliberately-broken progressive system. That system already has a
+  // walk position in `overview-interactables`, so the frame reuses it rather than
+  // reconfiguring a system mid-walk — and therefore scopes to THAT section, not this one.
+  const progressiveTargets = ['manager-components-bulk-edit-progressive'];
+  assert.equal(isD0SectionNeededForTargets('overview-interactables', progressiveTargets), true);
+  assert.equal(isD0SectionNeededForTargets('components-checks', progressiveTargets), false);
+  // It sits immediately after the browser frame that establishes that context, so a scoped
+  // run reaches it without a second system switch.
+  assert.equal(
+    captureOrderIndex('manager-components-bulk-edit-progressive'),
+    captureOrderIndex('manager-components-progressive') + 1,
+  );
+
+  // The staged frame is still captured immediately after the plain browser frame, so
+  // `manager-components` keeps winning its own `candidates[0]` with
+  // `manager-components-normal`; the unstaged frame follows it.
+  assert.equal(
+    captureOrderIndex('manager-components-bulk-edit'),
+    captureOrderIndex('manager-components-normal') + 1,
+  );
+  assert.equal(
+    captureOrderIndex('manager-components-bulk-edit-unstaged'),
+    captureOrderIndex('manager-components-bulk-edit') + 1,
+  );
+});
+
+test('the shared bulk-edit capture scaffold writes nothing and hands the rail back', () => {
+  assert.ok(BULK_EDIT_SCAFFOLD, 'the bulk-edit capture scaffold was not found in the harness');
+
+  // NET-ZERO: the routine stages through the shipped controls and never presses Apply, so
+  // no component is written and no later frame in the section sees a mutated fixture.
+  assert.equal(
+    /data-component-bulk-apply'\]\)\.first\(\)\.click\(\)/.test(BULK_EDIT_SCAFFOLD),
+    false,
+    'the capture must never press Apply — it would rewrite the shared component fixtures',
+  );
+  // Driven through the real controls, not seeded: `page.evaluate` here would touch
+  // `game.` / settings / flags and photograph a state no GM can reach.
+  assert.equal(
+    /page\.evaluate\(/.test(BULK_EDIT_SCAFFOLD),
+    false,
+    'the bulk-edit state must be driven through the UI',
+  );
+  // It goes through `captureStableManagerView`, as the plain browser frame beside it does,
+  // so the overflow and overlay guards run on the bulk state too rather than only the bare
+  // `screenshot()` — and on the `components normal` pinned selectors, which the selection
+  // leaves untouched (only the RAIL swaps the inspector for the panel).
+  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(page, \{ layout: 'components normal', label \}\)/);
+  // The selection control is an input, so the walk's Edit-pen selectors still resolve.
+  assert.match(BULK_EDIT_SCAFFOLD, /label:has\(input\[data-component-select\]\)/);
+  // The selection is cleared in a `finally`, so a failed capture cannot leave the rail
+  // showing the bulk panel for every following components frame — and a failed CLEAR is
+  // recorded as its own failed step rather than swallowed, because that leak is silent
+  // evidence corruption. It is recorded rather than thrown: throwing from this `finally`
+  // would mask an in-flight capture error and abort the rest of the section, while a
+  // recorded step failure is already fatal to the run.
+  assert.match(BULK_EDIT_SCAFFOLD, /\} finally \{[\s\S]*?data-component-clear-selection/);
+  assert.match(
+    BULK_EDIT_SCAFFOLD,
+    /\} finally \{[\s\S]*?results\.steps\.push\(\{ step: `\$\{stepName\}-cleared`, passed: false/,
+  );
+  assert.equal(
+    /state: 'detached', timeout: 5_000 \}\)\.catch\(/.test(BULK_EDIT_SCAFFOLD),
+    false,
+    'a failed clear must not be swallowed by a bare .catch()',
+  );
+});
+
+test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
+  // Split rather than one lazy regex per label: a `[\s\S]*?label: '<wanted>'` starts at the
+  // EARLIEST call site and happily swallows the two before it, which would let a staging
+  // control from the staged frame satisfy — or here, break — an assertion about another.
+  // Each segment is then truncated at its own `});` terminator, which is the first line in
+  // it that is nothing but indentation and the closer.
+  const callOf = (label) => {
+    const segment = HARNESS
+      .split('captureComponentBulkEditFrame(page, results, {')
+      .slice(1)
+      .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === label);
+    if (!segment) return null;
+    const end = segment.search(/\n *\}\);/);
+    return end === -1 ? null : segment.slice(0, end);
+  };
+
+  // STAGED: a category, both tag tri-states, and the essence axis armed.
+  const staged = callOf('manager-components-bulk-edit');
+  assert.ok(staged, 'the staged bulk-edit call site was not found');
+  assert.match(staged, /data-bulk-tag-state="\$\{state\}"/);
+  assert.match(staged, /data-component-bulk-essences\] \[data-component-edit-essence\] \[data-stepper-increment\]/);
+
+  // UNSTAGED: the pristine draft. Nothing is staged, so the ASSERTIONS are the state —
+  // Apply inert, and the essence chip on the unstaged face that is the only route to
+  // "clear essences on every selected component". It must not touch a staging control, or
+  // it would photograph the frame it exists to be the opposite of.
+  const unstaged = callOf('manager-components-bulk-edit-unstaged');
+  assert.ok(unstaged, 'the unstaged bulk-edit call site was not found');
+  assert.match(unstaged, /data-component-bulk-essences-staged="false"/);
+  assert.match(unstaged, /if \(!await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)/);
+  for (const stagingControl of [
+    'data-component-bulk-category',
+    'data-bulk-tag',
+    'data-stepper-increment',
+    'data-component-bulk-difficulty',
+  ]) {
+    assert.equal(
+      unstaged.includes(stagingControl),
+      false,
+      `the unstaged frame must not drive ${stagingControl}`,
+    );
+  }
+
+  // PROGRESSIVE: the fourth section, plus the empty item-tag copy that only a system with
+  // no authored tags can show. Both are why this frame exists at all.
+  const progressive = callOf('manager-components-bulk-edit-progressive');
+  assert.ok(progressive, 'the progressive bulk-edit call site was not found');
+  assert.match(progressive, /data-component-bulk-tags-empty/);
+  assert.match(progressive, /data-component-bulk-difficulty\]'\)\.first\(\)\.fill\('12'\)/);
+  assert.match(progressive, /data-component-bulk-difficulty-staged="true"/);
+});
+
 test('a Tool Studio target runs only the dedicated persisted-net-zero tools section', () => {
   assert.equal(isD0SectionNeededForTargets('tools', TOOL_STUDIO_LABELS), true);
   for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {

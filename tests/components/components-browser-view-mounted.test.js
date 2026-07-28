@@ -31,7 +31,10 @@ const browser = createMountedComponentHarness({
     'src/utils/componentBrowserModel.js',
     // componentBrowserModel imports the shared category totals; omitting it HANGS this
     // suite (`# cancelled`) rather than failing it.
-    'src/utils/browserGroupCounts.js'
+    'src/utils/browserGroupCounts.js',
+    // The pure bulk selection + staging model (issue 772). The view imports it for the
+    // selection helpers and its toolbar reads the description it returns.
+    'src/utils/componentBulkEditModel.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -44,6 +47,9 @@ const browser = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
+    // The manager's ONE selection control and the browser's multi-select row (issue 772).
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
     'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
   ],
@@ -75,6 +81,23 @@ function manyGeneral(count) {
 
 function countTexts(root) {
   return [...root.querySelectorAll('.fab-group-count')].map((node) => node.textContent.trim());
+}
+
+/** The toolbar's `{N} selected` readout, or '' when nothing is selected (it is absent). */
+function selectionCountText(root) {
+  return root.querySelector('[data-component-selection-count]')?.textContent.trim() || '';
+}
+
+/** The ids of the rows currently rendered with a ticked selection box. */
+function bulkSelectedIds(root) {
+  return [...root.querySelectorAll('.manager-component-row.is-bulk-selected')].map(
+    (row) => row.dataset.componentId
+  );
+}
+
+function clickRowBox(root, id) {
+  root.querySelector(`[data-component-select="${id}"]`).click();
+  flushSync();
 }
 
 /** [category, countText] per rendered group, in DOM order, for the current page. */
@@ -301,5 +324,200 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     root.querySelector('[data-pagination-next]').click();
     flushSync();
     assert.deepEqual(groupsOnPage(root), [['general', '2 of 4 components']]);
+  });
+});
+
+// Issue 772 — the multi-select. The rendered-rows control and the whole-results action are
+// DISTINCT operations and these tests keep them distinct, because conflating them is the
+// defect: a collapsed group's rows are not rendered, so the page control must never reach
+// them while the results link must.
+describe('ComponentsBrowserView bulk selection (issue 772)', () => {
+  function twoCategoryLibrary() {
+    return [
+      makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
+      makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
+      makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
+      makeComponent({ id: 'h2', name: 'Thyme', category: 'Herb' })
+    ];
+  }
+
+  it('ticks a row from its own trailing box, and that box is not a button', async () => {
+    const root = await browser.mount({ itemCards: manyGeneral(3) });
+
+    const box = root.querySelector('[data-component-select="g1"]');
+    assert.equal(box.tagName, 'INPUT', 'the selection control is a real checkbox input');
+    assert.equal(
+      root.querySelectorAll('[data-component-id="g1"] .manager-action-group button').length,
+      1,
+      'the row still carries exactly ONE button — the smoke walk reaches Edit through it'
+    );
+
+    clickRowBox(root, 'g1');
+    assert.deepEqual(bulkSelectedIds(root), ['g1'], 'the ticked row carries is-bulk-selected');
+    assert.match(selectionCountText(root), /1 selected/);
+
+    clickRowBox(root, 'g1');
+    assert.deepEqual(bulkSelectedIds(root), [], 'ticking again clears the row');
+    assert.equal(selectionCountText(root), '', 'the readout disappears with an empty selection');
+  });
+
+  it('toggles ONLY the rendered rows from the page box, leaving a collapsed group alone', async () => {
+    const root = await browser.mount({
+      itemCards: twoCategoryLibrary(),
+      categoryVocabulary: ['Metal', 'Herb']
+    });
+
+    // Collapse Metal through its real header button, so its two rows stop being rendered.
+    root.querySelector('[data-group-header="Metal"]').click();
+    flushSync();
+    assert.equal(
+      root.querySelectorAll('.manager-component-row').length,
+      2,
+      'only the Herb rows are rendered once Metal is collapsed'
+    );
+
+    const pageBox = root.querySelector('[data-component-select-all-page]');
+    pageBox.click();
+    flushSync();
+
+    assert.deepEqual(
+      bulkSelectedIds(root).sort(),
+      ['h1', 'h2'],
+      'the page control must not reach rows the GM cannot see'
+    );
+    assert.match(selectionCountText(root), /2 selected/, 'and the count cannot exceed them');
+    assert.equal(pageBox.checked, true, 'every RENDERED row is selected, so the box reads all');
+
+    pageBox.click();
+    flushSync();
+    assert.deepEqual(bulkSelectedIds(root), [], 'clicking again clears the rendered rows');
+  });
+
+  it('reports the tri-state over the rendered rows', async () => {
+    const root = await browser.mount({ itemCards: manyGeneral(3) });
+    const pageBox = root.querySelector('[data-component-select-all-page]');
+
+    assert.equal(pageBox.checked, false, 'nothing selected reads unchecked');
+    assert.equal(pageBox.indeterminate, false, 'and NOT indeterminate');
+
+    clickRowBox(root, 'g1');
+    assert.equal(pageBox.indeterminate, true, 'part of the page selected reads indeterminate');
+
+    clickRowBox(root, 'g2');
+    clickRowBox(root, 'g3');
+    assert.equal(pageBox.checked, true, 'the whole page selected reads checked');
+    assert.equal(pageBox.indeterminate, false);
+  });
+
+  it('reaches the whole filtered set through "Select all N results"', async () => {
+    const root = await browser.mount({ itemCards: manyGeneral(30) });
+
+    assert.ok(
+      !root.querySelector('[data-component-select-all-results]'),
+      'the results link belongs to the selection cluster and is absent with nothing selected'
+    );
+
+    clickRowBox(root, 'g1');
+    const link = root.querySelector('[data-component-select-all-results]');
+    assert.match(link.textContent, /30/, 'the link names the whole filtered set, not the page');
+
+    link.click();
+    flushSync();
+    assert.match(selectionCountText(root), /30 selected/, 'all 30 filtered rows are selected');
+    assert.ok(
+      !root.querySelector('[data-component-select-all-results]'),
+      'the link disappears once the filtered set is fully selected'
+    );
+  });
+
+  it('keeps a selection made on page 1 when the GM pages away', async () => {
+    const root = await browser.mount({ itemCards: manyGeneral(30) });
+
+    clickRowBox(root, 'g1');
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.ok(!root.querySelector('[data-component-select="g1"]'), 'page 2 does not render g1');
+    assert.match(
+      selectionCountText(root),
+      /1 selected/,
+      'the count is the WHOLE selection, not its intersection with the page'
+    );
+  });
+
+  it('drops a selected id that no longer resolves to a component', async () => {
+    const root = await browser.mount({ itemCards: manyGeneral(3) });
+
+    clickRowBox(root, 'g1');
+    clickRowBox(root, 'g2');
+    assert.match(selectionCountText(root), /2 selected/);
+
+    // A delete / unlink / refresh republishes `itemCards` without the row.
+    await browser.setProps({ itemCards: manyGeneral(3).filter((item) => item.id !== 'g1') });
+
+    assert.deepEqual(bulkSelectedIds(root), ['g2'], 'the surviving row stays selected');
+    assert.match(
+      selectionCountText(root),
+      /1 selected/,
+      'a phantom id must never survive in the count or in an Apply'
+    );
+  });
+
+  it('clears the selection on a genuine crafting-system switch', async () => {
+    const shared = createComponentBrowserState();
+    const itemCards = manyGeneral(3);
+
+    await browser.mount({ itemCards, selectedSystemId: 'sys-1', browserState: shared });
+    shared.bulkSelectedComponentIds = new Set(['g1', 'g2']);
+
+    browser.remount();
+    await browser.mount({ itemCards, selectedSystemId: 'sys-1', browserState: shared });
+    assert.equal(
+      shared.bulkSelectedComponentIds.size,
+      2,
+      'an editor round-trip is not a system switch and must not clear it'
+    );
+
+    browser.remount();
+    await browser.mount({ itemCards, selectedSystemId: 'sys-2', browserState: shared });
+    assert.equal(
+      shared.bulkSelectedComponentIds.size,
+      0,
+      'the selection names components the new system does not have'
+    );
+  });
+});
+
+// Issue 772, acceptance 13 (row half). The badge used to gate on the CRAFTING resolution
+// mode alone, so on a salvage-only or gathering-only progressive system the bulk panel
+// would have offered a Progressive DC control whose result NO row could display. Nothing
+// asserted the badge's absence before, so the re-gate breaks no test — and gains none
+// unless these two cases are stated.
+describe('ComponentsBrowserView progressive DC badge re-gate (issue 772)', () => {
+  const withDifficulty = [makeComponent({ id: 'd1', name: 'Brass Casing', difficulty: 8 })];
+
+  it('renders the row DC badge on a system progressive for SALVAGE only', async () => {
+    const root = await browser.mount({
+      itemCards: withDifficulty,
+      selectedSystemResolutionMode: 'simple',
+      difficultyAxisProgressive: true
+    });
+
+    const badge = root.querySelector('[data-component-id="d1"] [data-component-difficulty]');
+    assert.ok(Boolean(badge), 'the row badge follows the shared three-axis predicate');
+    assert.match(badge.textContent, /8/, 'and shows the authored value');
+  });
+
+  it('omits the badge when no axis is progressive, whatever the crafting mode says', async () => {
+    const root = await browser.mount({
+      itemCards: withDifficulty,
+      selectedSystemResolutionMode: 'progressive',
+      difficultyAxisProgressive: false
+    });
+
+    assert.ok(
+      !root.querySelector('[data-component-id="d1"] [data-component-difficulty]'),
+      'the badge reads ONE predicate — an unforwarded prop must not fall back to the old axis'
+    );
   });
 });

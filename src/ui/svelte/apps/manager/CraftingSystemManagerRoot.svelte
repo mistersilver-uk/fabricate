@@ -9,7 +9,7 @@
     DEFAULT_GATHERING_EVENT_IMG,
     DEFAULT_GATHERING_TASK_IMG
   } from '../../../../gatheringImageDefaults.js';
-  import { localize, notifyWarn } from '../../util/foundryBridge.js';
+  import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import {
     routedSuccessTierOptions,
@@ -31,7 +31,14 @@
   import { categoryIconFor } from '../../../../utils/categoryIcons.js';
   import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
-  import { createComponentBrowserState } from '../../../../utils/componentBrowserModel.js';
+  import {
+    componentCategoryOptions,
+    createComponentBrowserState
+  } from '../../../../utils/componentBrowserModel.js';
+  import {
+    createComponentBulkDraft,
+    toBulkComponentEdit
+  } from '../../../../utils/componentBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -57,6 +64,7 @@
   // under `components/` (the BROWSER's dir), NOT `component/`, which the screenshot map
   // globs for the component EDITOR's frames.
   import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
+  import ComponentBulkEditPanel from './components/ComponentBulkEditPanel.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
   import KnowledgeView from './KnowledgeView.svelte';
   import CraftingSettingsView from './CraftingSettingsView.svelte';
@@ -132,6 +140,13 @@
   // group/page state used to live inside ComponentsBrowserView, so every editor
   // round-trip reset it.
   let componentBrowserState = $state(createComponentBrowserState());
+  // The staged-but-unwritten bulk edit (issue 772). The ROOT owns it, not the panel: the
+  // panel is unmounted the moment the selection empties, so a panel-owned draft would be
+  // destroyed by the very transition that is supposed to DISCARD it — indistinguishable
+  // from working, until the panel is kept alive for any other reason. The selection itself
+  // lives on the lifted `componentBrowserState`, beside the browser's other view-state.
+  let componentBulkDraft = $state(createComponentBulkDraft());
+  let componentBulkApplying = $state(false);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
@@ -1405,13 +1420,24 @@
   const gatheringProgressive = $derived(
     $viewState.gatheringConfig?.systems?.[selectedSystemId]?.economy?.resolutionMode === 'progressive'
   );
+  // The SYSTEM-scoped half of that question, extracted so three surfaces can share it
+  // (issue 772): the single-component editor control, the browser row's read-only DC
+  // badge, and the browser's bulk-edit progressive-DC section. It carries NO view and NO
+  // selection term — `componentDifficultyShown` below adds those back for the editor —
+  // because the two browser surfaces are, by definition, not in the editor: reusing the
+  // view-scoped predicate there would render both of them NEVER, and pass vacuously.
+  const componentDifficultyAxisProgressive = $derived(
+    selectedSystem?.resolutionMode === 'progressive'
+    || salvageResolutionMode === 'progressive'
+    || gatheringProgressive
+  );
+  // Behaviour-preserving by construction: the same three axes ANDed with the same two view
+  // terms this derivation always had. It gates the editor control's VISIBILITY and the
+  // difficulty fold-in on the SAVE path (`saveComponentEdit`), so the rewrite has to hold
+  // for both — nothing under `tests/` names it.
   const componentDifficultyShown = $derived(
     currentView === 'component-edit'
-    && (
-      selectedSystem?.resolutionMode === 'progressive'
-      || salvageResolutionMode === 'progressive'
-      || gatheringProgressive
-    )
+    && componentDifficultyAxisProgressive
     && !!componentForEdit
   );
   const componentDifficultyDirty = $derived(
@@ -1422,6 +1448,22 @@
   const componentEditCombinedDirty = $derived(
     componentEditDirty === true || componentDifficultyDirty === true
   );
+  // ── The bulk selection (issue 772) ───────────────────────────────────────────────
+  // Read straight off the LIFTED browser state, which `ComponentsBrowserView` binds: the
+  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
+  // prop or a second copy of the truth.
+  const componentBulkSelectedIds = $derived(componentBrowserState.bulkSelectedComponentIds ?? new Set());
+  const componentBulkSelectionCount = $derived(componentBulkSelectedIds.size);
+  const componentBulkSelectedCards = $derived(itemCards.filter(item => componentBulkSelectedIds.has(item.id)));
+  const componentBulkCategoryOptions = $derived(
+    componentCategoryOptions(itemCards, selectedSystem?.componentCategories || [])
+  );
+  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
+  // prune that removed the last id, or a successful apply. The panel is unmounted at that
+  // point, so this is the only place the discard can honestly happen.
+  $effect(() => {
+    if (componentBulkSelectionCount === 0) componentBulkDraft = createComponentBulkDraft();
+  });
   const environmentList = $derived($viewState.environments || []);
   const environmentValidationCount = $derived(Array.isArray($viewState.environmentValidationState?.errors)
     ? $viewState.environmentValidationState.errors.length
@@ -3015,8 +3057,22 @@
     selectSystem(systemId);
   }
 
+  // A newly created system is already SELECTED by the store, but the GM was left on the
+  // systems library looking at a list — one more click from the thing they just asked for,
+  // and with no signal about which row is the new one. Open its System Overview instead,
+  // on the Settings tab, exactly as `editSystem` does: a new system's first job is to be
+  // configured, and that is the page that configures it.
+  //
+  // This depends on the store's refresh staleness guard. The manager fires
+  // `fabricate.craftingSystemsChanged` from inside its own write, which schedules a refresh
+  // holding the PREVIOUS selection; before that guard existed the older run could publish
+  // last, so the new system appeared and then flicked back and this navigation landed on
+  // the system the GM started from.
   function createSystem() {
-    store.createSystem?.();
+    afterTruthyResult(store.createSystem?.(), () => {
+      requestSystemTab('settings');
+      activeView = 'system-edit';
+    });
   }
 
   // The store resolves the post-import report content (or null when the import was
@@ -3175,6 +3231,67 @@
   function deleteComponent(itemId = selectedComponent?.id) {
     if (!itemId) return;
     store.deleteComponent?.(itemId);
+  }
+
+  // ── Bulk edit (issue 772) ────────────────────────────────────────────────────────
+  // The panel stages into a draft this root owns; NOTHING is written until Apply. The
+  // model's helpers are immutable, so the panel hands back a NEW draft rather than
+  // mutating this one — an in-place assumption would compile and silently do nothing.
+  function stageComponentBulkDraft(next) {
+    componentBulkDraft = next || createComponentBulkDraft();
+  }
+
+  // Clearing the selection is the documented escape from a mode that hides unlink, delete
+  // and copy-source-UUID; the count reaching zero also discards the draft (see the effect
+  // above) and returns the rail to the single-component inspector.
+  function clearComponentBulkSelection() {
+    componentBrowserState.bulkSelectedComponentIds = new Set();
+  }
+
+  async function applyComponentBulkEdit() {
+    if (componentBulkApplying) return false;
+    const ids = componentBulkSelectedIds;
+    if (ids.size === 0) return false;
+    // An unstaged axis is never sent. `essences` is present IFF the essence axis is
+    // staged and `difficulty` IFF the DC axis is — a staged all-zero map and a staged 0
+    // are REAL edits meaning "clear", so the write primitive tests key presence rather
+    // than truthiness and this projection must give it something to test.
+    const edit = toBulkComponentEdit(componentBulkDraft);
+    if (Object.keys(edit).length === 0) return false;
+    componentBulkApplying = true;
+    try {
+      // The store returns the write RESULT, never a bare boolean, so a `null` covers every
+      // no-write case in one test — including the optional call resolving to `undefined`
+      // because the action is absent, which a `=== false` check would have read as success.
+      const result = await store.applyComponentBulkEdit?.(ids, edit);
+      if (!result) return false;
+      // The count the GM is told is the count that actually CHANGED, not the count they
+      // ticked: the write primitive compares each component before and after, so adding a
+      // tag three of five already carry updates two. Naming the selection size instead
+      // would report work that did not happen.
+      const count = result.updated;
+      // One `save()` and one `refresh()` happened inside the store action, so the rows are
+      // already re-rendering; clearing the selection returns the rail to the inspector and
+      // the count-to-zero effect discards the draft.
+      clearComponentBulkSelection();
+      // Singular, on the same terms as the panel's own heading and Apply label: the
+      // threshold is `> 0`, so ONE ticked row is the advertised case, and this toast is
+      // the ONLY feedback that survives the panel unmounting on a successful apply.
+      // Zero is its own message rather than "applied to 0 components", which reads as a
+      // failure for what is a legitimate outcome — every selected component already
+      // matched the staged values.
+      notifyInfo(
+        count === 0
+          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.AppliedNone', 'No components needed changing.')
+          : count === 1
+            ? text('FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne', 'Applied bulk changes to 1 component.')
+            : text('FABRICATE.Admin.Manager.Component.BulkEdit.Applied', 'Applied bulk changes to {count} components.')
+                .replace('{count}', count)
+      );
+      return true;
+    } finally {
+      componentBulkApplying = false;
+    }
   }
 
   function addCategory(value, icon) {
@@ -5629,6 +5746,7 @@
         selectedComponentId={selectedComponent?.id || ''}
         {selectedSystemId}
         selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        difficultyAxisProgressive={componentDifficultyAxisProgressive}
         categoryVocabulary={selectedSystem?.componentCategories || []}
         bind:browserState={componentBrowserState}
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
@@ -7102,7 +7220,29 @@
           />
         {/if}
       {:else if currentView === 'components'}
-        {#if selectedComponent}
+        <!--
+          The bulk panel REPLACES the single-component inspector while the selection is
+          non-empty (issue 772) — the prototype's `bulkOn` / `bulkOff` swap, at its
+          `> 0` threshold. It sits FIRST so it wins over `selectedComponent`, which is
+          always truthy once the library has rows. The setup card below cannot be masked by
+          it: an empty `itemCards` forces an empty pruned selection.
+        -->
+        {#if componentBulkSelectionCount > 0}
+          <ComponentBulkEditPanel
+            count={componentBulkSelectionCount}
+            categoryOptions={componentBulkCategoryOptions}
+            tags={selectedSystem?.itemTags || []}
+            showEssences={selectedSystem?.features?.essences === true}
+            essenceDefinitions={selectedSystem?.essenceDefinitions || []}
+            showProgressiveDifficulty={componentDifficultyAxisProgressive}
+            selectedCards={componentBulkSelectedCards}
+            draft={componentBulkDraft}
+            applying={componentBulkApplying}
+            onDraftChange={(next) => stageComponentBulkDraft(next)}
+            onClearSelection={() => clearComponentBulkSelection()}
+            onApply={() => applyComponentBulkEdit()}
+          />
+        {:else if selectedComponent}
           <ComponentBrowserInspector
             {selectedComponent}
             showTags={showComponentTags}
