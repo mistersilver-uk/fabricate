@@ -227,6 +227,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
+  // Same rule, issue 917: the builder now shares its step->recipe view projection and
+  // its active-run step read with CraftingEngine through this import-free leaf, so it
+  // must be copied alongside the builder.
+  'src/systems/stepRecipeView.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
