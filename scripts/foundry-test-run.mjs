@@ -1916,6 +1916,24 @@ async function assertPointerTarget(page, locator, targetSelector, label) {
   }
 }
 
+/**
+ * Open a requirement-rail slot's chooser only if it is not already open (issue
+ * 917). `RequirementTile` is a real disclosure — its button reports its own
+ * state via `aria-expanded` — and clicking a tile that is ALREADY open now
+ * COLLAPSES it rather than being a no-op, because the rail's `openSlotId` is a
+ * single toggled key (`craftingStore.svelte.js`). Focus auto-advance already
+ * opens the first unsatisfied openable slot the moment a recipe is selected, so
+ * a blind click right after selection frequently lands on an already-open tile
+ * and closes the very chooser the walk is about to assert against. Read the
+ * tile's own reported state and click only when it says closed.
+ * @param {import('playwright').Locator} slotLocator
+ */
+async function ensureSlotOpen(slotLocator) {
+  await slotLocator.waitFor({ state: 'visible', timeout: 8_000 });
+  if (await slotLocator.getAttribute('aria-expanded') === 'true') return;
+  await slotLocator.click({ timeout: 5_000 });
+}
+
 function assertSingleToolMutation(report, expectedMethod, label) {
   const matchingCalls = report?.calls?.filter((call) => call.method === expectedMethod) ?? [];
   const unexpectedCalls = report?.calls?.filter((call) => call.method !== expectedMethod) ?? [];
@@ -3318,6 +3336,21 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     // single essence option) beside a fixed group, so the same selection also supplies the
     // consumption-plan frame: a fixed row, an essence-carrier row and a "still to choose"
     // line, all at once.
+    //
+    // Issue 917 review: `player-crafting-consumption-plan` and `player-crafting-essence-
+    // pool-shared` were captured on this SAME recipe at the SAME store state, differing
+    // only by `scrollIntoViewIfNeeded` — a no-op frame if the plan panel is already in
+    // view at the capture size. `smoke-shared-fitting` is an unaffordable pair (neither
+    // option held, same pattern as `smoke-rail-binding` above), so it stays PARTIAL —
+    // "unchosen" — for the life of both captures. It never contributes a plan row (an
+    // untouched choice contributes only to `pending`), so it does not disturb the
+    // existing `rows`/`carrierRows` assertions below, but it DOES put a non-essence
+    // requirement on the consumption plan's "still to choose" line — evidence the
+    // essence-pool panel (which shows only essence carriers) never renders at all. (The
+    // tile reports its CHOSEN OPTION's name there, not the authored group label, so the
+    // pending line names 'Smoke Anvil' rather than 'Fitting' — verified against a live
+    // run.) That is what makes the two frames prove different things instead of the same
+    // state twice.
     await rm.createRecipe({
       name: 'Smoke Tidecore Tempering',
       description: 'Shared essence pool: two requirements in one set funded jointly from dual carriers.',
@@ -3340,6 +3373,14 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
             id: 'smoke-shared-tide',
             name: 'Tide Essence',
             options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-tide-essence', amount: 3 } }]
+          },
+          {
+            id: 'smoke-shared-fitting',
+            name: 'Fitting',
+            options: [
+              { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Anvil'] } },
+              { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Bracket'] } }
+            ]
           }
         ]
       }],
@@ -11592,17 +11633,21 @@ async function main() {
             // always present. The alternatives picker is now the chooser ONE rail slot
             // opens, so it renders only while that slot is the open one. The rail
             // auto-advances to the first unsatisfied openable slot and this recipe's only
-            // openable slot IS the coil choice, so it opens by itself — but the click
-            // below makes the precondition explicit rather than incidental, so a change to
-            // the auto-advance rule surfaces here instead of as a bare 10s timeout. Wait on
-            // the rail container first: a container-level marker fails fast and locally,
-            // whereas waiting straight on deep chooser content turns any upstream slip
-            // into an unrelated-looking later failure.
+            // openable slot IS the coil choice, so it opens by itself — the slot tile is a
+            // real disclosure now (a later accessibility fix), and clicking one that is
+            // ALREADY open collapses it rather than being a no-op, so a blind click here
+            // would race the auto-advance and could close the very chooser this step
+            // asserts on. `ensureSlotOpen` reads the tile's own `aria-expanded` state and
+            // clicks only when it is still closed, making the precondition explicit
+            // without fighting the auto-advance. Wait on the rail container first: a
+            // container-level marker fails fast and locally, whereas waiting straight on
+            // deep chooser content turns any upstream slip into an unrelated-looking later
+            // failure.
             await appShell.locator('[data-recipe-section="requirement-rail"]').first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             const altSlotTile = appShell
               .locator('[data-requirement-slot][data-slot-kind="choice"]').first();
-            await altSlotTile.click({ timeout: 5_000 }).catch(() => {});
+            await ensureSlotOpen(altSlotTile).catch(() => {});
             const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
             await altSection.waitFor({ state: 'visible', timeout: 10_000 });
             // Pointer hit-test (issue 917): the slot tile is a new card-shaped `<button>`
@@ -11709,9 +11754,17 @@ async function main() {
               await input.blur().catch(() => {});
               await page.waitForTimeout(300);
             };
+            // `ensureSlotOpen` (issue 917): the essence slot's tile is a real disclosure,
+            // and focus auto-advance already opens the rail's first unsatisfied openable
+            // slot — which is this very essence slot in both recipes this helper is used
+            // against — the moment the recipe is selected. A blind click here would
+            // therefore collapse the pool that auto-advance already opened instead of
+            // opening it, which is exactly the defect that turned this step's fresh
+            // `[data-recipe-section="essence-pool"]` wait into a 10s timeout.
             const openEssencePool = async () => {
-              await appShell.locator('[data-requirement-slot][data-slot-kind="essence"]')
-                .first().click({ timeout: 5_000 });
+              await ensureSlotOpen(
+                appShell.locator('[data-requirement-slot][data-slot-kind="essence"]').first()
+              );
               await appShell.locator('[data-recipe-section="essence-pool"]').first()
                 .waitFor({ state: 'visible', timeout: 10_000 });
             };
@@ -11873,8 +11926,14 @@ async function main() {
                 `Shared pool was ${JSON.stringify(sharedMeters)}, expected one met and one part-delivered meter`
               );
             }
+            // Issue 917 re-point: the chip's class is `.essence-contribution`
+            // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never
+            // existed and always counted zero. Masked until now because the walk
+            // never actually reached this state: the essence pool auto-opened by
+            // focus advance and the (now-fixed) blind click above immediately closed
+            // it again, so the panel this selector reads was never rendered live.
             const duskContributions = await appShell
-              .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-pool-contribution')
+              .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-contribution')
               .count();
             if (duskContributions < 2) {
               throw new Error(
@@ -11884,10 +11943,16 @@ async function main() {
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-essence-pool-shared');
 
-            // (6) The same state, framed on the consumption plan: a FIXED row (the
-            // runeplate the craft spends) and an ESSENCE-CARRIER row (one entry per item
-            // key however many requirements that item funds), plus the "still to choose"
-            // line naming the requirement the allocation has not settled.
+            // (6) The same recipe and the same essence allocation, framed on the
+            // consumption plan: a FIXED row (the runeplate the craft spends) and an
+            // ESSENCE-CARRIER row (one entry per item key however many requirements that
+            // item funds), plus the "still to choose" line. `smoke-shared-fitting` (an
+            // unaffordable pair, permanently unchosen — see the recipe fixture above) is
+            // what keeps this frame from being a duplicate of (5): the essence-pool panel
+            // never shows a non-essence choice at all, so the plan naming its unresolved
+            // option ('Smoke Anvil' — the tile reports the CHOSEN OPTION's name, not the
+            // authored group label) here is evidence unique to this capture, not the same
+            // store state re-photographed.
             const planPanel = appShell.locator('[data-recipe-section="consumption-plan"]').first();
             await planPanel.waitFor({ state: 'visible', timeout: 10_000 });
             await planPanel.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
@@ -11907,6 +11972,15 @@ async function main() {
             }
             if (planReport.pending.length === 0) {
               throw new Error('Consumption plan showed no "still to choose" line for the unsettled requirement');
+            }
+            // The tile's own name is the CHOSEN option's name, not the authored group
+            // name — `_resolveGroupDescription`/`_resolveIngredientVisual` in
+            // `RecipeManager.js` report the option (here 'Smoke Anvil', the default pick
+            // among the unaffordable pair), never the group label ('Fitting'). Live-run
+            // verified (issue 917): asserting the group name here fails against the real
+            // render.
+            if (!planReport.pending.includes('Smoke Anvil')) {
+              throw new Error(`Consumption plan pending line did not name the unchosen Fitting requirement's option: ${JSON.stringify(planReport)}`);
             }
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-consumption-plan');
