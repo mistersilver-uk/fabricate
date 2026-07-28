@@ -651,7 +651,7 @@
   // No caller left. Deleting it would strip the only reader of the two TagsEdit ApplyTag /
   // RemoveTag lang keys, orphaning both and failing the lang-keys-no-orphans ratchet, which
   // may not be grown. lang/en.json is outside this change's owned paths, so the helper is
-  // suppressed rather than deleted; code and keys should be removed together in a follow-up.
+  // suppressed rather than deleted; issue 926 removes the code and the keys together.
   // (Do not spell those keys with their leading namespace here: the orphan scanner treats a
   // dotted key literal in a COMMENT as a reference, and a partial one covers a whole subtree.)
   // eslint-disable-next-line no-unused-vars

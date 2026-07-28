@@ -50,7 +50,9 @@
           canView = playerCanView(doc);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // An unresolvable uuid leaves the cleared placeholder state above in place.
+      });
     return () => { cancelled = true; };
   });
 

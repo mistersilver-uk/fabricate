@@ -131,8 +131,13 @@
   );
   const importDisabled = $derived(importCount === 0);
 
-  // Every existing tag, in the RecipeRoutingAssignment shape. The row's state is taken but
-  // not read: the list is not filtered down to the tags the row has yet to be assigned.
+  // Every existing tag, in the RecipeRoutingAssignment shape. Handing over the UNFILTERED
+  // list IS that component's contract: it takes `options` (the full candidate list) beside
+  // `selectedIds` and derives its own picker from the pair, dropping what is already selected
+  // here or disabled elsewhere. Do not filter here — it would be a second, divergent copy of
+  // that rule, and it would break the selected chips, whose labels resolve each selected id
+  // back through `options`. The `_state` parameter is vestigial: the row contributes nothing
+  // to the mapping.
   function tagOptionsFor(_state) {
     return (itemTags || []).map((tag) => ({ id: tag, name: `#${tag}` }));
   }

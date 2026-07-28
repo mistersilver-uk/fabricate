@@ -67,14 +67,16 @@
     onDeleteGatheringVocabularyValue = () => {},
     gatheringRealmSettings = { enabled: false },
     onSetGatheringRealmsEnabled = () => {},
-    // The Travel props below have NO reader in this component, and the parent
-    // (CraftingSystemManagerRoot) wires a real store call into every one of them. The
-    // consumer that used to read them, GatheringTravelView.svelte, is imported by nothing
-    // under src/, so realm and party create/rename/enable/delete are currently unreachable
-    // from the manager's Travel tab. Deleting these destructures would leave the parent
-    // attributes wired to nothing and erase the evidence — Svelte silently ignores a prop
-    // the child does not destructure, so no test would fail. They are kept and suppressed
-    // until issue 920 reconnects the surface.
+    // The suppressed props below (the image-picker wire plus the Travel CRUD callbacks) have
+    // NO reader in this component, and the parent (CraftingSystemManagerRoot) wires a real
+    // store call into every one of them. The consumer that used to read them,
+    // GatheringTravelView.svelte, is imported by nothing under src/, so party
+    // create/enable/delete and all realm CRUD are currently unreachable from the manager's
+    // Travel tab. (Party RENAME is the exception and carries no suppression: `onRenameParty`
+    // is forwarded to the live parties tab below.) Deleting these destructures would leave
+    // the parent attributes wired to nothing and erase the evidence — Svelte silently ignores
+    // a prop the child does not destructure, so no test would fail. They are kept and
+    // suppressed until issue 920 reconnects the surface.
     // eslint-disable-next-line no-unused-vars
     onPickImagePath = null,
     travelParties = [],

@@ -467,9 +467,12 @@
   // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
   // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
   // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
-  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. The separate
-  // `recipeRouted` derivation (multi-set / route enablement) still covers both routed
-  // modes.
+  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. Collapsing it
+  // here costs nothing elsewhere, because the multi-set and routing behaviours are derived
+  // separately from the RAW `resolutionMode` rather than from this value:
+  // `recipeMultiSetAllowed` gates more than one ingredient/result set, and
+  // `recipeRoutingProvider` picks the routing basis ('check' for routedByCheck,
+  // 'ingredientSet' for routedByIngredients). Both routed modes stay covered there.
   const craftingCheckMode = $derived(
     (function _craftingCheckMode(resolution) {
       if (resolution === 'routedByCheck') return 'routed';
@@ -4513,7 +4516,7 @@
   // salvageSummaryLabel) would strip the only readers of the twelve component Salvage* and
   // Usage* lang keys, orphaning them and failing the lang-keys-no-orphans ratchet, which may
   // not be grown. lang/en.json is outside this change's owned paths, so the trio is
-  // suppressed rather than deleted; code and keys should be removed together in a follow-up.
+  // suppressed rather than deleted; issue 926 removes the code and the keys together.
   // (Do not spell those keys with their leading namespace here: the orphan scanner treats a
   // dotted key literal in a COMMENT as a reference, and a partial one covers a whole subtree.)
   // eslint-disable-next-line no-unused-vars
