@@ -3,6 +3,8 @@
 // across each crafting test file (the SonarCloud new-code duplication gate counts
 // duplicated fixture lines exactly like production code).
 
+import { buildRequirementSlots, resolveOpenSlotId } from '../../src/ui/svelte/util/requirementSlots.js';
+
 export function craftability(overrides = {}) {
   return {
     canCraft: true,
@@ -24,6 +26,150 @@ export function craftability(overrides = {}) {
   };
 }
 
+// ── Issue 917: essence pool / requirement rail fixtures ─────────────────────
+//
+// The pool is the read-side projection of the resolved essence block: what each
+// requirement needs and was DELIVERED (an essence amount), what each carrier holds
+// and contributes (item units), and the allocation tying the two together. The two
+// units are deliberately distinct — `delivered`/`owned` on a requirement are essence
+// amounts, `allocatedUnits`/`ownedUnits` on a carrier are item units — so a fixture
+// that conflates them would hide exactly the defect these surfaces exist to remove.
+
+export function essencePool(overrides = {}) {
+  return {
+    scopeKey: 'set-a',
+    requirements: [
+      {
+        groupId: 'g-radiant',
+        essenceId: 'radiant',
+        name: 'Radiant',
+        icon: 'fas fa-sun',
+        colorToken: 'butter',
+        need: 4,
+        delivered: 2,
+        owned: 6,
+        satisfied: false
+      }
+    ],
+    carriers: [
+      {
+        itemKey: 'Item.dusk-1',
+        componentId: 'c-duskcrystal',
+        name: 'Duskcrystal',
+        img: 'icons/commodities/gems/gem-faceted-navette-purple.webp',
+        ownedUnits: 3,
+        allocatedUnits: 1,
+        perUnit: { radiant: 2 }
+      }
+    ],
+    allocation: { 'Item.dusk-1': 1 },
+    totals: { radiant: 2 },
+    suggested: { 'Item.dusk-1': 2 },
+    ...overrides
+  };
+}
+
+/** A set with ONE essence requirement, partly delivered from a single carrier. */
+export function essenceCraftability(overrides = {}) {
+  return craftability({
+    canCraft: false,
+    ingredientStates: [
+      {
+        groupId: 'g-radiant',
+        componentId: null,
+        name: 'Radiant',
+        img: null,
+        isEssence: true,
+        icon: 'fas fa-sun',
+        colorToken: 'butter',
+        description: '4x Radiant essence',
+        need: 4,
+        delivered: 2,
+        owned: 6,
+        satisfied: false
+      }
+    ],
+    essencePool: essencePool(),
+    ...overrides
+  });
+}
+
+/**
+ * The D-ESS proof fixture: TWO essence requirements funded from one shared pool of
+ * DUAL carriers (each unit credits both essences). One requirement is met and one is
+ * short, which is the state the `-essence-pool-shared` evidence frame captures.
+ */
+export function sharedEssenceCraftability(overrides = {}) {
+  const requirements = [
+    {
+      groupId: 'g-radiant',
+      essenceId: 'radiant',
+      name: 'Radiant',
+      icon: 'fas fa-sun',
+      colorToken: 'butter',
+      need: 2,
+      delivered: 2,
+      owned: 4,
+      satisfied: true
+    },
+    {
+      groupId: 'g-shadow',
+      essenceId: 'shadow',
+      name: 'Shadow',
+      icon: 'fas fa-moon',
+      colorToken: 'lavender',
+      need: 3,
+      delivered: 1,
+      owned: 2,
+      satisfied: false
+    }
+  ];
+  return craftability({
+    canCraft: false,
+    ingredientStates: requirements.map((requirement) => ({
+      groupId: requirement.groupId,
+      componentId: null,
+      name: requirement.name,
+      img: null,
+      isEssence: true,
+      icon: requirement.icon,
+      colorToken: requirement.colorToken,
+      description: `${requirement.need}x ${requirement.name} essence`,
+      need: requirement.need,
+      delivered: requirement.delivered,
+      owned: requirement.owned,
+      satisfied: requirement.satisfied
+    })),
+    essencePool: essencePool({
+      requirements,
+      carriers: [
+        {
+          itemKey: 'Item.dusk-1',
+          componentId: 'c-duskcrystal',
+          name: 'Duskcrystal',
+          img: 'icons/commodities/gems/gem-faceted-navette-purple.webp',
+          ownedUnits: 3,
+          allocatedUnits: 1,
+          perUnit: { radiant: 2, shadow: 1 }
+        },
+        {
+          itemKey: 'Item.prism-1',
+          componentId: 'c-prismash',
+          name: 'Prism Ash',
+          img: 'icons/commodities/materials/powder-pink.webp',
+          ownedUnits: 2,
+          allocatedUnits: 0,
+          perUnit: { radiant: 1, ember: 1 }
+        }
+      ],
+      allocation: { 'Item.dusk-1': 1 },
+      totals: { radiant: 2, shadow: 1 },
+      suggested: { 'Item.dusk-1': 2, 'Item.prism-1': 1 }
+    }),
+    ...overrides
+  });
+}
+
 export function recipe(overrides = {}) {
   const setId = overrides.defaultSetId ?? 'set-a';
   return {
@@ -42,6 +188,13 @@ export function recipe(overrides = {}) {
     blockingReasons: [],
     ingredientSets: [{ id: setId, label: 'Option A', craftability: craftability(), products: [] }],
     defaultSetId: setId,
+    // Multi-step run position (issue 917). Equal ids (both null here) mean the step
+    // being displayed IS the step the engine would execute, so the rail is
+    // interactive — which is the single-step case and today's default.
+    activeStepIndex: 0,
+    activeStepId: null,
+    displayedStepId: null,
+    activeStepTimeGateArmed: false,
     check: null,
     outcomeTiers: null,
     duration: null,
@@ -135,6 +288,46 @@ export function multiStepRecipe(overrides = {}) {
   });
 }
 
+/**
+ * A two-step recipe whose FIRST step carries the shared essence block. Step 1 is the
+ * step the engine would execute (so its rail is interactive); step 2 is a plain
+ * component step and must render read-only preview whatever the store holds.
+ */
+export function steppedEssenceRecipe(overrides = {}) {
+  const stepOne = {
+    id: 'step-ess-1',
+    label: 'Infuse',
+    duration: null,
+    ingredientSets: [
+      { id: 'set-ess-1', label: 'Option A', craftability: sharedEssenceCraftability(), products: [] }
+    ],
+    products: []
+  };
+  const stepTwo = {
+    id: 'step-ess-2',
+    label: 'Temper',
+    duration: null,
+    ingredientSets: [
+      { id: 'set-ess-2', label: 'Option A', craftability: essenceCraftability(), products: [] }
+    ],
+    products: []
+  };
+  return recipe({
+    id: 'recipe-sunblade',
+    name: 'Sunblade',
+    modeToken: 'simple',
+    modeLabel: 'Simple',
+    ingredientSets: stepOne.ingredientSets,
+    defaultSetId: 'set-ess-1',
+    steps: [stepOne, stepTwo],
+    activeStepIndex: 0,
+    activeStepId: 'step-ess-1',
+    displayedStepId: 'step-ess-1',
+    activeStepTimeGateArmed: false,
+    ...overrides
+  });
+}
+
 export function listing(recipes, overrides = {}) {
   return {
     selectedActorId: 'Actor.actor-1',
@@ -153,6 +346,9 @@ export function fakeCraftingStore(overrides = {}) {
   const recipes = overrides.recipes ?? [];
   const selected = recipes[0] ?? null;
   const loadedOnce = overrides.loadedOnce ?? true;
+  const selectedCraftability =
+    overrides.selectedCraftability ?? selected?.ingredientSets?.[0]?.craftability ?? null;
+  const scopeKey = selected?.ingredientSets?.[0]?.id ?? null;
   return {
     listing: overrides.listing ?? (loadedOnce ? listing(recipes) : null),
     loading: false,
@@ -180,7 +376,20 @@ export function fakeCraftingStore(overrides = {}) {
     pageItems: recipes,
     selectedRecipe: selected,
     selectedSet: selected?.ingredientSets?.[0] ?? null,
-    selectedCraftability: selected?.ingredientSets?.[0]?.craftability ?? null,
+    selectedCraftability,
+    // Issue 917 rail state. `openSlotId` is resolved through the SAME helper the real
+    // store uses, so the fake auto-advances to the first unsatisfied slot exactly as
+    // the store does — a hard-coded null would make every mounted CraftingView test
+    // pass against a rail that never opens anything.
+    selectedEssenceAllocation: {},
+    essenceScopeKey: scopeKey,
+    railSlots: buildRequirementSlots(selectedCraftability),
+    openSlotId: resolveOpenSlotId({
+      slots: buildRequirementSlots(selectedCraftability),
+      scopeKey,
+      rememberedKey: null
+    }),
+    slotAnnouncement: '',
     shoppingAggregate: { ingredients: [], essences: [], tools: [], allSatisfied: true, totalRecipes: 0, totalQuantity: 0 },
     load() {},
     select() {},
@@ -194,6 +403,9 @@ export function fakeCraftingStore(overrides = {}) {
     setPageSize() {},
     chooseIngredientSet() {},
     chooseIngredientOption() {},
+    openSlot() {},
+    setEssenceAllocation() {},
+    pickForMe() {},
     addToShoppingList() {},
     removeFromShoppingList() {},
     clearShoppingList() {},

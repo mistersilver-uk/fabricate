@@ -20,7 +20,15 @@
     // Per-step requirement projection (issue 765). Present only for an explicit
     // multi-step `simple` recipe; [] otherwise. Forwarded from RecipeDetail's BODIES
     // dispatcher — a prop that skips it silently drops to [] and no step blocks render.
-    steps = []
+    steps = [],
+    // The requirement rail's interaction state (issue 917), spread straight onto
+    // IoTable: which chooser is open, whether the rail is inert, and the callbacks
+    // back to the store. One cohesive value rather than eight props threaded through
+    // four bodies. `{}` renders a read-only rail with no chooser.
+    rail = {},
+    // The step the engine would execute for this actor's run, so a multi-step body
+    // makes only THAT step's rail interactive.
+    activeStepId = null
   } = $props();
 
   // An explicit multi-step recipe (more than one step) swaps the single IoTable for
@@ -33,12 +41,12 @@
   <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet results()}
       {#if isMultiStep}
-        <StepRequirementsList {steps} />
+        <StepRequirementsList {steps} {rail} {activeStepId} activeCraftability={craftability} />
         <!-- The single emphasized final product (terminal step). craftability={null}
              so IoTable emits only the Output group. -->
-        <IoTable craftability={null} result={recipe?.result} />
+        <IoTable craftability={null} result={recipe?.result} idPrefix="fabricate-req-result" />
       {:else}
-        <IoTable {craftability} result={recipe?.result} {onChooseOption} />
+        <IoTable {craftability} result={recipe?.result} {onChooseOption} {...rail} />
       {/if}
     {/snippet}
   </RecipeBodyShell>

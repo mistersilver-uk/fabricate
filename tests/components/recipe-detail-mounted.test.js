@@ -8,7 +8,13 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { recipe, craftability, multiStepRecipe } from '../helpers/crafting-fixtures.js';
+import {
+  craftability,
+  essenceCraftability,
+  multiStepRecipe,
+  recipe,
+  steppedEssenceRecipe,
+} from '../helpers/crafting-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -128,7 +134,7 @@ describe('RecipeDetail mounted behavior', () => {
     });
   }
 
-  it('renders ingredients as an image grid with sufficiency-coloured tiles and pips', async () => {
+  it('renders ingredients as rail slot tiles with state-coloured borders and pips', async () => {
     const target = await harness.mount({
       recipe: recipe({ modeToken: 'simple', modeLabel: 'Simple' }),
       selectedSetId: recipe().defaultSetId,
@@ -157,22 +163,26 @@ describe('RecipeDetail mounted behavior', () => {
       }),
     });
 
-    const tiles = target.querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
-    assert.equal(tiles.length, 2, 'one image tile per ingredient');
+    const tiles = target.querySelectorAll('[data-recipe-section="requirement-rail"] [data-requirement-slot]');
+    assert.equal(tiles.length, 2, 'one rail slot per ingredient');
 
     const [sufficient, short] = tiles;
-    assert.ok(sufficient.classList.contains('is-sufficient'), 'satisfied ingredient tile is green');
-    assert.ok(short.classList.contains('is-insufficient'), 'short ingredient tile is red');
+    assert.equal(sufficient.getAttribute('data-slot-state'), 'met');
+    assert.equal(short.getAttribute('data-slot-state'), 'short');
+    // A fixed requirement is not selectable, so it is role="img" with a label rather
+    // than a button promising a choice the surface does not offer.
+    assert.equal(sufficient.getAttribute('role'), 'img', 'a fixed slot is not a button');
+    assert.ok(sufficient.getAttribute('aria-label').includes('Iron'), 'and carries a name');
 
     assert.ok(sufficient.querySelector('.crafting-thumb img'), 'tile renders the component image');
     assert.equal(
-      sufficient.querySelector('.crafting-io-pip').textContent.trim(),
+      sufficient.querySelector('.requirement-slot-pip').textContent.trim(),
       '2/2',
       'pip shows have/need'
     );
-    const shortPip = short.querySelector('.crafting-io-pip');
+    const shortPip = short.querySelector('.requirement-slot-pip');
     assert.equal(shortPip.textContent.trim(), '1/3', 'short pip shows have/need');
-    assert.ok(shortPip.classList.contains('is-insufficient'), 'short pip is red');
+    assert.ok(shortPip.classList.contains('is-short'), 'short pip is red');
   });
 
   it('renders authored essence glyphs with fallback while preserving ordinary images', async () => {
@@ -190,7 +200,8 @@ describe('RecipeDetail mounted behavior', () => {
             isEssence: true,
             description: '2x Restorative essence',
             need: 2,
-            have: 1,
+            delivered: 1,
+            owned: 3,
             satisfied: false,
           },
           {
@@ -210,14 +221,14 @@ describe('RecipeDetail mounted behavior', () => {
       }),
     });
 
-    const tiles = target.querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
-    const essenceThumb = tiles[0].querySelector('.crafting-essence-thumb');
-    assert.ok(essenceThumb, 'first-class essence uses a glyph thumb');
-    assert.match(essenceThumb.getAttribute('style'), /48px/, 'detail glyph keeps 48px geometry');
-    assert.equal(essenceThumb.getAttribute('aria-hidden'), 'true');
-    assert.ok(essenceThumb.querySelector('i').classList.contains('fa-heart'));
-    assert.equal(tiles[0].querySelector('img'), null, 'essence does not render an image');
-    assert.equal(tiles[0].querySelector('.crafting-io-pip').textContent.trim(), '1/2');
+    const tiles = target.querySelectorAll('[data-recipe-section="requirement-rail"] [data-requirement-slot]');
+    const essenceGlyph = tiles[0].querySelector('.requirement-slot-glyph i');
+    assert.ok(essenceGlyph, 'first-class essence renders an authored glyph, not an image');
+    assert.ok(essenceGlyph.classList.contains('fa-heart'));
+    assert.ok(!tiles[0].querySelector('img'), 'essence does not render an image');
+    // `delivered`, never `have`: the essence branch upstream stopped answering the
+    // have question, so a `have` read would print 0/2 on a partly funded tile.
+    assert.equal(tiles[0].querySelector('.requirement-slot-pip').textContent.trim(), '1/2');
     assert.equal(tiles[1].querySelector('.crafting-thumb img').getAttribute('src'), 'icons/iron.webp');
 
     const legacyIcons = target.querySelectorAll(
@@ -588,10 +599,10 @@ describe('RecipeDetail mounted behavior', () => {
     );
 
     // Step 1 lists BOTH of its required materials.
-    const stepOneTiles = steps[0].querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    const stepOneTiles = steps[0].querySelectorAll('[data-requirement-slot]');
     assert.equal(stepOneTiles.length, 2, 'step 1 shows both required materials');
     // Step 2 lists its single material.
-    const stepTwoTiles = steps[1].querySelectorAll('[data-io-group="ingredients"] [data-io-ingredient]');
+    const stepTwoTiles = steps[1].querySelectorAll('[data-requirement-slot]');
     assert.equal(stepTwoTiles.length, 1, 'step 2 shows its material');
 
     // No per-step Output group leaks into a step block (inputs only).
@@ -616,6 +627,65 @@ describe('RecipeDetail mounted behavior', () => {
       null,
       'no crafting-check card when the check is off'
     );
+  });
+
+  // Only the step the engine would execute next may be interactive: a later step's
+  // rail would drive a craft it does not describe, and the engine drops an allocation
+  // naming the wrong step. The dispatcher is the only place that can be proved.
+  it('makes ONLY the active step rail interactive in a multi-step recipe', async () => {
+    const fixture = steppedEssenceRecipe();
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: fixture.ingredientSets[0].craftability,
+      steps: fixture.steps,
+      activeStepId: fixture.activeStepId,
+      rail: { openSlotId: 'essence-pool', chosenGroupIds: [] }
+    });
+
+    const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
+    assert.equal(steps.length, 2);
+    assert.ok(
+      steps[0].querySelector('[data-recipe-section="essence-pool"]'),
+      'the active step opens its pool'
+    );
+    assert.ok(
+      !steps[0].querySelector('[data-requirement-rail-readonly]'),
+      'and its rail is interactive'
+    );
+    assert.ok(
+      steps[1].querySelector('[data-requirement-rail-readonly]'),
+      'the later step is read-only preview'
+    );
+    assert.ok(
+      !steps[1].querySelector('[data-recipe-section="essence-pool"]'),
+      'and opens no chooser at all'
+    );
+    // Every rail in the list gets its OWN DOM id namespace, so aria-controls on one
+    // step's tile can never point at another step's panel.
+    assert.equal(
+      steps[0].querySelector('[data-recipe-section="essence-pool"]').getAttribute('id'),
+      'fabricate-req-step-step-ess-1-panel'
+    );
+  });
+
+  it('feeds the active step rail the re-evaluated craftability, not the baked step projection', async () => {
+    const fixture = steppedEssenceRecipe();
+    const recomputed = essenceCraftability();
+    const target = await harness.mount({
+      recipe: fixture,
+      selectedSetId: fixture.defaultSetId,
+      craftability: recomputed,
+      steps: fixture.steps,
+      activeStepId: fixture.activeStepId,
+      rail: {}
+    });
+    const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
+    // The step projection authors TWO essence requirements; the store's re-evaluated
+    // value authors one. Reading the baked projection here would silently show tiles
+    // that do not match the plan the craft consumes.
+    assert.equal(steps[0].querySelectorAll('[data-requirement-slot]').length, 1);
+    assert.equal(steps[1].querySelectorAll('[data-requirement-slot]').length, 1);
   });
 
   it('falls back to a single IoTable when steps is empty (single-step parity)', async () => {
